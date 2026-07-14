@@ -2,8 +2,21 @@
 
 :root {
   color-scheme: dark;
+  --color-primary: #c24332;
+  --color-primary-hover: #a83425;
+  --color-navy: #0b1248;
+  --color-blue-accent: #1c4aa9;
+  --color-heading: #2e313f;
+  --color-body: #707070;
+  --color-border: #ebebeb;
+  --color-light-bg: #f8f8f8;
 }
 
 body {
   margin: 0;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+  color: var(--color-body);
+  background-color: var(--color-light-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

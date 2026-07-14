@@ -1,0 +1,80 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+
+export function LoginForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const { login } = useAuth();
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+    setSubmitting(true);
+    const ok = await login(email, password);
+    setSubmitting(false);
+    if (ok) router.push('/company-selection');
+  };
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center">
+        <CardTitle>Welcome Back</CardTitle>
+        <CardDescription>Sign in to your NAVFarm account</CardDescription>
+      </CardHeader>
+      <form onSubmit={handleSubmit}>
+        <CardContent className="space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>
+          )}
+          <div className="space-y-2">
+            <label htmlFor="email" className="text-sm font-medium text-[#2e313f]">Email</label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="password" className="text-sm font-medium text-[#2e313f]">Password</label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col gap-4">
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? 'Signing in...' : 'Sign In'}
+          </Button>
+          <div className="flex items-center justify-between w-full text-sm">
+            <Link href="/reset-password" className="text-[#1c4aa9] hover:underline">
+              Forgot password?
+            </Link>
+            <Link href="/signup" className="text-[#1c4aa9] hover:underline">
+              Create account
+            </Link>
+          </div>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+}

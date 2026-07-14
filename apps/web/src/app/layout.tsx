@@ -1,8 +1,9 @@
 import './global.css';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export const metadata = {
   title: 'NAVFarm',
-  description: 'NAVFarm agriculture operations platform',
+  description: 'Universal Farm Management Software for Agriculture',
 };
 
 export default function RootLayout({
@@ -12,7 +13,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
