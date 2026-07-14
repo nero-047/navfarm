@@ -39,10 +39,11 @@ navfarm/
 
 ## Ownership
 
-- **Rishi — Product and client-platform lead:** Primary owner of NAVFarm's product implementation, including the Next.js web application and Flutter mobile application. Rishi leads the broader user-facing development effort and day-to-day product delivery.
-- **Arun — Backend and release owner:** Primary owner of the NestJS backend, sockets, notifications, and backend production releases. Arun also supports Flutter production releases and backend/client release coordination.
+Rishi leads NAVFarm's product development across the Next.js web application and Flutter mobile application, shaping the user experience and carrying features from implementation through day-to-day delivery.
 
-These roles describe different areas of responsibility and do not imply an equal split of implementation work. Rishi currently owns the larger overall product scope, while Arun owns the backend and its production responsibilities. Cross-review is still encouraged for changes that affect contracts shared across products.
+Arun leads the NestJS backend, including sockets, notifications, and backend production releases. He also supports Flutter production releases and coordinates backend changes with client releases.
+
+The team reviews shared contracts and integration changes together so that the web, mobile, and backend platforms continue to evolve as one product.
 
 ## Prerequisites
 
