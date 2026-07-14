@@ -1,9 +1,12 @@
 //@ts-check
 
+const { join } = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Next.js options go here
-  // See: https://nextjs.org/docs/app/api-reference/config/next-config-js
+  turbopack: {
+    root: join(__dirname, '../..'),
+  },
 };
 
 module.exports = nextConfig;

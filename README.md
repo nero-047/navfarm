@@ -1,107 +1,336 @@
-# New Nx Repository
+# NAVFarm
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+NAVFarm is an agriculture operations platform organized as an Nx monorepo. The backend, web application, and Flutter application are independent deployable products that share one repository and one task runner. This repository currently contains platform starters only; business and ERP modules should be added deliberately as product requirements are defined.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+> **Security:** Never commit `.env` files, credentials, access keys, database passwords, signing certificates, provisioning profiles, or other secrets. Commit only placeholder-only `.env.example` files.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/docs/technologies/typescript/introduction?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
-🚀 If you haven't connected to Nx Cloud yet, [complete your setup here](https://cloud.nx.app/get-started). Get faster builds with remote caching, distributed task execution, and self-healing CI. [See how your workspace can benefit](#nx-cloud).
-## Generate a library
+## Technology stack
+
+- Nx 23 with pnpm workspaces
+- NestJS 11 backend, with Socket.IO and notifications planned
+- Next.js 16, React 19, App Router, and the `src` directory
+- Tailwind CSS 4 through the Tailwind PostCSS plugin
+- Flutter 3 and Dart for iOS, Android, web, and desktop clients
+- MySQL for relational data
+- Redis for local caching, queues, and real-time infrastructure
+- Cloudflare R2 for S3-compatible object storage
+- Jest for API and web unit tests
+- Playwright for web end-to-end tests
+- ESLint and TypeScript for static checks
+
+## Repository structure
+
+```text
+navfarm/
+├── apps/
+│   ├── api/          # NestJS backend
+│   ├── api-e2e/      # API end-to-end tests
+│   ├── web/          # Next.js web app (App Router)
+│   ├── web-e2e/      # Playwright web tests
+│   └── mobile/       # Normal Flutter project (no package.json)
+├── packages/         # Future shared workspace packages
+├── nx.json
+├── package.json
+├── pnpm-workspace.yaml
+├── pnpm-lock.yaml
+├── tsconfig.base.json
+└── README.md
+```
+
+## Ownership
+
+- **Arun:** NestJS backend, sockets, notifications, backend production releases, and Flutter production-release support.
+- **Rishi:** Next.js web app and Flutter mobile app.
+
+Ownership identifies the primary maintainer; cross-review is still encouraged for changes that affect contracts shared across products.
+
+## Prerequisites
+
+- Node.js `^22.12.0`, `^24.0.0`, or `^26.0.0`. Nx 23 officially supports Node 22.12+, 24, and 26; use an even-numbered LTS release for development and production.
+- pnpm 11 (the repository pins `pnpm@11.10.0` in `package.json`).
+- Flutter 3.44 or a compatible stable release with Dart 3.12.
+- Xcode and CocoaPods for iOS development and release work (macOS only).
+- Android Studio and an installed Android SDK for Android development.
+- A local or reachable MySQL server.
+- A local or reachable Redis server.
+
+Check the local toolchain:
 
 ```sh
-npx nx g @nx/js:lib packages/pkg1 --publishable --importPath=@my-org/pkg1
+node --version
+pnpm --version
+flutter --version
+pnpm nx report
 ```
 
-## Run tasks
+## Installation
 
-To build the library use:
+From the repository root:
 
 ```sh
-npx nx run pkg1:build
+pnpm install
+pnpm nx reset
+pnpm nx show projects
+pnpm nx run mobile:pub-get
 ```
 
-To run any task with Nx use:
+The last command requires Flutter. Flutter remains a normal Dart project under `apps/mobile`; it is not a pnpm package and must not receive a `package.json`.
+
+If pnpm reports ignored dependency build scripts, review the package name and add it to `allowBuilds` in `pnpm-workspace.yaml` only after confirming that its install script is trusted. The currently approved packages are intentionally preserved there.
+
+## Environment files and secrets
+
+The repository contains only templates:
+
+- `.env.example` for shared local port conventions.
+- `apps/api/.env.example` for the API, MySQL, Redis, and Cloudflare R2.
+- `apps/web/.env.example` for public API/socket URLs and a public R2 URL.
+
+Create local files without committing them:
 
 ```sh
-npx nx run <project-name>:<target>
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
 ```
 
-These targets are either [inferred automatically](https://nx.dev/docs/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+Replace every placeholder locally. Values prefixed with `NEXT_PUBLIC_` are sent to the browser and must never contain secrets. Production values belong in the deployment platform's secret manager, not in Git.
 
-[More about running tasks in the docs &raquo;](https://nx.dev/docs/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### Cloudflare R2 placeholders
 
-## Versioning and releasing
+The API template defines these placeholders:
 
-To version and release the library use
-
+```text
+R2_ACCOUNT_ID
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
+R2_BUCKET_NAME
+R2_ENDPOINT
+R2_PUBLIC_URL
 ```
-npx nx release
-```
 
-Pass `--dry-run` to see what would happen without actually releasing the library.
+Create an R2 bucket and scoped API token in Cloudflare, keep the secret access key server-side, and configure CORS only for the web origins that need direct browser access. `R2_ENDPOINT` follows `https://<account-id>.r2.cloudflarestorage.com`. Do not expose `R2_SECRET_ACCESS_KEY` through a `NEXT_PUBLIC_` variable.
 
-[Learn more about Nx release &raquo;](https://nx.dev/docs/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Local MySQL and Redis
 
-## Keep TypeScript project references up to date
-
-Nx automatically updates TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html) in `tsconfig.json` files to ensure they remain accurate based on your project dependencies (`import` or `require` statements). This sync is automatically done when running tasks such as `build` or `typecheck`, which require updated references to function correctly.
-
-To manually trigger the process to sync the project graph dependencies information to the TypeScript project references, run the following command:
+Run MySQL and Redis with your preferred local package manager or containers. Use non-production credentials and create a dedicated `navfarm` database. Example container setup:
 
 ```sh
-npx nx sync
+docker run --name navfarm-mysql -e MYSQL_ROOT_PASSWORD=local-root-password -e MYSQL_DATABASE=navfarm -p 3306:3306 -d mysql:8
+docker run --name navfarm-redis -p 6379:6379 -d redis:7
 ```
 
-You can enforce that the TypeScript project references are always in the correct state when running in CI by adding a step to your CI job configuration that runs the following command:
+Confirm connectivity before starting features that depend on them:
 
 ```sh
-npx nx sync:check
+mysql -h 127.0.0.1 -P 3306 -u root -p navfarm
+redis-cli -h 127.0.0.1 -p 6379 ping
 ```
 
-[Learn more about nx sync](https://nx.dev/reference/nx-commands#sync)
+The generated API starter does not connect to either service yet. Their environment placeholders establish the intended local convention without inventing persistence modules prematurely.
 
-## Nx Cloud
+## Run the applications
 
-Nx Cloud ensures a [fast and scalable CI](https://nx.dev/nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+### API
 
-- [Remote caching](https://nx.dev/docs/features/ci-features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/docs/features/ci-features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/docs/features/ci-features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/docs/features/ci-features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Set up CI (non-Github Actions CI)
-
-**Note:** This is only required if your CI provider is not GitHub Actions.
-
-Use the following command to configure a CI workflow for your workspace:
+The NestJS API listens on `http://localhost:3000/api` by default.
 
 ```sh
-npx nx g ci-workflow
+pnpm dev:api
 ```
 
-[Learn more about Nx on CI](https://nx.dev/docs/features/ci-features?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+Equivalent Nx command:
 
-## Install Nx Console
+```sh
+pnpm nx serve api
+```
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+### Web
 
-[Install Nx Console &raquo;](https://nx.dev/docs/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+The root script uses port 3001 so it can run beside the API:
 
-## 🔗 Learn More
+```sh
+pnpm dev:web
+```
 
-- [Nx Documentation](https://nx.dev/docs)
-- [Crafting Your Workspace Tutorial](https://nx.dev/docs/getting-started/tutorials/crafting-your-workspace)
-- [Module Boundaries](https://nx.dev/docs/features/enforce-module-boundaries)
-- [Releasing Packages](https://nx.dev/docs/features/manage-releases)
-- [Nx Plugins](https://nx.dev/docs/concepts/nx-plugins)
-- [Nx Cloud](https://nx.dev/nx-cloud)
+Equivalent Nx command:
 
-## 💬 Community
+```sh
+pnpm nx dev web --port=3001
+```
 
-Join the Nx community:
+Open `http://localhost:3001`.
 
-- [Discord](https://go.nx.dev/community)
-- [X (Twitter)](https://twitter.com/nxdevtools)
-- [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [YouTube](https://www.youtube.com/@nxdevtools)
-- [Blog](https://nx.dev/blog)
+### Flutter
+
+List devices, fetch Dart packages, and start the interactive device selector:
+
+```sh
+flutter devices
+pnpm nx run mobile:pub-get
+pnpm dev:mobile
+```
+
+Useful platform-specific development commands are:
+
+```sh
+pnpm nx run mobile:run-ios
+pnpm nx run mobile:run-android
+```
+
+## Tests, linting, type checks, and builds
+
+Run the common root checks:
+
+```sh
+pnpm test
+pnpm lint
+pnpm typecheck
+pnpm build:api
+pnpm build:web
+```
+
+Run individual checks:
+
+```sh
+pnpm nx test api
+pnpm nx test web
+pnpm nx lint api
+pnpm nx lint web
+pnpm nx typecheck api
+pnpm nx typecheck web
+pnpm nx run mobile:analyze
+pnpm nx run mobile:test
+```
+
+Run end-to-end projects separately when their browser/runtime prerequisites are available:
+
+```sh
+pnpm nx e2e api-e2e
+pnpm exec playwright install
+pnpm nx e2e web-e2e
+```
+
+Build mobile release artifacts:
+
+```sh
+pnpm nx run mobile:build-android
+pnpm nx run mobile:build-ios-no-codesign
+```
+
+The iOS no-codesign target verifies compilation without requiring a distribution identity. Archive and sign through the approved Apple team workflow for a production release.
+
+## Nx project graph
+
+Open the interactive graph:
+
+```sh
+pnpm graph
+```
+
+Print graph data without opening a browser:
+
+```sh
+pnpm nx graph --print
+```
+
+Inspect resolved projects and inferred targets:
+
+```sh
+pnpm nx show projects
+pnpm nx show project api --json
+pnpm nx show project web --json
+```
+
+## Deployment
+
+### API
+
+Build with `pnpm nx build api`. Deploy the `apps/api/dist` output with a supported Node runtime, inject MySQL, Redis, R2, and application secrets from the hosting platform, expose the configured API port, and run database migrations as a separately controlled release step once migrations exist. Arun owns the backend production release.
+
+### Web
+
+Build with `pnpm nx build web`. Deploy the Next.js application independently with its project root set to the monorepo root or with an Nx-aware build command. Configure `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` for the deployed API origin before building. Rishi owns the web release.
+
+### Mobile
+
+Version, archive, sign, and publish Android and iOS applications through their respective store pipelines. Never put server credentials in the app bundle. Rishi owns application development; Arun supports Flutter production releases, signing, and backend-release coordination.
+
+API, web, and mobile releases do not need to share a release cadence. Coordinate contract changes so deployed client versions remain compatible with the API.
+
+## Troubleshooting
+
+### Nx path errors after moving apps
+
+Clear cached workspace data, then inspect the resolved roots and targets:
+
+```sh
+pnpm nx reset
+pnpm nx show projects
+pnpm nx show project api --json
+```
+
+Paths in package targets are resolved from either the workspace root or their declared `cwd`. App-local config imports from `apps/<project>` generally need `../../` to reach root files.
+
+### Incorrect TypeScript `extends` paths
+
+Configs directly under `apps/api`, `apps/web`, `apps/api-e2e`, and `apps/web-e2e` should extend `../../tsconfig.base.json`. Verify with:
+
+```sh
+pnpm nx typecheck api
+pnpm nx typecheck web
+pnpm nx sync:check
+```
+
+Do not hide move errors with unrelated TypeScript path aliases.
+
+### pnpm ignored build scripts
+
+pnpm blocks unapproved dependency build scripts. Run `pnpm install` and inspect its warning. If the dependency is required and trusted, add only its exact package name under `allowBuilds` in `pnpm-workspace.yaml`, then reinstall. Do not broadly approve unknown scripts.
+
+### Flutter device detection
+
+```sh
+flutter doctor -v
+flutter devices
+pnpm nx run mobile:doctor
+```
+
+Start an Android emulator or connect a device with USB debugging enabled. For iOS, open Simulator or connect an unlocked device and trust the development Mac.
+
+### iOS signing
+
+`mobile:build-ios-no-codesign` intentionally skips signing. For device/archive builds, open `apps/mobile/ios/Runner.xcworkspace` in Xcode, select the approved team and bundle identifier, and ensure certificates and provisioning profiles are available. Do not commit signing credentials.
+
+### Port conflicts
+
+API defaults to 3000 and the root web script to 3001. Find the process already using a port and stop it, or provide another port:
+
+```sh
+lsof -i :3000
+PORT=3100 pnpm dev:api
+pnpm nx dev web --port=3101
+```
+
+Update the local web environment URL when the API port changes.
+
+### Next.js workspace-root warning
+
+The web config pins Turbopack's root to this repository. If a warning returns, confirm `apps/web/next.config.js` still resolves `../..` and that no lockfile was accidentally added inside an app.
+
+## Maintainer start commands
+
+Rishi:
+
+```sh
+pnpm dev:web
+pnpm nx run mobile:pub-get
+pnpm dev:mobile
+```
+
+Arun:
+
+```sh
+pnpm dev:api
+```
+
+Both maintainers should run `pnpm install` once after dependency or lockfile changes.

@@ -4,3 +4,9 @@
 /.nx/cache
 /.nx/workspace-data
 .nx/self-healing
+
+# Rewritten by Next.js during builds
+/apps/web/next-env.d.ts
+
+# Generated and platform-managed Flutter files
+/apps/mobile/**

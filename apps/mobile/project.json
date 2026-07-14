@@ -11,7 +11,7 @@
         "command": "flutter doctor"
       }
     },
-    "get": {
+    "pub-get": {
       "executor": "nx:run-commands",
       "options": {
         "cwd": "apps/mobile",
@@ -33,6 +33,7 @@
       }
     },
     "serve": {
+      "continuous": true,
       "executor": "nx:run-commands",
       "options": {
         "cwd": "apps/mobile",
@@ -61,7 +62,7 @@
         "command": "flutter build appbundle --release"
       }
     },
-    "build-ios": {
+    "build-ios-no-codesign": {
       "executor": "nx:run-commands",
       "outputs": ["{projectRoot}/build/ios"],
       "options": {

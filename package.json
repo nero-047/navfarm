@@ -2,7 +2,21 @@
   "name": "@org/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || ^26.0.0"
+  },
+  "scripts": {
+    "dev:api": "pnpm nx serve api",
+    "dev:web": "pnpm nx dev web --port=3001",
+    "dev:mobile": "pnpm nx run mobile:serve",
+    "build:api": "pnpm nx build api",
+    "build:web": "pnpm nx build web",
+    "test": "pnpm nx run-many -t test -p api web mobile",
+    "lint": "pnpm nx run-many -t lint -p api web api-e2e web-e2e",
+    "typecheck": "pnpm nx run-many -t typecheck -p api web api-e2e web-e2e",
+    "graph": "pnpm nx graph"
+  },
   "private": true,
   "devDependencies": {
     "@eslint/js": "^9.8.0",

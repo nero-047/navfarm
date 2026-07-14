@@ -1,24 +1,24 @@
 {
-  "name": "@org/api-e2e",
+  "name": "api-e2e",
   "version": "0.0.1",
   "private": true,
   "nx": {
     "implicitDependencies": [
-      "@org/api"
+      "api"
     ],
     "targets": {
       "e2e": {
-        "executor": "@nx/jest:jest",
+        "executor": "nx:run-commands",
         "outputs": [
           "{projectRoot}/test-output/jest/coverage"
         ],
         "dependsOn": [
-          "@org/api:build",
-          "@org/api:serve"
+          "api:build",
+          "api:serve"
         ],
         "options": {
-          "jestConfig": "api-e2e/jest.config.cts",
-          "passWithNoTests": true
+          "cwd": "apps/api-e2e",
+          "command": "jest --config jest.config.cts --passWithNoTests"
         }
       }
     }
