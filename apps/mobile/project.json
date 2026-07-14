@@ -1,0 +1,74 @@
+{
+  "name": "mobile",
+  "root": "apps/mobile",
+  "sourceRoot": "apps/mobile/lib",
+  "projectType": "application",
+  "targets": {
+    "doctor": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter doctor"
+      }
+    },
+    "get": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter pub get"
+      }
+    },
+    "analyze": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter analyze"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter test"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter run"
+      }
+    },
+    "run-ios": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter run -d ios"
+      }
+    },
+    "run-android": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter run -d android"
+      }
+    },
+    "build-android": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/build/app/outputs"],
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter build appbundle --release"
+      }
+    },
+    "build-ios": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/build/ios"],
+      "options": {
+        "cwd": "apps/mobile",
+        "command": "flutter build ios --release --no-codesign"
+      }
+    }
+  },
+  "tags": ["type:app", "platform:flutter"]
+}
