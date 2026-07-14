@@ -1,5 +1,7 @@
 packages:
   - 'packages/*'
+  - 'api'
+  - 'api-e2e'
 allowBuilds:
   '@parcel/watcher': true
   '@swc/core': true
