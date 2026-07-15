@@ -21,3 +21,49 @@
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
 <!-- nx configuration end-->
+
+# NAVFarm Project Context
+
+## Current Product Phase and Scope
+
+- NAVFarm is currently a frontend demo. The backend will be designed and implemented by another developer.
+- Current product work is limited to the web demo in `apps/web` and, when explicitly requested, the Flutter app in `apps/mobile`.
+- Do not implement or modify `apps/api`, databases, migrations, authentication services, server APIs, or external integrations unless the user explicitly expands the scope.
+- Do not invent backend contracts. For demo features, use clearly local mock data, typed fixtures, component state, and/or browser storage. Keep mock boundaries easy to replace with real APIs later.
+- Never represent mock persistence, mock authentication, calculated sample data, or placeholder integrations as production behavior.
+
+## Product Source of Truth
+
+- Read the relevant material in `rak docs/` before planning or implementing NAVFarm product behavior.
+- Start with `rak docs/NAVFarm Wireframes Functional Doc.pdf` for the end-to-end functional process and UI/business rules.
+- When files `0`, `1`, or `2` exist in both the root of `rak docs/` and `rak docs/Final_Docs/`, consult the `Final_Docs` copy first and treat it as the current version unless the user says otherwise.
+- The workbooks cover company/tenant setup, NOB/LOB configuration, master data, GL mappings, QC/QR, slaughter cost splitting, resources, scheduler/KPI rules, variance calculations, and worked datasets. Use them to shape labels, flows, validation, information architecture, and realistic demo data.
+- The docs describe the intended future system and data model; they do not authorize backend implementation in the current frontend-only phase.
+
+## Domain Model Snapshot
+
+- NAVFarm is multi-tenant: a tenant can contain one or more companies, with company-scoped users, roles, modules, language, currency, fiscal, and setup configuration.
+- The main business hierarchy is Nature of Business (NOB) -> Line of Business (LOB) -> production batch. Supported domains include poultry, livestock/dairy, agriculture, aquaculture, beekeeping/insect farming, and feed/processing.
+- Core future concepts include `STANDARD`, `FIFO`, and `BIO_ASSET` costing; batch WIP; automatic double-entry journals; close-time price/usage/output/overhead variances for standard-cost batches; QC hold/pass/fail; QR traceability; schedulers and KPI alerts; resources; and multi-level locations.
+- The functional document defines a 15-step onboarding flow, with company profile, address, contacts, language, currency, timezone/region, fiscal setup, modules, and admin account treated as the mandatory foundation. Confirm exact step numbering and mandatory flags against the docs when building that flow.
+- Demo screens should preserve farm-to-fork traceability and the relationships between source batches, daily operations, outputs/harvests, quality checks, costing, and reports even when the underlying data is mocked.
+
+## Web Demo Conventions
+
+- The web app is Next.js 16 + React 19 under `apps/web` and normally runs at `http://localhost:3001` during local development.
+- The demo currently uses local browser state for authentication (`navfarm_auth_user`) and custom companies (`navfarm_custom_companies`); there is no real authentication or persistence layer.
+- Company workspaces use `/{company}/dashboard`. Built-in demo companies currently include piggery, poultry, dairy, agriculture, livestock, aquaculture, and beekeeping.
+- Keep company-scoped navigation and UI reusable across industries. Prefer domain configuration and typed metadata over duplicating pages per company/LOB.
+- Preserve the existing visual language unless the user asks for a redesign: navy navigation, white/light-gray content surfaces, restrained red/blue accents, compact typography, and card-based layouts.
+- Treat incomplete cards, operations, reports, and settings views as demo placeholders to be progressively backed by realistic local fixtures from the RAK docs.
+
+## Mobile App Conventions
+
+- `apps/mobile` is a Flutter application. Keep mobile work in Flutter/Dart and align its terminology, flows, and fixtures with the web demo and the RAK docs.
+- Do not assume that a web feature must be implemented in Flutter in the same task unless the user explicitly asks for both surfaces.
+
+## Working Safely
+
+- The user may have active route migrations or other uncommitted frontend changes. Inspect `git status` and preserve unrelated work.
+- Run web and mobile validation through their Nx targets with `pnpm nx ...` as required by the workspace guidance above.
+- For frontend demo work, verify the rendered UI at desktop and relevant mobile viewport sizes, not only types or source code.
