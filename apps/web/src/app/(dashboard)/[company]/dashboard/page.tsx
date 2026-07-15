@@ -1,17 +1,46 @@
-import { COMPANIES, isValidCompany } from '@/modules/company';
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useMemo } from 'react';
+import { use } from 'react';
+import { COMPANIES, type CompanyMeta } from '@/modules/company';
 import { Building2, BarChart3, Settings } from 'lucide-react';
+
+const CUSTOM_KEY = 'navfarm_custom_companies';
+
+function getCustom(): CompanyMeta[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const s = localStorage.getItem(CUSTOM_KEY);
+    return s ? JSON.parse(s) : [];
+  } catch {
+    return [];
+  }
+}
 
 interface Props {
   params: Promise<{ company: string }>;
 }
 
-export default async function CompanyDashboardPage({ params }: Props) {
-  const { company } = await params;
+export default function CompanyDashboardPage({ params }: Props) {
+  const { company } = use(params);
 
-  if (!isValidCompany(company)) notFound();
+  const meta = useMemo(() => {
+    if (company in COMPANIES) return COMPANIES[company];
+    const custom = getCustom();
+    return custom.find((c) => c.slug === company) ?? null;
+  }, [company]);
 
-  const meta = COMPANIES[company];
+  if (!meta) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <span className="text-5xl mb-4">🏭</span>
+        <h1 className="text-xl font-bold text-[#2e313f] mb-2">Industry Not Found</h1>
+        <p className="text-sm text-[#707070] max-w-sm">
+          This industry is not available yet. Go back to company selection to create it.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -27,7 +56,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
         {[
           { icon: Building2, title: 'Operations', desc: 'Manage day-to-day farm operations' },
           { icon: BarChart3, title: 'Reports', desc: 'View analytics and performance reports' },
-          { icon: Settings, title: 'Settings', desc: 'Configure your {meta.name} module' },
+          { icon: Settings, title: 'Settings', desc: `Configure your ${meta.name} module` },
         ].map((item) => (
           <div
             key={item.title}
