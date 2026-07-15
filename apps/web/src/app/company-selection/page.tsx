@@ -7,7 +7,7 @@ import { CompanyCard } from '@/modules/company';
 import { COMPANIES, type CompanyMeta } from '@/modules/company';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, AlertCircle } from 'lucide-react';
 
 const STORAGE_KEY = 'navfarm_custom_companies';
 
@@ -45,6 +45,19 @@ function saveCustomCompany(company: CompanyMeta) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
 }
 
+function getIndustryIcon(industry: string): string {
+  const icons: Record<string, string> = {
+    poultry: '🐔',
+    piggery: '🐷',
+    dairy: '🥛',
+    agriculture: '🌾',
+    livestock: '🐄',
+    aquaculture: '🐟',
+    beekeeping: '🐝',
+  };
+  return icons[industry] ?? '🏭';
+}
+
 export default function CompanySelectionPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -67,11 +80,8 @@ export default function CompanySelectionPage() {
   if (loading || !user) return null;
 
   const allCompanies = { ...COMPANIES };
-
   for (const c of customCompanies) {
-    if (!(c.slug in allCompanies)) {
-      allCompanies[c.slug] = c;
-    }
+    if (!(c.slug in allCompanies)) allCompanies[c.slug] = c;
   }
 
   const handleCreate = () => {
@@ -85,22 +95,18 @@ export default function CompanySelectionPage() {
       setError('Please select an industry');
       return;
     }
-
     const slug = slugify(trimmed);
-
     if (slug in allCompanies) {
       setError('A company with this name already exists');
       return;
     }
-
-    const industryMeta = INDUSTRY_OPTIONS.find((o) => o.value === industry);
+    const opt = INDUSTRY_OPTIONS.find((o) => o.value === industry);
     const newCompany: CompanyMeta = {
       slug,
       name: trimmed,
-      icon: industryMeta ? getIndustryIcon(industry) : '🏭',
-      description: `${industryMeta?.label ?? industry} operations for ${trimmed}`,
+      icon: opt ? getIndustryIcon(industry) : '🏭',
+      description: `${opt?.label ?? industry} operations for ${trimmed}`,
     };
-
     saveCustomCompany(newCompany);
     setCustomCompanies((prev) => [...prev, newCompany]);
     setName('');
@@ -110,51 +116,71 @@ export default function CompanySelectionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f8f8]">
-      <div className="max-w-5xl mx-auto px-4 py-12">
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <h1 className="text-3xl font-bold text-[#2e313f]">Select Your Industry</h1>
-            <p className="text-[#707070] mt-2">Choose the sector to manage your farm operations</p>
-          </div>
-          <Button onClick={() => setModalOpen(true)}>
-            <Plus size={18} />
-            New Company
-          </Button>
+    <div className="min-h-screen bg-white">
+      <div className="max-w-6xl mx-auto px-6 py-14">
+        {/* Header */}
+        <div className="mb-10 animate-fade-in">
+          <h1 className="text-[32px] font-semibold text-[#2e313f] tracking-tight">
+            Choose your workspace
+          </h1>
+          <p className="text-[#707070] text-[15px] mt-1.5">
+            Select an industry to manage your farm operations
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {Object.values(allCompanies).map((company) => (
             <CompanyCard key={company.slug} company={company} />
           ))}
+
+          {/* New Company Card */}
+          <button
+            onClick={() => setModalOpen(true)}
+            className="group flex flex-col items-center justify-center gap-3 bg-white rounded-2xl border-2 border-dashed border-[#d4d4d4] p-7 cursor-pointer h-full min-h-[180px] transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-[#1c4aa9]"
+          >
+            <div className="w-12 h-12 rounded-full bg-[#f0f0f0] flex items-center justify-center transition-colors group-hover:bg-[#1c4aa9]/10">
+              <Plus size={22} className="text-[#707070] group-hover:text-[#1c4aa9] transition-colors" />
+            </div>
+            <span className="text-[15px] font-medium text-[#707070] group-hover:text-[#2e313f] transition-colors">
+              New Company
+            </span>
+          </button>
         </div>
       </div>
 
-      {/* New Company Modal */}
+      {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-7 animate-slide-up">
             <button
               onClick={() => setModalOpen(false)}
-              className="absolute top-4 right-4 text-[#707070] hover:text-[#2e313f]"
+              className="absolute top-5 right-5 text-[#707070] hover:text-[#2e313f] transition-colors"
             >
               <X size={20} />
             </button>
 
-            <h2 className="text-xl font-bold text-[#2e313f] mb-1">Create New Company</h2>
-            <p className="text-sm text-[#707070] mb-6">Set up a new farm operations workspace</p>
+            <h2 className="text-xl font-semibold text-[#2e313f] tracking-tight mb-1">
+              Create new company
+            </h2>
+            <p className="text-sm text-[#707070] mb-7">
+              Set up a new farm operations workspace
+            </p>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-2 rounded mb-4">{error}</p>
+              <div className="flex items-center gap-2 text-sm text-[#c24332] mb-5">
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
             )}
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="company-name" className="text-sm font-medium text-[#2e313f]">
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <label htmlFor="company-name" className="block text-[13px] font-medium text-[#2e313f]">
                   Company Name
                 </label>
                 <Input
@@ -165,15 +191,15 @@ export default function CompanySelectionPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="industry-type" className="text-sm font-medium text-[#2e313f]">
+              <div className="space-y-1.5">
+                <label htmlFor="industry-type" className="block text-[13px] font-medium text-[#2e313f]">
                   Industry Type
                 </label>
                 <select
                   id="industry-type"
                   value={industry}
                   onChange={(e) => setIndustry(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-[#ebebeb] bg-white px-3 py-2 text-sm text-[#2e313f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1c4aa9] focus-visible:ring-offset-1"
+                  className="flex h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 py-2.5 text-sm text-[#2e313f] transition-all duration-200 focus-visible:outline-none focus-visible:border-[#c24332] focus-visible:shadow-[0_0_0_3px_rgba(194,67,50,0.08)]"
                 >
                   <option value="">Select industry</option>
                   {INDUSTRY_OPTIONS.map((opt) => (
@@ -185,7 +211,7 @@ export default function CompanySelectionPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 mt-7">
               <Button variant="outline" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
@@ -196,17 +222,4 @@ export default function CompanySelectionPage() {
       )}
     </div>
   );
-}
-
-function getIndustryIcon(industry: string): string {
-  const icons: Record<string, string> = {
-    poultry: '🐔',
-    piggery: '🐷',
-    dairy: '🥛',
-    agriculture: '🌾',
-    livestock: '🐄',
-    aquaculture: '🐟',
-    beekeeping: '🐝',
-  };
-  return icons[industry] ?? '🏭';
 }

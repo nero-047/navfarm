@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertCircle } from 'lucide-react';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -30,51 +30,73 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <CardTitle>Welcome Back</CardTitle>
-        <CardDescription>Sign in to your NAVFarm account</CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>
-          )}
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium text-[#2e313f]">Email</label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+    <div>
+      <div className="mb-10">
+        <h1 className="text-3xl font-semibold text-[#2e313f] tracking-tight mb-2">
+          Welcome back
+        </h1>
+        <p className="text-[#707070] text-[15px]">
+          Sign in to your NAVFarm account
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-[#c24332] py-1">
+            <AlertCircle size={16} />
+            <span>{error}</span>
           </div>
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium text-[#2e313f]">Password</label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? 'Signing in...' : 'Sign In'}
-          </Button>
-          <div className="flex items-center justify-between w-full text-sm">
-            <Link href="/reset-password" className="text-[#1c4aa9] hover:underline">
-              Forgot password?
-            </Link>
-            <Link href="/signup" className="text-[#1c4aa9] hover:underline">
-              Create account
-            </Link>
-          </div>
-        </CardFooter>
+        )}
+
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="block text-[13px] font-medium text-[#2e313f]">
+            Email
+          </label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="password" className="block text-[13px] font-medium text-[#2e313f]">
+            Password
+          </label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Link
+            href="/reset-password"
+            className="text-[13px] text-[#707070] hover:text-[#2e313f] transition-colors"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
+        <Button type="submit" className="w-full" disabled={submitting}>
+          {submitting ? 'Signing in...' : 'Sign In'}
+        </Button>
       </form>
-    </Card>
+
+      <p className="mt-8 text-center text-[14px] text-[#707070]">
+        Don&apos;t have an account?{' '}
+        <Link
+          href="/signup"
+          className="font-medium text-[#2e313f] hover:text-[#c24332] transition-colors"
+        >
+          Create one
+        </Link>
+      </p>
+    </div>
   );
 }

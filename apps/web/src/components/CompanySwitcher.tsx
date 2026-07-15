@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { COMPANIES, type CompanyMeta } from '@/modules/company';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronDown, Check, Plus, X } from 'lucide-react';
+import { ChevronDown, Check, Plus, X, AlertCircle } from 'lucide-react';
 
 const CUSTOM_KEY = 'navfarm_custom_companies';
 
@@ -150,7 +150,7 @@ export function CompanySwitcher() {
         {open && (
           <div
             ref={dropdownRef}
-            className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-[#ebebeb] py-1 z-50"
+            className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-[#e5e5e5] py-1 z-50"
           >
             <div className="max-h-64 overflow-y-auto">
               {Object.values(allCompanies).map((company) => (
@@ -171,7 +171,7 @@ export function CompanySwitcher() {
                 </button>
               ))}
             </div>
-            <div className="border-t border-[#ebebeb] mt-1 pt-1">
+            <div className="border-t border-[#e5e5e5] mt-1 pt-1">
               <button
                 onClick={() => {
                   setOpen(false);
@@ -191,27 +191,34 @@ export function CompanySwitcher() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-7 animate-slide-up">
             <button
               onClick={() => setModalOpen(false)}
-              className="absolute top-4 right-4 text-[#707070] hover:text-[#2e313f]"
+              className="absolute top-5 right-5 text-[#707070] hover:text-[#2e313f] transition-colors"
             >
               <X size={20} />
             </button>
 
-            <h2 className="text-xl font-bold text-[#2e313f] mb-1">Create New Company</h2>
-            <p className="text-sm text-[#707070] mb-6">Set up a new farm operations workspace</p>
+            <h2 className="text-xl font-semibold text-[#2e313f] tracking-tight mb-1">
+              Create new company
+            </h2>
+            <p className="text-sm text-[#707070] mb-7">
+              Set up a new farm operations workspace
+            </p>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-2 rounded mb-4">{error}</p>
+              <div className="flex items-center gap-2 text-sm text-[#c24332] mb-5">
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
             )}
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="cs-name" className="text-sm font-medium text-[#2e313f]">
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <label htmlFor="cs-name" className="block text-[13px] font-medium text-[#2e313f]">
                   Company Name
                 </label>
                 <Input
@@ -222,15 +229,15 @@ export function CompanySwitcher() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="cs-industry" className="text-sm font-medium text-[#2e313f]">
+              <div className="space-y-1.5">
+                <label htmlFor="cs-industry" className="block text-[13px] font-medium text-[#2e313f]">
                   Industry Type
                 </label>
                 <select
                   id="cs-industry"
                   value={industry}
                   onChange={(e) => setIndustry(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-[#ebebeb] bg-white px-3 py-2 text-sm text-[#2e313f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1c4aa9] focus-visible:ring-offset-1"
+                  className="flex h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 py-2.5 text-sm text-[#2e313f] transition-all duration-200 focus-visible:outline-none focus-visible:border-[#c24332] focus-visible:shadow-[0_0_0_3px_rgba(194,67,50,0.08)]"
                 >
                   <option value="">Select industry</option>
                   {INDUSTRY_OPTIONS.map((opt) => (
@@ -242,7 +249,7 @@ export function CompanySwitcher() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 mt-7">
               <Button variant="outline" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>

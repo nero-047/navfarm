@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { use } from 'react';
+import { useParams } from 'next/navigation';
 import { COMPANIES, type CompanyMeta } from '@/modules/company';
 import { Building2, BarChart3, Settings } from 'lucide-react';
 
@@ -17,12 +17,8 @@ function getCustom(): CompanyMeta[] {
   }
 }
 
-interface Props {
-  params: Promise<{ company: string }>;
-}
-
-export default function CompanyDashboardPage({ params }: Props) {
-  const { company } = use(params);
+export default function CompanyDashboardPage() {
+  const { company } = useParams<{ company: string }>();
 
   const meta = useMemo(() => {
     if (company in COMPANIES) return COMPANIES[company];

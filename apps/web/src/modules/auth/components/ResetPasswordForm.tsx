@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertCircle, MailCheck } from 'lucide-react';
 
 export function ResetPasswordForm() {
   const [email, setEmail] = useState('');
@@ -23,61 +23,84 @@ export function ResetPasswordForm() {
 
   if (submitted) {
     return (
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle>Check Your Email</CardTitle>
-          <CardDescription>
-            We&apos;ve sent a password reset link to <strong>{email}</strong>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-          <p className="text-sm text-[#707070] mb-4">
-            Didn&apos;t receive the email? Check your spam folder or try again.
-          </p>
-          <Button variant="outline" onClick={() => setSubmitted(false)}>
-            Try again
-          </Button>
-        </CardContent>
-        <CardFooter className="justify-center">
-          <Link href="/login" className="text-sm text-[#1c4aa9] hover:underline">
+      <div className="text-center">
+        <div className="flex justify-center mb-6">
+          <div className="w-16 h-16 rounded-full bg-[#0b1248]/5 flex items-center justify-center">
+            <MailCheck size={28} className="text-[#0b1248]" />
+          </div>
+        </div>
+        <h1 className="text-3xl font-semibold text-[#2e313f] tracking-tight mb-2">
+          Check your email
+        </h1>
+        <p className="text-[#707070] text-[15px] mb-1">
+          We sent a reset link to
+        </p>
+        <p className="text-[#2e313f] font-medium text-[15px] mb-8">
+          {email}
+        </p>
+        <p className="text-[13px] text-[#707070] mb-8 leading-relaxed">
+          Didn&apos;t receive the email? Check your spam folder or try again.
+        </p>
+        <Button variant="outline" onClick={() => setSubmitted(false)} className="mx-auto">
+          Try again
+        </Button>
+        <p className="mt-8 text-[14px]">
+          <Link
+            href="/login"
+            className="font-medium text-[#2e313f] hover:text-[#c24332] transition-colors"
+          >
             Back to sign in
           </Link>
-        </CardFooter>
-      </Card>
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <CardTitle>Reset Password</CardTitle>
-        <CardDescription>Enter your email and we&apos;ll send you a reset link</CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>
-          )}
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium text-[#2e313f]">Email</label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+    <div>
+      <div className="mb-10">
+        <h1 className="text-3xl font-semibold text-[#2e313f] tracking-tight mb-2">
+          Reset password
+        </h1>
+        <p className="text-[#707070] text-[15px]">
+          Enter your email and we&apos;ll send you a reset link
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-[#c24332] py-1">
+            <AlertCircle size={16} />
+            <span>{error}</span>
           </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full">
-            Send Reset Link
-          </Button>
-          <Link href="/login" className="text-sm text-[#1c4aa9] hover:underline">
-            Back to sign in
-          </Link>
-        </CardFooter>
+        )}
+
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="block text-[13px] font-medium text-[#2e313f]">
+            Email
+          </label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <Button type="submit" className="w-full">
+          Send Reset Link
+        </Button>
       </form>
-    </Card>
+
+      <p className="mt-8 text-center text-[14px] text-[#707070]">
+        <Link
+          href="/login"
+          className="font-medium text-[#2e313f] hover:text-[#c24332] transition-colors"
+        >
+          Back to sign in
+        </Link>
+      </p>
+    </div>
   );
 }

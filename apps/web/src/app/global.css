@@ -1,14 +1,25 @@
 @import 'tailwindcss';
 
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   --color-primary: #c24332;
   --color-primary-hover: #a83425;
   --color-navy: #0b1248;
+  --color-navy-light: #151d5e;
   --color-blue-accent: #1c4aa9;
   --color-heading: #2e313f;
   --color-body: #707070;
-  --color-border: #ebebeb;
+  --color-border: #e5e5e5;
   --color-light-bg: #f8f8f8;
 }
 
@@ -16,7 +27,15 @@ body {
   margin: 0;
   font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   color: var(--color-body);
-  background-color: var(--color-light-bg);
+  background-color: #ffffff;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.6s ease-out both;
 }
