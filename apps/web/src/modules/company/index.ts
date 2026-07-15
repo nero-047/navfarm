@@ -1,3 +1,10 @@
 export { CompanyCard } from './components/CompanyCard';
-export { COMPANIES, isValidCompany } from './types';
-export type { CompanyMeta, CompanySlug } from './types';
+export {
+  COMPANIES,
+  NOB_OPTIONS,
+  createCompanyMeta,
+  getNobOption,
+  isValidCompany,
+  normalizeCompany,
+} from './types';
+export type { CompanyMeta, CompanySlug, NobCode, NobOption } from './types';

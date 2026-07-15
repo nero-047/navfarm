@@ -52,10 +52,13 @@
 
 - The web app is Next.js 16 + React 19 under `apps/web` and normally runs at `http://localhost:3001` during local development.
 - The demo currently uses local browser state for authentication (`navfarm_auth_user`) and custom companies (`navfarm_custom_companies`); there is no real authentication or persistence layer.
-- Company workspaces use `/{company}/dashboard`. Built-in demo companies currently include piggery, poultry, dairy, agriculture, livestock, aquaculture, and beekeeping.
+- Company workspaces use `/{company}/...`. The company selector must show company entities, not industries or LOBs. Each company is assigned a documented NOB; piggery, dairy, rearing, laying, hatching, slaughter, crops, seeds, etc. belong inside the company as LOBs.
+- Seed/demo NOB options must follow the docs: Poultry, Livestock, Agriculture, Aquaculture, Insect Farming, and Feed & Processing. New NOBs/LOBs should remain configuration-driven.
 - Keep company-scoped navigation and UI reusable across industries. Prefer domain configuration and typed metadata over duplicating pages per company/LOB.
 - Preserve the existing visual language unless the user asks for a redesign: navy navigation, white/light-gray content surfaces, restrained red/blue accents, compact typography, and card-based layouts.
-- Treat incomplete cards, operations, reports, and settings views as demo placeholders to be progressively backed by realistic local fixtures from the RAK docs.
+- The frontend demo information architecture should cover: dashboard/overview, batches, daily operations, QC, QR traceability, resources and KPI schedules, financial/variance reports, and settings/onboarding/master data.
+- Settings should reflect the documented setup domains: company profile and addresses/contacts, language and currency, timezone and fiscal rules, enabled modules/NOB/LOB configuration, users/roles, notifications, GL/item mappings, and master data.
+- Treat incomplete pages as demo placeholders to be progressively backed by realistic local fixtures from the RAK docs, with visible `Demo data` labelling where users could otherwise mistake values for live records.
 
 ## Mobile App Conventions
 

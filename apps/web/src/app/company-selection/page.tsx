@@ -2,24 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AlertCircle, LogOut, Plus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { CompanyCard } from '@/modules/company';
-import { COMPANIES, type CompanyMeta } from '@/modules/company';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, X, AlertCircle } from 'lucide-react';
-
-const STORAGE_KEY = 'navfarm_custom_companies';
-
-const INDUSTRY_OPTIONS = [
-  { value: 'poultry', label: 'Poultry' },
-  { value: 'piggery', label: 'Piggery' },
-  { value: 'dairy', label: 'Dairy' },
-  { value: 'agriculture', label: 'Agriculture' },
-  { value: 'livestock', label: 'Livestock' },
-  { value: 'aquaculture', label: 'Aquaculture' },
-  { value: 'beekeeping', label: 'Beekeeping' },
-];
+import {
+  COMPANIES,
+  NOB_OPTIONS,
+  CompanyCard,
+  createCompanyMeta,
+  type CompanyMeta,
+  type NobCode,
+} from '@/modules/company';
+import {
+  CUSTOM_COMPANIES_KEY,
+  getCustomCompanies,
+} from '@/modules/company/use-current-company';
 
 function slugify(text: string) {
   return text
@@ -29,193 +27,174 @@ function slugify(text: string) {
     .replace(/^-|-$/g, '');
 }
 
-function getCustomCompanies(): CompanyMeta[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveCustomCompany(company: CompanyMeta) {
-  const existing = getCustomCompanies();
-  existing.push(company);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-}
-
-function getIndustryIcon(industry: string): string {
-  const icons: Record<string, string> = {
-    poultry: '🐔',
-    piggery: '🐷',
-    dairy: '🥛',
-    agriculture: '🌾',
-    livestock: '🐄',
-    aquaculture: '🐟',
-    beekeeping: '🐝',
-  };
-  return icons[industry] ?? '🏭';
-}
-
 export default function CompanySelectionPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
-  const [customCompanies, setCustomCompanies] = useState<CompanyMeta[]>([]);
+  const [companies, setCompanies] =
+    useState<Record<string, CompanyMeta>>(COMPANIES);
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('');
-  const [industry, setIndustry] = useState('');
+  const [nobCode, setNobCode] = useState<NobCode | ''>('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
+    if (!loading && !user) router.push('/login');
   }, [user, loading, router]);
-
   useEffect(() => {
-    setCustomCompanies(getCustomCompanies());
+    const next = { ...COMPANIES };
+    for (const custom of getCustomCompanies()) next[custom.slug] = custom;
+    setCompanies(next);
   }, []);
 
   if (loading || !user) return null;
 
-  const allCompanies = { ...COMPANIES };
-  for (const c of customCompanies) {
-    if (!(c.slug in allCompanies)) allCompanies[c.slug] = c;
-  }
-
-  const handleCreate = () => {
+  function createCompany() {
     setError('');
     const trimmed = name.trim();
-    if (!trimmed) {
-      setError('Company name is required');
-      return;
-    }
-    if (!industry) {
-      setError('Please select an industry');
-      return;
-    }
+    if (!trimmed) return setError('Company name is required');
+    if (!nobCode) return setError('Select a Nature of Business');
     const slug = slugify(trimmed);
-    if (slug in allCompanies) {
-      setError('A company with this name already exists');
-      return;
-    }
-    const opt = INDUSTRY_OPTIONS.find((o) => o.value === industry);
-    const newCompany: CompanyMeta = {
-      slug,
-      name: trimmed,
-      icon: opt ? getIndustryIcon(industry) : '🏭',
-      description: `${opt?.label ?? industry} operations for ${trimmed}`,
-    };
-    saveCustomCompany(newCompany);
-    setCustomCompanies((prev) => [...prev, newCompany]);
-    setName('');
-    setIndustry('');
+    if (companies[slug])
+      return setError('A company with this name already exists');
+    const created = createCompanyMeta(trimmed, slug, nobCode);
+    localStorage.setItem(
+      CUSTOM_COMPANIES_KEY,
+      JSON.stringify([...getCustomCompanies(), created]),
+    );
+    setCompanies((current) => ({ ...current, [slug]: created }));
     setModalOpen(false);
+    setName('');
+    setNobCode('');
     router.push(`/${slug}/dashboard`);
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-6xl mx-auto px-6 py-14">
-        {/* Header */}
-        <div className="mb-10 animate-fade-in">
-          <h1 className="text-[32px] font-semibold text-[#2e313f] tracking-tight">
-            Choose your workspace
-          </h1>
-          <p className="text-[#707070] text-[15px] mt-1.5">
-            Select an industry to manage your farm operations
-          </p>
+    <div className="min-h-screen bg-[#f7f8fa]">
+      <header className="border-b border-[#e7e7e7] bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
+          <div className="text-xl font-bold tracking-tight text-[#0b1248]">
+            NAV<span className="text-[#c24332]">Farm</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <p className="text-xs font-semibold text-[#2e313f]">
+                {user.name}
+              </p>
+              <p className="text-[10px] text-[#8a8a8a]">Frontend demo</p>
+            </div>
+            <button
+              onClick={() => {
+                logout();
+                router.push('/login');
+              }}
+              className="rounded-lg border border-[#e5e5e5] p-2 text-[#707070] hover:text-[#c24332]"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
-
-        {/* Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {Object.values(allCompanies).map((company) => (
+      </header>
+      <main className="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
+        <div className="mb-9 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1c4aa9]">
+              Tenant workspace
+            </p>
+            <h1 className="mt-2 text-[30px] font-semibold tracking-tight text-[#2e313f]">
+              Choose a company
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[#707070]">
+              Companies are separate legal or operating entities. Each workspace
+              is assigned a documented Nature of Business and contains its LOBs,
+              batches and settings.
+            </p>
+          </div>
+          <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700">
+            Demo companies
+          </span>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.values(companies).map((company) => (
             <CompanyCard key={company.slug} company={company} />
           ))}
-
-          {/* New Company Card */}
           <button
             onClick={() => setModalOpen(true)}
-            className="group flex flex-col items-center justify-center gap-3 bg-white rounded-2xl border-2 border-dashed border-[#d4d4d4] p-7 cursor-pointer h-full min-h-[180px] transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-[#1c4aa9]"
+            className="group flex min-h-[230px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[#d4d4d4] bg-white p-7 transition-all hover:-translate-y-1 hover:border-[#1c4aa9] hover:shadow-lg"
           >
-            <div className="w-12 h-12 rounded-full bg-[#f0f0f0] flex items-center justify-center transition-colors group-hover:bg-[#1c4aa9]/10">
-              <Plus size={22} className="text-[#707070] group-hover:text-[#1c4aa9] transition-colors" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-[#707070] group-hover:bg-blue-50 group-hover:text-[#1c4aa9]">
+              <Plus size={21} />
             </div>
-            <span className="text-[15px] font-medium text-[#707070] group-hover:text-[#2e313f] transition-colors">
-              New Company
+            <span className="text-sm font-semibold text-[#606372]">
+              Create company
+            </span>
+            <span className="text-xs text-[#8a8a8a]">
+              Assign a NOB and configure LOBs
             </span>
           </button>
         </div>
-      </div>
-
-      {/* Modal */}
+      </main>
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
+          <button
+            aria-label="Close modal"
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-7 animate-slide-up">
+          <div className="relative mx-4 w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl animate-slide-up">
             <button
               onClick={() => setModalOpen(false)}
-              className="absolute top-5 right-5 text-[#707070] hover:text-[#2e313f] transition-colors"
+              className="absolute right-5 top-5 text-[#707070]"
             >
-              <X size={20} />
+              <X size={19} />
             </button>
-
-            <h2 className="text-xl font-semibold text-[#2e313f] tracking-tight mb-1">
-              Create new company
+            <h2 className="text-xl font-semibold text-[#2e313f]">
+              Create company
             </h2>
-            <p className="text-sm text-[#707070] mb-7">
-              Set up a new farm operations workspace
+            <p className="mt-1 text-sm text-[#707070]">
+              Company details can be completed in the 15-step setup checklist.
             </p>
-
             {error && (
-              <div className="flex items-center gap-2 text-sm text-[#c24332] mb-5">
-                <AlertCircle size={16} />
-                <span>{error}</span>
+              <div className="mt-5 flex items-center gap-2 text-xs text-[#c24332]">
+                <AlertCircle size={15} />
+                {error}
               </div>
             )}
-
-            <div className="space-y-5">
-              <div className="space-y-1.5">
-                <label htmlFor="company-name" className="block text-[13px] font-medium text-[#2e313f]">
-                  Company Name
-                </label>
+            <div className="mt-6 space-y-5">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-[#2e313f]">
+                  Company name
+                </span>
                 <Input
-                  id="company-name"
-                  placeholder="e.g. Sunrise Farms"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="e.g. Green Valley Farms"
                 />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="industry-type" className="block text-[13px] font-medium text-[#2e313f]">
-                  Industry Type
-                </label>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-[#2e313f]">
+                  Nature of Business
+                </span>
                 <select
-                  id="industry-type"
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                  className="flex h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 py-2.5 text-sm text-[#2e313f] transition-all duration-200 focus-visible:outline-none focus-visible:border-[#c24332] focus-visible:shadow-[0_0_0_3px_rgba(194,67,50,0.08)]"
+                  value={nobCode}
+                  onChange={(event) =>
+                    setNobCode(event.target.value as NobCode)
+                  }
+                  className="h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm text-[#2e313f] outline-none focus:border-[#c24332]"
                 >
-                  <option value="">Select industry</option>
-                  {INDUSTRY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  <option value="">Select NOB</option>
+                  {NOB_OPTIONS.map((nob) => (
+                    <option key={nob.code} value={nob.code}>
+                      {nob.icon} {nob.name}
                     </option>
                   ))}
                 </select>
-              </div>
+              </label>
             </div>
-
-            <div className="flex justify-end gap-3 mt-7">
+            <div className="mt-7 flex justify-end gap-3">
               <Button variant="outline" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreate}>Create Company</Button>
+              <Button onClick={createCompany}>Create company</Button>
             </div>
           </div>
         </div>
