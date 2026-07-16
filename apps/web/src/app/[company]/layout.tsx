@@ -7,6 +7,7 @@ import {
   BarChart3,
   Bell,
   Boxes,
+  Building2,
   ChevronDown,
   ClipboardCheck,
   Command,
@@ -159,28 +160,28 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
         </nav>
         <div className="relative border-t border-white/[0.08] p-4">
           <Link
-            href={slug ? `/${slug}/profile` : '#'}
-            className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.05] p-3 hover:bg-white/[0.09]"
+            href="/organization"
+            className="group block rounded-xl border border-white/10 bg-white/[0.05] p-3 transition-colors hover:bg-white/[0.09]"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f16d50] text-xs font-bold">
-              {getInitial(user.name || user.email)}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold">
-                {user.name || 'User'}
+            <span className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+                <Building2 size={16} />
               </span>
-              <span className="mt-0.5 block truncate text-[9px] text-white/40">
-                Company administrator
+              <span className="min-w-0 flex-1">
+                <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-white/35">
+                  Organization
+                </span>
+                <span className="mt-0.5 block truncate text-xs font-semibold text-white">
+                  Green Valley Holdings
+                </span>
               </span>
+              <ChevronDown size={13} className="-rotate-90 text-white/35 transition-transform group-hover:translate-x-0.5" />
             </span>
-            <ShieldCheck size={15} className="text-emerald-300" />
+            <span className="mt-3 flex items-center justify-between border-t border-white/[0.08] pt-2.5 text-[9px] text-white/40">
+              <span>6 companies</span>
+              <span>Enterprise plan</span>
+            </span>
           </Link>
-          <button
-            onClick={signOut}
-            className="mt-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] text-white/50 hover:bg-white/[0.06] hover:text-white"
-          >
-            <LogOut size={14} /> Sign out
-          </button>
         </div>
       </aside>
 
