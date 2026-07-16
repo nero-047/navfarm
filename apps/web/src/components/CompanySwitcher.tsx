@@ -152,13 +152,13 @@ export function CompanySwitcher() {
                   </p>
                 </div>
               </div>
-              <label className="mt-3 flex h-9 items-center gap-2 rounded-xl border border-[#e3e7ee] bg-[#f7f8fa] px-3">
+              <label className="mt-3 flex h-9 items-center gap-2 rounded-xl border border-[#e3e7ee] bg-[#f7f8fa] px-3 transition focus-within:border-[#2f66d0] focus-within:bg-white focus-within:ring-[3px] focus-within:ring-blue-100/80">
                 <Search size={13} className="text-[#8a90a0]" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Find a company"
-                  className="min-w-0 flex-1 bg-transparent text-xs text-[#30364b] outline-none"
+                  className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-[#30364b] outline-none"
                 />
               </label>
             </div>
@@ -268,7 +268,7 @@ export function CompanySwitcher() {
                   onChange={(event) =>
                     setNobCode(event.target.value as NobCode)
                   }
-                  className="flex h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm outline-none focus:border-[#c24332]"
+                  className="flex h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm outline-none focus:border-[#2f66d0]"
                 >
                   <option value="">Select NOB</option>
                   {nobOptions.map((nob) => (

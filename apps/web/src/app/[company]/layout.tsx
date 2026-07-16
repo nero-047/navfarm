@@ -208,7 +208,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
             >
               NAV<span className="text-[#c24332]">Farm</span>
             </Link>
-            <div className="relative hidden h-10 min-w-0 w-full items-center gap-2 rounded-xl border border-[#e4e8ef] bg-[#f7f8fa] px-3 text-[#8a90a0] md:flex">
+            <div className="relative hidden h-10 min-w-0 w-full items-center gap-2 rounded-xl border border-[#e4e8ef] bg-[#f7f8fa] px-3 text-[#8a90a0] transition md:flex focus-within:border-[#2f66d0] focus-within:bg-white focus-within:ring-[3px] focus-within:ring-blue-100/80">
               <Search size={15} />
               <input
                 id="workspace-search"
@@ -216,7 +216,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
                 placeholder="Search batches, lots, reports and settings"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-xs text-[#30364b] outline-none"
+                className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-[#30364b] outline-none"
               />
               <span className="flex items-center gap-1 rounded-md border border-[#dfe3ea] bg-white px-1.5 py-1 text-[9px]">
                 <Command size={9} /> K

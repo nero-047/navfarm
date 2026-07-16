@@ -213,7 +213,7 @@ export default function CompanySelectionPage() {
                   onChange={(event) =>
                     setNobCode(event.target.value as NobCode)
                   }
-                  className="h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm text-[#2e313f] outline-none focus:border-[#c24332]"
+                  className="h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm text-[#2e313f] outline-none focus:border-[#2f66d0]"
                 >
                   <option value="">Select NOB</option>
                   {nobOptions.map((nob) => (

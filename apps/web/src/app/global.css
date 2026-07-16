@@ -36,7 +36,26 @@ body {
 button, a, select { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled), select { cursor: pointer; }
 ::selection { background: #dce7ff; color: #0b1248; }
-*:focus-visible { outline: 2px solid #2f66d0; outline-offset: 2px; }
+
+:where(a, button, summary, [role='button']):focus-visible {
+  outline: 2px solid #2f66d0;
+  outline-offset: 2px;
+}
+
+input, select, textarea {
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+:where(input:not(.nf-embedded-input), select, textarea):focus-visible {
+  outline: none;
+  border-color: #2f66d0 !important;
+  box-shadow: 0 0 0 3px rgba(47, 102, 208, 0.12);
+}
+
+.nf-embedded-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
