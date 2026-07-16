@@ -9,6 +9,7 @@ import {
   type DemoResourceRecord,
   type NewOperationInput,
   type QualityLot,
+  type WorkflowBatch,
   useDemoStore,
 } from './demo-store';
 import { StatusBadge } from './components';
@@ -107,7 +108,7 @@ export function BatchDialog({ company, onClose }: { company: CompanyMeta; onClos
 
 export function OperationDialog({ company, onClose }: { company: CompanyMeta; onClose: () => void }) {
   const { state, recordOperation } = useDemoStore();
-  const approved = state.batches.filter((item) => item.status === 'APPROVED' || item.status === 'READY_TO_CLOSE');
+  const approved = state.batches.filter((item) => item.status === 'APPROVED' || item.status === 'ACTIVE' || item.status === 'READY_TO_CLOSE');
   const [entry, setEntry] = useState<NewOperationInput>({
     batchId: approved[0]?.id ?? '', entryType: 'CONSUMPTION', parameter: INDUSTRY_CONFIG[company.nobCode].dailyParameter,
     quantity: 100, uom: 'KG', unitCost: 20, expected: 95, notes: '',
@@ -168,6 +169,27 @@ export function ResourceDialog({ company, onClose }: { company: CompanyMeta; onC
   const [resource, setResource] = useState<Omit<DemoResourceRecord, 'id'>>({ name: '', type: 'EQUIPMENT', allocation: company.lobs[0], status: 'Available', costRate: 500, costUom: 'DAY' });
   function submit(event: FormEvent) { event.preventDefault(); addResource(resource); onClose(); }
   return <WorkflowDialog title="Add resource" description="Resources can be costed and allocated to scheduler parameters across LOBs." onClose={onClose}><form onSubmit={submit}><div className="grid gap-4 sm:grid-cols-2"><Field label="Resource name"><input className={inputClass} value={resource.name} onChange={(e) => setResource({ ...resource, name: e.target.value })} /></Field><Field label="Type"><select className={inputClass} value={resource.type} onChange={(e) => setResource({ ...resource, type: e.target.value as DemoResourceRecord['type'] })}>{['MANPOWER', 'EQUIPMENT', 'VEHICLE', 'UTILITY', 'OTHER'].map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="LOB allocation"><select className={inputClass} value={resource.allocation} onChange={(e) => setResource({ ...resource, allocation: e.target.value })}>{company.lobs.map((item) => <option key={item}>{item}</option>)}<option>Shared resource</option></select></Field><Field label="Cost rate (₹)"><input className={inputClass} min="0" type="number" value={resource.costRate} onChange={(e) => setResource({ ...resource, costRate: Number(e.target.value) })} /></Field><Field label="Cost unit"><select className={inputClass} value={resource.costUom} onChange={(e) => setResource({ ...resource, costUom: e.target.value as DemoResourceRecord['costUom'] })}>{['HOUR', 'DAY', 'SHIFT', 'BATCH'].map((item) => <option key={item}>{item}</option>)}</select></Field></div><SubmitRow label="Add resource" onClose={onClose} disabled={!resource.name} /></form></WorkflowDialog>;
+}
+
+export function BatchStatusDialog({ batch, onClose }: { batch: WorkflowBatch; onClose: () => void }) {
+  const { approveBatch, transitionBatch, closeBatch } = useDemoStore();
+  const [reason, setReason] = useState('');
+  const [message, setMessage] = useState('');
+  const run = (action: 'APPROVE' | 'START' | 'PAUSE' | 'RESUME' | 'CANCEL' | 'CLOSE') => {
+    if (action === 'APPROVE') { approveBatch(batch.id); setMessage('Batch approved; costing programme and standards are locked.'); setTimeout(onClose, 650); return; }
+    const result = action === 'CLOSE' ? closeBatch(batch.id) : transitionBatch(batch.id, action, reason);
+    setMessage(result.message);
+    if (result.ok) setTimeout(onClose, 650);
+  };
+  const actions = batch.status === 'DRAFT' ? ['APPROVE','CANCEL'] : batch.status === 'APPROVED' ? ['START','CANCEL'] : batch.status === 'ACTIVE' ? ['PAUSE'] : batch.status === 'PAUSED' ? ['RESUME','CANCEL'] : batch.status === 'READY_TO_CLOSE' ? ['CLOSE'] : [];
+  return <WorkflowDialog title={`${batch.code} controls`} description="Lifecycle, operational risk, QC, inventory release and costing are tracked independently." onClose={onClose}>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[
+      ['Lifecycle', batch.status.replaceAll('_',' ')], ['Stage', batch.stage], ['Health', batch.riskStatus.replaceAll('_',' ')], ['Quality', batch.qcStatus.replaceAll('_',' ')], ['Inventory', batch.inventoryStatus.replaceAll('_',' ')], ['Costing', batch.costingStatus.replaceAll('_',' ')],
+    ].map(([label,value]) => <div key={label} className="rounded-xl border border-[#ededed] p-3"><p className="text-[10px] uppercase tracking-wide text-[#8a8a8a]">{label}</p><p className="mt-1 text-xs font-semibold text-[#2e313f]">{value}</p></div>)}</div>
+    {(actions.includes('PAUSE') || actions.includes('CANCEL')) && <Field label="Reason required for pause or cancellation"><input className={inputClass} value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="Operational reason and corrective action"/></Field>}
+    {message && <Notice tone={message.includes('blocked') || message.includes('required') || message.includes('not allowed') ? 'error' : 'info'}>{message}</Notice>}
+    <div className="mt-6 flex flex-wrap justify-end gap-2"><button onClick={onClose} className="h-10 rounded-xl border border-[#dedede] px-4 text-xs font-semibold">Close</button>{actions.map((action)=><button key={action} onClick={()=>run(action as 'APPROVE' | 'START' | 'PAUSE' | 'RESUME' | 'CANCEL' | 'CLOSE')} className={`h-10 rounded-xl px-4 text-xs font-semibold text-white ${action==='CANCEL'?'bg-[#c24332]':'bg-[#0b1248]'}`}>{action==='APPROVE'?'Approve & lock':action==='CLOSE'?'Validate & close':action.charAt(0)+action.slice(1).toLowerCase()}</button>)}</div>
+  </WorkflowDialog>;
 }
 
 const STEP_DETAILS = [

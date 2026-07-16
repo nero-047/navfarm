@@ -54,6 +54,7 @@ import {
 import { useDemoStore, type MasterRecord, type QualityLot, type WorkflowBatch } from './demo-store';
 import {
   BatchDialog,
+  BatchStatusDialog,
   DispositionDialog,
   OnboardingWizard,
   OperationDialog,
@@ -142,7 +143,7 @@ function Dashboard({ company }: { company: Company }) {
   const tasks = getDemoTasks(company);
   const config = INDUSTRY_CONFIG[company.nobCode];
   const { state, calculateVariance } = useDemoStore();
-  const activeCount = state.batches.filter((batch) => batch.status === 'APPROVED' || batch.status === 'QC_HOLD' || batch.status === 'READY_TO_CLOSE').length;
+  const activeCount = state.batches.filter((batch) => ['APPROVED', 'ACTIVE', 'PAUSED', 'QC_HOLD', 'READY_TO_CLOSE'].includes(batch.status)).length;
   const passRate = state.qualityLots.length ? (state.qualityLots.filter((lot) => lot.status === 'PASS').length / state.qualityLots.length) * 100 : 0;
   const totalVariance = state.batches.reduce((sum, batch) => sum + calculateVariance(batch).total, 0);
   return (
@@ -361,7 +362,8 @@ function Batches({ company }: { company: Company }) {
   const { state, approveBatch, closeBatch, calculateVariance } = useDemoStore();
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState('');
-  const active = state.batches.filter((batch) => batch.status === 'APPROVED' || batch.status === 'QC_HOLD').length;
+  const [managing, setManaging] = useState<WorkflowBatch | null>(null);
+  const active = state.batches.filter((batch) => ['APPROVED','ACTIVE','PAUSED','QC_HOLD'].includes(batch.status)).length;
   const ready = state.batches.filter((batch) => batch.status === 'READY_TO_CLOSE').length;
   const wip = state.batches.reduce((sum, batch) => sum + batch.wip, 0);
   function close(batch: WorkflowBatch) {
@@ -461,9 +463,11 @@ function Batches({ company }: { company: Company }) {
                     label={batch.status.replaceAll('_', ' ')}
                     tone={batch.status === 'CLOSED' ? 'green' : batch.status === 'QC_HOLD' ? 'amber' : batch.status === 'DRAFT' ? 'gray' : 'blue'}
                   />
+                  <div className="mt-1.5"><StatusBadge label={batch.riskStatus.replaceAll('_', ' ')} tone={batch.riskStatus === 'ON_TRACK' ? 'green' : batch.riskStatus === 'WARNING' ? 'amber' : 'red'} /></div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {batch.status === 'DRAFT' && <button onClick={() => approveBatch(batch.id)} className="text-[10px] font-semibold text-[#1c4aa9]">Approve & lock</button>}
                     {batch.status === 'READY_TO_CLOSE' && <button onClick={() => close(batch)} className="text-[10px] font-semibold text-[#c24332]">Run close</button>}
+                    <button onClick={() => setManaging(batch)} className="text-[10px] font-semibold text-[#1c4aa9]">Manage</button>
                   </div>
                 </TableCell>
               </tr>
@@ -474,6 +478,7 @@ function Batches({ company }: { company: Company }) {
       </SectionCard>
       {notice && <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">{notice}</div>}
       {creating && <BatchDialog company={company} onClose={() => setCreating(false)} />}
+      {managing && <BatchStatusDialog batch={managing} onClose={() => setManaging(null)} />}
     </div>
   );
 }

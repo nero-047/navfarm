@@ -235,6 +235,9 @@ function seedState(company: CompanyMeta): DemoState {
           : index === 2
             ? 'READY_TO_CLOSE'
             : 'DRAFT',
+    riskStatus: index === 1 ? 'AT_RISK' : index === 0 ? 'WARNING' : 'ON_TRACK',
+    inventoryStatus: index === 2 ? 'RELEASED' : 'BLOCKED',
+    costingStatus: index === 3 ? 'DRAFT' : 'OPEN',
     stage: batch.stage,
     inputName: config.primaryInput,
     inputQty: index === 0 ? 10000 : 5000 + index * 500,
@@ -276,7 +279,7 @@ function seedState(company: CompanyMeta): DemoState {
     costUom: index === 1 ? 'SHIFT' : index === 2 ? 'HOUR' : 'DAY',
   }));
   return {
-    version: 3,
+    version: 4,
     batches,
     operations: [],
     qualityLots,
@@ -321,7 +324,7 @@ function journalFor(input: NewOperationInput): OperationEntry['journal'] {
 }
 
 export function DemoStoreProvider({ company, children }: { company: CompanyMeta; children: ReactNode }) {
-  const key = `navfarm_demo_state_v3_${company.slug}`;
+  const key = `navfarm_demo_state_v4_${company.slug}`;
   const [state, setState] = useState<DemoState>(() => seedState(company));
   const [isReady, setIsReady] = useState(false);
 
@@ -329,7 +332,7 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
     try {
       const saved = localStorage.getItem(key);
       const parsed = saved ? (JSON.parse(saved) as DemoState) : null;
-      setState(parsed?.version === 3 ? parsed : seedState(company));
+      setState(parsed?.version === 4 ? parsed : seedState(company));
     } catch {
       setState(seedState(company));
     }
@@ -354,6 +357,9 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
         lob: input.lob,
         method: input.method,
         status: 'DRAFT',
+        riskStatus: 'ON_TRACK',
+        inventoryStatus: 'BLOCKED',
+        costingStatus: 'DRAFT',
         stage: 'Draft setup',
         inputName: INDUSTRY_CONFIG[company.nobCode].primaryInput,
         inputQty: input.inputQty,
@@ -393,12 +399,35 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
               status: 'APPROVED',
               stage: batch.method === 'BIO_ASSET' ? 'Premature / NCA' : 'Daily operations',
               wip: money(batch.inputQty * batch.standardRate),
+              costingStatus: 'OPEN',
             }
           : batch,
       ),
       auditLog: [`Approved batch; costing method and standards locked.`, ...current.auditLog],
     }));
   }, []);
+
+  const transitionBatch = useCallback((id: string, action: 'START' | 'PAUSE' | 'RESUME' | 'CANCEL', reason = '') => {
+    const batch = state.batches.find((item) => item.id === id);
+    if (!batch) return { ok: false, message: 'Batch not found.' };
+    const allowed = action === 'START' ? batch.status === 'APPROVED' : action === 'PAUSE' ? batch.status === 'ACTIVE' : action === 'RESUME' ? batch.status === 'PAUSED' : ['DRAFT', 'APPROVED', 'PAUSED'].includes(batch.status);
+    if (!allowed) return { ok: false, message: `${action.toLowerCase()} is not allowed from ${batch.status.replaceAll('_', ' ')}.` };
+    if ((action === 'PAUSE' || action === 'CANCEL') && !reason.trim()) return { ok: false, message: 'A reason is required for this action.' };
+    const nextStatus: WorkflowStatus = action === 'START' || action === 'RESUME' ? 'ACTIVE' : action === 'PAUSE' ? 'PAUSED' : 'CANCELLED';
+    setState((current) => ({
+      ...current,
+      batches: current.batches.map((item) => item.id === id ? {
+        ...item,
+        status: nextStatus,
+        stage: action === 'START' || action === 'RESUME' ? 'Daily operations' : action === 'PAUSE' ? 'Operations paused' : 'Cancelled',
+        riskStatus: action === 'PAUSE' ? 'WARNING' : item.riskStatus,
+        costingStatus: action === 'CANCEL' ? 'FINALIZED' : item.costingStatus,
+        wip: action === 'CANCEL' ? 0 : item.wip,
+      } : item),
+      auditLog: [`${action} ${batch.code}${reason ? ` — ${reason}` : ''}.`, ...current.auditLog],
+    }));
+    return { ok: true, message: `${batch.code} changed to ${nextStatus.replaceAll('_', ' ')}.` };
+  }, [state.batches]);
 
   const recordOperation = useCallback((input: NewOperationInput) => {
     const journal = journalFor(input);
@@ -435,8 +464,9 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
                 ? batch.wip
                 : batch.wip + amount,
           status:
-            input.entryType === 'OUTPUT' ? 'READY_TO_CLOSE' : batch.status,
-          stage: input.entryType === 'OUTPUT' ? 'Final output' : batch.stage,
+            input.entryType === 'OUTPUT' ? 'READY_TO_CLOSE' : batch.status === 'APPROVED' ? 'ACTIVE' : batch.status,
+          riskStatus: input.expected !== undefined && input.quantity > input.expected * 1.05 ? 'WARNING' : batch.riskStatus,
+          stage: input.entryType === 'OUTPUT' ? 'Final output' : batch.status === 'APPROVED' ? 'Daily operations' : batch.stage,
         };
       }),
       auditLog: [
@@ -485,6 +515,8 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
                   ...batch,
                   qcStatus: status,
                   status: status === 'PASS' ? 'READY_TO_CLOSE' : 'QC_HOLD',
+                  inventoryStatus: status === 'PASS' ? 'RELEASED' : 'BLOCKED',
+                  costingStatus: status === 'FAIL' ? 'CLOSE_BLOCKED' : batch.costingStatus,
                 }
               : batch,
           ),
@@ -533,7 +565,7 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
       ...current,
       batches: current.batches.map((item) =>
         item.id === id
-          ? { ...item, status: 'CLOSED', stage: 'Cost finalized', wip: 0, closedAt: new Date().toISOString() }
+          ? { ...item, status: 'CLOSED', stage: 'Cost finalized', costingStatus: 'FINALIZED', inventoryStatus: 'RELEASED', wip: 0, closedAt: new Date().toISOString() }
           : item,
       ),
       auditLog: [
@@ -606,6 +638,7 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
       isReady,
       createBatch,
       approveBatch,
+      transitionBatch,
       recordOperation,
       createQualityLot,
       setQualityDisposition,
@@ -620,7 +653,7 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
       removeMasterRecord,
       resetDemo,
     }),
-    [state, isReady, createBatch, approveBatch, recordOperation, createQualityLot, setQualityDisposition, generateQrPack, addResource, closeBatch, calculateVariance, saveSetupStep, setModule, setNotificationChannel, addMasterRecord, removeMasterRecord, resetDemo],
+    [state, isReady, createBatch, approveBatch, transitionBatch, recordOperation, createQualityLot, setQualityDisposition, generateQrPack, addResource, closeBatch, calculateVariance, saveSetupStep, setModule, setNotificationChannel, addMasterRecord, removeMasterRecord, resetDemo],
   );
 
   return <DemoStoreContext.Provider value={value}>{children}</DemoStoreContext.Provider>;

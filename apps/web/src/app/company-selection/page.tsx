@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, LogOut, Plus, X } from 'lucide-react';
+import { AlertCircle, Building2, LogOut, Plus, ShieldCheck, X } from 'lucide-react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,6 +82,8 @@ export default function CompanySelectionPage() {
             NAV<span className="text-[#c24332]">Farm</span>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/tenant-admin" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><Building2 size={14}/> Tenant admin</Link>
+            <Link href="/operator" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><ShieldCheck size={14}/> Operator</Link>
             <div className="hidden text-right sm:block">
               <p className="text-xs font-semibold text-[#2e313f]">
                 {user.name}
