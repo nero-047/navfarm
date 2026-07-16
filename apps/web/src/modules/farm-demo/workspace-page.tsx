@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Activity,
   AlertTriangle,
@@ -30,6 +31,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentCompany } from '@/modules/company/use-current-company';
 import {
   getDemoBatches,
@@ -149,10 +151,15 @@ function Dashboard({ company }: { company: Company }) {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        eyebrow={`${company.nobName} workspace`}
-        title={`${company.icon} ${company.name}`}
-        description={`${company.location} · ${company.lobs.length} configured lines of business · Frontend demonstration using document-aligned sample records.`}
+        eyebrow="Command centre"
+        title="Executive dashboard"
+        description={`A complete operating view of ${company.name} · ${company.location} · ${company.lobs.length} lines of business.`}
+        action={<><DemoBadge/><select aria-label="Dashboard period" className="h-10 rounded-xl border border-[#dfe3ea] bg-white px-3 text-xs font-semibold text-[#51586a]"><option>Last 6 months</option><option>This month</option><option>This fiscal year</option></select><Link href={`/${company.slug}/reports`} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"><FileBarChart size={14}/> View reports</Link></>}
       />
+
+      <div className="overflow-hidden rounded-2xl bg-[linear-gradient(110deg,#0b1248_0%,#16336f_64%,#1c4aa9_100%)] p-5 text-white shadow-[0_16px_45px_rgba(11,18,72,0.18)] sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-center gap-4"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-2xl ring-1 ring-white/15">{company.icon}</div><div><p className="text-lg font-semibold">{company.name}</p><p className="mt-1 text-xs text-white/55">{company.nobName} · Operational snapshot for 16 July 2026</p></div></div><div className="grid grid-cols-3 gap-5 border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0"><div><p className="text-[9px] uppercase tracking-wider text-white/45">Setup</p><p className="mt-1 text-base font-semibold">{company.setupProgress}%</p></div><div><p className="text-[9px] uppercase tracking-wider text-white/45">LOBs</p><p className="mt-1 text-base font-semibold">{company.lobs.length}</p></div><div><p className="text-[9px] uppercase tracking-wider text-white/45">Health</p><p className="mt-1 text-base font-semibold text-emerald-300">Stable</p></div></div></div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -426,6 +433,7 @@ function Batches({ company }: { company: Company }) {
               <TableHead>Quantity & output</TableHead>
               <TableHead>Cost / variance</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
             </tr>
           </thead>
           <tbody>
@@ -464,12 +472,8 @@ function Batches({ company }: { company: Company }) {
                     tone={batch.status === 'CLOSED' ? 'green' : batch.status === 'QC_HOLD' ? 'amber' : batch.status === 'DRAFT' ? 'gray' : 'blue'}
                   />
                   <div className="mt-1.5"><StatusBadge label={batch.riskStatus.replaceAll('_', ' ')} tone={batch.riskStatus === 'ON_TRACK' ? 'green' : batch.riskStatus === 'WARNING' ? 'amber' : 'red'} /></div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {batch.status === 'DRAFT' && <button onClick={() => approveBatch(batch.id)} className="text-[10px] font-semibold text-[#1c4aa9]">Approve & lock</button>}
-                    {batch.status === 'READY_TO_CLOSE' && <button onClick={() => close(batch)} className="text-[10px] font-semibold text-[#c24332]">Run close</button>}
-                    <button onClick={() => setManaging(batch)} className="text-[10px] font-semibold text-[#1c4aa9]">Manage</button>
-                  </div>
                 </TableCell>
+                <TableCell><div className="flex min-w-32 flex-col gap-2"><button onClick={() => setManaging(batch)} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#0b1248] px-3 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1b2869]"><Settings2 size={13}/> Manage batch</button>{batch.status === 'DRAFT' && <button onClick={() => approveBatch(batch.id)} className="inline-flex h-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-2 text-[10px] font-semibold text-[#1c4aa9] hover:bg-blue-100">Approve & lock</button>}{batch.status === 'READY_TO_CLOSE' && <button onClick={() => close(batch)} className="inline-flex h-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-2 text-[10px] font-semibold text-[#c24332] hover:bg-red-100">Run close</button>}</div></TableCell>
               </tr>
               );
             })}
@@ -484,7 +488,7 @@ function Batches({ company }: { company: Company }) {
 }
 
 function DomainProcess({ company }: { company: Company }) {
-  const rules: Record<typeof company.nobCode, string[]> = {
+  const rules: Record<string, string[]> = {
     POULTRY: ['Rearing → laying/CB source-batch transfer', 'Hatching candling at days 7/14/18 with setter-to-hatcher transfer', 'Mortality is expensed; slaughter supports main/by-product cost split'],
     LIVESTOCK: ['Premature costs capitalize to biological-asset NCA', 'Maturity starts amortisation and fair-value review', 'Milk, offspring, wool and disposal retain animal/batch lineage'],
     AGRICULTURE: ['Bearer plant premature-to-mature stage control', 'Annual harvest enters FIFO inventory', 'Closed mature-season batches copy scheduler and location to next year'],
@@ -492,9 +496,10 @@ function DomainProcess({ company }: { company: Company }) {
     INSECT: ['Colony/hive placement and maintenance costs', 'Honey and wax are separate traceable outputs', 'Moisture, HMF and grade QC gate jar QR generation'],
     PROCESSING: ['BOR version and ingredient lines lock at approval', 'Actual inclusion is compared with recipe quantity and nutrition', 'Resource/indirect costs enter WIP before QC-released finished feed'],
   };
+  const domainRules = rules[company.nobCode] ?? rules.PROCESSING;
   return (
     <SectionCard title={`${company.nobName} process controls`} description="Documented LOB rules represented by the shared batch, operation, QC and close engine">
-      <div className="grid gap-3 p-5 md:grid-cols-3">{rules[company.nobCode].map((rule, index) => <div key={rule} className="rounded-xl border border-[#ededed] p-4"><span className="text-[10px] font-semibold text-[#1c4aa9]">RULE {index + 1}</span><p className="mt-2 text-xs leading-5 text-[#515463]">{rule}</p></div>)}</div>
+      <div className="grid gap-3 p-5 md:grid-cols-3">{domainRules.map((rule, index) => <div key={rule} className="rounded-xl border border-[#ededed] p-4"><span className="text-[10px] font-semibold text-[#1c4aa9]">RULE {index + 1}</span><p className="mt-2 text-xs leading-5 text-[#515463]">{rule}</p></div>)}</div>
     </SectionCard>
   );
 }
@@ -1294,11 +1299,14 @@ const SETTINGS_TABS = [
   'People',
   'Notifications',
   'Master data',
+  'My profile',
 ] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 function Settings({ company }: { company: Company }) {
-  const [tab, setTab] = useState<SettingsTab>('Setup checklist');
+  const searchParams = useSearchParams();
+  const initialTab: SettingsTab = searchParams.get('tab') === 'profile' ? 'My profile' : 'Setup checklist';
+  const [tab, setTab] = useState<SettingsTab>(initialTab);
   const [wizardOpen, setWizardOpen] = useState(false);
   const { resetDemo } = useDemoStore();
   return (
@@ -1336,6 +1344,7 @@ function Settings({ company }: { company: Company }) {
           {tab === 'People' && <PeopleSettings />}
           {tab === 'Notifications' && <NotificationSettings />}
           {tab === 'Master data' && <MasterDataSettings />}
+          {tab === 'My profile' && <ProfileSettings company={company} />}
         </div>
       </div>
       {wizardOpen && <OnboardingWizard company={company} onClose={() => setWizardOpen(false)} />}
@@ -1351,7 +1360,13 @@ function settingsIcon(tab: SettingsTab) {
   if (tab === 'Finance') return <Coins {...props} />;
   if (tab === 'People') return <UserRoundCog {...props} />;
   if (tab === 'Notifications') return <Bell {...props} />;
+  if (tab === 'My profile') return <UserRoundCog {...props} />;
   return <Settings2 {...props} />;
+}
+
+function ProfileSettings({ company }: { company: Company }) {
+  const { user } = useAuth();
+  return <div className="space-y-5"><SettingsPanel title="My profile" description="Personal identity, workspace role and account preferences"><div className="flex flex-col gap-6 p-5 sm:flex-row sm:items-center"><div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-2xl font-bold text-white shadow-lg">{(user?.name || user?.email || 'U').charAt(0).toUpperCase()}</div><div className="min-w-0 flex-1"><p className="text-lg font-semibold text-[#2e313f]">{user?.name || 'NAVFarm user'}</p><p className="mt-1 text-xs text-[#707070]">{user?.email}</p><div className="mt-3 flex flex-wrap gap-2"><StatusBadge label="COMPANY ADMIN" tone="blue"/><StatusBadge label="ACTIVE" tone="green"/></div></div><button className="h-10 rounded-xl border border-[#dfe3ea] px-4 text-xs font-semibold text-[#515463]">Change photo</button></div><div className="border-t border-[#ededed] p-5"><SettingsGrid fields={[["Full name",user?.name || 'NAVFarm user'],['Email',user?.email || 'demo@navfarm.local'],['Company',company.name],['Role','Company administrator'],['Language','English'],['Timezone','Asia/Kolkata']]}/></div></SettingsPanel><SettingsPanel title="Experience preferences" description="Personal settings do not affect company accounting configuration"><div className="grid gap-3 p-5 sm:grid-cols-2">{[['Compact data tables','Show more rows on operational screens'],['Email summaries','Receive the daily workspace digest'],['High-priority alerts','Notify for QC holds and cost risks'],['Remember last workspace','Open this company after sign in']].map(([title,description],index)=><div key={title} className="flex items-center justify-between gap-4 rounded-xl border border-[#ededed] p-4"><div><p className="text-xs font-semibold text-[#2e313f]">{title}</p><p className="mt-1 text-[10px] leading-4 text-[#7d8290]">{description}</p></div><span className={`relative h-6 w-11 shrink-0 rounded-full ${index===0?'bg-slate-200':'bg-[#1c4aa9]'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow ${index===0?'left-1':'right-1'}`}/></span></div>)}</div></SettingsPanel></div>;
 }
 
 function SetupChecklist({ company }: { company: Company }) {

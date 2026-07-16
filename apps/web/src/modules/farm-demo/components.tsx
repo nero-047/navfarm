@@ -128,7 +128,8 @@ export function StatCard({
     gray: 'bg-slate-50 text-slate-600',
   };
   return (
-    <div className="rounded-2xl border border-[#e7e7e7] bg-white p-5">
+    <div className="group relative overflow-hidden rounded-2xl border border-[#e3e7ee] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(16,24,40,0.08)]">
+      <span className={`absolute inset-x-0 top-0 h-0.5 ${tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : tone === 'red' ? 'bg-red-500' : tone === 'gray' ? 'bg-slate-400' : 'bg-[#2f66d0]'}`} />
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-[#707070]">{label}</p>
@@ -137,7 +138,7 @@ export function StatCard({
           </p>
         </div>
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass[tone]}`}
+          className={`flex h-10 w-10 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${iconClass[tone]}`}
         >
           <Icon size={19} />
         </div>
@@ -198,7 +199,7 @@ export function TextButton({ children }: { children: ReactNode }) {
 export function DataTable({ children }: { children: ReactNode }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left">
+      <table className="w-full min-w-[920px] border-collapse text-left">
         {children}
       </table>
     </div>
