@@ -173,7 +173,7 @@ export function createCompanyMeta(
     nobName: nob.name,
     lobs: nob.lobs,
     location: 'Location not configured',
-    setupProgress: 40,
+    setupProgress: 0,
   };
 }
 
@@ -195,7 +195,7 @@ export function normalizeCompany(
     nobName: value.nobName ?? inferred.name,
     lobs: value.lobs?.length ? value.lobs : inferred.lobs,
     location: value.location ?? 'Location not configured',
-    setupProgress: value.setupProgress ?? 40,
+    setupProgress: value.setupProgress ?? 0,
   };
 }
 

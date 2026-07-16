@@ -24,8 +24,13 @@ export function SignupForm() {
       setError('Please fill in all fields');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (
+      password.length < 8 ||
+      !/[A-Z]/.test(password) ||
+      !/[0-9]/.test(password) ||
+      !/[^A-Za-z0-9]/.test(password)
+    ) {
+      setError('Use 8+ characters with an uppercase letter, number and special character');
       return;
     }
     setSubmitting(true);
@@ -41,7 +46,7 @@ export function SignupForm() {
           Create account
         </h1>
         <p className="text-[#707070] text-[15px]">
-          Get started with NAVFarm
+          Create a local frontend-demo account
         </p>
       </div>
 
@@ -86,7 +91,7 @@ export function SignupForm() {
           <Input
             id="password"
             type="password"
-            placeholder="••••••••"
+            placeholder="8+ chars, uppercase, number, special"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />

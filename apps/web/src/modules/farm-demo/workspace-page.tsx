@@ -19,13 +19,12 @@ import {
   FileBarChart,
   Gauge,
   GitBranch,
+  LockKeyhole,
   PackageCheck,
   Plus,
   QrCode,
-  Search,
   Settings2,
   ShieldCheck,
-  SlidersHorizontal,
   TrendingUp,
   UserRoundCog,
   Users,
@@ -35,8 +34,6 @@ import { useCurrentCompany } from '@/modules/company/use-current-company';
 import {
   getDemoBatches,
   getDemoTasks,
-  getQualityRecords,
-  getResources,
   INDUSTRY_CONFIG,
   SETUP_STEPS,
   statusTone,
@@ -54,6 +51,16 @@ import {
   TableHead,
   TextButton,
 } from './components';
+import { useDemoStore, type MasterRecord, type QualityLot, type WorkflowBatch } from './demo-store';
+import {
+  BatchDialog,
+  DispositionDialog,
+  OnboardingWizard,
+  OperationDialog,
+  QrDialog,
+  QualityDialog,
+  ResourceDialog,
+} from './workflow-dialogs';
 
 export type WorkspacePageKind =
   | 'dashboard'
@@ -67,7 +74,11 @@ export type WorkspacePageKind =
 
 export function WorkspacePage({ kind }: { kind: WorkspacePageKind }) {
   const company = useCurrentCompany();
+  const { state } = useDemoStore();
   if (!company) return <EmptyCompany />;
+
+  if (state.setup.completedSteps < 9 && kind !== 'settings' && kind !== 'dashboard')
+    return <LockedWorkspace company={company} />;
 
   switch (kind) {
     case 'dashboard':
@@ -89,17 +100,37 @@ export function WorkspacePage({ kind }: { kind: WorkspacePageKind }) {
   }
 }
 
+function LockedWorkspace({ company }: { company: Company }) {
+  const { state } = useDemoStore();
+  return (
+    <div className="flex min-h-[65vh] items-center justify-center">
+      <SectionCard className="max-w-xl">
+        <div className="p-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><LockKeyhole size={24} /></div>
+          <h1 className="mt-5 text-xl font-semibold text-[#2e313f]">Mandatory setup is incomplete</h1>
+          <p className="mt-2 text-sm leading-6 text-[#707070]">Complete steps 1–9 before creating batches or entering production data. Current progress: {state.setup.completedSteps}/15 steps.</p>
+          <Link href={`/${company.slug}/settings`} className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white">Continue company setup</Link>
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
 type Company = NonNullable<ReturnType<typeof useCurrentCompany>>;
 
 function PrimaryButton({
   icon: Icon = Plus,
   children,
+  onClick,
+  disabled = false,
 }: {
   icon?: typeof Plus;
   children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <button className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#151d5e]">
+    <button disabled={disabled} onClick={onClick} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#151d5e] disabled:cursor-not-allowed disabled:opacity-40">
       <Icon size={15} /> {children}
     </button>
   );
@@ -109,6 +140,10 @@ function Dashboard({ company }: { company: Company }) {
   const batches = getDemoBatches(company);
   const tasks = getDemoTasks(company);
   const config = INDUSTRY_CONFIG[company.nobCode];
+  const { state, calculateVariance } = useDemoStore();
+  const activeCount = state.batches.filter((batch) => batch.status === 'APPROVED' || batch.status === 'QC_HOLD' || batch.status === 'READY_TO_CLOSE').length;
+  const passRate = state.qualityLots.length ? (state.qualityLots.filter((lot) => lot.status === 'PASS').length / state.qualityLots.length) * 100 : 0;
+  const totalVariance = state.batches.reduce((sum, batch) => sum + calculateVariance(batch).total, 0);
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -120,29 +155,29 @@ function Dashboard({ company }: { company: Company }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Active batches"
-          value="12"
-          detail="3 approaching planned output"
+          value={String(activeCount)}
+          detail={`${state.batches.filter((batch) => batch.status === 'READY_TO_CLOSE').length} approaching close`}
           icon={Boxes}
           tone="blue"
         />
         <StatCard
           label="Tasks due today"
-          value="8"
-          detail="2 KPI readings need attention"
+          value={String(tasks.filter((task) => task.status !== 'Completed').length)}
+          detail={`${tasks.filter((task) => task.status === 'Deviation').length} KPI reading needs attention`}
           icon={CalendarClock}
           tone="amber"
         />
         <StatCard
           label="QC release rate"
-          value="96.4%"
+          value={`${passRate.toFixed(1)}%`}
           detail="Across the last 30 QC lots"
           icon={ShieldCheck}
           tone="green"
         />
         <StatCard
           label="Cost variance"
-          value="+2.4%"
-          detail="₹ 48,620 unfavourable this period"
+          value={`₹ ${(totalVariance / 100000).toFixed(2)}L`}
+          detail="Projected STANDARD close variance"
           icon={TrendingUp}
           tone="red"
         />
@@ -321,7 +356,16 @@ function AlertCard({
 }
 
 function Batches({ company }: { company: Company }) {
-  const batches = getDemoBatches(company);
+  const { state, approveBatch, closeBatch, calculateVariance } = useDemoStore();
+  const [creating, setCreating] = useState(false);
+  const [notice, setNotice] = useState('');
+  const active = state.batches.filter((batch) => batch.status === 'APPROVED' || batch.status === 'QC_HOLD').length;
+  const ready = state.batches.filter((batch) => batch.status === 'READY_TO_CLOSE').length;
+  const wip = state.batches.reduce((sum, batch) => sum + batch.wip, 0);
+  function close(batch: WorkflowBatch) {
+    const result = closeBatch(batch.id);
+    setNotice(result.message);
+  }
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -331,43 +375,43 @@ function Batches({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton>New batch</PrimaryButton>
+            <PrimaryButton onClick={() => setCreating(true)}>New batch</PrimaryButton>
           </>
         }
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total batches"
-          value="28"
-          detail="12 active · 4 planned"
+          value={String(state.batches.length)}
+          detail={`${active} active · ${state.batches.filter((batch) => batch.status === 'DRAFT').length} draft`}
           icon={Boxes}
         />
         <StatCard
           label="WIP value"
-          value="₹ 18.4L"
+          value={`₹ ${(wip / 100000).toFixed(2)}L`}
           detail="Across all active batches"
           icon={Coins}
           tone="blue"
         />
         <StatCard
           label="Ready to close"
-          value="3"
+          value={String(ready)}
           detail="Balance check pending"
           icon={CheckCircle2}
           tone="green"
         />
         <StatCard
           label="At risk / hold"
-          value="2"
+          value={String(state.batches.filter((batch) => batch.status === 'QC_HOLD').length)}
           detail="One QC hold, one KPI risk"
           icon={AlertTriangle}
           tone="amber"
         />
       </div>
+      <DomainProcess company={company} />
       <SectionCard
         title="Batch register"
         description="Document-aligned local fixtures; no backend records are created"
-        action={<FilterBar />}
       >
         <DataTable>
           <thead>
@@ -381,7 +425,9 @@ function Batches({ company }: { company: Company }) {
             </tr>
           </thead>
           <tbody>
-            {batches.map((batch) => (
+            {state.batches.map((batch) => {
+              const variance = calculateVariance(batch);
+              return (
               <tr key={batch.code} className="hover:bg-[#fcfcfc]">
                 <TableCell>
                   <p className="font-semibold text-[#2e313f]">{batch.code}</p>
@@ -393,52 +439,64 @@ function Batches({ company }: { company: Company }) {
                 <TableCell>
                   <p>{batch.stage}</p>
                   <div className="mt-2 w-28">
-                    <ProgressBar value={batch.progress} />
+                    <ProgressBar value={batch.status === 'CLOSED' ? 100 : batch.actualOutput > 0 ? Math.min(96, (batch.actualOutput / batch.expectedOutput) * 100) : batch.status === 'DRAFT' ? 10 : 55} />
                   </div>
                 </TableCell>
                 <TableCell>
-                  <p>{batch.quantity}</p>
+                  <p>{batch.inputQty.toLocaleString('en-IN')} {batch.inputUom}</p>
                   <p className="mt-1 text-[11px] text-[#707070]">
-                    {batch.output}
+                    Output {batch.actualOutput.toLocaleString('en-IN')} / {batch.expectedOutput.toLocaleString('en-IN')}
                   </p>
                 </TableCell>
                 <TableCell>
-                  <p className="font-medium text-[#2e313f]">{batch.cost}</p>
+                  <p className="font-medium text-[#2e313f]">₹ {batch.wip.toLocaleString('en-IN')}</p>
                   <p className="mt-1 text-[11px] text-[#707070]">
-                    Variance {batch.variance}
+                    {batch.method === 'STANDARD' ? `Projected variance ₹ ${variance.total.toLocaleString('en-IN')}` : 'Actual-cost settlement'}
                   </p>
                 </TableCell>
                 <TableCell>
                   <StatusBadge
-                    label={batch.status}
-                    tone={statusTone(batch.status)}
+                    label={batch.status.replaceAll('_', ' ')}
+                    tone={batch.status === 'CLOSED' ? 'green' : batch.status === 'QC_HOLD' ? 'amber' : batch.status === 'DRAFT' ? 'gray' : 'blue'}
                   />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {batch.status === 'DRAFT' && <button onClick={() => approveBatch(batch.id)} className="text-[10px] font-semibold text-[#1c4aa9]">Approve & lock</button>}
+                    {batch.status === 'READY_TO_CLOSE' && <button onClick={() => close(batch)} className="text-[10px] font-semibold text-[#c24332]">Run close</button>}
+                  </div>
                 </TableCell>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </DataTable>
       </SectionCard>
+      {notice && <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">{notice}</div>}
+      {creating && <BatchDialog company={company} onClose={() => setCreating(false)} />}
     </div>
   );
 }
 
-function FilterBar() {
+function DomainProcess({ company }: { company: Company }) {
+  const rules: Record<typeof company.nobCode, string[]> = {
+    POULTRY: ['Rearing → laying/CB source-batch transfer', 'Hatching candling at days 7/14/18 with setter-to-hatcher transfer', 'Mortality is expensed; slaughter supports main/by-product cost split'],
+    LIVESTOCK: ['Premature costs capitalize to biological-asset NCA', 'Maturity starts amortisation and fair-value review', 'Milk, offspring, wool and disposal retain animal/batch lineage'],
+    AGRICULTURE: ['Bearer plant premature-to-mature stage control', 'Annual harvest enters FIFO inventory', 'Closed mature-season batches copy scheduler and location to next year'],
+    AQUACULTURE: ['Fingerling stocking and pond sub-location tracking', 'Feed capitalizes to biological-asset NCA', 'Partial/full harvests create FIFO lots before aqua slaughter split'],
+    INSECT: ['Colony/hive placement and maintenance costs', 'Honey and wax are separate traceable outputs', 'Moisture, HMF and grade QC gate jar QR generation'],
+    PROCESSING: ['BOR version and ingredient lines lock at approval', 'Actual inclusion is compared with recipe quantity and nutrition', 'Resource/indirect costs enter WIP before QC-released finished feed'],
+  };
   return (
-    <div className="flex items-center gap-2">
-      <button className="rounded-lg border border-[#e5e5e5] p-2 text-[#707070]">
-        <Search size={15} />
-      </button>
-      <button className="rounded-lg border border-[#e5e5e5] p-2 text-[#707070]">
-        <SlidersHorizontal size={15} />
-      </button>
-    </div>
+    <SectionCard title={`${company.nobName} process controls`} description="Documented LOB rules represented by the shared batch, operation, QC and close engine">
+      <div className="grid gap-3 p-5 md:grid-cols-3">{rules[company.nobCode].map((rule, index) => <div key={rule} className="rounded-xl border border-[#ededed] p-4"><span className="text-[10px] font-semibold text-[#1c4aa9]">RULE {index + 1}</span><p className="mt-2 text-xs leading-5 text-[#515463]">{rule}</p></div>)}</div>
+    </SectionCard>
   );
 }
 
 function Operations({ company }: { company: Company }) {
   const tasks = getDemoTasks(company);
   const config = INDUSTRY_CONFIG[company.nobCode];
+  const { state } = useDemoStore();
+  const [recording, setRecording] = useState(false);
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -448,7 +506,7 @@ function Operations({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton>Record entry</PrimaryButton>
+            <PrimaryButton onClick={() => setRecording(true)}>Record entry</PrimaryButton>
           </>
         }
       />
@@ -549,6 +607,14 @@ function Operations({ company }: { company: Company }) {
           </div>
         </SectionCard>
       </div>
+      <SectionCard title="Saved operation entries" description="Local demo transactions shared with batch costing, QC and reports">
+        {state.operations.length === 0 ? (
+          <div className="p-8 text-center text-xs text-[#707070]">No user-entered transactions yet. Record an entry to see the connected workflow.</div>
+        ) : (
+          <DataTable><thead><tr><TableHead>Entry</TableHead><TableHead>Batch</TableHead><TableHead>Actual / expected</TableHead><TableHead>Journal</TableHead></tr></thead><tbody>{state.operations.slice(0, 8).map((entry) => { const batch = state.batches.find((item) => item.id === entry.batchId); return <tr key={entry.id}><TableCell><p className="font-semibold text-[#2e313f]">{entry.entryType}</p><p className="mt-1 text-[11px]">{entry.parameter}</p></TableCell><TableCell>{batch?.code}</TableCell><TableCell>{entry.quantity} {entry.uom}{entry.expected !== undefined ? ` / ${entry.expected}` : ''}</TableCell><TableCell>{entry.journal ? `Dr ${entry.journal.debit} → Cr ${entry.journal.credit} · ₹${entry.journal.amount.toLocaleString('en-IN')}` : 'No cost impact'}</TableCell></tr>; })}</tbody></DataTable>
+        )}
+      </SectionCard>
+      {recording && <OperationDialog company={company} onClose={() => setRecording(false)} />}
     </div>
   );
 }
@@ -611,8 +677,11 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function Quality({ company }: { company: Company }) {
-  const records = getQualityRecords(company);
+  const { state } = useDemoStore();
+  const records = state.qualityLots;
   const config = INDUSTRY_CONFIG[company.nobCode];
+  const [creating, setCreating] = useState(false);
+  const [inspecting, setInspecting] = useState<QualityLot | null>(null);
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -622,35 +691,35 @@ function Quality({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={ClipboardCheck}>New QC batch</PrimaryButton>
+            <PrimaryButton icon={ClipboardCheck} onClick={() => setCreating(true)}>New QC batch</PrimaryButton>
           </>
         }
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Awaiting inspection"
-          value="6"
+          value={String(records.filter((record) => record.status === 'HOLD').length)}
           detail="Oldest: 3h 18m"
           icon={Clock3}
           tone="amber"
         />
         <StatCard
           label="Pass rate"
-          value="96.4%"
+          value={`${records.length ? ((records.filter((record) => record.status === 'PASS').length / records.length) * 100).toFixed(1) : '0.0'}%`}
           detail="30-day rolling result"
           icon={ShieldCheck}
           tone="green"
         />
         <StatCard
           label="On hold"
-          value="1"
+          value={String(records.filter((record) => record.status === 'HOLD').length)}
           detail="Manager disposition required"
           icon={AlertTriangle}
           tone="amber"
         />
         <StatCard
           label="Failed"
-          value="1"
+          value={String(records.filter((record) => record.status === 'FAIL').length)}
           detail="Temperature excursion"
           icon={Activity}
           tone="red"
@@ -659,7 +728,6 @@ function Quality({ company }: { company: Company }) {
       <SectionCard
         title="QC lot register"
         description={`Primary configured parameter: ${config.qualityParameter} · Target ${config.qualityTarget}`}
-        action={<FilterBar />}
       >
         <DataTable>
           <thead>
@@ -674,19 +742,16 @@ function Quality({ company }: { company: Company }) {
           </thead>
           <tbody>
             {records.map((record) => (
-              <tr key={record.lot}>
+              <tr key={record.id}>
                 <TableCell className="font-semibold text-[#2e313f]">
-                  {record.lot}
+                  {record.code}
                 </TableCell>
-                <TableCell>{record.batch}</TableCell>
+                <TableCell>{state.batches.find((batch) => batch.id === record.batchId)?.code ?? 'Unknown'}</TableCell>
                 <TableCell>{record.parameter}</TableCell>
                 <TableCell>{record.result}</TableCell>
                 <TableCell>{record.owner}</TableCell>
                 <TableCell>
-                  <StatusBadge
-                    label={record.status}
-                    tone={statusTone(record.status)}
-                  />
+                  <button onClick={() => setInspecting(record)} className="flex items-center gap-2"><StatusBadge label={record.status} tone={statusTone(record.status)} /><span className="text-[10px] font-semibold text-[#1c4aa9]">Inspect</span></button>
                 </TableCell>
               </tr>
             ))}
@@ -753,12 +818,17 @@ function Quality({ company }: { company: Company }) {
           </div>
         </SectionCard>
       </div>
+      {creating && <QualityDialog company={company} onClose={() => setCreating(false)} />}
+      {inspecting && <DispositionDialog lot={inspecting} onClose={() => setInspecting(null)} />}
     </div>
   );
 }
 
 function Traceability({ company }: { company: Company }) {
   const config = INDUSTRY_CONFIG[company.nobCode];
+  const { state } = useDemoStore();
+  const [generating, setGenerating] = useState(false);
+  const workflowBatch = state.batches.find((item) => item.qcStatus === 'PASS') ?? state.batches[0];
   const batch = getDemoBatches(company)[0];
   return (
     <div className="space-y-6 animate-fade-in">
@@ -769,7 +839,7 @@ function Traceability({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={QrCode}>Generate QR pack</PrimaryButton>
+            <PrimaryButton icon={QrCode} onClick={() => setGenerating(true)}>Generate QR pack</PrimaryButton>
           </>
         }
       />
@@ -824,21 +894,18 @@ function Traceability({ company }: { company: Company }) {
               </tr>
             </thead>
             <tbody>
-              {['0009512', '0009511', '0009510', '0009509'].map((id, index) => (
-                <tr key={id}>
+              {(state.qrPacks.length ? state.qrPacks : [
+                { id: 'seed-1', code: 'PACK-2026-0009512', batchId: workflowBatch.id, createdAt: new Date(2026, 6, 15, 10, 42).toISOString(), quantity: 1, payload: '{}' },
+              ]).map((pack) => (
+                <tr key={pack.id}>
                   <TableCell className="font-semibold text-[#2e313f]">
-                    PACK-2026-{id}
+                    {pack.code}
                   </TableCell>
                   <TableCell>{config.primaryOutput}</TableCell>
                   <TableCell>
-                    <StatusBadge
-                      label={index === 3 ? 'HOLD' : 'PASS'}
-                      tone={index === 3 ? 'amber' : 'green'}
-                    />
+                    <StatusBadge label="PASS" tone="green" />
                   </TableCell>
-                  <TableCell>
-                    {index === 0 ? '10:42 today' : `${index + 1}h ago`}
-                  </TableCell>
+                  <TableCell>{new Date(pack.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</TableCell>
                 </tr>
               ))}
             </tbody>
@@ -865,7 +932,7 @@ function Traceability({ company }: { company: Company }) {
                 </div>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <Metric label="Batch" value={batch.code} />
+                <Metric label="Batch" value={workflowBatch.code} />
                 <Metric label="Origin" value={company.location} />
                 <Metric label="Produced" value="15 Jul 2026" />
                 <Metric label="Expiry" value="22 Jul 2026" />
@@ -874,13 +941,16 @@ function Traceability({ company }: { company: Company }) {
           </div>
         </SectionCard>
       </div>
+      {generating && <QrDialog onClose={() => setGenerating(false)} />}
     </div>
   );
 }
 
 function Resources({ company }: { company: Company }) {
-  const resources = getResources(company);
+  const { state } = useDemoStore();
+  const resources = state.resources;
   const config = INDUSTRY_CONFIG[company.nobCode];
+  const [adding, setAdding] = useState(false);
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -890,7 +960,7 @@ function Resources({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={Wrench}>Add resource</PrimaryButton>
+            <PrimaryButton icon={Wrench} onClick={() => setAdding(true)}>Add resource</PrimaryButton>
           </>
         }
       />
@@ -920,7 +990,7 @@ function Resources({ company }: { company: Company }) {
               {resource.type} · {resource.allocation}
             </p>
             <div className="mt-4 border-t border-[#ededed] pt-3 text-xs font-medium text-[#515463]">
-              {resource.cost}
+              ₹ {resource.costRate.toLocaleString('en-IN')} / {resource.costUom.toLowerCase()}
             </div>
           </div>
         ))}
@@ -1009,35 +1079,42 @@ function Resources({ company }: { company: Company }) {
           </div>
         </SectionCard>
       </div>
+      {adding && <ResourceDialog company={company} onClose={() => setAdding(false)} />}
     </div>
   );
 }
 
 function Reports({ company }: { company: Company }) {
   const config = INDUSTRY_CONFIG[company.nobCode];
+  const { state, calculateVariance } = useDemoStore();
+  const totals = state.batches.reduce((sum, batch) => {
+    const current = calculateVariance(batch);
+    return { price: sum.price + current.price, usage: sum.usage + current.usage, output: sum.output + current.output, overhead: sum.overhead + current.overhead };
+  }, { price: 0, usage: 0, output: 0, overhead: 0 });
+  const maxVariance = Math.max(1, totals.price, totals.usage, totals.output, totals.overhead);
   const variances = [
     {
       name: 'Price variance',
-      value: 72,
-      amount: '₹ 1,29,600',
+      value: (totals.price / maxVariance) * 100,
+      amount: `₹ ${totals.price.toLocaleString('en-IN')}`,
       tone: 'bg-red-400',
     },
     {
       name: 'Usage variance',
-      value: 48,
-      amount: '₹ 49,680',
+      value: (totals.usage / maxVariance) * 100,
+      amount: `₹ ${totals.usage.toLocaleString('en-IN')}`,
       tone: 'bg-amber-400',
     },
     {
       name: 'Output variance',
-      value: 22,
-      amount: '₹ 4,250',
+      value: (totals.output / maxVariance) * 100,
+      amount: `₹ ${totals.output.toLocaleString('en-IN')}`,
       tone: 'bg-blue-400',
     },
     {
       name: 'Overhead variance',
-      value: 34,
-      amount: '₹ 5,000',
+      value: (totals.overhead / maxVariance) * 100,
+      amount: `₹ ${totals.overhead.toLocaleString('en-IN')}`,
       tone: 'bg-violet-400',
     },
   ];
@@ -1051,20 +1128,20 @@ function Reports({ company }: { company: Company }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Period WIP"
-          value="₹ 18.4L"
+          value={`₹ ${(state.batches.reduce((sum, batch) => sum + batch.wip, 0) / 100000).toFixed(2)}L`}
           detail="Across active batches"
           icon={Coins}
         />
         <StatCard
           label="Output value"
-          value="₹ 32.8L"
+          value={`₹ ${(state.batches.reduce((sum, batch) => sum + batch.actualOutput * batch.standardRate, 0) / 100000).toFixed(2)}L`}
           detail={`${config.primaryOutput}`}
           icon={PackageCheck}
           tone="green"
         />
         <StatCard
           label="Unfavourable variance"
-          value="₹ 1.88L"
+          value={`₹ ${((totals.price + totals.usage + totals.output + totals.overhead) / 100000).toFixed(2)}L`}
           detail="Standard-cost batches only"
           icon={TrendingUp}
           tone="red"
@@ -1106,7 +1183,7 @@ function Reports({ company }: { company: Company }) {
         </SectionCard>
         <SectionCard
           title="Management reports"
-          description="Ready-to-build report surfaces from the functional specification"
+          description="Downloadable local CSV views from the connected demo state"
         >
           <div className="grid gap-3 p-5">
             {[
@@ -1118,6 +1195,7 @@ function Reports({ company }: { company: Company }) {
             ].map(([title, text], index) => (
               <button
                 key={title}
+                onClick={() => downloadDemoReport(title, state)}
                 className="flex items-center gap-3 rounded-xl border border-[#ededed] p-3.5 text-left transition-colors hover:border-[#1c4aa9]"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-[#1c4aa9]">
@@ -1182,8 +1260,23 @@ function Reports({ company }: { company: Company }) {
           </tbody>
         </DataTable>
       </SectionCard>
+      <SectionCard title="Audit trail" description="Cross-module actions recorded by the local demo boundary">
+        <div className="divide-y divide-[#ededed]">{state.auditLog.slice(0, 10).map((item, index) => <div key={`${item}-${index}`} className="flex gap-3 px-5 py-3.5 text-xs text-[#515463]"><span className="font-semibold text-[#1c4aa9]">{String(index + 1).padStart(2, '0')}</span><span>{item}</span></div>)}</div>
+      </SectionCard>
     </div>
   );
+}
+
+function downloadDemoReport(title: string, state: ReturnType<typeof useDemoStore>['state']) {
+  const header = ['Report', 'Batch', 'LOB', 'Method', 'Status', 'WIP', 'Actual output'];
+  const rows = state.batches.map((batch) => [title, batch.code, batch.lob, batch.method, batch.status, batch.wip, batch.actualOutput]);
+  const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `navfarm-${title.toLowerCase().replaceAll(' ', '-')}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 const SETTINGS_TABS = [
@@ -1199,6 +1292,8 @@ type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 function Settings({ company }: { company: Company }) {
   const [tab, setTab] = useState<SettingsTab>('Setup checklist');
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const { resetDemo } = useDemoStore();
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -1208,7 +1303,8 @@ function Settings({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={Check}>Save demo changes</PrimaryButton>
+            <button onClick={resetDemo} className="h-10 rounded-xl border border-[#dedede] px-3 text-xs font-semibold text-[#515463]">Reset demo</button>
+            <PrimaryButton icon={Check} onClick={() => setWizardOpen(true)}>Open setup wizard</PrimaryButton>
           </>
         }
       />
@@ -1235,6 +1331,7 @@ function Settings({ company }: { company: Company }) {
           {tab === 'Master data' && <MasterDataSettings />}
         </div>
       </div>
+      {wizardOpen && <OnboardingWizard company={company} onClose={() => setWizardOpen(false)} />}
     </div>
   );
 }
@@ -1251,24 +1348,24 @@ function settingsIcon(tab: SettingsTab) {
 }
 
 function SetupChecklist({ company }: { company: Company }) {
-  const completedCount = Math.round(
-    (company.setupProgress / 100) * SETUP_STEPS.length,
-  );
+  const { state } = useDemoStore();
+  const completedCount = state.setup.completedSteps;
+  const progress = (completedCount / SETUP_STEPS.length) * 100;
   return (
     <SectionCard
       title="Initial setup checklist"
       description="Steps 1–9 are the mandatory foundation; remaining configuration can be completed progressively"
       action={
         <StatusBadge
-          label={`${company.setupProgress}% complete`}
-          tone={company.setupProgress === 100 ? 'green' : 'amber'}
+          label={`${Math.round(progress)}% complete`}
+          tone={progress === 100 ? 'green' : 'amber'}
         />
       }
     >
       <div className="p-5 sm:p-6">
         <ProgressBar
-          value={company.setupProgress}
-          tone={company.setupProgress === 100 ? 'green' : 'blue'}
+          value={progress}
+          tone={progress === 100 ? 'green' : 'blue'}
         />
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           {SETUP_STEPS.map((step, index) => {
@@ -1286,9 +1383,7 @@ function SetupChecklist({ company }: { company: Company }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-[#2e313f]">{step}</p>
                   <p className="mt-0.5 text-[10px] text-[#8a8a8a]">
-                    {index < 9
-                      ? 'Mandatory foundation'
-                      : 'Progressive configuration'}
+                    {index < 9 ? 'Mandatory foundation' : index === 10 || index === 11 ? 'Operational readiness' : 'Progressive configuration'}
                   </p>
                 </div>
                 <StatusBadge
@@ -1305,6 +1400,7 @@ function SetupChecklist({ company }: { company: Company }) {
 }
 
 function CompanySettings({ company }: { company: Company }) {
+  const { state } = useDemoStore();
   return (
     <div className="space-y-5">
       <SettingsPanel
@@ -1313,8 +1409,8 @@ function CompanySettings({ company }: { company: Company }) {
       >
         <SettingsGrid
           fields={[
-            ['Legal name', company.name],
-            ['Display name', company.name],
+            ['Legal name', state.setup.legalName],
+            ['Display name', state.setup.displayName],
             ['Company code', company.slug.toUpperCase().slice(0, 12)],
             ['Registration no.', 'U01100MH2026PTC00184'],
           ]}
@@ -1326,10 +1422,10 @@ function CompanySettings({ company }: { company: Company }) {
       >
         <SettingsGrid
           fields={[
-            ['Primary location', company.location],
+            ['Primary location', state.setup.address],
             ['Address type', 'Farm / registered'],
-            ['Primary contact', 'Rajesh Kumar Sharma'],
-            ['Support email', 'operations@navfarm.demo'],
+            ['Primary contact', state.setup.contactName],
+            ['Support email', state.setup.contactEmail],
           ]}
         />
       </SettingsPanel>
@@ -1339,9 +1435,9 @@ function CompanySettings({ company }: { company: Company }) {
       >
         <SettingsGrid
           fields={[
-            ['Default language', 'English (en)'],
+            ['Default language', state.setup.language],
             ['Additional languages', 'Hindi, Marathi'],
-            ['Timezone', 'Asia/Kolkata'],
+            ['Timezone', state.setup.timezone],
             ['Country', 'India'],
           ]}
         />
@@ -1351,6 +1447,7 @@ function CompanySettings({ company }: { company: Company }) {
 }
 
 function ModuleSettings({ company }: { company: Company }) {
+  const { state, setModule } = useDemoStore();
   return (
     <div className="space-y-5">
       <SettingsPanel
@@ -1359,14 +1456,14 @@ function ModuleSettings({ company }: { company: Company }) {
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            'Batch Management',
-            'Inventory & Costing',
-            'Quality Control',
-            'QR Traceability',
-            'Finance & GL',
+            'Batches',
+            'Inventory',
+            'QC',
+            'QR',
+            'Finance',
             'Analytics',
           ].map((module) => (
-            <ToggleRow key={module} label={module} enabled />
+            <ToggleRow key={module} label={module} enabled={state.setup.modules.includes(module)} onChange={(enabled) => setModule(module, enabled)} />
           ))}
         </div>
       </SettingsPanel>
@@ -1404,6 +1501,7 @@ function ModuleSettings({ company }: { company: Company }) {
 }
 
 function FinanceSettings() {
+  const { state } = useDemoStore();
   return (
     <div className="space-y-5">
       <SettingsPanel
@@ -1412,8 +1510,8 @@ function FinanceSettings() {
       >
         <SettingsGrid
           fields={[
-            ['Base currency', 'INR — Indian Rupee'],
-            ['Fiscal year', 'April to March'],
+            ['Base currency', state.setup.currency],
+            ['Fiscal year', state.setup.fiscalYear],
             ['Accounting standard', 'IND AS / IAS 41'],
             ['Inventory valuation', 'LOB-level configuration'],
           ]}
@@ -1473,11 +1571,17 @@ function PeopleSettings() {
           ))}
         </div>
       </SettingsPanel>
+      <SettingsPanel title="Role permission matrix" description="Documented company-scoped permissions used for the future authorization boundary">
+        <DataTable><thead><tr><TableHead>Role</TableHead><TableHead>Create</TableHead><TableHead>Approve</TableHead><TableHead>Cost</TableHead><TableHead>Finance</TableHead><TableHead>Users</TableHead><TableHead>Export</TableHead></tr></thead><tbody>{[
+          ['SUPER_ADMIN', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes'], ['FARM_MANAGER', 'Yes', 'Yes', 'Own farms', 'No', 'No', 'Yes'], ['ACCOUNTANT', 'No', 'No', 'All', 'Yes', 'No', 'Yes'], ['AUDITOR', 'No', 'No', 'All', 'Read only', 'No', 'Yes'], ['SUPERVISOR', 'Yes', 'No', 'Own batches', 'No', 'No', 'No'], ['VIEWER', 'No', 'No', 'No', 'No', 'No', 'No'],
+        ].map((row) => <tr key={row[0]}>{row.map((cell, index) => <TableCell key={`${row[0]}-${index}`} className={index === 0 ? 'font-semibold text-[#2e313f]' : ''}>{cell}</TableCell>)}</tr>)}</tbody></DataTable>
+      </SettingsPanel>
     </div>
   );
 }
 
 function NotificationSettings() {
+  const { state, setNotificationChannel } = useDemoStore();
   return (
     <SettingsPanel
       title="Alert channels"
@@ -1490,12 +1594,13 @@ function NotificationSettings() {
           ['SMS / WhatsApp', 'Critical operations alerts'],
           ['Push notifications', 'Flutter app delivery'],
           ['Webhook', 'Future external integration'],
-        ].map(([name, detail], index) => (
+        ].map(([name, detail]) => (
           <ToggleRow
             key={name}
             label={name}
             detail={detail}
-            enabled={index < 2}
+            enabled={state.setup.notificationChannels.includes(name)}
+            onChange={(enabled) => setNotificationChannel(name, enabled)}
           />
         ))}
       </div>
@@ -1504,38 +1609,27 @@ function NotificationSettings() {
 }
 
 function MasterDataSettings() {
+  const { state, addMasterRecord, removeMasterRecord } = useDemoStore();
+  const [record, setRecord] = useState<Omit<MasterRecord, 'id'>>({ type: 'ITEM', code: '', name: '', uom: 'KG' });
+  function add() {
+    if (!record.code.trim() || !record.name.trim()) return;
+    addMasterRecord(record);
+    setRecord({ ...record, code: '', name: '' });
+  }
   return (
-    <SettingsPanel
-      title="Master data readiness"
-      description="Reusable master records shared by configured LOBs"
-    >
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[
-          ['Units of measure', '24 records'],
-          ['Items', '186 records'],
-          ['Breeds / varieties', '32 records'],
-          ['Locations', '18 records'],
-          ['Resources', '41 records'],
-          ['QC parameters', '28 records'],
-          ['Schedulers', '16 templates'],
-          ['Costing methods', '3 active'],
-        ].map(([name, count], index) => (
-          <div
-            key={name}
-            className="flex items-center justify-between rounded-xl border border-[#ededed] p-4"
-          >
-            <div>
-              <p className="text-xs font-semibold text-[#2e313f]">{name}</p>
-              <p className="mt-1 text-[11px] text-[#707070]">{count}</p>
-            </div>
-            <StatusBadge
-              label={index === 6 ? 'Review' : 'Ready'}
-              tone={index === 6 ? 'amber' : 'green'}
-            />
-          </div>
-        ))}
-      </div>
-    </SettingsPanel>
+    <div className="space-y-5">
+      <SettingsPanel title="Add master record" description="Configuration-driven UOM, item, breed/variety and multi-level location fixtures">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <select value={record.type} onChange={(e) => setRecord({ ...record, type: e.target.value as MasterRecord['type'] })} className="h-11 rounded-xl border border-[#dedede] px-3 text-xs"><option>UOM</option><option>ITEM</option><option>BREED</option><option>LOCATION</option></select>
+          <input value={record.code} onChange={(e) => setRecord({ ...record, code: e.target.value })} placeholder="Code" className="h-11 rounded-xl border border-[#dedede] px-3 text-xs" />
+          <input value={record.name} onChange={(e) => setRecord({ ...record, name: e.target.value })} placeholder="Name" className="h-11 rounded-xl border border-[#dedede] px-3 text-xs" />
+          <button onClick={add} className="h-11 rounded-xl bg-[#0b1248] px-3 text-xs font-semibold text-white">Add local record</button>
+        </div>
+      </SettingsPanel>
+      <SettingsPanel title="Master data register" description="Local fixtures remain easy to replace with the future master-data API">
+        <div className="divide-y divide-[#ededed]">{state.masterData.map((item) => <div key={item.id} className="grid grid-cols-[70px_100px_1fr_auto] items-center gap-3 py-3 text-xs"><StatusBadge label={item.type} tone="blue" /><span className="font-semibold text-[#2e313f]">{item.code}</span><span className="text-[#707070]">{item.name} · {item.uom}</span><button onClick={() => removeMasterRecord(item.id)} className="font-semibold text-[#c24332]">Remove</button></div>)}</div>
+      </SettingsPanel>
+    </div>
   );
 }
 
@@ -1576,15 +1670,21 @@ function ToggleRow({
   label,
   detail,
   enabled = false,
+  onChange,
 }: {
   label: string;
   detail?: string;
   enabled?: boolean;
+  onChange?: (enabled: boolean) => void;
 }) {
   const [on, setOn] = useState(enabled);
+  const active = onChange ? enabled : on;
   return (
     <button
-      onClick={() => setOn(!on)}
+      onClick={() => {
+        setOn(!active);
+        onChange?.(!active);
+      }}
       className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#ededed] p-3.5 text-left"
     >
       <div>
@@ -1592,10 +1692,10 @@ function ToggleRow({
         {detail && <p className="mt-1 text-[11px] text-[#707070]">{detail}</p>}
       </div>
       <span
-        className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${on ? 'bg-[#1c4aa9]' : 'bg-[#d8d8d8]'}`}
+        className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${active ? 'bg-[#1c4aa9]' : 'bg-[#d8d8d8]'}`}
       >
         <span
-          className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${on ? 'translate-x-5' : 'translate-x-1'}`}
+          className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${active ? 'translate-x-5' : 'translate-x-1'}`}
         />
       </span>
     </button>

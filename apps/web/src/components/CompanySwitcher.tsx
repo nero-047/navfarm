@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { AlertCircle, Check, ChevronDown, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FullPageOverlay } from '@/components/ui/full-page-overlay';
 import {
   COMPANIES,
   NOB_OPTIONS,
@@ -84,7 +85,7 @@ export function CompanySwitcher() {
     setNobCode('');
     setModalOpen(false);
     setOpen(false);
-    router.push(`/${slug}/dashboard`);
+    router.push(`/${slug}/settings`);
   }
 
   return (
@@ -158,13 +159,8 @@ export function CompanySwitcher() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <button
-            aria-label="Close modal"
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setModalOpen(false)}
-          />
-          <div className="relative mx-4 w-full max-w-md rounded-2xl bg-white p-7 text-[#2e313f] shadow-2xl animate-slide-up">
+        <FullPageOverlay onClose={() => setModalOpen(false)} className="max-w-md">
+          <div role="dialog" aria-modal="true" aria-label="Create company" className="w-full rounded-2xl bg-white p-7 text-[#2e313f] shadow-2xl animate-slide-up">
             <button
               onClick={() => setModalOpen(false)}
               className="absolute right-5 top-5 text-[#707070]"
@@ -220,7 +216,7 @@ export function CompanySwitcher() {
               <Button onClick={handleCreate}>Create company</Button>
             </div>
           </div>
-        </div>
+        </FullPageOverlay>
       )}
     </>
   );

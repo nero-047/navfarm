@@ -6,6 +6,7 @@ import { AlertCircle, LogOut, Plus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FullPageOverlay } from '@/components/ui/full-page-overlay';
 import {
   COMPANIES,
   NOB_OPTIONS,
@@ -65,7 +66,7 @@ export default function CompanySelectionPage() {
     setModalOpen(false);
     setName('');
     setNobCode('');
-    router.push(`/${slug}/dashboard`);
+    router.push(`/${slug}/settings`);
   }
 
   return (
@@ -134,13 +135,8 @@ export default function CompanySelectionPage() {
         </div>
       </main>
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <button
-            aria-label="Close modal"
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setModalOpen(false)}
-          />
-          <div className="relative mx-4 w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl animate-slide-up">
+        <FullPageOverlay onClose={() => setModalOpen(false)} className="max-w-md">
+          <div role="dialog" aria-modal="true" aria-label="Create company" className="w-full rounded-2xl bg-white p-7 shadow-2xl animate-slide-up">
             <button
               onClick={() => setModalOpen(false)}
               className="absolute right-5 top-5 text-[#707070]"
@@ -197,7 +193,7 @@ export default function CompanySelectionPage() {
               <Button onClick={createCompany}>Create company</Button>
             </div>
           </div>
-        </div>
+        </FullPageOverlay>
       )}
     </div>
   );

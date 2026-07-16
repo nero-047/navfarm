@@ -16,6 +16,8 @@ import {
   Wrench,
 } from 'lucide-react';
 import { CompanySwitcher } from '@/components/CompanySwitcher';
+import { useCurrentCompany } from '@/modules/company/use-current-company';
+import { DemoStoreProvider } from '@/modules/farm-demo/demo-store';
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', href: 'dashboard' },
@@ -64,6 +66,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const slug = getCurrentSlug(pathname);
+  const currentCompany = useCurrentCompany();
 
   useEffect(() => {
     if (!loading && !user) router.push('/login');
@@ -148,7 +151,13 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
             ))}
           </nav>
         </header>
-        <main className="min-h-screen p-4 sm:p-6 xl:p-8">{children}</main>
+        <main className="min-h-screen p-4 sm:p-6 xl:p-8">
+          {currentCompany ? (
+            <DemoStoreProvider company={currentCompany}>{children}</DemoStoreProvider>
+          ) : (
+            children
+          )}
+        </main>
       </div>
     </div>
   );
