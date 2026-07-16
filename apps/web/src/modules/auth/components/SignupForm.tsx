@@ -46,7 +46,7 @@ export function SignupForm() {
           Create account
         </h1>
         <p className="text-[#707070] text-[15px]">
-          Create a local frontend-demo account
+          Create your NAVFarm account
         </p>
       </div>
 

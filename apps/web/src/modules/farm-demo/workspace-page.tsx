@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import QRCode from 'react-qr-code';
 import {
   Activity,
   AlertTriangle,
@@ -18,9 +18,11 @@ import {
   Clock3,
   Coins,
   FileBarChart,
+  ExternalLink,
   Gauge,
   GitBranch,
   LockKeyhole,
+  LogOut,
   PackageCheck,
   Plus,
   QrCode,
@@ -53,7 +55,12 @@ import {
   TableHead,
   TextButton,
 } from './components';
-import { useDemoStore, type MasterRecord, type QualityLot, type WorkflowBatch } from './demo-store';
+import {
+  useDemoStore,
+  type MasterRecord,
+  type QualityLot,
+  type WorkflowBatch,
+} from './demo-store';
 import {
   BatchDialog,
   BatchStatusDialog,
@@ -81,7 +88,11 @@ export function WorkspacePage({ kind }: { kind: WorkspacePageKind }) {
   const { state } = useDemoStore();
   if (!company) return <EmptyCompany />;
 
-  if (state.setup.completedSteps < 9 && kind !== 'settings' && kind !== 'dashboard')
+  if (
+    state.setup.completedSteps < 9 &&
+    kind !== 'settings' &&
+    kind !== 'dashboard'
+  )
     return <LockedWorkspace company={company} />;
 
   switch (kind) {
@@ -100,8 +111,29 @@ export function WorkspacePage({ kind }: { kind: WorkspacePageKind }) {
     case 'reports':
       return <Reports company={company} />;
     case 'settings':
-      return <Settings company={company} />;
+      return <Settings company={company} section="setup" />;
   }
+}
+
+export function SettingsWorkspacePage({ section }: { section: string }) {
+  const company = useCurrentCompany();
+  if (!company) return <EmptyCompany />;
+  return <Settings company={company} section={section} />;
+}
+
+export function ProfileWorkspacePage() {
+  const company = useCurrentCompany();
+  if (!company) return <EmptyCompany />;
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        eyebrow="Account"
+        title="Profile & preferences"
+        description="Manage your personal details, regional preferences and workspace experience."
+      />
+      <ProfileSettings company={company} />
+    </div>
+  );
 }
 
 function LockedWorkspace({ company }: { company: Company }) {
@@ -110,10 +142,22 @@ function LockedWorkspace({ company }: { company: Company }) {
     <div className="flex min-h-[65vh] items-center justify-center">
       <SectionCard className="max-w-xl">
         <div className="p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><LockKeyhole size={24} /></div>
-          <h1 className="mt-5 text-xl font-semibold text-[#2e313f]">Mandatory setup is incomplete</h1>
-          <p className="mt-2 text-sm leading-6 text-[#707070]">Complete steps 1–9 before creating batches or entering production data. Current progress: {state.setup.completedSteps}/15 steps.</p>
-          <Link href={`/${company.slug}/settings`} className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white">Continue company setup</Link>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+            <LockKeyhole size={24} />
+          </div>
+          <h1 className="mt-5 text-xl font-semibold text-[#2e313f]">
+            Mandatory setup is incomplete
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#707070]">
+            Complete steps 1–9 before creating batches or entering production
+            data. Current progress: {state.setup.completedSteps}/15 steps.
+          </p>
+          <Link
+            href={`/${company.slug}/settings`}
+            className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"
+          >
+            Continue company setup
+          </Link>
         </div>
       </SectionCard>
     </div>
@@ -134,7 +178,11 @@ function PrimaryButton({
   disabled?: boolean;
 }) {
   return (
-    <button disabled={disabled} onClick={onClick} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#151d5e] disabled:cursor-not-allowed disabled:opacity-40">
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#151d5e] disabled:cursor-not-allowed disabled:opacity-40"
+    >
       <Icon size={15} /> {children}
     </button>
   );
@@ -145,20 +193,87 @@ function Dashboard({ company }: { company: Company }) {
   const tasks = getDemoTasks(company);
   const config = INDUSTRY_CONFIG[company.nobCode];
   const { state, calculateVariance } = useDemoStore();
-  const activeCount = state.batches.filter((batch) => ['APPROVED', 'ACTIVE', 'PAUSED', 'QC_HOLD', 'READY_TO_CLOSE'].includes(batch.status)).length;
-  const passRate = state.qualityLots.length ? (state.qualityLots.filter((lot) => lot.status === 'PASS').length / state.qualityLots.length) * 100 : 0;
-  const totalVariance = state.batches.reduce((sum, batch) => sum + calculateVariance(batch).total, 0);
+  const activeCount = state.batches.filter((batch) =>
+    ['APPROVED', 'ACTIVE', 'PAUSED', 'QC_HOLD', 'READY_TO_CLOSE'].includes(
+      batch.status,
+    ),
+  ).length;
+  const passRate = state.qualityLots.length
+    ? (state.qualityLots.filter((lot) => lot.status === 'PASS').length /
+        state.qualityLots.length) *
+      100
+    : 0;
+  const totalVariance = state.batches.reduce(
+    (sum, batch) => sum + calculateVariance(batch).total,
+    0,
+  );
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         eyebrow="Command centre"
         title="Executive dashboard"
         description={`A complete operating view of ${company.name} · ${company.location} · ${company.lobs.length} lines of business.`}
-        action={<><DemoBadge/><select aria-label="Dashboard period" className="h-10 rounded-xl border border-[#dfe3ea] bg-white px-3 text-xs font-semibold text-[#51586a]"><option>Last 6 months</option><option>This month</option><option>This fiscal year</option></select><Link href={`/${company.slug}/reports`} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"><FileBarChart size={14}/> View reports</Link></>}
+        action={
+          <>
+            <DemoBadge />
+            <select
+              aria-label="Dashboard period"
+              className="h-10 rounded-xl border border-[#dfe3ea] bg-white px-3 text-xs font-semibold text-[#51586a]"
+            >
+              <option>Last 6 months</option>
+              <option>This month</option>
+              <option>This fiscal year</option>
+            </select>
+            <Link
+              href={`/${company.slug}/reports`}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"
+            >
+              <FileBarChart size={14} /> View reports
+            </Link>
+          </>
+        }
       />
 
       <div className="overflow-hidden rounded-2xl bg-[linear-gradient(110deg,#0b1248_0%,#16336f_64%,#1c4aa9_100%)] p-5 text-white shadow-[0_16px_45px_rgba(11,18,72,0.18)] sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-center gap-4"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-2xl ring-1 ring-white/15">{company.icon}</div><div><p className="text-lg font-semibold">{company.name}</p><p className="mt-1 text-xs text-white/55">{company.nobName} · Operational snapshot for 16 July 2026</p></div></div><div className="grid grid-cols-3 gap-5 border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0"><div><p className="text-[9px] uppercase tracking-wider text-white/45">Setup</p><p className="mt-1 text-base font-semibold">{company.setupProgress}%</p></div><div><p className="text-[9px] uppercase tracking-wider text-white/45">LOBs</p><p className="mt-1 text-base font-semibold">{company.lobs.length}</p></div><div><p className="text-[9px] uppercase tracking-wider text-white/45">Health</p><p className="mt-1 text-base font-semibold text-emerald-300">Stable</p></div></div></div>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-2xl ring-1 ring-white/15">
+              {company.icon}
+            </div>
+            <div>
+              <p className="text-lg font-semibold">{company.name}</p>
+              <p className="mt-1 text-xs text-white/55">
+                {company.nobName} · Operational snapshot for 16 July 2026
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-5 border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-white/45">
+                Setup
+              </p>
+              <p className="mt-1 text-base font-semibold">
+                {company.setupProgress}%
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-white/45">
+                LOBs
+              </p>
+              <p className="mt-1 text-base font-semibold">
+                {company.lobs.length}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-white/45">
+                Health
+              </p>
+              <p className="mt-1 text-base font-semibold text-emerald-300">
+                Stable
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -171,7 +286,9 @@ function Dashboard({ company }: { company: Company }) {
         />
         <StatCard
           label="Tasks due today"
-          value={String(tasks.filter((task) => task.status !== 'Completed').length)}
+          value={String(
+            tasks.filter((task) => task.status !== 'Completed').length,
+          )}
           detail={`${tasks.filter((task) => task.status === 'Deviation').length} KPI reading needs attention`}
           icon={CalendarClock}
           tone="amber"
@@ -370,8 +487,12 @@ function Batches({ company }: { company: Company }) {
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState('');
   const [managing, setManaging] = useState<WorkflowBatch | null>(null);
-  const active = state.batches.filter((batch) => ['APPROVED','ACTIVE','PAUSED','QC_HOLD'].includes(batch.status)).length;
-  const ready = state.batches.filter((batch) => batch.status === 'READY_TO_CLOSE').length;
+  const active = state.batches.filter((batch) =>
+    ['APPROVED', 'ACTIVE', 'PAUSED', 'QC_HOLD'].includes(batch.status),
+  ).length;
+  const ready = state.batches.filter(
+    (batch) => batch.status === 'READY_TO_CLOSE',
+  ).length;
   const wip = state.batches.reduce((sum, batch) => sum + batch.wip, 0);
   function close(batch: WorkflowBatch) {
     const result = closeBatch(batch.id);
@@ -386,7 +507,9 @@ function Batches({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton onClick={() => setCreating(true)}>New batch</PrimaryButton>
+            <PrimaryButton onClick={() => setCreating(true)}>
+              New batch
+            </PrimaryButton>
           </>
         }
       />
@@ -413,7 +536,9 @@ function Batches({ company }: { company: Company }) {
         />
         <StatCard
           label="At risk / hold"
-          value={String(state.batches.filter((batch) => batch.status === 'QC_HOLD').length)}
+          value={String(
+            state.batches.filter((batch) => batch.status === 'QC_HOLD').length,
+          )}
           detail="One QC hold, one KPI risk"
           icon={AlertTriangle}
           tone="amber"
@@ -422,7 +547,7 @@ function Batches({ company }: { company: Company }) {
       <DomainProcess company={company} />
       <SectionCard
         title="Batch register"
-        description="Document-aligned local fixtures; no backend records are created"
+        description="Production batches across every line of business"
       >
         <DataTable>
           <thead>
@@ -440,66 +565,180 @@ function Batches({ company }: { company: Company }) {
             {state.batches.map((batch) => {
               const variance = calculateVariance(batch);
               return (
-              <tr key={batch.code} className="hover:bg-[#fcfcfc]">
-                <TableCell>
-                  <p className="font-semibold text-[#2e313f]">{batch.code}</p>
-                  <p className="mt-1 text-[11px] text-[#707070]">{batch.lob}</p>
-                </TableCell>
-                <TableCell>
-                  <StatusBadge label={batch.method} tone="gray" />
-                </TableCell>
-                <TableCell>
-                  <p>{batch.stage}</p>
-                  <div className="mt-2 w-28">
-                    <ProgressBar value={batch.status === 'CLOSED' ? 100 : batch.actualOutput > 0 ? Math.min(96, (batch.actualOutput / batch.expectedOutput) * 100) : batch.status === 'DRAFT' ? 10 : 55} />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <p>{batch.inputQty.toLocaleString('en-IN')} {batch.inputUom}</p>
-                  <p className="mt-1 text-[11px] text-[#707070]">
-                    Output {batch.actualOutput.toLocaleString('en-IN')} / {batch.expectedOutput.toLocaleString('en-IN')}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  <p className="font-medium text-[#2e313f]">₹ {batch.wip.toLocaleString('en-IN')}</p>
-                  <p className="mt-1 text-[11px] text-[#707070]">
-                    {batch.method === 'STANDARD' ? `Projected variance ₹ ${variance.total.toLocaleString('en-IN')}` : 'Actual-cost settlement'}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  <StatusBadge
-                    label={batch.status.replaceAll('_', ' ')}
-                    tone={batch.status === 'CLOSED' ? 'green' : batch.status === 'QC_HOLD' ? 'amber' : batch.status === 'DRAFT' ? 'gray' : 'blue'}
-                  />
-                  <div className="mt-1.5"><StatusBadge label={batch.riskStatus.replaceAll('_', ' ')} tone={batch.riskStatus === 'ON_TRACK' ? 'green' : batch.riskStatus === 'WARNING' ? 'amber' : 'red'} /></div>
-                </TableCell>
-                <TableCell><div className="flex min-w-32 flex-col gap-2"><button onClick={() => setManaging(batch)} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#0b1248] px-3 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1b2869]"><Settings2 size={13}/> Manage batch</button>{batch.status === 'DRAFT' && <button onClick={() => approveBatch(batch.id)} className="inline-flex h-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-2 text-[10px] font-semibold text-[#1c4aa9] hover:bg-blue-100">Approve & lock</button>}{batch.status === 'READY_TO_CLOSE' && <button onClick={() => close(batch)} className="inline-flex h-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-2 text-[10px] font-semibold text-[#c24332] hover:bg-red-100">Run close</button>}</div></TableCell>
-              </tr>
+                <tr key={batch.code} className="hover:bg-[#fcfcfc]">
+                  <TableCell>
+                    <p className="font-semibold text-[#2e313f]">{batch.code}</p>
+                    <p className="mt-1 text-[11px] text-[#707070]">
+                      {batch.lob}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge label={batch.method} tone="gray" />
+                  </TableCell>
+                  <TableCell>
+                    <p>{batch.stage}</p>
+                    <div className="mt-2 w-28">
+                      <ProgressBar
+                        value={
+                          batch.status === 'CLOSED'
+                            ? 100
+                            : batch.actualOutput > 0
+                              ? Math.min(
+                                  96,
+                                  (batch.actualOutput / batch.expectedOutput) *
+                                    100,
+                                )
+                              : batch.status === 'DRAFT'
+                                ? 10
+                                : 55
+                        }
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <p>
+                      {batch.inputQty.toLocaleString('en-IN')} {batch.inputUom}
+                    </p>
+                    <p className="mt-1 text-[11px] text-[#707070]">
+                      Output {batch.actualOutput.toLocaleString('en-IN')} /{' '}
+                      {batch.expectedOutput.toLocaleString('en-IN')}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-medium text-[#2e313f]">
+                      ₹ {batch.wip.toLocaleString('en-IN')}
+                    </p>
+                    <p className="mt-1 text-[11px] text-[#707070]">
+                      {batch.method === 'STANDARD'
+                        ? `Projected variance ₹ ${variance.total.toLocaleString('en-IN')}`
+                        : 'Actual-cost settlement'}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge
+                      label={batch.status.replaceAll('_', ' ')}
+                      tone={
+                        batch.status === 'CLOSED'
+                          ? 'green'
+                          : batch.status === 'QC_HOLD'
+                            ? 'amber'
+                            : batch.status === 'DRAFT'
+                              ? 'gray'
+                              : 'blue'
+                      }
+                    />
+                    <div className="mt-1.5">
+                      <StatusBadge
+                        label={batch.riskStatus.replaceAll('_', ' ')}
+                        tone={
+                          batch.riskStatus === 'ON_TRACK'
+                            ? 'green'
+                            : batch.riskStatus === 'WARNING'
+                              ? 'amber'
+                              : 'red'
+                        }
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex min-w-32 flex-col gap-2">
+                      <button
+                        onClick={() => setManaging(batch)}
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#0b1248] px-3 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1b2869]"
+                      >
+                        <Settings2 size={13} /> Manage batch
+                      </button>
+                      {batch.status === 'DRAFT' && (
+                        <button
+                          onClick={() => approveBatch(batch.id)}
+                          className="inline-flex h-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-2 text-[10px] font-semibold text-[#1c4aa9] hover:bg-blue-100"
+                        >
+                          Approve & lock
+                        </button>
+                      )}
+                      {batch.status === 'READY_TO_CLOSE' && (
+                        <button
+                          onClick={() => close(batch)}
+                          className="inline-flex h-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-2 text-[10px] font-semibold text-[#c24332] hover:bg-red-100"
+                        >
+                          Run close
+                        </button>
+                      )}
+                    </div>
+                  </TableCell>
+                </tr>
               );
             })}
           </tbody>
         </DataTable>
       </SectionCard>
-      {notice && <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">{notice}</div>}
-      {creating && <BatchDialog company={company} onClose={() => setCreating(false)} />}
-      {managing && <BatchStatusDialog batch={managing} onClose={() => setManaging(null)} />}
+      {notice && (
+        <div
+          role="status"
+          className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800"
+        >
+          {notice}
+        </div>
+      )}
+      {creating && (
+        <BatchDialog company={company} onClose={() => setCreating(false)} />
+      )}
+      {managing && (
+        <BatchStatusDialog batch={managing} onClose={() => setManaging(null)} />
+      )}
     </div>
   );
 }
 
 function DomainProcess({ company }: { company: Company }) {
   const rules: Record<string, string[]> = {
-    POULTRY: ['Rearing → laying/CB source-batch transfer', 'Hatching candling at days 7/14/18 with setter-to-hatcher transfer', 'Mortality is expensed; slaughter supports main/by-product cost split'],
-    LIVESTOCK: ['Premature costs capitalize to biological-asset NCA', 'Maturity starts amortisation and fair-value review', 'Milk, offspring, wool and disposal retain animal/batch lineage'],
-    AGRICULTURE: ['Bearer plant premature-to-mature stage control', 'Annual harvest enters FIFO inventory', 'Closed mature-season batches copy scheduler and location to next year'],
-    AQUACULTURE: ['Fingerling stocking and pond sub-location tracking', 'Feed capitalizes to biological-asset NCA', 'Partial/full harvests create FIFO lots before aqua slaughter split'],
-    INSECT: ['Colony/hive placement and maintenance costs', 'Honey and wax are separate traceable outputs', 'Moisture, HMF and grade QC gate jar QR generation'],
-    PROCESSING: ['BOR version and ingredient lines lock at approval', 'Actual inclusion is compared with recipe quantity and nutrition', 'Resource/indirect costs enter WIP before QC-released finished feed'],
+    POULTRY: [
+      'Rearing → laying/CB source-batch transfer',
+      'Hatching candling at days 7/14/18 with setter-to-hatcher transfer',
+      'Mortality is expensed; slaughter supports main/by-product cost split',
+    ],
+    LIVESTOCK: [
+      'Premature costs capitalize to biological-asset NCA',
+      'Maturity starts amortisation and fair-value review',
+      'Milk, offspring, wool and disposal retain animal/batch lineage',
+    ],
+    AGRICULTURE: [
+      'Bearer plant premature-to-mature stage control',
+      'Annual harvest enters FIFO inventory',
+      'Closed mature-season batches copy scheduler and location to next year',
+    ],
+    AQUACULTURE: [
+      'Fingerling stocking and pond sub-location tracking',
+      'Feed capitalizes to biological-asset NCA',
+      'Partial/full harvests create FIFO lots before aqua slaughter split',
+    ],
+    INSECT: [
+      'Colony/hive placement and maintenance costs',
+      'Honey and wax are separate traceable outputs',
+      'Moisture, HMF and grade QC gate jar QR generation',
+    ],
+    PROCESSING: [
+      'BOR version and ingredient lines lock at approval',
+      'Actual inclusion is compared with recipe quantity and nutrition',
+      'Resource/indirect costs enter WIP before QC-released finished feed',
+    ],
   };
   const domainRules = rules[company.nobCode] ?? rules.PROCESSING;
   return (
-    <SectionCard title={`${company.nobName} process controls`} description="Documented LOB rules represented by the shared batch, operation, QC and close engine">
-      <div className="grid gap-3 p-5 md:grid-cols-3">{domainRules.map((rule, index) => <div key={rule} className="rounded-xl border border-[#ededed] p-4"><span className="text-[10px] font-semibold text-[#1c4aa9]">RULE {index + 1}</span><p className="mt-2 text-xs leading-5 text-[#515463]">{rule}</p></div>)}</div>
+    <SectionCard
+      title={`${company.nobName} process controls`}
+      description="Key operating rules applied across batches, quality checks and close"
+    >
+      <div className="grid gap-3 p-5 md:grid-cols-3">
+        {domainRules.map((rule, index) => (
+          <div key={rule} className="rounded-xl border border-[#ededed] p-4">
+            <span className="text-[10px] font-semibold text-[#1c4aa9]">
+              RULE {index + 1}
+            </span>
+            <p className="mt-2 text-xs leading-5 text-[#515463]">{rule}</p>
+          </div>
+        ))}
+      </div>
     </SectionCard>
   );
 }
@@ -518,7 +757,9 @@ function Operations({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton onClick={() => setRecording(true)}>Record entry</PrimaryButton>
+            <PrimaryButton onClick={() => setRecording(true)}>
+              Record entry
+            </PrimaryButton>
           </>
         }
       />
@@ -581,7 +822,7 @@ function Operations({ company }: { company: Company }) {
       <div className="grid gap-5 lg:grid-cols-2">
         <SectionCard
           title="Automatic accounting preview"
-          description="Shown for demo only; no GL journal is posted"
+          description="Balanced accounting entry prepared from the selected operation"
         >
           <div className="space-y-3 p-5">
             <JournalLine
@@ -619,14 +860,63 @@ function Operations({ company }: { company: Company }) {
           </div>
         </SectionCard>
       </div>
-      <SectionCard title="Saved operation entries" description="Local demo transactions shared with batch costing, QC and reports">
+      <SectionCard
+        title="Recent operation entries"
+        description="Entries reflected in batch costing, quality and reports"
+      >
         {state.operations.length === 0 ? (
-          <div className="p-8 text-center text-xs text-[#707070]">No user-entered transactions yet. Record an entry to see the connected workflow.</div>
+          <div className="p-8 text-center text-xs text-[#707070]">
+            No user-entered transactions yet. Record an entry to see the
+            connected workflow.
+          </div>
         ) : (
-          <DataTable><thead><tr><TableHead>Entry</TableHead><TableHead>Batch</TableHead><TableHead>Actual / expected</TableHead><TableHead>Journal</TableHead></tr></thead><tbody>{state.operations.slice(0, 8).map((entry) => { const batch = state.batches.find((item) => item.id === entry.batchId); return <tr key={entry.id}><TableCell><p className="font-semibold text-[#2e313f]">{entry.entryType}</p><p className="mt-1 text-[11px]">{entry.parameter}</p></TableCell><TableCell>{batch?.code}</TableCell><TableCell>{entry.quantity} {entry.uom}{entry.expected !== undefined ? ` / ${entry.expected}` : ''}</TableCell><TableCell>{entry.journal ? `Dr ${entry.journal.debit} → Cr ${entry.journal.credit} · ₹${entry.journal.amount.toLocaleString('en-IN')}` : 'No cost impact'}</TableCell></tr>; })}</tbody></DataTable>
+          <DataTable>
+            <thead>
+              <tr>
+                <TableHead>Entry</TableHead>
+                <TableHead>Batch</TableHead>
+                <TableHead>Actual / expected</TableHead>
+                <TableHead>Journal</TableHead>
+              </tr>
+            </thead>
+            <tbody>
+              {state.operations.slice(0, 8).map((entry) => {
+                const batch = state.batches.find(
+                  (item) => item.id === entry.batchId,
+                );
+                return (
+                  <tr key={entry.id}>
+                    <TableCell>
+                      <p className="font-semibold text-[#2e313f]">
+                        {entry.entryType}
+                      </p>
+                      <p className="mt-1 text-[11px]">{entry.parameter}</p>
+                    </TableCell>
+                    <TableCell>{batch?.code}</TableCell>
+                    <TableCell>
+                      {entry.quantity} {entry.uom}
+                      {entry.expected !== undefined
+                        ? ` / ${entry.expected}`
+                        : ''}
+                    </TableCell>
+                    <TableCell>
+                      {entry.journal
+                        ? `Dr ${entry.journal.debit} → Cr ${entry.journal.credit} · ₹${entry.journal.amount.toLocaleString('en-IN')}`
+                        : 'No cost impact'}
+                    </TableCell>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </DataTable>
         )}
       </SectionCard>
-      {recording && <OperationDialog company={company} onClose={() => setRecording(false)} />}
+      {recording && (
+        <OperationDialog
+          company={company}
+          onClose={() => setRecording(false)}
+        />
+      )}
     </div>
   );
 }
@@ -703,14 +993,21 @@ function Quality({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={ClipboardCheck} onClick={() => setCreating(true)}>New QC batch</PrimaryButton>
+            <PrimaryButton
+              icon={ClipboardCheck}
+              onClick={() => setCreating(true)}
+            >
+              New QC batch
+            </PrimaryButton>
           </>
         }
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Awaiting inspection"
-          value={String(records.filter((record) => record.status === 'HOLD').length)}
+          value={String(
+            records.filter((record) => record.status === 'HOLD').length,
+          )}
           detail="Oldest: 3h 18m"
           icon={Clock3}
           tone="amber"
@@ -724,14 +1021,18 @@ function Quality({ company }: { company: Company }) {
         />
         <StatCard
           label="On hold"
-          value={String(records.filter((record) => record.status === 'HOLD').length)}
+          value={String(
+            records.filter((record) => record.status === 'HOLD').length,
+          )}
           detail="Manager disposition required"
           icon={AlertTriangle}
           tone="amber"
         />
         <StatCard
           label="Failed"
-          value={String(records.filter((record) => record.status === 'FAIL').length)}
+          value={String(
+            records.filter((record) => record.status === 'FAIL').length,
+          )}
           detail="Temperature excursion"
           icon={Activity}
           tone="red"
@@ -758,12 +1059,26 @@ function Quality({ company }: { company: Company }) {
                 <TableCell className="font-semibold text-[#2e313f]">
                   {record.code}
                 </TableCell>
-                <TableCell>{state.batches.find((batch) => batch.id === record.batchId)?.code ?? 'Unknown'}</TableCell>
+                <TableCell>
+                  {state.batches.find((batch) => batch.id === record.batchId)
+                    ?.code ?? 'Unknown'}
+                </TableCell>
                 <TableCell>{record.parameter}</TableCell>
                 <TableCell>{record.result}</TableCell>
                 <TableCell>{record.owner}</TableCell>
                 <TableCell>
-                  <button onClick={() => setInspecting(record)} className="flex items-center gap-2"><StatusBadge label={record.status} tone={statusTone(record.status)} /><span className="text-[10px] font-semibold text-[#1c4aa9]">Inspect</span></button>
+                  <button
+                    onClick={() => setInspecting(record)}
+                    className="flex items-center gap-2"
+                  >
+                    <StatusBadge
+                      label={record.status}
+                      tone={statusTone(record.status)}
+                    />
+                    <span className="text-[10px] font-semibold text-[#1c4aa9]">
+                      Inspect
+                    </span>
+                  </button>
                 </TableCell>
               </tr>
             ))}
@@ -830,8 +1145,15 @@ function Quality({ company }: { company: Company }) {
           </div>
         </SectionCard>
       </div>
-      {creating && <QualityDialog company={company} onClose={() => setCreating(false)} />}
-      {inspecting && <DispositionDialog lot={inspecting} onClose={() => setInspecting(null)} />}
+      {creating && (
+        <QualityDialog company={company} onClose={() => setCreating(false)} />
+      )}
+      {inspecting && (
+        <DispositionDialog
+          lot={inspecting}
+          onClose={() => setInspecting(null)}
+        />
+      )}
     </div>
   );
 }
@@ -840,8 +1162,23 @@ function Traceability({ company }: { company: Company }) {
   const config = INDUSTRY_CONFIG[company.nobCode];
   const { state } = useDemoStore();
   const [generating, setGenerating] = useState(false);
-  const workflowBatch = state.batches.find((item) => item.qcStatus === 'PASS') ?? state.batches[0];
+  const workflowBatch =
+    state.batches.find((item) => item.qcStatus === 'PASS') ?? state.batches[0];
   const batch = getDemoBatches(company)[0];
+  const packs = state.qrPacks.length
+    ? state.qrPacks
+    : [
+        {
+          id: 'seed-1',
+          code: 'PACK-2026-0009512',
+          batchId: workflowBatch.id,
+          createdAt: new Date(2026, 6, 15, 10, 42).toISOString(),
+          quantity: 1,
+          payload: '{}',
+        },
+      ];
+  const previewPack = packs[0];
+  const tracePath = `/trace/${company.slug}/${previewPack.code}`;
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -851,13 +1188,15 @@ function Traceability({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={QrCode} onClick={() => setGenerating(true)}>Generate QR pack</PrimaryButton>
+            <PrimaryButton icon={QrCode} onClick={() => setGenerating(true)}>
+              Generate QR pack
+            </PrimaryButton>
           </>
         }
       />
       <SectionCard
         title="Trace chain"
-        description={`${batch.code} · Complete sample lineage`}
+        description={`${batch.code} · Verified production lineage`}
         action={<StatusBadge label="Verified" tone="green" />}
       >
         <div className="overflow-x-auto p-6">
@@ -903,12 +1242,11 @@ function Traceability({ company }: { company: Company }) {
                 <TableHead>Output</TableHead>
                 <TableHead>QC</TableHead>
                 <TableHead>Generated</TableHead>
+                <TableHead>Record</TableHead>
               </tr>
             </thead>
             <tbody>
-              {(state.qrPacks.length ? state.qrPacks : [
-                { id: 'seed-1', code: 'PACK-2026-0009512', batchId: workflowBatch.id, createdAt: new Date(2026, 6, 15, 10, 42).toISOString(), quantity: 1, payload: '{}' },
-              ]).map((pack) => (
+              {packs.map((pack) => (
                 <tr key={pack.id}>
                   <TableCell className="font-semibold text-[#2e313f]">
                     {pack.code}
@@ -917,7 +1255,21 @@ function Traceability({ company }: { company: Company }) {
                   <TableCell>
                     <StatusBadge label="PASS" tone="green" />
                   </TableCell>
-                  <TableCell>{new Date(pack.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</TableCell>
+                  <TableCell>
+                    {new Date(pack.createdAt).toLocaleString('en-IN', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/trace/${company.slug}/${pack.code}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#1c4aa9]"
+                    >
+                      Open page <ExternalLink size={12} />
+                    </Link>
+                  </TableCell>
                 </tr>
               ))}
             </tbody>
@@ -930,8 +1282,14 @@ function Traceability({ company }: { company: Company }) {
           <div className="p-6">
             <div className="mx-auto max-w-sm rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-5">
               <div className="flex items-center gap-4">
-                <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-white text-[#0b1248] shadow-sm">
-                  <QrCode size={54} />
+                <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-white p-2 shadow-sm">
+                  <QRCode
+                    value={`https://navfarm.app${tracePath}`}
+                    size={80}
+                    fgColor="#0b1248"
+                    bgColor="#ffffff"
+                    level="M"
+                  />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-[#2e313f]">
@@ -949,6 +1307,13 @@ function Traceability({ company }: { company: Company }) {
                 <Metric label="Produced" value="15 Jul 2026" />
                 <Metric label="Expiry" value="22 Jul 2026" />
               </div>
+              <Link
+                href={tracePath}
+                target="_blank"
+                className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#0b1248] text-xs font-semibold text-white"
+              >
+                View public trace page <ExternalLink size={13} />
+              </Link>
             </div>
           </div>
         </SectionCard>
@@ -972,7 +1337,9 @@ function Resources({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={Wrench} onClick={() => setAdding(true)}>Add resource</PrimaryButton>
+            <PrimaryButton icon={Wrench} onClick={() => setAdding(true)}>
+              Add resource
+            </PrimaryButton>
           </>
         }
       />
@@ -1002,7 +1369,8 @@ function Resources({ company }: { company: Company }) {
               {resource.type} · {resource.allocation}
             </p>
             <div className="mt-4 border-t border-[#ededed] pt-3 text-xs font-medium text-[#515463]">
-              ₹ {resource.costRate.toLocaleString('en-IN')} / {resource.costUom.toLowerCase()}
+              ₹ {resource.costRate.toLocaleString('en-IN')} /{' '}
+              {resource.costUom.toLowerCase()}
             </div>
           </div>
         ))}
@@ -1091,7 +1459,9 @@ function Resources({ company }: { company: Company }) {
           </div>
         </SectionCard>
       </div>
-      {adding && <ResourceDialog company={company} onClose={() => setAdding(false)} />}
+      {adding && (
+        <ResourceDialog company={company} onClose={() => setAdding(false)} />
+      )}
     </div>
   );
 }
@@ -1099,11 +1469,25 @@ function Resources({ company }: { company: Company }) {
 function Reports({ company }: { company: Company }) {
   const config = INDUSTRY_CONFIG[company.nobCode];
   const { state, calculateVariance } = useDemoStore();
-  const totals = state.batches.reduce((sum, batch) => {
-    const current = calculateVariance(batch);
-    return { price: sum.price + current.price, usage: sum.usage + current.usage, output: sum.output + current.output, overhead: sum.overhead + current.overhead };
-  }, { price: 0, usage: 0, output: 0, overhead: 0 });
-  const maxVariance = Math.max(1, totals.price, totals.usage, totals.output, totals.overhead);
+  const totals = state.batches.reduce(
+    (sum, batch) => {
+      const current = calculateVariance(batch);
+      return {
+        price: sum.price + current.price,
+        usage: sum.usage + current.usage,
+        output: sum.output + current.output,
+        overhead: sum.overhead + current.overhead,
+      };
+    },
+    { price: 0, usage: 0, output: 0, overhead: 0 },
+  );
+  const maxVariance = Math.max(
+    1,
+    totals.price,
+    totals.usage,
+    totals.output,
+    totals.overhead,
+  );
   const variances = [
     {
       name: 'Price variance',
@@ -1161,7 +1545,7 @@ function Reports({ company }: { company: Company }) {
         <StatCard
           label="Gross margin"
           value="18.6%"
-          detail="Demo management view"
+          detail="Current operating estimate"
           icon={BarChart3}
           tone="blue"
         />
@@ -1195,7 +1579,7 @@ function Reports({ company }: { company: Company }) {
         </SectionCard>
         <SectionCard
           title="Management reports"
-          description="Downloadable local CSV views from the connected demo state"
+          description="Operational and financial reports available for export"
         >
           <div className="grid gap-3 p-5">
             {[
@@ -1207,7 +1591,7 @@ function Reports({ company }: { company: Company }) {
             ].map(([title, text], index) => (
               <button
                 key={title}
-                onClick={() => downloadDemoReport(title, state)}
+                onClick={() => index === 3 ? window.location.assign(`/${company.slug}/traceability`) : downloadDemoReport(title, state)}
                 className="flex items-center gap-3 rounded-xl border border-[#ededed] p-3.5 text-left transition-colors hover:border-[#1c4aa9]"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-[#1c4aa9]">
@@ -1272,17 +1656,55 @@ function Reports({ company }: { company: Company }) {
           </tbody>
         </DataTable>
       </SectionCard>
-      <SectionCard title="Audit trail" description="Cross-module actions recorded by the local demo boundary">
-        <div className="divide-y divide-[#ededed]">{state.auditLog.slice(0, 10).map((item, index) => <div key={`${item}-${index}`} className="flex gap-3 px-5 py-3.5 text-xs text-[#515463]"><span className="font-semibold text-[#1c4aa9]">{String(index + 1).padStart(2, '0')}</span><span>{item}</span></div>)}</div>
+      <SectionCard
+        title="Activity history"
+        description="Recent changes across the company workspace"
+      >
+        <div className="divide-y divide-[#ededed]">
+          {state.auditLog.slice(0, 10).map((item, index) => (
+            <div
+              key={`${item}-${index}`}
+              className="flex gap-3 px-5 py-3.5 text-xs text-[#515463]"
+            >
+              <span className="font-semibold text-[#1c4aa9]">
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
       </SectionCard>
     </div>
   );
 }
 
-function downloadDemoReport(title: string, state: ReturnType<typeof useDemoStore>['state']) {
-  const header = ['Report', 'Batch', 'LOB', 'Method', 'Status', 'WIP', 'Actual output'];
-  const rows = state.batches.map((batch) => [title, batch.code, batch.lob, batch.method, batch.status, batch.wip, batch.actualOutput]);
-  const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\n');
+function downloadDemoReport(
+  title: string,
+  state: ReturnType<typeof useDemoStore>['state'],
+) {
+  const header = [
+    'Report',
+    'Batch',
+    'LOB',
+    'Method',
+    'Status',
+    'WIP',
+    'Actual output',
+  ];
+  const rows = state.batches.map((batch) => [
+    title,
+    batch.code,
+    batch.lob,
+    batch.method,
+    batch.status,
+    batch.wip,
+    batch.actualOutput,
+  ]);
+  const csv = [header, ...rows]
+    .map((row) =>
+      row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','),
+    )
+    .join('\n');
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
   const link = document.createElement('a');
   link.href = url;
@@ -1291,82 +1713,167 @@ function downloadDemoReport(title: string, state: ReturnType<typeof useDemoStore
   URL.revokeObjectURL(url);
 }
 
-const SETTINGS_TABS = [
-  'Setup checklist',
-  'Company',
-  'Modules & LOBs',
-  'Finance',
-  'People',
-  'Notifications',
-  'Master data',
-  'My profile',
+const SETTINGS_SECTIONS = [
+  { slug: 'setup', label: 'Setup checklist' },
+  { slug: 'company', label: 'Company profile' },
+  { slug: 'modules', label: 'Modules & LOBs' },
+  { slug: 'finance', label: 'Finance & mappings' },
+  { slug: 'members', label: 'Members' },
+  { slug: 'roles', label: 'Roles & permissions' },
+  { slug: 'notifications', label: 'Notifications' },
+  { slug: 'master-data', label: 'Master data' },
 ] as const;
-type SettingsTab = (typeof SETTINGS_TABS)[number];
+type SettingsSection = (typeof SETTINGS_SECTIONS)[number]['slug'];
 
-function Settings({ company }: { company: Company }) {
-  const searchParams = useSearchParams();
-  const initialTab: SettingsTab = searchParams.get('tab') === 'profile' ? 'My profile' : 'Setup checklist';
-  const [tab, setTab] = useState<SettingsTab>(initialTab);
+function Settings({ company, section }: { company: Company; section: string }) {
+  const activeSection: SettingsSection = SETTINGS_SECTIONS.some(
+    (item) => item.slug === section,
+  )
+    ? (section as SettingsSection)
+    : 'setup';
   const [wizardOpen, setWizardOpen] = useState(false);
   const { resetDemo } = useDemoStore();
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         eyebrow="Configuration"
-        title="Settings & onboarding"
-        description="The documented 15-step company setup, module configuration and master-data foundation in a frontend-only demo."
+        title="Company settings"
+        description="Manage company details, operating structure, finance, access and master data."
         action={
           <>
-            <DemoBadge />
-            <button onClick={resetDemo} className="h-10 rounded-xl border border-[#dedede] px-3 text-xs font-semibold text-[#515463]">Reset demo</button>
-            <PrimaryButton icon={Check} onClick={() => setWizardOpen(true)}>Open setup wizard</PrimaryButton>
+            <button
+              onClick={resetDemo}
+              className="h-10 rounded-xl border border-[#dedede] px-3 text-xs font-semibold text-[#515463]"
+            >
+              Restore sample data
+            </button>
+            <PrimaryButton icon={Check} onClick={() => setWizardOpen(true)}>
+              Open setup wizard
+            </PrimaryButton>
           </>
         }
       />
       <div className="grid gap-5 xl:grid-cols-[230px_1fr]">
-        <aside className="h-fit rounded-2xl border border-[#e7e7e7] bg-white p-2">
-          {SETTINGS_TABS.map((item) => (
-            <button
-              key={item}
-              onClick={() => setTab(item)}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition-colors ${tab === item ? 'bg-[#0b1248] text-white' : 'text-[#606372] hover:bg-[#f7f7f7]'}`}
+        <aside className="h-fit rounded-2xl border border-[#e7e7e7] bg-white p-2 xl:sticky xl:top-24">
+          <p className="px-3 pb-2 pt-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-[#9aa0ae]">
+            Settings
+          </p>
+          {SETTINGS_SECTIONS.map((item) => (
+            <Link
+              key={item.slug}
+              href={`/${company.slug}/settings/${item.slug}`}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition-colors ${activeSection === item.slug ? 'bg-[#0b1248] text-white' : 'text-[#606372] hover:bg-[#f7f7f7]'}`}
             >
-              {settingsIcon(item)}
-              {item}
-            </button>
+              {settingsIcon(item.slug)}
+              {item.label}
+            </Link>
           ))}
         </aside>
         <div>
-          {tab === 'Setup checklist' && <SetupChecklist company={company} />}
-          {tab === 'Company' && <CompanySettings company={company} />}
-          {tab === 'Modules & LOBs' && <ModuleSettings company={company} />}
-          {tab === 'Finance' && <FinanceSettings />}
-          {tab === 'People' && <PeopleSettings />}
-          {tab === 'Notifications' && <NotificationSettings />}
-          {tab === 'Master data' && <MasterDataSettings />}
-          {tab === 'My profile' && <ProfileSettings company={company} />}
+          {activeSection === 'setup' && <SetupChecklist company={company} />}
+          {activeSection === 'company' && <CompanySettings company={company} />}
+          {activeSection === 'modules' && <ModuleSettings company={company} />}
+          {activeSection === 'finance' && <FinanceSettings />}
+          {activeSection === 'members' && <MemberSettings />}
+          {activeSection === 'roles' && <RoleSettings />}
+          {activeSection === 'notifications' && <NotificationSettings />}
+          {activeSection === 'master-data' && <MasterDataSettings />}
         </div>
       </div>
-      {wizardOpen && <OnboardingWizard company={company} onClose={() => setWizardOpen(false)} />}
+      {wizardOpen && (
+        <OnboardingWizard
+          company={company}
+          onClose={() => setWizardOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
-function settingsIcon(tab: SettingsTab) {
+function settingsIcon(tab: SettingsSection) {
   const props = { size: 15 };
-  if (tab === 'Setup checklist') return <ClipboardCheck {...props} />;
-  if (tab === 'Company') return <Building2 {...props} />;
-  if (tab === 'Modules & LOBs') return <Boxes {...props} />;
-  if (tab === 'Finance') return <Coins {...props} />;
-  if (tab === 'People') return <UserRoundCog {...props} />;
-  if (tab === 'Notifications') return <Bell {...props} />;
-  if (tab === 'My profile') return <UserRoundCog {...props} />;
+  if (tab === 'setup') return <ClipboardCheck {...props} />;
+  if (tab === 'company') return <Building2 {...props} />;
+  if (tab === 'modules') return <Boxes {...props} />;
+  if (tab === 'finance') return <Coins {...props} />;
+  if (tab === 'members' || tab === 'roles') return <UserRoundCog {...props} />;
+  if (tab === 'notifications') return <Bell {...props} />;
   return <Settings2 {...props} />;
 }
 
 function ProfileSettings({ company }: { company: Company }) {
-  const { user } = useAuth();
-  return <div className="space-y-5"><SettingsPanel title="My profile" description="Personal identity, workspace role and account preferences"><div className="flex flex-col gap-6 p-5 sm:flex-row sm:items-center"><div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-2xl font-bold text-white shadow-lg">{(user?.name || user?.email || 'U').charAt(0).toUpperCase()}</div><div className="min-w-0 flex-1"><p className="text-lg font-semibold text-[#2e313f]">{user?.name || 'NAVFarm user'}</p><p className="mt-1 text-xs text-[#707070]">{user?.email}</p><div className="mt-3 flex flex-wrap gap-2"><StatusBadge label="COMPANY ADMIN" tone="blue"/><StatusBadge label="ACTIVE" tone="green"/></div></div><button className="h-10 rounded-xl border border-[#dfe3ea] px-4 text-xs font-semibold text-[#515463]">Change photo</button></div><div className="border-t border-[#ededed] p-5"><SettingsGrid fields={[["Full name",user?.name || 'NAVFarm user'],['Email',user?.email || 'demo@navfarm.local'],['Company',company.name],['Role','Company administrator'],['Language','English'],['Timezone','Asia/Kolkata']]}/></div></SettingsPanel><SettingsPanel title="Experience preferences" description="Personal settings do not affect company accounting configuration"><div className="grid gap-3 p-5 sm:grid-cols-2">{[['Compact data tables','Show more rows on operational screens'],['Email summaries','Receive the daily workspace digest'],['High-priority alerts','Notify for QC holds and cost risks'],['Remember last workspace','Open this company after sign in']].map(([title,description],index)=><div key={title} className="flex items-center justify-between gap-4 rounded-xl border border-[#ededed] p-4"><div><p className="text-xs font-semibold text-[#2e313f]">{title}</p><p className="mt-1 text-[10px] leading-4 text-[#7d8290]">{description}</p></div><span className={`relative h-6 w-11 shrink-0 rounded-full ${index===0?'bg-slate-200':'bg-[#1c4aa9]'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow ${index===0?'left-1':'right-1'}`}/></span></div>)}</div></SettingsPanel></div>;
+  const { user, logout } = useAuth();
+  return (
+    <div className="space-y-5">
+      <SettingsPanel
+        title="My profile"
+        description="Personal identity, workspace role and account preferences"
+      >
+        <div className="flex flex-col gap-6 p-5 sm:flex-row sm:items-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-2xl font-bold text-white shadow-lg">
+            {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-semibold text-[#2e313f]">
+              {user?.name || 'NAVFarm user'}
+            </p>
+            <p className="mt-1 text-xs text-[#707070]">{user?.email}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <StatusBadge label="COMPANY ADMIN" tone="blue" />
+              <StatusBadge label="ACTIVE" tone="green" />
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-[#ededed] p-5">
+          <SettingsGrid
+            fields={[
+              ['Full name', user?.name || 'NAVFarm user'],
+              ['Email', user?.email || 'user@navfarm.app'],
+              ['Company', company.name],
+              ['Role', 'Company administrator'],
+              ['Language', 'English'],
+              ['Timezone', 'Asia/Kolkata'],
+            ]}
+          />
+        </div>
+      </SettingsPanel>
+      <SettingsPanel
+        title="Experience preferences"
+        description="Personal settings do not affect company accounting configuration"
+      >
+        <div className="grid gap-3 p-5 sm:grid-cols-2">
+          {[
+            ['Compact data tables', 'Show more rows on operational screens'],
+            ['Email summaries', 'Receive the daily workspace digest'],
+            ['High-priority alerts', 'Notify for QC holds and cost risks'],
+            ['Remember last workspace', 'Open this company after sign in'],
+          ].map(([title, description], index) => (
+            <div
+              key={title}
+              className="flex items-center justify-between gap-4 rounded-xl border border-[#ededed] p-4"
+            >
+              <div>
+                <p className="text-xs font-semibold text-[#2e313f]">{title}</p>
+                <p className="mt-1 text-[10px] leading-4 text-[#7d8290]">
+                  {description}
+                </p>
+              </div>
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full ${index === 0 ? 'bg-slate-200' : 'bg-[#1c4aa9]'}`}
+              >
+                <span
+                  className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow ${index === 0 ? 'left-1' : 'right-1'}`}
+                />
+              </span>
+            </div>
+          ))}
+        </div>
+      </SettingsPanel>
+      <SettingsPanel title="Account security" description="Review your session or sign out of NAVFarm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-semibold text-[#30364b]">Current session</p><p className="mt-1 text-[10px] text-[#7d8290]">Signed in on this browser · Active now</p></div><button onClick={() => { logout(); window.location.assign('/login'); }} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-xs font-semibold text-[#c24332]"><LogOut size={14}/> Sign out</button></div>
+      </SettingsPanel>
+    </div>
+  );
 }
 
 function SetupChecklist({ company }: { company: Company }) {
@@ -1405,7 +1912,11 @@ function SetupChecklist({ company }: { company: Company }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-[#2e313f]">{step}</p>
                   <p className="mt-0.5 text-[10px] text-[#8a8a8a]">
-                    {index < 9 ? 'Mandatory foundation' : index === 10 || index === 11 ? 'Operational readiness' : 'Progressive configuration'}
+                    {index < 9
+                      ? 'Mandatory foundation'
+                      : index === 10 || index === 11
+                        ? 'Operational readiness'
+                        : 'Progressive configuration'}
                   </p>
                 </div>
                 <StatusBadge
@@ -1477,16 +1988,16 @@ function ModuleSettings({ company }: { company: Company }) {
         description="Modules drive navigation, schedulers and configuration"
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            'Batches',
-            'Inventory',
-            'QC',
-            'QR',
-            'Finance',
-            'Analytics',
-          ].map((module) => (
-            <ToggleRow key={module} label={module} enabled={state.setup.modules.includes(module)} onChange={(enabled) => setModule(module, enabled)} />
-          ))}
+          {['Batches', 'Inventory', 'QC', 'QR', 'Finance', 'Analytics'].map(
+            (module) => (
+              <ToggleRow
+                key={module}
+                label={module}
+                enabled={state.setup.modules.includes(module)}
+                onChange={(enabled) => setModule(module, enabled)}
+              />
+            ),
+          )}
         </div>
       </SettingsPanel>
       <SettingsPanel
@@ -1568,35 +2079,158 @@ function FinanceSettings() {
   );
 }
 
-function PeopleSettings() {
+function MemberSettings() {
+  return (
+    <SettingsPanel
+      title="Members"
+      description="People with access to this company workspace"
+      action={<PrimaryButton icon={Plus}>Invite member</PrimaryButton>}
+    >
+      <div className="border-b border-[#ededed] p-5">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input
+            aria-label="Search members"
+            placeholder="Search by name, email or role"
+            className="h-10 flex-1 rounded-xl border border-[#dedede] px-3 text-xs outline-none focus:border-[#1c4aa9]"
+          />
+          <select
+            aria-label="Filter members"
+            className="h-10 rounded-xl border border-[#dedede] bg-white px-3 text-xs"
+          >
+            <option>All roles</option>
+            <option>Administrators</option>
+            <option>Operations</option>
+            <option>Quality</option>
+            <option>Finance</option>
+          </select>
+        </div>
+      </div>
+      <DataTable>
+        <thead>
+          <tr>
+            <TableHead>Member</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Access</TableHead>
+            <TableHead>Status</TableHead>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            [
+              'Rajesh Sharma',
+              'rajesh@sunriselivestock.in',
+              'Super admin',
+              'All modules',
+            ],
+            [
+              'Anita Patel',
+              'anita@sunriselivestock.in',
+              'Farm manager',
+              'Batches, operations and KPIs',
+            ],
+            [
+              'Harish Rao',
+              'harish@sunriselivestock.in',
+              'QC inspector',
+              'Quality and traceability',
+            ],
+            [
+              'Meera Iyer',
+              'meera@sunriselivestock.in',
+              'Accountant',
+              'Finance and reports',
+            ],
+          ].map(([name, email, role, scope]) => (
+            <tr key={name}>
+              <TableCell>
+                <p className="font-semibold text-[#2e313f]">{name}</p>
+                <p className="mt-1 text-[10px] text-[#8a8a8a]">{email}</p>
+              </TableCell>
+              <TableCell>
+                <StatusBadge label={role} tone="blue" />
+              </TableCell>
+              <TableCell>{scope}</TableCell>
+              <TableCell>
+                <StatusBadge label="Active" tone="green" />
+              </TableCell>
+            </tr>
+          ))}
+        </tbody>
+      </DataTable>
+      <div className="flex items-center justify-between border-t border-[#ededed] px-5 py-3 text-[10px] text-[#7d8290]">
+        <span>Showing 4 of 18 members</span>
+        <span>1–4 of 18</span>
+      </div>
+    </SettingsPanel>
+  );
+}
+
+function RoleSettings() {
   return (
     <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Roles"
+          value="6"
+          detail="4 standard · 2 custom"
+          icon={ShieldCheck}
+        />
+        <StatCard
+          label="Assigned members"
+          value="18"
+          detail="Across all active roles"
+          icon={Users}
+          tone="green"
+        />
+        <StatCard
+          label="Unassigned"
+          value="1"
+          detail="Invitation pending"
+          icon={AlertTriangle}
+          tone="amber"
+        />
+      </div>
       <SettingsPanel
-        title="Users & roles"
-        description="Company-scoped role-based access with granular module actions"
+        title="Roles & permissions"
+        description="Define workspace access by role"
+        action={<PrimaryButton icon={Plus}>Create role</PrimaryButton>}
       >
-        <div className="space-y-3">
-          {[
-            ['Rajesh Sharma', 'SUPER_ADMIN', 'All modules'],
-            ['Anita Patel', 'FARM_MANAGER', 'Batches, operations, KPI'],
-            ['Harish Rao', 'QC_INSPECTOR', 'QC and QR'],
-            ['Meera Iyer', 'ACCOUNTANT', 'Finance and reports'],
-          ].map(([name, role, scope]) => (
-            <div
-              key={name}
-              className="grid gap-2 rounded-xl border border-[#ededed] p-4 sm:grid-cols-[1fr_150px_1fr] sm:items-center"
-            >
-              <p className="text-xs font-semibold text-[#2e313f]">{name}</p>
-              <StatusBadge label={role} tone="blue" />
-              <p className="text-[11px] text-[#707070]">{scope}</p>
-            </div>
-          ))}
-        </div>
-      </SettingsPanel>
-      <SettingsPanel title="Role permission matrix" description="Documented company-scoped permissions used for the future authorization boundary">
-        <DataTable><thead><tr><TableHead>Role</TableHead><TableHead>Create</TableHead><TableHead>Approve</TableHead><TableHead>Cost</TableHead><TableHead>Finance</TableHead><TableHead>Users</TableHead><TableHead>Export</TableHead></tr></thead><tbody>{[
-          ['SUPER_ADMIN', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes'], ['FARM_MANAGER', 'Yes', 'Yes', 'Own farms', 'No', 'No', 'Yes'], ['ACCOUNTANT', 'No', 'No', 'All', 'Yes', 'No', 'Yes'], ['AUDITOR', 'No', 'No', 'All', 'Read only', 'No', 'Yes'], ['SUPERVISOR', 'Yes', 'No', 'Own batches', 'No', 'No', 'No'], ['VIEWER', 'No', 'No', 'No', 'No', 'No', 'No'],
-        ].map((row) => <tr key={row[0]}>{row.map((cell, index) => <TableCell key={`${row[0]}-${index}`} className={index === 0 ? 'font-semibold text-[#2e313f]' : ''}>{cell}</TableCell>)}</tr>)}</tbody></DataTable>
+        <DataTable>
+          <thead>
+            <tr>
+              <TableHead>Role</TableHead>
+              <TableHead>Create</TableHead>
+              <TableHead>Approve</TableHead>
+              <TableHead>Cost</TableHead>
+              <TableHead>Finance</TableHead>
+              <TableHead>Users</TableHead>
+              <TableHead>Export</TableHead>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ['Super admin', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes'],
+              ['Farm manager', 'Yes', 'Yes', 'Own farms', 'No', 'No', 'Yes'],
+              ['Accountant', 'No', 'No', 'All', 'Yes', 'No', 'Yes'],
+              ['Auditor', 'No', 'No', 'All', 'Read only', 'No', 'Yes'],
+              ['Supervisor', 'Yes', 'No', 'Own batches', 'No', 'No', 'No'],
+              ['Viewer', 'No', 'No', 'No', 'No', 'No', 'No'],
+            ].map((row) => (
+              <tr key={row[0]}>
+                {row.map((cell, index) => (
+                  <TableCell
+                    key={`${row[0]}-${index}`}
+                    className={
+                      index === 0 ? 'font-semibold text-[#2e313f]' : ''
+                    }
+                  >
+                    {cell}
+                  </TableCell>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </DataTable>
       </SettingsPanel>
     </div>
   );
@@ -1615,7 +2249,7 @@ function NotificationSettings() {
           ['Email', 'Critical alerts and weekly reports'],
           ['SMS / WhatsApp', 'Critical operations alerts'],
           ['Push notifications', 'Flutter app delivery'],
-          ['Webhook', 'Future external integration'],
+          ['Webhook', 'Send alerts to connected business systems'],
         ].map(([name, detail]) => (
           <ToggleRow
             key={name}
@@ -1632,7 +2266,12 @@ function NotificationSettings() {
 
 function MasterDataSettings() {
   const { state, addMasterRecord, removeMasterRecord } = useDemoStore();
-  const [record, setRecord] = useState<Omit<MasterRecord, 'id'>>({ type: 'ITEM', code: '', name: '', uom: 'KG' });
+  const [record, setRecord] = useState<Omit<MasterRecord, 'id'>>({
+    type: 'ITEM',
+    code: '',
+    name: '',
+    uom: 'KG',
+  });
   function add() {
     if (!record.code.trim() || !record.name.trim()) return;
     addMasterRecord(record);
@@ -1640,16 +2279,70 @@ function MasterDataSettings() {
   }
   return (
     <div className="space-y-5">
-      <SettingsPanel title="Add master record" description="Configuration-driven UOM, item, breed/variety and multi-level location fixtures">
+      <SettingsPanel
+        title="Add master record"
+        description="Create a unit, item, breed, variety or operating location"
+      >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <select value={record.type} onChange={(e) => setRecord({ ...record, type: e.target.value as MasterRecord['type'] })} className="h-11 rounded-xl border border-[#dedede] px-3 text-xs"><option>UOM</option><option>ITEM</option><option>BREED</option><option>LOCATION</option></select>
-          <input value={record.code} onChange={(e) => setRecord({ ...record, code: e.target.value })} placeholder="Code" className="h-11 rounded-xl border border-[#dedede] px-3 text-xs" />
-          <input value={record.name} onChange={(e) => setRecord({ ...record, name: e.target.value })} placeholder="Name" className="h-11 rounded-xl border border-[#dedede] px-3 text-xs" />
-          <button onClick={add} className="h-11 rounded-xl bg-[#0b1248] px-3 text-xs font-semibold text-white">Add local record</button>
+          <select
+            value={record.type}
+            onChange={(e) =>
+              setRecord({
+                ...record,
+                type: e.target.value as MasterRecord['type'],
+              })
+            }
+            className="h-11 rounded-xl border border-[#dedede] px-3 text-xs"
+          >
+            <option>UOM</option>
+            <option>ITEM</option>
+            <option>BREED</option>
+            <option>LOCATION</option>
+          </select>
+          <input
+            value={record.code}
+            onChange={(e) => setRecord({ ...record, code: e.target.value })}
+            placeholder="Code"
+            className="h-11 rounded-xl border border-[#dedede] px-3 text-xs"
+          />
+          <input
+            value={record.name}
+            onChange={(e) => setRecord({ ...record, name: e.target.value })}
+            placeholder="Name"
+            className="h-11 rounded-xl border border-[#dedede] px-3 text-xs"
+          />
+          <button
+            onClick={add}
+            className="h-11 rounded-xl bg-[#0b1248] px-3 text-xs font-semibold text-white"
+          >
+            Add record
+          </button>
         </div>
       </SettingsPanel>
-      <SettingsPanel title="Master data register" description="Local fixtures remain easy to replace with the future master-data API">
-        <div className="divide-y divide-[#ededed]">{state.masterData.map((item) => <div key={item.id} className="grid grid-cols-[70px_100px_1fr_auto] items-center gap-3 py-3 text-xs"><StatusBadge label={item.type} tone="blue" /><span className="font-semibold text-[#2e313f]">{item.code}</span><span className="text-[#707070]">{item.name} · {item.uom}</span><button onClick={() => removeMasterRecord(item.id)} className="font-semibold text-[#c24332]">Remove</button></div>)}</div>
+      <SettingsPanel
+        title="Master data register"
+        description="Units, items, breeds, varieties and locations used by this company"
+      >
+        <div className="divide-y divide-[#ededed]">
+          {state.masterData.map((item) => (
+            <div
+              key={item.id}
+              className="grid grid-cols-[70px_100px_1fr_auto] items-center gap-3 py-3 text-xs"
+            >
+              <StatusBadge label={item.type} tone="blue" />
+              <span className="font-semibold text-[#2e313f]">{item.code}</span>
+              <span className="text-[#707070]">
+                {item.name} · {item.uom}
+              </span>
+              <button
+                onClick={() => removeMasterRecord(item.id)}
+                className="font-semibold text-[#c24332]"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
       </SettingsPanel>
     </div>
   );
@@ -1658,14 +2351,16 @@ function MasterDataSettings() {
 function SettingsPanel({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <SectionCard title={title} description={description}>
+    <SectionCard title={title} description={description} action={action}>
       <div className="p-5 sm:p-6">{children}</div>
     </SectionCard>
   );

@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Building2, LogOut, Plus, ShieldCheck, X } from 'lucide-react';
+import {
+  AlertCircle,
+  Building2,
+  LogOut,
+  Plus,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -62,7 +69,12 @@ export default function CompanySelectionPage() {
     const slug = slugify(trimmed);
     if (companies[slug])
       return setError('A company with this name already exists');
-    const created = createCompanyMeta(trimmed, slug, nobCode, nobOptions.find((item) => item.code === nobCode));
+    const created = createCompanyMeta(
+      trimmed,
+      slug,
+      nobCode,
+      nobOptions.find((item) => item.code === nobCode),
+    );
     localStorage.setItem(
       CUSTOM_COMPANIES_KEY,
       JSON.stringify([...getCustomCompanies(), created]),
@@ -82,13 +94,25 @@ export default function CompanySelectionPage() {
             NAV<span className="text-[#c24332]">Farm</span>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/tenant-admin" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><Building2 size={14}/> Tenant admin</Link>
-            <Link href="/operator" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><ShieldCheck size={14}/> Operator</Link>
+            <Link
+              href="/organization"
+              className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"
+            >
+              <Building2 size={14} /> Tenant admin
+            </Link>
+            <Link
+              href="/operator"
+              className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"
+            >
+              <ShieldCheck size={14} /> Operator
+            </Link>
             <div className="hidden text-right sm:block">
               <p className="text-xs font-semibold text-[#2e313f]">
                 {user.name}
               </p>
-              <p className="text-[10px] text-[#8a8a8a]">Frontend demo</p>
+              <p className="text-[10px] text-[#8a8a8a]">
+                Organization workspace
+              </p>
             </div>
             <button
               onClick={() => {
@@ -106,19 +130,18 @@ export default function CompanySelectionPage() {
         <div className="mb-9 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1c4aa9]">
-              Tenant workspace
+              Organization
             </p>
             <h1 className="mt-2 text-[30px] font-semibold tracking-tight text-[#2e313f]">
               Choose a company
             </h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[#707070]">
-              Companies are separate legal or operating entities. Each workspace
-              is assigned a documented Nature of Business and contains its LOBs,
-              batches and settings.
+              Choose the legal or operating company you want to work in. Each
+              company has its own operations, finance, users and settings.
             </p>
           </div>
           <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700">
-            Demo companies
+            Companies
           </span>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -142,8 +165,16 @@ export default function CompanySelectionPage() {
         </div>
       </main>
       {modalOpen && (
-        <FullPageOverlay onClose={() => setModalOpen(false)} className="max-w-md">
-          <div role="dialog" aria-modal="true" aria-label="Create company" className="w-full rounded-2xl bg-white p-7 shadow-2xl animate-slide-up">
+        <FullPageOverlay
+          onClose={() => setModalOpen(false)}
+          className="max-w-md"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Create company"
+            className="w-full rounded-2xl bg-white p-7 shadow-2xl animate-slide-up"
+          >
             <button
               onClick={() => setModalOpen(false)}
               className="absolute right-5 top-5 text-[#707070]"

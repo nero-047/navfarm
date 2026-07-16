@@ -1,5 +1,6 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { redirect } from 'next/navigation';
 
-export default function SettingsPage() {
-  return <WorkspacePage kind="settings" />;
+export default async function SettingsPage({ params }: { params: Promise<{ company: string }> }) {
+  const { company } = await params;
+  redirect(`/${company}/settings/setup`);
 }

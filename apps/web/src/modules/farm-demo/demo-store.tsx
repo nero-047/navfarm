@@ -62,7 +62,13 @@ export interface WorkflowBatch {
 export interface OperationEntry {
   id: string;
   batchId: string;
-  entryType: 'CONSUMPTION' | 'OUTPUT' | 'OVERHEAD' | 'RESOURCE' | 'MORTALITY' | 'OBSERVATION';
+  entryType:
+    | 'CONSUMPTION'
+    | 'OUTPUT'
+    | 'OVERHEAD'
+    | 'RESOURCE'
+    | 'MORTALITY'
+    | 'OBSERVATION';
   parameter: string;
   quantity: number;
   uom: string;
@@ -137,7 +143,7 @@ export interface MasterRecord {
 }
 
 export interface DemoState {
-  version: 4;
+  version: 5;
   batches: WorkflowBatch[];
   operations: OperationEntry[];
   qualityLots: QualityLot[];
@@ -174,13 +180,28 @@ interface DemoStoreValue {
   isReady: boolean;
   createBatch: (input: NewBatchInput) => WorkflowBatch;
   approveBatch: (id: string) => void;
-  transitionBatch: (id: string, action: 'START' | 'PAUSE' | 'RESUME' | 'CANCEL', reason?: string) => { ok: boolean; message: string };
+  transitionBatch: (
+    id: string,
+    action: 'START' | 'PAUSE' | 'RESUME' | 'CANCEL',
+    reason?: string,
+  ) => { ok: boolean; message: string };
   recordOperation: (input: NewOperationInput) => void;
   createQualityLot: (batchId: string, parameter: string) => void;
-  setQualityDisposition: (id: string, status: QualityLot['status'], result: string) => void;
-  generateQrPack: (batchId: string, quantity: number) => { ok: boolean; message: string };
+  setQualityDisposition: (
+    id: string,
+    status: QualityLot['status'],
+    result: string,
+  ) => void;
+  generateQrPack: (
+    batchId: string,
+    quantity: number,
+  ) => { ok: boolean; message: string };
   addResource: (resource: Omit<DemoResourceRecord, 'id'>) => void;
-  closeBatch: (id: string) => { ok: boolean; message: string; variance?: VarianceResult };
+  closeBatch: (id: string) => {
+    ok: boolean;
+    message: string;
+    variance?: VarianceResult;
+  };
   calculateVariance: (batch: WorkflowBatch) => VarianceResult;
   saveSetupStep: (step: number, values: Partial<SetupState>) => void;
   setModule: (module: string, enabled: boolean) => void;
@@ -196,14 +217,28 @@ function money(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-export function calculateVarianceForBatch(batch: WorkflowBatch): VarianceResult {
+export function calculateVarianceForBatch(
+  batch: WorkflowBatch,
+): VarianceResult {
   if (batch.method !== 'STANDARD')
     return { price: 0, usage: 0, output: 0, overhead: 0, total: 0 };
-  const price = money((batch.actualRate - batch.standardRate) * batch.actualUsage);
-  const usage = money((batch.actualUsage - batch.expectedUsage) * batch.standardRate);
-  const output = money(Math.max(0, batch.expectedOutput - batch.actualOutput) * batch.standardRate);
+  const price = money(
+    (batch.actualRate - batch.standardRate) * batch.actualUsage,
+  );
+  const usage = money(
+    (batch.actualUsage - batch.expectedUsage) * batch.standardRate,
+  );
+  const output = money(
+    Math.max(0, batch.expectedOutput - batch.actualOutput) * batch.standardRate,
+  );
   const overhead = money(batch.actualOverhead - batch.standardOverhead);
-  return { price, usage, output, overhead, total: money(price + usage + output + overhead) };
+  return {
+    price,
+    usage,
+    output,
+    overhead,
+    total: money(price + usage + output + overhead),
+  };
 }
 
 export function validateBatchClose(batch: WorkflowBatch): string | null {
@@ -214,7 +249,9 @@ export function validateBatchClose(batch: WorkflowBatch): string | null {
   return null;
 }
 
-export function canGenerateQr(batch: WorkflowBatch | undefined): batch is WorkflowBatch {
+export function canGenerateQr(
+  batch: WorkflowBatch | undefined,
+): batch is WorkflowBatch {
   return Boolean(batch && batch.qcStatus === 'PASS');
 }
 
@@ -254,32 +291,38 @@ function seedState(company: CompanyMeta): DemoState {
     sourceBatchId: index ? `batch-${index}` : undefined,
     qcRequired: true,
     qcStatus: index === 1 ? 'HOLD' : index === 2 ? 'PASS' : 'NOT_STARTED',
-    borVersion: company.nobCode === 'PROCESSING' ? 'BOR-2026-001 V1' : undefined,
-    costSplitMethod:
-      batch.lob.toLowerCase().includes('slaughter') ? 'FIXED_PERCENT' : undefined,
+    borVersion:
+      company.nobCode === 'PROCESSING' ? 'BOR-2026-001 V1' : undefined,
+    costSplitMethod: batch.lob.toLowerCase().includes('slaughter')
+      ? 'FIXED_PERCENT'
+      : undefined,
     createdAt: new Date(2026, 6, 10 + index).toISOString(),
   }));
-  const qualityLots: QualityLot[] = getQualityRecords(company).map((lot, index) => ({
-    id: `qc-${index + 1}`,
-    code: lot.lot,
-    batchId: batches[index % batches.length].id,
-    parameter: lot.parameter,
-    result: lot.result,
-    status: lot.status,
-    owner: lot.owner,
-    createdAt: new Date(2026, 6, 15, 9 + index).toISOString(),
-  }));
-  const resources: DemoResourceRecord[] = getResources(company).map((resource, index) => ({
-    id: `resource-${index + 1}`,
-    name: resource.name,
-    type: resource.type === 'MANPOWER' ? 'MANPOWER' : 'EQUIPMENT',
-    allocation: resource.allocation,
-    status: resource.status,
-    costRate: [405, 1200, 850][index],
-    costUom: index === 1 ? 'SHIFT' : index === 2 ? 'HOUR' : 'DAY',
-  }));
+  const qualityLots: QualityLot[] = getQualityRecords(company).map(
+    (lot, index) => ({
+      id: `qc-${index + 1}`,
+      code: lot.lot,
+      batchId: batches[index % batches.length].id,
+      parameter: lot.parameter,
+      result: lot.result,
+      status: lot.status,
+      owner: lot.owner,
+      createdAt: new Date(2026, 6, 15, 9 + index).toISOString(),
+    }),
+  );
+  const resources: DemoResourceRecord[] = getResources(company).map(
+    (resource, index) => ({
+      id: `resource-${index + 1}`,
+      name: resource.name,
+      type: resource.type === 'MANPOWER' ? 'MANPOWER' : 'EQUIPMENT',
+      allocation: resource.allocation,
+      status: resource.status,
+      costRate: [405, 1200, 850][index],
+      costUom: index === 1 ? 'SHIFT' : index === 2 ? 'HOUR' : 'DAY',
+    }),
+  );
   return {
-    version: 4,
+    version: 5,
     batches,
     operations: [],
     qualityLots,
@@ -292,22 +335,43 @@ function seedState(company: CompanyMeta): DemoState {
       companyType: 'Private Limited',
       address: company.location,
       contactName: 'Rajesh Kumar Sharma',
-      contactEmail: 'operations@navfarm.demo',
+      contactEmail: 'operations@sunriselivestock.in',
       language: 'English',
       currency: 'INR',
       timezone: 'Asia/Kolkata',
       fiscalYear: 'April to March',
       modules: ['Batches', 'Inventory', 'QC', 'QR', 'Finance', 'Analytics'],
       notificationChannels: ['In-app notifications', 'Email'],
-      adminEmail: 'admin@navfarm.demo',
+      adminEmail: 'admin@sunriselivestock.in',
     },
     masterData: [
       { id: 'master-1', type: 'UOM', code: 'KG', name: 'Kilogram', uom: 'KG' },
-      { id: 'master-2', type: 'ITEM', code: 'FEED-001', name: config.primaryInput, uom: 'KG' },
-      { id: 'master-3', type: 'BREED', code: 'BREED-001', name: company.nobCode === 'AGRICULTURE' ? 'Documented variety' : 'Documented breed', uom: 'NOS' },
-      { id: 'master-4', type: 'LOCATION', code: 'LOC-001', name: company.location, uom: 'N/A' },
+      {
+        id: 'master-2',
+        type: 'ITEM',
+        code: 'FEED-001',
+        name: config.primaryInput,
+        uom: 'KG',
+      },
+      {
+        id: 'master-3',
+        type: 'BREED',
+        code: 'BREED-001',
+        name:
+          company.nobCode === 'AGRICULTURE'
+            ? 'Primary variety'
+            : 'Primary breed',
+        uom: 'NOS',
+      },
+      {
+        id: 'master-4',
+        type: 'LOCATION',
+        code: 'LOC-001',
+        name: company.location,
+        uom: 'N/A',
+      },
     ],
-    auditLog: ['Demo workspace initialized from document-aligned fixtures.'],
+    auditLog: ['Company workspace created and opening balances loaded.'],
   };
 }
 
@@ -323,8 +387,14 @@ function journalFor(input: NewOperationInput): OperationEntry['journal'] {
   return { debit: '1190 Batch WIP', credit: '2100 Accounts Payable', amount };
 }
 
-export function DemoStoreProvider({ company, children }: { company: CompanyMeta; children: ReactNode }) {
-  const key = `navfarm_demo_state_v4_${company.slug}`;
+export function DemoStoreProvider({
+  company,
+  children,
+}: {
+  company: CompanyMeta;
+  children: ReactNode;
+}) {
+  const key = `navfarm_demo_state_v5_${company.slug}`;
   const [state, setState] = useState<DemoState>(() => seedState(company));
   const [isReady, setIsReady] = useState(false);
 
@@ -332,7 +402,7 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
     try {
       const saved = localStorage.getItem(key);
       const parsed = saved ? (JSON.parse(saved) as DemoState) : null;
-      setState(parsed?.version === 4 ? parsed : seedState(company));
+      setState(parsed?.version === 5 ? parsed : seedState(company));
     } catch {
       setState(seedState(company));
     }
@@ -343,51 +413,60 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
     if (isReady) localStorage.setItem(key, JSON.stringify(state));
   }, [isReady, key, state]);
 
-  const calculateVariance = useCallback((batch: WorkflowBatch): VarianceResult => {
-    return calculateVarianceForBatch(batch);
-  }, []);
+  const calculateVariance = useCallback(
+    (batch: WorkflowBatch): VarianceResult => {
+      return calculateVarianceForBatch(batch);
+    },
+    [],
+  );
 
-  const createBatch = useCallback((input: NewBatchInput): WorkflowBatch => {
-    let created!: WorkflowBatch;
-    setState((current) => {
-      const nextNumber = current.batches.length + 45;
-      created = {
-        id: `batch-${Date.now()}`,
-        code: `${INDUSTRY_CONFIG[company.nobCode].batchPrefix}-2026-${String(nextNumber).padStart(3, '0')}`,
-        lob: input.lob,
-        method: input.method,
-        status: 'DRAFT',
-        riskStatus: 'ON_TRACK',
-        inventoryStatus: 'BLOCKED',
-        costingStatus: 'DRAFT',
-        stage: 'Draft setup',
-        inputName: INDUSTRY_CONFIG[company.nobCode].primaryInput,
-        inputQty: input.inputQty,
-        inputUom: INDUSTRY_CONFIG[company.nobCode].unit,
-        expectedOutput: input.expectedOutput,
-        actualOutput: 0,
-        standardRate: 20,
-        actualRate: 20,
-        expectedUsage: input.inputQty * 0.2,
-        actualUsage: 0,
-        standardOverhead: input.inputQty * 5,
-        actualOverhead: 0,
-        wip: 0,
-        sourceBatchId: input.sourceBatchId,
-        qcRequired: true,
-        qcStatus: 'NOT_STARTED',
-        borVersion: input.borVersion,
-        costSplitMethod: input.costSplitMethod,
-        createdAt: new Date().toISOString(),
-      };
-      return {
-        ...current,
-        batches: [created, ...current.batches],
-        auditLog: [`Created draft batch ${created.code}.`, ...current.auditLog],
-      };
-    });
-    return created;
-  }, [company.nobCode]);
+  const createBatch = useCallback(
+    (input: NewBatchInput): WorkflowBatch => {
+      let created!: WorkflowBatch;
+      setState((current) => {
+        const nextNumber = current.batches.length + 45;
+        created = {
+          id: `batch-${Date.now()}`,
+          code: `${INDUSTRY_CONFIG[company.nobCode].batchPrefix}-2026-${String(nextNumber).padStart(3, '0')}`,
+          lob: input.lob,
+          method: input.method,
+          status: 'DRAFT',
+          riskStatus: 'ON_TRACK',
+          inventoryStatus: 'BLOCKED',
+          costingStatus: 'DRAFT',
+          stage: 'Draft setup',
+          inputName: INDUSTRY_CONFIG[company.nobCode].primaryInput,
+          inputQty: input.inputQty,
+          inputUom: INDUSTRY_CONFIG[company.nobCode].unit,
+          expectedOutput: input.expectedOutput,
+          actualOutput: 0,
+          standardRate: 20,
+          actualRate: 20,
+          expectedUsage: input.inputQty * 0.2,
+          actualUsage: 0,
+          standardOverhead: input.inputQty * 5,
+          actualOverhead: 0,
+          wip: 0,
+          sourceBatchId: input.sourceBatchId,
+          qcRequired: true,
+          qcStatus: 'NOT_STARTED',
+          borVersion: input.borVersion,
+          costSplitMethod: input.costSplitMethod,
+          createdAt: new Date().toISOString(),
+        };
+        return {
+          ...current,
+          batches: [created, ...current.batches],
+          auditLog: [
+            `Created draft batch ${created.code}.`,
+            ...current.auditLog,
+          ],
+        };
+      });
+      return created;
+    },
+    [company.nobCode],
+  );
 
   const approveBatch = useCallback((id: string) => {
     setState((current) => ({
@@ -397,37 +476,83 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
           ? {
               ...batch,
               status: 'APPROVED',
-              stage: batch.method === 'BIO_ASSET' ? 'Premature / NCA' : 'Daily operations',
+              stage:
+                batch.method === 'BIO_ASSET'
+                  ? 'Premature / NCA'
+                  : 'Daily operations',
               wip: money(batch.inputQty * batch.standardRate),
               costingStatus: 'OPEN',
             }
           : batch,
       ),
-      auditLog: [`Approved batch; costing method and standards locked.`, ...current.auditLog],
+      auditLog: [
+        `Approved batch; costing method and standards locked.`,
+        ...current.auditLog,
+      ],
     }));
   }, []);
 
-  const transitionBatch = useCallback((id: string, action: 'START' | 'PAUSE' | 'RESUME' | 'CANCEL', reason = '') => {
-    const batch = state.batches.find((item) => item.id === id);
-    if (!batch) return { ok: false, message: 'Batch not found.' };
-    const allowed = action === 'START' ? batch.status === 'APPROVED' : action === 'PAUSE' ? batch.status === 'ACTIVE' : action === 'RESUME' ? batch.status === 'PAUSED' : ['DRAFT', 'APPROVED', 'PAUSED'].includes(batch.status);
-    if (!allowed) return { ok: false, message: `${action.toLowerCase()} is not allowed from ${batch.status.replaceAll('_', ' ')}.` };
-    if ((action === 'PAUSE' || action === 'CANCEL') && !reason.trim()) return { ok: false, message: 'A reason is required for this action.' };
-    const nextStatus: WorkflowStatus = action === 'START' || action === 'RESUME' ? 'ACTIVE' : action === 'PAUSE' ? 'PAUSED' : 'CANCELLED';
-    setState((current) => ({
-      ...current,
-      batches: current.batches.map((item) => item.id === id ? {
-        ...item,
-        status: nextStatus,
-        stage: action === 'START' || action === 'RESUME' ? 'Daily operations' : action === 'PAUSE' ? 'Operations paused' : 'Cancelled',
-        riskStatus: action === 'PAUSE' ? 'WARNING' : item.riskStatus,
-        costingStatus: action === 'CANCEL' ? 'FINALIZED' : item.costingStatus,
-        wip: action === 'CANCEL' ? 0 : item.wip,
-      } : item),
-      auditLog: [`${action} ${batch.code}${reason ? ` — ${reason}` : ''}.`, ...current.auditLog],
-    }));
-    return { ok: true, message: `${batch.code} changed to ${nextStatus.replaceAll('_', ' ')}.` };
-  }, [state.batches]);
+  const transitionBatch = useCallback(
+    (
+      id: string,
+      action: 'START' | 'PAUSE' | 'RESUME' | 'CANCEL',
+      reason = '',
+    ) => {
+      const batch = state.batches.find((item) => item.id === id);
+      if (!batch) return { ok: false, message: 'Batch not found.' };
+      const allowed =
+        action === 'START'
+          ? batch.status === 'APPROVED'
+          : action === 'PAUSE'
+            ? batch.status === 'ACTIVE'
+            : action === 'RESUME'
+              ? batch.status === 'PAUSED'
+              : ['DRAFT', 'APPROVED', 'PAUSED'].includes(batch.status);
+      if (!allowed)
+        return {
+          ok: false,
+          message: `${action.toLowerCase()} is not allowed from ${batch.status.replaceAll('_', ' ')}.`,
+        };
+      if ((action === 'PAUSE' || action === 'CANCEL') && !reason.trim())
+        return { ok: false, message: 'A reason is required for this action.' };
+      const nextStatus: WorkflowStatus =
+        action === 'START' || action === 'RESUME'
+          ? 'ACTIVE'
+          : action === 'PAUSE'
+            ? 'PAUSED'
+            : 'CANCELLED';
+      setState((current) => ({
+        ...current,
+        batches: current.batches.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: nextStatus,
+                stage:
+                  action === 'START' || action === 'RESUME'
+                    ? 'Daily operations'
+                    : action === 'PAUSE'
+                      ? 'Operations paused'
+                      : 'Cancelled',
+                riskStatus: action === 'PAUSE' ? 'WARNING' : item.riskStatus,
+                costingStatus:
+                  action === 'CANCEL' ? 'FINALIZED' : item.costingStatus,
+                wip: action === 'CANCEL' ? 0 : item.wip,
+              }
+            : item,
+        ),
+        auditLog: [
+          `${action} ${batch.code}${reason ? ` — ${reason}` : ''}.`,
+          ...current.auditLog,
+        ],
+      }));
+      return {
+        ok: true,
+        message: `${batch.code} changed to ${nextStatus.replaceAll('_', ' ')}.`,
+      };
+    },
+    [state.batches],
+  );
 
   const recordOperation = useCallback((input: NewOperationInput) => {
     const journal = journalFor(input);
@@ -464,9 +589,22 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
                 ? batch.wip
                 : batch.wip + amount,
           status:
-            input.entryType === 'OUTPUT' ? 'READY_TO_CLOSE' : batch.status === 'APPROVED' ? 'ACTIVE' : batch.status,
-          riskStatus: input.expected !== undefined && input.quantity > input.expected * 1.05 ? 'WARNING' : batch.riskStatus,
-          stage: input.entryType === 'OUTPUT' ? 'Final output' : batch.status === 'APPROVED' ? 'Daily operations' : batch.stage,
+            input.entryType === 'OUTPUT'
+              ? 'READY_TO_CLOSE'
+              : batch.status === 'APPROVED'
+                ? 'ACTIVE'
+                : batch.status,
+          riskStatus:
+            input.expected !== undefined &&
+            input.quantity > input.expected * 1.05
+              ? 'WARNING'
+              : batch.riskStatus,
+          stage:
+            input.entryType === 'OUTPUT'
+              ? 'Final output'
+              : batch.status === 'APPROVED'
+                ? 'Daily operations'
+                : batch.stage,
         };
       }),
       auditLog: [
@@ -492,9 +630,14 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
         ...current,
         qualityLots: [lot, ...current.qualityLots],
         batches: current.batches.map((batch) =>
-          batch.id === batchId ? { ...batch, qcStatus: 'HOLD', status: 'QC_HOLD' } : batch,
+          batch.id === batchId
+            ? { ...batch, qcStatus: 'HOLD', status: 'QC_HOLD' }
+            : batch,
         ),
-        auditLog: [`Created ${lot.code}; source output placed on QC hold.`, ...current.auditLog],
+        auditLog: [
+          `Created ${lot.code}; source output placed on QC hold.`,
+          ...current.auditLog,
+        ],
       };
     });
   }, []);
@@ -516,73 +659,126 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
                   qcStatus: status,
                   status: status === 'PASS' ? 'READY_TO_CLOSE' : 'QC_HOLD',
                   inventoryStatus: status === 'PASS' ? 'RELEASED' : 'BLOCKED',
-                  costingStatus: status === 'FAIL' ? 'CLOSE_BLOCKED' : batch.costingStatus,
+                  costingStatus:
+                    status === 'FAIL' ? 'CLOSE_BLOCKED' : batch.costingStatus,
                 }
               : batch,
           ),
-          auditLog: [`${lot.code} disposition changed to ${status}.`, ...current.auditLog],
+          auditLog: [
+            `${lot.code} disposition changed to ${status}.`,
+            ...current.auditLog,
+          ],
         };
       });
     },
     [],
   );
 
-  const generateQrPack = useCallback((batchId: string, quantity: number) => {
-    const batch = state.batches.find((item) => item.id === batchId);
-    if (!canGenerateQr(batch))
-      return { ok: false, message: 'QR generation is blocked until the source batch has QC PASS.' };
-    const pack: QrPack = {
-      id: `qr-${Date.now()}`,
-      code: `PACK-2026-${String(state.qrPacks.length + 9513).padStart(7, '0')}`,
-      batchId,
-      quantity,
-      payload: JSON.stringify({ company: company.name, batch: batch.code, sourceBatchId: batch.sourceBatchId, qc: 'PASS' }),
-      createdAt: new Date().toISOString(),
-    };
-    setState((current) => ({
-      ...current,
-      qrPacks: [pack, ...current.qrPacks],
-      auditLog: [`Generated ${pack.code} with farm-to-fork source lineage.`, ...current.auditLog],
-    }));
-    return { ok: true, message: `${pack.code} generated.` };
-  }, [company.name, state.batches, state.qrPacks.length]);
+  const generateQrPack = useCallback(
+    (batchId: string, quantity: number) => {
+      const batch = state.batches.find((item) => item.id === batchId);
+      if (!canGenerateQr(batch))
+        return {
+          ok: false,
+          message:
+            'QR generation is blocked until the source batch has QC PASS.',
+        };
+      const pack: QrPack = {
+        id: `qr-${Date.now()}`,
+        code: `PACK-2026-${String(state.qrPacks.length + 9513).padStart(7, '0')}`,
+        batchId,
+        quantity,
+        payload: JSON.stringify({
+          company: company.name,
+          batch: batch.code,
+          sourceBatchId: batch.sourceBatchId,
+          qc: 'PASS',
+        }),
+        createdAt: new Date().toISOString(),
+      };
+      setState((current) => ({
+        ...current,
+        qrPacks: [pack, ...current.qrPacks],
+        auditLog: [
+          `Generated ${pack.code} with farm-to-fork source lineage.`,
+          ...current.auditLog,
+        ],
+      }));
+      return { ok: true, message: `${pack.code} generated.` };
+    },
+    [company.name, state.batches, state.qrPacks.length],
+  );
 
-  const addResource = useCallback((resource: Omit<DemoResourceRecord, 'id'>) => {
-    setState((current) => ({
-      ...current,
-      resources: [{ ...resource, id: `resource-${Date.now()}` }, ...current.resources],
-      auditLog: [`Added ${resource.type.toLowerCase()} resource ${resource.name}.`, ...current.auditLog],
-    }));
-  }, []);
+  const addResource = useCallback(
+    (resource: Omit<DemoResourceRecord, 'id'>) => {
+      setState((current) => ({
+        ...current,
+        resources: [
+          { ...resource, id: `resource-${Date.now()}` },
+          ...current.resources,
+        ],
+        auditLog: [
+          `Added ${resource.type.toLowerCase()} resource ${resource.name}.`,
+          ...current.auditLog,
+        ],
+      }));
+    },
+    [],
+  );
 
-  const closeBatch = useCallback((id: string) => {
-    const batch = state.batches.find((item) => item.id === id);
-    if (!batch) return { ok: false, message: 'Batch not found.' };
-    const validationMessage = validateBatchClose(batch);
-    if (validationMessage) return { ok: false, message: validationMessage };
-    const variance = calculateVariance(batch);
-    setState((current) => ({
-      ...current,
-      batches: current.batches.map((item) =>
-        item.id === id
-          ? { ...item, status: 'CLOSED', stage: 'Cost finalized', costingStatus: 'FINALIZED', inventoryStatus: 'RELEASED', wip: 0, closedAt: new Date().toISOString() }
-          : item,
-      ),
-      auditLog: [
-        `${batch.code} closed; ${batch.method === 'STANDARD' ? 'four variances calculated' : batch.method === 'FIFO' ? 'actual FIFO cost finalized with no variances' : 'NCA/harvest cost finalized'} and WIP balanced to zero.`,
-        ...current.auditLog,
-      ],
-    }));
-    return { ok: true, message: `${batch.code} closed with a zero WIP balance.`, variance };
-  }, [calculateVariance, state.batches]);
+  const closeBatch = useCallback(
+    (id: string) => {
+      const batch = state.batches.find((item) => item.id === id);
+      if (!batch) return { ok: false, message: 'Batch not found.' };
+      const validationMessage = validateBatchClose(batch);
+      if (validationMessage) return { ok: false, message: validationMessage };
+      const variance = calculateVariance(batch);
+      setState((current) => ({
+        ...current,
+        batches: current.batches.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: 'CLOSED',
+                stage: 'Cost finalized',
+                costingStatus: 'FINALIZED',
+                inventoryStatus: 'RELEASED',
+                wip: 0,
+                closedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+        auditLog: [
+          `${batch.code} closed; ${batch.method === 'STANDARD' ? 'four variances calculated' : batch.method === 'FIFO' ? 'actual FIFO cost finalized with no variances' : 'NCA/harvest cost finalized'} and WIP balanced to zero.`,
+          ...current.auditLog,
+        ],
+      }));
+      return {
+        ok: true,
+        message: `${batch.code} closed with a zero WIP balance.`,
+        variance,
+      };
+    },
+    [calculateVariance, state.batches],
+  );
 
-  const saveSetupStep = useCallback((step: number, values: Partial<SetupState>) => {
-    setState((current) => ({
-      ...current,
-      setup: { ...current.setup, ...values, completedSteps: Math.max(current.setup.completedSteps, step) },
-      auditLog: [`Completed onboarding step ${step} of 15.`, ...current.auditLog],
-    }));
-  }, []);
+  const saveSetupStep = useCallback(
+    (step: number, values: Partial<SetupState>) => {
+      setState((current) => ({
+        ...current,
+        setup: {
+          ...current.setup,
+          ...values,
+          completedSteps: Math.max(current.setup.completedSteps, step),
+        },
+        auditLog: [
+          `Completed onboarding step ${step} of 15.`,
+          ...current.auditLog,
+        ],
+      }));
+    },
+    [],
+  );
 
   const setModule = useCallback((module: string, enabled: boolean) => {
     setState((current) => ({
@@ -593,28 +789,47 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
           ? Array.from(new Set([...current.setup.modules, module]))
           : current.setup.modules.filter((item) => item !== module),
       },
-      auditLog: [`${enabled ? 'Enabled' : 'Disabled'} ${module} module.`, ...current.auditLog],
+      auditLog: [
+        `${enabled ? 'Enabled' : 'Disabled'} ${module} module.`,
+        ...current.auditLog,
+      ],
     }));
   }, []);
 
-  const setNotificationChannel = useCallback((channel: string, enabled: boolean) => {
-    setState((current) => ({
-      ...current,
-      setup: {
-        ...current.setup,
-        notificationChannels: enabled
-          ? Array.from(new Set([...current.setup.notificationChannels, channel]))
-          : current.setup.notificationChannels.filter((item) => item !== channel),
-      },
-      auditLog: [`${enabled ? 'Enabled' : 'Disabled'} ${channel} notifications.`, ...current.auditLog],
-    }));
-  }, []);
+  const setNotificationChannel = useCallback(
+    (channel: string, enabled: boolean) => {
+      setState((current) => ({
+        ...current,
+        setup: {
+          ...current.setup,
+          notificationChannels: enabled
+            ? Array.from(
+                new Set([...current.setup.notificationChannels, channel]),
+              )
+            : current.setup.notificationChannels.filter(
+                (item) => item !== channel,
+              ),
+        },
+        auditLog: [
+          `${enabled ? 'Enabled' : 'Disabled'} ${channel} notifications.`,
+          ...current.auditLog,
+        ],
+      }));
+    },
+    [],
+  );
 
   const addMasterRecord = useCallback((record: Omit<MasterRecord, 'id'>) => {
     setState((current) => ({
       ...current,
-      masterData: [{ ...record, id: `master-${Date.now()}` }, ...current.masterData],
-      auditLog: [`Added ${record.type} master ${record.code}.`, ...current.auditLog],
+      masterData: [
+        { ...record, id: `master-${Date.now()}` },
+        ...current.masterData,
+      ],
+      auditLog: [
+        `Added ${record.type} master ${record.code}.`,
+        ...current.auditLog,
+      ],
     }));
   }, []);
 
@@ -622,7 +837,7 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
     setState((current) => ({
       ...current,
       masterData: current.masterData.filter((record) => record.id !== id),
-      auditLog: ['Removed a local master-data record.', ...current.auditLog],
+      auditLog: ['Removed a master-data record.', ...current.auditLog],
     }));
   }, []);
 
@@ -653,14 +868,38 @@ export function DemoStoreProvider({ company, children }: { company: CompanyMeta;
       removeMasterRecord,
       resetDemo,
     }),
-    [state, isReady, createBatch, approveBatch, transitionBatch, recordOperation, createQualityLot, setQualityDisposition, generateQrPack, addResource, closeBatch, calculateVariance, saveSetupStep, setModule, setNotificationChannel, addMasterRecord, removeMasterRecord, resetDemo],
+    [
+      state,
+      isReady,
+      createBatch,
+      approveBatch,
+      transitionBatch,
+      recordOperation,
+      createQualityLot,
+      setQualityDisposition,
+      generateQrPack,
+      addResource,
+      closeBatch,
+      calculateVariance,
+      saveSetupStep,
+      setModule,
+      setNotificationChannel,
+      addMasterRecord,
+      removeMasterRecord,
+      resetDemo,
+    ],
   );
 
-  return <DemoStoreContext.Provider value={value}>{children}</DemoStoreContext.Provider>;
+  return (
+    <DemoStoreContext.Provider value={value}>
+      {children}
+    </DemoStoreContext.Provider>
+  );
 }
 
 export function useDemoStore(): DemoStoreValue {
   const value = useContext(DemoStoreContext);
-  if (!value) throw new Error('useDemoStore must be used inside DemoStoreProvider');
+  if (!value)
+    throw new Error('useDemoStore must be used inside DemoStoreProvider');
   return value;
 }

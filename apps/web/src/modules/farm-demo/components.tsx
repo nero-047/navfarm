@@ -14,7 +14,7 @@ const TONES: Record<Tone, string> = {
 export function DemoBadge() {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-      <Database size={12} /> Demo data
+      <Database size={12} /> Sample data
     </span>
   );
 }
@@ -182,7 +182,7 @@ export function EmptyCompany() {
         Company not found
       </h1>
       <p className="mt-2 max-w-sm text-sm text-[#707070]">
-        Select a configured company workspace to view the NAVFarm demo.
+        Select a company workspace to continue.
       </p>
     </div>
   );
