@@ -9,9 +9,11 @@ import { FullPageOverlay } from '@/components/ui/full-page-overlay';
 import {
   COMPANIES,
   NOB_OPTIONS,
+  getNobCatalog,
   createCompanyMeta,
   type CompanyMeta,
   type NobCode,
+  type NobOption,
 } from '@/modules/company';
 import {
   CUSTOM_COMPANIES_KEY,
@@ -36,6 +38,7 @@ export function CompanySwitcher() {
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [nobCode, setNobCode] = useState<NobCode | ''>('');
+  const [nobOptions, setNobOptions] = useState<NobOption[]>(NOB_OPTIONS);
   const [error, setError] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -44,6 +47,7 @@ export function CompanySwitcher() {
     const next = { ...COMPANIES };
     for (const custom of getCustomCompanies()) next[custom.slug] = custom;
     setCompanies(next);
+    setNobOptions(getNobCatalog());
   }, []);
 
   useEffect(() => {
@@ -77,7 +81,7 @@ export function CompanySwitcher() {
     const slug = slugify(trimmed);
     if (companies[slug])
       return setError('A company with this name already exists');
-    const created = createCompanyMeta(trimmed, slug, nobCode);
+    const created = createCompanyMeta(trimmed, slug, nobCode, nobOptions.find((item) => item.code === nobCode));
     const custom = [...getCustomCompanies(), created];
     localStorage.setItem(CUSTOM_COMPANIES_KEY, JSON.stringify(custom));
     setCompanies((value) => ({ ...value, [slug]: created }));
@@ -201,7 +205,7 @@ export function CompanySwitcher() {
                   className="flex h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm outline-none focus:border-[#c24332]"
                 >
                   <option value="">Select NOB</option>
-                  {NOB_OPTIONS.map((nob) => (
+                  {nobOptions.map((nob) => (
                     <option key={nob.code} value={nob.code}>
                       {nob.icon} {nob.name}
                     </option>

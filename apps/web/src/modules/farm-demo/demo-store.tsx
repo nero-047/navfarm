@@ -21,9 +21,12 @@ export type CostingMethod = 'STANDARD' | 'FIFO' | 'BIO_ASSET';
 export type WorkflowStatus =
   | 'DRAFT'
   | 'APPROVED'
+  | 'ACTIVE'
+  | 'PAUSED'
   | 'QC_HOLD'
   | 'READY_TO_CLOSE'
-  | 'CLOSED';
+  | 'CLOSED'
+  | 'CANCELLED';
 
 export interface WorkflowBatch {
   id: string;
@@ -31,6 +34,9 @@ export interface WorkflowBatch {
   lob: string;
   method: CostingMethod;
   status: WorkflowStatus;
+  riskStatus: 'ON_TRACK' | 'WARNING' | 'AT_RISK' | 'CRITICAL';
+  inventoryStatus: 'BLOCKED' | 'PARTIAL' | 'RELEASED';
+  costingStatus: 'DRAFT' | 'OPEN' | 'CLOSE_BLOCKED' | 'FINALIZED';
   stage: string;
   inputName: string;
   inputQty: number;
@@ -131,7 +137,7 @@ export interface MasterRecord {
 }
 
 export interface DemoState {
-  version: 3;
+  version: 4;
   batches: WorkflowBatch[];
   operations: OperationEntry[];
   qualityLots: QualityLot[];
@@ -168,6 +174,7 @@ interface DemoStoreValue {
   isReady: boolean;
   createBatch: (input: NewBatchInput) => WorkflowBatch;
   approveBatch: (id: string) => void;
+  transitionBatch: (id: string, action: 'START' | 'PAUSE' | 'RESUME' | 'CANCEL', reason?: string) => { ok: boolean; message: string };
   recordOperation: (input: NewOperationInput) => void;
   createQualityLot: (batchId: string, parameter: string) => void;
   setQualityDisposition: (id: string, status: QualityLot['status'], result: string) => void;

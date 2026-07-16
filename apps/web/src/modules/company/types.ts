@@ -1,10 +1,4 @@
-export type NobCode =
-  | 'POULTRY'
-  | 'LIVESTOCK'
-  | 'AGRICULTURE'
-  | 'AQUACULTURE'
-  | 'INSECT'
-  | 'PROCESSING';
+export type NobCode = string;
 
 export interface NobOption {
   code: NobCode;
@@ -162,8 +156,9 @@ export function createCompanyMeta(
   name: string,
   slug: string,
   nobCode: NobCode,
+  configuredNob?: NobOption,
 ): CompanyMeta {
-  const nob = getNobOption(nobCode);
+  const nob = configuredNob ?? getNobOption(nobCode);
   return {
     slug,
     name,

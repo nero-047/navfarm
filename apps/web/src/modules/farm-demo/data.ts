@@ -18,7 +18,7 @@ export interface IndustryDemoConfig {
   traceSteps: string[];
 }
 
-export const INDUSTRY_CONFIG: Record<NobCode, IndustryDemoConfig> = {
+const BASE_INDUSTRY_CONFIG: Record<string, IndustryDemoConfig> = {
   POULTRY: {
     unit: 'birds',
     outputUnit: 'birds / eggs',
@@ -140,6 +140,23 @@ export const INDUSTRY_CONFIG: Record<NobCode, IndustryDemoConfig> = {
     ],
   },
 };
+
+export const INDUSTRY_CONFIG: Record<NobCode, IndustryDemoConfig> = new Proxy(
+  BASE_INDUSTRY_CONFIG,
+  {
+    get(target, property: string) {
+      return target[property] ?? {
+        ...target.PROCESSING,
+        batchPrefix: property.slice(0, 3).toUpperCase() || 'CUS',
+        primaryInput: 'Configured production inputs',
+        primaryOutput: 'Configured production outputs',
+        dailyParameter: 'Configured daily operation',
+        qualityParameter: 'Configured quality parameter',
+        traceSteps: ['Source lot', 'Production', 'Operations', 'Output', 'QC release', 'QR pack'],
+      };
+    },
+  },
+);
 
 export interface DemoBatch {
   code: string;

@@ -10,10 +10,12 @@ import { FullPageOverlay } from '@/components/ui/full-page-overlay';
 import {
   COMPANIES,
   NOB_OPTIONS,
+  getNobCatalog,
   CompanyCard,
   createCompanyMeta,
   type CompanyMeta,
   type NobCode,
+  type NobOption,
 } from '@/modules/company';
 import {
   CUSTOM_COMPANIES_KEY,
@@ -36,6 +38,7 @@ export default function CompanySelectionPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [nobCode, setNobCode] = useState<NobCode | ''>('');
+  const [nobOptions, setNobOptions] = useState<NobOption[]>(NOB_OPTIONS);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -45,6 +48,7 @@ export default function CompanySelectionPage() {
     const next = { ...COMPANIES };
     for (const custom of getCustomCompanies()) next[custom.slug] = custom;
     setCompanies(next);
+    setNobOptions(getNobCatalog());
   }, []);
 
   if (loading || !user) return null;
@@ -57,7 +61,7 @@ export default function CompanySelectionPage() {
     const slug = slugify(trimmed);
     if (companies[slug])
       return setError('A company with this name already exists');
-    const created = createCompanyMeta(trimmed, slug, nobCode);
+    const created = createCompanyMeta(trimmed, slug, nobCode, nobOptions.find((item) => item.code === nobCode));
     localStorage.setItem(
       CUSTOM_COMPANIES_KEY,
       JSON.stringify([...getCustomCompanies(), created]),
@@ -178,7 +182,7 @@ export default function CompanySelectionPage() {
                   className="h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm text-[#2e313f] outline-none focus:border-[#c24332]"
                 >
                   <option value="">Select NOB</option>
-                  {NOB_OPTIONS.map((nob) => (
+                  {nobOptions.map((nob) => (
                     <option key={nob.code} value={nob.code}>
                       {nob.icon} {nob.name}
                     </option>

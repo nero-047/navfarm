@@ -8,3 +8,4 @@ export {
   normalizeCompany,
 } from './types';
 export type { CompanyMeta, CompanySlug, NobCode, NobOption } from './types';
+export { getNobCatalog, saveCustomNob, removeCustomNob, CUSTOM_NOB_CATALOG_KEY } from './catalog';

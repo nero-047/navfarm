@@ -61,6 +61,7 @@ import {
   QualityDialog,
   ResourceDialog,
 } from './workflow-dialogs';
+import { DashboardCharts } from './dashboard-charts';
 
 export type WorkspacePageKind =
   | 'dashboard'
@@ -182,6 +183,7 @@ function Dashboard({ company }: { company: Company }) {
           tone="red"
         />
       </div>
+      <DashboardCharts company={company} state={state} />
 
       <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr]">
         <SectionCard
