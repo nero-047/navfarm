@@ -1,13 +1,25 @@
 @import 'tailwindcss';
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 :root {
@@ -25,7 +37,11 @@
 
 body {
   margin: 0;
-  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Montserrat',
+    system-ui,
+    -apple-system,
+    sans-serif;
   color: var(--color-body);
   background-color: #ffffff;
   -webkit-font-smoothing: antialiased;
@@ -33,17 +49,32 @@ body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
-button, a, select { -webkit-tap-highlight-color: transparent; }
-button:not(:disabled), select { cursor: pointer; }
-::selection { background: #dce7ff; color: #0b1248; }
+button,
+a,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled),
+select {
+  cursor: pointer;
+}
+::selection {
+  background: #dce7ff;
+  color: #0b1248;
+}
 
 :where(a, button, summary, [role='button']):focus-visible {
   outline: 2px solid #2f66d0;
   outline-offset: 2px;
 }
 
-input, select, textarea {
-  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+input,
+select,
+textarea {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
 }
 
 :where(input:not(.nf-embedded-input), select, textarea):focus-visible {
@@ -57,10 +88,20 @@ input, select, textarea {
   box-shadow: none;
 }
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cdd2dc; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #aeb5c2; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cdd2dc;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #aeb5c2;
+}
 
 .animate-fade-in {
   animation: fade-in 0.5s ease-out both;
@@ -68,4 +109,15 @@ input, select, textarea {
 
 .animate-slide-up {
   animation: slide-up 0.6s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

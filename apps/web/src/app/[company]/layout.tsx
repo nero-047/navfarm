@@ -31,14 +31,39 @@ import { useCurrentCompany } from '@/modules/company/use-current-company';
 import { DemoStoreProvider } from '@/modules/farm-demo/demo-store';
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: 'dashboard' },
-  { icon: Boxes, label: 'Batches', href: 'batches' },
-  { icon: Gauge, label: 'Operations', href: 'operations' },
-  { icon: ClipboardCheck, label: 'Quality Control', href: 'quality' },
-  { icon: QrCode, label: 'Traceability', href: 'traceability' },
-  { icon: Wrench, label: 'Resources & KPIs', href: 'resources' },
-  { icon: BarChart3, label: 'Reports', href: 'reports' },
-  { icon: Settings, label: 'Settings', href: 'settings' },
+  { icon: LayoutDashboard, label: 'Dashboard', href: 'dashboard', modules: [] },
+  { icon: Boxes, label: 'Batches', href: 'batches', modules: ['Batches'] },
+  {
+    icon: Gauge,
+    label: 'Operations',
+    href: 'operations',
+    modules: ['Batches', 'Inventory'],
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Quality Control',
+    href: 'quality',
+    modules: ['QC'],
+  },
+  {
+    icon: QrCode,
+    label: 'Traceability',
+    href: 'traceability',
+    modules: ['QR'],
+  },
+  {
+    icon: Wrench,
+    label: 'Resources & KPIs',
+    href: 'resources',
+    modules: ['Batches', 'Analytics'],
+  },
+  {
+    icon: BarChart3,
+    label: 'Reports',
+    href: 'reports',
+    modules: ['Finance', 'Analytics'],
+  },
+  { icon: Settings, label: 'Settings', href: 'settings', modules: [] },
 ];
 
 function getInitial(name: string) {
@@ -85,6 +110,43 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [enabledModules, setEnabledModules] = useState<string[]>([
+    'Batches',
+    'Inventory',
+    'QC',
+    'QR',
+    'Finance',
+    'Analytics',
+  ]);
+
+  useEffect(() => {
+    if (!company) return;
+    const key = `navfarm_demo_state_v6_${company.slug}`;
+    const syncModules = () => {
+      try {
+        const saved = localStorage.getItem(key);
+        const parsed = saved ? JSON.parse(saved) : null;
+        if (Array.isArray(parsed?.setup?.modules)) {
+          setEnabledModules(parsed.setup.modules);
+        }
+      } catch {
+        // Keep documented demo defaults when local state is unavailable.
+      }
+    };
+    const handleDemoState = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail?.company === company.slug && Array.isArray(detail.modules)) {
+        setEnabledModules(detail.modules);
+      }
+    };
+    syncModules();
+    window.addEventListener('storage', syncModules);
+    window.addEventListener('navfarm-demo-state', handleDemoState);
+    return () => {
+      window.removeEventListener('storage', syncModules);
+      window.removeEventListener('navfarm-demo-state', handleDemoState);
+    };
+  }, [company]);
 
   useEffect(() => {
     if (!loading && !user) router.push('/login');
@@ -112,7 +174,12 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
       </div>
     );
   if (!user) return null;
-  const searchResults = NAV_ITEMS.filter((item) =>
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) =>
+      item.modules.length === 0 ||
+      item.modules.some((module) => enabledModules.includes(module)),
+  );
+  const searchResults = visibleNavItems.filter((item) =>
     item.label.toLowerCase().includes(searchQuery.toLowerCase()),
   );
   const signOut = () => {
@@ -122,7 +189,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#f3f5f8] lg:flex">
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] text-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] text-white lg:flex">
         <div className="pointer-events-none absolute -left-24 top-28 h-60 w-60 rounded-full bg-blue-500/10 blur-3xl" />
         <div className="relative border-b border-white/[0.08] p-5 pb-4">
           <Link
@@ -149,7 +216,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
           <p className="px-3 pb-1 pt-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/30">
             Company workspace
           </p>
-          {NAV_ITEMS.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.href}
               item={item}
@@ -175,7 +242,10 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
                   Green Valley Holdings
                 </span>
               </span>
-              <ChevronDown size={13} className="-rotate-90 text-white/35 transition-transform group-hover:translate-x-0.5" />
+              <ChevronDown
+                size={13}
+                className="-rotate-90 text-white/35 transition-transform group-hover:translate-x-0.5"
+              />
             </span>
             <span className="mt-3 flex items-center justify-between border-t border-white/[0.08] pt-2.5 text-[9px] text-white/40">
               <span>6 companies</span>
@@ -214,7 +284,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
               <input
                 id="workspace-search"
                 aria-label="Search workspace"
-                placeholder="Search batches, lots, reports and settings"
+                placeholder="Search workspace pages"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-[#30364b] outline-none"
@@ -361,7 +431,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
           </div>
           {mobileOpen && (
             <nav className="flex gap-1 overflow-x-auto border-t border-[#edf0f4] bg-[#0b1248] px-3 py-2 lg:hidden">
-              {NAV_ITEMS.map((item) => (
+              {visibleNavItems.map((item) => (
                 <NavLink
                   key={item.href}
                   item={item}
@@ -374,6 +444,15 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
           )}
         </header>
         <main className="min-h-[calc(100vh-4rem)] p-4 sm:p-6 xl:p-8">
+          {company && (
+            <div className="mb-5 flex flex-col gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800 sm:flex-row sm:items-center sm:justify-between">
+              <span className="font-semibold">Interactive frontend demo</span>
+              <span className="text-blue-700">
+                Sample values are stored only in this browser; no live ERP,
+                authentication service, or backend is connected.
+              </span>
+            </div>
+          )}
           {company ? (
             <DemoStoreProvider company={company}>{children}</DemoStoreProvider>
           ) : (

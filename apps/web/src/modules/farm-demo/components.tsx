@@ -61,7 +61,7 @@ export function PageHeader({
           {description}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {action ?? <DemoBadge />}
       </div>
     </div>
@@ -129,7 +129,9 @@ export function StatCard({
   };
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-[#e3e7ee] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(16,24,40,0.08)]">
-      <span className={`absolute inset-x-0 top-0 h-0.5 ${tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : tone === 'red' ? 'bg-red-500' : tone === 'gray' ? 'bg-slate-400' : 'bg-[#2f66d0]'}`} />
+      <span
+        className={`absolute inset-x-0 top-0 h-0.5 ${tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : tone === 'red' ? 'bg-red-500' : tone === 'gray' ? 'bg-slate-400' : 'bg-[#2f66d0]'}`}
+      />
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-[#707070]">{label}</p>
@@ -198,7 +200,12 @@ export function TextButton({ children }: { children: ReactNode }) {
 
 export function DataTable({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500"
+      role="region"
+      aria-label="Scrollable data table"
+      tabIndex={0}
+    >
       <table className="w-full min-w-[920px] border-collapse text-left">
         {children}
       </table>

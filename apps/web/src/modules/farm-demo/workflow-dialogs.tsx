@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, X } from 'lucide-react';
 import type { CompanyMeta } from '@/modules/company';
 import { INDUSTRY_CONFIG, SETUP_STEPS } from './data';
@@ -9,6 +9,7 @@ import {
   type DemoResourceRecord,
   type NewOperationInput,
   type QualityLot,
+  type SetupState,
   type WorkflowBatch,
   useDemoStore,
 } from './demo-store';
@@ -847,44 +848,67 @@ export function OnboardingWizard({
   const [step, setStep] = useState(
     Math.min(15, state.setup.completedSteps + 1),
   );
-  const [value, setValue] = useState('');
-  const required = step <= 9 || step === 11 || step === 12;
+  const [draft, setDraft] = useState<SetupState>({ ...state.setup });
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const required = step <= 9;
   const completed = state.setup.completedSteps >= step;
-  const defaultValue = useMemo(() => {
-    if (value) return value;
-    if (step === 1) return state.setup.legalName;
-    if (step === 2) return state.setup.address;
-    if (step === 3) return state.setup.contactEmail;
-    if (step === 4) return state.setup.language;
-    if (step === 5) return state.setup.currency;
-    if (step === 6) return state.setup.timezone;
-    if (step === 7) return state.setup.fiscalYear;
-    if (step === 9) return state.setup.adminEmail;
-    return value;
-  }, [state.setup, step, value]);
-  function save() {
-    const update =
-      step === 1
-        ? { legalName: defaultValue, displayName: defaultValue }
-        : step === 2
-          ? { address: defaultValue }
-          : step === 3
-            ? { contactEmail: defaultValue }
-            : step === 4
-              ? { language: defaultValue }
-              : step === 5
-                ? { currency: defaultValue }
-                : step === 6
-                  ? { timezone: defaultValue }
-                  : step === 7
-                    ? { fiscalYear: defaultValue }
+  const passwordValid =
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password) &&
+    password === confirmPassword;
+  const valid =
+    step === 1
+      ? Boolean(draft.legalName && draft.companyType)
+      : step === 2
+        ? Boolean(
+            draft.addressLine1 &&
+            draft.city &&
+            draft.stateProvince &&
+            draft.country &&
+            draft.postalCode,
+          )
+        : step === 3
+          ? Boolean(draft.contactName && draft.contactEmail.includes('@'))
+          : step === 4
+            ? Boolean(draft.language && draft.dateFormat && draft.numberFormat)
+            : step === 5
+              ? Boolean(draft.currency)
+              : step === 6
+                ? Boolean(draft.timezone && draft.country)
+                : step === 7
+                  ? Boolean(
+                      draft.fiscalStartMonth &&
+                      draft.accountingStandard &&
+                      draft.inventoryValuation,
+                    )
+                  : step === 8
+                    ? draft.modules.length > 0
                     : step === 9
-                      ? { adminEmail: defaultValue }
-                      : {};
+                      ? Boolean(
+                          draft.adminName &&
+                          draft.adminEmail.includes('@') &&
+                          (completed || passwordValid),
+                        )
+                      : true;
+  function save() {
+    if (!valid) return;
+    const address = [draft.city, draft.stateProvince]
+      .filter(Boolean)
+      .join(', ');
+    const fiscalYear = `${draft.fiscalStartMonth} start`;
+    const update =
+      step === 2
+        ? { ...draft, address }
+        : step === 7
+          ? { ...draft, fiscalYear }
+          : draft;
+    setDraft(update);
     saveSetupStep(step, update);
     if (step < 15) {
       setStep(step + 1);
-      setValue('');
     } else onClose();
   }
   return (
@@ -907,6 +931,29 @@ export function OnboardingWizard({
             style={{ width: `${(step / 15) * 100}%` }}
           />
         </div>
+        <div
+          className="mt-3 flex gap-1.5 overflow-x-auto pb-1"
+          aria-label="Setup steps"
+        >
+          {SETUP_STEPS.map((label, index) => {
+            const number = index + 1;
+            const locked = number > state.setup.completedSteps + 1;
+            return (
+              <button
+                key={label}
+                type="button"
+                title={`${number}. ${label}`}
+                aria-label={`Step ${number}: ${label}`}
+                aria-current={step === number ? 'step' : undefined}
+                disabled={locked}
+                onClick={() => setStep(number)}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${step === number ? 'bg-[#0b1248] text-white' : number <= state.setup.completedSteps ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
+              >
+                {number}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="rounded-2xl border border-[#ededed] p-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-[#1c4aa9]">
@@ -920,24 +967,22 @@ export function OnboardingWizard({
             ? `Enable modules for ${company.nobName}; navigation and schedulers follow this configuration.`
             : step === 12
               ? `${company.lobs.join(', ')} inherit company settings with per-LOB costing.`
-              : 'This value will be used as the company default.'}
+              : step <= 9
+                ? 'Required company foundation. Operations unlock after steps 1–9 are complete.'
+                : 'Optional readiness configuration can be completed later from Settings.'}
         </p>
         <div className="mt-5">
-          {[8, 10, 11, 12, 13, 14, 15].includes(step) ? (
-            <Notice>
-              {completed
-                ? 'This step is already complete. Saving again reconfirms the configuration.'
-                : 'Recommended defaults are ready to review and confirm.'}
-            </Notice>
-          ) : (
-            <Field label="Configuration value">
-              <input
-                className={inputClass}
-                value={defaultValue}
-                onChange={(e) => setValue(e.target.value)}
-              />
-            </Field>
-          )}
+          <SetupStepFields
+            step={step}
+            company={company}
+            draft={draft}
+            setDraft={setDraft}
+            password={password}
+            setPassword={setPassword}
+            confirmPassword={confirmPassword}
+            setConfirmPassword={setConfirmPassword}
+            completed={completed}
+          />
         </div>
       </div>
       <div className="mt-5 flex items-center justify-between">
@@ -957,13 +1002,581 @@ export function OnboardingWizard({
           </button>
           <button
             onClick={save}
-            className="h-10 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"
+            disabled={!valid}
+            className="h-10 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             {step === 15 ? 'Complete setup' : 'Save & continue'}
           </button>
         </div>
       </div>
     </WorkflowDialog>
+  );
+}
+
+function SetupStepFields({
+  step,
+  company,
+  draft,
+  setDraft,
+  password,
+  setPassword,
+  confirmPassword,
+  setConfirmPassword,
+  completed,
+}: {
+  step: number;
+  company: CompanyMeta;
+  draft: SetupState;
+  setDraft: (value: SetupState) => void;
+  password: string;
+  setPassword: (value: string) => void;
+  confirmPassword: string;
+  setConfirmPassword: (value: string) => void;
+  completed: boolean;
+}) {
+  const update = <K extends keyof SetupState>(key: K, value: SetupState[K]) =>
+    setDraft({ ...draft, [key]: value });
+  const toggleList = (
+    key:
+      | 'modules'
+      | 'additionalLanguages'
+      | 'reportingCurrencies'
+      | 'notificationChannels',
+    value: string,
+  ) =>
+    update(
+      key,
+      draft[key].includes(value)
+        ? draft[key].filter((item) => item !== value)
+        : [...draft[key], value],
+    );
+  const grid = 'grid gap-4 sm:grid-cols-2';
+
+  if (step === 1)
+    return (
+      <div className={grid}>
+        <Field label="Company legal name">
+          <input
+            className={inputClass}
+            value={draft.legalName}
+            onChange={(e) => update('legalName', e.target.value)}
+          />
+        </Field>
+        <Field label="Display name">
+          <input
+            className={inputClass}
+            value={draft.displayName}
+            onChange={(e) => update('displayName', e.target.value)}
+          />
+        </Field>
+        <Field label="Company type">
+          <select
+            className={inputClass}
+            value={draft.companyType}
+            onChange={(e) => update('companyType', e.target.value)}
+          >
+            {[
+              'Sole Proprietor',
+              'Partnership',
+              'Private Limited',
+              'LLP',
+              'Trust',
+              'NGO',
+              'Co-operative',
+            ].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Registration number">
+          <input
+            className={inputClass}
+            value={draft.registrationNumber}
+            onChange={(e) => update('registrationNumber', e.target.value)}
+          />
+        </Field>
+        <Field label="Tax ID">
+          <input
+            className={inputClass}
+            value={draft.taxId}
+            onChange={(e) => update('taxId', e.target.value)}
+          />
+        </Field>
+        <Field label="Company website">
+          <input
+            className={inputClass}
+            type="url"
+            value={draft.website}
+            onChange={(e) => update('website', e.target.value)}
+          />
+        </Field>
+        <Field label="Brand primary colour">
+          <input
+            className={inputClass}
+            type="color"
+            value={draft.brandColor}
+            onChange={(e) => update('brandColor', e.target.value)}
+          />
+        </Field>
+        <Field
+          label="Company logo"
+          hint="Demo only: file selection is not uploaded."
+        >
+          <input
+            className={`${inputClass} py-2.5`}
+            type="file"
+            accept="image/png,image/svg+xml"
+          />
+        </Field>
+      </div>
+    );
+  if (step === 2)
+    return (
+      <div className={grid}>
+        <Field label="Address line 1">
+          <input
+            className={inputClass}
+            value={draft.addressLine1}
+            onChange={(e) => update('addressLine1', e.target.value)}
+          />
+        </Field>
+        <Field label="City">
+          <input
+            className={inputClass}
+            value={draft.city}
+            onChange={(e) => update('city', e.target.value)}
+          />
+        </Field>
+        <Field label="State / province">
+          <input
+            className={inputClass}
+            value={draft.stateProvince}
+            onChange={(e) => update('stateProvince', e.target.value)}
+          />
+        </Field>
+        <Field label="Country">
+          <select
+            className={inputClass}
+            value={draft.country}
+            onChange={(e) => update('country', e.target.value)}
+          >
+            {[
+              'India',
+              'United Arab Emirates',
+              'United Kingdom',
+              'United States',
+              'Singapore',
+            ].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="PIN / ZIP code">
+          <input
+            className={inputClass}
+            value={draft.postalCode}
+            onChange={(e) => update('postalCode', e.target.value)}
+          />
+        </Field>
+        <Field label="Farm GPS coordinates" hint="Latitude, longitude">
+          <input
+            className={inputClass}
+            value={draft.gpsCoordinates}
+            onChange={(e) => update('gpsCoordinates', e.target.value)}
+          />
+        </Field>
+      </div>
+    );
+  if (step === 3)
+    return (
+      <div className={grid}>
+        <Field label="Primary contact">
+          <input
+            className={inputClass}
+            value={draft.contactName}
+            onChange={(e) => update('contactName', e.target.value)}
+          />
+        </Field>
+        <Field label="Email">
+          <input
+            className={inputClass}
+            type="email"
+            value={draft.contactEmail}
+            onChange={(e) => update('contactEmail', e.target.value)}
+          />
+        </Field>
+        <Field label="Mobile number">
+          <input
+            className={inputClass}
+            type="tel"
+            value={draft.contactPhone}
+            onChange={(e) => update('contactPhone', e.target.value)}
+          />
+        </Field>
+        <div className="space-y-2">
+          <CheckOption
+            label="Receive critical KPI alerts"
+            checked={draft.receiveKpiAlerts}
+            onChange={(checked) => update('receiveKpiAlerts', checked)}
+          />
+          <CheckOption
+            label="Receive weekly reports"
+            checked={draft.receiveWeeklyReports}
+            onChange={(checked) => update('receiveWeeklyReports', checked)}
+          />
+        </div>
+      </div>
+    );
+  if (step === 4)
+    return (
+      <div className={grid}>
+        <Field label="Default language">
+          <select
+            className={inputClass}
+            value={draft.language}
+            onChange={(e) => update('language', e.target.value)}
+          >
+            {[
+              'English',
+              'Hindi',
+              'Marathi',
+              'Tamil',
+              'Telugu',
+              'Punjabi',
+              'Gujarati',
+              'Bengali',
+              'Arabic',
+              'French',
+              'Spanish',
+              'Chinese',
+            ].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Date display format">
+          <select
+            className={inputClass}
+            value={draft.dateFormat}
+            onChange={(e) => update('dateFormat', e.target.value)}
+          >
+            {['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Number format">
+          <select
+            className={inputClass}
+            value={draft.numberFormat}
+            onChange={(e) => update('numberFormat', e.target.value)}
+          >
+            {[
+              'Indian (1,00,000)',
+              'International (100,000)',
+              'European (100.000)',
+            ].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <div>
+          <p className="mb-2 text-xs font-semibold text-[#515463]">
+            Additional languages
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {['Hindi', 'Marathi', 'Tamil', 'Arabic'].map((item) => (
+              <CheckOption
+                key={item}
+                label={item}
+                checked={draft.additionalLanguages.includes(item)}
+                onChange={() => toggleList('additionalLanguages', item)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  if (step === 5)
+    return (
+      <div className={grid}>
+        <Field
+          label="Base accounting currency"
+          hint="Locked after the first transaction."
+        >
+          <select
+            className={inputClass}
+            value={draft.currency}
+            onChange={(e) => update('currency', e.target.value)}
+          >
+            {['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD'].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <div>
+          <p className="mb-2 text-xs font-semibold text-[#515463]">
+            Reporting currencies
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {['USD', 'EUR', 'GBP', 'AED', 'SGD'].map((item) => (
+              <CheckOption
+                key={item}
+                label={item}
+                checked={draft.reportingCurrencies.includes(item)}
+                onChange={() => toggleList('reportingCurrencies', item)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  if (step === 6)
+    return (
+      <div className={grid}>
+        <Field label="Company timezone">
+          <select
+            className={inputClass}
+            value={draft.timezone}
+            onChange={(e) => update('timezone', e.target.value)}
+          >
+            {[
+              'Asia/Kolkata',
+              'Asia/Dubai',
+              'Europe/London',
+              'America/New_York',
+              'Asia/Singapore',
+            ].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Regional country">
+          <input className={inputClass} value={draft.country} readOnly />
+        </Field>
+      </div>
+    );
+  if (step === 7)
+    return (
+      <div className={grid}>
+        <Field label="Fiscal year start month">
+          <select
+            className={inputClass}
+            value={draft.fiscalStartMonth}
+            onChange={(e) => update('fiscalStartMonth', e.target.value)}
+          >
+            {['January', 'April', 'July', 'October'].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Accounting standard">
+          <select
+            className={inputClass}
+            value={draft.accountingStandard}
+            onChange={(e) => update('accountingStandard', e.target.value)}
+          >
+            {['IND AS', 'IFRS', 'US GAAP', 'Local GAAP'].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Inventory valuation">
+          <select
+            className={inputClass}
+            value={draft.inventoryValuation}
+            onChange={(e) => update('inventoryValuation', e.target.value)}
+          >
+            {[
+              'STANDARD COSTING',
+              'FIFO',
+              'Weighted Average',
+              'LOB-level configuration',
+            ].map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+    );
+  if (step === 8)
+    return (
+      <div className="grid gap-2 sm:grid-cols-2">
+        {['Batches', 'Inventory', 'QC', 'QR', 'Finance', 'Analytics'].map(
+          (item) => (
+            <CheckOption
+              key={item}
+              label={item}
+              checked={draft.modules.includes(item)}
+              onChange={() => toggleList('modules', item)}
+            />
+          ),
+        )}
+      </div>
+    );
+  if (step === 9)
+    return (
+      <div className={grid}>
+        <Field label="Administrator full name">
+          <input
+            className={inputClass}
+            value={draft.adminName}
+            onChange={(e) => update('adminName', e.target.value)}
+          />
+        </Field>
+        <Field label="Login email">
+          <input
+            className={inputClass}
+            type="email"
+            value={draft.adminEmail}
+            onChange={(e) => update('adminEmail', e.target.value)}
+          />
+        </Field>
+        <Field label="Mobile number">
+          <input
+            className={inputClass}
+            type="tel"
+            value={draft.adminPhone}
+            onChange={(e) => update('adminPhone', e.target.value)}
+          />
+        </Field>
+        <CheckOption
+          label="Enable two-factor authentication"
+          checked={draft.adminTwoFactor}
+          onChange={(checked) => update('adminTwoFactor', checked)}
+        />
+        {!completed && (
+          <>
+            <Field
+              label="Password"
+              hint="8+ characters with uppercase, number and special character"
+            >
+              <input
+                className={inputClass}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Field>
+            <Field label="Confirm password">
+              <input
+                className={inputClass}
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </Field>
+          </>
+        )}
+      </div>
+    );
+  if (step === 10)
+    return (
+      <ReviewList
+        items={[
+          'Invite farm managers, accountants and supervisors',
+          'Assign documented company-scoped roles',
+          'Invitation messages use the company default language',
+        ]}
+      />
+    );
+  if (step === 11)
+    return (
+      <ReviewList
+        items={[
+          '1100 Inventory – Feed & Consumables',
+          '1110 Inventory – Live Animals / Birds',
+          '1190 Batch Work in Progress',
+          'Variance accounts 6100–6150',
+        ]}
+      />
+    );
+  if (step === 12)
+    return (
+      <ReviewList
+        items={company.lobs.map(
+          (lob) => `${lob}: costing, scheduler and KPI defaults ready`,
+        )}
+      />
+    );
+  if (step === 13)
+    return (
+      <ReviewList
+        items={[
+          'UOM and conversions',
+          'Items, breeds and varieties',
+          'Locations, sub-locations and resources',
+        ]}
+      />
+    );
+  if (step === 14)
+    return (
+      <div className="grid gap-2 sm:grid-cols-2">
+        {[
+          'In-app notifications',
+          'Email',
+          'SMS / WhatsApp',
+          'Push notifications',
+        ].map((item) => (
+          <CheckOption
+            key={item}
+            label={item}
+            checked={draft.notificationChannels.includes(item)}
+            onChange={() => toggleList('notificationChannels', item)}
+          />
+        ))}
+      </div>
+    );
+  return (
+    <ReviewList
+      items={[
+        `${draft.legalName} · ${draft.country}`,
+        `${draft.currency} · ${draft.accountingStandard} · ${draft.fiscalStartMonth} fiscal start`,
+        `${draft.modules.length} modules · ${company.lobs.length} lines of business`,
+        'Steps 1–9 complete: production workspace can be unlocked',
+      ]}
+    />
+  );
+}
+
+function CheckOption({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#dedede] bg-white px-3 text-xs font-medium text-[#515463]">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 accent-[#1c4aa9]"
+      />
+      {label}
+    </label>
+  );
+}
+
+function ReviewList({ items }: { items: string[] }) {
+  return (
+    <div className="space-y-2">
+      {items.map((item) => (
+        <div
+          key={item}
+          className="flex items-start gap-2 rounded-xl border border-[#ededed] bg-[#fafafa] p-3 text-xs text-[#515463]"
+        >
+          <CheckCircle2
+            size={15}
+            className="mt-0.5 shrink-0 text-emerald-600"
+          />
+          {item}
+        </div>
+      ))}
+    </div>
   );
 }
 

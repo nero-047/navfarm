@@ -72,6 +72,7 @@ import {
   ResourceDialog,
 } from './workflow-dialogs';
 import { DashboardCharts } from './dashboard-charts';
+import { GuidedPoultryDemo } from './guided-demo';
 
 export type WorkspacePageKind =
   | 'dashboard'
@@ -308,6 +309,7 @@ function Dashboard({ company }: { company: Company }) {
           tone="red"
         />
       </div>
+      <GuidedPoultryDemo company={company} />
       <DashboardCharts company={company} state={state} />
 
       <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr]">
@@ -567,7 +569,12 @@ function Batches({ company }: { company: Company }) {
               return (
                 <tr key={batch.code} className="hover:bg-[#fcfcfc]">
                   <TableCell>
-                    <p className="font-semibold text-[#2e313f]">{batch.code}</p>
+                    <Link
+                      href={`/${company.slug}/batches/${encodeURIComponent(batch.code)}`}
+                      className="font-semibold text-[#1c4aa9] hover:text-[#c24332]"
+                    >
+                      {batch.code}
+                    </Link>
                     <p className="mt-1 text-[11px] text-[#707070]">
                       {batch.lob}
                     </p>
@@ -642,6 +649,12 @@ function Batches({ company }: { company: Company }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex min-w-32 flex-col gap-2">
+                      <Link
+                        href={`/${company.slug}/batches/${encodeURIComponent(batch.code)}`}
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-[11px] font-semibold text-[#1c4aa9] hover:bg-blue-100"
+                      >
+                        View workspace
+                      </Link>
                       <button
                         onClick={() => setManaging(batch)}
                         className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#0b1248] px-3 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1b2869]"
@@ -1591,7 +1604,11 @@ function Reports({ company }: { company: Company }) {
             ].map(([title, text], index) => (
               <button
                 key={title}
-                onClick={() => index === 3 ? window.location.assign(`/${company.slug}/traceability`) : downloadDemoReport(title, state)}
+                onClick={() =>
+                  index === 3
+                    ? window.location.assign(`/${company.slug}/traceability`)
+                    : downloadDemoReport(title, state)
+                }
                 className="flex items-center gap-3 rounded-xl border border-[#ededed] p-3.5 text-left transition-colors hover:border-[#1c4aa9]"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-[#1c4aa9]">
@@ -1869,8 +1886,29 @@ function ProfileSettings({ company }: { company: Company }) {
           ))}
         </div>
       </SettingsPanel>
-      <SettingsPanel title="Account security" description="Review your session or sign out of NAVFarm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-semibold text-[#30364b]">Current session</p><p className="mt-1 text-[10px] text-[#7d8290]">Signed in on this browser · Active now</p></div><button onClick={() => { logout(); window.location.assign('/login'); }} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-xs font-semibold text-[#c24332]"><LogOut size={14}/> Sign out</button></div>
+      <SettingsPanel
+        title="Account security"
+        description="Review your session or sign out of NAVFarm"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-[#30364b]">
+              Current session
+            </p>
+            <p className="mt-1 text-[10px] text-[#7d8290]">
+              Signed in on this browser · Active now
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              logout();
+              window.location.assign('/login');
+            }}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-xs font-semibold text-[#c24332]"
+          >
+            <LogOut size={14} /> Sign out
+          </button>
+        </div>
       </SettingsPanel>
     </div>
   );
@@ -1945,7 +1983,11 @@ function CompanySettings({ company }: { company: Company }) {
             ['Legal name', state.setup.legalName],
             ['Display name', state.setup.displayName],
             ['Company code', company.slug.toUpperCase().slice(0, 12)],
-            ['Registration no.', 'U01100MH2026PTC00184'],
+            ['Company type', state.setup.companyType],
+            ['Registration no.', state.setup.registrationNumber],
+            ['Tax ID', state.setup.taxId],
+            ['Website', state.setup.website],
+            ['Brand colour', state.setup.brandColor],
           ]}
         />
       </SettingsPanel>
@@ -1956,9 +1998,15 @@ function CompanySettings({ company }: { company: Company }) {
         <SettingsGrid
           fields={[
             ['Primary location', state.setup.address],
-            ['Address type', 'Farm / registered'],
+            ['Registered address', state.setup.addressLine1],
+            [
+              'Country / postal code',
+              `${state.setup.country} · ${state.setup.postalCode}`,
+            ],
+            ['Farm GPS', state.setup.gpsCoordinates],
             ['Primary contact', state.setup.contactName],
             ['Support email', state.setup.contactEmail],
+            ['Contact phone', state.setup.contactPhone],
           ]}
         />
       </SettingsPanel>
@@ -1969,9 +2017,14 @@ function CompanySettings({ company }: { company: Company }) {
         <SettingsGrid
           fields={[
             ['Default language', state.setup.language],
-            ['Additional languages', 'Hindi, Marathi'],
+            [
+              'Additional languages',
+              state.setup.additionalLanguages.join(', ') || 'None',
+            ],
+            ['Date format', state.setup.dateFormat],
+            ['Number format', state.setup.numberFormat],
             ['Timezone', state.setup.timezone],
-            ['Country', 'India'],
+            ['Country', state.setup.country],
           ]}
         />
       </SettingsPanel>
@@ -2044,9 +2097,14 @@ function FinanceSettings() {
         <SettingsGrid
           fields={[
             ['Base currency', state.setup.currency],
+            [
+              'Reporting currencies',
+              state.setup.reportingCurrencies.join(', ') || 'None',
+            ],
             ['Fiscal year', state.setup.fiscalYear],
-            ['Accounting standard', 'IND AS / IAS 41'],
-            ['Inventory valuation', 'LOB-level configuration'],
+            ['Fiscal start month', state.setup.fiscalStartMonth],
+            ['Accounting standard', state.setup.accountingStandard],
+            ['Inventory valuation', state.setup.inventoryValuation],
           ]}
         />
       </SettingsPanel>
@@ -2369,16 +2427,14 @@ function SettingsGrid({ fields }: { fields: string[][] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {fields.map(([label, value]) => (
-        <label key={label} className="block">
-          <span className="mb-1.5 block text-[11px] font-semibold text-[#515463]">
+        <div key={label}>
+          <p className="mb-1.5 text-[11px] font-semibold text-[#515463]">
             {label}
-          </span>
-          <input
-            value={value}
-            readOnly
-            className="h-11 w-full rounded-xl border border-[#e5e5e5] bg-[#fafafa] px-3.5 text-xs text-[#2e313f] outline-none"
-          />
-        </label>
+          </p>
+          <div className="flex min-h-11 items-center rounded-xl border border-[#e5e5e5] bg-[#fafafa] px-3.5 py-2.5 text-xs text-[#2e313f]">
+            {value || 'Not configured'}
+          </div>
+        </div>
       ))}
     </div>
   );

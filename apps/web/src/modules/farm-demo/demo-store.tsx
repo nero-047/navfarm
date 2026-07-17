@@ -122,16 +122,39 @@ export interface SetupState {
   legalName: string;
   displayName: string;
   companyType: string;
+  registrationNumber: string;
+  taxId: string;
+  website: string;
+  brandColor: string;
   address: string;
+  addressLine1: string;
+  city: string;
+  stateProvince: string;
+  country: string;
+  postalCode: string;
+  gpsCoordinates: string;
   contactName: string;
   contactEmail: string;
+  contactPhone: string;
+  receiveKpiAlerts: boolean;
+  receiveWeeklyReports: boolean;
   language: string;
+  additionalLanguages: string[];
+  dateFormat: string;
+  numberFormat: string;
   currency: string;
+  reportingCurrencies: string[];
   timezone: string;
   fiscalYear: string;
+  fiscalStartMonth: string;
+  accountingStandard: string;
+  inventoryValuation: string;
   modules: string[];
   notificationChannels: string[];
+  adminName: string;
   adminEmail: string;
+  adminPhone: string;
+  adminTwoFactor: boolean;
 }
 
 export interface MasterRecord {
@@ -143,7 +166,7 @@ export interface MasterRecord {
 }
 
 export interface DemoState {
-  version: 5;
+  version: 6;
   batches: WorkflowBatch[];
   operations: OperationEntry[];
   qualityLots: QualityLot[];
@@ -322,7 +345,7 @@ function seedState(company: CompanyMeta): DemoState {
     }),
   );
   return {
-    version: 5,
+    version: 6,
     batches,
     operations: [],
     qualityLots,
@@ -333,16 +356,39 @@ function seedState(company: CompanyMeta): DemoState {
       legalName: company.name,
       displayName: company.name,
       companyType: 'Private Limited',
+      registrationNumber: 'U01100MH2026PTC00184',
+      taxId: '27AABCG1234F1ZK',
+      website: 'https://www.navfarm.app',
+      brandColor: '#1F4E79',
       address: company.location,
+      addressLine1: 'Registered farm and operations office',
+      city: company.location.split(',')[0]?.trim() || 'Pune',
+      stateProvince: company.location.split(',')[1]?.trim() || 'Maharashtra',
+      country: 'India',
+      postalCode: '411001',
+      gpsCoordinates: '18.520430, 73.856744',
       contactName: 'Rajesh Kumar Sharma',
       contactEmail: 'operations@sunriselivestock.in',
+      contactPhone: '+91 98700 12309',
+      receiveKpiAlerts: true,
+      receiveWeeklyReports: true,
       language: 'English',
+      additionalLanguages: ['Hindi', 'Marathi'],
+      dateFormat: 'DD/MM/YYYY',
+      numberFormat: 'Indian (1,00,000)',
       currency: 'INR',
+      reportingCurrencies: ['USD'],
       timezone: 'Asia/Kolkata',
       fiscalYear: 'April to March',
+      fiscalStartMonth: 'April',
+      accountingStandard: 'IND AS',
+      inventoryValuation: 'LOB-level configuration',
       modules: ['Batches', 'Inventory', 'QC', 'QR', 'Finance', 'Analytics'],
       notificationChannels: ['In-app notifications', 'Email'],
+      adminName: 'Rajesh Kumar Sharma',
       adminEmail: 'admin@sunriselivestock.in',
+      adminPhone: '+91 98700 12309',
+      adminTwoFactor: true,
     },
     masterData: [
       { id: 'master-1', type: 'UOM', code: 'KG', name: 'Kilogram', uom: 'KG' },
@@ -394,7 +440,7 @@ export function DemoStoreProvider({
   company: CompanyMeta;
   children: ReactNode;
 }) {
-  const key = `navfarm_demo_state_v5_${company.slug}`;
+  const key = `navfarm_demo_state_v6_${company.slug}`;
   const [state, setState] = useState<DemoState>(() => seedState(company));
   const [isReady, setIsReady] = useState(false);
 
@@ -402,7 +448,7 @@ export function DemoStoreProvider({
     try {
       const saved = localStorage.getItem(key);
       const parsed = saved ? (JSON.parse(saved) as DemoState) : null;
-      setState(parsed?.version === 5 ? parsed : seedState(company));
+      setState(parsed?.version === 6 ? parsed : seedState(company));
     } catch {
       setState(seedState(company));
     }
@@ -410,8 +456,15 @@ export function DemoStoreProvider({
   }, [company, key]);
 
   useEffect(() => {
-    if (isReady) localStorage.setItem(key, JSON.stringify(state));
-  }, [isReady, key, state]);
+    if (isReady) {
+      localStorage.setItem(key, JSON.stringify(state));
+      window.dispatchEvent(
+        new CustomEvent('navfarm-demo-state', {
+          detail: { company: company.slug, modules: state.setup.modules },
+        }),
+      );
+    }
+  }, [company.slug, isReady, key, state]);
 
   const calculateVariance = useCallback(
     (batch: WorkflowBatch): VarianceResult => {
