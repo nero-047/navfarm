@@ -2,6 +2,14 @@ const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { join } = require('path');
 
 module.exports = {
+  resolve: {
+    alias: {
+      'class-transformer/storage': require.resolve(
+        'class-transformer/cjs/storage',
+        { paths: [__dirname] },
+      ),
+    },
+  },
   output: {
     path: join(__dirname, 'dist'),
     clean: true,
@@ -15,7 +23,7 @@ module.exports = {
       compiler: 'tsc',
       main: './src/main.ts',
       tsConfig: './tsconfig.app.json',
-      assets: ['./src/assets'],
+      assets: ['./src/assets', './src/drizzle'],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: false,
