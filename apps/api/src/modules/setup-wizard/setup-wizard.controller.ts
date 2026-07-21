@@ -1,5 +1,8 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, Request, UseGuards, HttpStatus, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, resolve } from 'node:path';
 import { SetupWizardService } from './setup-wizard.service';
 import { Step1ProfileDto } from './dto/step1-profile.dto';
 import { Step2AddressDto } from './dto/step2-address.dto';
@@ -15,12 +18,52 @@ import { SystemAdminGuard } from '../../common/guards/system-admin.guard';
 export class SetupWizardController {
   constructor(private readonly wizardService: SetupWizardService) {}
 
+  @Post('upload-logo')
+  @ApiOperation({ summary: 'Upload Company Logo image file' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary', description: 'Logo image file (PNG, JPG, SVG, WebP)' },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: resolve(process.env.UPLOADS_DIR || 'apps/api/uploads'),
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          cb(null, `company-logo-${uniqueSuffix}${ext}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max size
+      fileFilter: (_req, file, cb) => {
+        const allowed = new Set(['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']);
+        if (!allowed.has(file.mimetype)) {
+          return cb(new BadRequestException('Only PNG, JPG, SVG, and WebP logo files are allowed.'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadLogo(@UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException('No logo image file was uploaded.');
+    }
+    const logoUrl = `/uploads/${file.filename}`;
+    return { logoUrl, filename: file.filename };
+  }
+
   @Post('step-1')
   @ApiOperation({ summary: 'Step 1: Save Company legal Profile info' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Step completed.' })
   async saveStep1(@Body() dto: Step1ProfileDto) {
     return this.wizardService.saveStep1Profile(dto);
   }
+
 
   @Post('step-2')
   @ApiOperation({ summary: 'Step 2: Save Company registered Address' })
@@ -104,16 +147,27 @@ export class SetupWizardController {
   }
 
   @Get('nobs')
-  @ApiOperation({ summary: 'Retrieve active Nature of Business (NOB) master sectors' })
-  async listNobs() {
-    return this.wizardService.listNobs();
+  @ApiOperation({ summary: 'Retrieve active Nature of Business (NOB) master sectors (scoped by tenant if tenantId specified/header present)' })
+  async listNobs(
+    @Query('tenantId') queryTenantId?: string,
+    @Headers('x-tenant-id') headerTenantId?: string,
+    @Request() req?: any,
+  ) {
+    const tenantId = queryTenantId || headerTenantId || req?.user?.tenantId;
+    return this.wizardService.listNobs(tenantId);
   }
 
   @Get('lobs/:nobId')
-  @ApiOperation({ summary: 'Retrieve active Line of Business (LOB) sub-sectors filtered by parent NOB' })
+  @ApiOperation({ summary: 'Retrieve active Line of Business (LOB) sub-sectors filtered by parent NOB (scoped by tenant)' })
   @ApiParam({ name: 'nobId', description: 'Parent NOB Master UUID' })
-  async listLobs(@Param('nobId') nobId: string) {
-    return this.wizardService.listLobs(nobId);
+  async listLobs(
+    @Param('nobId') nobId: string,
+    @Query('tenantId') queryTenantId?: string,
+    @Headers('x-tenant-id') headerTenantId?: string,
+    @Request() req?: any,
+  ) {
+    const tenantId = queryTenantId || headerTenantId || req?.user?.tenantId;
+    return this.wizardService.listLobs(nobId, tenantId);
   }
 
   @Post('nobs')

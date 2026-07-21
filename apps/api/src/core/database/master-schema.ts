@@ -45,6 +45,8 @@ export const tenantMaster = mysqlTable('tenant_master', {
   api_rate_limit: int('api_rate_limit').default(1000).notNull(),
   is_trial: boolean('is_trial').default(false).notNull(),
   trial_end_date: date('trial_end_date', { mode: 'string' }),
+  allowed_nob_ids: json('allowed_nob_ids').$type<string[]>(),
+  allowed_lob_ids: json('allowed_lob_ids').$type<string[]>(),
   is_active: boolean('is_active').default(true).notNull(),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   

@@ -16,19 +16,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FullPageOverlay } from '@/components/ui/full-page-overlay';
 import {
-  COMPANIES,
   NOB_OPTIONS,
   getNobCatalog,
   CompanyCard,
-  createCompanyMeta,
+  createBackendCompany,
+  fetchTenantCompanies,
   type CompanyMeta,
   type NobCode,
   type NobOption,
 } from '@/modules/company';
-import {
-  CUSTOM_COMPANIES_KEY,
-  getCustomCompanies,
-} from '@/modules/company/use-current-company';
+import { saveApiCompanies } from '@/modules/company/use-current-company';
 
 function slugify(text: string) {
   return text
@@ -42,26 +39,33 @@ export default function CompanySelectionPage() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [companies, setCompanies] =
-    useState<Record<string, CompanyMeta>>(COMPANIES);
+    useState<Record<string, CompanyMeta>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [nobCode, setNobCode] = useState<NobCode | ''>('');
   const [nobOptions, setNobOptions] = useState<NobOption[]>(NOB_OPTIONS);
   const [error, setError] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.push('/login');
   }, [user, loading, router]);
   useEffect(() => {
-    const next = { ...COMPANIES };
-    for (const custom of getCustomCompanies()) next[custom.slug] = custom;
-    setCompanies(next);
     setNobOptions(getNobCatalog());
-  }, []);
+    if (!user?.tenantId) return;
+    setSyncing(true);
+    fetchTenantCompanies(user.tenantId)
+      .then((items) => {
+        saveApiCompanies(items);
+        setCompanies(Object.fromEntries(items.map((company) => [company.slug, company])));
+      })
+      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not load companies'))
+      .finally(() => setSyncing(false));
+  }, [user?.tenantId]);
 
   if (loading || !user) return null;
 
-  function createCompany() {
+  async function createCompany() {
     setError('');
     const trimmed = name.trim();
     if (!trimmed) return setError('Company name is required');
@@ -69,21 +73,21 @@ export default function CompanySelectionPage() {
     const slug = slugify(trimmed);
     if (companies[slug])
       return setError('A company with this name already exists');
-    const created = createCompanyMeta(
-      trimmed,
-      slug,
-      nobCode,
-      nobOptions.find((item) => item.code === nobCode),
-    );
-    localStorage.setItem(
-      CUSTOM_COMPANIES_KEY,
-      JSON.stringify([...getCustomCompanies(), created]),
-    );
-    setCompanies((current) => ({ ...current, [slug]: created }));
-    setModalOpen(false);
-    setName('');
-    setNobCode('');
-    router.push(`/${slug}/settings`);
+    setSyncing(true);
+    try {
+      const created = await createBackendCompany({ name: trimmed, nobCode });
+      const next = { ...companies, [created.slug]: created };
+      setCompanies(next);
+      saveApiCompanies(Object.values(next));
+      setModalOpen(false);
+      setName('');
+      setNobCode('');
+      router.push(`/${created.slug}/settings`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not create company');
+    } finally {
+      setSyncing(false);
+    }
   }
 
   return (
@@ -94,18 +98,11 @@ export default function CompanySelectionPage() {
             NAV<span className="text-[#c24332]">Farm</span>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href="/organization"
-              className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"
-            >
-              <Building2 size={14} /> Tenant admin
-            </Link>
-            <Link
-              href="/operator"
-              className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"
-            >
-              <ShieldCheck size={14} /> Operator
-            </Link>
+            {user.userType === 'SYSTEM_ADMIN' ? (
+              <Link href="/operator" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><ShieldCheck size={14} /> Operator</Link>
+            ) : (
+              <Link href="/organization" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><Building2 size={14} /> Tenant admin</Link>
+            )}
             <div className="hidden text-right sm:block">
               <p className="text-xs font-semibold text-[#2e313f]">
                 {user.name}
@@ -145,6 +142,9 @@ export default function CompanySelectionPage() {
           </span>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {syncing && Object.keys(companies).length === 0 && (
+            <p className="text-sm text-[#707070]">Loading companies from NAVFarm API…</p>
+          )}
           {Object.values(companies).map((company) => (
             <CompanyCard key={company.slug} company={company} />
           ))}
@@ -228,7 +228,9 @@ export default function CompanySelectionPage() {
               <Button variant="outline" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={createCompany}>Create company</Button>
+              <Button onClick={createCompany} disabled={syncing}>
+                {syncing ? 'Creating…' : 'Create company'}
+              </Button>
             </div>
           </div>
         </FullPageOverlay>

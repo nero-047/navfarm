@@ -450,12 +450,60 @@ export class AuthService {
 
   private async generateTokens(user: any) {
     const permissions = await this.getUserPermissions(user.user_id);
+    let companies: Array<{
+      company_id: string;
+      company_name: string;
+      is_primary: boolean;
+    }> = [];
+
+    try {
+      companies = await this.db
+        .select({
+          company_id: schema.companyMaster.company_id,
+          company_name: schema.companyMaster.company_name,
+          is_primary: schema.userCompanyAssignments.is_primary,
+        })
+        .from(schema.userCompanyAssignments)
+        .innerJoin(
+          schema.companyMaster,
+          eq(schema.userCompanyAssignments.company_id, schema.companyMaster.company_id),
+        )
+        .where(
+          and(
+            eq(schema.userCompanyAssignments.user_id, user.user_id),
+            eq(schema.userCompanyAssignments.is_active, true),
+          ),
+        );
+    } catch (error) {
+      console.warn(
+        'Could not load user company assignments. Run the tenant migrations.',
+        error instanceof Error ? error.message : error,
+      );
+    }
+
+    if (
+      companies.length === 0 &&
+      user.company_id &&
+      user.company_id !== '00000000-0000-0000-0000-000000000000'
+    ) {
+      const [homeCompany] = await this.db
+        .select({
+          company_id: schema.companyMaster.company_id,
+          company_name: schema.companyMaster.company_name,
+        })
+        .from(schema.companyMaster)
+        .where(eq(schema.companyMaster.company_id, user.company_id))
+        .limit(1);
+      if (homeCompany) companies = [{ ...homeCompany, is_primary: true }];
+    }
+
     const payload = {
       email: user.email,
       sub: user.user_id,
       tenantId: user.tenant_id,
       companyId: user.company_id,
       userType: user.user_type,
+      companies,
     };
 
     return {
@@ -468,6 +516,7 @@ export class AuthService {
         userType: user.user_type,
         companyId: user.company_id,
         tenantId: user.tenant_id,
+        companies,
         permissions,
       },
     };

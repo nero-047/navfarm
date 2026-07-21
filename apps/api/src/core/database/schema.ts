@@ -13,7 +13,8 @@ import {
   json, 
   text, 
   primaryKey,
-  foreignKey
+  foreignKey,
+  uniqueIndex,
 } from 'drizzle-orm/mysql-core';
 import { relations } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -94,6 +95,7 @@ export const companyFiscal = mysqlTable('company_fiscal', {
   fiscal_year_format: varchar('fiscal_year_format', { length: 20 }).default('FY APR MAR').notNull(),
   fiscal_start_month: int('fiscal_start_month').default(4).notNull(),
   fiscal_start_day: int('fiscal_start_day').default(1).notNull(),
+  fiscal_end_day: int('fiscal_end_day').default(31).notNull(),
   current_fiscal_year: varchar('current_fiscal_year', { length: 20 }).notNull(),
   period_type: varchar('period_type', { length: 20 }).default('MONTHLY').notNull(),
   accounting_standard: varchar('accounting_standard', { length: 20 }).default('IND AS').notNull(),
@@ -101,6 +103,7 @@ export const companyFiscal = mysqlTable('company_fiscal', {
   inventory_valuation: varchar('inventory_valuation', { length: 20 }).default('STANDARD').notNull(),
   gst_filing_frequency: varchar('gst_filing_frequency', { length: 20 }),
   tax_audit_applicable: boolean('tax_audit_applicable').default(false).notNull(),
+  decimal_places: int('decimal_places').default(2).notNull(),
   is_active: boolean('is_active').default(true).notNull()
 });
 
@@ -277,6 +280,18 @@ export const userRoleAssignment = mysqlTable('user_role_assignment', {
   expires_at: timestamp('expires_at', { mode: 'string' }),
   is_active: boolean('is_active').default(true).notNull()
 });
+
+export const userCompanyAssignments = mysqlTable('user_company_assignments', {
+  assign_id: varchar('assign_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  user_id: varchar('user_id', { length: 36 }).notNull().references(() => userMaster.user_id, { onDelete: 'cascade' }),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  is_primary: boolean('is_primary').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  assigned_by: varchar('assigned_by', { length: 36 }).notNull(),
+  assigned_at: timestamp('assigned_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('uq_user_company').on(table.user_id, table.company_id),
+]);
 
 // ==========================================
 // 6. SETUP WIZARD & NOTIFICATIONS
@@ -608,6 +623,17 @@ export const userRoleAssignmentRelations = relations(userRoleAssignment, ({ one 
   })
 }));
 
+export const userCompanyAssignmentsRelations = relations(userCompanyAssignments, ({ one }) => ({
+  user: one(userMaster, {
+    fields: [userCompanyAssignments.user_id],
+    references: [userMaster.user_id]
+  }),
+  company: one(companyMaster, {
+    fields: [userCompanyAssignments.company_id],
+    references: [companyMaster.company_id]
+  })
+}));
+
 export const itemMasterRelations = relations(itemMaster, ({ one, many }) => ({
   nob: one(nobMaster, {
     fields: [itemMaster.nob_id],
@@ -690,4 +716,3 @@ export const notificationLogRelations = relations(notificationLog, ({ one }) => 
     references: [companyMaster.company_id]
   })
 }));
-

@@ -38,4 +38,12 @@ export class UpdateTenantDto {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+
+  @ApiProperty({ example: ['nob-uuid-1'], description: 'Updated list of permitted NOB IDs for this tenant', required: false })
+  @IsOptional()
+  allowed_nob_ids?: string[];
+
+  @ApiProperty({ example: ['lob-uuid-1'], description: 'Updated list of permitted LOB IDs for this tenant', required: false })
+  @IsOptional()
+  allowed_lob_ids?: string[];
 }

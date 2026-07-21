@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException, Inject, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, sql, and } from 'drizzle-orm';
+import { eq, sql, and, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import * as masterSchema from '../../core/database/master-schema';
 import * as schema from '../../core/database/schema';
@@ -157,6 +157,8 @@ export class TenantService {
             max_companies: plan.max_companies,
             max_users: plan.max_users,
             api_rate_limit: plan.plan_id === 'PLAN_ENTERPRISE' ? 5000 : 1000,
+            allowed_nob_ids: dto.allowed_nob_ids || null,
+            allowed_lob_ids: dto.allowed_lob_ids || null,
             db_host: this.config.get<string>('database.host') || 'localhost',
             db_port: this.config.get<number>('database.port') || 3306,
             db_name: dbName,
@@ -257,7 +259,13 @@ export class TenantService {
   async getTenantCompanies(tenantId: string) {
     const tenant = await this.findOne(tenantId);
     const tenantDb = await this.connectionManager.getTenantConnection(tenant);
-    return tenantDb.select().from(schema.companyMaster);
+    return tenantDb
+      .select()
+      .from(schema.companyMaster)
+      .where(and(
+        ne(schema.companyMaster.company_code, 'PLACEHOLDER'),
+        eq(schema.companyMaster.is_active, true),
+      ));
   }
 
   async getTenantUsers(tenantId: string) {
@@ -327,6 +335,8 @@ export class TenantService {
           tenant_type: dto.tenant_type !== undefined ? dto.tenant_type : undefined,
           billing_email: dto.billing_email !== undefined ? dto.billing_email : undefined,
           is_active: dto.is_active !== undefined ? dto.is_active : undefined,
+          allowed_nob_ids: dto.allowed_nob_ids !== undefined ? dto.allowed_nob_ids : undefined,
+          allowed_lob_ids: dto.allowed_lob_ids !== undefined ? dto.allowed_lob_ids : undefined,
         })
         .where(eq(masterSchema.tenantMaster.tenant_id, id));
 

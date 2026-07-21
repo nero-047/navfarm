@@ -10,6 +10,8 @@ import { AlertCircle } from 'lucide-react';
 
 export function SignupForm() {
   const [name, setName] = useState('');
+  const [tenantName, setTenantName] = useState('');
+  const [tenantCode, setTenantCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,7 +22,7 @@ export function SignupForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!name || !email || !password) {
+    if (!tenantName || !tenantCode || !name || !email || !password) {
       setError('Please fill in all fields');
       return;
     }
@@ -34,9 +36,14 @@ export function SignupForm() {
       return;
     }
     setSubmitting(true);
-    const ok = await signup(name, email, password);
-    setSubmitting(false);
-    if (ok) router.push('/company-selection');
+    try {
+      await signup({ tenantName, tenantCode, name, email, password });
+      router.push('/company-selection');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to create workspace');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -57,6 +64,32 @@ export function SignupForm() {
             <span>{error}</span>
           </div>
         )}
+
+        <div className="space-y-1.5">
+          <label htmlFor="tenant-name" className="block text-[13px] font-medium text-[#2e313f]">
+            Organization name
+          </label>
+          <Input
+            id="tenant-name"
+            type="text"
+            placeholder="Green Valley Holdings"
+            value={tenantName}
+            onChange={(e) => setTenantName(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="tenant-code" className="block text-[13px] font-medium text-[#2e313f]">
+            Workspace code
+          </label>
+          <Input
+            id="tenant-code"
+            type="text"
+            placeholder="greenvalley"
+            value={tenantCode}
+            onChange={(e) => setTenantCode(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+          />
+        </div>
 
         <div className="space-y-1.5">
           <label htmlFor="name" className="block text-[13px] font-medium text-[#2e313f]">

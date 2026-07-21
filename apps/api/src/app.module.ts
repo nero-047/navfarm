@@ -13,6 +13,7 @@ import { CurrencyModule } from './modules/currency/currency.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { UserModule } from './modules/user/user.module';
+import { UserCompanyModule } from './modules/user-company/user-company.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -23,6 +24,7 @@ import { SystemController } from './system/system.controller';
     // Global environment configuration
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['apps/api/.env', '.env'],
       load: [appConfig, databaseConfig],
     }),
 
@@ -46,6 +48,7 @@ import { SystemController } from './system/system.controller';
     AuditLogModule,
     NotificationModule,
     UserModule,
+    UserCompanyModule,
   ],
   controllers: [SystemController],
   providers: [],

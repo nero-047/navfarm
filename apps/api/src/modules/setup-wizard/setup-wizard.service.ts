@@ -74,6 +74,14 @@ export class SetupWizardService implements OnModuleInit {
             industry_type: dto.industry_type,
             registration_no: dto.registration_no,
             tax_id: dto.tax_id,
+            tax_regime: dto.tax_regime || 'STANDARD',
+            incorporation_date: dto.incorporation_date,
+            website: dto.website,
+            email_domain: dto.email_domain,
+            support_email: dto.support_email,
+            phone_primary: dto.phone_primary,
+            company_logo_url: dto.company_logo_url,
+            company_logo_dark_url: dto.company_logo_dark_url,
             primary_color_hex: dto.primary_color_hex || '#1F4E79',
           })
           .where(eq(schema.companyMaster.company_id, existing[0].company_id));
@@ -122,6 +130,14 @@ export class SetupWizardService implements OnModuleInit {
             industry_type: dto.industry_type,
             registration_no: dto.registration_no,
             tax_id: dto.tax_id,
+            tax_regime: dto.tax_regime || 'STANDARD',
+            incorporation_date: dto.incorporation_date,
+            website: dto.website,
+            email_domain: dto.email_domain,
+            support_email: dto.support_email,
+            phone_primary: dto.phone_primary,
+            company_logo_url: dto.company_logo_url,
+            company_logo_dark_url: dto.company_logo_dark_url,
             primary_color_hex: dto.primary_color_hex || '#1F4E79',
             base_currency_id: NIL_UUID,
             default_language_id: NIL_UUID,
@@ -168,6 +184,7 @@ export class SetupWizardService implements OnModuleInit {
           .update(schema.companyAddress)
           .set({
             address_type: dto.address_type,
+            address_label: dto.address_label,
             line1: dto.line1,
             line2: dto.line2,
             city: dto.city,
@@ -182,6 +199,7 @@ export class SetupWizardService implements OnModuleInit {
         await tx.insert(schema.companyAddress).values({
           company_id: dto.company_id,
           address_type: dto.address_type,
+          address_label: dto.address_label,
           line1: dto.line1,
           line2: dto.line2,
           city: dto.city,
@@ -216,7 +234,9 @@ export class SetupWizardService implements OnModuleInit {
             designation: dto.designation,
             email: dto.email,
             phone_primary: dto.phone_primary,
+            phone_secondary: dto.phone_secondary,
             receives_alerts: dto.receives_alerts || false,
+            receives_reports: dto.receives_reports || false,
           })
           .where(eq(schema.companyContacts.company_id, dto.company_id));
       } else {
@@ -227,7 +247,9 @@ export class SetupWizardService implements OnModuleInit {
           designation: dto.designation,
           email: dto.email,
           phone_primary: dto.phone_primary,
+          phone_secondary: dto.phone_secondary,
           receives_alerts: dto.receives_alerts || false,
+          receives_reports: dto.receives_reports || false,
           is_primary: true,
         });
       }
@@ -288,10 +310,15 @@ export class SetupWizardService implements OnModuleInit {
             fiscal_year_format: dto.fiscal_year_format,
             fiscal_start_month: dto.fiscal_start_month,
             fiscal_start_day: dto.fiscal_start_day,
+            fiscal_end_day: dto.fiscal_end_day || 31,
             current_fiscal_year: dto.current_fiscal_year,
             period_type: dto.period_type,
             accounting_standard: dto.accounting_standard,
+            depreciation_method: dto.depreciation_method || 'SLM',
             inventory_valuation: dto.inventory_valuation,
+            gst_filing_frequency: dto.gst_filing_frequency,
+            tax_audit_applicable: dto.tax_audit_applicable || false,
+            decimal_places: dto.decimal_places ?? 2,
           })
           .where(eq(schema.companyFiscal.company_id, dto.company_id));
       } else {
@@ -300,10 +327,15 @@ export class SetupWizardService implements OnModuleInit {
           fiscal_year_format: dto.fiscal_year_format,
           fiscal_start_month: dto.fiscal_start_month,
           fiscal_start_day: dto.fiscal_start_day,
+          fiscal_end_day: dto.fiscal_end_day || 31,
           current_fiscal_year: dto.current_fiscal_year,
           period_type: dto.period_type,
           accounting_standard: dto.accounting_standard,
+          depreciation_method: dto.depreciation_method || 'SLM',
           inventory_valuation: dto.inventory_valuation,
+          gst_filing_frequency: dto.gst_filing_frequency,
+          tax_audit_applicable: dto.tax_audit_applicable || false,
+          decimal_places: dto.decimal_places ?? 2,
         });
       }
 
@@ -422,16 +454,39 @@ export class SetupWizardService implements OnModuleInit {
     }
   }
 
-  async listNobs() {
-    return this.masterDb.select().from(masterSchema.nobMaster).where(eq(masterSchema.nobMaster.is_active, true));
+  async listNobs(tenantId?: string) {
+    const nobs = await this.masterDb
+      .select()
+      .from(masterSchema.nobMaster)
+      .where(eq(masterSchema.nobMaster.is_active, true));
+    if (!tenantId) return nobs;
+
+    const [tenant] = await this.masterDb
+      .select({ allowedNobIds: masterSchema.tenantMaster.allowed_nob_ids })
+      .from(masterSchema.tenantMaster)
+      .where(eq(masterSchema.tenantMaster.tenant_id, tenantId))
+      .limit(1);
+    if (!tenant?.allowedNobIds?.length) return nobs;
+    const allowed = new Set(tenant.allowedNobIds);
+    return nobs.filter((nob) => allowed.has(nob.nob_id));
   }
 
-  async listLobs(nobId: string) {
-    return this.masterDb
+  async listLobs(nobId: string, tenantId?: string) {
+    const lobs = await this.masterDb
       .select()
       .from(masterSchema.lobMaster)
       .where(and(eq(masterSchema.lobMaster.nob_id, nobId), eq(masterSchema.lobMaster.is_active, true)))
       .orderBy(masterSchema.lobMaster.sort_order);
+    if (!tenantId) return lobs;
+
+    const [tenant] = await this.masterDb
+      .select({ allowedLobIds: masterSchema.tenantMaster.allowed_lob_ids })
+      .from(masterSchema.tenantMaster)
+      .where(eq(masterSchema.tenantMaster.tenant_id, tenantId))
+      .limit(1);
+    if (!tenant?.allowedLobIds?.length) return lobs;
+    const allowed = new Set(tenant.allowedLobIds);
+    return lobs.filter((lob) => allowed.has(lob.lob_id));
   }
 
   async getCompanySetupDetails(companyId: string) {

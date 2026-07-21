@@ -55,7 +55,8 @@ export class TenantMiddleware implements NestMiddleware {
       path.includes('/auth/login') || 
       path.includes('/auth/register-admin') || 
       path.includes('/tenant') ||
-      path.includes('/plan');
+      path.includes('/plan') ||
+      path.includes('/setup/wizard');
 
     const effectiveTenantId = tenantId || tokenTenantId;
 

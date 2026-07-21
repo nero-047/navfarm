@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../core/database/schema';
 import * as masterSchema from '../../core/database/master-schema';
 import { MASTER_CONNECTION } from '../../core/database/database.module';
 import { CreateCompanyDto, UpdateCompanyDto } from './dto/company.dto';
 import * as crypto from 'crypto';
+
+const toMysqlTimestamp = (date: Date = new Date()) =>
+  date.toISOString().slice(0, 19).replace('T', ' ');
 
 @Injectable()
 export class CompanyService {
@@ -28,7 +31,11 @@ export class CompanyService {
     return this.db
       .select()
       .from(schema.companyMaster)
-      .where(eq(schema.companyMaster.tenant_id, tenantId));
+      .where(and(
+        eq(schema.companyMaster.tenant_id, tenantId),
+        ne(schema.companyMaster.company_code, 'PLACEHOLDER'),
+        eq(schema.companyMaster.is_active, true),
+      ));
   }
 
   async findOne(companyId: string) {
@@ -59,7 +66,11 @@ export class CompanyService {
 
     const activeCompanies = await this.db
       .select()
-      .from(schema.companyMaster);
+      .from(schema.companyMaster)
+      .where(and(
+        ne(schema.companyMaster.company_code, 'PLACEHOLDER'),
+        eq(schema.companyMaster.is_active, true),
+      ));
 
     if (activeCompanies.length >= tenantMeta.max_companies) {
       throw new BadRequestException(
@@ -141,6 +152,32 @@ export class CompanyService {
         can_export: true,
         can_print: true,
       });
+
+      if (userPayload?.userId) {
+        const existingAssignments = await tx
+          .select({ assignId: schema.userCompanyAssignments.assign_id })
+          .from(schema.userCompanyAssignments)
+          .where(eq(schema.userCompanyAssignments.user_id, userPayload.userId));
+
+        await tx.insert(schema.userCompanyAssignments).values({
+          user_id: userPayload.userId,
+          company_id: companyId,
+          is_primary: existingAssignments.length === 0,
+          assigned_by: userPayload.userId,
+        });
+        await tx.insert(schema.userRoleAssignment).values({
+          user_id: userPayload.userId,
+          role_id: roleId,
+          assigned_by: userPayload.userId,
+        });
+
+        if (existingAssignments.length === 0) {
+          await tx
+            .update(schema.userMaster)
+            .set({ company_id: companyId })
+            .where(eq(schema.userMaster.user_id, userPayload.userId));
+        }
+      }
 
       // Create default MANAGER role for this company
       const managerRoleId = crypto.randomUUID();
@@ -292,7 +329,7 @@ export class CompanyService {
           company_id: companyId,
           step_id: step.step_id,
           status: 'COMPLETED',
-          completed_at: new Date().toISOString(),
+          completed_at: toMysqlTimestamp(),
           completed_by: userPayload?.userId || null,
         }));
         await tx.insert(schema.setupWizardLog).values(wizardLogs);

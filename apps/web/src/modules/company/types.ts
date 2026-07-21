@@ -9,6 +9,9 @@ export interface NobOption {
 }
 
 export interface CompanyMeta {
+  id?: string;
+  tenantId?: string;
+  source?: 'api' | 'demo';
   slug: string;
   name: string;
   icon: string;
@@ -90,6 +93,7 @@ function company(
 ): CompanyMeta {
   const nob = getNobOption(nobCode);
   return {
+    source: 'demo',
     slug,
     name,
     icon: nob.icon,
@@ -160,6 +164,7 @@ export function createCompanyMeta(
 ): CompanyMeta {
   const nob = configuredNob ?? getNobOption(nobCode);
   return {
+    source: 'api',
     slug,
     name,
     icon: nob.icon,
@@ -182,6 +187,9 @@ export function normalizeCompany(
         item.name.toLowerCase() === value.nobName?.toLowerCase(),
     ) ?? NOB_OPTIONS[0];
   return {
+    id: value.id,
+    tenantId: value.tenantId,
+    source: value.source ?? 'demo',
     slug: value.slug,
     name: value.name,
     icon: value.icon ?? inferred.icon,

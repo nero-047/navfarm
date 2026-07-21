@@ -3,9 +3,16 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import express from 'express';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const uploadsDir = resolve(process.env.UPLOADS_DIR || 'apps/api/uploads');
+  mkdirSync(uploadsDir, { recursive: true });
+  app.use('/uploads', express.static(uploadsDir));
 
   const apiPrefix = (process.env.API_PREFIX || 'api/v1').replace(/^\/+|\/+$/g, '');
   const docsPath = (process.env.API_DOCS_PATH || 'api/docs').replace(/^\/+|\/+$/g, '');

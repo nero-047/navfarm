@@ -9,9 +9,16 @@ export function CompanyCard({ company }: { company: CompanyMeta }) {
       <div className="group flex h-full min-h-[230px] cursor-pointer flex-col rounded-2xl border border-[#e5e5e5] bg-white p-6 transition-all duration-200 hover:-translate-y-1 hover:border-[#c24332] hover:shadow-lg">
         <div className="flex items-start justify-between gap-3">
           <span className="text-4xl leading-none">{company.icon}</span>
-          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#1c4aa9]">
-            {company.nobName}
-          </span>
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#1c4aa9]">
+              {company.nobName}
+            </span>
+            {company.source === 'demo' && (
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase text-amber-700">
+                Demo data
+              </span>
+            )}
+          </div>
         </div>
         <h3 className="mt-5 text-[15px] font-semibold text-[#2e313f]">
           {company.name}

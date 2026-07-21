@@ -12,6 +12,11 @@ export class Step2AddressDto {
   @IsNotEmpty()
   address_type: string;
 
+  @ApiProperty({ example: 'Head Office - Gate 1', description: 'Address label/tag name', required: false })
+  @IsString()
+  @IsOptional()
+  address_label?: string;
+
   @ApiProperty({ example: 'Suite 201, Farms Road', description: 'Address line 1' })
   @IsString()
   @IsNotEmpty()

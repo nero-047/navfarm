@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsInt, Min, Max, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class Step7FiscalDto {
@@ -24,6 +24,13 @@ export class Step7FiscalDto {
   @Max(31)
   fiscal_start_day: number;
 
+  @ApiProperty({ example: 31, description: 'Calendar end day index', required: false })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  @Max(31)
+  fiscal_end_day?: number;
+
   @ApiProperty({ example: '2026-27', description: 'Active fiscal year label' })
   @IsString()
   @IsNotEmpty()
@@ -39,8 +46,30 @@ export class Step7FiscalDto {
   @IsNotEmpty()
   accounting_standard: string;
 
+  @ApiProperty({ example: 'SLM', description: 'Depreciation method: SLM / WDV / UNITS_OF_PRODUCTION', required: false })
+  @IsString()
+  @IsOptional()
+  depreciation_method?: string;
+
   @ApiProperty({ example: 'STANDARD', description: 'STANDARD COSTING / FIFO / Weighted Average' })
   @IsString()
   @IsNotEmpty()
   inventory_valuation: string;
+
+  @ApiProperty({ example: 'MONTHLY', description: 'GST/VAT filing frequency: MONTHLY / QUARTERLY', required: false })
+  @IsString()
+  @IsOptional()
+  gst_filing_frequency?: string;
+
+  @ApiProperty({ example: false, description: 'Tax audit applicability flag', required: false })
+  @IsBoolean()
+  @IsOptional()
+  tax_audit_applicable?: boolean;
+
+  @ApiProperty({ example: 2, description: 'Standard decimal precision (0 to 4)', required: false })
+  @IsInt()
+  @IsOptional()
+  @Min(0)
+  @Max(4)
+  decimal_places?: number;
 }

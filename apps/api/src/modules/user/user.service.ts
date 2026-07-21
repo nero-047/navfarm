@@ -38,19 +38,27 @@ export class UserService {
     const passwordHash = await bcrypt.hash(dto.password, salt);
 
     const userId = randomUUID();
-    await this.db.insert(schema.userMaster).values({
-      user_id: userId,
-      company_id: dto.company_id,
-      tenant_id: dto.tenant_id,
-      full_name: dto.full_name,
-      email: dto.email.toLowerCase(),
-      phone: dto.phone || null,
-      password_hash: passwordHash,
-      user_type: dto.user_type || 'STAFF',
-      employee_id: dto.employee_id || null,
-      department: dto.department || null,
-      designation: dto.designation || null,
-      timezone_pref_id: dto.timezone_pref_id || null,
+    await this.db.transaction(async (tx) => {
+      await tx.insert(schema.userMaster).values({
+        user_id: userId,
+        company_id: dto.company_id,
+        tenant_id: dto.tenant_id,
+        full_name: dto.full_name,
+        email: dto.email.toLowerCase(),
+        phone: dto.phone || null,
+        password_hash: passwordHash,
+        user_type: dto.user_type || 'STAFF',
+        employee_id: dto.employee_id || null,
+        department: dto.department || null,
+        designation: dto.designation || null,
+        timezone_pref_id: dto.timezone_pref_id || null,
+      });
+      await tx.insert(schema.userCompanyAssignments).values({
+        user_id: userId,
+        company_id: dto.company_id,
+        is_primary: true,
+        assigned_by: userId,
+      });
     });
 
     return this.findById(userId);

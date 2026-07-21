@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import * as bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
 import * as mysql from 'mysql2/promise';
@@ -194,20 +195,36 @@ async function bootstrap() {
       await masterDb
         .insert(master.setupStepMaster)
         .values(step)
-        .onDuplicateKeyUpdate({ set: { ...step } });
+        .onDuplicateKeyUpdate({
+          set: {
+            step_name: name,
+            step_order: order,
+            is_mandatory: order <= 9,
+            step_category: category,
+            is_active: true,
+          },
+        });
       await tenantDb
         .insert(tenant.setupStepMaster)
         .values(step)
-        .onDuplicateKeyUpdate({ set: { ...step } });
+        .onDuplicateKeyUpdate({
+          set: {
+            step_name: name,
+            step_order: order,
+            is_mandatory: order <= 9,
+            step_category: category,
+            is_active: true,
+          },
+        });
     }
 
     const nobs = [
       ['POULTRY', 'Poultry', 'STANDARD'],
       ['LIVESTOCK', 'Livestock', 'BIO_ASSET'],
-      ['AGRICULTURE', 'Agriculture', 'STANDARD'],
-      ['AQUACULTURE', 'Aquaculture', 'BIO_ASSET'],
+      ['AGRI', 'Agriculture', 'STANDARD'],
+      ['AQUA', 'Aquaculture', 'BIO_ASSET'],
       ['INSECT', 'Insect Farming', 'STANDARD'],
-      ['PROCESSING', 'Feed & Processing', 'STANDARD'],
+      ['PRODUCTION', 'Feed & Processing', 'STANDARD'],
     ] as const;
     const nobIds = new Map<string, string>();
     for (const [index, [code, name, costing]] of nobs.entries()) {
@@ -220,34 +237,55 @@ async function bootstrap() {
         is_system: true,
         is_active: true,
       };
-      nobIds.set(code, nob.nob_id);
       await masterDb
         .insert(master.nobMaster)
         .values(nob)
-        .onDuplicateKeyUpdate({ set: { ...nob } });
+        .onDuplicateKeyUpdate({
+          set: {
+            nob_name: name,
+            default_costing_method: costing,
+            sort_order: index + 1,
+            is_system: true,
+            is_active: true,
+          },
+        });
+      const [persistedNob] = await masterDb
+        .select({ nobId: master.nobMaster.nob_id })
+        .from(master.nobMaster)
+        .where(eq(master.nobMaster.nob_code, code))
+        .limit(1);
+      nobIds.set(code, persistedNob.nobId);
       await tenantDb
         .insert(tenant.nobMaster)
-        .values(nob)
-        .onDuplicateKeyUpdate({ set: { ...nob } });
+        .values({ ...nob, nob_id: persistedNob.nobId })
+        .onDuplicateKeyUpdate({
+          set: {
+            nob_name: name,
+            default_costing_method: costing,
+            sort_order: index + 1,
+            is_system: true,
+            is_active: true,
+          },
+        });
     }
 
     const lobs = [
-      ['POULTRY', 'REARING', 'Rearing & Breeding', 'STANDARD,FIFO', 'NO', 'NO'],
-      ['POULTRY', 'LAYING', 'Laying', 'STANDARD,FIFO', 'YES', 'YES'],
-      ['POULTRY', 'HATCHING', 'Hatching', 'STANDARD,FIFO', 'YES', 'YES'],
-      ['POULTRY', 'CB_FARMING', 'Commercial Broiler Farming', 'STANDARD', 'YES', 'YES'],
-      ['POULTRY', 'SLAUGHTER', 'Poultry Slaughter', 'STANDARD', 'YES', 'YES'],
-      ['LIVESTOCK', 'DAIRY', 'Dairy', 'BIO_ASSET,FIFO', 'YES', 'YES'],
-      ['LIVESTOCK', 'PIGGERY', 'Piggery', 'BIO_ASSET,STANDARD', 'YES', 'YES'],
-      ['LIVESTOCK', 'GOAT_SHEEP', 'Goat & Sheep', 'BIO_ASSET', 'YES', 'YES'],
-      ['AGRICULTURE', 'FRUIT', 'Fruit Farming', 'BIO_ASSET,FIFO', 'YES', 'YES'],
-      ['AGRICULTURE', 'CROP', 'Crop Farming', 'STANDARD,FIFO', 'YES', 'YES'],
-      ['AGRICULTURE', 'SEEDS', 'Seed Processing', 'STANDARD', 'YES', 'YES'],
-      ['AQUACULTURE', 'FISH', 'Fish Farming', 'BIO_ASSET,FIFO', 'YES', 'YES'],
-      ['AQUACULTURE', 'AQUA_SLAUGHTER', 'Aquaculture Slaughter', 'STANDARD', 'YES', 'YES'],
-      ['INSECT', 'BEEKEEPING', 'Bee Keeping', 'STANDARD', 'YES', 'YES'],
+      ['POULTRY', 'PLT_REARING', 'Rearing & Breeding', 'STANDARD,FIFO', 'NO', 'NO'],
+      ['POULTRY', 'PLT_LAYING', 'Laying', 'STANDARD,FIFO', 'YES', 'YES'],
+      ['POULTRY', 'PLT_HATCHING', 'Hatching', 'STANDARD,FIFO', 'YES', 'YES'],
+      ['POULTRY', 'PLT_CB', 'Commercial Broiler Farming', 'STANDARD', 'YES', 'YES'],
+      ['POULTRY', 'PLT_SLAUGHTER', 'Poultry Slaughter', 'STANDARD', 'YES', 'YES'],
+      ['LIVESTOCK', 'LVS_MILKING', 'Dairy', 'BIO_ASSET,FIFO', 'YES', 'YES'],
+      ['LIVESTOCK', 'LVS_PIGGERY', 'Piggery', 'BIO_ASSET,STANDARD', 'YES', 'YES'],
+      ['LIVESTOCK', 'LVS_GOAT_SHEEP', 'Goat & Sheep', 'BIO_ASSET', 'YES', 'YES'],
+      ['AGRI', 'AGRI_FRUIT', 'Fruit Farming', 'BIO_ASSET,FIFO', 'YES', 'YES'],
+      ['AGRI', 'AGRI_CROP', 'Crop Farming', 'STANDARD,FIFO', 'YES', 'YES'],
+      ['AGRI', 'AGRI_SEEDS', 'Seed Processing', 'STANDARD', 'YES', 'YES'],
+      ['AQUA', 'AQA_FISH', 'Fish Farming', 'BIO_ASSET,FIFO', 'YES', 'YES'],
+      ['AQUA', 'AQA_SLAUGHTER', 'Aquaculture Slaughter', 'STANDARD', 'YES', 'YES'],
+      ['INSECT', 'INS_BEE', 'Bee Keeping', 'STANDARD', 'YES', 'YES'],
       ['INSECT', 'BSF', 'Black Soldier Fly', 'STANDARD', 'YES', 'YES'],
-      ['PROCESSING', 'FEED', 'Feed Production', 'STANDARD', 'YES', 'YES'],
+      ['PRODUCTION', 'FEED_PROD', 'Feed Production', 'STANDARD', 'YES', 'YES'],
     ] as const;
     for (const [index, [nobCode, code, name, costing, qc, qr]] of lobs.entries()) {
       const lob = {
@@ -266,11 +304,35 @@ async function bootstrap() {
       await masterDb
         .insert(master.lobMaster)
         .values(lob)
-        .onDuplicateKeyUpdate({ set: { ...lob } });
+        .onDuplicateKeyUpdate({
+          set: {
+            nob_id: lob.nob_id,
+            lob_name: name,
+            costing_method_allowed: costing,
+            qc_required: qc,
+            qr_required: qr,
+            traceability_required: 'YES',
+            sort_order: index + 1,
+            is_system: true,
+            is_active: true,
+          },
+        });
       await tenantDb
         .insert(tenant.lobMaster)
         .values(lob)
-        .onDuplicateKeyUpdate({ set: { ...lob } });
+        .onDuplicateKeyUpdate({
+          set: {
+            nob_id: lob.nob_id,
+            lob_name: name,
+            costing_method_allowed: costing,
+            qc_required: qc,
+            qr_required: qr,
+            traceability_required: 'YES',
+            sort_order: index + 1,
+            is_system: true,
+            is_active: true,
+          },
+        });
     }
 
     const today = new Date().toISOString().slice(0, 10);

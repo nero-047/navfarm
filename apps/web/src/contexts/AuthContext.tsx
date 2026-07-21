@@ -1,23 +1,64 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import {
+  AUTH_STORAGE,
+  api,
+  clearAuthSession,
+  persistAuthSession,
+} from '@/lib/api-client';
 
-interface User {
+export interface UserCompany {
+  company_id: string;
+  company_name: string;
+  is_primary: boolean;
+}
+
+export interface User {
+  userId: string;
+  fullName: string;
   name: string;
   email: string;
+  userType: string;
+  companyId: string;
+  tenantId: string;
+  companies: UserCompany[];
+  permissions: unknown[];
+}
+
+interface AuthResponse {
+  access_token: string;
+  refresh_token: string;
+  user: Omit<User, 'name'> & { name?: string };
+  mfa_required?: boolean;
+}
+
+interface SignupInput {
+  tenantName: string;
+  tenantCode: string;
+  name: string;
+  email: string;
+  password: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string, tenantCode?: string) => Promise<User>;
+  signup: (input: SignupInput) => Promise<User>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const STORAGE_KEY = 'navfarm_auth_user';
+function normalizeUser(user: AuthResponse['user']): User {
+  return {
+    ...user,
+    name: user.fullName || user.name || user.email,
+    companies: user.companies || [],
+    permissions: user.permissions || [],
+  };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -25,31 +66,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setUser(JSON.parse(stored));
+      const stored = localStorage.getItem(AUTH_STORAGE.user);
+      if (stored) setUser(normalizeUser(JSON.parse(stored)));
     } catch {
-      // ignore
+      clearAuthSession();
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  const login = useCallback(async (email: string, _password: string) => {
-    const mockUser: User = { name: email.split('@')[0], email };
-    setUser(mockUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser));
-    return true;
+  const login = useCallback(async (email: string, password: string, tenantCode?: string) => {
+    const response = await api.post<AuthResponse>(
+      '/auth/login',
+      { email, password },
+      { tenantId: tenantCode?.trim() || null },
+    );
+    if (!response.access_token || response.mfa_required) {
+      throw new Error('MFA verification is required for this account.');
+    }
+    const nextUser = normalizeUser(response.user);
+    persistAuthSession({ ...response, user: nextUser });
+    setUser(nextUser);
+    return nextUser;
   }, []);
 
-  const signup = useCallback(async (name: string, email: string, _password: string) => {
-    const mockUser: User = { name, email };
-    setUser(mockUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser));
-    return true;
-  }, []);
+  const signup = useCallback(async (input: SignupInput) => {
+    const tenant = await api.post<{ tenant_id: string }>('/tenant/signup', {
+      tenant_code: input.tenantCode,
+      tenant_name: input.tenantName,
+      tenant_type: 'SME',
+      plan_id: 'PLAN_PRO',
+      billing_email: input.email,
+      admin_name: input.name,
+      admin_email: input.email,
+      admin_password: input.password,
+    });
+    return login(input.email, input.password, tenant.tenant_id);
+  }, [login]);
 
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
+    clearAuthSession();
   }, []);
 
   return (

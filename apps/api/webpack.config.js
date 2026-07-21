@@ -2,6 +2,12 @@ const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { join } = require('path');
 
 module.exports = {
+  externals: [
+    {
+      'swagger-ui-dist/absolute-path.js':
+        'commonjs swagger-ui-dist/absolute-path.js',
+    },
+  ],
   resolve: {
     alias: {
       'class-transformer/storage': require.resolve(
@@ -28,6 +34,10 @@ module.exports = {
       outputHashing: 'none',
       generatePackageJson: false,
       sourceMap: true,
+      // Nest Swagger asks this helper for the on-disk UI asset directory.
+      // Bundling it changes `__dirname` to apps/api/dist and makes every
+      // Swagger CSS/JS request return 404.
+      mergeExternals: true,
     }),
   ],
 };

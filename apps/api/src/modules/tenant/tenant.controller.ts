@@ -43,8 +43,7 @@ export class TenantController {
   constructor(private readonly tenantService: TenantService) {}
 
   @Post('signup')
-  @UseGuards(JwtAuthGuard, SystemAdminGuard)
-  @ApiOperation({ summary: 'Platform Admin: Register a new Tenant account' })
+  @ApiOperation({ summary: 'Register a new tenant workspace and its initial administrator' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Tenant registered successfully.', type: TenantResponse })
   @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Tenant subdomain code already registered.' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input payload.' })

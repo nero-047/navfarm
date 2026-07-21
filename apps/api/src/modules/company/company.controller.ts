@@ -28,9 +28,6 @@ export class CompanyController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Register a new company under the active tenant' })
   async create(@Body() dto: CreateCompanyDto, @Req() req: any) {
-    console.log("=== CREATE COMPANY REQUEST ===");
-    console.log("Headers:", req.headers);
-    console.log("DTO Payload:", dto);
     const tenantId = req.user?.tenantId || req['tenantId'];
     return this.companyService.create(dto, tenantId, req.user);
   }

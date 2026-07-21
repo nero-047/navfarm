@@ -16,17 +16,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FullPageOverlay } from '@/components/ui/full-page-overlay';
 import {
-  COMPANIES,
   NOB_OPTIONS,
   getNobCatalog,
-  createCompanyMeta,
+  createBackendCompany,
   type CompanyMeta,
   type NobCode,
   type NobOption,
 } from '@/modules/company';
 import {
-  CUSTOM_COMPANIES_KEY,
-  getCustomCompanies,
+  getAllCompanies,
+  saveApiCompanies,
 } from '@/modules/company/use-current-company';
 
 function slugify(text: string) {
@@ -42,7 +41,7 @@ export function CompanySwitcher() {
   const pathname = usePathname();
   const currentSlug = pathname.split('/').filter(Boolean)[0] ?? null;
   const [companies, setCompanies] =
-    useState<Record<string, CompanyMeta>>(COMPANIES);
+    useState<Record<string, CompanyMeta>>({});
   const [open, setOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('');
@@ -54,9 +53,7 @@ export function CompanySwitcher() {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const next = { ...COMPANIES };
-    for (const custom of getCustomCompanies()) next[custom.slug] = custom;
-    setCompanies(next);
+    setCompanies(getAllCompanies());
     setNobOptions(getNobCatalog());
   }, []);
 
@@ -83,7 +80,7 @@ export function CompanySwitcher() {
 
   const current = currentSlug ? companies[currentSlug] : null;
 
-  function handleCreate() {
+  async function handleCreate() {
     setError('');
     const trimmed = name.trim();
     if (!trimmed) return setError('Company name is required');
@@ -91,20 +88,19 @@ export function CompanySwitcher() {
     const slug = slugify(trimmed);
     if (companies[slug])
       return setError('A company with this name already exists');
-    const created = createCompanyMeta(
-      trimmed,
-      slug,
-      nobCode,
-      nobOptions.find((item) => item.code === nobCode),
-    );
-    const custom = [...getCustomCompanies(), created];
-    localStorage.setItem(CUSTOM_COMPANIES_KEY, JSON.stringify(custom));
-    setCompanies((value) => ({ ...value, [slug]: created }));
-    setName('');
-    setNobCode('');
-    setModalOpen(false);
-    setOpen(false);
-    router.push(`/${slug}/settings`);
+    try {
+      const created = await createBackendCompany({ name: trimmed, nobCode });
+      const next = { ...companies, [created.slug]: created };
+      setCompanies(next);
+      saveApiCompanies(Object.values(next));
+      setName('');
+      setNobCode('');
+      setModalOpen(false);
+      setOpen(false);
+      router.push(`/${created.slug}/settings`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not create company');
+    }
   }
 
   return (

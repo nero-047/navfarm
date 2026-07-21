@@ -11,6 +11,7 @@ import { AlertCircle } from 'lucide-react';
 export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [tenantCode, setTenantCode] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
@@ -24,9 +25,14 @@ export function LoginForm() {
       return;
     }
     setSubmitting(true);
-    const ok = await login(email, password);
-    setSubmitting(false);
-    if (ok) router.push('/company-selection');
+    try {
+      const signedInUser = await login(email, password, tenantCode);
+      router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/operator' : '/company-selection');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to sign in');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -58,6 +64,19 @@ export function LoginForm() {
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="tenant-code" className="block text-[13px] font-medium text-[#2e313f]">
+            Workspace code <span className="font-normal text-[#8a8a8a]">(not needed for platform admin)</span>
+          </label>
+          <Input
+            id="tenant-code"
+            type="text"
+            placeholder="e.g. greenvalley"
+            value={tenantCode}
+            onChange={(e) => setTenantCode(e.target.value)}
           />
         </div>
 

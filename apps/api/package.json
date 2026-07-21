@@ -122,6 +122,8 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
     "mysql2": "^3.23.1",
     "nestjs-cls": "^6.2.1",
     "nodemailer": "^9.0.3",
@@ -129,12 +131,14 @@
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
+    "swagger-ui-dist": "^5.32.9",
     "swagger-ui-express": "^5.0.1",
     "tslib": "^2.3.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
     "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.1",
     "drizzle-kit": "^0.31.10",

@@ -32,8 +32,18 @@ export class Step3ContactDto {
   @IsNotEmpty()
   phone_primary: string;
 
+  @ApiProperty({ example: '+919999999992', description: 'Secondary phone contact number', required: false })
+  @IsString()
+  @IsOptional()
+  phone_secondary?: string;
+
   @ApiProperty({ example: true, description: 'Flag to send high priority alerts to this contact' })
   @IsBoolean()
   @IsOptional()
   receives_alerts?: boolean;
+
+  @ApiProperty({ example: true, description: 'Flag to send executive report emails to this contact' })
+  @IsBoolean()
+  @IsOptional()
+  receives_reports?: boolean;
 }
