@@ -20,6 +20,18 @@ async function bootstrap() {
     ?.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const isLoopbackOrigin = (origin: string) => {
+    try {
+      const url = new URL(origin);
+      return (
+        (url.protocol === 'http:' || url.protocol === 'https:') &&
+        (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+      );
+    } catch {
+      return false;
+    }
+  };
 
   // Set global API prefix
   app.setGlobalPrefix(apiPrefix);
@@ -36,7 +48,19 @@ async function bootstrap() {
 
   // Enable CORS for frontend integration
   app.enableCors({
-    origin: corsOrigins?.length ? corsOrigins : true,
+    origin: (origin, callback) => {
+      // Requests without an Origin header are not browser cross-origin requests.
+      if (
+        !origin ||
+        corsOrigins?.includes(origin) ||
+        (isDevelopment && isLoopbackOrigin(origin))
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} is not allowed by CORS`), false);
+    },
     credentials: true,
   });
 

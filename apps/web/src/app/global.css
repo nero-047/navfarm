@@ -121,3 +121,64 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Upstream NAVFarm admin/console theme tokens. */
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-raised: #f9fafb;
+  --surface-overlay: #ffffff;
+  --border: #e5e7eb;
+  --border-subtle: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --accent: #2563eb;
+  --accent-muted: rgba(37, 99, 235, 0.08);
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e5e7eb;
+  --sidebar-text: #374151;
+  --sidebar-active-bg: #eff6ff;
+  --sidebar-active-text: #1d4ed8;
+  --header-bg: #ffffff;
+  --input-bg: #ffffff;
+  --input-text: #111827;
+  --input-placeholder: #9ca3af;
+  --input-border: #d1d5db;
+  --input-border-focus: #2563eb;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --row-hover: rgba(0, 0, 0, 0.03);
+  --row-border: #e5e7eb;
+  --badge-bg: rgba(0, 0, 0, 0.06);
+}
+
+html[data-theme='dark'] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-raised: #263449;
+  --surface-overlay: #1e293b;
+  --border: #334155;
+  --border-subtle: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #3b82f6;
+  --accent-muted: rgba(59, 130, 246, 0.12);
+  --sidebar-bg: #1e293b;
+  --sidebar-border: #334155;
+  --sidebar-text: #cbd5e1;
+  --sidebar-active-bg: rgba(59, 130, 246, 0.15);
+  --sidebar-active-text: #93c5fd;
+  --header-bg: #1e293b;
+  --input-bg: #0f172a;
+  --input-text: #f1f5f9;
+  --input-placeholder: #64748b;
+  --input-border: #334155;
+  --input-border-focus: #3b82f6;
+  --card-bg: #1e293b;
+  --card-border: #334155;
+  --row-hover: rgba(255, 255, 255, 0.03);
+  --row-border: #1a2234;
+  --badge-bg: rgba(255, 255, 255, 0.06);
+}

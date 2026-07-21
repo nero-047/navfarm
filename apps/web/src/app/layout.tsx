@@ -1,5 +1,7 @@
 import './global.css';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/hooks/useTheme';
+import { LanguageProvider } from '@/hooks/useLanguage';
 
 export const metadata = {
   title: 'NAVFarm',
@@ -12,9 +14,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

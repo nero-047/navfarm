@@ -1,2 +1,2 @@
-import { TenantAdminPage } from '@/modules/admin-demo/tenant-admin-page';
-export default function Page() { return <TenantAdminPage />; }
+import { redirect } from 'next/navigation';
+export default function Page() { redirect('/console'); }

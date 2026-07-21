@@ -24,7 +24,7 @@ export function AdminShell({
   if (loading || !user) return null;
   const links = [
     ...(user.userType === 'SYSTEM_ADMIN'
-      ? [{ href: '/operator', label: 'Platform operator', icon: ShieldCheck }]
+      ? [{ href: '/admin', label: 'System admin', icon: ShieldCheck }]
       : [{ href: '/organization', label: 'Organization', icon: Building2 }]),
     {
       href: '/company-selection',

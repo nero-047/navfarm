@@ -43,6 +43,10 @@ function clearSession() {
   localStorage.removeItem(AUTH_STORAGE.accessToken);
   localStorage.removeItem(AUTH_STORAGE.refreshToken);
   localStorage.removeItem(AUTH_STORAGE.tenantId);
+  localStorage.removeItem('user');
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('tenant_id');
 }
 
 let refreshPromise: Promise<string> | null = null;
@@ -119,8 +123,18 @@ export function persistAuthSession(session: {
   localStorage.setItem(AUTH_STORAGE.accessToken, session.access_token);
   localStorage.setItem(AUTH_STORAGE.refreshToken, session.refresh_token);
   localStorage.setItem(AUTH_STORAGE.user, JSON.stringify(session.user));
+  // Keep the upstream admin/console storage names during the migration.
+  localStorage.setItem('access_token', session.access_token);
+  localStorage.setItem('refresh_token', session.refresh_token);
+  localStorage.setItem('user', JSON.stringify(session.user));
   const tenantId = (session.user as { tenantId?: string }).tenantId;
-  if (tenantId) localStorage.setItem(AUTH_STORAGE.tenantId, tenantId);
+  if (tenantId) {
+    localStorage.setItem(AUTH_STORAGE.tenantId, tenantId);
+    localStorage.setItem('tenant_id', tenantId);
+  } else {
+    localStorage.removeItem(AUTH_STORAGE.tenantId);
+    localStorage.removeItem('tenant_id');
+  }
 }
 
 export function clearAuthSession() {

@@ -99,7 +99,7 @@ export default function CompanySelectionPage() {
           </div>
           <div className="flex items-center gap-3">
             {user.userType === 'SYSTEM_ADMIN' ? (
-              <Link href="/operator" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><ShieldCheck size={14} /> Operator</Link>
+              <Link href="/admin" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><ShieldCheck size={14} /> System Admin</Link>
             ) : (
               <Link href="/organization" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><Building2 size={14} /> Tenant admin</Link>
             )}

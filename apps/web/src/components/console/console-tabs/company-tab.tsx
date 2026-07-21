@@ -1,0 +1,1551 @@
+import React, { useState, useEffect } from "react";
+import Card from "../../source-ui/card";
+import Input from "../../source-ui/input";
+import Button from "../../source-ui/button";
+import {
+  Edit2,
+  Save,
+  X,
+  AlertCircle,
+  CheckCircle,
+  Building2,
+  Plus,
+  ArrowLeft,
+  Users,
+  UserPlus,
+  Trash2,
+  MapPin,
+  Contact,
+  Globe,
+  Calendar,
+  Layers,
+  Check
+} from "lucide-react";
+import { api } from "../../../services/api-client";
+
+interface CompanyTabProps {
+  activeCompany: any;
+  currencies: any[];
+  tenantId?: string;
+  onRefreshCompany?: (selectCompanyId?: string) => Promise<void>;
+  companies?: any[];
+  currentUser?: any;
+  onSelectCompany?: (company: any) => void;
+  /** When true, skip the Corporate Directory list and go straight to company settings */
+  skipDirectory?: boolean;
+}
+
+export default function CompanyTab({
+  activeCompany,
+  currencies,
+  tenantId,
+  onRefreshCompany,
+  companies = [],
+  currentUser,
+  onSelectCompany,
+  skipDirectory = false,
+}: CompanyTabProps) {
+  const isTenantAdmin = currentUser?.userType === "TENANT_ADMIN";
+  const isCompanyAdmin = currentUser?.userType === "COMPANY_ADMIN";
+  const canEditCompany = isTenantAdmin || isCompanyAdmin;
+
+  // Navigation context
+  const [selectedCompanyDetails, setSelectedCompanyDetails] = useState<any>(null);
+
+  // Users of the selected details company context
+  const [companyUsers, setCompanyUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // New admin form context
+  const [adminForm, setAdminForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    phone: ""
+  });
+  const [addingAdmin, setAddingAdmin] = useState(false);
+
+  // 8 steps detailed setup configuration context
+  const [setupDetails, setSetupDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"profile" | "address" | "contact" | "localization" | "fiscal" | "modules">("profile");
+
+  // Support catalogs fetched on mount
+  const [languages, setLanguages] = useState<any[]>([]);
+  const [nobs, setNobs] = useState<any[]>([]);
+
+  // Mapping of NOB ID to its LOBs list for Step 8 editing
+  const [lobMap, setLobMap] = useState<Record<string, any[]>>({});
+  const [loadingLobs, setLoadingLobs] = useState<Record<string, boolean>>({});
+
+  // Edit settings context for the active tab
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Form states matching wizard steps
+  const [profileForm, setProfileForm] = useState({
+    company_code: "",
+    company_name: "",
+    company_display_name: "",
+    company_type: "Pvt Ltd",
+    industry_type: "Poultry Farming",
+    registration_no: "",
+    tax_id: "",
+    primary_color_hex: "#1F4E79"
+  });
+
+  const [addressForm, setAddressForm] = useState({
+    address_type: "HQ",
+    line1: "",
+    line2: "",
+    city: "",
+    state_id: "",
+    country_id: "IND",
+    pincode: "",
+    gps_latitude: "",
+    gps_longitude: ""
+  });
+
+  const [contactForm, setContactForm] = useState({
+    contact_type: "Primary",
+    full_name: "",
+    designation: "Director",
+    email: "",
+    phone_primary: "",
+    receives_alerts: false
+  });
+
+  const [localizationForm, setLocalizationForm] = useState({
+    default_language_id: "",
+    base_currency_id: "",
+    default_timezone_id: "Asia/Kolkata",
+    country_id: "IND"
+  });
+
+  const [fiscalForm, setFiscalForm] = useState({
+    fiscal_start_month: 4,
+    fiscal_start_day: 1,
+    current_fiscal_year: "2026-27",
+    period_type: "MONTHLY",
+    accounting_standard: "Local GAAP",
+    inventory_valuation: "FIFO"
+  });
+
+  const [modulesForm, setModulesForm] = useState<string[]>([]);
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Create company modal (Tenant Admin only)
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    company_code: "",
+    company_name: "",
+    company_display_name: "",
+    company_type: "Pvt Ltd",
+    industry_type: "Poultry Farming",
+    country_id: "IND",
+    default_timezone_id: "Asia/Kolkata",
+    registration_no: "",
+    tax_id: "",
+    primary_color_hex: "#1F4E79"
+  });
+  const [creating, setCreating] = useState(false);
+
+  // Determine active company details context
+  const targetCompany = isTenantAdmin ? (selectedCompanyDetails || activeCompany) : activeCompany;
+
+  // Load catalogs on mount — fetch independently so one failure doesn't block the other
+  useEffect(() => {
+    const fetchCatalogs = async () => {
+      // Languages live at /language (GET), not /setup/wizard/languages
+      const [langsResult, nobsResult] = await Promise.allSettled([
+        api.get("/language"),
+        api.get("/setup/wizard/nobs"),
+      ]);
+      if (langsResult.status === "fulfilled") setLanguages(langsResult.value || []);
+      if (nobsResult.status  === "fulfilled") setNobs(nobsResult.value  || []);
+    };
+    fetchCatalogs();
+  }, []);
+
+  const fetchCompanyUsers = async (companyId: string) => {
+    setLoadingUsers(true);
+    try {
+      const data = await api.get(`/user/company/${companyId}`);
+      setCompanyUsers(data || []);
+    } catch (err) {
+      console.error("Failed to fetch company operators:", err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const fetchSetupDetails = async (companyId: string) => {
+    setLoadingDetails(true);
+    try {
+      const details = await api.get(`/setup/wizard/company-details/${companyId}`);
+      setSetupDetails(details);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load complete company configuration details.");
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  useEffect(() => {
+    if (targetCompany?.company_id) {
+      fetchCompanyUsers(targetCompany.company_id);
+      fetchSetupDetails(targetCompany.company_id);
+      setIsEditing(false);
+    }
+  }, [targetCompany?.company_id]);
+
+  // Sync details response to states
+  useEffect(() => {
+    if (setupDetails) {
+      setProfileForm({
+        company_code: setupDetails.company?.company_code || "",
+        company_name: setupDetails.company?.company_name || "",
+        company_display_name: setupDetails.company?.company_display_name || "",
+        company_type: setupDetails.company?.company_type || "Pvt Ltd",
+        industry_type: setupDetails.company?.industry_type || "Poultry Farming",
+        registration_no: setupDetails.company?.registration_no || "",
+        tax_id: setupDetails.company?.tax_id || "",
+        primary_color_hex: setupDetails.company?.primary_color_hex || "#1F4E79"
+      });
+
+      setAddressForm({
+        address_type: setupDetails.address?.address_type || "HQ",
+        line1: setupDetails.address?.line1 || "",
+        line2: setupDetails.address?.line2 || "",
+        city: setupDetails.address?.city || "",
+        state_id: setupDetails.address?.state_id || "",
+        country_id: setupDetails.address?.country_id || "IND",
+        pincode: setupDetails.address?.pincode || "",
+        gps_latitude: setupDetails.address?.gps_latitude || "",
+        gps_longitude: setupDetails.address?.gps_longitude || ""
+      });
+
+      setContactForm({
+        contact_type: setupDetails.contact?.contact_type || "Primary",
+        full_name: setupDetails.contact?.full_name || "",
+        designation: setupDetails.contact?.designation || "Director",
+        email: setupDetails.contact?.email || "",
+        phone_primary: setupDetails.contact?.phone_primary || "",
+        receives_alerts: setupDetails.contact?.receives_alerts || false
+      });
+
+      setLocalizationForm({
+        default_language_id: setupDetails.company?.default_language_id || "",
+        base_currency_id: setupDetails.company?.base_currency_id || "",
+        default_timezone_id: setupDetails.company?.default_timezone_id || "Asia/Kolkata",
+        country_id: setupDetails.company?.country_id || "IND"
+      });
+
+      setFiscalForm({
+        fiscal_start_month: setupDetails.fiscal?.fiscal_start_month || 4,
+        fiscal_start_day: setupDetails.fiscal?.fiscal_start_day || 1,
+        current_fiscal_year: setupDetails.fiscal?.current_fiscal_year || "2026-27",
+        period_type: setupDetails.fiscal?.period_type || "MONTHLY",
+        accounting_standard: setupDetails.fiscal?.accounting_standard || "Local GAAP",
+        inventory_valuation: setupDetails.fiscal?.inventory_valuation || "FIFO"
+      });
+
+      setModulesForm(setupDetails.modules || []);
+    }
+  }, [setupDetails]);
+
+  // Fetch LOBs list for selected NOBs in modulesForm editing
+  useEffect(() => {
+    if (settingsTab === "modules" && nobs.length > 0) {
+      nobs.forEach(nob => {
+        if (modulesForm.includes(nob.nob_code)) {
+          fetchLobsForNob(nob.nob_id, nob.nob_code);
+        }
+      });
+    }
+  }, [modulesForm, settingsTab, nobs]);
+
+  const fetchLobsForNob = async (nobId: string, nobCode: string) => {
+    if (lobMap[nobId]) return;
+    setLoadingLobs(prev => ({ ...prev, [nobId]: true }));
+    try {
+      const list = await api.get(`/setup/wizard/lobs/${nobId}`);
+      setLobMap(prev => ({ ...prev, [nobId]: list || [] }));
+    } catch (e) {
+      console.error(`Failed to fetch LOBs for ${nobCode}:`, e);
+    } finally {
+      setLoadingLobs(prev => ({ ...prev, [nobId]: false }));
+    }
+  };
+
+  const handleNobToggle = (nobCode: string, nobId: string) => {
+    const isChecked = modulesForm.includes(nobCode);
+    if (isChecked) {
+      const associatedLobs = lobMap[nobId] || [];
+      const associatedCodes = associatedLobs.map(l => l.lob_code);
+      setModulesForm(modulesForm.filter(code => code !== nobCode && !associatedCodes.includes(code)));
+    } else {
+      setModulesForm([...modulesForm, nobCode]);
+    }
+  };
+
+  const handleLobToggle = (lobCode: string) => {
+    const isChecked = modulesForm.includes(lobCode);
+    if (isChecked) {
+      setModulesForm(modulesForm.filter(code => code !== lobCode));
+    } else {
+      setModulesForm([...modulesForm, lobCode]);
+    }
+  };
+
+  // Submit handlings for all steps
+  const handleSaveTab = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantId) {
+      setError("Tenant context is missing.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      if (settingsTab === "profile") {
+        await api.post("/setup/wizard/step-1", {
+          ...profileForm,
+          tenant_id: tenantId,
+          company_id: targetCompany.company_id
+        });
+      } else if (settingsTab === "address") {
+        await api.post("/setup/wizard/step-2", {
+          ...addressForm,
+          company_id: targetCompany.company_id,
+          gps_latitude: addressForm.gps_latitude ? parseFloat(addressForm.gps_latitude) : undefined,
+          gps_longitude: addressForm.gps_longitude ? parseFloat(addressForm.gps_longitude) : undefined,
+        });
+      } else if (settingsTab === "contact") {
+        await api.post("/setup/wizard/step-3", {
+          ...contactForm,
+          company_id: targetCompany.company_id
+        });
+      } else if (settingsTab === "localization") {
+        const { default_language_id, base_currency_id, default_timezone_id, country_id } = localizationForm;
+        await Promise.all([
+          api.post(`/setup/wizard/step-4/${targetCompany.company_id}/${default_language_id}`),
+          api.post(`/setup/wizard/step-5/${targetCompany.company_id}/${base_currency_id}`),
+          api.post(`/setup/wizard/step-6/${targetCompany.company_id}/${encodeURIComponent(default_timezone_id)}/${country_id.toUpperCase()}`)
+        ]);
+      } else if (settingsTab === "fiscal") {
+        const isAprilStart = parseInt(fiscalForm.fiscal_start_month as any) === 4;
+        await api.post("/setup/wizard/step-7", {
+          ...fiscalForm,
+          company_id: targetCompany.company_id,
+          fiscal_year_format: isAprilStart ? "FY APR-MAR" : "FY JAN-DEC",
+          fiscal_start_day: 1
+        });
+      }
+
+      setSuccess(`Company settings step updated successfully!`);
+      setIsEditing(false);
+      await fetchSetupDetails(targetCompany.company_id);
+      if (onRefreshCompany) {
+        await onRefreshCompany(targetCompany.company_id);
+      }
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err?.message || "Failed to update step parameter.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveModules = async () => {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await api.post(`/setup/wizard/step-8/${targetCompany.company_id}`, {
+        modules: modulesForm
+      });
+      setSuccess("Nature of Business and sub-sectors modules list saved!");
+      setIsEditing(false);
+      await fetchSetupDetails(targetCompany.company_id);
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err?.message || "Failed to update modules configuration.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantId) {
+      setError("Tenant ID not found.");
+      return;
+    }
+    setCreating(true);
+    setError("");
+    setSuccess("");
+    try {
+      const payload: any = {
+        ...createForm,
+        default_language_id: undefined
+      };
+
+      const firstCurrencyId = currencies && currencies.length > 0 ? currencies[0]?.currency_id : null;
+      if (firstCurrencyId && typeof firstCurrencyId === 'string' && firstCurrencyId.length === 36) {
+        payload.base_currency_id = firstCurrencyId;
+      }
+
+      const createdCompany = await api.post("/company", payload);
+      setSuccess(`Company '${createForm.company_name}' created successfully!`);
+      setShowCreateModal(false);
+      setCreateForm({
+        company_code: "",
+        company_name: "",
+        company_display_name: "",
+        company_type: "Pvt Ltd",
+        industry_type: "Poultry Farming",
+        country_id: "IND",
+        default_timezone_id: "Asia/Kolkata",
+        registration_no: "",
+        tax_id: "",
+        primary_color_hex: "#1F4E79"
+      });
+
+      if (onRefreshCompany && createdCompany?.company_id) {
+        await onRefreshCompany(createdCompany.company_id);
+      } else if (onRefreshCompany) {
+        await onRefreshCompany();
+      }
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err?.message || "Failed to create company.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleAddCompanyAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetCompany?.company_id) return;
+    setAddingAdmin(true);
+    setError("");
+    setSuccess("");
+    try {
+      await api.post("/auth/register-admin", {
+        email: adminForm.email,
+        password_hash: adminForm.password,
+        full_name: adminForm.fullName,
+        phone: adminForm.phone,
+        user_type: isTenantAdmin ? "COMPANY_ADMIN" : "STANDARD_USER",
+        tenant_id: tenantId,
+        company_id: targetCompany.company_id,
+        timezone_pref_id: targetCompany.default_timezone_id || "Asia/Kolkata"
+      });
+      setSuccess(isTenantAdmin ? "New Company Administrator registered successfully!" : "New Company Operator registered successfully!");
+      setAdminForm({ fullName: "", email: "", password: "", phone: "" });
+      fetchCompanyUsers(targetCompany.company_id);
+      if (onRefreshCompany) {
+        await onRefreshCompany(targetCompany.company_id);
+      }
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err?.message || "Failed to register company user.");
+    } finally {
+      setAddingAdmin(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm("Are you sure you want to deactivate this account?")) return;
+    setError("");
+    setSuccess("");
+    try {
+      await api.delete(`/user/${userId}`);
+      setSuccess("Account deactivated successfully!");
+      if (targetCompany?.company_id) {
+        fetchCompanyUsers(targetCompany.company_id);
+      }
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err?.message || "Failed to deactivate account.");
+    }
+  };
+
+  // Render List View (Tenant Admin only when selectedCompanyDetails is null)
+  if (isTenantAdmin && !selectedCompanyDetails && !skipDirectory) {
+    return (
+      <div className="flex flex-col gap-6 w-full animate-fade-in">
+
+        {/* Toast Feedbacks */}
+        {error && (
+          <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/30 text-red-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <span className="text-sm">{error}</span>
+          </div>
+        )}
+        {success && (
+          <div className="fixed top-4 right-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
+            <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <span className="text-sm">{success}</span>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center bg-[#0b0f19] border border-[#1a1f2e] p-5 rounded-2xl">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-bold text-white text-base">Corporate Directory</h3>
+            <p className="text-xs text-gray-500">Monitor and configure company business nodes under this SaaS tenant.</p>
+          </div>
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-1.5 py-2.5 px-4 text-xs cursor-pointer hover:scale-[1.02]"
+          >
+            <Plus className="w-4 h-4" /> Add Company Node
+          </Button>
+        </div>
+
+        <Card className="p-0 border-[#1a1f2e] bg-[#0b0f19] overflow-hidden">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#1a1f2e] text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                  <th className="p-4 text-center w-12">#</th>
+                  <th className="p-4 w-28">Code</th>
+                  <th className="p-4">Company Name</th>
+                  <th className="p-4 w-44">Industry</th>
+                  <th className="p-4 w-48">Identifiers</th>
+                  <th className="p-4 text-center w-28">Status</th>
+                  <th className="p-4 text-right w-36">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-gray-500 text-xs">No corporate profiles registered. Click above to add one.</td>
+                  </tr>
+                ) : (
+                  companies.map((comp, idx) => (
+                    <tr key={comp.company_id} className="border-b border-[#1a1f2e] hover:bg-white/[0.02] text-xs transition-colors">
+                      <td className="p-4 text-center text-gray-505 font-mono">{idx + 1}</td>
+                      <td className="p-4">
+                        <span className="font-mono text-white bg-[#121824] px-2 py-1 rounded border border-[#1a1f2e] font-semibold">{comp.company_code}</span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-white">{comp.company_name}</span>
+                          <span className="text-[10px] text-gray-550">{comp.company_display_name || comp.company_name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-gray-400">{comp.industry_type}</td>
+                      <td className="p-4">
+                        <div className="flex flex-col text-[10px] text-gray-400 font-mono gap-0.5">
+                          <span>Tax: {comp.tax_id || "—"}</span>
+                          <span>Reg: {comp.registration_no || "—"}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          comp.onboarding_status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                        }`}>
+                          {comp.onboarding_status || 'PENDING'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <Button
+                          onClick={() => {
+                            setSelectedCompanyDetails(comp);
+                            if (onSelectCompany) onSelectCompany(comp);
+                          }}
+                          className="py-1.5 px-3 text-[10px] uppercase font-bold tracking-wider hover:scale-[1.02] cursor-pointer"
+                        >
+                          Manage Profile
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {/* Register Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <form onSubmit={handleCreateCompany} className="bg-[#0b0f19] border border-[#1a1f2e] rounded-2xl p-6 max-w-lg w-full relative shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-3">
+                <h3 className="font-bold text-white text-base flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-teal-400" />
+                  Register New Company
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-white/[0.04] text-gray-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Company Code"
+                  placeholder="UNIQUE_CODE"
+                  value={createForm.company_code}
+                  onChange={(e) => setCreateForm({ ...createForm, company_code: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Legal Entity Name"
+                  placeholder="Company Pvt Ltd"
+                  value={createForm.company_name}
+                  onChange={(e) => setCreateForm({ ...createForm, company_name: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Display / Brand Name"
+                  placeholder="Brand Name"
+                  value={createForm.company_display_name}
+                  onChange={(e) => setCreateForm({ ...createForm, company_display_name: e.target.value })}
+                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Classification</label>
+                  <select
+                    value={createForm.company_type}
+                    onChange={(e) => setCreateForm({ ...createForm, company_type: e.target.value })}
+                    className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                  >
+                    <option value="Pvt Ltd">Pvt Ltd</option>
+                    <option value="Sole Proprietor">Sole Proprietor</option>
+                    <option value="Partnership">Partnership</option>
+                    <option value="LLP">LLP</option>
+                    <option value="Trust">Trust</option>
+                    <option value="Co-operative">Co-operative</option>
+                  </select>
+                </div>
+                <Input
+                  label="Primary Industry"
+                  placeholder="Poultry Farming"
+                  value={createForm.industry_type}
+                  onChange={(e) => setCreateForm({ ...createForm, industry_type: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Operating Country"
+                  placeholder="IND"
+                  value={createForm.country_id}
+                  onChange={(e) => setCreateForm({ ...createForm, country_id: e.target.value })}
+                />
+                <Input
+                  label="Timezone"
+                  placeholder="Asia/Kolkata"
+                  value={createForm.default_timezone_id}
+                  onChange={(e) => setCreateForm({ ...createForm, default_timezone_id: e.target.value })}
+                />
+                <Input
+                  label="Tax Registration ID"
+                  placeholder="GSTIN12345"
+                  value={createForm.tax_id}
+                  onChange={(e) => setCreateForm({ ...createForm, tax_id: e.target.value })}
+                />
+                <Input
+                  label="Corporate Registration No"
+                  placeholder="CIN12345"
+                  value={createForm.registration_no}
+                  onChange={(e) => setCreateForm({ ...createForm, registration_no: e.target.value })}
+                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Brand Hex Accent Color</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={createForm.primary_color_hex}
+                      onChange={(e) => setCreateForm({ ...createForm, primary_color_hex: e.target.value })}
+                      className="w-12 h-12 rounded-xl bg-transparent border-0 cursor-pointer"
+                    />
+                    <Input
+                      value={createForm.primary_color_hex}
+                      onChange={(e) => setCreateForm({ ...createForm, primary_color_hex: e.target.value })}
+                      className="flex-1"
+                      placeholder="#1F4E79"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-[#1a1f2e] pt-4">
+                <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)} className="py-2 px-4 text-xs cursor-pointer">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={creating} className="py-2 px-4 text-xs cursor-pointer">
+                  {creating ? "Creating..." : "Create Company"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+      </div>
+    );
+  }
+
+  // Render Details View (Tenant Admin managing details, or Company Admin viewing their own details)
+  return (
+    <div className="flex flex-col gap-6 w-full animate-fade-in">
+
+      {/* Toast Feedbacks */}
+      {error && (
+        <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/30 text-red-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
+          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+          <span className="text-sm">{error}</span>
+        </div>
+      )}
+      {success && (
+        <div className="fixed top-4 right-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
+          <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+          <span className="text-sm">{success}</span>
+        </div>
+      )}
+
+      {/* Header back button for Tenant Admin */}
+      {isTenantAdmin && (
+        <button
+          onClick={() => setSelectedCompanyDetails(null)}
+          className="flex items-center gap-2 text-xs text-gray-400 hover:text-white cursor-pointer w-fit font-bold bg-white/5 py-2 px-4 rounded-xl border border-[#1a1f2e] transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Workspace Directory
+        </button>
+      )}
+
+      <div className="company-settings-container grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        {/* Left Column Settings (Configuring all 8 wizard steps) */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+
+          {/* Settings details card */}
+          <Card className="p-6 flex flex-col gap-6 border-[#1a1f2e] bg-[#0b0f19]">
+            <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-4">
+              <div>
+                <h3 className="font-bold text-white text-sm">ERP Setup Wizard Configurations</h3>
+                {targetCompany && (
+                  <span className="text-[9px] text-gray-500 font-mono font-semibold bg-[#121824] px-1.5 py-0.5 rounded border border-[#1a1f2e] mt-1 block w-fit">{targetCompany.company_id}</span>
+                )}
+              </div>
+
+              {/* Edit button allowed for Tenant Admin & Company Admin */}
+              {canEditCompany && (
+                <div>
+                  {!isEditing ? (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 font-bold bg-white/5 py-1.5 px-3 rounded-lg border border-[#1a1f2e] cursor-pointer transition-colors"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" /> Edit Configuration
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-white font-bold bg-white/5 py-1.5 px-3 rounded-lg border border-[#1a1f2e] cursor-pointer transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" /> Close Editor
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {!targetCompany ? (
+              <div className="text-center p-8 text-gray-500">
+                <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30 text-teal-400" />
+                <p className="text-xs">No active company profile found.</p>
+              </div>
+            ) : loadingDetails ? (
+              <div className="text-xs text-gray-500 text-center py-12 animate-pulse">Loading step configurations...</div>
+            ) : (
+              <div className="flex flex-col md:flex-row gap-6 items-start">
+
+                {/* Tab Selector Sidebar inside Settings card */}
+                <div className="flex flex-row md:flex-col gap-1 w-full md:w-52 overflow-x-auto shrink-0 pb-3 md:pb-0 border-b md:border-b-0 md:border-r border-gray-850 pr-0 md:pr-4">
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsTab("profile"); setIsEditing(false); }}
+                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      settingsTab === "profile"
+                        ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
+                        : "text-gray-400 hover:text-white hover:bg-white/[0.02]"
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4 shrink-0" /> Step 1: Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsTab("address"); setIsEditing(false); }}
+                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      settingsTab === "address"
+                        ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
+                        : "text-gray-400 hover:text-white hover:bg-white/[0.02]"
+                    }`}
+                  >
+                    <MapPin className="w-4 h-4 shrink-0" /> Step 2: Address
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsTab("contact"); setIsEditing(false); }}
+                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      settingsTab === "contact"
+                        ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
+                        : "text-gray-400 hover:text-white hover:bg-white/[0.02]"
+                    }`}
+                  >
+                    <Contact className="w-4 h-4 shrink-0" /> Step 3: Contact
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsTab("localization"); setIsEditing(false); }}
+                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      settingsTab === "localization"
+                        ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
+                        : "text-gray-400 hover:text-white hover:bg-white/[0.02]"
+                    }`}
+                  >
+                    <Globe className="w-4 h-4 shrink-0" /> Steps 4-6: Locale & TZ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsTab("fiscal"); setIsEditing(false); }}
+                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      settingsTab === "fiscal"
+                        ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
+                        : "text-gray-400 hover:text-white hover:bg-white/[0.02]"
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4 shrink-0" /> Step 7: Fiscal Config
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsTab("modules"); setIsEditing(false); }}
+                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      settingsTab === "modules"
+                        ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
+                        : "text-gray-400 hover:text-white hover:bg-white/[0.02]"
+                    }`}
+                  >
+                    <Layers className="w-4 h-4 shrink-0" /> Step 8: Sectors & LOBs
+                  </button>
+                </div>
+
+                {/* Tab content body */}
+                <div className="flex-1 w-full min-w-0">
+
+                  {/* profile TAB */}
+                  {settingsTab === "profile" && (
+                    !isEditing ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Company Code</span>
+                          <span className="text-xs font-semibold text-white mt-1 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">{setupDetails?.company?.company_code}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Legal Entity Name</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_name}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Display / Brand Name</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_display_name || setupDetails?.company?.company_name}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Classification</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_type}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-555 font-bold uppercase tracking-wider">Primary Industry</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.industry_type}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-555 font-bold uppercase tracking-wider">Tax Registration ID</span>
+                          <span className="text-xs font-semibold text-white mt-1 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">{setupDetails?.company?.tax_id || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-555 font-bold uppercase tracking-wider">Corporate Registration No</span>
+                          <span className="text-xs font-semibold text-white mt-1.5 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">{setupDetails?.company?.registration_no || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-555 font-bold uppercase tracking-wider">Primary Accent Color</span>
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="w-5 h-5 rounded-lg border border-[#1a1f2e]" style={{ backgroundColor: setupDetails?.company?.primary_color_hex || "#1F4E79" }} />
+                            <span className="text-xs font-mono text-gray-300 uppercase">{setupDetails?.company?.primary_color_hex || "#1F4E79"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <Input
+                            label="Company Code (Read Only)"
+                            value={profileForm.company_code}
+                            disabled
+                            className="opacity-50"
+                          />
+                          <Input
+                            label="Legal Entity Name"
+                            value={profileForm.company_name}
+                            onChange={(e) => setProfileForm({ ...profileForm, company_name: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Display / Brand Name"
+                            value={profileForm.company_display_name}
+                            onChange={(e) => setProfileForm({ ...profileForm, company_display_name: e.target.value })}
+                          />
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Classification</label>
+                            <select
+                              value={profileForm.company_type}
+                              onChange={(e) => setProfileForm({ ...profileForm, company_type: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="Sole Proprietor">Sole Proprietor</option>
+                              <option value="Partnership">Partnership</option>
+                              <option value="Pvt Ltd">Pvt Ltd</option>
+                              <option value="LLP">LLP</option>
+                              <option value="Trust">Trust</option>
+                              <option value="Co-operative">Co-operative</option>
+                            </select>
+                          </div>
+                          <Input
+                            label="Primary Industry"
+                            value={profileForm.industry_type}
+                            onChange={(e) => setProfileForm({ ...profileForm, industry_type: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Tax Registration ID"
+                            value={profileForm.tax_id}
+                            onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
+                          />
+                          <Input
+                            label="Corporate Registration No"
+                            value={profileForm.registration_no}
+                            onChange={(e) => setProfileForm({ ...profileForm, registration_no: e.target.value })}
+                          />
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Brand Hex Accent Color</label>
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="color"
+                                value={profileForm.primary_color_hex}
+                                onChange={(e) => setProfileForm({ ...profileForm, primary_color_hex: e.target.value })}
+                                className="w-12 h-12 rounded-xl bg-transparent border-0 cursor-pointer"
+                              />
+                              <Input
+                                value={profileForm.primary_color_hex}
+                                onChange={(e) => setProfileForm({ ...profileForm, primary_color_hex: e.target.value })}
+                                className="flex-1"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
+                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Step 1 Settings"}
+                        </Button>
+                      </form>
+                    )
+                  )}
+
+                  {/* address TAB */}
+                  {settingsTab === "address" && (
+                    !isEditing ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Address Type</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.address_type || "HQ"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Address Line 1</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.line1 || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Address Line 2</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.line2 || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">City</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.city || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">State / Province</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.state_id || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Country</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.country_id || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Pincode / Postal Code</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.address?.pincode || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">GPS Coordinates</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">
+                            {setupDetails?.address?.gps_latitude && setupDetails?.address?.gps_longitude
+                              ? `${setupDetails.address.gps_latitude}, ${setupDetails.address.gps_longitude}`
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Address Type</label>
+                            <select
+                              value={addressForm.address_type}
+                              onChange={(e) => setAddressForm({ ...addressForm, address_type: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="HQ">Corporate HQ</option>
+                              <option value="Branch">Branch Office</option>
+                              <option value="Warehouse">Warehouse Depot</option>
+                              <option value="Farm">Farm Site</option>
+                            </select>
+                          </div>
+                          <Input
+                            label="Address Line 1"
+                            value={addressForm.line1}
+                            onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Address Line 2"
+                            value={addressForm.line2}
+                            onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
+                          />
+                          <Input
+                            label="City"
+                            value={addressForm.city}
+                            onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="State / Province"
+                            value={addressForm.state_id}
+                            onChange={(e) => setAddressForm({ ...addressForm, state_id: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Country"
+                            value={addressForm.country_id}
+                            onChange={(e) => setAddressForm({ ...addressForm, country_id: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Pincode"
+                            value={addressForm.pincode}
+                            onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
+                            required
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              label="GPS Lat"
+                              placeholder="e.g. 28.61"
+                              value={addressForm.gps_latitude}
+                              onChange={(e) => setAddressForm({ ...addressForm, gps_latitude: e.target.value })}
+                            />
+                            <Input
+                              label="GPS Lng"
+                              placeholder="e.g. 77.20"
+                              value={addressForm.gps_longitude}
+                              onChange={(e) => setAddressForm({ ...addressForm, gps_longitude: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
+                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Step 2 Address"}
+                        </Button>
+                      </form>
+                    )
+                  )}
+
+                  {/* contact TAB */}
+                  {settingsTab === "contact" && (
+                    !isEditing ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Contact Person Name</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.contact?.full_name || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Designation</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.contact?.designation || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Primary Phone</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.contact?.phone_primary || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Primary Email</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.contact?.email || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Alerts & System Emails</span>
+                          <span className="text-xs font-semibold text-white mt-2">
+                            {setupDetails?.contact?.receives_alerts ? "Active - Receives ERP system notifications" : "Inactive - Do not notify"}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <Input
+                            label="Key Contact Person Full Name"
+                            value={contactForm.full_name}
+                            onChange={(e) => setContactForm({ ...contactForm, full_name: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Designation Role"
+                            value={contactForm.designation}
+                            onChange={(e) => setContactForm({ ...contactForm, designation: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Primary Contact Phone"
+                            value={contactForm.phone_primary}
+                            onChange={(e) => setContactForm({ ...contactForm, phone_primary: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Primary Email"
+                            type="email"
+                            value={contactForm.email}
+                            onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                            required
+                          />
+                          <div className="flex flex-col gap-2.5 justify-center h-full pt-4">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs">
+                              <input
+                                type="checkbox"
+                                checked={contactForm.receives_alerts}
+                                onChange={(e) => setContactForm({ ...contactForm, receives_alerts: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-800 bg-gray-900 text-teal-500 focus:ring-teal-500 focus:ring-offset-0 focus:ring-0 cursor-pointer"
+                              />
+                              <span className="text-gray-300 font-medium">Send security logs and threshold alert emails to this address</span>
+                            </label>
+                          </div>
+                        </div>
+                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
+                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Step 3 Contact"}
+                        </Button>
+                      </form>
+                    )
+                  )}
+
+                  {/* localization TAB */}
+                  {settingsTab === "localization" && (
+                    !isEditing ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Default Language</span>
+                          <span className="text-xs font-semibold text-white mt-2">
+                            {languages.find(l => l.lang_id === setupDetails?.company?.default_language_id)?.lang_name || setupDetails?.company?.default_language_id || "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Base Currency</span>
+                          <span className="text-xs font-semibold text-white mt-2">
+                            {currencies.find(c => c.currency_id === setupDetails?.company?.base_currency_id)?.currency_name || setupDetails?.company?.base_currency_id || "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-505 font-bold uppercase tracking-wider">Default Timezone</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.company?.default_timezone_id || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-505 font-bold uppercase tracking-wider">Country Locale Code</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.company?.country_id || "—"}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Default Language</label>
+                            <select
+                              value={localizationForm.default_language_id}
+                              onChange={(e) => setLocalizationForm({ ...localizationForm, default_language_id: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="">Select Language</option>
+                              {languages.map((l: any) => (
+                                <option key={l.lang_id} value={l.lang_id}>{l.lang_name} ({l.lang_code})</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Base Currency</label>
+                            <select
+                              value={localizationForm.base_currency_id}
+                              onChange={(e) => setLocalizationForm({ ...localizationForm, base_currency_id: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="">Select Currency</option>
+                              {currencies.map((c: any) => (
+                                <option key={c.currency_id} value={c.currency_id}>{c.currency_name} ({c.currency_code})</option>
+                              ))}
+                            </select>
+                          </div>
+                          <Input
+                            label="Timezone ID"
+                            value={localizationForm.default_timezone_id}
+                            onChange={(e) => setLocalizationForm({ ...localizationForm, default_timezone_id: e.target.value })}
+                            required
+                          />
+                          <Input
+                            label="Operating Country Code"
+                            value={localizationForm.country_id}
+                            onChange={(e) => setLocalizationForm({ ...localizationForm, country_id: e.target.value.toUpperCase() })}
+                            required
+                          />
+                        </div>
+                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
+                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Localization"}
+                        </Button>
+                      </form>
+                    )
+                  )}
+
+                  {/* fiscal TAB */}
+                  {settingsTab === "fiscal" && (
+                    !isEditing ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Fiscal Year Format</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.fiscal?.fiscal_year_format || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Fiscal Start Month</span>
+                          <span className="text-xs font-semibold text-white mt-2">
+                            {setupDetails?.fiscal?.fiscal_start_month ? `Month ${setupDetails.fiscal.fiscal_start_month}` : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Current Fiscal Year</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.fiscal?.current_fiscal_year || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Period Type</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.period_type || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Accounting Standard</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.accounting_standard || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Inventory Valuation</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.inventory_valuation || "—"}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Fiscal Start Month</label>
+                            <select
+                              value={fiscalForm.fiscal_start_month}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, fiscal_start_month: parseInt(e.target.value) })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value={1}>January</option>
+                              <option value={4}>April</option>
+                            </select>
+                          </div>
+                          <Input
+                            label="Current Fiscal Year"
+                            placeholder="e.g. 2026-27"
+                            value={fiscalForm.current_fiscal_year}
+                            onChange={(e) => setFiscalForm({ ...fiscalForm, current_fiscal_year: e.target.value })}
+                            required
+                          />
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Accounting Periodicity</label>
+                            <select
+                              value={fiscalForm.period_type}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, period_type: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="MONTHLY">Monthly Periods</option>
+                              <option value="QUARTERLY">Quarterly Periods</option>
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Accounting Standard</label>
+                            <select
+                              value={fiscalForm.accounting_standard}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, accounting_standard: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="Local GAAP">Local GAAP</option>
+                              <option value="IFRS">IFRS</option>
+                              <option value="US GAAP">US GAAP</option>
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Inventory Costing Method</label>
+                            <select
+                              value={fiscalForm.inventory_valuation}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, inventory_valuation: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="FIFO">FIFO (First-In, First-Out)</option>
+                              <option value="WEIGHTED_AVG">Weighted Average Cost</option>
+                              <option value="STANDARD">Standard Costing</option>
+                            </select>
+                          </div>
+                        </div>
+                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
+                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Fiscal Configurations"}
+                        </Button>
+                      </form>
+                    )
+                  )}
+
+                  {/* modules TAB */}
+                  {settingsTab === "modules" && (
+                    !isEditing ? (
+                      <div className="flex flex-col gap-4">
+                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Activated Sectors & LOB Verticals</span>
+                        {modulesForm.length === 0 ? (
+                          <div className="text-xs text-gray-500 bg-[#121824] p-4 rounded-xl border border-gray-850">No business modules enabled. Click Edit above to select sectors.</div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {nobs.map((n: any) => {
+                              const isNobActive = modulesForm.includes(n.nob_code);
+                              if (!isNobActive) return null;
+
+                              const associatedLobs = lobMap[n.nob_id] || [];
+                              const activeLobs = associatedLobs.filter(l => modulesForm.includes(l.lob_code));
+
+                              return (
+                                <div key={n.nob_id} className="p-4 rounded-xl bg-[#121824] border border-[#1a1f2e] flex flex-col gap-2">
+                                  <div className="flex items-center gap-2 border-b border-gray-850 pb-2">
+                                    <span className="font-bold text-xs text-white">{n.nob_name}</span>
+                                    <span className="text-[9px] bg-teal-500/10 text-teal-400 font-bold border border-teal-500/20 px-1.5 py-0.5 rounded font-mono uppercase shrink-0">Active</span>
+                                  </div>
+                                  <div className="flex flex-col gap-1 mt-1">
+                                    <span className="text-[9px] font-bold text-teal-400 uppercase tracking-wider">Active Operations (LOBs):</span>
+                                    {activeLobs.length === 0 ? (
+                                      <span className="text-xs text-gray-500">None active</span>
+                                    ) : (
+                                      <div className="flex flex-wrap gap-1.5 mt-1">
+                                        {activeLobs.map(lob => (
+                                          <span key={lob.lob_id} className="text-[10px] text-gray-300 bg-white/[0.03] px-2 py-0.5 rounded border border-gray-800">{lob.lob_name}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {nobs.map((n: any) => {
+                            const isNobChecked = modulesForm.includes(n.nob_code);
+                            const associatedLobs = lobMap[n.nob_id] || [];
+
+                            return (
+                              <div
+                                key={n.nob_id}
+                                onClick={() => handleNobToggle(n.nob_code, n.nob_id)}
+                                className={`p-4 border rounded-2xl flex flex-col gap-2 cursor-pointer transition-all ${
+                                  isNobChecked
+                                    ? "border-teal-500/40 bg-teal-500/5"
+                                    : "border-gray-800 bg-[#121824]/50 hover:border-gray-700"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-sm text-white">{n.nob_name}</span>
+                                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                    isNobChecked ? "bg-teal-500 border-teal-500 text-white" : "border-gray-700"
+                                  }`}>
+                                    {isNobChecked && <Check className="w-3.5 h-3.5" />}
+                                  </div>
+                                </div>
+                                <p className="text-xs text-gray-500">{n.description || "Link this sector to enable daily feed logs and batches."}</p>
+
+                                {/* LOB Checkboxes inside setup view */}
+                                {isNobChecked && (
+                                  <div className="mt-3 pt-3 border-t border-gray-800/80 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                                    <span className="text-[10px] font-bold text-teal-400 uppercase tracking-wider">Select Active Operations (LOBs):</span>
+                                    {loadingLobs[n.nob_id] ? (
+                                      <div className="text-[11px] text-gray-505 animate-pulse py-1">Loading active sub-sectors...</div>
+                                    ) : associatedLobs.length === 0 ? (
+                                      <div className="text-[11px] text-gray-505 py-1">No sub-sectors available.</div>
+                                    ) : (
+                                      <div className="flex flex-col gap-1.5 mt-1">
+                                        {associatedLobs.map((lob: any) => {
+                                          const isLobChecked = modulesForm.includes(lob.lob_code);
+                                          return (
+                                            <label
+                                              key={lob.lob_id}
+                                              className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2 rounded-lg hover:bg-white/[0.02] text-xs transition-colors"
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={isLobChecked}
+                                                onChange={() => handleLobToggle(lob.lob_code)}
+                                                className="w-4 h-4 rounded border-gray-800 bg-gray-900 text-teal-500 focus:ring-teal-500 focus:ring-offset-0 focus:ring-0 cursor-pointer"
+                                              />
+                                              <div className="flex flex-col">
+                                                <span className="font-semibold text-gray-200">{lob.lob_name}</span>
+                                                {lob.description && <span className="text-[10px] text-gray-500">{lob.description}</span>}
+                                              </div>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <Button onClick={handleSaveModules} disabled={saving} className="mt-6 self-end flex items-center gap-2 cursor-pointer text-xs">
+                          <Save className="w-4 h-4" /> {saving ? "Saving Changes..." : "Save Business Verticals"}
+                        </Button>
+                      </div>
+                    )
+                  )}
+
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Details footer stats */}
+          <Card className="p-6 flex flex-col gap-4 border-[#1a1f2e] bg-[#0b0f19]">
+            <h4 className="font-bold text-white text-sm">Tenant Configuration Summary</h4>
+            {targetCompany ? (
+              <div className="text-xs text-gray-400 flex flex-col gap-4">
+                <div className="flex justify-between items-center py-2 border-b border-gray-850">
+                  <span className="text-gray-500 font-medium">Base Currency</span>
+                  <span className="text-white font-semibold font-mono bg-[#121824] px-2 py-0.5 rounded border border-[#1a1f2e]">
+                    {currencies.find(c => c.currency_id === targetCompany?.base_currency_id)?.currency_name || "INR"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-850">
+                  <span className="text-gray-500 font-medium">Timezone</span>
+                  <span className="text-white font-semibold">{targetCompany?.default_timezone_id || "Asia/Kolkata"}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-850">
+                  <span className="text-gray-500 font-medium">Operating Country</span>
+                  <span className="text-white font-semibold font-mono bg-[#121824] px-2 py-0.5 rounded border border-[#1a1f2e]">
+                    {targetCompany?.country_id || "IND"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-gray-500 font-medium">Onboarding Status</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    targetCompany?.onboarding_status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                  }`}>
+                    {targetCompany?.onboarding_status || 'PENDING'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500">No company selected.</div>
+            )}
+          </Card>
+
+        </div>
+
+        {/* Right Column: Manage Users */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+
+          {/* User list card */}
+          <Card className="p-6 border-[#1a1f2e] bg-[#0b0f19]">
+            <h4 className="font-bold text-white text-sm border-b border-[#1a1f2e] pb-3 mb-4 flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-teal-400" />
+              {isTenantAdmin ? "Company Administrators" : "Company Operators"}
+            </h4>
+
+            <div className="flex flex-col gap-3 max-h-60 overflow-y-auto pr-1">
+              {loadingUsers ? (
+                <div className="text-xs text-gray-500 text-center py-6">Loading team directory...</div>
+              ) : companyUsers.length === 0 ? (
+                <div className="text-xs text-gray-500 text-center py-6">No users assigned. Register one below.</div>
+              ) : (
+                companyUsers.map((u) => (
+                  <div key={u.user_id} className="flex justify-between items-center p-3 rounded-xl bg-[#121824] border border-[#1a1f2e]">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="font-semibold text-xs text-white truncate">{u.full_name}</span>
+                      <span className="text-[10px] text-gray-505 truncate">{u.email}</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteUser(u.user_id)}
+                      className="p-1 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg cursor-pointer transition-colors shrink-0"
+                      title="Deactivate account"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+
+          {/* Register User form */}
+          <Card className="p-6 border-[#1a1f2e] bg-[#0b0f19]">
+            <h4 className="font-bold text-white text-sm border-b border-[#1a1f2e] pb-3 mb-4 flex items-center gap-1.5">
+              <UserPlus className="w-4 h-4 text-teal-400" />
+              {isTenantAdmin ? "Add Company Administrator" : "Add Company Operator"}
+            </h4>
+            <form onSubmit={handleAddCompanyAdmin} className="flex flex-col gap-4">
+              <Input
+                label="Full Name"
+                placeholder="John Doe"
+                value={adminForm.fullName}
+                onChange={(e) => setAdminForm({ ...adminForm, fullName: e.target.value })}
+                required
+              />
+              <Input
+                label="Email Address"
+                type="email"
+                placeholder="user@domain.com"
+                value={adminForm.email}
+                onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                required
+              />
+              <Input
+                label="Temporary Password"
+                type="password"
+                placeholder="At least 8 characters"
+                value={adminForm.password}
+                onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                required
+              />
+              <Input
+                label="Phone Number"
+                placeholder="+919999911111"
+                value={adminForm.phone}
+                onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
+              />
+              <Button type="submit" disabled={addingAdmin} className="w-full flex items-center justify-center gap-2 text-xs cursor-pointer">
+                <UserPlus className="w-4 h-4" /> {addingAdmin ? "Registering..." : (isTenantAdmin ? "Add Administrator" : "Add Operator")}
+              </Button>
+            </form>
+          </Card>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}

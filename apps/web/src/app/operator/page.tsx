@@ -1,2 +1,2 @@
-import { OperatorPage } from '@/modules/admin-demo/operator-page';
-export default function Page() { return <OperatorPage />; }
+import { redirect } from 'next/navigation';
+export default function Page() { redirect('/admin'); }
