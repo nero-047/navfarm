@@ -13,7 +13,8 @@
 :root {
   color-scheme: light;
 
-  /* NAVFarm brand */
+  /* Color distribution: ~80% neutral canvas/surfaces, ~15% NAVFarm navy
+     structure, ~5% semantic accent and status colors. */
   --color-primary: #c84335;
   --color-primary-hover: #aa352a;
   --color-primary-soft: #fff1ee;
@@ -23,22 +24,22 @@
   --color-blue-soft: #eef4ff;
 
   /* Semantic design tokens */
-  --bg: #f5f7fa;
+  --bg: #f5f5f7;
   --surface: #ffffff;
-  --surface-raised: #fafbfc;
+  --surface-raised: #fafafa;
   --surface-overlay: rgba(255, 255, 255, 0.88);
-  --border: #e1e4e9;
-  --border-subtle: #eceef2;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-muted: rgba(37, 99, 235, 0.08);
-  --danger: #c84335;
-  --success: #237a52;
-  --warning: #a85f00;
-  --info: #2457b7;
+  --border: rgba(60, 60, 67, 0.18);
+  --border-subtle: rgba(60, 60, 67, 0.1);
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #8e8e93;
+  --accent: #0066cc;
+  --accent-hover: #0055b3;
+  --accent-muted: rgba(0, 102, 204, 0.08);
+  --danger: #d70015;
+  --success: #248a3d;
+  --warning: #9a6700;
+  --info: #0066cc;
 
   --sidebar-bg: #0b1248;
   --sidebar-border: rgba(255, 255, 255, 0.1);
@@ -47,19 +48,19 @@
   --sidebar-active-text: #0b1248;
   --header-bg: rgba(255, 255, 255, 0.88);
   --input-bg: #ffffff;
-  --input-text: #202331;
-  --input-placeholder: #969ba7;
-  --input-border: #d9dde4;
-  --input-border-focus: #2457b7;
+  --input-text: #1d1d1f;
+  --input-placeholder: #8e8e93;
+  --input-border: rgba(60, 60, 67, 0.24);
+  --input-border-focus: #0066cc;
   --card-bg: #ffffff;
-  --card-border: #e1e4e9;
+  --card-border: rgba(60, 60, 67, 0.16);
   --row-hover: rgba(11, 18, 72, 0.035);
   --row-border: #e8eaee;
   --badge-bg: rgba(11, 18, 72, 0.06);
 
   --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-lg: 14px;
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
   --shadow-md: 0 12px 30px rgba(16, 24, 40, 0.08);
 }
@@ -75,7 +76,7 @@ body {
   min-width: 320px;
   color: var(--text-secondary);
   background: var(--bg);
-  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   font-size: 1rem;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -117,21 +118,25 @@ input, select, textarea {
 
 /* Legacy company settings content is kept functional but presented in the
    same light NAVFarm workspace language as the surrounding console. */
-.nf-company-config { color: #2e313f !important; }
-.nf-company-config [class*='text-white'] { color: #2e313f !important; }
-.nf-company-config [class*='text-gray-'] { color: #707784 !important; }
-.nf-company-config [class*='text-teal-'] { color: #1c4aa9 !important; }
+.nf-company-config { color: var(--text-primary) !important; }
+.nf-company-config [class*='text-white'] { color: var(--text-primary) !important; }
+.nf-company-config [class*='text-gray-'] { color: var(--text-secondary) !important; }
+.nf-company-config [class*='text-teal-'] { color: var(--accent) !important; }
 .nf-company-config [class*='bg-[#121824]'],
-.nf-company-config [class*='bg-[#0b0f19]'] { background-color: #f7f8fa !important; }
+.nf-company-config [class*='bg-[#0b0f19]'] { background-color: var(--surface-raised) !important; }
 .nf-company-config [class*='border-[#1a1f2e]'],
-.nf-company-config [class*='border-gray-8'] { border-color: #e3e7ee !important; }
-.nf-company-config [class*='bg-teal-'] { background-color: #eef4ff !important; }
+.nf-company-config [class*='border-gray-8'] { border-color: var(--border) !important; }
+.nf-company-config [class*='bg-teal-'] { background-color: var(--accent-muted) !important; }
 .nf-company-config button[class*='bg-[#0b1248]'],
 .nf-company-config button[type='submit'] { color: #fff !important; }
+.nf-company-config .nf-primary-action {
+  background: var(--accent) !important;
+  color: #fff !important;
+}
 .nf-company-config select {
-  border-color: #d9dde4 !important;
-  background: #fff !important;
-  color: #2e313f !important;
+  border-color: var(--input-border) !important;
+  background: var(--input-bg) !important;
+  color: var(--input-text) !important;
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -144,33 +149,37 @@ input, select, textarea {
 
 html[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0d1020;
-  --surface: #171b2d;
-  --surface-raised: #1c2135;
-  --surface-overlay: rgba(23, 27, 45, 0.88);
-  --border: #2d3348;
-  --border-subtle: #242a3e;
-  --text-primary: #f5f6fa;
-  --text-secondary: #b2b7c5;
-  --text-muted: #7f8596;
-  --accent: #e75b49;
-  --accent-hover: #ef715f;
-  --accent-muted: rgba(231, 91, 73, 0.13);
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-raised: #2c2c2e;
+  --surface-overlay: rgba(28, 28, 30, 0.88);
+  --border: rgba(84, 84, 88, 0.65);
+  --border-subtle: rgba(84, 84, 88, 0.4);
+  --text-primary: #f5f5f7;
+  --text-secondary: #aeaeb2;
+  --text-muted: #8e8e93;
+  --accent: #0a84ff;
+  --accent-hover: #409cff;
+  --accent-muted: rgba(10, 132, 255, 0.14);
+  --danger: #ff453a;
+  --success: #30d158;
+  --warning: #ffd60a;
+  --info: #64d2ff;
   --sidebar-bg: #090d31;
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-text: rgba(255, 255, 255, 0.7);
   --sidebar-active-bg: #ffffff;
   --sidebar-active-text: #0b1248;
   --header-bg: rgba(23, 27, 45, 0.88);
-  --input-bg: #111526;
+  --input-bg: #1c1c1e;
   --input-text: #f5f6fa;
-  --input-placeholder: #747b8f;
-  --input-border: #343a50;
-  --input-border-focus: #7798df;
-  --card-bg: #171b2d;
-  --card-border: #2d3348;
+  --input-placeholder: #8e8e93;
+  --input-border: rgba(84, 84, 88, 0.72);
+  --input-border-focus: #0a84ff;
+  --card-bg: #1c1c1e;
+  --card-border: rgba(84, 84, 88, 0.65);
   --row-hover: rgba(255, 255, 255, 0.035);
-  --row-border: #262c40;
+  --row-border: rgba(84, 84, 88, 0.4);
   --badge-bg: rgba(255, 255, 255, 0.07);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.22), 0 8px 20px rgba(0, 0, 0, 0.14);
   --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.28);

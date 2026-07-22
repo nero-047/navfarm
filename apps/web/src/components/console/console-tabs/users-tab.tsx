@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import Card from "../../source-ui/card";
 import Input from "../../source-ui/input";
 import Button from "../../source-ui/button";
-import { UserPlus, Shield } from "lucide-react";
+import { UserPlus } from "lucide-react";
+import { Dialog } from "../../ui/dialog";
 
 interface UsersTabProps {
   users: any[];
@@ -217,38 +218,20 @@ export default function UsersTab({
         </form>
       </Card>
 
-      {/* ASSIGN ROLE MODAL */}
-      {selectedUserForAssign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-[#0b0f19] border border-[#1a1f2e] rounded-2xl p-6 max-w-sm w-full relative shadow-2xl flex flex-col gap-4">
-            <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-3">
-              <h3 className="font-bold text-white text-base flex items-center gap-1.5">
-                <Shield className="w-4 h-4 text-teal-400" />
-                Assign Role
-              </h3>
-              <button
-                onClick={() => setSelectedUserForAssign(null)}
-                className="text-gray-400 hover:text-white cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-
-            <div className="text-xs text-gray-400 leading-relaxed">
-              Select the active policy role to assign to <strong className="text-white">{selectedUserForAssign.full_name}</strong>.
-            </div>
+      <Dialog open={Boolean(selectedUserForAssign)} onClose={() => !assigning && setSelectedUserForAssign(null)} title="Assign role" description={selectedUserForAssign ? `Choose an active role for ${selectedUserForAssign.full_name}.` : undefined} maxWidth="sm">
+          {selectedUserForAssign && <div className="flex flex-col gap-5">
 
             <div className="flex flex-col gap-1.5 mt-2">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Available Roles</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Available Roles</label>
               {roles.length === 0 ? (
-                <div className="text-xs text-gray-650 p-3 bg-black/30 border border-[#1a1f2e] rounded-xl text-center">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-center text-xs text-[var(--text-secondary)]">
                   No roles defined. Please create a role first in the Roles tab.
                 </div>
               ) : (
                 <select
                   value={targetRoleId}
                   onChange={(e) => setTargetRoleId(e.target.value)}
-                  className="w-full bg-[#121824] border border-[#1a1f2e] rounded-xl py-3 px-4 text-xs text-white focus:border-teal-500 outline-none"
+                  className="w-full rounded-xl border border-[var(--input-border)] bg-white px-4 py-3 text-sm text-[var(--text-primary)] outline-none"
                 >
                   {roles.map((role) => (
                     <option key={role.role_id} value={role.role_id}>
@@ -259,7 +242,7 @@ export default function UsersTab({
               )}
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-[#1a1f2e] pt-4 mt-2">
+            <div className="mt-2 flex flex-col-reverse gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => setSelectedUserForAssign(null)} className="py-2 px-4 text-xs">
                 Close
               </Button>
@@ -271,9 +254,8 @@ export default function UsersTab({
                 {assigning ? "Assigning..." : "Assign Role"}
               </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </div>}
+      </Dialog>
 
     </div>
   );

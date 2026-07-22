@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { Dialog } from "../../ui/dialog";
+import { FullPageDialogBoundary } from "../../ui/full-page-overlay";
 
 interface CompanyTabProps {
   activeCompany: any;
@@ -71,6 +72,7 @@ export default function CompanyTab({
   // 8 steps detailed setup configuration context
   const [setupDetails, setSetupDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [setupLoadWarning, setSetupLoadWarning] = useState("");
   const [settingsTab, setSettingsTab] = useState<"profile" | "address" | "contact" | "localization" | "fiscal" | "modules">("profile");
 
   // Support catalogs fetched on mount
@@ -186,11 +188,13 @@ export default function CompanyTab({
 
   const fetchSetupDetails = async (companyId: string) => {
     setLoadingDetails(true);
+    setSetupLoadWarning("");
+    setSetupDetails(null);
     try {
       const details = await api.get(`/setup/wizard/company-details/${companyId}`);
       setSetupDetails(details);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load complete company configuration details.");
+    } catch {
+      setSetupLoadWarning("Some setup details are temporarily unavailable. Available information is still shown.");
     } finally {
       setLoadingDetails(false);
     }
@@ -203,18 +207,6 @@ export default function CompanyTab({
       setIsEditing(false);
     }
   }, [targetCompany?.company_id]);
-
-  useEffect(() => {
-    if (!isEditing) return;
-    const closeEditor = (event: KeyboardEvent) => event.key === "Escape" && setIsEditing(false);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", closeEditor);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener("keydown", closeEditor);
-    };
-  }, [isEditing]);
 
   // Sync details response to states
   useEffect(() => {
@@ -732,8 +724,8 @@ export default function CompanyTab({
         <div className="flex flex-col gap-4 lg:col-span-8">
 
           {/* Settings details card */}
-          {isEditing && <button type="button" aria-label="Close configuration editor" onClick={() => setIsEditing(false)} className="fixed inset-0 z-[65] cursor-default bg-[#070a20]/50 backdrop-blur-[2px]" />}
-          <Card role={isEditing ? "dialog" : undefined} aria-modal={isEditing ? true : undefined} className={`nf-company-config flex flex-col gap-5 border-[#e3e7ee] bg-white p-5 ${isEditing ? "fixed left-1/2 top-1/2 z-[70] max-h-[88vh] w-[min(980px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto shadow-[0_28px_90px_rgba(11,18,72,0.24)]" : ""}`}>
+          <FullPageDialogBoundary open={isEditing} onClose={() => setIsEditing(false)} className="max-w-[980px]">
+          <Card role={isEditing ? "dialog" : undefined} aria-modal={isEditing ? true : undefined} className={`nf-company-config flex flex-col gap-5 border-[#e3e7ee] bg-white p-5 ${isEditing ? "max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-[0_24px_80px_rgba(0,0,0,0.24)] sm:max-h-[calc(100dvh-3rem)]" : ""}`}>
             <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-4">
               <div>
                 <h3 className="text-sm font-semibold text-[#2e313f]">ERP setup configuration</h3>
@@ -763,6 +755,13 @@ export default function CompanyTab({
                 </div>
               )}
             </div>
+
+            {setupLoadWarning && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-800">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{setupLoadWarning}</span>
+              </div>
+            )}
 
             {!targetCompany ? (
               <div className="text-center p-8 text-gray-500">
@@ -1435,6 +1434,7 @@ export default function CompanyTab({
               </div>
             )}
           </Card>
+          </FullPageDialogBoundary>
 
           {/* Details footer stats */}
           <Card className="nf-company-config flex flex-col gap-4 border-[#e3e7ee] bg-white p-6">
@@ -1480,7 +1480,7 @@ export default function CompanyTab({
           <Card className="nf-company-config border-[#e3e7ee] bg-white p-5">
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#edf0f4] pb-4">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-[#2e313f]"><Users className="h-4 w-4 text-[#1c4aa9]" />{isTenantAdmin ? "Company administrators" : "Company operators"}</h4>
-              <button type="button" onClick={() => setShowAdminDialog(true)} className="flex h-9 items-center gap-1.5 rounded-xl bg-[#0b1248] px-3 text-[11px] font-semibold text-white hover:bg-[#151d5e]"><UserPlus size={14} /> Add</button>
+              <button type="button" onClick={() => setShowAdminDialog(true)} className="nf-primary-action flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold text-white transition hover:opacity-90"><UserPlus size={14} /> Add</button>
             </div>
 
             <div className="flex flex-col gap-3 max-h-60 overflow-y-auto pr-1">

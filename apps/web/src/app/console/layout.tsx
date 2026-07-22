@@ -249,7 +249,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   };
 
   return (
-    <div className="min-h-screen bg-[#f3f5f8] lg:flex">
+    <div className="min-h-screen bg-[var(--bg)] lg:flex">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] text-white lg:flex"><SidebarContent /></aside>
 
       {sidebarOpen && (
@@ -263,7 +263,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       )}
 
       <div className="min-w-0 flex-1 lg:ml-[264px]">
-        <header className="sticky top-0 z-20 border-b border-[#e4e8ef] bg-white/95 backdrop-blur-xl">
+        <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-white/90 backdrop-blur-xl">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6 xl:px-8">
             <button onClick={() => setSidebarOpen(true)} aria-label="Open navigation" className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e4e8ef] text-[#30364b] lg:hidden"><Menu size={18} /></button>
             <nav className="flex min-w-0 items-center gap-2 text-xs">
