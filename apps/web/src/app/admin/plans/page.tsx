@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw, AlertCircle, CheckCircle, Plus, Edit2, X } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
+import { Dialog } from "../../../components/ui/dialog";
 
 const s = {
   input: { borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)", color: "var(--input-text)" },
@@ -131,13 +132,8 @@ export default function AdminPlansPage() {
       {success && <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
 
       {/* Form */}
-      {showForm && (
-        <div className="rounded-lg border shadow-sm" style={s.surface}>
-          <div className="flex items-center justify-between px-6 py-4 border-b" style={s.border}>
-            <h2 className="text-sm font-bold" style={s.sub}>{editingPlan ? "Edit Plan" : "Create New Plan"}</h2>
-            <button onClick={() => setShowForm(false)} style={s.muted}><X className="w-4 h-4" /></button>
-          </div>
-          <form onSubmit={handleSave} className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <Dialog open={showForm} onClose={() => setShowForm(false)} title={editingPlan ? "Edit subscription plan" : "Create subscription plan"} description="Set billing, capacity, and feature availability." maxWidth="lg">
+          <form onSubmit={handleSave} className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
               { key: "plan_id", label: "Plan ID", placeholder: "PLAN_BASIC", disabled: !!editingPlan },
               { key: "plan_name", label: "Plan Name", placeholder: "Basic Starter" },
@@ -196,22 +192,19 @@ export default function AdminPlansPage() {
               </label>
             </div>
 
-            <div className="sm:col-span-2 lg:col-span-3 flex gap-3 pt-2">
+            <div className="flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:col-span-2 sm:flex-row sm:justify-end lg:col-span-3">
               <button type="submit" disabled={saving}
-                className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
-                style={{ backgroundColor: "var(--accent)" }}>
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
                 {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
                 {saving ? "Saving…" : editingPlan ? "Save Changes" : "Create Plan"}
               </button>
               <button type="button" onClick={() => setShowForm(false)}
-                className="px-5 py-2.5 text-sm font-medium rounded-lg border"
-                style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
+                className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm font-medium text-[#515463] hover:bg-[#f7f8fa]">
                 Cancel
               </button>
             </div>
           </form>
-        </div>
-      )}
+      </Dialog>
 
       {/* Plans Table */}
       <div className="rounded-lg border overflow-hidden shadow-sm" style={s.surface}>

@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Building, RefreshCw, AlertCircle, CheckCircle, XCircle,
-  ChevronDown, ChevronUp, Search, ArrowUpRight, Eye, Plus, X
+  ChevronDown, ChevronUp, Search, ArrowUpRight, Eye, Plus
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
+import { Dialog } from "../../../components/ui/dialog";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -297,25 +298,14 @@ export default function AdminTenantsPage() {
         </table>
       </div>
 
-      {/* Add Tenant Modal */}
-      {showAddModal && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 60,
-          backgroundColor: "rgba(0,0,0,0.55)",
-          display: "flex", alignItems: "center",
-          justifyContent: "center", padding: 16, overflowY: "auto",
-        }}>
-          <div className="rounded-xl border shadow-2xl w-full max-w-2xl my-auto" style={S.surface}>
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b" style={S.border}>
-              <div className="flex items-center gap-2">
-                <Building className="w-5 h-5" style={S.accent} />
-                <h2 className="text-base font-bold" style={S.primary}>Register New Tenant Account</h2>
-              </div>
-              <button onClick={() => setShowAddModal(false)} style={S.muted} className="cursor-pointer"><X className="w-5 h-5" /></button>
-            </div>
-            {/* Form */}
-            <form onSubmit={handleCreateTenant} className="px-6 py-5 space-y-6">
+      <Dialog
+        open={showAddModal}
+        onClose={() => !creating && setShowAddModal(false)}
+        title="Register new tenant"
+        description="Create the tenant account and its first administrator. Additional setup can be completed afterward."
+        maxWidth="lg"
+      >
+            <form onSubmit={handleCreateTenant} className="space-y-6">
               {createError && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
                   <AlertCircle className="w-4 h-4 shrink-0" /> {createError}
@@ -380,22 +370,19 @@ export default function AdminTenantsPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-3 border-t" style={S.border}>
+              <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
+                <button type="button" disabled={creating} onClick={() => setShowAddModal(false)}
+                  className="min-h-10 rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                  Cancel
+                </button>
                 <button type="submit" disabled={creating}
-                  className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-lg disabled:opacity-50 cursor-pointer"
-                  style={{ backgroundColor: "var(--accent)" }}>
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
                   {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   {creating ? "Provisioning..." : "Provision Tenant"}
                 </button>
-                <button type="button" onClick={() => setShowAddModal(false)}
-                  className="px-5 py-2.5 text-sm font-medium rounded-lg border cursor-pointer" style={{ ...S.raised, ...S.sub }}>
-                  Cancel
-                </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Dialog>
     </div>
   );
 }

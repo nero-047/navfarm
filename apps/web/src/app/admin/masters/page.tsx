@@ -3,10 +3,11 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  RefreshCw, AlertCircle, CheckCircle, Plus, X, ChevronDown, ChevronRight,
+  RefreshCw, AlertCircle, CheckCircle, Plus, ChevronDown, ChevronRight, X,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
+import { Dialog } from "../../../components/ui/dialog";
 
 // ── Shared style tokens ─────────────────────────────────────────────────────
 const S = {
@@ -205,10 +206,8 @@ export default function AdminMastersPage() {
                 </button>
               </div>
 
-              {showNobForm && (
-                <form onSubmit={handleSaveNob}
-                  className="border rounded-lg p-4 grid grid-cols-2 gap-3"
-                  style={{ backgroundColor: "var(--accent-muted)", borderColor: "var(--accent)" }}>
+              <Dialog open={showNobForm} onClose={() => setShowNobForm(false)} title="Add nature of business" description="Create a configurable farming vertical for company setup." maxWidth="md">
+                <form onSubmit={handleSaveNob} className="grid grid-cols-2 gap-4">
                   {[
                     { k: "nob_code",    l: "NOB Code",    p: "POULTRY"              },
                     { k: "nob_name",    l: "NOB Name",    p: "Poultry Farming"      },
@@ -231,19 +230,18 @@ export default function AdminMastersPage() {
                       <option value="BIO">Bio Asset (IAS 41)</option>
                     </select>
                   </Field>
-                  <div className="col-span-2 flex gap-2 pt-1">
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
                     <button type="submit" disabled={savingNob}
-                      className="px-4 py-2 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
-                      style={{ backgroundColor: "var(--accent)" }}>
+                      className="h-11 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
                       {savingNob ? "Saving…" : "Save NOB"}
                     </button>
                     <button type="button" onClick={() => setShowNobForm(false)}
-                      className="px-4 py-2 text-sm rounded-lg border" style={{ ...S.raised, ...S.sub }}>
+                      className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm text-[#515463] hover:bg-[#f7f8fa]">
                       Cancel
                     </button>
                   </div>
                 </form>
-              )}
+              </Dialog>
 
               <div className="space-y-2">
                 {nobs.length === 0 && <p className="text-sm text-center py-4" style={S.muted}>No NOBs configured.</p>}
@@ -280,10 +278,8 @@ export default function AdminMastersPage() {
                             </button>
                           </div>
 
-                          {showLobForm === nob.nob_id && (
-                            <form onSubmit={(e) => handleSaveLob(e, nob.nob_id)}
-                              className="border rounded-lg p-4 grid grid-cols-2 gap-3 mb-3"
-                              style={{ backgroundColor: "var(--accent-muted)", borderColor: "var(--accent)" }}>
+                          <Dialog open={showLobForm === nob.nob_id} onClose={() => setShowLobForm(null)} title="Add line of business" description={`Add an operating line beneath ${nob.nob_name}.`} maxWidth="md">
+                            <form onSubmit={(e) => handleSaveLob(e, nob.nob_id)} className="grid grid-cols-2 gap-4">
                               {[
                                 { k: "lob_code", l: "LOB Code", p: "BROILER"           },
                                 { k: "lob_name", l: "LOB Name", p: "Broiler Production" },
@@ -294,19 +290,18 @@ export default function AdminMastersPage() {
                                     placeholder={p} className={inputCls} style={S.input} />
                                 </Field>
                               ))}
-                              <div className="col-span-2 flex gap-2 pt-1">
+                              <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
                                 <button type="submit" disabled={savingLob}
-                                  className="px-4 py-2 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
-                                  style={{ backgroundColor: "var(--accent)" }}>
+                                  className="h-11 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
                                   {savingLob ? "Saving…" : "Save LOB"}
                                 </button>
                                 <button type="button" onClick={() => setShowLobForm(null)}
-                                  className="px-4 py-2 text-sm rounded-lg border" style={{ ...S.raised, ...S.sub }}>
+                                  className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm text-[#515463] hover:bg-[#f7f8fa]">
                                   Cancel
                                 </button>
                               </div>
                             </form>
-                          )}
+                          </Dialog>
 
                           {loadingLobs[nob.nob_id] ? (
                             <div className="text-xs flex items-center gap-1.5" style={S.muted}>
@@ -346,10 +341,8 @@ export default function AdminMastersPage() {
                 </button>
               </div>
 
-              {showCurrForm && (
-                <form onSubmit={handleSaveCurrency}
-                  className="border rounded-lg p-4 grid grid-cols-2 gap-3"
-                  style={{ backgroundColor: "var(--accent-muted)", borderColor: "var(--accent)" }}>
+              <Dialog open={showCurrForm} onClose={() => setShowCurrForm(false)} title="Add currency" description="Add a reporting or accounting currency to the system catalog." maxWidth="md">
+                <form onSubmit={handleSaveCurrency} className="grid grid-cols-2 gap-4">
                   {[
                     { k: "iso_code",       l: "ISO Code", p: "USD"        },
                     { k: "currency_name",  l: "Name",     p: "US Dollar"  },
@@ -369,17 +362,16 @@ export default function AdminMastersPage() {
                       <option value="AFTER">After amount</option>
                     </select>
                   </Field>
-                  <div className="col-span-2 flex gap-2 pt-1">
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
                     <button type="submit" disabled={savingCurr}
-                      className="px-4 py-2 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
-                      style={{ backgroundColor: "var(--accent)" }}>
+                      className="h-11 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
                       {savingCurr ? "Saving…" : "Add Currency"}
                     </button>
                     <button type="button" onClick={() => setShowCurrForm(false)}
-                      className="px-4 py-2 text-sm rounded-lg border" style={{ ...S.raised, ...S.sub }}>Cancel</button>
+                      className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm text-[#515463] hover:bg-[#f7f8fa]">Cancel</button>
                   </div>
                 </form>
-              )}
+              </Dialog>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 {currencies.length === 0 && (
@@ -413,10 +405,8 @@ export default function AdminMastersPage() {
                 </button>
               </div>
 
-              {showLangForm && (
-                <form onSubmit={handleSaveLanguage}
-                  className="border rounded-lg p-4 grid grid-cols-2 gap-3"
-                  style={{ backgroundColor: "var(--accent-muted)", borderColor: "var(--accent)" }}>
+              <Dialog open={showLangForm} onClose={() => setShowLangForm(false)} title="Add language" description="Add a supported interface language and script direction." maxWidth="md">
+                <form onSubmit={handleSaveLanguage} className="grid grid-cols-2 gap-4">
                   {[
                     { k: "lang_code",         l: "Code",          p: "en"      },
                     { k: "lang_name_english",  l: "English Name",  p: "English" },
@@ -436,17 +426,16 @@ export default function AdminMastersPage() {
                       <option value="RTL">Right to Left (RTL)</option>
                     </select>
                   </Field>
-                  <div className="col-span-2 flex gap-2 pt-1">
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
                     <button type="submit" disabled={savingLang}
-                      className="px-4 py-2 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
-                      style={{ backgroundColor: "var(--accent)" }}>
+                      className="h-11 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
                       {savingLang ? "Saving…" : "Add Language"}
                     </button>
                     <button type="button" onClick={() => setShowLangForm(false)}
-                      className="px-4 py-2 text-sm rounded-lg border" style={{ ...S.raised, ...S.sub }}>Cancel</button>
+                      className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm text-[#515463] hover:bg-[#f7f8fa]">Cancel</button>
                   </div>
                 </form>
-              )}
+              </Dialog>
 
               <div className="rounded-lg border overflow-hidden" style={S.surface}>
                 <table className="w-full text-sm">

@@ -115,6 +115,25 @@ input, select, textarea {
 .nf-card { border: 1px solid var(--card-border); background: var(--card-bg); border-radius: var(--radius-lg); }
 .nf-touch { min-height: 44px; min-width: 44px; }
 
+/* Legacy company settings content is kept functional but presented in the
+   same light NAVFarm workspace language as the surrounding console. */
+.nf-company-config { color: #2e313f !important; }
+.nf-company-config [class*='text-white'] { color: #2e313f !important; }
+.nf-company-config [class*='text-gray-'] { color: #707784 !important; }
+.nf-company-config [class*='text-teal-'] { color: #1c4aa9 !important; }
+.nf-company-config [class*='bg-[#121824]'],
+.nf-company-config [class*='bg-[#0b0f19]'] { background-color: #f7f8fa !important; }
+.nf-company-config [class*='border-[#1a1f2e]'],
+.nf-company-config [class*='border-gray-8'] { border-color: #e3e7ee !important; }
+.nf-company-config [class*='bg-teal-'] { background-color: #eef4ff !important; }
+.nf-company-config button[class*='bg-[#0b1248]'],
+.nf-company-config button[type='submit'] { color: #fff !important; }
+.nf-company-config select {
+  border-color: #d9dde4 !important;
+  background: #fff !important;
+  color: #2e313f !important;
+}
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #c7cbd3; border-radius: 999px; }

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, NavUser } from "../../../hooks/useAuth";
+import { Dialog } from "../../../components/ui/dialog";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -226,16 +227,8 @@ export default function UsersPage() {
       {success && <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
 
       {/* ── Add User Form ── */}
-      {showAddForm && (
-        <div className="overflow-hidden rounded-2xl border border-[#e3e7ee] bg-white shadow-sm">
-          <div className="flex items-center justify-between px-6 py-4 border-b" style={S.border}>
-            <div className="flex items-center gap-2">
-              <UserPlus className="w-4 h-4" style={S.accent} />
-              <h2 className="text-sm font-semibold text-[#2e313f]">Register new team member</h2>
-            </div>
-            <button onClick={() => setShowAddForm(false)} style={S.muted}><X className="w-4 h-4" /></button>
-          </div>
-          <form onSubmit={handleAddUser} className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <Dialog open={showAddForm} onClose={() => setShowAddForm(false)} title="Invite a team member" description="Create an account and assign it to the appropriate company workspace." maxWidth="lg">
+          <form onSubmit={handleAddUser} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <Label>Full Name</Label>
               <input required value={newUser.full_name}
@@ -288,21 +281,19 @@ export default function UsersPage() {
               </select>
             </div>
 
-            <div className="sm:col-span-2 flex gap-3 pt-2">
+            <div className="sm:col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
               <button type="submit" disabled={submitting}
-                className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
-                style={{ backgroundColor: "var(--accent)" }}>
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white transition hover:bg-[#151d5e] disabled:opacity-50">
                 {submitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                 {submitting ? "Registering…" : "Register User"}
               </button>
               <button type="button" onClick={() => setShowAddForm(false)}
-                className="px-5 py-2.5 text-sm font-medium rounded-lg border" style={{ ...S.raised, ...S.sub }}>
+                className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm font-medium text-[#515463] hover:bg-[#f7f8fa]">
                 Cancel
               </button>
             </div>
           </form>
-        </div>
-      )}
+      </Dialog>
 
       {/* ── Users Table ── */}
       <div className="overflow-hidden rounded-2xl border border-[#e3e7ee] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">

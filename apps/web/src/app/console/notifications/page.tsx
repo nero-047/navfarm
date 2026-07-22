@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bell, RefreshCw, AlertCircle, CheckCircle, Save, Send, Mail, Globe, Eye, EyeOff } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser, getStoredTenantId, type NavUser } from "../../../hooks/useAuth";
+import { Dialog } from "../../../components/ui/dialog";
 
 // Reusable labelled input for this page
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -33,6 +34,7 @@ export default function NotificationsPage() {
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [showTestDialog, setShowTestDialog] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeChannel, setActiveChannel] = useState<"EMAIL" | "WEBHOOK">("EMAIL");
 
@@ -138,6 +140,7 @@ export default function NotificationsPage() {
 
       await api.post("/notification/test", { configId: emailCfg.notif_id, recipient: testRecipient, message: testMessage });
       setSuccess(`Test notification sent successfully!`);
+      setShowTestDialog(false);
 
       // Reload logs
       const updatedLogs = await api.get(`/notification/logs/${activeCompany.company_id}`).catch(() => []);
@@ -162,7 +165,7 @@ export default function NotificationsPage() {
   }`;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6 xl:p-8">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Notification Engine</h1>
@@ -276,29 +279,54 @@ export default function NotificationsPage() {
       </div>
 
       {/* Test Send */}
-      <div className="rounded-lg border shadow-sm" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-        <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--border)" }}>
-          <Send className="w-4 h-4" style={{ color: "var(--accent)" }} />
-          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Send Test Notification</h2>
-        </div>
-        <form onSubmit={handleTestSend} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Recipient Email">
-              <input type="email" required value={testRecipient} onChange={(e) => setTestRecipient(e.target.value)}
-                placeholder="recipient@example.com" className={inputCls} style={inputStyle} />
-            </Field>
-            <Field label="Test Message">
-              <input value={testMessage} onChange={(e) => setTestMessage(e.target.value)}
-                className={inputCls} style={inputStyle} />
-            </Field>
+      <div className="flex flex-col gap-4 rounded-xl border bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+        style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
+            <Send className="h-4 w-4" />
           </div>
-          <button type="submit" disabled={testing || !testRecipient}
-            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors">
-            {testing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            {testing ? "Sending…" : "Send Test"}
-          </button>
-        </form>
+          <div>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Test your notification setup</h2>
+            <p className="mt-0.5 text-sm" style={{ color: "var(--text-secondary)" }}>
+              Send a one-time message after saving your channel configuration.
+            </p>
+          </div>
+        </div>
+        <button type="button" onClick={() => setShowTestDialog(true)}
+          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#101b52] px-4 text-sm font-semibold text-white transition hover:bg-[#17266d]">
+          <Send className="h-4 w-4" /> Send test
+        </button>
       </div>
+
+      <Dialog
+        open={showTestDialog}
+        onClose={() => !testing && setShowTestDialog(false)}
+        title="Send test notification"
+        description="Confirm the recipient and message. This sends a real test through the saved email configuration."
+        maxWidth="md"
+      >
+        <form onSubmit={handleTestSend} className="space-y-5">
+          <Field label="Recipient Email">
+            <input type="email" required autoFocus value={testRecipient} onChange={(e) => setTestRecipient(e.target.value)}
+              placeholder="recipient@example.com" className={inputCls} style={inputStyle} />
+          </Field>
+          <Field label="Test Message">
+            <textarea required rows={4} value={testMessage} onChange={(e) => setTestMessage(e.target.value)}
+              className={`${inputCls} resize-y`} style={inputStyle} />
+          </Field>
+          <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={{ borderColor: "var(--border)" }}>
+            <button type="button" disabled={testing} onClick={() => setShowTestDialog(false)}
+              className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={testing || !testRecipient}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
+              {testing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {testing ? "Sending…" : "Send test"}
+            </button>
+          </div>
+        </form>
+      </Dialog>
 
       {/* Notification Logs */}
       <div className="rounded-lg border shadow-sm" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>

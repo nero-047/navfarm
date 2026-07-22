@@ -22,6 +22,7 @@ import {
   Check
 } from "lucide-react";
 import { api } from "../../../services/api-client";
+import { Dialog } from "../../ui/dialog";
 
 interface CompanyTabProps {
   activeCompany: any;
@@ -64,6 +65,7 @@ export default function CompanyTab({
     phone: ""
   });
   const [addingAdmin, setAddingAdmin] = useState(false);
+  const [showAdminDialog, setShowAdminDialog] = useState(false);
 
   // 8 steps detailed setup configuration context
   const [setupDetails, setSetupDetails] = useState<any>(null);
@@ -200,6 +202,18 @@ export default function CompanyTab({
       setIsEditing(false);
     }
   }, [targetCompany?.company_id]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const closeEditor = (event: KeyboardEvent) => event.key === "Escape" && setIsEditing(false);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeEditor);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", closeEditor);
+    };
+  }, [isEditing]);
 
   // Sync details response to states
   useEffect(() => {
@@ -447,6 +461,7 @@ export default function CompanyTab({
       });
       setSuccess(isTenantAdmin ? "New Company Administrator registered successfully!" : "New Company Operator registered successfully!");
       setAdminForm({ fullName: "", email: "", password: "", phone: "" });
+      setShowAdminDialog(false);
       fetchCompanyUsers(targetCompany.company_id);
       if (onRefreshCompany) {
         await onRefreshCompany(targetCompany.company_id);
@@ -572,24 +587,15 @@ export default function CompanyTab({
           </div>
         </Card>
 
-        {/* Register Modal */}
-        {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <form onSubmit={handleCreateCompany} className="bg-[#0b0f19] border border-[#1a1f2e] rounded-2xl p-6 max-w-lg w-full relative shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-3">
-                <h3 className="font-bold text-white text-base flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-teal-400" />
-                  Register New Company
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="p-1.5 rounded-lg hover:bg-white/[0.04] text-gray-400 hover:text-white cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
+        <Dialog
+          open={showCreateModal}
+          onClose={() => !creating && setShowCreateModal(false)}
+          title="Register new company"
+          description="Create the company record. Detailed ERP setup continues after registration."
+          maxWidth="lg"
+          className="nf-company-config"
+        >
+            <form onSubmit={handleCreateCompany} className="flex flex-col gap-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Company Code"
@@ -676,17 +682,16 @@ export default function CompanyTab({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-[#1a1f2e] pt-4">
-                <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)} className="py-2 px-4 text-xs cursor-pointer">
+              <div className="flex flex-col-reverse gap-3 border-t border-[#e3e7ee] pt-4 sm:flex-row sm:justify-end">
+                <Button type="button" variant="outline" disabled={creating} onClick={() => setShowCreateModal(false)} className="min-h-10 px-4 text-sm cursor-pointer">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={creating} className="py-2 px-4 text-xs cursor-pointer">
+                <Button type="submit" disabled={creating} className="min-h-10 px-5 text-sm cursor-pointer">
                   {creating ? "Creating..." : "Create Company"}
                 </Button>
               </div>
             </form>
-          </div>
-        )}
+        </Dialog>
 
       </div>
     );
@@ -711,7 +716,7 @@ export default function CompanyTab({
       )}
 
       {/* Header back button for Tenant Admin */}
-      {isTenantAdmin && (
+      {isTenantAdmin && !skipDirectory && (
         <button
           onClick={() => setSelectedCompanyDetails(null)}
           className="flex items-center gap-2 text-xs text-gray-400 hover:text-white cursor-pointer w-fit font-bold bg-white/5 py-2 px-4 rounded-xl border border-[#1a1f2e] transition-colors"
@@ -726,10 +731,11 @@ export default function CompanyTab({
         <div className="lg:col-span-8 flex flex-col gap-6">
 
           {/* Settings details card */}
-          <Card className="p-6 flex flex-col gap-6 border-[#1a1f2e] bg-[#0b0f19]">
+          {isEditing && <button type="button" aria-label="Close configuration editor" onClick={() => setIsEditing(false)} className="fixed inset-0 z-[65] cursor-default bg-[#070a20]/50 backdrop-blur-[2px]" />}
+          <Card role={isEditing ? "dialog" : undefined} aria-modal={isEditing ? true : undefined} className={`nf-company-config flex flex-col gap-6 border-[#e3e7ee] bg-white p-6 ${isEditing ? "fixed left-1/2 top-1/2 z-[70] max-h-[88vh] w-[min(980px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto shadow-[0_28px_90px_rgba(11,18,72,0.24)]" : ""}`}>
             <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-4">
               <div>
-                <h3 className="font-bold text-white text-sm">ERP Setup Wizard Configurations</h3>
+                <h3 className="text-sm font-semibold text-[#2e313f]">ERP setup configuration</h3>
                 {targetCompany && (
                   <span className="text-[9px] text-gray-500 font-mono font-semibold bg-[#121824] px-1.5 py-0.5 rounded border border-[#1a1f2e] mt-1 block w-fit">{targetCompany.company_id}</span>
                 )}
@@ -741,7 +747,7 @@ export default function CompanyTab({
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 font-bold bg-white/5 py-1.5 px-3 rounded-lg border border-[#1a1f2e] cursor-pointer transition-colors"
+                      className="flex h-10 items-center gap-1.5 rounded-xl border border-[#dfe3ea] bg-white px-4 text-xs font-semibold text-[#1c4aa9] transition hover:bg-blue-50"
                     >
                       <Edit2 className="w-3.5 h-3.5" /> Edit Configuration
                     </button>
@@ -771,7 +777,7 @@ export default function CompanyTab({
                 <div className="flex flex-row md:flex-col gap-1 w-full md:w-52 overflow-x-auto shrink-0 pb-3 md:pb-0 border-b md:border-b-0 md:border-r border-gray-850 pr-0 md:pr-4">
                   <button
                     type="button"
-                    onClick={() => { setSettingsTab("profile"); setIsEditing(false); }}
+                    onClick={() => setSettingsTab("profile")}
                     className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                       settingsTab === "profile"
                         ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
@@ -782,7 +788,7 @@ export default function CompanyTab({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setSettingsTab("address"); setIsEditing(false); }}
+                    onClick={() => setSettingsTab("address")}
                     className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                       settingsTab === "address"
                         ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
@@ -793,7 +799,7 @@ export default function CompanyTab({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setSettingsTab("contact"); setIsEditing(false); }}
+                    onClick={() => setSettingsTab("contact")}
                     className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                       settingsTab === "contact"
                         ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
@@ -804,7 +810,7 @@ export default function CompanyTab({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setSettingsTab("localization"); setIsEditing(false); }}
+                    onClick={() => setSettingsTab("localization")}
                     className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                       settingsTab === "localization"
                         ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
@@ -815,7 +821,7 @@ export default function CompanyTab({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setSettingsTab("fiscal"); setIsEditing(false); }}
+                    onClick={() => setSettingsTab("fiscal")}
                     className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                       settingsTab === "fiscal"
                         ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
@@ -826,7 +832,7 @@ export default function CompanyTab({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setSettingsTab("modules"); setIsEditing(false); }}
+                    onClick={() => setSettingsTab("modules")}
                     className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                       settingsTab === "modules"
                         ? "bg-teal-500/10 text-white border-l-2 border-teal-500"
@@ -1430,8 +1436,8 @@ export default function CompanyTab({
           </Card>
 
           {/* Details footer stats */}
-          <Card className="p-6 flex flex-col gap-4 border-[#1a1f2e] bg-[#0b0f19]">
-            <h4 className="font-bold text-white text-sm">Tenant Configuration Summary</h4>
+          <Card className="nf-company-config flex flex-col gap-4 border-[#e3e7ee] bg-white p-6">
+            <h4 className="text-sm font-semibold text-[#2e313f]">Tenant configuration summary</h4>
             {targetCompany ? (
               <div className="text-xs text-gray-400 flex flex-col gap-4">
                 <div className="flex justify-between items-center py-2 border-b border-gray-850">
@@ -1470,11 +1476,11 @@ export default function CompanyTab({
         <div className="lg:col-span-4 flex flex-col gap-6">
 
           {/* User list card */}
-          <Card className="p-6 border-[#1a1f2e] bg-[#0b0f19]">
-            <h4 className="font-bold text-white text-sm border-b border-[#1a1f2e] pb-3 mb-4 flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-teal-400" />
-              {isTenantAdmin ? "Company Administrators" : "Company Operators"}
-            </h4>
+          <Card className="nf-company-config border-[#e3e7ee] bg-white p-6">
+            <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#edf0f4] pb-4">
+              <h4 className="flex items-center gap-2 text-sm font-semibold text-[#2e313f]"><Users className="h-4 w-4 text-[#1c4aa9]" />{isTenantAdmin ? "Company administrators" : "Company operators"}</h4>
+              <button type="button" onClick={() => setShowAdminDialog(true)} className="flex h-9 items-center gap-1.5 rounded-xl bg-[#0b1248] px-3 text-[11px] font-semibold text-white hover:bg-[#151d5e]"><UserPlus size={14} /> Add</button>
+            </div>
 
             <div className="flex flex-col gap-3 max-h-60 overflow-y-auto pr-1">
               {loadingUsers ? (
@@ -1483,7 +1489,7 @@ export default function CompanyTab({
                 <div className="text-xs text-gray-500 text-center py-6">No users assigned. Register one below.</div>
               ) : (
                 companyUsers.map((u) => (
-                  <div key={u.user_id} className="flex justify-between items-center p-3 rounded-xl bg-[#121824] border border-[#1a1f2e]">
+                  <div key={u.user_id} className="flex items-center justify-between rounded-xl border border-[#e7eaf0] bg-[#f8f9fb] p-3">
                     <div className="flex flex-col gap-0.5 min-w-0">
                       <span className="font-semibold text-xs text-white truncate">{u.full_name}</span>
                       <span className="text-[10px] text-gray-505 truncate">{u.email}</span>
@@ -1501,13 +1507,8 @@ export default function CompanyTab({
             </div>
           </Card>
 
-          {/* Register User form */}
-          <Card className="p-6 border-[#1a1f2e] bg-[#0b0f19]">
-            <h4 className="font-bold text-white text-sm border-b border-[#1a1f2e] pb-3 mb-4 flex items-center gap-1.5">
-              <UserPlus className="w-4 h-4 text-teal-400" />
-              {isTenantAdmin ? "Add Company Administrator" : "Add Company Operator"}
-            </h4>
-            <form onSubmit={handleAddCompanyAdmin} className="flex flex-col gap-4">
+          <Dialog open={showAdminDialog} onClose={() => setShowAdminDialog(false)} title={isTenantAdmin ? "Add company administrator" : "Add company operator"} description={`Create an account for ${targetCompany?.company_name ?? "this company"}.`} maxWidth="md">
+            <form onSubmit={handleAddCompanyAdmin} className="flex flex-col gap-5">
               <Input
                 label="Full Name"
                 placeholder="John Doe"
@@ -1537,11 +1538,14 @@ export default function CompanyTab({
                 value={adminForm.phone}
                 onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
               />
-              <Button type="submit" disabled={addingAdmin} className="w-full flex items-center justify-center gap-2 text-xs cursor-pointer">
+              <div className="mt-1 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setShowAdminDialog(false)} className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm font-medium text-[#515463] hover:bg-[#f7f8fa]">Cancel</button>
+              <Button type="submit" disabled={addingAdmin} className="flex h-11 items-center justify-center gap-2 bg-[#0b1248] px-5 text-xs text-white hover:bg-[#151d5e]">
                 <UserPlus className="w-4 h-4" /> {addingAdmin ? "Registering..." : (isTenantAdmin ? "Add Administrator" : "Add Operator")}
               </Button>
+              </div>
             </form>
-          </Card>
+          </Dialog>
 
         </div>
 

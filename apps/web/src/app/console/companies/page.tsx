@@ -4,11 +4,12 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2, RefreshCw, AlertCircle, CheckCircle,
-  Settings, ArrowLeft, Activity, Plus, X,
+  Settings, ArrowLeft, Activity, Plus,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, NavUser } from "../../../hooks/useAuth";
 import CompanyTab from "../../../components/console/console-tabs/company-tab";
+import { Dialog } from "../../../components/ui/dialog";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -128,24 +129,23 @@ export default function CompaniesPage() {
     // ── Managing a specific company ──────────────────────────────────────────
     if (managingCompany) {
       return (
-        <div className="p-6 max-w-6xl mx-auto space-y-4">
+        <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 xl:p-8">
           {/* Back bar */}
           <button
             onClick={() => setManagingCompany(null)}
-            className="inline-flex items-center gap-2 text-sm font-semibold hover:underline"
-            style={S.accent}>
+            className="inline-flex h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b1248] hover:bg-white"
+          >
             <ArrowLeft className="w-4 h-4" />
             Back to Companies
           </button>
 
           {/* Company identity header */}
-          <div className="rounded-lg border p-5 flex items-center gap-4" style={S.surface}>
-            <div className="w-11 h-11 rounded-lg flex items-center justify-center text-white text-sm font-black shrink-0"
-              style={{ backgroundColor: "var(--accent)" }}>
+          <div className="flex items-center gap-4 rounded-2xl border border-[#e3e7ee] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-sm font-black text-white">
               {managingCompany.company_code?.substring(0, 2) || managingCompany.company_name?.substring(0, 2) || "CO"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-base font-bold" style={S.primary}>{managingCompany.company_name}</div>
+              <div className="text-base font-semibold text-[#2e313f]">{managingCompany.company_name}</div>
               <div className="text-xs flex items-center gap-3 mt-0.5" style={S.muted}>
                 <span className="font-mono">{managingCompany.company_code}</span>
                 {managingCompany.registration_no && <span>Reg: {managingCompany.registration_no}</span>}
@@ -158,7 +158,7 @@ export default function CompaniesPage() {
           {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
 
           {/* Company settings — pass ONLY this one company */}
-          <div className="rounded-lg border overflow-hidden" style={S.surface}>
+          <div>
             <CompanyTab
               activeCompany={managingCompany}
               currencies={currencies}
@@ -176,7 +176,7 @@ export default function CompaniesPage() {
 
     // ── Companies directory table ────────────────────────────────────────────
     return (
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
@@ -200,23 +200,8 @@ export default function CompaniesPage() {
         </div>
 
         {/* Add Company Modal */}
-        {showAddModal && (
-          <div style={{
-            position: "fixed", inset: 0, zIndex: 60,
-            backgroundColor: "rgba(0,0,0,0.55)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-          }}>
-            <div className="rounded-xl border shadow-2xl w-full max-w-xl" style={S.surface}>
-              {/* Modal header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b" style={S.border}>
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5" style={S.accent} />
-                  <h2 className="text-base font-bold" style={S.primary}>Add New Company</h2>
-                </div>
-                <button onClick={() => setShowAddModal(false)} style={S.muted}><X className="w-5 h-5" /></button>
-              </div>
-              {/* Form */}
-              <form onSubmit={handleCreateCompany} className="px-6 py-5 space-y-4">
+        <Dialog open={showAddModal} onClose={() => setShowAddModal(false)} title="Add a company" description="Create the legal company record. Detailed setup continues after creation." maxWidth="lg">
+              <form onSubmit={handleCreateCompany} className="space-y-5">
                 {createError && (
                   <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
                     <AlertCircle className="w-4 h-4 shrink-0" /> {createError}
@@ -286,22 +271,19 @@ export default function CompaniesPage() {
                     </select>
                   </div>
                 </div>
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
                   <button type="submit" disabled={creating}
-                    className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
-                    style={{ backgroundColor: "var(--accent)" }}>
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
                     {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                     {creating ? "Creating…" : "Create Company"}
                   </button>
                   <button type="button" onClick={() => setShowAddModal(false)}
-                    className="px-5 py-2.5 text-sm font-medium rounded-lg border" style={{ ...S.raised, ...S.sub }}>
+                    className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm font-medium text-[#515463] hover:bg-[#f7f8fa]">
                     Cancel
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
+        </Dialog>
 
         {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
 
