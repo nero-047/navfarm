@@ -8,15 +8,24 @@ jest.mock('next/navigation', () => ({
 }));
 
 describe('Page', () => {
-  it('shows the landing page to an unauthenticated user', () => {
-    const push = jest.fn();
-    (useRouter as jest.Mock).mockReturnValue({ push });
+  it('sends an unauthenticated user to login', () => {
+    const replace = jest.fn();
+    (useRouter as jest.Mock).mockReturnValue({ replace });
     localStorage.clear();
 
     render(<Page />);
 
-    expect(screen.getByText('Agricultural ERP & Compliance Platform')).toBeTruthy();
-    expect(screen.getAllByText('Sign In').length).toBeGreaterThan(0);
-    expect(push).not.toHaveBeenCalled();
+    expect(screen.getByText('Opening your workspace…')).toBeTruthy();
+    expect(replace).toHaveBeenCalledWith('/login');
+  });
+
+  it('sends an authenticated user to company selection', () => {
+    const replace = jest.fn();
+    (useRouter as jest.Mock).mockReturnValue({ replace });
+    localStorage.setItem('navfarm_auth_user', JSON.stringify({ email: 'demo@navfarm.com' }));
+
+    render(<Page />);
+
+    expect(replace).toHaveBeenCalledWith('/company-selection');
   });
 });
