@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  UserPlus, RefreshCw, AlertCircle, CheckCircle, X, Shield, Building2,
+  UserPlus, RefreshCw, AlertCircle, CheckCircle, X, Shield, Building2, Search, Users,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, NavUser } from "../../../hooks/useAuth";
@@ -27,14 +27,14 @@ function Label({ children }: { children: React.ReactNode }) {
 
 function UserTypeBadge({ type }: { type: string }) {
   const styles: Record<string, React.CSSProperties> = {
-    TENANT_ADMIN:  { background: "#EDE9FE", color: "#6D28D9", border: "1px solid #C4B5FD" },
-    COMPANY_ADMIN: { background: "#DBEAFE", color: "#1D4ED8", border: "1px solid #93C5FD" },
+    TENANT_ADMIN:  { background: "#eef0f8", color: "#0b1248", border: "1px solid #ccd1e3" },
+    COMPANY_ADMIN: { background: "#eaf1ff", color: "#1c4aa9", border: "1px solid #bfd0f3" },
     STANDARD_USER: { background: "var(--surface-raised)", color: "var(--text-secondary)", border: "1px solid var(--border)" },
     SYSTEM_ADMIN:  { background: "#FEE2E2", color: "#DC2626", border: "1px solid #FCA5A5" },
   };
   const st = styles[type] || styles.STANDARD_USER;
   return (
-    <span className="text-[11px] font-semibold px-2 py-0.5 rounded" style={st}>
+    <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide" style={st}>
       {type?.replace(/_/g, " ")}
     </span>
   );
@@ -51,6 +51,7 @@ export default function UsersPage() {
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState("");
   const [success,       setSuccess]       = useState("");
+  const [query,         setQuery]         = useState("");
 
   // Add user form
   const [showAddForm,    setShowAddForm]    = useState(false);
@@ -175,6 +176,10 @@ export default function UsersPage() {
   const displayedUsers = isCompanyAdmin
     ? users.filter((u) => u.user_type !== "TENANT_ADMIN" && u.company_id === myCompanyId)
     : users; // Tenant Admin sees everyone
+  const visibleUsers = displayedUsers.filter((member) => {
+    const value = `${member.full_name ?? ""} ${member.email ?? ""} ${member.user_type ?? ""} ${companyMap[member.company_id] ?? ""}`.toLowerCase();
+    return value.includes(query.trim().toLowerCase());
+  });
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -184,21 +189,37 @@ export default function UsersPage() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={S.primary}>Team Management</h1>
-          <p className="text-sm mt-0.5" style={S.sub}>
-            {displayedUsers.length} member{displayedUsers.length !== 1 ? "s" : ""} in workspace
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#1c4aa9]">People & access</p>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-[#2e313f] sm:text-[30px]">Team management</h1>
+          <p className="mt-1 text-sm leading-6 text-[#707070]">
+            Invite people, control workspace access, and assign company roles.
           </p>
         </div>
         <button onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-sm transition-colors"
-          style={{ backgroundColor: "var(--accent)" }}>
+          className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#151d5e] active:scale-[0.98]">
           <UserPlus className="w-4 h-4" /> Invite User
         </button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          { label: "Workspace members", value: displayedUsers.length, detail: "Across the organization", tone: "bg-blue-50 text-[#1c4aa9]" },
+          { label: "Administrators", value: displayedUsers.filter((member) => member.user_type?.includes("ADMIN")).length, detail: "Tenant and company admins", tone: "bg-red-50 text-[#c24332]" },
+          { label: "Roles assigned", value: displayedUsers.filter((member) => member.roles?.length).length, detail: `${displayedUsers.filter((member) => !member.roles?.length).length} awaiting assignment`, tone: "bg-emerald-50 text-emerald-700" },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-[#e3e7ee] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-xs font-medium text-[#707070]">{item.label}</p><p className="mt-1 text-2xl font-semibold tracking-tight text-[#2e313f]">{item.value}</p></div>
+              <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.tone}`}><Users size={17} /></span>
+            </div>
+            <p className="mt-2 text-[11px] text-[#8a8a8a]">{item.detail}</p>
+          </div>
+        ))}
       </div>
 
       {error   && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
@@ -206,11 +227,11 @@ export default function UsersPage() {
 
       {/* ── Add User Form ── */}
       {showAddForm && (
-        <div className="rounded-lg border shadow-sm" style={S.surface}>
+        <div className="overflow-hidden rounded-2xl border border-[#e3e7ee] bg-white shadow-sm">
           <div className="flex items-center justify-between px-6 py-4 border-b" style={S.border}>
             <div className="flex items-center gap-2">
               <UserPlus className="w-4 h-4" style={S.accent} />
-              <h2 className="text-sm font-bold" style={S.sub}>Register New Team Member</h2>
+              <h2 className="text-sm font-semibold text-[#2e313f]">Register new team member</h2>
             </div>
             <button onClick={() => setShowAddForm(false)} style={S.muted}><X className="w-4 h-4" /></button>
           </div>
@@ -284,39 +305,49 @@ export default function UsersPage() {
       )}
 
       {/* ── Users Table ── */}
-      <div className="rounded-lg border shadow-sm overflow-hidden" style={S.surface}>
-        <table className="w-full text-sm">
+      <div className="overflow-hidden rounded-2xl border border-[#e3e7ee] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+        <div className="flex flex-col gap-3 border-b border-[#ededed] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-[15px] font-semibold text-[#2e313f]">Workspace directory</h2>
+            <p className="mt-0.5 text-xs text-[#8a8a8a]">{displayedUsers.length} member{displayedUsers.length !== 1 ? "s" : ""}</p>
+          </div>
+          <label className="flex h-10 w-full items-center gap-2 rounded-xl border border-[#e3e7ee] bg-[#f7f8fa] px-3 text-[#8a90a0] transition focus-within:border-[#2f66d0] focus-within:bg-white focus-within:ring-[3px] focus-within:ring-blue-100/80 sm:w-72">
+            <Search size={14} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search members" className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-[#30364b] outline-none" />
+          </label>
+        </div>
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[940px] text-sm">
           <thead>
-            <tr className="border-b" style={S.raised}>
+            <tr className="border-b border-[#ededed] bg-[#fafafa]">
               {["#", "Name", "Email", isTenantAdmin ? "Company" : "", "Type", "Assigned Roles", "Actions"]
                 .filter(Boolean)
                 .map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
+                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8a90a0]">{h}</th>
                 ))}
             </tr>
           </thead>
           <tbody>
-            {displayedUsers.length === 0 && (
+            {visibleUsers.length === 0 && (
               <tr><td colSpan={7} className="text-center py-12 text-sm" style={S.muted}>No team members found.</td></tr>
             )}
-            {displayedUsers.map((u, idx) => (
+            {visibleUsers.map((u, idx) => (
               <React.Fragment key={u.user_id}>
-                <tr className="border-b transition-colors hover:opacity-90" style={S.border}>
-                  <td className="px-5 py-3.5 font-mono text-xs" style={S.muted}>{idx + 1}</td>
+                <tr className="border-b border-[#ededed] transition-colors last:border-0 hover:bg-[#fafbfc]">
+                  <td className="px-5 py-4 text-xs text-[#9aa0ad]">{idx + 1}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                        style={{ backgroundColor: "var(--accent)" }}>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-[10px] font-bold text-white">
                         {u.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "?"}
                       </div>
-                      <span className="font-semibold" style={S.primary}>{u.full_name}</span>
+                      <span className="font-semibold text-[#2e313f]">{u.full_name}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-xs" style={S.sub}>{u.email}</td>
+                  <td className="px-5 py-4 text-xs text-[#646b7c]">{u.email}</td>
 
                   {/* Company column only for Tenant Admin */}
                   {isTenantAdmin && (
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
                       {u.company_id ? (
                         <div className="flex items-center gap-1 text-xs" style={S.sub}>
                           <Building2 className="w-3 h-3 shrink-0" style={S.muted} />
@@ -328,8 +359,8 @@ export default function UsersPage() {
                     </td>
                   )}
 
-                  <td className="px-5 py-3.5"><UserTypeBadge type={u.user_type} /></td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-4"><UserTypeBadge type={u.user_type} /></td>
+                  <td className="px-5 py-4">
                     {u.roles && u.roles.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {u.roles.map((r: any) => (
@@ -350,7 +381,7 @@ export default function UsersPage() {
                       <span className="text-xs" style={S.muted}>No roles assigned</span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-4">
                     {/* Role assignment only available for Company Admin (has roles) */}
                     {!isTenantAdmin && roles.length > 0 && (
                       <button
@@ -392,6 +423,7 @@ export default function UsersPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

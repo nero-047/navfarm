@@ -31,33 +31,10 @@ function ThemeIconButton() {
     <button
       onClick={toggleTheme}
       title={isDark ? "Switch to Light" : "Switch to Dark"}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "32px",
-        height: "32px",
-        borderRadius: "50%",
-        border: "1px solid var(--border)",
-        backgroundColor: "transparent",
-        color: "var(--text-secondary)",
-        cursor: "pointer",
-        transition: "background-color 150ms, border-color 150ms, color 150ms",
-      }}
-      onMouseEnter={(e) => {
-        const b = e.currentTarget;
-        b.style.backgroundColor = "var(--accent-muted)";
-        b.style.color = "var(--accent)";
-        b.style.borderColor = "var(--accent)";
-      }}
-      onMouseLeave={(e) => {
-        const b = e.currentTarget;
-        b.style.backgroundColor = "transparent";
-        b.style.color = "var(--text-secondary)";
-        b.style.borderColor = "var(--border)";
-      }}
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-raised)] hover:text-[var(--color-navy)]"
     >
-      {isDark ? <Sun style={{ width: 15, height: 15 }} /> : <Moon style={{ width: 15, height: 15 }} />}
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
   );
 }
@@ -221,278 +198,89 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const initials = user.fullName?.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase() || "U";
   const breadcrumbLabel = navItems.find((i) => pathname.startsWith(i.href))?.label || "Console";
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full erp-sidebar">
-      {/* Logo */}
-      <div className="h-14 flex items-center px-5 shrink-0 border-b" style={{ borderColor: "var(--sidebar-border)" }}>
-        <span className="text-lg font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-          NAV<span style={{ color: "var(--accent)" }}>Farm</span>
-        </span>
-        <span className="ml-2 text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded"
-          style={{ color: "var(--text-muted)", backgroundColor: "var(--surface-raised)" }}>
-          Console
-        </span>
-      </div>
-
-      {/* ── Active Plan Card ── */}
-      {tenantPlanInfo && (() => {
-        const planName = (tenantPlanInfo.plan_id?.replace("PLAN_", "") || "STANDARD").toUpperCase();
-        const planColors: Record<string, string> = {
-          PRO:        "var(--accent)",
-          ENTERPRISE: "#8B5CF6",
-          BASIC:      "#10B981",
-          STANDARD:   "#6B7280",
-        };
-        const planColor = planColors[planName] || planColors.STANDARD;
-        return (
-          <div className="mx-3 mt-3 mb-3 rounded-xl border"
-            style={{ borderColor: planColor + "55", backgroundColor: planColor + "0d" }}>
-            {/* Single row — everything vertically centered */}
-            <div className="flex items-center gap-2.5 px-3 py-2.5">
-              {/* Star icon */}
-              <svg viewBox="0 0 24 24" fill="currentColor"
-                style={{ width: 15, height: 15, color: planColor, flexShrink: 0 }}>
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </svg>
-              {/* Labels stacked */}
-              <div className="flex flex-col justify-center leading-none gap-0.5 flex-1 min-w-0">
-                <span className="text-[9px] font-bold uppercase tracking-[0.12em]"
-                  style={{ color: "var(--text-muted)" }}>Active Plan</span>
-                <span className="text-sm font-black tracking-tight"
-                  style={{ color: planColor }}>{planName}</span>
-              </div>
-              {/* Live indicator */}
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse"
-                  style={{ backgroundColor: "#10B981" }} />
-                <span className="text-[9px] font-bold uppercase tracking-wider"
-                  style={{ color: "#10B981" }}>Live</span>
-              </div>
+  const SidebarContent = () => {
+    const planName = (tenantPlanInfo?.plan_id?.replace("PLAN_", "") || "STANDARD").toUpperCase();
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-white/[0.08] px-5 pb-4 pt-5">
+          <Link href="/console/dashboard" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#f16d50,#c24332)] text-sm font-black text-white shadow-lg">NF</span>
+            <span>
+              <span className="block text-xl font-bold tracking-tight text-white">NAV<span className="text-[#f16d50]">Farm</span></span>
+              <span className="block text-[8px] font-semibold uppercase tracking-[0.22em] text-white/35">Management console</span>
+            </span>
+          </Link>
+          <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.06] p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/40">Current plan</span>
+              <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Active</span>
             </div>
-          </div>
-        );
-      })()}
-
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest px-2 mb-3" style={{ color: "var(--text-muted)" }}>Navigation</p>
-        <ul className="space-y-0.5">
-          {navItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`erp-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border-l-4 ${isActive ? "active border-l-[var(--accent)]" : "border-transparent"}`}
-                  style={isActive
-                    ? { backgroundColor: "var(--sidebar-active-bg)", color: "var(--sidebar-active-text)", borderLeftColor: "var(--accent)" }
-                    : { color: "var(--sidebar-text)" }
-                  }
-                >
-                  <span style={{ color: isActive ? "var(--accent)" : "var(--text-muted)" }}>
-                    <item.icon className="w-4 h-4 shrink-0" />
-                  </span>
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      {/* ── Footer ── */}
-      <div className="border-t shrink-0" style={{ borderColor: "var(--sidebar-border)" }}>
-
-        {/* User card */}
-        <div className="px-4 pt-3 pb-2 flex items-center gap-3">
-          <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm"
-              style={{ background: "linear-gradient(135deg, var(--accent), #7C3AED)" }}>
-              {initials}
-            </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 rounded-full"
-              style={{ borderColor: "var(--sidebar-bg)" }} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold truncate" style={{ color: "var(--sidebar-text)" }}>{user.fullName}</div>
-            <div className="text-[10px] truncate font-mono" style={{ color: "var(--text-muted)" }}>{user.email}</div>
+            <p className="mt-1 text-sm font-bold text-white">{planName}</p>
           </div>
         </div>
 
-        {/* Sign out button container */}
-        <div className="px-3 pb-3 flex flex-col gap-2">
-          <button
-            onClick={handleLogout}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              padding: "7px 12px",
-              borderRadius: "8px",
-              border: "1px solid var(--sidebar-border)",
-              backgroundColor: "transparent",
-              color: "var(--text-muted)",
-              fontSize: "12px",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "background-color 150ms, color 150ms, border-color 150ms",
-            }}
-            onMouseEnter={(e) => {
-              const b = e.currentTarget;
-              b.style.backgroundColor = "rgba(239,68,68,0.1)";
-              b.style.color = "#EF4444";
-              b.style.borderColor = "rgba(239,68,68,0.35)";
-            }}
-            onMouseLeave={(e) => {
-              const b = e.currentTarget;
-              b.style.backgroundColor = "transparent";
-              b.style.color = "var(--text-muted)";
-              b.style.borderColor = "var(--sidebar-border)";
-            }}
-          >
-            <LogOut style={{ width: 14, height: 14 }} />
-            Sign Out
-          </button>
+        <nav className="flex-1 overflow-y-auto p-3">
+          <p className="px-3 pb-2 pt-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/30">Organization</p>
+          <ul className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <li key={item.href}>
+                  <Link href={item.href} onClick={() => setSidebarOpen(false)} className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-medium transition-all ${isActive ? "bg-white text-[#111a4f] shadow-[0_8px_22px_rgba(0,0,0,0.16)]" : "text-white/62 hover:bg-white/[0.07] hover:text-white"}`}>
+                    {isActive && <span className="absolute -left-3 h-5 w-1 rounded-r-full bg-[#ed6a4f]" />}
+                    <item.icon size={17} strokeWidth={isActive ? 2 : 1.6} />
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="border-t border-white/[0.08] p-4">
+          <div className="flex items-center gap-3 px-1 pb-3">
+            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white">{initials}<span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0b1248] bg-emerald-400" /></span>
+            <span className="min-w-0"><span className="block truncate text-xs font-semibold text-white">{user.fullName}</span><span className="mt-0.5 block truncate text-[9px] text-white/38">{user.email}</span></span>
+          </div>
+          <button onClick={handleLogout} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-medium text-white/50 transition hover:border-red-400/25 hover:bg-red-400/10 hover:text-red-300"><LogOut size={14} /> Sign out</button>
         </div>
-
       </div>
-    </div>
-  );
-
-  const sidebarStyle: React.CSSProperties = {
-    backgroundColor: "var(--sidebar-bg)",
-    borderColor: "var(--sidebar-border)",
-    color: "var(--sidebar-text)",
-  };
-
-  const headerStyle: React.CSSProperties = {
-    backgroundColor: "var(--header-bg)",
-    borderColor: "var(--border)",
+    );
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", backgroundColor: "var(--bg)" }}>
+    <div className="min-h-screen bg-[#f3f5f8] lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] text-white lg:flex"><SidebarContent /></aside>
 
-      {/* ── Desktop Sidebar (≥768px) ── */}
-      <aside style={{
-        ...sidebarStyle,
-        width: 240,
-        position: "fixed",
-        top: 0, bottom: 0, left: 0,
-        zIndex: 30,
-        display: "flex",
-        flexDirection: "column",
-        borderRight: "1px solid var(--sidebar-border)",
-      }}
-        className="hidden md:flex"
-      >
-        <SidebarContent />
-      </aside>
-
-      {/* ── Mobile Sidebar Overlay (<768px) ── */}
       {sidebarOpen && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 50,
-          display: "flex",
-        }} className="md:hidden">
-          {/* Backdrop */}
-          <div
-            onClick={() => setSidebarOpen(false)}
-            style={{
-              position: "absolute",
-              inset: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.7)",
-            }}
-          />
-          {/* Drawer panel — solid, full height */}
-          <aside style={{
-            ...sidebarStyle,
-            position: "relative",
-            width: 260,
-            height: "100%",
-            display: "flex",
-            flexDirection: "column",
-            borderRight: "1px solid var(--sidebar-border)",
-            boxShadow: "4px 0 24px rgba(0,0,0,0.35)",
-            overflowY: "auto",
-            zIndex: 51,
-          }}>
-            {/* Mobile close row */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px 16px",
-              borderBottom: "1px solid var(--sidebar-border)",
-              flexShrink: 0,
-            }}>
-              <span style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
-                NAV<span style={{ color: "var(--accent)" }}>Farm</span>
-              </span>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                style={{ color: "var(--text-muted)", cursor: "pointer", background: "none", border: "none", padding: 4 }}
-              >
-                <X style={{ width: 20, height: 20 }} />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button aria-label="Close navigation" onClick={() => setSidebarOpen(false)} className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
+          <aside className="relative h-full w-[min(300px,86vw)] bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] shadow-2xl">
+            <button onClick={() => setSidebarOpen(false)} aria-label="Close navigation" className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"><X size={19} /></button>
             <SidebarContent />
           </aside>
         </div>
       )}
 
-      {/* ── Main content area ── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}
-        className="md:pl-60">
-        {/* Top header */}
-        <header style={{
-          ...headerStyle,
-          height: 56,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 24px",
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
-          borderBottom: "1px solid var(--border)",
-          flexShrink: 0,
-        }}>
-          {/* Hamburger — mobile only */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            style={{ color: "var(--text-secondary)", marginRight: 12, cursor: "pointer", background: "none", border: "none" }}
-            className="md:hidden"
-          >
-            <Menu style={{ width: 20, height: 20 }} />
-          </button>
-          {/* Breadcrumb */}
-          <nav style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--text-muted)" }}>
-            <span style={{ fontWeight: 500, color: "var(--text-secondary)" }}>Console</span>
-            <ChevronRight style={{ width: 14, height: 14 }} />
-            <span style={{ fontWeight: 600, color: "var(--text-primary)", textTransform: "capitalize" }}>{breadcrumbLabel}</span>
-          </nav>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-            <ThemeIconButton />
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                backgroundColor: "var(--accent)", color: "#fff",
-                fontSize: 11, fontWeight: 700,
-              }}>
-                {initials}
+      <div className="min-w-0 flex-1 lg:ml-[264px]">
+        <header className="sticky top-0 z-20 border-b border-[#e4e8ef] bg-white/95 backdrop-blur-xl">
+          <div className="flex h-16 items-center gap-3 px-4 sm:px-6 xl:px-8">
+            <button onClick={() => setSidebarOpen(true)} aria-label="Open navigation" className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e4e8ef] text-[#30364b] lg:hidden"><Menu size={18} /></button>
+            <nav className="flex min-w-0 items-center gap-2 text-xs">
+              <span className="hidden font-medium text-[#9298a8] sm:inline">Organization console</span>
+              <ChevronRight size={13} className="hidden text-[#b0b5c0] sm:block" />
+              <span className="truncate font-semibold text-[#30364b]">{breadcrumbLabel}</span>
+            </nav>
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeIconButton />
+              <div className="flex h-10 items-center gap-2 rounded-xl border border-[#e4e8ef] bg-white px-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-[10px] font-bold text-white">{initials}</span>
+                <span className="hidden max-w-32 truncate text-xs font-semibold text-[#30364b] sm:block">{user.fullName}</span>
               </div>
-              <span style={{ fontWeight: 500, color: "var(--text-primary)" }} className="hidden sm:inline">{user.fullName}</span>
             </div>
           </div>
         </header>
-
-        <main style={{ flex: 1, overflowY: "auto" }}>{children}</main>
+        <main className="min-h-[calc(100vh-4rem)]">{children}</main>
       </div>
     </div>
   );
