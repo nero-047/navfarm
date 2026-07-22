@@ -174,7 +174,7 @@ export default function AdminMastersPage() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold" style={S.primary}>Master Data</h1>

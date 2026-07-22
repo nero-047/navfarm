@@ -129,18 +129,20 @@ export default function CompaniesPage() {
     // ── Managing a specific company ──────────────────────────────────────────
     if (managingCompany) {
       return (
-        <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 xl:p-8">
-          {/* Back bar */}
-          <button
-            onClick={() => setManagingCompany(null)}
-            className="inline-flex h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b1248] hover:bg-white"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Companies
-          </button>
-
-          {/* Company identity header */}
-          <div className="flex items-center gap-4 rounded-2xl border border-[#e3e7ee] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+        <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 lg:p-7">
+          {/* Compact navigation and company identity toolbar */}
+          <div className="flex items-center gap-3 rounded-2xl border border-[#e3e7ee] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+            <button
+              type="button"
+              onClick={() => setManagingCompany(null)}
+              aria-label="Back to companies"
+              title="Back to companies"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#e3e7ee] px-3 text-sm font-semibold text-[#0b1248] transition hover:bg-[#f5f7fb]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Companies</span>
+            </button>
+            <div className="mx-1 hidden h-8 w-px bg-[#e7eaf0] sm:block" />
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-sm font-black text-white">
               {managingCompany.company_code?.substring(0, 2) || managingCompany.company_name?.substring(0, 2) || "CO"}
             </div>
@@ -166,7 +168,7 @@ export default function CompaniesPage() {
               onRefreshCompany={handleRefresh as any}
               companies={[managingCompany]}
               currentUser={user}
-              onSelectCompany={() => {}}
+              onSelectCompany={(company) => void company}
               skipDirectory={true}
             />
           </div>
@@ -178,7 +180,7 @@ export default function CompaniesPage() {
     return (
       <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold" style={S.primary}>Companies</h1>
             <p className="text-sm mt-0.5" style={S.sub}>
@@ -186,11 +188,6 @@ export default function CompaniesPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleRefresh}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg"
-              style={{ ...S.surface, ...S.sub }}>
-              <RefreshCw className="w-4 h-4" /> Refresh
-            </button>
             <button onClick={() => { setCreateError(""); setShowAddModal(true); }}
               className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-sm"
               style={{ backgroundColor: "var(--accent)" }}>
@@ -344,7 +341,7 @@ export default function CompaniesPage() {
   // ════════════════════════════════════════════════════════════════════════════
   if (!myCompany) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 xl:p-8">
         <div className="rounded-lg border p-12 text-center" style={S.surface}>
           <Building2 className="w-10 h-10 mx-auto mb-3" style={S.muted} />
           <p className="text-sm font-semibold" style={S.sub}>No company assigned to your account yet.</p>
@@ -355,11 +352,10 @@ export default function CompaniesPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 xl:p-8">
       {/* Company identity header */}
-      <div className="rounded-lg border p-5 flex items-center gap-4" style={S.surface}>
-        <div className="w-11 h-11 rounded-lg flex items-center justify-center text-white text-sm font-black shrink-0"
-          style={{ backgroundColor: "var(--accent)" }}>
+      <div className="flex items-center gap-4 rounded-2xl border border-[#e3e7ee] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-sm font-black text-white">
           {myCompany.company_code?.substring(0, 2) || myCompany.company_name?.substring(0, 2) || "CO"}
         </div>
         <div className="flex-1 min-w-0">
@@ -374,17 +370,15 @@ export default function CompaniesPage() {
 
       {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
 
-      <div className="rounded-lg border overflow-hidden" style={S.surface}>
-        <CompanyTab
+      <CompanyTab
           activeCompany={myCompany}
           currencies={currencies}
           tenantId={tenantId}
           onRefreshCompany={handleRefresh as any}
           companies={[myCompany]}
           currentUser={user}
-          onSelectCompany={() => {}}
-        />
-      </div>
+          onSelectCompany={(company) => void company}
+      />
     </div>
   );
 }

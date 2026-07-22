@@ -121,21 +121,16 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
 
       {/* Welcome Banner */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div>
         <div>
           <h1 className="text-2xl font-black tracking-tight" style={S.primary}>{t("controlTowerDashboard")}</h1>
           <p className="text-sm mt-0.5" style={S.sub}>
             {t("platformWideSaaSAnalytics")}
           </p>
         </div>
-        <button onClick={loadData}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg hover:opacity-90 transition-opacity"
-          style={{ ...S.surface, ...S.sub }}>
-          <RefreshCw className="w-4 h-4" /> {t("refresh")}
-        </button>
       </div>
 
       {/* Stats Widgets */}

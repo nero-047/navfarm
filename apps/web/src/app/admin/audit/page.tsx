@@ -64,24 +64,19 @@ export default function AdminAuditPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>{t("systemAuditLogs")}</h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>{auditLogs.length} {t("platformWideEventsRecorded")}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="w-full sm:w-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("searchLogs")}
-              className="pl-9 pr-4 py-2 border rounded-lg text-sm w-52"
+              className="w-full rounded-lg border py-2 pl-9 pr-4 text-sm sm:w-64"
               style={{ borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)", color: "var(--input-text)" }} />
           </div>
-          <button onClick={loadLogs}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg shadow-sm"
-            style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-            <RefreshCw className="w-4 h-4" /> {t("refresh")}
-          </button>
         </div>
       </div>
 

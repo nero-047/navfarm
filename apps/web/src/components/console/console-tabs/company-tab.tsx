@@ -66,6 +66,7 @@ export default function CompanyTab({
   });
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [showAdminDialog, setShowAdminDialog] = useState(false);
+  const [userPendingDeletion, setUserPendingDeletion] = useState<string | null>(null);
 
   // 8 steps detailed setup configuration context
   const [setupDetails, setSetupDetails] = useState<any>(null);
@@ -475,12 +476,12 @@ export default function CompanyTab({
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to deactivate this account?")) return;
     setError("");
     setSuccess("");
     try {
       await api.delete(`/user/${userId}`);
       setSuccess("Account deactivated successfully!");
+      setUserPendingDeletion(null);
       if (targetCompany?.company_id) {
         fetchCompanyUsers(targetCompany.company_id);
       }
@@ -493,18 +494,18 @@ export default function CompanyTab({
   // Render List View (Tenant Admin only when selectedCompanyDetails is null)
   if (isTenantAdmin && !selectedCompanyDetails && !skipDirectory) {
     return (
-      <div className="flex flex-col gap-6 w-full animate-fade-in">
+      <div className="flex w-full flex-col gap-4 animate-fade-in">
 
-        {/* Toast Feedbacks */}
+        {/* Feedback stays in the content flow so it never obscures actions. */}
         {error && (
-          <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/30 text-red-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
-            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
             <span className="text-sm">{error}</span>
           </div>
         )}
         {success && (
-          <div className="fixed top-4 right-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
-            <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
             <span className="text-sm">{success}</span>
           </div>
         )}
@@ -699,18 +700,18 @@ export default function CompanyTab({
 
   // Render Details View (Tenant Admin managing details, or Company Admin viewing their own details)
   return (
-    <div className="flex flex-col gap-6 w-full animate-fade-in">
+    <div className="flex w-full flex-col gap-4 animate-fade-in">
 
-      {/* Toast Feedbacks */}
+      {/* Feedback stays in the content flow so it never covers card actions. */}
       {error && (
-        <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/30 text-red-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
-          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span className="text-sm">{error}</span>
         </div>
       )}
       {success && (
-        <div className="fixed top-4 right-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
-          <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+          <CheckCircle className="h-4 w-4 flex-shrink-0" />
           <span className="text-sm">{success}</span>
         </div>
       )}
@@ -725,14 +726,14 @@ export default function CompanyTab({
         </button>
       )}
 
-      <div className="company-settings-container grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="company-settings-container grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
 
         {/* Left Column Settings (Configuring all 8 wizard steps) */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
+        <div className="flex flex-col gap-4 lg:col-span-8">
 
           {/* Settings details card */}
           {isEditing && <button type="button" aria-label="Close configuration editor" onClick={() => setIsEditing(false)} className="fixed inset-0 z-[65] cursor-default bg-[#070a20]/50 backdrop-blur-[2px]" />}
-          <Card role={isEditing ? "dialog" : undefined} aria-modal={isEditing ? true : undefined} className={`nf-company-config flex flex-col gap-6 border-[#e3e7ee] bg-white p-6 ${isEditing ? "fixed left-1/2 top-1/2 z-[70] max-h-[88vh] w-[min(980px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto shadow-[0_28px_90px_rgba(11,18,72,0.24)]" : ""}`}>
+          <Card role={isEditing ? "dialog" : undefined} aria-modal={isEditing ? true : undefined} className={`nf-company-config flex flex-col gap-5 border-[#e3e7ee] bg-white p-5 ${isEditing ? "fixed left-1/2 top-1/2 z-[70] max-h-[88vh] w-[min(980px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto shadow-[0_28px_90px_rgba(11,18,72,0.24)]" : ""}`}>
             <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-4">
               <div>
                 <h3 className="text-sm font-semibold text-[#2e313f]">ERP setup configuration</h3>
@@ -1473,10 +1474,10 @@ export default function CompanyTab({
         </div>
 
         {/* Right Column: Manage Users */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="flex flex-col gap-4 lg:col-span-4">
 
           {/* User list card */}
-          <Card className="nf-company-config border-[#e3e7ee] bg-white p-6">
+          <Card className="nf-company-config border-[#e3e7ee] bg-white p-5">
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#edf0f4] pb-4">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-[#2e313f]"><Users className="h-4 w-4 text-[#1c4aa9]" />{isTenantAdmin ? "Company administrators" : "Company operators"}</h4>
               <button type="button" onClick={() => setShowAdminDialog(true)} className="flex h-9 items-center gap-1.5 rounded-xl bg-[#0b1248] px-3 text-[11px] font-semibold text-white hover:bg-[#151d5e]"><UserPlus size={14} /> Add</button>
@@ -1495,7 +1496,7 @@ export default function CompanyTab({
                       <span className="text-[10px] text-gray-505 truncate">{u.email}</span>
                     </div>
                     <button
-                      onClick={() => handleDeleteUser(u.user_id)}
+                      onClick={() => setUserPendingDeletion(u.user_id)}
                       className="p-1 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg cursor-pointer transition-colors shrink-0"
                       title="Deactivate account"
                     >
@@ -1545,6 +1546,16 @@ export default function CompanyTab({
               </Button>
               </div>
             </form>
+          </Dialog>
+
+          <Dialog open={Boolean(userPendingDeletion)} onClose={() => setUserPendingDeletion(null)} title="Deactivate account" description="The user will no longer be able to access this company workspace." maxWidth="sm">
+            <div className="space-y-5">
+              <p className="text-sm leading-6 text-[#515463]">Are you sure you want to deactivate this account?</p>
+              <div className="flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-4 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => setUserPendingDeletion(null)} className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                <button type="button" onClick={() => userPendingDeletion && handleDeleteUser(userPendingDeletion)} className="min-h-10 rounded-lg bg-red-600 px-5 text-sm font-semibold text-white hover:bg-red-700">Deactivate</button>
+              </div>
+            </div>
           </Dialog>
 
         </div>

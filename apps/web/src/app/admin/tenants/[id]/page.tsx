@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { api } from "../../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../../hooks/useAuth";
+import { Dialog } from "../../../../components/ui/dialog";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -94,6 +95,7 @@ export default function TenantDetailPage() {
   const [success,      setSuccess]      = useState("");
   const [upgrading,    setUpgrading]    = useState(false);
   const [selectedPlan, setSelectedPlan] = useState("");
+  const [showPlanDialog, setShowPlanDialog] = useState(false);
 
   const [companyDetails,  setCompanyDetails]  = useState<Record<string, any>>({});
   const [loadingDetails,  setLoadingDetails]  = useState<Record<string, boolean>>({});
@@ -189,6 +191,7 @@ export default function TenantDetailPage() {
     try {
       await api.post(`/tenant/${tenantId}/change-plan`, { plan_id: selectedPlan });
       setSuccess("Subscription plan updated successfully.");
+      setShowPlanDialog(false);
       await loadAll();
     } catch (err: any) {
       setError(err?.message || "Failed to update plan.");
@@ -220,7 +223,7 @@ export default function TenantDetailPage() {
   const isSystemTenant = tenant?.tenant_id === "00000000-0000-0000-0000-000000000000" || tenant?.tenant_code === "system";
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
 
       {/* Header */}
       <div>
@@ -285,36 +288,42 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
-      {/* Plan Upgrade */}
-      <div className="rounded-lg border" style={S.surface}>
-        <div className="px-6 py-4 border-b flex items-center gap-2" style={S.border}>
-          <ArrowUpRight className="w-4 h-4 text-amber-500" />
-          <h2 className="text-sm font-bold uppercase tracking-wider" style={S.sub}>Change Subscription Plan</h2>
-        </div>
-        <form onSubmit={handleUpgrade} className="px-6 py-5 flex items-end gap-4 flex-wrap">
+      <div className="flex flex-col gap-4 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between" style={S.surface}>
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-blue-50 p-2 text-blue-700"><ArrowUpRight className="h-4 w-4" /></div>
           <div>
-            <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={S.sub}>Select Plan</label>
+            <h2 className="text-sm font-semibold" style={S.primary}>Subscription plan</h2>
+            <p className="mt-0.5 text-sm" style={S.sub}>{isSystemTenant ? "The platform tenant uses a fixed plan." : `Currently on ${planLabel}.`}</p>
+          </div>
+        </div>
+        {!isSystemTenant && <button type="button" onClick={() => setShowPlanDialog(true)} className="min-h-10 rounded-lg bg-[#101b52] px-4 text-sm font-semibold text-white hover:bg-[#17266d]">Change plan</button>}
+      </div>
+
+      <Dialog open={showPlanDialog} onClose={() => !upgrading && setShowPlanDialog(false)} title="Change subscription plan" description={`Choose a new plan for ${tenant.tenant_name}.`} maxWidth="sm">
+        <form onSubmit={handleUpgrade} className="space-y-5">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={S.sub}>New plan</label>
             <select value={selectedPlan} onChange={(e) => setSelectedPlan(e.target.value)}
-              disabled={isSystemTenant}
-              className="border rounded-lg px-4 py-2.5 text-sm min-w-[220px] disabled:opacity-60 cursor-not-allowed" style={S.input}>
+              className="min-h-11 w-full rounded-lg border px-4 text-sm" style={S.input}>
               <option value="">— Select a plan —</option>
               {plans.map((p) => (
                 <option key={p.plan_id} value={p.plan_id}>{p.plan_name} — {p.billing_cycle} · ${p.price}</option>
               ))}
             </select>
           </div>
-          <button type="submit" disabled={isSystemTenant || !selectedPlan || upgrading || selectedPlan === tenant?.plan_id}
-            className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-            {upgrading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowUpRight className="w-4 h-4" />}
-            {upgrading ? "Updating…" : "Apply Plan Change"}
-          </button>
-          {isSystemTenant ? (
-            <p className="text-xs text-amber-600 font-semibold">This is the platform admin tenant; subscription plan is fixed.</p>
-          ) : selectedPlan && selectedPlan === tenant?.plan_id && (
+          {selectedPlan && selectedPlan === tenant?.plan_id && (
             <p className="text-xs" style={S.muted}>This is the current plan.</p>
           )}
+          <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
+            <button type="button" disabled={upgrading} onClick={() => setShowPlanDialog(false)} className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={!selectedPlan || upgrading || selectedPlan === tenant?.plan_id}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
+              {upgrading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
+              {upgrading ? "Updating…" : "Apply plan change"}
+            </button>
+          </div>
         </form>
-      </div>
+      </Dialog>
 
       {/* ── Companies Table ── */}
       <div className="rounded-lg border overflow-hidden" style={S.surface}>
@@ -323,9 +332,6 @@ export default function TenantDetailPage() {
           <h2 className="text-sm font-bold uppercase tracking-wider" style={S.sub}>
             Companies under this Tenant ({companies.length})
           </h2>
-          <button onClick={loadAll} className="ml-auto text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border" style={{ ...S.raised, ...S.sub }}>
-            <RefreshCw className="w-3 h-3" /> Refresh
-          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

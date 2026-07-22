@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import Card from "../../source-ui/card";
 import Button from "../../source-ui/button";
 import Input from "../../source-ui/input";
-import { ShieldAlert, Plus, Save, RefreshCw, Edit3, Trash2, X } from "lucide-react";
+import { ShieldAlert, Plus, Save, RefreshCw, Edit3, Trash2 } from "lucide-react";
 import { api } from "../../../services/api-client";
+import { Dialog } from "../../ui/dialog";
 
 interface RolesTabProps {
   roles: any[];
@@ -357,84 +358,44 @@ export default function RolesTab({
         )}
       </div>
 
-      {/* CREATE ROLE MODAL */}
-      {isCreateModalOpen && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 60,
-          backgroundColor: "rgba(0,0,0,0.55)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-        }}>
-          <form onSubmit={handleCreateRoleSubmit} className="border rounded-2xl p-6 max-w-sm w-full relative shadow-2xl flex flex-col gap-4" style={S.surface}>
-            <div className="flex justify-between items-center border-b pb-3" style={S.border}>
-              <h3 className="font-bold text-base" style={S.textPrimary}>Create Custom Role</h3>
-              <button type="button" onClick={() => setIsCreateModalOpen(false)} style={S.textMuted} className="cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Dialog open={isCreateModalOpen} onClose={() => !creatingRole && setIsCreateModalOpen(false)} title="Create custom role" description="Define a reusable permission role for this company." maxWidth="sm">
+          <form onSubmit={handleCreateRoleSubmit} className="flex flex-col gap-4">
             <Input label="Role Code" placeholder="e.g. FARM_SUPERVISOR" value={newRole.roleCode} onChange={(e) => setNewRole({ ...newRole, roleCode: e.target.value.toUpperCase() })} required />
             <Input label="Role Name" placeholder="Farm Supervisor" value={newRole.roleName} onChange={(e) => setNewRole({ ...newRole, roleName: e.target.value })} required />
             <Input label="Description" placeholder="Manages coops and biological feeds" value={newRole.description} onChange={(e) => setNewRole({ ...newRole, description: e.target.value })} />
-            <div className="flex justify-end gap-3 border-t pt-4 mt-2" style={S.border}>
+            <div className="mt-2 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
               <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)} className="py-2 px-4 text-xs">Cancel</Button>
               <Button type="submit" disabled={creatingRole} className="py-2 px-4 text-xs text-white" style={{ backgroundColor: "var(--accent)" }}>{creatingRole ? "Saving..." : "Create"}</Button>
             </div>
           </form>
-        </div>
-      )}
+      </Dialog>
 
-      {/* EDIT ROLE MODAL */}
-      {isEditModalOpen && editingRole && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 60,
-          backgroundColor: "rgba(0,0,0,0.55)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-        }}>
-          <form onSubmit={handleEditSubmit} className="border rounded-2xl p-6 max-w-sm w-full relative shadow-2xl flex flex-col gap-4" style={S.surface}>
-            <div className="flex justify-between items-center border-b pb-3" style={S.border}>
-              <h3 className="font-bold text-base" style={S.textPrimary}>Edit Role</h3>
-              <button type="button" onClick={() => setIsEditModalOpen(false)} style={S.textMuted} className="cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Dialog open={isEditModalOpen && Boolean(editingRole)} onClose={() => !savingEdit && setIsEditModalOpen(false)} title="Edit role" description={editingRole ? `Update ${editingRole.role_code}.` : undefined} maxWidth="sm">
+          {editingRole && <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
             <div className="text-[10px] font-mono" style={S.textMuted}>Role Code: {editingRole.role_code}</div>
             <Input label="Role Name" placeholder="Farm Supervisor" value={editName} onChange={(e) => setEditName(e.target.value)} required />
             <Input label="Description" placeholder="Role description" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
-            <div className="flex justify-end gap-3 border-t pt-4 mt-2" style={S.border}>
+            <div className="mt-2 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
               <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} className="py-2 px-4 text-xs">Cancel</Button>
               <Button type="submit" disabled={savingEdit} className="py-2 px-4 text-xs text-white" style={{ backgroundColor: "var(--accent)" }}>{savingEdit ? "Saving..." : "Save Changes"}</Button>
             </div>
           </form>
-        </div>
-      )}
+          }
+      </Dialog>
 
-      {/* DELETE CONFIRM MODAL */}
-      {deletingRoleId && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 60,
-          backgroundColor: "rgba(0,0,0,0.55)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-        }}>
-          <div className="border rounded-2xl p-6 max-w-sm w-full relative shadow-2xl flex flex-col gap-4" style={S.surface}>
-            <div className="flex justify-between items-center border-b pb-3" style={S.border}>
-              <h3 className="font-bold text-base flex items-center gap-2" style={S.textPrimary}>
-                <Trash2 className="w-4 h-4 text-rose-500" /> Delete Role
-              </h3>
-              <button type="button" onClick={() => setDeletingRoleId(null)} style={S.textMuted} className="cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Dialog open={Boolean(deletingRoleId)} onClose={() => !deletingRole && setDeletingRoleId(null)} title="Delete role" description="This action cannot be undone." maxWidth="sm">
+          <div className="flex flex-col gap-4">
             <div className="text-xs leading-relaxed" style={S.textSecondary}>
               Are you sure you want to delete this role? This action cannot be undone. Any permissions tied to this role will also be removed.
             </div>
-            <div className="flex justify-end gap-3 border-t pt-4 mt-2" style={S.border}>
+            <div className="mt-2 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
               <Button variant="outline" onClick={() => setDeletingRoleId(null)} className="py-2 px-4 text-xs">Cancel</Button>
-              <Button onClick={() => handleDeleteRole(deletingRoleId)} disabled={deletingRole} className="py-2 px-4 text-xs text-white bg-rose-500 hover:bg-rose-600">
+              <Button onClick={() => deletingRoleId && handleDeleteRole(deletingRoleId)} disabled={deletingRole} className="py-2 px-4 text-xs text-white bg-rose-500 hover:bg-rose-600">
                 {deletingRole ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>
-        </div>
-      )}
+      </Dialog>
     </div>
   );
 }

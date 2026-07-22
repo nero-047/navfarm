@@ -18,7 +18,6 @@ const S = {
 
 export default function RolesPage() {
   const router = useRouter();
-  const [user,          setUser]          = useState<NavUser | null>(null);
   const [roles,         setRoles]         = useState<any[]>([]);
   const [activeCompany, setActiveCompany] = useState<any>(null);
   const [loading,       setLoading]       = useState(true);
@@ -30,7 +29,6 @@ export default function RolesPage() {
     const storedUser = getStoredUser();
     const tid = getStoredTenantId();
     if (!token || !storedUser || !tid) { router.replace("/"); return; }
-    setUser(storedUser);
     loadData(storedUser, tid);
   }, [router]);
 
@@ -54,7 +52,9 @@ export default function RolesPage() {
     try {
       const list = await api.get(`/role/company/${activeCompany.company_id}`);
       setRoles(list);
-    } catch {}
+    } catch {
+      setError("Failed to refresh roles.");
+    }
   };
 
   if (loading) return (
@@ -65,21 +65,15 @@ export default function RolesPage() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div>
         <div>
           <h1 className="text-xl font-bold" style={S.primary}>Role Permissions</h1>
           <p className="text-sm mt-0.5" style={S.sub}>
             RBAC scopes for <span className="font-semibold" style={S.primary}>{activeCompany?.company_name || "—"}</span>
           </p>
         </div>
-        <button
-          onClick={() => user && getStoredTenantId() && loadData(user, getStoredTenantId()!)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg shadow-sm transition-colors"
-          style={{ ...S.surface, ...S.sub }}>
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
       </div>
 
       {error   && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}

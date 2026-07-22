@@ -76,7 +76,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     setUser(storedUser);
 
     if (tenantId) {
-      api.get(`/tenant/${tenantId}`).then((data: any) => setTenantPlanInfo(data)).catch(() => {});
+      api.get(`/tenant/${tenantId}`).then((data: any) => setTenantPlanInfo(data)).catch(() => setTenantPlanInfo(null));
     }
     checkOnboardingStatus(storedUser, tenantId || "");
   }, [router]);

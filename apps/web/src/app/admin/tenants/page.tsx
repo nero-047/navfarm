@@ -131,7 +131,7 @@ export default function AdminTenantsPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -139,21 +139,16 @@ export default function AdminTenantsPage() {
           <h1 className="text-xl font-bold" style={S.primary}>Tenant Registry</h1>
           <p className="text-sm mt-0.5" style={S.sub}>{tenants.length} tenants registered on platform</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex w-full items-center gap-3 sm:w-auto">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={S.muted} />
             <input value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tenants…"
-              className="pl-9 pr-4 py-2 border rounded-lg text-sm w-52"
+              className="w-full rounded-lg border py-2 pl-9 pr-4 text-sm sm:w-60"
               style={S.input} />
           </div>
-          <button onClick={loadData}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg"
-            style={{ ...S.surface, ...S.sub }}>
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
           <button onClick={() => { setCreateError(""); setShowAddModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-sm"
+            className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white shadow-sm"
             style={{ backgroundColor: "var(--accent)" }}>
             <Plus className="w-4 h-4" /> Add Tenant
           </button>
@@ -163,32 +158,32 @@ export default function AdminTenantsPage() {
       {error   && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
       {success && <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
 
-      {/* Upgrade Plan Inline Form */}
-      {upgradingTenant && (
-        <div className="rounded-lg border p-5" style={{ backgroundColor: "var(--surface)", borderColor: "#F59E0B" }}>
-          <h3 className="text-sm font-bold text-amber-600 mb-3">
-            Upgrade Plan — {upgradingTenant.tenant_name}
-          </h3>
-          <form onSubmit={handleUpgrade} className="flex items-center gap-3 flex-wrap">
+      <Dialog
+        open={Boolean(upgradingTenant)}
+        onClose={() => { if (!upgrading) { setUpgradingTenant(null); setSelectedPlanId(""); } }}
+        title="Change subscription plan"
+        description={upgradingTenant ? `Choose a new plan for ${upgradingTenant.tenant_name}.` : undefined}
+        maxWidth="sm"
+      >
+          <form onSubmit={handleUpgrade} className="space-y-5">
+            <label className="block text-xs font-semibold uppercase tracking-wider" style={S.sub}>New plan</label>
             <select value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm min-w-[200px]" style={S.input}>
+              className="min-h-11 w-full rounded-lg border px-3 text-sm" style={S.input}>
               <option value="">— Select new plan —</option>
               {plans.map((p) => (
                 <option key={p.plan_id} value={p.plan_id}>{p.plan_name} ({p.billing_cycle})</option>
               ))}
             </select>
-            <button type="submit" disabled={!selectedPlanId || upgrading}
-              className="px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors">
-              {upgrading ? "Upgrading…" : "Apply Upgrade"}
-            </button>
-            <button type="button" onClick={() => { setUpgradingTenant(null); setSelectedPlanId(""); }}
-              className="px-4 py-2 text-sm rounded-lg border"
-              style={{ ...S.raised, ...S.sub }}>
-              Cancel
-            </button>
+            <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
+              <button type="button" disabled={upgrading} onClick={() => { setUpgradingTenant(null); setSelectedPlanId(""); }}
+                className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+              <button type="submit" disabled={!selectedPlanId || upgrading}
+                className="min-h-10 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
+                {upgrading ? "Updating…" : "Apply plan change"}
+              </button>
+            </div>
           </form>
-        </div>
-      )}
+      </Dialog>
 
       {/* Tenants Table */}
       <div className="rounded-lg border shadow-sm overflow-hidden" style={S.surface}>
