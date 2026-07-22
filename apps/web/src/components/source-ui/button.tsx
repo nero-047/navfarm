@@ -13,7 +13,7 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   ...props 
 }) => {
-  const baseStyle = 'px-4 py-2.5 rounded-lg font-medium text-sm cursor-pointer flex items-center justify-center gap-2 transition-all active:scale-[0.98]';
+  const baseStyle = 'min-h-11 px-5 py-2.5 rounded-xl font-semibold text-sm cursor-pointer flex items-center justify-center gap-2 transition-all active:scale-[0.98] focus-visible:outline-none';
   
   // Custom styles for each variant that adapt to light and dark themes
   const variantStyles: Record<string, React.CSSProperties> = {
@@ -27,13 +27,13 @@ export const Button: React.FC<ButtonProps> = ({
       border: '1px solid var(--border)',
     },
     outline: {
-      backgroundColor: 'transparent',
-      color: 'var(--text-secondary)',
+      backgroundColor: 'var(--surface)',
+      color: 'var(--text-primary)',
       border: '1px solid var(--border)',
     },
     ghost: {
       backgroundColor: 'transparent',
-      color: 'var(--text-secondary)',
+      color: 'var(--text-primary)',
     },
     danger: {
       backgroundColor: 'rgba(239, 68, 68, 0.08)',

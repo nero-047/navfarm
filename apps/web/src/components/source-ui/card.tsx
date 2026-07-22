@@ -13,7 +13,7 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   return (
     <div 
-      className={`rounded-xl p-6 relative overflow-hidden ${
+      className={`rounded-[var(--radius-lg)] p-6 relative overflow-hidden shadow-[var(--shadow-sm)] ${
         glow ? 'shadow-lg border-teal-500/20' : ''
       } ${className}`}
       style={{
