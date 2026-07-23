@@ -7,7 +7,7 @@ import {
   Settings, ArrowLeft, Activity, Plus,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
-import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
+import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, NavUser } from "../../../hooks/useAuth";
 import CompanyTab from "../../../components/console/console-tabs/company-tab";
 import { Dialog } from "../../../components/ui/dialog";
 
@@ -319,13 +319,36 @@ export default function CompaniesPage() {
                   <td className="px-5 py-4 text-xs" style={S.sub}>{co.country_id || "—"}</td>
                   <td className="px-5 py-4"><StatusBadge status={co.onboarding_status} /></td>
                   <td className="px-5 py-4">
-                    <button
-                      onClick={() => setManagingCompany(co)}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-                      style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
-                      <Settings className="w-3.5 h-3.5" />
-                      Manage
-                    </button>
+                    {co.onboarding_status === "COMPLETED" ? (
+                      <button
+                        onClick={() => setManagingCompany(co)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
+                        style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
+                        <Settings className="w-3.5 h-3.5" />
+                        Manage
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          const currentUser = getStoredUser();
+                          if (currentUser) {
+                            const patched = {
+                              ...currentUser,
+                              companyId: co.company_id,
+                              company_id: co.company_id,
+                            };
+                            localStorage.setItem("user", JSON.stringify(patched));
+                            localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
+                          }
+                          setActiveCompanyId(co.company_id);
+                          window.location.reload();
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
+                        style={{ backgroundColor: "var(--surface-raised)", color: "var(--text-primary)", borderColor: "var(--border)" }}>
+                        <Activity className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                        Continue Setup
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

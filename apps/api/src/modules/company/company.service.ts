@@ -124,7 +124,7 @@ export class CompanyService {
         registration_no: dto.registration_no || null,
         tax_id: dto.tax_id || null,
         primary_color_hex: dto.primary_color_hex || '#1F4E79',
-        onboarding_status: 'COMPLETED',
+        onboarding_status: 'PENDING',
         is_active: true,
       });
 
@@ -321,18 +321,22 @@ export class CompanyService {
       }));
       await tx.insert(schema.companyModules).values(moduleInserts);
 
-      // 7. Seed completed logs in setupWizardLog for all setup steps
-      const steps = await tx.select().from(schema.setupStepMaster);
-      if (steps.length > 0) {
-        const wizardLogs = steps.map((step) => ({
+      // 7. Seed only COMPANY_PROFILE step as COMPLETED in setupWizardLog
+      const [profileStep] = await tx
+        .select()
+        .from(schema.setupStepMaster)
+        .where(eq(schema.setupStepMaster.step_code, 'COMPANY_PROFILE'))
+        .limit(1);
+
+      if (profileStep) {
+        await tx.insert(schema.setupWizardLog).values({
           log_id: crypto.randomUUID(),
           company_id: companyId,
-          step_id: step.step_id,
+          step_id: profileStep.step_id,
           status: 'COMPLETED',
           completed_at: toMysqlTimestamp(),
           completed_by: userPayload?.userId || null,
-        }));
-        await tx.insert(schema.setupWizardLog).values(wizardLogs);
+        });
       }
 
       const [company] = await tx
