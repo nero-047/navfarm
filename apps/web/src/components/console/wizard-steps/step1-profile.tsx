@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Input from "../../source-ui/input";
 import Button from "../../source-ui/button";
-import { Building2 } from "lucide-react";
+import { Building2, Upload, X, Image as ImageIcon } from "lucide-react";
+import { api } from "../../../services/api-client";
 
 interface Step1ProfileProps {
   onSubmit: (data: any) => Promise<void>;
@@ -10,6 +11,10 @@ interface Step1ProfileProps {
 }
 
 export default function Step1Profile({ onSubmit, isSubmitting, initialData }: Step1ProfileProps) {
+  const [logoUrl, setLogoUrl] = useState(initialData?.company_logo_url || "");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState("");
+
   const [formData, setFormData] = useState({
     company_code: initialData?.company_code || "",
     company_name: initialData?.company_name || "",
@@ -18,13 +23,72 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
     industry_type: initialData?.industry_type || "Poultry Farming",
     registration_no: initialData?.registration_no || "",
     tax_id: initialData?.tax_id || "",
-    primary_color_hex: initialData?.primary_color_hex || "#1F4E79"
+    tax_regime: initialData?.tax_regime || "STANDARD",
+    incorporation_date: initialData?.incorporation_date || "",
+    website: initialData?.website || "",
+    email_domain: initialData?.email_domain || "",
+    support_email: initialData?.support_email || "",
+    phone_primary: initialData?.phone_primary || "",
+    primary_color_hex: initialData?.primary_color_hex || "#1F4E79",
+    company_logo_url: initialData?.company_logo_url || ""
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setLogoUrl(initialData.company_logo_url || "");
+      setFormData({
+        company_code: initialData.company_code || "",
+        company_name: initialData.company_name || "",
+        company_display_name: initialData.company_display_name || "",
+        company_type: initialData.company_type || "Pvt Ltd",
+        industry_type: initialData.industry_type || "Poultry Farming",
+        registration_no: initialData.registration_no || "",
+        tax_id: initialData.tax_id || "",
+        tax_regime: initialData.tax_regime || "STANDARD",
+        incorporation_date: initialData.incorporation_date || "",
+        website: initialData.website || "",
+        email_domain: initialData.email_domain || "",
+        support_email: initialData.support_email || "",
+        phone_primary: initialData.phone_primary || "",
+        primary_color_hex: initialData.primary_color_hex || "#1F4E79",
+        company_logo_url: initialData.company_logo_url || ""
+      });
+    }
+  }, [initialData]);
+
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    setLogoError("");
+
+    try {
+      const data = new FormData();
+      data.append("file", file);
+
+      const res = await api.upload("/setup/wizard/upload-logo", data);
+      setLogoUrl(res.logoUrl);
+      setFormData(prev => ({ ...prev, company_logo_url: res.logoUrl }));
+    } catch (err: any) {
+      setLogoError(err?.message || "Failed to upload logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleClearLogo = () => {
+    setLogoUrl("");
+    setFormData(prev => ({ ...prev, company_logo_url: "" }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
   };
+
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:2877';
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -33,7 +97,54 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           <Building2 className="w-5 h-5 text-teal-400" />
           Step 1: Register Company Profile
         </h2>
-        <p className="text-xs text-gray-500">Provide registration names and brand details. Limits set by pricing plan are applied.</p>
+        <p className="text-xs text-gray-500">Provide registration names, company logo, and brand details. Limits set by pricing plan are applied.</p>
+      </div>
+
+      {/* ── Company Logo Upload Section ── */}
+      <div className="p-4 rounded-xl border border-gray-800 bg-[#0f1420] flex flex-col sm:flex-row items-center gap-4">
+        <div className="w-20 h-20 rounded-xl border border-dashed border-gray-700 bg-[#121824] flex items-center justify-center overflow-hidden relative group shrink-0">
+          {logoUrl ? (
+            <img
+              src={logoUrl.startsWith('/') ? `${backendUrl}${logoUrl}` : logoUrl}
+              alt="Company Logo"
+              className="w-full h-full object-contain p-1"
+            />
+          ) : (
+            <ImageIcon className="w-8 h-8 text-gray-600" />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5 flex-1 w-full">
+          <label className="text-xs font-semibold text-gray-300">Company Brand Logo</label>
+          <p className="text-[11px] text-gray-500">Supported formats: PNG, JPG, SVG, WebP (Max 5MB). Saved to server /uploads folder.</p>
+
+          <div className="flex items-center gap-3 mt-1">
+            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/30 text-xs font-semibold hover:bg-teal-500/20 transition-all">
+              <Upload className="w-3.5 h-3.5" />
+              {uploadingLogo ? "Uploading..." : logoUrl ? "Change Logo" : "Upload Logo"}
+              <input
+                type="file"
+                accept="image/png, image/jpeg, image/svg+xml, image/webp"
+                onChange={handleLogoUpload}
+                disabled={uploadingLogo}
+                className="hidden"
+              />
+            </label>
+
+            {logoUrl && (
+              <button
+                type="button"
+                onClick={handleClearLogo}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 text-xs font-semibold hover:bg-red-500/20 transition-all"
+              >
+                <X className="w-3.5 h-3.5" />
+                Remove
+              </button>
+            )}
+          </div>
+
+          {logoError && <p className="text-xs text-red-400 mt-1">{logoError}</p>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -70,6 +181,21 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             <option value="LLP">LLP</option>
           </select>
         </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs text-gray-400 font-medium">Industry Classification</label>
+          <select
+            value={formData.industry_type}
+            onChange={(e) => setFormData({ ...formData, industry_type: e.target.value })}
+            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+          >
+            <option value="Poultry Farming">Poultry Farming</option>
+            <option value="Livestock">Livestock Farming</option>
+            <option value="Agriculture">Agriculture & Crop Farming</option>
+            <option value="Aquaculture">Aquaculture & Fisheries</option>
+            <option value="Insect Farming">Insect Farming & Apiaries</option>
+            <option value="Feed & Processing">Feed Mill & Food Processing</option>
+          </select>
+        </div>
         <Input
           label="Registration Certificate No"
           placeholder="e.g. U01403DL2023PTC123456"
@@ -82,8 +208,51 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           value={formData.tax_id}
           onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
         />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs text-gray-400 font-medium">Tax Regime</label>
+          <select
+            value={formData.tax_regime}
+            onChange={(e) => setFormData({ ...formData, tax_regime: e.target.value })}
+            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+          >
+            <option value="STANDARD">Standard Scheme</option>
+            <option value="COMPOSITION">Composition Scheme</option>
+            <option value="EXEMPT">Exempt / Non-Taxable</option>
+          </select>
+        </div>
+        <Input
+          label="Incorporation Date"
+          type="date"
+          value={formData.incorporation_date}
+          onChange={(e) => setFormData({ ...formData, incorporation_date: e.target.value })}
+        />
+        <Input
+          label="Website URL"
+          placeholder="https://greenvalleyfarms.in"
+          value={formData.website}
+          onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+        />
+        <Input
+          label="Email Domain (for Auto-verify)"
+          placeholder="greenvalleyfarms.in"
+          value={formData.email_domain}
+          onChange={(e) => setFormData({ ...formData, email_domain: e.target.value })}
+        />
+        <Input
+          label="Support Email"
+          placeholder="support@greenvalleyfarms.in"
+          type="email"
+          value={formData.support_email}
+          onChange={(e) => setFormData({ ...formData, support_email: e.target.value })}
+        />
+        <Input
+          label="Primary Phone / Landline"
+          placeholder="+91 11 2345 6789"
+          value={formData.phone_primary}
+          onChange={(e) => setFormData({ ...formData, phone_primary: e.target.value })}
+        />
       </div>
-      <Button type="submit" disabled={isSubmitting} className="mt-4 self-end">
+      <Button type="submit" disabled={isSubmitting || uploadingLogo} className="mt-4 self-end">
         {isSubmitting ? "Registering..." : "Save & Continue"}
       </Button>
     </form>

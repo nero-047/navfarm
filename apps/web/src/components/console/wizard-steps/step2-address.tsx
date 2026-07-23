@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Input from "../../source-ui/input";
 import Button from "../../source-ui/button";
 import { MapPin } from "lucide-react";
@@ -11,6 +11,7 @@ interface Step2AddressProps {
 
 export default function Step2Address({ onSubmit, isSubmitting, initialData }: Step2AddressProps) {
   const [formData, setFormData] = useState({
+    address_label: initialData?.address_label || "",
     address_line_1: initialData?.address_line_1 || "",
     address_line_2: initialData?.address_line_2 || "",
     city: initialData?.city || "",
@@ -21,6 +22,24 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
     gps_lat: initialData?.gps_lat || "28.7041",
     gps_lng: initialData?.gps_lng || "77.1025"
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        address_label: initialData.address_label || "",
+        address_line_1: initialData.address_line_1 || "",
+        address_line_2: initialData.address_line_2 || "",
+        city: initialData.city || "",
+        state_province: initialData.state_province || "",
+        postal_code: initialData.postal_code || "",
+        country_name: initialData.country_name || "India",
+        address_type: initialData.address_type || "HEAD_OFFICE",
+        gps_lat: initialData.gps_lat || "28.7041",
+        gps_lng: initialData.gps_lng || "77.1025"
+      });
+    }
+  }, [initialData]);
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,12 +58,19 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
+          label="Address Tag / Label"
+          placeholder="e.g. Head Office - Gate 1"
+          value={formData.address_label}
+          onChange={(e) => setFormData({ ...formData, address_label: e.target.value })}
+        />
+        <Input
           label="Street Address line 1"
           placeholder="Main Farm Gate Road"
           value={formData.address_line_1}
           onChange={(e) => setFormData({ ...formData, address_line_1: e.target.value })}
           required
         />
+
         <Input
           label="Street Address line 2"
           placeholder="Shed Area 4"

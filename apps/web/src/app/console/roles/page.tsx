@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 import { api } from "../../../services/api-client";
-import { getStoredUser, getStoredToken, getStoredTenantId, NavUser } from "../../../hooks/useAuth";
+import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
 import RolesTab from "../../../components/console/console-tabs/roles-tab";
 
 const S = {
@@ -36,8 +36,8 @@ export default function RolesPage() {
     setLoading(true); setError("");
     try {
       const companiesList = await api.get(`/company/tenant/${tid}`);
-      const myId = storedUser.companyId || storedUser.company_id;
-      const myCompany = companiesList.find((c: any) => c.company_id === myId) || companiesList[0];
+      const activeId = getActiveCompanyId() || storedUser.companyId || storedUser.company_id;
+      const myCompany = companiesList.find((c: any) => c.company_id === activeId) || companiesList[0];
       setActiveCompany(myCompany || null);
       if (myCompany?.company_id) {
         const rolesList = await api.get(`/role/company/${myCompany.company_id}`);

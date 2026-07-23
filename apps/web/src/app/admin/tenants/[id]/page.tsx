@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, RefreshCw, AlertCircle, CheckCircle, XCircle,
+  ArrowLeft, RefreshCw, AlertCircle, CheckCircle, XCircle, X,
   ArrowUpRight, Users, Layers, Database, Building, Mail,
   Shield, Calendar, Activity, ChevronDown, ChevronUp,
   MapPin, Phone,
@@ -106,6 +106,12 @@ export default function TenantDetailPage() {
   const [nobs,       setNobs]       = useState<any[]>([]);
   const [lobs,       setLobs]       = useState<any[]>([]);
 
+  // Edit Permitted Sectors (NOB/LOB) state
+  const [showSectorModal, setShowSectorModal] = useState(false);
+  const [editNobIds,      setEditNobIds]      = useState<string[]>([]);
+  const [editLobIds,      setEditLobIds]      = useState<string[]>([]);
+  const [savingSectors,   setSavingSectors]   = useState(false);
+
   useEffect(() => {
     const token = getStoredToken();
     const user  = getStoredUser();
@@ -133,6 +139,8 @@ export default function TenantDetailPage() {
       setSelectedPlan(tenantData?.plan_id || "");
       setCurrencies(currenciesList || []);
       setNobs(nobsList || []);
+      setEditNobIds(Array.isArray(tenantData?.allowed_nob_ids) ? tenantData.allowed_nob_ids : nobsList.map((n: any) => n.nob_id));
+      setEditLobIds(Array.isArray(tenantData?.allowed_lob_ids) ? tenantData.allowed_lob_ids : []);
 
       // If we have NOBs, load all of their LOB sub-sectors in parallel
       if (nobsList && nobsList.length > 0) {
@@ -288,9 +296,64 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
+      {/* Permitted Business Sectors (NOB & LOB) */}
+      <div className="rounded-lg border overflow-hidden" style={S.surface}>
+        <div className="px-6 py-4 border-b flex items-center justify-between" style={S.border}>
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4" style={S.accent} />
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={S.sub}>Permitted Business Sectors (NOB & LOB)</h2>
+          </div>
+          <button
+            onClick={() => {
+              setEditNobIds(Array.isArray(tenant.allowed_nob_ids) && tenant.allowed_nob_ids.length > 0
+                ? tenant.allowed_nob_ids
+                : nobs.map(n => n.nob_id));
+              setEditLobIds(Array.isArray(tenant.allowed_lob_ids) && tenant.allowed_lob_ids.length > 0
+                ? tenant.allowed_lob_ids
+                : lobs.map(l => l.lob_id));
+              setShowSectorModal(true);
+            }}
+            className="text-xs font-semibold px-3 py-1.5 rounded border hover:opacity-80 flex items-center gap-1.5"
+            style={{ ...S.raised, ...S.accent, borderColor: "var(--accent)" }}
+          >
+            Configure Sector Access
+          </button>
+        </div>
+        <div className="p-6">
+          {(!tenant.allowed_nob_ids || tenant.allowed_nob_ids.length === 0) ? (
+            <p className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 rounded-lg p-3">
+              Full Unrestricted Sector Access — All Nature of Business (NOB) and Line of Business (LOB) sectors are permitted for this tenant.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {nobs
+                  .filter(n => tenant.allowed_nob_ids.includes(n.nob_id))
+                  .map(n => (
+                    <div key={n.nob_id} className="rounded-lg border px-3 py-2 text-xs font-bold flex flex-col gap-1"
+                      style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
+                      <span>{n.nob_name} ({n.nob_code})</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {lobs
+                          .filter(l => l.nob_id === n.nob_id && (!tenant.allowed_lob_ids || tenant.allowed_lob_ids.length === 0 || tenant.allowed_lob_ids.includes(l.lob_id)))
+                          .map(l => (
+                            <span key={l.lob_id} className="text-[10px] font-normal px-2 py-0.5 rounded bg-black/20 text-white">
+                              {l.lob_name}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Plan Upgrade */}
       <div className="flex flex-col gap-4 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between" style={S.surface}>
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-blue-50 p-2 text-blue-700"><ArrowUpRight className="h-4 w-4" /></div>
+          <div className="rounded-lg bg-amber-50 p-2 text-amber-600"><ArrowUpRight className="h-4 w-4" /></div>
           <div>
             <h2 className="text-sm font-semibold" style={S.primary}>Subscription plan</h2>
             <p className="mt-0.5 text-sm" style={S.sub}>{isSystemTenant ? "The platform tenant uses a fixed plan." : `Currently on ${planLabel}.`}</p>
@@ -669,6 +732,140 @@ export default function TenantDetailPage() {
           </table>
         </div>
       </div>
+
+      {/* ── Configure Sector Access Modal ── */}
+      {showSectorModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 60,
+          backgroundColor: "rgba(0,0,0,0.55)",
+          display: "flex", alignItems: "center",
+          justifyContent: "center", padding: 16, overflowY: "auto",
+        }}>
+          <div className="rounded-xl border shadow-2xl w-full max-w-2xl my-auto" style={S.surface}>
+            <div className="flex items-center justify-between px-6 py-4 border-b" style={S.border}>
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5" style={S.accent} />
+                <h2 className="text-base font-bold" style={S.primary}>Configure Permitted Business Sectors</h2>
+              </div>
+              <button onClick={() => setShowSectorModal(false)} style={S.muted} className="cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-xs" style={S.sub}>
+                Select which Nature of Business (NOB) and Line of Business (LOB) sectors this tenant is permitted to configure during company onboarding.
+              </p>
+
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                {nobs.map((nob: any) => {
+                  const isNobChecked = editNobIds.includes(nob.nob_id);
+                  const childLobs = lobs.filter(l => l.nob_id === nob.nob_id);
+
+                  const toggleNob = () => {
+                    if (isNobChecked) {
+                      setEditNobIds(prev => prev.filter(id => id !== nob.nob_id));
+                      const childIds = new Set(childLobs.map(l => l.lob_id));
+                      setEditLobIds(prev => prev.filter(id => !childIds.has(id)));
+                    } else {
+                      setEditNobIds(prev => [...prev, nob.nob_id]);
+                      const childIds = childLobs.map(l => l.lob_id);
+                      setEditLobIds(prev => Array.from(new Set([...prev, ...childIds])));
+                    }
+                  };
+
+                  return (
+                    <div
+                      key={nob.nob_id}
+                      className="rounded-lg border p-3.5 transition-colors"
+                      style={{
+                        backgroundColor: isNobChecked ? "var(--accent-muted)" : "var(--surface-raised)",
+                        borderColor: isNobChecked ? "var(--accent)" : "var(--border)",
+                      }}
+                    >
+                      <label className="flex items-center gap-2.5 cursor-pointer font-bold text-xs select-none" style={S.primary}>
+                        <input
+                          type="checkbox"
+                          checked={isNobChecked}
+                          onChange={toggleNob}
+                          className="w-4 h-4 rounded accent-teal-500 cursor-pointer"
+                        />
+                        <span>{nob.nob_name}</span>
+                        <span className="text-[10px] font-mono font-normal opacity-60">({nob.nob_code})</span>
+                      </label>
+
+                      {isNobChecked && childLobs.length > 0 && (
+                        <div className="mt-2.5 ml-6 pt-2 border-t flex flex-wrap gap-2" style={{ borderColor: "var(--border)" }}>
+                          {childLobs.map((lob: any) => {
+                            const isLobChecked = editLobIds.includes(lob.lob_id);
+                            const toggleLob = () => {
+                              if (isLobChecked) {
+                                setEditLobIds(prev => prev.filter(id => id !== lob.lob_id));
+                              } else {
+                                setEditLobIds(prev => [...prev, lob.lob_id]);
+                              }
+                            };
+
+                            return (
+                              <label
+                                key={lob.lob_id}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium border cursor-pointer select-none"
+                                style={{
+                                  backgroundColor: isLobChecked ? "var(--surface)" : "transparent",
+                                  borderColor: isLobChecked ? "var(--accent)" : "var(--border)",
+                                  color: isLobChecked ? "var(--accent)" : "var(--text-secondary)",
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isLobChecked}
+                                  onChange={toggleLob}
+                                  className="w-3 h-3 rounded accent-teal-500 cursor-pointer"
+                                />
+                                <span>{lob.lob_name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t" style={S.border}>
+                <button
+                  type="button"
+                  disabled={savingSectors}
+                  onClick={async () => {
+                    setSavingSectors(true); setError(""); setSuccess("");
+                    try {
+                      await api.patch(`/tenant/${tenantId}`, {
+                        allowed_nob_ids: editNobIds,
+                        allowed_lob_ids: editLobIds,
+                      });
+                      setSuccess("Tenant permitted business sectors updated successfully.");
+                      setShowSectorModal(false);
+                      await loadAll();
+                    } catch (err: any) {
+                      setError(err?.message || "Failed to update permitted sectors.");
+                    } finally {
+                      setSavingSectors(false);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-lg disabled:opacity-50 cursor-pointer"
+                  style={{ backgroundColor: "var(--accent)" }}
+                >
+                  {savingSectors ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  {savingSectors ? "Saving..." : "Save Sector Licensing"}
+                </button>
+                <button type="button" onClick={() => setShowSectorModal(false)}
+                  className="px-5 py-2.5 text-sm font-medium rounded-lg border cursor-pointer" style={{ ...S.raised, ...S.sub }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

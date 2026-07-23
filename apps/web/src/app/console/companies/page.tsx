@@ -7,7 +7,7 @@ import {
   Settings, ArrowLeft, Activity, Plus,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
-import { getStoredUser, getStoredToken, getStoredTenantId, NavUser } from "../../../hooks/useAuth";
+import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
 import CompanyTab from "../../../components/console/console-tabs/company-tab";
 import { Dialog } from "../../../components/ui/dialog";
 
@@ -87,9 +87,9 @@ export default function CompaniesPage() {
           if (refreshed) setManagingCompany(refreshed);
         }
       } else {
-        // Company Admin / Standard User — only their own company
-        const myId = storedUser.companyId || storedUser.company_id;
-        const mine = companiesList.find((c: any) => c.company_id === myId) || companiesList[0] || null;
+        // Company Admin / Standard User — show the active company (respects switch)
+        const activeId = getActiveCompanyId() || storedUser.companyId || storedUser.company_id;
+        const mine = companiesList.find((c: any) => c.company_id === activeId) || companiesList[0] || null;
         setMyCompany(mine);
       }
     } catch (e: any) { setError(e?.message || "Failed to load companies."); }

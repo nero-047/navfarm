@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Input from "../../source-ui/input";
 import Button from "../../source-ui/button";
 import { Clock } from "lucide-react";
@@ -14,6 +14,12 @@ interface Step6TimezoneProps {
 export default function Step6Timezone({ onSubmit, isSubmitting, initialTz, initialCountry, onError }: Step6TimezoneProps) {
   const [timezone, setTimezone] = useState(initialTz || "Asia/Kolkata");
   const [country, setCountry] = useState(initialCountry || "");
+
+  useEffect(() => {
+    if (initialTz) setTimezone(initialTz);
+    if (initialCountry) setCountry(initialCountry);
+  }, [initialTz, initialCountry]);
+
 
   const handleSubmit = () => {
     if (!country) {

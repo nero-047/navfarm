@@ -7,6 +7,8 @@ export const api = {
   get: (path: string, options?: any): Promise<any> => coreApi.get<any>(path, options),
   post: (path: string, body?: any, options?: any): Promise<any> =>
     coreApi.post<any>(path, body, options),
+  upload: (path: string, formData: FormData, options?: any): Promise<any> =>
+    coreApi.post<any>(path, formData, options),
   put: (path: string, body?: any, options?: any): Promise<any> =>
     coreApi.put<any>(path, body, options),
   patch: (path: string, body?: any, options?: any): Promise<any> =>

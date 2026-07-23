@@ -19,7 +19,9 @@ import {
   Globe,
   Calendar,
   Layers,
-  Check
+  Check,
+  Upload,
+  Image as ImageIcon
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { Dialog } from "../../ui/dialog";
@@ -87,6 +89,9 @@ export default function CompanyTab({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Logo upload state
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
   // Form states matching wizard steps
   const [profileForm, setProfileForm] = useState({
     company_code: "",
@@ -96,11 +101,19 @@ export default function CompanyTab({
     industry_type: "Poultry Farming",
     registration_no: "",
     tax_id: "",
+    tax_regime: "STANDARD",
+    incorporation_date: "",
+    website: "",
+    email_domain: "",
+    support_email: "",
+    phone_primary: "",
+    company_logo_url: "",
     primary_color_hex: "#1F4E79"
   });
 
   const [addressForm, setAddressForm] = useState({
     address_type: "HQ",
+    address_label: "",
     line1: "",
     line2: "",
     city: "",
@@ -117,7 +130,9 @@ export default function CompanyTab({
     designation: "Director",
     email: "",
     phone_primary: "",
-    receives_alerts: false
+    phone_secondary: "",
+    receives_alerts: false,
+    receives_reports: false
   });
 
   const [localizationForm, setLocalizationForm] = useState({
@@ -130,11 +145,17 @@ export default function CompanyTab({
   const [fiscalForm, setFiscalForm] = useState({
     fiscal_start_month: 4,
     fiscal_start_day: 1,
+    fiscal_end_day: 31,
     current_fiscal_year: "2026-27",
     period_type: "MONTHLY",
     accounting_standard: "Local GAAP",
-    inventory_valuation: "FIFO"
+    depreciation_method: "SLM",
+    inventory_valuation: "FIFO",
+    gst_filing_frequency: "MONTHLY",
+    tax_audit_applicable: false,
+    decimal_places: 2
   });
+
 
   const [modulesForm, setModulesForm] = useState<string[]>([]);
 
@@ -208,62 +229,104 @@ export default function CompanyTab({
     }
   }, [targetCompany?.company_id]);
 
-  // Sync details response to states
+  // Sync details response or targetCompany to states
   useEffect(() => {
-    if (setupDetails) {
+    const comp = setupDetails?.company || targetCompany;
+    if (comp) {
       setProfileForm({
-        company_code: setupDetails.company?.company_code || "",
-        company_name: setupDetails.company?.company_name || "",
-        company_display_name: setupDetails.company?.company_display_name || "",
-        company_type: setupDetails.company?.company_type || "Pvt Ltd",
-        industry_type: setupDetails.company?.industry_type || "Poultry Farming",
-        registration_no: setupDetails.company?.registration_no || "",
-        tax_id: setupDetails.company?.tax_id || "",
-        primary_color_hex: setupDetails.company?.primary_color_hex || "#1F4E79"
+        company_code: comp.company_code || "",
+        company_name: comp.company_name || "",
+        company_display_name: comp.company_display_name || "",
+        company_type: comp.company_type || "Pvt Ltd",
+        industry_type: comp.industry_type || "Poultry Farming",
+        registration_no: comp.registration_no || "",
+        tax_id: comp.tax_id || "",
+        tax_regime: comp.tax_regime || "STANDARD",
+        incorporation_date: comp.incorporation_date || "",
+        website: comp.website || "",
+        email_domain: comp.email_domain || "",
+        support_email: comp.support_email || "",
+        phone_primary: comp.phone_primary || "",
+        company_logo_url: comp.company_logo_url || "",
+        primary_color_hex: comp.primary_color_hex || "#1F4E79"
       });
 
       setAddressForm({
-        address_type: setupDetails.address?.address_type || "HQ",
-        line1: setupDetails.address?.line1 || "",
-        line2: setupDetails.address?.line2 || "",
-        city: setupDetails.address?.city || "",
-        state_id: setupDetails.address?.state_id || "",
-        country_id: setupDetails.address?.country_id || "IND",
-        pincode: setupDetails.address?.pincode || "",
-        gps_latitude: setupDetails.address?.gps_latitude || "",
-        gps_longitude: setupDetails.address?.gps_longitude || ""
+        address_type: setupDetails?.address?.address_type || "HQ",
+        address_label: setupDetails?.address?.address_label || "",
+        line1: setupDetails?.address?.line1 || "",
+        line2: setupDetails?.address?.line2 || "",
+        city: setupDetails?.address?.city || "",
+        state_id: setupDetails?.address?.state_id || "",
+        country_id: setupDetails?.address?.country_id || comp.country_id || "IND",
+        pincode: setupDetails?.address?.pincode || "",
+        gps_latitude: setupDetails?.address?.gps_latitude || "",
+        gps_longitude: setupDetails?.address?.gps_longitude || ""
       });
 
       setContactForm({
-        contact_type: setupDetails.contact?.contact_type || "Primary",
-        full_name: setupDetails.contact?.full_name || "",
-        designation: setupDetails.contact?.designation || "Director",
-        email: setupDetails.contact?.email || "",
-        phone_primary: setupDetails.contact?.phone_primary || "",
-        receives_alerts: setupDetails.contact?.receives_alerts || false
+        contact_type: setupDetails?.contact?.contact_type || "Primary",
+        full_name: setupDetails?.contact?.full_name || "",
+        designation: setupDetails?.contact?.designation || "Director",
+        email: setupDetails?.contact?.email || comp.support_email || "",
+        phone_primary: setupDetails?.contact?.phone_primary || comp.phone_primary || "",
+        phone_secondary: setupDetails?.contact?.phone_secondary || "",
+        receives_alerts: setupDetails?.contact?.receives_alerts || false,
+        receives_reports: setupDetails?.contact?.receives_reports || false
       });
 
       setLocalizationForm({
-        default_language_id: setupDetails.company?.default_language_id || "",
-        base_currency_id: setupDetails.company?.base_currency_id || "",
-        default_timezone_id: setupDetails.company?.default_timezone_id || "Asia/Kolkata",
-        country_id: setupDetails.company?.country_id || "IND"
+        default_language_id: comp.default_language_id || "",
+        base_currency_id: comp.base_currency_id || "",
+        default_timezone_id: comp.default_timezone_id || "Asia/Kolkata",
+        country_id: comp.country_id || "IND"
       });
 
       setFiscalForm({
-        fiscal_start_month: setupDetails.fiscal?.fiscal_start_month || 4,
-        fiscal_start_day: setupDetails.fiscal?.fiscal_start_day || 1,
-        current_fiscal_year: setupDetails.fiscal?.current_fiscal_year || "2026-27",
-        period_type: setupDetails.fiscal?.period_type || "MONTHLY",
-        accounting_standard: setupDetails.fiscal?.accounting_standard || "Local GAAP",
-        inventory_valuation: setupDetails.fiscal?.inventory_valuation || "FIFO"
+        fiscal_start_month: setupDetails?.fiscal?.fiscal_start_month || comp.financial_year_start || 4,
+        fiscal_start_day: setupDetails?.fiscal?.fiscal_start_day || 1,
+        fiscal_end_day: setupDetails?.fiscal?.fiscal_end_day || 31,
+        current_fiscal_year: setupDetails?.fiscal?.current_fiscal_year || "2026-27",
+        period_type: setupDetails?.fiscal?.period_type || "MONTHLY",
+        accounting_standard: setupDetails?.fiscal?.accounting_standard || "Local GAAP",
+        depreciation_method: setupDetails?.fiscal?.depreciation_method || "SLM",
+        inventory_valuation: setupDetails?.fiscal?.inventory_valuation || "FIFO",
+        gst_filing_frequency: setupDetails?.fiscal?.gst_filing_frequency || "MONTHLY",
+        tax_audit_applicable: setupDetails?.fiscal?.tax_audit_applicable || false,
+        decimal_places: setupDetails?.fiscal?.decimal_places ?? 2
       });
 
-      setModulesForm(setupDetails.modules || []);
+      if (setupDetails?.modules) {
+        setModulesForm(setupDetails.modules);
+      }
     }
-  }, [setupDetails]);
+  }, [setupDetails, targetCompany]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    setError("");
+
+    try {
+      const data = new FormData();
+      data.append("file", file);
+
+      const res = await api.upload("/setup/wizard/upload-logo", data);
+      setProfileForm(prev => ({ ...prev, company_logo_url: res.logoUrl }));
+    } catch (err: any) {
+      setError(err?.message || "Failed to upload logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:2877';
 
   // Fetch LOBs list for selected NOBs in modulesForm editing
+
   useEffect(() => {
     if (settingsTab === "modules" && nobs.length > 0) {
       nobs.forEach(nob => {
@@ -691,6 +754,8 @@ export default function CompanyTab({
   }
 
   // Render Details View (Tenant Admin managing details, or Company Admin viewing their own details)
+  const currentLogoUrl = setupDetails?.company?.company_logo_url || targetCompany?.company_logo_url || "";
+
   return (
     <div className="flex w-full flex-col gap-4 animate-fade-in">
 
@@ -849,45 +914,130 @@ export default function CompanyTab({
                   {/* profile TAB */}
                   {settingsTab === "profile" && (
                     !isEditing ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Company Code</span>
-                          <span className="text-xs font-semibold text-white mt-1 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">{setupDetails?.company?.company_code}</span>
+                      <div className="flex flex-col gap-6">
+                        {/* Logo & Header Card */}
+                        <div className="p-4 rounded-xl border border-[#1a1f2e] bg-[#121824] flex items-center gap-4">
+                          <div className="w-16 h-16 rounded-xl border border-gray-800 bg-[#0b0f19] flex items-center justify-center overflow-hidden shrink-0">
+                            {currentLogoUrl ? (
+                              <img
+                                src={currentLogoUrl.startsWith('/') ? `${backendUrl}${currentLogoUrl}` : currentLogoUrl}
+                                alt="Company Logo"
+                                className="w-full h-full object-contain p-1"
+                              />
+                            ) : (
+                              <ImageIcon className="w-8 h-8 text-gray-600" />
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-bold text-white">{setupDetails?.company?.company_name || targetCompany?.company_name}</span>
+                            <span className="text-xs text-gray-400 font-mono">{setupDetails?.company?.company_code || targetCompany?.company_code} • {setupDetails?.company?.company_type || targetCompany?.company_type}</span>
+                            {setupDetails?.company?.website && (
+                              <a href={setupDetails.company.website} target="_blank" rel="noreferrer" className="text-xs text-teal-400 hover:underline">
+                                {setupDetails.company.website}
+                              </a>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Legal Entity Name</span>
-                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_name}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Display / Brand Name</span>
-                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_display_name || setupDetails?.company?.company_name}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Classification</span>
-                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_type}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-555 font-bold uppercase tracking-wider">Primary Industry</span>
-                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.industry_type}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-555 font-bold uppercase tracking-wider">Tax Registration ID</span>
-                          <span className="text-xs font-semibold text-white mt-1 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">{setupDetails?.company?.tax_id || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-555 font-bold uppercase tracking-wider">Corporate Registration No</span>
-                          <span className="text-xs font-semibold text-white mt-1.5 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">{setupDetails?.company?.registration_no || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-555 font-bold uppercase tracking-wider">Primary Accent Color</span>
-                          <div className="flex items-center gap-2 mt-2">
-                            <div className="w-5 h-5 rounded-lg border border-[#1a1f2e]" style={{ backgroundColor: setupDetails?.company?.primary_color_hex || "#1F4E79" }} />
-                            <span className="text-xs font-mono text-gray-300 uppercase">{setupDetails?.company?.primary_color_hex || "#1F4E79"}</span>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Company Code</span>
+                            <span className="text-xs font-semibold text-white mt-1 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">
+                              {setupDetails?.company?.company_code || targetCompany?.company_code}
+                            </span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Legal Entity Name</span>
+                            <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_name || targetCompany?.company_name}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Display / Brand Name</span>
+                            <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_display_name || targetCompany?.company_display_name || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Business Classification</span>
+                            <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.company_type || targetCompany?.company_type || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Primary Industry</span>
+                            <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.industry_type || targetCompany?.industry_type || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Tax Registration ID (GSTIN / TIN)</span>
+                            <span className="text-xs font-semibold text-white mt-1 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">
+                              {setupDetails?.company?.tax_id || targetCompany?.tax_id || "—"}
+                            </span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Tax Regime Scheme</span>
+                            <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.tax_regime || "STANDARD"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Corporate Registration No (CIN)</span>
+                            <span className="text-xs font-semibold text-white mt-1.5 font-mono bg-[#121824] border border-[#1a1f2e] px-3 py-1.5 rounded-xl w-fit">
+                              {setupDetails?.company?.registration_no || targetCompany?.registration_no || "—"}
+                            </span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Incorporation Date</span>
+                            <span className="text-xs font-semibold text-white mt-2">{setupDetails?.company?.incorporation_date || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Official Website</span>
+                            <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.company?.website || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Auto-Verify Email Domain</span>
+                            <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.company?.email_domain || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Support Email</span>
+                            <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.company?.support_email || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Primary Phone / Landline</span>
+                            <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.company?.phone_primary || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Primary Accent Color</span>
+                            <div className="flex items-center gap-2 mt-2">
+                              <div className="w-5 h-5 rounded-lg border border-[#1a1f2e]" style={{ backgroundColor: setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79" }} />
+                              <span className="text-xs font-mono text-gray-300 uppercase">{setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79"}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
+                        {/* Logo Upload Section */}
+                        <div className="p-4 rounded-xl border border-gray-800 bg-[#121824] flex flex-col sm:flex-row items-center gap-4">
+                          <div className="w-16 h-16 rounded-xl border border-dashed border-gray-700 bg-[#0b0f19] flex items-center justify-center overflow-hidden shrink-0">
+                            {profileForm.company_logo_url ? (
+                              <img
+                                src={profileForm.company_logo_url.startsWith('/') ? `${backendUrl}${profileForm.company_logo_url}` : profileForm.company_logo_url}
+                                alt="Logo Preview"
+                                className="w-full h-full object-contain p-1"
+                              />
+                            ) : (
+                              <ImageIcon className="w-8 h-8 text-gray-600" />
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1 flex-1">
+                            <label className="text-xs font-semibold text-gray-300">Company Logo Image</label>
+                            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/30 text-xs font-semibold hover:bg-teal-500/20 transition-all w-fit">
+                              <Upload className="w-3.5 h-3.5" />
+                              {uploadingLogo ? "Uploading..." : profileForm.company_logo_url ? "Change Logo" : "Upload Logo"}
+                              <input
+                                type="file"
+                                accept="image/png, image/jpeg, image/svg+xml, image/webp"
+                                onChange={handleLogoUpload}
+                                disabled={uploadingLogo}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                        </div>
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <Input
                             label="Company Code (Read Only)"
@@ -932,10 +1082,53 @@ export default function CompanyTab({
                             value={profileForm.tax_id}
                             onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
                           />
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Tax Regime</label>
+                            <select
+                              value={profileForm.tax_regime}
+                              onChange={(e) => setProfileForm({ ...profileForm, tax_regime: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="STANDARD">Standard Scheme</option>
+                              <option value="COMPOSITION">Composition Scheme</option>
+                              <option value="EXEMPT">Exempt / Non-Taxable</option>
+                            </select>
+                          </div>
                           <Input
                             label="Corporate Registration No"
                             value={profileForm.registration_no}
                             onChange={(e) => setProfileForm({ ...profileForm, registration_no: e.target.value })}
+                          />
+                          <Input
+                            label="Incorporation Date"
+                            type="date"
+                            value={profileForm.incorporation_date}
+                            onChange={(e) => setProfileForm({ ...profileForm, incorporation_date: e.target.value })}
+                          />
+                          <Input
+                            label="Website URL"
+                            placeholder="https://greenvalleyfarms.in"
+                            value={profileForm.website}
+                            onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                          />
+                          <Input
+                            label="Email Domain (for Auto-verify)"
+                            placeholder="greenvalleyfarms.in"
+                            value={profileForm.email_domain}
+                            onChange={(e) => setProfileForm({ ...profileForm, email_domain: e.target.value })}
+                          />
+                          <Input
+                            label="Support Email"
+                            placeholder="support@greenvalleyfarms.in"
+                            type="email"
+                            value={profileForm.support_email}
+                            onChange={(e) => setProfileForm({ ...profileForm, support_email: e.target.value })}
+                          />
+                          <Input
+                            label="Primary Phone / Landline"
+                            placeholder="+91 11 2345 6789"
+                            value={profileForm.phone_primary}
+                            onChange={(e) => setProfileForm({ ...profileForm, phone_primary: e.target.value })}
                           />
                           <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Brand Hex Accent Color</label>
@@ -954,17 +1147,22 @@ export default function CompanyTab({
                             </div>
                           </div>
                         </div>
-                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Step 1 Settings"}
+                        <Button type="submit" disabled={saving || uploadingLogo} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
+                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Step 1 Profile Settings"}
                         </Button>
                       </form>
                     )
                   )}
 
+
                   {/* address TAB */}
                   {settingsTab === "address" && (
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Address Label / Tag</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.address_label || "Primary HQ"}</span>
+                        </div>
                         <div className="flex flex-col">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Address Type</span>
                           <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.address_type || "HQ"}</span>
@@ -986,14 +1184,14 @@ export default function CompanyTab({
                           <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.state_id || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Country</span>
-                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.address?.country_id || "—"}</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Country Code</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.address?.country_id || "—"}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Pincode / Postal Code</span>
                           <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.address?.pincode || "—"}</span>
                         </div>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col sm:col-span-2">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">GPS Coordinates</span>
                           <span className="text-xs font-semibold text-white mt-2 font-mono">
                             {setupDetails?.address?.gps_latitude && setupDetails?.address?.gps_longitude
@@ -1005,6 +1203,12 @@ export default function CompanyTab({
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <Input
+                            label="Address Nickname / Tag"
+                            placeholder="e.g. Headquarters - Gate 1"
+                            value={addressForm.address_label}
+                            onChange={(e) => setAddressForm({ ...addressForm, address_label: e.target.value })}
+                          />
                           <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Address Type</label>
                             <select
@@ -1053,16 +1257,16 @@ export default function CompanyTab({
                             onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
                             required
                           />
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-2 gap-2 sm:col-span-2">
                             <Input
-                              label="GPS Lat"
-                              placeholder="e.g. 28.61"
+                              label="GPS Latitude"
+                              placeholder="e.g. 28.6139"
                               value={addressForm.gps_latitude}
                               onChange={(e) => setAddressForm({ ...addressForm, gps_latitude: e.target.value })}
                             />
                             <Input
-                              label="GPS Lng"
-                              placeholder="e.g. 77.20"
+                              label="GPS Longitude"
+                              placeholder="e.g. 77.2090"
                               value={addressForm.gps_longitude}
                               onChange={(e) => setAddressForm({ ...addressForm, gps_longitude: e.target.value })}
                             />
@@ -1092,13 +1296,23 @@ export default function CompanyTab({
                           <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.contact?.phone_primary || "—"}</span>
                         </div>
                         <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Secondary Phone</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.contact?.phone_secondary || "—"}</span>
+                        </div>
+                        <div className="flex flex-col">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Primary Email</span>
                           <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.contact?.email || "—"}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Alerts & System Emails</span>
                           <span className="text-xs font-semibold text-white mt-2">
-                            {setupDetails?.contact?.receives_alerts ? "Active - Receives ERP system notifications" : "Inactive - Do not notify"}
+                            {setupDetails?.contact?.receives_alerts ? "Active - Receives ERP threshold notifications" : "Disabled"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col sm:col-span-2">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Executive Reports Emails</span>
+                          <span className="text-xs font-semibold text-white mt-2">
+                            {setupDetails?.contact?.receives_reports ? "Active - Receives periodic executive summary reports" : "Disabled"}
                           </span>
                         </div>
                       </div>
@@ -1124,21 +1338,35 @@ export default function CompanyTab({
                             required
                           />
                           <Input
+                            label="Secondary Contact Phone"
+                            value={contactForm.phone_secondary}
+                            onChange={(e) => setContactForm({ ...contactForm, phone_secondary: e.target.value })}
+                          />
+                          <Input
                             label="Primary Email"
                             type="email"
                             value={contactForm.email}
                             onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
                             required
                           />
-                          <div className="flex flex-col gap-2.5 justify-center h-full pt-4">
+                          <div className="flex flex-col gap-2 justify-center pt-2">
                             <label className="flex items-center gap-2 cursor-pointer text-xs">
                               <input
                                 type="checkbox"
                                 checked={contactForm.receives_alerts}
                                 onChange={(e) => setContactForm({ ...contactForm, receives_alerts: e.target.checked })}
-                                className="w-4 h-4 rounded border-gray-800 bg-gray-900 text-teal-500 focus:ring-teal-500 focus:ring-offset-0 focus:ring-0 cursor-pointer"
+                                className="w-4 h-4 rounded border-gray-800 bg-gray-900 text-teal-500 cursor-pointer"
                               />
-                              <span className="text-gray-300 font-medium">Send security logs and threshold alert emails to this address</span>
+                              <span className="text-gray-300 font-medium">Receive system threshold alerts</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer text-xs">
+                              <input
+                                type="checkbox"
+                                checked={contactForm.receives_reports}
+                                onChange={(e) => setContactForm({ ...contactForm, receives_reports: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-800 bg-gray-900 text-teal-500 cursor-pointer"
+                              />
+                              <span className="text-gray-300 font-medium">Receive periodic executive reports</span>
                             </label>
                           </div>
                         </div>
@@ -1148,6 +1376,7 @@ export default function CompanyTab({
                       </form>
                     )
                   )}
+
 
                   {/* localization TAB */}
                   {settingsTab === "localization" && (
@@ -1229,29 +1458,47 @@ export default function CompanyTab({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Fiscal Year Format</span>
-                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.fiscal?.fiscal_year_format || "—"}</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.fiscal?.fiscal_year_format || "FY APR-MAR"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Fiscal Start Month</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Fiscal Start Month & Day</span>
                           <span className="text-xs font-semibold text-white mt-2">
-                            {setupDetails?.fiscal?.fiscal_start_month ? `Month ${setupDetails.fiscal.fiscal_start_month}` : "—"}
+                            {setupDetails?.fiscal?.fiscal_start_month ? `Month ${setupDetails.fiscal.fiscal_start_month}` : "Month 4 (April)"} (Day {setupDetails?.fiscal?.fiscal_start_day || 1} to Day {setupDetails?.fiscal?.fiscal_end_day || 31})
                           </span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Current Fiscal Year</span>
-                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.fiscal?.current_fiscal_year || "—"}</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.fiscal?.current_fiscal_year || "2026-27"}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Period Type</span>
-                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.period_type || "—"}</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.period_type || "MONTHLY"}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Accounting Standard</span>
-                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.accounting_standard || "—"}</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.accounting_standard || "Local GAAP"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Inventory Valuation</span>
-                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.inventory_valuation || "—"}</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Asset Depreciation Model</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.depreciation_method || "SLM (Straight Line)"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Inventory Costing Model</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.inventory_valuation || "FIFO"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">GST / Tax Filing Frequency</span>
+                          <span className="text-xs font-semibold text-white mt-2">{setupDetails?.fiscal?.gst_filing_frequency || "MONTHLY"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Statutory Tax Audit</span>
+                          <span className="text-xs font-semibold text-white mt-2">
+                            {setupDetails?.fiscal?.tax_audit_applicable ? "Mandatory Tax Audit Applicable" : "Not Applicable"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Decimal Precision</span>
+                          <span className="text-xs font-semibold text-white mt-2 font-mono">{setupDetails?.fiscal?.decimal_places ?? 2} Decimal Places</span>
                         </div>
                       </div>
                     ) : (
@@ -1299,6 +1546,18 @@ export default function CompanyTab({
                             </select>
                           </div>
                           <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Asset Depreciation Model</label>
+                            <select
+                              value={fiscalForm.depreciation_method}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, depreciation_method: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="SLM">Straight Line Method (SLM)</option>
+                              <option value="WDV">Written Down Value (WDV)</option>
+                              <option value="UNITS_OF_PRODUCTION">Units of Production</option>
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Inventory Costing Method</label>
                             <select
                               value={fiscalForm.inventory_valuation}
@@ -1306,9 +1565,43 @@ export default function CompanyTab({
                               className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
                             >
                               <option value="FIFO">FIFO (First-In, First-Out)</option>
-                              <option value="WEIGHTED_AVG">Weighted Average Cost</option>
-                              <option value="STANDARD">Standard Costing</option>
+                              <option value="Weighted Average">Weighted Average Cost</option>
+                              <option value="STANDARD COSTING">Standard Costing</option>
                             </select>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">GST / Tax Filing Frequency</label>
+                            <select
+                              value={fiscalForm.gst_filing_frequency}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, gst_filing_frequency: e.target.value })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value="MONTHLY">Monthly Filing</option>
+                              <option value="QUARTERLY">Quarterly Filing</option>
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Decimal Precision</label>
+                            <select
+                              value={fiscalForm.decimal_places}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, decimal_places: parseInt(e.target.value) })}
+                              className="bg-[#121824] border border-[#1a1f2e] rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500 cursor-pointer"
+                            >
+                              <option value={2}>2 Decimal Places (0.00)</option>
+                              <option value={3}>3 Decimal Places (0.000)</option>
+                              <option value={4}>4 Decimal Places (0.0000)</option>
+                            </select>
+                          </div>
+                          <div className="flex flex-col justify-center pt-2 sm:col-span-2">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs">
+                              <input
+                                type="checkbox"
+                                checked={fiscalForm.tax_audit_applicable}
+                                onChange={(e) => setFiscalForm({ ...fiscalForm, tax_audit_applicable: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-800 bg-gray-900 text-teal-500 cursor-pointer"
+                              />
+                              <span className="text-gray-300 font-medium">Mandatory Statutory Tax Audit Applicable</span>
+                            </label>
                           </div>
                         </div>
                         <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
@@ -1317,6 +1610,7 @@ export default function CompanyTab({
                       </form>
                     )
                   )}
+
 
                   {/* modules TAB */}
                   {settingsTab === "modules" && (

@@ -14,7 +14,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
-import { getStoredUser, getStoredToken, getStoredTenantId, NavUser } from "../../../hooks/useAuth";
+import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -44,17 +44,28 @@ export default function DashboardPage() {
         api.get("/auth/users").catch(() => []),
       ]);
       setTenantPlanInfo(tenant);
+
+      // Use the active company from localStorage (reflects company switch)
+      const activeId = getActiveCompanyId() ||
+        storedUser.companyId ||
+        (storedUser as any).company_id;
+
       let filteredCompanies = companiesList;
       if (storedUser.userType !== "TENANT_ADMIN") {
-        const myId = storedUser.companyId || (storedUser as any).company_id;
-        filteredCompanies = companiesList.filter((c: any) => c.company_id === myId);
+        // For non-tenant-admins show only the currently active company
+        filteredCompanies = companiesList.filter((c: any) => c.company_id === activeId);
+        // Fallback: show all if filter returns nothing (e.g. first load)
+        if (filteredCompanies.length === 0) filteredCompanies = companiesList;
       }
       setCompanies(filteredCompanies);
       setUsers(usersList);
-      const assigned = filteredCompanies.find(
-        (c: any) => c.company_id === (storedUser.companyId || (storedUser as any).company_id)
-      ) || filteredCompanies[0];
-      setActiveCompany(assigned || null);
+
+      // Active company = the one matching the switched/active ID
+      const assigned =
+        companiesList.find((c: any) => c.company_id === activeId) ||
+        filteredCompanies[0] ||
+        null;
+      setActiveCompany(assigned);
     } catch (e: any) {
       setError(e?.message || "Failed to load dashboard.");
     } finally {

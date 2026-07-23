@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "../../source-ui/button";
 import { Globe } from "lucide-react";
 
@@ -11,6 +11,13 @@ interface Step4LanguageProps {
 
 export default function Step4Language({ onSubmit, isSubmitting, languages, initialValue }: Step4LanguageProps) {
   const [selectedLang, setSelectedLang] = useState(initialValue || (languages.length > 0 ? languages[0].lang_id : ""));
+
+  useEffect(() => {
+    if (initialValue) {
+      setSelectedLang(initialValue);
+    }
+  }, [initialValue]);
+
 
   const handleSubmit = () => {
     onSubmit(selectedLang);

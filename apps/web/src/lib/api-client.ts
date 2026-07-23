@@ -47,6 +47,7 @@ function clearSession() {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('tenant_id');
+  localStorage.removeItem('active_company_id');
 }
 
 let refreshPromise: Promise<string> | null = null;
@@ -87,6 +88,8 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   const token = stored(AUTH_STORAGE.accessToken);
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (tenantId) headers.set('x-tenant-id', tenantId);
+  const activeCompanyId = stored('active_company_id');
+  if (activeCompanyId) headers.set('x-active-company-id', activeCompanyId);
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -128,6 +131,9 @@ export function persistAuthSession(session: {
   localStorage.setItem('refresh_token', session.refresh_token);
   localStorage.setItem('user', JSON.stringify(session.user));
   const tenantId = (session.user as { tenantId?: string }).tenantId;
+  const companyId = (session.user as { companyId?: string; company_id?: string }).companyId ??
+    (session.user as { company_id?: string }).company_id;
+  if (companyId) localStorage.setItem('active_company_id', companyId);
   if (tenantId) {
     localStorage.setItem(AUTH_STORAGE.tenantId, tenantId);
     localStorage.setItem('tenant_id', tenantId);

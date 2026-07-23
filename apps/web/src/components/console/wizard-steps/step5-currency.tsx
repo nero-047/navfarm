@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "../../source-ui/button";
 import { Coins } from "lucide-react";
 
@@ -11,6 +11,13 @@ interface Step5CurrencyProps {
 
 export default function Step5Currency({ onSubmit, isSubmitting, currencies, initialValue }: Step5CurrencyProps) {
   const [selectedCurr, setSelectedCurr] = useState(initialValue || (currencies.length > 0 ? currencies[0].currency_id : ""));
+
+  useEffect(() => {
+    if (initialValue) {
+      setSelectedCurr(initialValue);
+    }
+  }, [initialValue]);
+
 
   const handleSubmit = () => {
     onSubmit(selectedCurr);

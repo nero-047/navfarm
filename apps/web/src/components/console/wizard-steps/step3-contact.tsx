@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Input from "../../source-ui/input";
 import Button from "../../source-ui/button";
 import { Contact } from "lucide-react";
@@ -14,9 +14,26 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
     contact_name: initialData?.contact_name || "",
     contact_email: initialData?.contact_email || "",
     contact_phone: initialData?.contact_phone || "",
+    phone_secondary: initialData?.phone_secondary || "",
     designation: initialData?.designation || "CEO",
+    receives_reports: initialData?.receives_reports ?? true,
     is_primary: true
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        contact_name: initialData.contact_name || "",
+        contact_email: initialData.contact_email || "",
+        contact_phone: initialData.contact_phone || "",
+        phone_secondary: initialData.phone_secondary || "",
+        designation: initialData.designation || "CEO",
+        receives_reports: initialData.receives_reports ?? true,
+        is_primary: true
+      });
+    }
+  }, [initialData]);
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +47,7 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
           <Contact className="w-5 h-5 text-teal-400" />
           Step 3: Primary Contact Details
         </h2>
-        <p className="text-xs text-gray-500">Provide the contact profile for administrative alerts.</p>
+        <p className="text-xs text-gray-500">Provide the contact profile for administrative alerts and reporting.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -49,11 +66,17 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
           required
         />
         <Input
-          label="Mobile Phone No"
+          label="Primary Mobile Phone"
           placeholder="+91 99999 88888"
           value={formData.contact_phone}
           onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
           required
+        />
+        <Input
+          label="Secondary / Alternate Phone"
+          placeholder="+91 99999 77777"
+          value={formData.phone_secondary}
+          onChange={(e) => setFormData({ ...formData, phone_secondary: e.target.value })}
         />
         <Input
           label="Job Designation"
@@ -61,7 +84,20 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
           value={formData.designation}
           onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
         />
+        <div className="flex items-center gap-3 mt-4">
+          <input
+            type="checkbox"
+            id="receives_reports"
+            checked={formData.receives_reports}
+            onChange={(e) => setFormData({ ...formData, receives_reports: e.target.checked })}
+            className="w-4 h-4 rounded border-gray-800 bg-[#121824] text-teal-500 focus:ring-teal-500"
+          />
+          <label htmlFor="receives_reports" className="text-xs text-gray-300 font-medium cursor-pointer">
+            Receive periodic executive report emails (weekly P&L, batch metrics)
+          </label>
+        </div>
       </div>
+
       <Button type="submit" disabled={isSubmitting} className="mt-4 self-end">
         {isSubmitting ? "Saving..." : "Save & Continue"}
       </Button>

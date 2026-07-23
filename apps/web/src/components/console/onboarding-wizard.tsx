@@ -98,14 +98,15 @@ export default function OnboardingWizard({
       await api.post("/setup/wizard/step-2", {
         company_id: activeCompany.company_id,
         address_type: data.address_type,
+        address_label: data.address_label,
         line1: data.address_line_1,
         line2: data.address_line_2,
         city: data.city,
         state_id: data.state_province,
         country_id: data.country_name,
         pincode: data.postal_code,
-        gps_latitude: parseFloat(data.gps_lat) || undefined,
-        gps_longitude: parseFloat(data.gps_lng) || undefined,
+        gps_latitude: !data.gps_lat || isNaN(parseFloat(data.gps_lat)) ? undefined : parseFloat(data.gps_lat),
+        gps_longitude: !data.gps_lng || isNaN(parseFloat(data.gps_lng)) ? undefined : parseFloat(data.gps_lng),
       });
       setActionSuccess("Company address configured successfully!");
       await fetchWizardProgress(activeCompany.company_id);
@@ -129,7 +130,9 @@ export default function OnboardingWizard({
         designation: data.designation,
         email: data.contact_email,
         phone_primary: data.contact_phone,
+        phone_secondary: data.phone_secondary,
         receives_alerts: true,
+        receives_reports: data.receives_reports ?? true,
       });
       setActionSuccess("Contact details associated successfully!");
       await fetchWizardProgress(activeCompany.company_id);
@@ -200,14 +203,20 @@ export default function OnboardingWizard({
         fiscal_year_format: isAprilStart ? "FY APR-MAR" : "FY JAN-DEC",
         fiscal_start_month: data.fiscal_start_month,
         fiscal_start_day: 1,
+        fiscal_end_day: 31,
         current_fiscal_year: "2026-27",
         period_type: "MONTHLY",
         accounting_standard: "Local GAAP",
-        inventory_valuation: data.valuation_method === "WEIGHTED_AVG" ? "Weighted Average" : data.valuation_method === "FIFO" ? "FIFO" : "STANDARD COSTING"
+        depreciation_method: data.depreciation_method || "SLM",
+        inventory_valuation: data.valuation_method === "WEIGHTED_AVG" ? "Weighted Average" : data.valuation_method === "FIFO" ? "FIFO" : "STANDARD COSTING",
+        gst_filing_frequency: data.gst_filing_frequency || "MONTHLY",
+        tax_audit_applicable: data.tax_audit_applicable ?? false,
+        decimal_places: data.decimal_places ?? 2,
       });
       setActionSuccess("Fiscal parameters registered!");
       await fetchWizardProgress(activeCompany.company_id);
       await fetchSetupDetails(activeCompany.company_id);
+
       setActiveWizardStep(8);
     } catch (err: any) {
       setActionError(err?.message || "Step 7 failed.");
@@ -251,10 +260,25 @@ export default function OnboardingWizard({
   };
 
   return (
-    <div className="flex-1 max-w-6xl mx-auto w-full p-6 md:p-12 flex flex-col md:flex-row gap-8 overflow-y-auto">
+    <div className="nf-onboarding flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 md:p-12 flex flex-col md:flex-row gap-4 md:gap-8 overflow-y-auto">
+
+      <div className="rounded-2xl border border-[#23304b] bg-[#0b0f19] p-4 text-white shadow-lg md:hidden">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-400">Company setup</p>
+            <p className="mt-1 text-sm font-semibold text-white">Step {activeWizardStep} of 9</p>
+          </div>
+          <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold text-white/70">
+            {Math.round((activeWizardStep / 9) * 100)}%
+          </span>
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full rounded-full bg-teal-400 transition-all" style={{ width: `${(activeWizardStep / 9) * 100}%` }} />
+        </div>
+      </div>
 
       {/* Progress Menu (Left Sidebar) */}
-      <aside className="md:w-72 shrink-0 flex flex-col gap-3">
+      <aside className="hidden md:flex md:w-72 shrink-0 flex-col gap-3">
         <div className="p-4 bg-[#0b0f19] border border-gray-800 rounded-2xl flex flex-col gap-1 mb-2">
           <h3 className="font-bold text-white text-sm">ERP Setup Wizard</h3>
           <p className="text-xs text-gray-400">Configure your company settings to activate agricultural management.</p>
@@ -301,7 +325,7 @@ export default function OnboardingWizard({
       </aside>
 
       {/* Wizard Form Panel (Right Side) */}
-      <main className="flex-1 bg-[#0b0f19] border border-gray-800 rounded-3xl p-8 shadow-xl flex flex-col gap-6 justify-between animate-fade-in">
+      <main className="flex-1 bg-[#0b0f19] border border-gray-800 rounded-3xl p-5 sm:p-8 shadow-xl flex flex-col gap-6 justify-between animate-fade-in">
         <div className="flex-1">
           {loadingDetails ? (
             <div className="flex items-center justify-center h-48">
@@ -317,6 +341,7 @@ export default function OnboardingWizard({
                   onSubmit={handleStep2Submit}
                   isSubmitting={isSubmitting}
                   initialData={setupDetails?.address ? {
+                    address_label: setupDetails.address.address_label,
                     address_line_1: setupDetails.address.line1,
                     address_line_2: setupDetails.address.line2,
                     city: setupDetails.address.city,
@@ -337,7 +362,9 @@ export default function OnboardingWizard({
                     contact_name: setupDetails.contact.full_name,
                     contact_email: setupDetails.contact.email,
                     contact_phone: setupDetails.contact.phone_primary,
+                    phone_secondary: setupDetails.contact.phone_secondary,
                     designation: setupDetails.contact.designation,
+                    receives_reports: setupDetails.contact.receives_reports,
                   } : null}
                 />
               )}
@@ -362,6 +389,7 @@ export default function OnboardingWizard({
                   onSubmit={handleStep6Submit}
                   isSubmitting={isSubmitting}
                   initialTz={setupDetails?.company?.default_timezone_id || activeCompany?.default_timezone_id}
+                  initialCountry={setupDetails?.company?.country_id || activeCompany?.country_id}
                   onError={setActionError}
                 />
               )}
@@ -372,11 +400,16 @@ export default function OnboardingWizard({
                   initialData={setupDetails?.fiscal ? {
                     fiscal_start_month: setupDetails.fiscal.fiscal_start_month,
                     valuation_method:
-                      setupDetails.fiscal.inventory_valuation === "Weighted Average"
+                      setupDetails.fiscal.inventory_valuation === "Weighted Average" ||
+                      setupDetails.fiscal.inventory_valuation === "WEIGHTED_AVG"
                         ? "WEIGHTED_AVG"
                         : setupDetails.fiscal.inventory_valuation === "FIFO"
                         ? "FIFO"
                         : "STANDARD",
+                    depreciation_method: setupDetails.fiscal.depreciation_method || "SLM",
+                    gst_filing_frequency: setupDetails.fiscal.gst_filing_frequency || "MONTHLY",
+                    tax_audit_applicable: setupDetails.fiscal.tax_audit_applicable ?? false,
+                    decimal_places: setupDetails.fiscal.decimal_places ?? 2,
                   } : null}
                 />
               )}

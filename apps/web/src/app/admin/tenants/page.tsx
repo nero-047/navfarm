@@ -50,6 +50,12 @@ export default function AdminTenantsPage() {
     admin_name: "", admin_email: "", admin_password: "",
   });
 
+  // NOB & LOB catalog selection state for Super Admin
+  const [nobsList, setNobsList] = useState<any[]>([]);
+  const [lobsByNob, setLobsByNob] = useState<Record<string, any[]>>({});
+  const [selectedNobIds, setSelectedNobIds] = useState<string[]>([]);
+  const [selectedLobIds, setSelectedLobIds] = useState<string[]>([]);
+
   useEffect(() => {
     const token = getStoredToken();
     const user  = getStoredUser();
@@ -70,8 +76,34 @@ export default function AdminTenantsPage() {
   const loadData = async () => {
     setLoading(true); setError("");
     try {
-      const [tList, pList] = await Promise.all([api.get("/tenant"), api.get("/plan")]);
+      const [tList, pList, nobsData] = await Promise.all([
+        api.get("/tenant"),
+        api.get("/plan"),
+        api.get("/setup/wizard/nobs").catch(() => []),
+      ]);
       setTenants(tList); setFiltered(tList); setPlans(pList);
+      setNobsList(Array.isArray(nobsData) ? nobsData : []);
+
+      // Pre-fetch LOBs for all NOBs
+      if (Array.isArray(nobsData) && nobsData.length > 0) {
+        const lobMap: Record<string, any[]> = {};
+        await Promise.all(
+          nobsData.map(async (nob: any) => {
+            try {
+              const lobs = await api.get(`/setup/wizard/lobs/${nob.nob_id}`);
+              lobMap[nob.nob_id] = Array.isArray(lobs) ? lobs : [];
+            } catch {
+              lobMap[nob.nob_id] = [];
+            }
+          })
+        );
+        setLobsByNob(lobMap);
+        // By default select all NOBs and LOBs for quick setup
+        const allNobIds = nobsData.map((n: any) => n.nob_id);
+        const allLobIds = Object.values(lobMap).flat().map((l: any) => l.lob_id);
+        setSelectedNobIds(allNobIds);
+        setSelectedLobIds(allLobIds);
+      }
     } catch (e: any) { setError(e?.message || "Failed to load tenants."); }
     finally { setLoading(false); }
   };
@@ -105,7 +137,11 @@ export default function AdminTenantsPage() {
     e.preventDefault();
     setCreating(true); setCreateError(""); setSuccess("");
     try {
-      await api.post("/tenant/signup", createForm);
+      await api.post("/tenant/signup", {
+        ...createForm,
+        allowed_nob_ids: selectedNobIds,
+        allowed_lob_ids: selectedLobIds,
+      });
       setSuccess(`Tenant account ${createForm.tenant_name} registered successfully!`);
       setShowAddModal(false);
       setCreateForm({
@@ -362,6 +398,117 @@ export default function AdminTenantsPage() {
                       onChange={e => setCreateForm(f => ({ ...f, admin_password: e.target.value }))}
                       className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
                   </div>
+                </div>
+              </div>
+
+              {/* ── Section 3: NOB / LOB Licensing ── */}
+              <div className="space-y-4 pt-4 border-t" style={S.border}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-teal-500">3. Permitted Business Sectors (NOB & LOB)</h3>
+                    <p className="text-xs mt-0.5" style={S.muted}>Select which Nature of Business (NOB) & Line of Business (LOB) options this tenant is licensed to use.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allNobIds = nobsList.map(n => n.nob_id);
+                      const allLobIds = Object.values(lobsByNob).flat().map(l => l.lob_id);
+                      if (selectedNobIds.length === allNobIds.length) {
+                        setSelectedNobIds([]);
+                        setSelectedLobIds([]);
+                      } else {
+                        setSelectedNobIds(allNobIds);
+                        setSelectedLobIds(allLobIds);
+                      }
+                    }}
+                    className="text-xs font-semibold px-2.5 py-1 rounded border hover:opacity-80"
+                    style={{ ...S.raised, ...S.accent, borderColor: "var(--accent)" }}
+                  >
+                    {selectedNobIds.length === nobsList.length ? "Deselect All" : "Select All"}
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                  {nobsList.length === 0 ? (
+                    <p className="text-xs italic" style={S.muted}>No NOB sectors configured in master catalog.</p>
+                  ) : (
+                    nobsList.map((nob: any) => {
+                      const isNobChecked = selectedNobIds.includes(nob.nob_id);
+                      const childLobs = lobsByNob[nob.nob_id] || [];
+
+                      const toggleNob = () => {
+                        if (isNobChecked) {
+                          setSelectedNobIds(prev => prev.filter(id => id !== nob.nob_id));
+                          // Deselect child LOBs
+                          const childIds = new Set(childLobs.map(l => l.lob_id));
+                          setSelectedLobIds(prev => prev.filter(id => !childIds.has(id)));
+                        } else {
+                          setSelectedNobIds(prev => [...prev, nob.nob_id]);
+                          // Select all child LOBs by default
+                          const childIds = childLobs.map(l => l.lob_id);
+                          setSelectedLobIds(prev => Array.from(new Set([...prev, ...childIds])));
+                        }
+                      };
+
+                      return (
+                        <div
+                          key={nob.nob_id}
+                          className="rounded-lg border p-3 transition-colors"
+                          style={{
+                            backgroundColor: isNobChecked ? "var(--accent-muted)" : "var(--surface-raised)",
+                            borderColor: isNobChecked ? "var(--accent)" : "var(--border)",
+                          }}
+                        >
+                          <label className="flex items-center gap-2.5 cursor-pointer font-bold text-xs select-none" style={S.primary}>
+                            <input
+                              type="checkbox"
+                              checked={isNobChecked}
+                              onChange={toggleNob}
+                              className="w-4 h-4 rounded accent-teal-500 cursor-pointer"
+                            />
+                            <span>{nob.nob_name}</span>
+                            <span className="text-[10px] font-mono font-normal opacity-60">({nob.nob_code})</span>
+                          </label>
+
+                          {/* Child LOBs */}
+                          {isNobChecked && childLobs.length > 0 && (
+                            <div className="mt-2.5 ml-6 pt-2 border-t flex flex-wrap gap-2" style={{ borderColor: "var(--border)" }}>
+                              {childLobs.map((lob: any) => {
+                                const isLobChecked = selectedLobIds.includes(lob.lob_id);
+                                const toggleLob = () => {
+                                  if (isLobChecked) {
+                                    setSelectedLobIds(prev => prev.filter(id => id !== lob.lob_id));
+                                  } else {
+                                    setSelectedLobIds(prev => [...prev, lob.lob_id]);
+                                  }
+                                };
+
+                                return (
+                                  <label
+                                    key={lob.lob_id}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium border cursor-pointer select-none"
+                                    style={{
+                                      backgroundColor: isLobChecked ? "var(--surface)" : "transparent",
+                                      borderColor: isLobChecked ? "var(--accent)" : "var(--border)",
+                                      color: isLobChecked ? "var(--accent)" : "var(--text-secondary)",
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isLobChecked}
+                                      onChange={toggleLob}
+                                      className="w-3 h-3 rounded accent-teal-500 cursor-pointer"
+                                    />
+                                    <span>{lob.lob_name}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 

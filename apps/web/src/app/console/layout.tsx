@@ -18,7 +18,7 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
-import { getStoredUser, getStoredToken, clearSession, hasPermission, NavUser } from "../../hooks/useAuth";
+import { getStoredUser, getStoredToken, clearSession, hasPermission, getActiveCompanyId, setActiveCompanyId, NavUser, CompanyRef } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../services/api-client";
 import OnboardingWizard from "../../components/console/onboarding-wizard";
@@ -54,6 +54,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ready, setReady] = useState(false);
 
+  // Multi-company switcher
+  const [headerSwitcherOpen,  setHeaderSwitcherOpen]  = useState(false);
+  const [currentActiveCompanyId, setCurrentActiveCompanyId] = useState<string | null>(null);
+
   // Onboarding wizard state
   const [checkingOnboard, setCheckingOnboard] = useState(true);
   const [isOnboarded, setIsOnboarded] = useState(false);
@@ -73,12 +77,34 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     const tenantId = localStorage.getItem("tenant_id");
     if (!token || !storedUser) { router.replace("/"); return; }
     if (storedUser.userType === "SYSTEM_ADMIN") { router.replace("/admin/tenants"); return; }
-    setUser(storedUser);
+
+    // On mount: if active_company_id is set and differs from user.companyId,
+    // update the user object so all pages read the correct company.
+    const storedActiveId = getActiveCompanyId();
+    const homeId = storedUser.companyId || (storedUser as any).company_id;
+    const initialActiveId = storedActiveId || homeId || null;
+
+    if (initialActiveId && initialActiveId !== homeId) {
+      // Patch the in-memory and stored user to reflect switched company
+      const patched = { ...storedUser, companyId: initialActiveId, company_id: initialActiveId };
+      localStorage.setItem("user", JSON.stringify(patched));
+      setUser(patched);
+    } else {
+      setUser(storedUser);
+    }
+
+    setCurrentActiveCompanyId(initialActiveId);
+    if (initialActiveId && !storedActiveId) setActiveCompanyId(initialActiveId);
 
     if (tenantId) {
       api.get(`/tenant/${tenantId}`).then((data: any) => setTenantPlanInfo(data)).catch(() => setTenantPlanInfo(null));
     }
-    checkOnboardingStatus(storedUser, tenantId || "");
+    checkOnboardingStatus(
+      initialActiveId && initialActiveId !== homeId
+        ? { ...storedUser, companyId: initialActiveId, company_id: initialActiveId }
+        : storedUser,
+      tenantId || ""
+    );
   }, [router]);
 
   const checkOnboardingStatus = async (storedUser: NavUser, tenantId: string) => {
@@ -86,15 +112,21 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     try {
       const companiesList = await api.get(`/company/tenant/${tenantId}`);
       let filtered = companiesList;
+
+      // Always use active company ID as the source of truth
+      const activeId = getActiveCompanyId() ||
+        storedUser.companyId ||
+        (storedUser as any).company_id;
+
       if (storedUser.userType !== "TENANT_ADMIN") {
-        const myId = storedUser.companyId || (storedUser as any).company_id;
-        filtered = companiesList.filter((c: any) => c.company_id === myId);
+        filtered = companiesList.filter((c: any) => c.company_id === activeId);
+        if (filtered.length === 0) filtered = companiesList; // fallback
       }
       if (filtered.length === 0) {
         setIsOnboarded(false);
         setActiveWizardStep(1);
       } else {
-        const comp = filtered.find((c: any) => c.company_id === (storedUser.companyId || (storedUser as any).company_id)) || filtered[0];
+        const comp = companiesList.find((c: any) => c.company_id === activeId) || filtered[0];
         setActiveCompany(comp);
         if (comp.onboarding_status === "COMPLETED") {
           setIsOnboarded(true);
@@ -148,17 +180,17 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   if (!isOnboarded) {
     return (
       <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--bg)", color: "var(--text-primary)" }}>
-        <header className="h-14 flex items-center px-6 shrink-0 border-b" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+        <header className="h-14 flex items-center px-4 sm:px-6 shrink-0 border-b" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
           <span className="text-lg font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
             NAV<span style={{ color: "var(--accent)" }}>Farm</span>
           </span>
-          <span className="ml-2 text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded" style={{ color: "var(--text-muted)", backgroundColor: "var(--surface-raised)" }}>
+          <span className="ml-2 hidden text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded sm:inline-flex" style={{ color: "var(--text-muted)", backgroundColor: "var(--surface-raised)" }}>
             Company Setup
           </span>
           <div className="ml-auto flex items-center gap-3">
             <ThemeIconButton />
-            <button onClick={handleLogout} className="text-sm flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
-              <LogOut className="w-4 h-4" /> Sign Out
+            <button onClick={handleLogout} aria-label="Sign out" className="text-sm flex h-10 items-center gap-1.5 rounded-xl px-2 sm:px-3" style={{ color: "var(--text-secondary)" }}>
+              <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </header>
@@ -262,20 +294,197 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         </div>
       )}
 
-      <div className="min-w-0 flex-1 lg:ml-[264px]">
-        <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-white/90 backdrop-blur-xl">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6 xl:px-8">
-            <button onClick={() => setSidebarOpen(true)} aria-label="Open navigation" className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e4e8ef] text-[#30364b] lg:hidden"><Menu size={18} /></button>
-            <nav className="flex min-w-0 items-center gap-2 text-xs">
-              <span className="hidden font-medium text-[#9298a8] sm:inline">Organization console</span>
-              <ChevronRight size={13} className="hidden text-[#b0b5c0] sm:block" />
-              <span className="truncate font-semibold text-[#30364b]">{breadcrumbLabel}</span>
-            </nav>
-            <div className="ml-auto flex items-center gap-2">
-              <ThemeIconButton />
-              <div className="flex h-10 items-center gap-2 rounded-xl border border-[#e4e8ef] bg-white px-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-[10px] font-bold text-white">{initials}</span>
-                <span className="hidden max-w-32 truncate text-xs font-semibold text-[#30364b] sm:block">{user.fullName}</span>
+      {/* ── Main content area ── */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}
+        className="min-w-0 lg:ml-[264px]">
+        {/* Top header */}
+        <header style={{
+          backgroundColor: "var(--header-bg)",
+          backdropFilter: "blur(20px)",
+          height: 56,
+          display: "flex",
+          alignItems: "center",
+          padding: "0 24px",
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          borderBottom: "1px solid var(--border)",
+          flexShrink: 0,
+        }}>
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            style={{ color: "var(--text-secondary)", marginRight: 12, cursor: "pointer", background: "none", border: "none" }}
+            className="md:hidden"
+          >
+            <Menu style={{ width: 20, height: 20 }} />
+          </button>
+          {/* Breadcrumb */}
+          <nav style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--text-muted)" }}>
+            <span style={{ fontWeight: 500, color: "var(--text-secondary)" }}>Console</span>
+            <ChevronRight style={{ width: 14, height: 14 }} />
+            <span style={{ fontWeight: 600, color: "var(--text-primary)", textTransform: "capitalize" }}>{breadcrumbLabel}</span>
+          </nav>
+          {/* Right side: company switcher + theme + user */}
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+
+            {/* ── Company Switcher Pill (header) — only when ≥2 companies ── */}
+            {user?.companies && user.companies.length > 1 && (() => {
+              const active = user.companies.find((c) => c.company_id === currentActiveCompanyId) || user.companies[0];
+              return (
+                <div style={{ position: "relative" }}>
+                  <button
+                    onClick={() => setHeaderSwitcherOpen((o) => !o)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 10px 5px 8px",
+                      borderRadius: 999,
+                      border: "1.5px solid var(--accent)",
+                      backgroundColor: "var(--accent-muted)",
+                      color: "var(--accent)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      maxWidth: 180,
+                      overflow: "hidden",
+                      transition: "background-color 150ms, box-shadow 150ms",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px var(--accent-muted)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
+                    title="Switch active company"
+                  >
+                    {/* dot indicator */}
+                    <span style={{
+                      width: 7, height: 7, borderRadius: "50%",
+                      backgroundColor: "var(--accent)",
+                      flexShrink: 0,
+                    }} />
+                    <Building2 style={{ width: 13, height: 13, flexShrink: 0 }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 110 }}>
+                      {active.company_name}
+                    </span>
+                    <ChevronRight style={{
+                      width: 12, height: 12, flexShrink: 0,
+                      transform: headerSwitcherOpen ? "rotate(90deg)" : "rotate(0deg)",
+                      transition: "transform 200ms",
+                    }} />
+                  </button>
+
+                  {/* Dropdown */}
+                  {headerSwitcherOpen && (
+                    <>
+                      {/* Click-away overlay */}
+                      <div
+                        style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                        onClick={() => setHeaderSwitcherOpen(false)}
+                      />
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 8px)",
+                        right: 0,
+                        minWidth: 220,
+                        borderRadius: 12,
+                        border: "1px solid var(--border)",
+                        backgroundColor: "var(--surface)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                        overflow: "hidden",
+                        zIndex: 50,
+                      }}>
+                        {/* Header of dropdown */}
+                        <div style={{
+                          padding: "10px 14px 8px",
+                          borderBottom: "1px solid var(--border)",
+                        }}>
+                          <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)", margin: 0 }}>
+                            Switch Company
+                          </p>
+                        </div>
+                        {/* Company list */}
+                        {user.companies.map((c: CompanyRef) => {
+                          const isCurrent = c.company_id === currentActiveCompanyId;
+                          return (
+                            <button
+                              key={c.company_id}
+                              onClick={() => {
+                                // Update localStorage user so all pages see the new companyId
+                                const currentUser = getStoredUser();
+                                if (currentUser) {
+                                  const patched = {
+                                    ...currentUser,
+                                    companyId:  c.company_id,
+                                    company_id: c.company_id,
+                                  };
+                                  localStorage.setItem("user", JSON.stringify(patched));
+                                  localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
+                                }
+                                setActiveCompanyId(c.company_id);
+                                setCurrentActiveCompanyId(c.company_id);
+                                setHeaderSwitcherOpen(false);
+                                window.location.reload();
+                              }}
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                padding: "10px 14px",
+                                background: isCurrent ? "var(--accent-muted)" : "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                                textAlign: "left",
+                                transition: "background 150ms",
+                              }}
+                              onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = "var(--surface-raised)"; }}
+                              onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.background = "transparent"; }}
+                            >
+                              {/* Avatar circle with initials */}
+                              <div style={{
+                                width: 30, height: 30,
+                                borderRadius: "50%",
+                                backgroundColor: isCurrent ? "var(--accent)" : "var(--surface-raised)",
+                                color: isCurrent ? "#fff" : "var(--text-secondary)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 11, fontWeight: 700, flexShrink: 0,
+                                border: isCurrent ? "2px solid var(--accent)" : "1.5px solid var(--border)",
+                              }}>
+                                {c.company_name.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: isCurrent ? "var(--accent)" : "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {c.company_name}
+                                </p>
+                                {c.is_primary && (
+                                  <p style={{ margin: 0, fontSize: 10, color: "var(--text-muted)", fontWeight: 500 }}>Home company</p>
+                                )}
+                              </div>
+                              {isCurrent && (
+                                <span style={{
+                                  width: 8, height: 8, borderRadius: "50%",
+                                  backgroundColor: "var(--accent)", flexShrink: 0,
+                                }} />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
+            <ThemeIconButton />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                backgroundColor: "var(--accent)", color: "#fff",
+                fontSize: 11, fontWeight: 700,
+              }}>
+                {initials}
               </div>
             </div>
           </div>
