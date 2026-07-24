@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { CompanySwitcher } from '@/components/CompanySwitcher';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api-client';
 import { useCurrentCompany } from '@/modules/company/use-current-company';
 import { DemoStoreProvider } from '@/modules/farm-demo/demo-store';
 
@@ -121,17 +122,15 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!company) return;
-    const key = `navfarm_demo_state_v6_${company.slug}`;
     const syncModules = () => {
-      try {
-        const saved = localStorage.getItem(key);
-        const parsed = saved ? JSON.parse(saved) : null;
-        if (Array.isArray(parsed?.setup?.modules)) {
-          setEnabledModules(parsed.setup.modules);
-        }
-      } catch {
-        // Keep documented demo defaults when local state is unavailable.
-      }
+      void api
+        .get<{ state: { setup?: { modules?: string[] } } | null }>(
+          `/demo/companies/${company.slug}/state`,
+        )
+        .then(({ state }) => {
+          if (Array.isArray(state?.setup?.modules)) setEnabledModules(state.setup.modules);
+        })
+        .catch(() => undefined);
     };
     const handleDemoState = (event: Event) => {
       const detail = (event as CustomEvent).detail;
@@ -140,10 +139,8 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
       }
     };
     syncModules();
-    window.addEventListener('storage', syncModules);
     window.addEventListener('navfarm-demo-state', handleDemoState);
     return () => {
-      window.removeEventListener('storage', syncModules);
       window.removeEventListener('navfarm-demo-state', handleDemoState);
     };
   }, [company]);

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { CompanyMeta } from '@/modules/company';
+import { api } from '../../lib/api-client';
 import {
   getDemoBatches,
   getQualityRecords,
@@ -440,31 +441,40 @@ export function DemoStoreProvider({
   company: CompanyMeta;
   children: ReactNode;
 }) {
-  const key = `navfarm_demo_state_v6_${company.slug}`;
   const [state, setState] = useState<DemoState>(() => seedState(company));
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      const parsed = saved ? (JSON.parse(saved) as DemoState) : null;
-      setState(parsed?.version === 6 ? parsed : seedState(company));
-    } catch {
-      setState(seedState(company));
-    }
-    setIsReady(true);
-  }, [company, key]);
+    let cancelled = false;
+    setIsReady(false);
+    api
+      .get<{ state: unknown | null }>(`/demo/companies/${company.slug}/state`)
+      .then(({ state: storedState }) => {
+        if (cancelled) return;
+        const parsed = storedState as DemoState | null;
+        setState(parsed?.version === 6 ? parsed : seedState(company));
+      })
+      .catch(() => {
+        if (!cancelled) setState(seedState(company));
+      })
+      .finally(() => {
+        if (!cancelled) setIsReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company]);
 
   useEffect(() => {
     if (isReady) {
-      localStorage.setItem(key, JSON.stringify(state));
+      void api.put(`/demo/companies/${company.slug}/state`, { state });
       window.dispatchEvent(
         new CustomEvent('navfarm-demo-state', {
           detail: { company: company.slug, modules: state.setup.modules },
         }),
       );
     }
-  }, [company.slug, isReady, key, state]);
+  }, [company.slug, isReady, state]);
 
   const calculateVariance = useCallback(
     (batch: WorkflowBatch): VarianceResult => {
@@ -897,8 +907,7 @@ export function DemoStoreProvider({
   const resetDemo = useCallback(() => {
     const next = seedState(company);
     setState(next);
-    localStorage.setItem(key, JSON.stringify(next));
-  }, [company, key]);
+  }, [company]);
 
   const value = useMemo<DemoStoreValue>(
     () => ({

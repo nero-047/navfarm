@@ -1,5 +1,6 @@
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:2877/api/v1';
+import { apiErrorSchema, responseSchemaFor, unwrapApiPayload } from '../contracts/api';
+
+export const API_BASE_URL = '/api/v1';
 
 export const AUTH_STORAGE = {
   user: 'navfarm_auth_user',
@@ -12,7 +13,9 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code = 'INTERNAL_ERROR',
     readonly details?: unknown,
+    readonly requestId?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -25,98 +28,144 @@ type ApiOptions = Omit<RequestInit, 'body'> & {
   retry?: boolean;
 };
 
+export interface NavfarmApiClient {
+  request<T>(path: string, options?: ApiOptions): Promise<T>;
+  get<T>(path: string, options?: ApiOptions): Promise<T>;
+  post<T>(path: string, body?: unknown, options?: ApiOptions): Promise<T>;
+  put<T>(path: string, body?: unknown, options?: ApiOptions): Promise<T>;
+  patch<T>(path: string, body?: unknown, options?: ApiOptions): Promise<T>;
+  delete<T>(path: string, options?: ApiOptions): Promise<T>;
+}
+
 function stored(key: string): string | null {
   return typeof window === 'undefined' ? null : localStorage.getItem(key);
 }
 
-function errorMessage(payload: unknown, fallback: string): string {
-  if (!payload || typeof payload !== 'object') return fallback;
-  const candidate = (payload as { message?: unknown; error?: unknown }).message ??
-    (payload as { error?: unknown }).error;
-  if (Array.isArray(candidate)) return candidate.join(', ');
-  return typeof candidate === 'string' ? candidate : fallback;
-}
-
 function clearSession() {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(AUTH_STORAGE.user);
-  localStorage.removeItem(AUTH_STORAGE.accessToken);
-  localStorage.removeItem(AUTH_STORAGE.refreshToken);
-  localStorage.removeItem(AUTH_STORAGE.tenantId);
-  localStorage.removeItem('user');
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('tenant_id');
-  localStorage.removeItem('active_company_id');
+  for (const key of [
+    ...Object.values(AUTH_STORAGE),
+    'user',
+    'access_token',
+    'refresh_token',
+    'tenant_id',
+    'active_company_id',
+  ]) {
+    localStorage.removeItem(key);
+  }
 }
 
-let refreshPromise: Promise<string> | null = null;
+function errorFromPayload(payload: unknown, status: number): ApiError {
+  const parsed = apiErrorSchema.safeParse(payload);
+  if (parsed.success) {
+    const value = parsed.data.error;
+    return new ApiError(value.message, value.status, value.code, value.details, value.requestId);
+  }
+  const legacy = payload as { message?: string | string[]; error?: string } | null;
+  const candidate = legacy?.message ?? legacy?.error;
+  const message = Array.isArray(candidate)
+    ? candidate.join(', ')
+    : candidate || `Request failed (${status}).`;
+  return new ApiError(message, status, 'UPSTREAM_ERROR', payload);
+}
 
-async function refreshAccessToken(): Promise<string> {
-  if (refreshPromise) return refreshPromise;
-  refreshPromise = (async () => {
-    const refreshToken = stored(AUTH_STORAGE.refreshToken);
-    if (!refreshToken) throw new ApiError('Your session has expired.', 401);
-    const headers = new Headers({ 'Content-Type': 'application/json' });
-    const tenantId = stored(AUTH_STORAGE.tenantId);
+export function createApiClient(
+  fetcher?: typeof fetch,
+  baseUrl = API_BASE_URL,
+): NavfarmApiClient {
+  let refreshPromise: Promise<string> | null = null;
+
+  const request = async <T>(path: string, options: ApiOptions = {}): Promise<T> => {
+    const activeFetcher = fetcher ?? globalThis.fetch;
+    if (!activeFetcher) {
+      throw new ApiError('Fetch is unavailable in this runtime.', 500, 'CONFIGURATION_ERROR');
+    }
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    const {
+      body,
+      tenantId = stored(AUTH_STORAGE.tenantId),
+      retry = true,
+      ...init
+    } = options;
+    const headers = new Headers(init.headers);
+    if (!(body instanceof FormData)) headers.set('Content-Type', 'application/json');
+    const token = stored(AUTH_STORAGE.accessToken);
+    if (token) headers.set('Authorization', `Bearer ${token}`);
     if (tenantId) headers.set('x-tenant-id', tenantId);
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
+    const activeCompanyId = stored('active_company_id');
+    if (activeCompanyId) headers.set('x-active-company-id', activeCompanyId);
+
+    const response = await activeFetcher(`${baseUrl}${normalizedPath}`, {
+      ...init,
       headers,
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body),
     });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok || !payload?.access_token) {
-      clearSession();
-      throw new ApiError(errorMessage(payload, 'Your session has expired.'), response.status, payload);
+    const payload = response.status === 204 ? null : await response.json().catch(() => null);
+
+    if (response.status === 401 && token && retry && normalizedPath !== '/auth/refresh') {
+      refreshPromise ??= (async () => {
+        const refreshToken = stored(AUTH_STORAGE.refreshToken);
+        if (!refreshToken) throw new ApiError('Your session has expired.', 401, 'UNAUTHORIZED');
+        const refreshResponse = await activeFetcher(`${baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        const refreshPayload = unwrapApiPayload(await refreshResponse.json().catch(() => null));
+        if (!refreshResponse.ok) {
+          clearSession();
+          throw errorFromPayload(refreshPayload, refreshResponse.status);
+        }
+        const refreshSchema = responseSchemaFor('POST', '/auth/refresh');
+        if (!refreshSchema) throw new ApiError('Refresh contract is not registered.', 500);
+        const parsed = refreshSchema.safeParse(refreshPayload);
+        if (!parsed.success) throw new ApiError('Invalid refresh response.', 502, 'UPSTREAM_ERROR', parsed.error.flatten());
+        const session = parsed.data as { access_token: string; refresh_token?: string };
+        localStorage.setItem(AUTH_STORAGE.accessToken, session.access_token);
+        if (session.refresh_token) localStorage.setItem(AUTH_STORAGE.refreshToken, session.refresh_token);
+        return session.access_token;
+      })().finally(() => {
+        refreshPromise = null;
+      });
+      const refreshed = await refreshPromise;
+      headers.set('Authorization', `Bearer ${refreshed}`);
+      return request<T>(normalizedPath, { ...options, headers, retry: false });
     }
-    localStorage.setItem(AUTH_STORAGE.accessToken, payload.access_token);
-    if (payload.refresh_token) {
-      localStorage.setItem(AUTH_STORAGE.refreshToken, payload.refresh_token);
+
+    if (!response.ok) throw errorFromPayload(payload, response.status);
+    const unwrapped = unwrapApiPayload(payload);
+    const schema = responseSchemaFor(init.method || 'GET', normalizedPath);
+    if (schema) {
+      const parsed = schema.safeParse(unwrapped);
+      if (!parsed.success) {
+        throw new ApiError(
+          `Response contract failed for ${init.method || 'GET'} ${normalizedPath}.`,
+          502,
+          'UPSTREAM_ERROR',
+          parsed.error.flatten(),
+        );
+      }
+      return parsed.data as T;
     }
-    return payload.access_token as string;
-  })().finally(() => {
-    refreshPromise = null;
-  });
-  return refreshPromise;
+    return unwrapped as T;
+  };
+
+  return {
+    request,
+    get: <T>(path: string, options?: ApiOptions) => request<T>(path, { ...options, method: 'GET' }),
+    post: <T>(path: string, body?: unknown, options?: ApiOptions) =>
+      request<T>(path, { ...options, method: 'POST', body }),
+    put: <T>(path: string, body?: unknown, options?: ApiOptions) =>
+      request<T>(path, { ...options, method: 'PUT', body }),
+    patch: <T>(path: string, body?: unknown, options?: ApiOptions) =>
+      request<T>(path, { ...options, method: 'PATCH', body }),
+    delete: <T>(path: string, options?: ApiOptions) =>
+      request<T>(path, { ...options, method: 'DELETE' }),
+  };
 }
 
-export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const { body, tenantId = stored(AUTH_STORAGE.tenantId), retry = true, ...init } = options;
-  const headers = new Headers(init.headers);
-  if (!(body instanceof FormData)) headers.set('Content-Type', 'application/json');
-  const token = stored(AUTH_STORAGE.accessToken);
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  if (tenantId) headers.set('x-tenant-id', tenantId);
-  const activeCompanyId = stored('active_company_id');
-  if (activeCompanyId) headers.set('x-active-company-id', activeCompanyId);
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body),
-  });
-
-  if (response.status === 401 && token && retry && path !== '/auth/refresh') {
-    const refreshed = await refreshAccessToken();
-    headers.set('Authorization', `Bearer ${refreshed}`);
-    return apiRequest<T>(path, { ...options, headers, retry: false });
-  }
-
-  const payload = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new ApiError(errorMessage(payload, `Request failed (${response.status}).`), response.status, payload);
-  }
-  return payload as T;
-}
-
-export const api = {
-  get: <T>(path: string, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'GET' }),
-  post: <T>(path: string, body?: unknown, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'POST', body }),
-  put: <T>(path: string, body?: unknown, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'PUT', body }),
-  patch: <T>(path: string, body?: unknown, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'PATCH', body }),
-  delete: <T>(path: string, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'DELETE' }),
-};
+export const api = createApiClient();
+export const apiRequest = api.request;
 
 export function persistAuthSession(session: {
   access_token: string;
@@ -126,20 +175,15 @@ export function persistAuthSession(session: {
   localStorage.setItem(AUTH_STORAGE.accessToken, session.access_token);
   localStorage.setItem(AUTH_STORAGE.refreshToken, session.refresh_token);
   localStorage.setItem(AUTH_STORAGE.user, JSON.stringify(session.user));
-  // Keep the upstream admin/console storage names during the migration.
   localStorage.setItem('access_token', session.access_token);
   localStorage.setItem('refresh_token', session.refresh_token);
   localStorage.setItem('user', JSON.stringify(session.user));
-  const tenantId = (session.user as { tenantId?: string }).tenantId;
-  const companyId = (session.user as { companyId?: string; company_id?: string }).companyId ??
-    (session.user as { company_id?: string }).company_id;
+  const user = session.user as { tenantId?: string; companyId?: string; company_id?: string };
+  const companyId = user.companyId ?? user.company_id;
   if (companyId) localStorage.setItem('active_company_id', companyId);
-  if (tenantId) {
-    localStorage.setItem(AUTH_STORAGE.tenantId, tenantId);
-    localStorage.setItem('tenant_id', tenantId);
-  } else {
-    localStorage.removeItem(AUTH_STORAGE.tenantId);
-    localStorage.removeItem('tenant_id');
+  if (user.tenantId) {
+    localStorage.setItem(AUTH_STORAGE.tenantId, user.tenantId);
+    localStorage.setItem('tenant_id', user.tenantId);
   }
 }
 
