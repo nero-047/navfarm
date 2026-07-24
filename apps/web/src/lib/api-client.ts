@@ -64,7 +64,7 @@ export function createApiClient(fetcher?: typeof fetch, baseUrl = API_BASE_URL):
         : await response.blob();
     if (!response.ok) throw errorFromPayload(payload, response.status);
     const unwrapped = unwrapApiPayload(payload);
-    const schema = responseSchemaFor(init.method || 'GET', normalizedPath);
+    const schema = responseSchemaFor(init.method || 'GET', normalizedPath.split('?')[0]);
     if (!schema) return unwrapped as T;
     const parsed = schema.safeParse(unwrapped);
     if (!parsed.success) {

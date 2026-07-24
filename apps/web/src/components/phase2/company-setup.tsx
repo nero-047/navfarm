@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AlertTriangle, Check, ChevronLeft, ChevronRight, LockKeyhole } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { can } from '../../lib/authorization';
@@ -156,9 +157,6 @@ export function CompanySetup({ companySlug, step }: { companySlug: string; step:
         const created = await api.post<TeamMember>(`${root}/team`, teamDraft);
         setTeam((items) => [...items, created]); setTeamDraft(blankTeam);
       }
-      if (step === 'chart-of-accounts' && chart) setChart(await api.patch<ChartOfAccounts>(`${root}/chart-of-accounts`, chart));
-      if (step === 'business-structure' && business) setBusiness(await api.patch<BusinessStructure>(`${root}/business-structure`, business));
-      if (step === 'masters' && masters) setMasters(await api.patch<EssentialMasters>(`${root}/essential-masters`, masters));
       if (step === 'notifications' && notifications) setNotifications(await api.patch<SetupNotifications>(`${root}/notifications`, notifications));
       await reloadStatus();
       setDirty(false); setSuccess('Progress saved through the setup API.');
@@ -232,11 +230,11 @@ export function CompanySetup({ companySlug, step }: { companySlug: string; step:
 
           {step === 'team' ? <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-3"><TextField label="Team member name" value={teamDraft.fullName} onChange={(fullName) => { setTeamDraft({ ...teamDraft, fullName }); touch(); }} /><TextField label="Email" type="email" value={teamDraft.email} onChange={(email) => { setTeamDraft({ ...teamDraft, email }); touch(); }} /><SelectField label="Role" value={teamDraft.role} options={['FARM_MANAGER', 'ACCOUNTANT', 'SUPERVISOR', 'VIEWER']} onChange={(role) => { setTeamDraft({ ...teamDraft, role }); touch(); }} /></div>{team.map((member) => <div key={member.memberId} className="flex justify-between rounded-lg border border-slate-200 p-3 text-sm"><span><strong>{member.fullName}</strong><span className="ml-2 text-slate-500">{member.email}</span></span><StatusBadge status={member.status} /></div>)}</div> : null}
 
-          {step === 'chart-of-accounts' && chart ? <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-2"><CheckField label="Chart of accounts confirmed" checked={chart.confirmed} onChange={(confirmed) => { setChart({ ...chart, confirmed }); touch(); }} /><CheckField label="Required item and entry-type GL mappings ready" checked={chart.glMappingsReady} onChange={(glMappingsReady) => { setChart({ ...chart, glMappingsReady }); touch(); }} /></div><div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-3">Code</th><th className="p-3">Account</th><th className="p-3">Type</th></tr></thead><tbody>{chart.accounts.map((account) => <tr key={account.accountCode} className="border-t border-slate-100"><td className="p-3 font-mono">{account.accountCode}</td><td className="p-3">{account.accountName}</td><td className="p-3">{account.accountType}</td></tr>)}</tbody></table></div></div> : null}
+          {step === 'chart-of-accounts' && chart ? <Phase3SetupLink title="Chart of accounts, GL mappings & costing" description="This readiness step now uses the active Phase 3 accounting resources. Summary checkboxes no longer unlock operations." href={`/${companySlug}/accounting/readiness`} linkLabel="Open accounting readiness" /> : null}
 
-          {step === 'business-structure' && business ? <div className="space-y-5"><p className="text-sm text-slate-600">NOB and LOB options remain configuration-driven. This setup demonstrates one permitted LOB and costing policy.</p><SelectField label="Nature of business" value={business.nobs[0]?.nobCode ?? ''} options={['', 'POULTRY', 'LIVESTOCK', 'AGRICULTURE', 'AQUACULTURE', 'INSECT', 'PROCESSING']} onChange={(nobCode) => { setBusiness({ configured: Boolean(nobCode), nobs: nobCode ? [{ nobCode: nobCode as BusinessStructure['nobs'][number]['nobCode'], nobName: nobCode.replaceAll('_', ' '), lobs: [{ lobCode: 'PRIMARY', lobName: 'Primary Production', costingMethod: 'STANDARD', qcRequired: true, qrRequired: true }] }] : [] }); touch(); }} />{business.nobs[0] ? <div className="grid gap-4 sm:grid-cols-2"><TextField label="Line of business" value={business.nobs[0].lobs[0]?.lobName ?? ''} onChange={(lobName) => { const nob = business.nobs[0]; setBusiness({ configured: true, nobs: [{ ...nob, lobs: [{ ...(nob.lobs[0] ?? { lobCode: 'PRIMARY', costingMethod: 'STANDARD', qcRequired: true, qrRequired: true }), lobName }] }] }); touch(); }} /><SelectField label="Costing method" value={business.nobs[0].lobs[0]?.costingMethod ?? 'STANDARD'} options={['STANDARD', 'FIFO', 'BIO_ASSET', 'WAVG']} onChange={(costingMethod) => { const nob = business.nobs[0]; const lob = nob.lobs[0]; setBusiness({ configured: true, nobs: [{ ...nob, lobs: [{ ...lob, costingMethod: costingMethod as BusinessStructure['nobs'][number]['lobs'][number]['costingMethod'] }] }] }); touch(); }} /></div> : null}</div> : null}
+          {step === 'business-structure' && business ? <Phase3SetupLink title="NOB & LOB business structure" description="Configure company-owned NOB and LOB records from platform templates. Stable IDs, dependencies and costing applicability are validated by the API." href={`/${companySlug}/settings/business-structure`} linkLabel="Open business structure" /> : null}
 
-          {step === 'masters' && masters ? <div className="space-y-3"><p className="text-sm text-slate-600">Confirm the minimum master data required for operational batch creation.</p>{([['uomReady', 'Units of measure'], ['itemsReady', 'Items'], ['breedsReady', 'Breeds'], ['locationsReady', 'Locations'], ['resourcesReady', 'Resources']] as const).map(([key, label]) => <CheckField key={key} label={label} checked={masters[key]} onChange={(checked) => { setMasters({ ...masters, [key]: checked }); touch(); }} />)}</div> : null}
+          {step === 'masters' && masters ? <Phase3SetupLink title="Essential operational masters" description="Readiness is calculated from active UOMs, items/categories, locations, operational parameters and applicable QC parameters." href={`/${companySlug}/masters`} linkLabel="Open master-data dashboard" /> : null}
 
           {step === 'notifications' && notifications ? <div className="space-y-3">{([['emailEnabled', 'Email notifications'], ['smsEnabled', 'SMS notifications'], ['pushEnabled', 'Push notifications'], ['kpiAlertsEnabled', 'KPI alerts'], ['scheduledReportsEnabled', 'Scheduled reports']] as const).map(([key, label]) => <CheckField key={key} label={label} checked={notifications[key]} onChange={(checked) => { setNotifications({ ...notifications, [key]: checked }); touch(); }} />)}<p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Delivery providers, credentials, retries, and external integrations are not implemented in this frontend demo.</p></div> : null}
           </div>
@@ -255,6 +253,10 @@ export function CompanySetup({ companySlug, step }: { companySlug: string; step:
       </div>
     </div>
   );
+}
+
+function Phase3SetupLink({ title, description, href, linkLabel }: { title: string; description: string; href: string; linkLabel: string }) {
+  return <section className="rounded-xl border border-blue-200 bg-blue-50/50 p-5"><h2 className="font-black text-slate-950">{title}</h2><p className="mt-2 text-sm text-slate-600">{description}</p><Link href={href} className={`${primaryButtonClass} mt-5`}>{linkLabel}<ChevronRight className="ml-2 h-4 w-4" /></Link></section>;
 }
 
 function TextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {

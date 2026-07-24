@@ -111,4 +111,39 @@ describe('contract-first NAVFarm client', () => {
       expect.objectContaining({ method: 'GET' }),
     );
   });
+
+  it.each([
+    ['mock response', {
+      resource: 'items',
+      records: [{
+        id: 'item-feed', companyId: 'company-green-valley', code: 'FEED_GROWER',
+        name: 'Grower feed', categoryId: 'category-feed', primaryUomId: 'uom-kg',
+        secondaryUomId: null, itemType: 'CONSUMABLE',
+        companyNobId: 'company-nob-poultry', companyLobId: 'company-lob-broiler',
+        valuationMethod: 'FIFO', standardCost: null, lotTracking: true,
+        status: 'ACTIVE', referencedBy: [],
+        audit: { createdAt: '2026-07-24T08:00:00.000Z', createdBy: 'seed', updatedAt: '2026-07-24T08:00:00.000Z', updatedBy: 'seed' },
+      }],
+      page: 1, pageSize: 20, total: 1,
+    }],
+    ['proxy-compatible data envelope', { data: {
+      resource: 'items',
+      records: [{
+        id: 'item-feed', companyId: 'company-green-valley', code: 'FEED_GROWER',
+        name: 'Grower feed', categoryId: 'category-feed', primaryUomId: 'uom-kg',
+        secondaryUomId: null, itemType: 'CONSUMABLE',
+        companyNobId: 'company-nob-poultry', companyLobId: 'company-lob-broiler',
+        valuationMethod: 'FIFO', standardCost: null, lotTracking: true,
+        status: 'ACTIVE', referencedBy: [],
+        audit: { createdAt: '2026-07-24T08:00:00.000Z', createdBy: 'seed', updatedAt: '2026-07-24T08:00:00.000Z', updatedBy: 'seed' },
+      }],
+      page: 1, pageSize: 20, total: 1,
+    }, meta: { requestId: 'proxy-phase3' } }],
+  ])('uses the same typed client for Phase 3 %s', async (_label, payload) => {
+    const fetcher = jest.fn(() => response(payload));
+    const client = createApiClient(fetcher as typeof fetch);
+    await expect(client.get('/companies/company-green-valley/masters/items?status=ACTIVE')).resolves.toMatchObject({
+      resource: 'items', total: 1,
+    });
+  });
 });

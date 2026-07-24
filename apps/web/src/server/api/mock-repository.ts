@@ -6,6 +6,7 @@ import type { CompanySummary } from '../../contracts/phase2';
 import { ROLE_PERMISSIONS } from '../../lib/authorization';
 import { apiErrorResponse } from './errors';
 import { handlePhase2Request, resetPhase2Repository } from './phase2-repository';
+import { handlePhase3Request, resetPhase3Repository } from './phase3-repository';
 
 type JsonRecord = Record<string, unknown>;
 type FixtureUser = {
@@ -73,6 +74,8 @@ const fixtureUsers: FixtureUser[] = [
   { userId: 'user-system', email: 'system@navfarm.demo', fullName: 'System Administrator', password: 'Demo123!', platformRole: 'SYSTEM_ADMIN', tenantIds: [], companies: [] },
   { userId: 'user-tenant', email: 'tenant@navfarm.demo', fullName: 'Tenant Administrator', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'SUPER_ADMIN' }] },
   { userId: 'user-manager', email: 'manager@navfarm.demo', fullName: 'Farm Manager', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'FARM_MANAGER' }] },
+  { userId: 'user-accountant', email: 'accountant@navfarm.demo', fullName: 'Company Accountant', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'ACCOUNTANT' }] },
+  { userId: 'user-auditor', email: 'auditor@navfarm.demo', fullName: 'Read-only Auditor', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'AUDITOR' }] },
   { userId: 'user-viewer', email: 'viewer@navfarm.demo', fullName: 'Company Viewer', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'VIEWER' }] },
   { userId: 'user-multi', email: 'multi@navfarm.demo', fullName: 'Multi-company Manager', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo', 'tenant-second'], companies: [{ companyId: 'company-green-valley', role: 'ADMIN' }, { companyId: 'company-harvest-ridge', role: 'ADMIN' }, { companyId: 'company-bluewater', role: 'FARM_MANAGER' }] },
   { userId: 'user-suspended', email: 'suspended@navfarm.demo', fullName: 'Suspended Tenant User', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-suspended'], companies: [] },
@@ -275,6 +278,7 @@ export async function handleMockRequest(request: Request, path: string, requestI
     state.demoStates.clear();
     state.sessions.clear();
     resetPhase2Repository();
+    resetPhase3Repository();
     return json({ success: true });
   }
 
@@ -316,6 +320,20 @@ export async function handleMockRequest(request: Request, path: string, requestI
     },
   });
   if (phase2Response) return phase2Response;
+  const activeMembership = session.companies.find(
+    (company) => company.companyId === session.activeCompanyId,
+  );
+  const phase3Response = await handlePhase3Request(phase2Request, path, requestId, {
+    userId: session.user.userId,
+    fullName: session.user.fullName,
+    platformRole: session.user.platformRole,
+    activeCompanyId: session.activeCompanyId,
+    companyView: Boolean(activeMembership?.permissions.includes('company.view')),
+    companyManage: Boolean(activeMembership?.permissions.includes('company.manage')),
+    financeView: Boolean(activeMembership?.permissions.includes('finance.view')),
+    financeManage: Boolean(activeMembership?.permissions.includes('finance.manage')),
+  });
+  if (phase3Response) return phase3Response;
   if (!['GET', 'HEAD'].includes(method) && !hasMockMutationAccess(session, path)) {
     return apiErrorResponse(403, 'You do not have permission to perform this operation.', requestId);
   }

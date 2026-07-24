@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { phase2RuntimeContracts } from './phase2';
+import { phase3RuntimeContracts } from './phase3';
 
 export const apiErrorCodeSchema = z.enum([
   'BAD_REQUEST',
@@ -12,6 +13,7 @@ export const apiErrorCodeSchema = z.enum([
   'UPSTREAM_UNAVAILABLE',
   'CONFIGURATION_ERROR',
   'INTERNAL_ERROR',
+  'resource_in_use',
 ]);
 
 export const apiErrorSchema = z.object({
@@ -168,6 +170,7 @@ export type RuntimeContract = {
  * runtime validated.
  */
 export const runtimeContracts: RuntimeContract[] = [
+  ...phase3RuntimeContracts,
   ...phase2RuntimeContracts,
   { method: 'POST', pattern: /^\/auth\/(login|mfa\/verify|mfa\/recovery)$/, response: authSessionSchema },
   { method: 'GET', pattern: /^\/auth\/session$/, response: authSessionSchema },

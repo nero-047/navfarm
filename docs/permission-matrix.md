@@ -17,6 +17,24 @@ checks and a production backend must do the same.
 | Viewer | No / No | Hidden | No | No | No | No |
 | Custom | Granted | Granted | Granted | Granted | Granted | Granted |
 
+## Phase 3 configuration access
+
+| Role | Platform templates | Company masters | COA/GL/costing |
+| --- | --- | --- | --- |
+| System administrator | View/manage | Full through company context | Full through company context |
+| Tenant administrator | No platform access | Full for granted company | Full for granted company |
+| Company super administrator / administrator | No | Full | Full |
+| Farm manager | No | Read; mutation only with `company.manage` | No |
+| Accountant | No | Read | Full |
+| Auditor | No | Read only | Read only |
+| Supervisor / viewer | No | Read only | No unless explicitly granted |
+| Custom | Permission-driven | Permission-driven | Permission-driven |
+
+The API enforces the same boundary as navigation. Platform reads require
+`SYSTEM_ADMIN`; master mutations require `company.manage`; accounting reads
+require `finance.view` or `company.manage`; accounting mutations require
+`finance.manage` or `company.manage`.
+
 Canonical permission identifiers are defined in
 `apps/web/src/contracts/api.ts`; role defaults and permission evaluation are in
 `apps/web/src/lib/authorization.ts`.

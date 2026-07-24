@@ -29,6 +29,7 @@ import {
 } from '../../contracts/phase2';
 import { COMPANY_SETUP_STEPS, evaluateReadiness, type ReadinessInput } from '../../lib/readiness-policy';
 import { apiErrorResponse } from './errors';
+import { phase3ReadinessSnapshot } from './phase3-repository';
 
 export interface CompanySetupActor {
   userId: string;
@@ -149,7 +150,17 @@ function completedMap(record: SetupRecord): ReadinessInput['completed'] {
 }
 
 function statusFor(companyId: string, record: SetupRecord) {
-  return evaluateReadiness({ companyId, completed: completedMap(record), setupComplete: record.setupComplete });
+  const completed = completedMap(record);
+  const phase3 = phase3ReadinessSnapshot(companyId);
+  const blockers = new Set<string>(phase3.blockingRequirements.map((item) => item.code));
+  completed.chartOfAccounts = !['accounts', 'glMappings', 'costing'].some((code) => blockers.has(code));
+  completed.businessStructure = !['nob', 'lob'].some((code) => blockers.has(code));
+  completed.essentialMasters = !['uoms', 'items', 'locations', 'parameters', 'qc'].some((code) => blockers.has(code));
+  return evaluateReadiness({
+    companyId,
+    completed,
+    setupComplete: record.setupComplete && phase3.operationsReady,
+  });
 }
 
 function mark(record: SetupRecord, ...ids: string[]) {

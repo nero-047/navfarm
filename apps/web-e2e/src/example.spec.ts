@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
 
 const screenshotDirectory = resolve(process.cwd(), '../../docs/screenshots/phase2');
+const phase3ScreenshotDirectory = resolve(process.cwd(), '../../docs/screenshots/phase3');
 
 async function login(page: Page, email: string) {
   const sessionLoaded = page.waitForResponse((response) =>
@@ -38,6 +39,18 @@ async function capturePair(page: Page, name: string) {
   await page.evaluate('document.fonts.ready');
   await expect.poll(() => page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(390);
   await page.screenshot({ path: resolve(screenshotDirectory, `${name}-mobile.png`), fullPage: true });
+}
+
+async function capturePhase3Pair(page: Page, name: string) {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.evaluate(() => new Promise((resolvePromise) => setTimeout(resolvePromise, 250)));
+  await page.evaluate('document.fonts.ready');
+  await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-desktop.png`), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => new Promise((resolvePromise) => setTimeout(resolvePromise, 250)));
+  await page.evaluate('document.fonts.ready');
+  await expect.poll(() => page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-mobile.png`), fullPage: true });
 }
 
 test('authenticates and opens the unified company shell', async ({ page }) => {
@@ -154,4 +167,64 @@ test('captures the Phase 2 desktop and mobile evidence set', async ({ page }) =>
   await page.goto('/bluewater-aqua/setup/review');
   await expect(page.getByRole('heading', { name: 'Review & completion' })).toBeVisible();
   await capturePair(page, 'setup-review-readiness');
+});
+
+test('Phase 3 masters and accounting workflows render responsively', async ({ page }) => {
+  test.slow();
+  expect((await page.request.post('/api/v1/__mock/reset')).ok()).toBe(true);
+  await mkdir(phase3ScreenshotDirectory, { recursive: true });
+  await login(page, 'tenant@navfarm.demo');
+  await selectCompany(page, /Green Valley Poultry/);
+
+  await page.goto('/green-valley-poultry/masters');
+  await expect(page.getByRole('heading', { name: 'Master-data dashboard' })).toBeVisible();
+  await capturePhase3Pair(page, 'master-data-dashboard');
+
+  await page.goto('/green-valley-poultry/masters/items');
+  await expect(page.getByRole('heading', { name: 'Items' })).toBeVisible();
+  await expect(page.getByText('FEED_GROWER')).toBeVisible();
+  await page.getByRole('button', { name: 'Add record' }).click();
+  await expect(page.getByRole('heading', { name: 'Create items record' })).toBeVisible();
+  await capturePhase3Pair(page, 'item-listing-and-form');
+
+  await page.goto('/green-valley-poultry/settings/business-structure');
+  await expect(page.getByRole('heading', { name: 'NOB & LOB business structure' })).toBeVisible();
+  await expect(page.getByText('company-nob-poultry')).toBeVisible();
+  await capturePhase3Pair(page, 'nob-lob-configuration');
+
+  await page.goto('/green-valley-poultry/accounting/chart-of-accounts');
+  await expect(page.getByRole('heading', { name: 'Chart of accounts' })).toBeVisible();
+  await expect(page.getByText(/1100/)).toBeVisible();
+  await capturePhase3Pair(page, 'chart-of-accounts-tree');
+
+  await page.goto('/green-valley-poultry/accounting/gl-mappings');
+  await expect(page.getByRole('heading', { name: 'GL mapping matrix' })).toBeVisible();
+  await capturePhase3Pair(page, 'gl-mapping-dashboard');
+
+  await page.goto('/green-valley-poultry/masters/items/import');
+  await expect(page.getByRole('heading', { name: 'Import Items' })).toBeVisible();
+  await page.getByRole('button', { name: 'Validate upload' }).click();
+  await expect(page.getByRole('heading', { name: 'Validation preview' })).toBeVisible();
+  await capturePhase3Pair(page, 'import-validation');
+
+  await page.goto('/green-valley-poultry/accounting/readiness');
+  await expect(page.getByRole('heading', { name: 'Configuration readiness' })).toBeVisible();
+  await expect(page.getByText('Operations ready')).toBeVisible();
+  await capturePhase3Pair(page, 'operations-readiness');
+
+  await page.goto('/green-valley-poultry/masters');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('heading', { name: 'Master-data dashboard' })).toBeVisible();
+  await page.screenshot({ path: resolve(phase3ScreenshotDirectory, 'mobile-master-data-navigation.png'), fullPage: true });
+});
+
+test('Phase 3 role restrictions apply to direct URLs and actions', async ({ page }) => {
+  await login(page, 'auditor@navfarm.demo');
+  await selectCompany(page, /Green Valley Poultry/);
+  await page.goto('/green-valley-poultry/accounting/chart-of-accounts');
+  await expect(page.getByRole('heading', { name: 'Chart of accounts' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Add account' })).toHaveCount(0);
+  await page.goto('/green-valley-poultry/masters/items');
+  await expect(page.getByRole('heading', { name: 'Items' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add record' })).toHaveCount(0);
 });

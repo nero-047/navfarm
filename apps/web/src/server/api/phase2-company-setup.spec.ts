@@ -86,10 +86,9 @@ describe('Phase 2 company creation and setup', () => {
     await call(setupActor, 'PATCH', `${root}/chart-of-accounts`, { accountingStandard: 'IND_AS', confirmed: true, glMappingsReady: true, accounts: [{ accountCode: '110100', accountName: 'Inventory', accountType: 'ASSET' }] });
     await call(setupActor, 'PATCH', `${root}/business-structure`, { configured: true, nobs: [{ nobCode: 'POULTRY', nobName: 'Poultry', lobs: [{ lobCode: 'REARING', lobName: 'Rearing', costingMethod: 'STANDARD', qcRequired: true, qrRequired: true }] }] });
     await call(setupActor, 'PATCH', `${root}/essential-masters`, { uomReady: true, itemsReady: true, breedsReady: true, locationsReady: true, resourcesReady: true });
-    const completed = await call(setupActor, 'POST', `${root}/complete`);
-    expect(completed.response.status).toBe(200);
-    expect(completed.payload.operationsReady).toBe(true);
-    expect(completed.payload.setupComplete).toBe(true);
+    const legacySummaryDoesNotUnlock = await call(setupActor, 'POST', `${root}/complete`);
+    expect(legacySummaryDoesNotUnlock.response.status).toBe(409);
+    expect(legacySummaryDoesNotUnlock.payload.error.message).toContain('operations blockers');
   });
 
   it('denies setup editing without tenant or company administration permission', async () => {

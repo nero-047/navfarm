@@ -28,8 +28,8 @@ Legend:
 | Companies | `POST /company` | Consumed, runtime contract, seeded |
 | Languages | `GET/POST /language` | Consumed; read runtime contract/seeded, mutation pass-through |
 | Currencies | `GET/POST /currency` | Consumed; read runtime contract/seeded, mutation pass-through |
-| NOB | `GET/POST /setup/wizard/nobs`, `DELETE /setup/wizard/nobs/{nobId}` | Consumed; read runtime contract/seeded, mutations pass-through |
-| LOB | `GET /setup/wizard/lobs/{nobId}`, `POST /setup/wizard/lobs`, `DELETE /setup/wizard/lobs/{lobId}` | Consumed; read seeded, mutations pass-through |
+| NOB | `GET/POST /setup/wizard/nobs`, `DELETE /setup/wizard/nobs/{nobId}` | Inactive compatibility only after Phase 3 |
+| LOB | `GET /setup/wizard/lobs/{nobId}`, `POST /setup/wizard/lobs`, `DELETE /setup/wizard/lobs/{lobId}` | Inactive compatibility only after Phase 3 |
 | Legacy setup | `/setup/wizard/status`, `/company-details`, `/step-*`, `/complete`, `/upload-logo` | Retained compatibility handlers; inactive after migration to company setup contracts |
 | Users | `GET/PUT/DELETE /user/{userId}`, `GET /user/company/{companyId}` | Consumed; reads partly seeded, mutations pass-through |
 | User-company | `GET /user-company/{userId}/companies`, `GET /user-company/company/{companyId}/members` | Consumed, seeded |
@@ -50,9 +50,9 @@ implementations.
 | Domain | Required versioned endpoints |
 | --- | --- |
 | Company setup | `GET/PATCH /companies/{companyId}/profile`; `GET/PUT /companies/{companyId}/addresses`; `GET/PUT /companies/{companyId}/contacts`; `GET/PUT /companies/{companyId}/localization`; `GET/PUT /companies/{companyId}/fiscal`; `GET/PUT /companies/{companyId}/modules`; `GET /companies/{companyId}/setup-status` |
-| NOB/LOB config | `GET /nobs`; `GET /nobs/{nobId}/lobs`; `GET/PUT /companies/{companyId}/lobs`; `GET/PUT /companies/{companyId}/lobs/{lobId}/costing-policy` |
-| Master data | CRUD collections below `/companies/{companyId}/masters/{uoms|items|breeds|locations|resources|entry-types|qc-parameters|scheduler-parameters}` |
-| GL mapping | `GET/PUT /companies/{companyId}/gl/accounts`; `GET/PUT /companies/{companyId}/gl/item-mappings`; `GET/PUT /companies/{companyId}/gl/entry-type-mappings` |
+| NOB/LOB config | Implemented Phase 3 platform template and company NOB/LOB endpoints below |
+| Master data | Implemented Phase 3 CRUD/lifecycle/import/export pattern below; scheduler definitions remain Phase 4 |
+| GL mapping | Implemented Phase 3 `/accounting/accounts`, `/accounting/gl-mappings`, `/accounting/costing`, and `/accounting/readiness` |
 | Batches | `GET/POST /companies/{companyId}/batches`; `GET/PATCH /companies/{companyId}/batches/{batchId}`; `POST /.../{batchId}/approve`; `POST /.../{batchId}/pause`; `POST /.../{batchId}/resume`; `POST /.../{batchId}/close`; `GET/PUT /.../{batchId}/inputs` |
 | Daily operations | `GET/POST /companies/{companyId}/batches/{batchId}/entries`; `GET/PATCH/DELETE /.../entries/{entryId}`; `GET /.../{batchId}/journals` |
 | Inventory/costing | `GET /companies/{companyId}/inventory/lots`; `GET /.../lots/{lotId}/layers`; `GET /batches/{batchId}/wip`; `GET /batches/{batchId}/cost-summary`; `GET /batches/{batchId}/variances` |
@@ -68,9 +68,9 @@ implementations.
 
 1. The older backend uses singular nouns (`/company`, `/tenant`, `/role`) and
    setup-step RPC paths. They remain proxied for compatibility. Active Phase 2
-   pages use the resource-oriented contracts listed below. Admin master-data
-   configuration still consumes `/setup/wizard/nobs` and `/setup/wizard/lobs`;
-   those two legacy areas remain an explicit migration item.
+   pages use the resource-oriented contracts listed below. Phase 3 removed
+   active admin and onboarding use of `/setup/wizard/nobs` and
+   `/setup/wizard/lobs`; the handlers remain for inactive legacy source.
 2. Runtime schemas cover auth sessions, Phase 2 platform and tenant resources,
    all active company setup resources, companies, NOBs, languages, currencies,
    normalized errors, and the demo state repository. Other legacy
@@ -161,3 +161,63 @@ The temporary readiness split is explicit: steps 1–9 establish workspace
 readiness; chart of accounts, business structure, and essential masters
 establish operations readiness. The policy is centralized in
 `apps/web/src/lib/readiness-policy.ts`.
+
+## Phase 3 platform reference APIs
+
+| Method and route | Purpose | Status |
+| --- | --- | --- |
+| `GET /platform/masters/nobs` | RAK-backed NOB template catalogue | Complete |
+| `GET /platform/masters/lobs` | LOB templates, permitted costing methods and dependencies | Complete |
+| `GET /platform/masters/modules` | Supported module catalogue | Complete |
+| `GET /platform/masters/reference-data` | Languages, currencies and timezones | Complete |
+
+## Phase 3 company NOB/LOB APIs
+
+| Method and route | Purpose | Status |
+| --- | --- | --- |
+| `GET /companies/{companyId}/business-structure` | Completeness, blockers, company NOBs and LOBs | Complete |
+| `GET/POST /companies/{companyId}/nobs` | List or enable a company NOB | Complete |
+| `PATCH /companies/{companyId}/nobs/{companyNobId}` | Company code/name changes | Complete |
+| `POST /companies/{companyId}/nobs/{companyNobId}/{activate\|deactivate}` | Lifecycle with dependency conflict | Complete |
+| `GET/POST /companies/{companyId}/lobs` | List or enable a permitted LOB | Complete |
+| `PATCH /companies/{companyId}/lobs/{companyLobId}` | Company LOB changes | Complete |
+| `POST /companies/{companyId}/lobs/{companyLobId}/{activate\|deactivate}` | Lifecycle with dependency conflict | Complete |
+
+## Phase 3 company master-data APIs
+
+The collection/detail/create/update/activate/deactivate pattern is complete for
+the strict resource schemas `uoms`, `uom-conversions`, `item-categories`,
+`items`, `attributes`, `breeds`, `locations`, `resources`,
+`operational-parameters`, and `qc-parameters`.
+
+| Method and route | Purpose | Status |
+| --- | --- | --- |
+| `GET /companies/{companyId}/masters` | Counts, state, blockers, permissions and import availability | Complete |
+| `GET/POST /companies/{companyId}/masters/{resource}` | Search/filter/sort/page collection and create | Complete |
+| `GET/PATCH /companies/{companyId}/masters/{resource}/{id}` | Detail and update | Complete |
+| `POST /companies/{companyId}/masters/{resource}/{id}/{activate\|deactivate}` | Non-destructive lifecycle | Complete |
+| `GET /companies/{companyId}/masters/{resource}/import-template` | CSV template metadata/content | Complete demo contract |
+| `POST /companies/{companyId}/masters/{resource}/import/validate` | Validation preview | Complete demo contract |
+| `POST /companies/{companyId}/masters/{resource}/import/confirm` | Confirm a valid preview | Complete demo contract |
+| `GET /companies/{companyId}/masters/imports/{importId}` | Import status | Complete |
+| `GET /companies/{companyId}/masters/{resource}/export` | CSV export payload | Complete demo contract |
+
+CSV parsing/storage and XLSX generation remain backend prerequisites. The mock
+models deterministic valid, partial, and invalid previews without pretending
+to persist uploaded files.
+
+## Phase 3 accounting APIs
+
+| Method and route | Purpose | Status |
+| --- | --- | --- |
+| `GET/POST /companies/{companyId}/accounting/accounts` | Chart of accounts collection/create | Complete |
+| `GET/PATCH /companies/{companyId}/accounting/accounts/{accountId}` | Account detail/update | Complete |
+| `POST /companies/{companyId}/accounting/accounts/{accountId}/{activate\|deactivate}` | Lifecycle/dependency validation | Complete |
+| `GET/POST /companies/{companyId}/accounting/gl-mappings` | Supported event mapping collection/create | Complete |
+| `PATCH /companies/{companyId}/accounting/gl-mappings/{mappingId}` | Update mapping | Complete |
+| `GET/PATCH /companies/{companyId}/accounting/costing` | `STANDARD`, `FIFO`, `BIO_ASSET` policy | Complete |
+| `GET /companies/{companyId}/accounting/readiness` | Resource-derived operations readiness | Complete |
+
+Phase 3 does not calculate costs, generate journals, balance entries, or post
+accounting results. Slaughter split remains a Phase 4 batch/output resource
+because the RAK structure requires `batch_id`, actual outputs and weights.

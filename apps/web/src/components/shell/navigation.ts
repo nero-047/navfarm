@@ -1,6 +1,6 @@
 import {
   BarChart3, Bell, Boxes, Building2, ClipboardCheck, Database, Gauge,
-  History, LayoutDashboard, Layers, QrCode, Settings, ShieldAlert, UserPlus, Users, Wrench,
+  History, LayoutDashboard, Layers, QrCode, Settings, ShieldAlert, UserPlus, Users, Wrench, Landmark,
 } from 'lucide-react';
 import type { AppScope, NavigationRule } from '../../lib/authorization';
 
@@ -41,6 +41,8 @@ export function navigationForScope(scope: AppScope, companySlug?: string): AppNa
     { label: 'Quality control', href: `${root}/quality`, icon: ClipboardCheck, permission: 'quality.view', module: 'QC' },
     { label: 'Traceability', href: `${root}/traceability`, icon: QrCode, permission: 'traceability.view', module: 'QR' },
     { label: 'Resources & KPIs', href: `${root}/resources`, icon: Wrench, permission: 'resources.view' },
+    { label: 'Master data', href: `${root}/masters`, icon: Database, permission: 'company.view' },
+    { label: 'Accounting', href: `${root}/accounting/readiness`, icon: Landmark, permission: 'finance.view', module: 'Finance' },
     { label: 'Reports', href: `${root}/reports`, icon: BarChart3, permission: 'finance.view' },
     { label: 'Settings', href: `${root}/settings`, icon: Settings, permission: 'company.manage' },
   ];
