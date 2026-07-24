@@ -47,4 +47,68 @@ describe('contract-first NAVFarm client', () => {
       code: 'UPSTREAM_ERROR',
     });
   });
+
+  it.each([
+    ['mock response', {
+      companyId: 'company-draft',
+      setupPercentage: 25,
+      workspaceReady: false,
+      operationsReady: false,
+      setupComplete: false,
+      blockingRequirements: [{
+        code: 'PROFILE',
+        label: 'Company profile',
+        route: 'profile',
+        kind: 'WORKSPACE',
+      }],
+      recommendedRequirements: [],
+      steps: [{
+        id: 'profile',
+        number: 1,
+        label: 'Company profile',
+        route: 'profile',
+        status: 'CURRENT',
+        requiredForWorkspace: true,
+        requiredForOperations: false,
+      }],
+    }],
+    ['proxy-compatible data envelope', {
+      data: {
+        companyId: 'company-draft',
+        setupPercentage: 25,
+        workspaceReady: false,
+        operationsReady: false,
+        setupComplete: false,
+        blockingRequirements: [{
+          code: 'PROFILE',
+          label: 'Company profile',
+          route: 'profile',
+          kind: 'WORKSPACE',
+        }],
+        recommendedRequirements: [],
+        steps: [{
+          id: 'profile',
+          number: 1,
+          label: 'Company profile',
+          route: 'profile',
+          status: 'CURRENT',
+          requiredForWorkspace: true,
+          requiredForOperations: false,
+        }],
+      },
+      meta: { requestId: 'proxy-phase2' },
+    }],
+  ])('validates the same Phase 2 setup contract for a %s', async (_label, payload) => {
+    const fetcher = jest.fn(() => response(payload));
+    const client = createApiClient(fetcher as typeof fetch);
+
+    await expect(client.get('/companies/company-draft/setup/status')).resolves.toMatchObject({
+      companyId: 'company-draft',
+      setupPercentage: 25,
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/companies/company-draft/setup/status',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
 });

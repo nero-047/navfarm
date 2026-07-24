@@ -1,6 +1,6 @@
 import {
   BarChart3, Bell, Boxes, Building2, ClipboardCheck, Database, Gauge,
-  History, LayoutDashboard, Layers, QrCode, Settings, ShieldAlert, Users, Wrench,
+  History, LayoutDashboard, Layers, QrCode, Settings, ShieldAlert, UserPlus, Users, Wrench,
 } from 'lucide-react';
 import type { AppScope, NavigationRule } from '../../lib/authorization';
 
@@ -22,9 +22,13 @@ export function navigationForScope(scope: AppScope, companySlug?: string): AppNa
   if (scope === 'tenant') {
     return [
       { label: 'Dashboard', href: '/console/dashboard', icon: LayoutDashboard, permission: 'tenant.view' },
+      { label: 'Tenant profile', href: '/console/profile', icon: Settings, permission: 'tenant.manage' },
       { label: 'Companies', href: '/console/companies', icon: Building2, permission: 'company.view' },
       { label: 'Team management', href: '/console/users', icon: Users, permission: 'users.view' },
+      { label: 'Invitations', href: '/console/invitations', icon: UserPlus, permission: 'users.manage' },
       { label: 'Role permissions', href: '/console/roles', icon: ShieldAlert, permission: 'roles.view' },
+      { label: 'Subscription', href: '/console/subscription', icon: Layers, permission: 'tenant.view' },
+      { label: 'Usage & limits', href: '/console/usage', icon: Gauge, permission: 'tenant.view' },
       { label: 'Audit ledger', href: '/console/audit', icon: History, permission: 'audit.view' },
       { label: 'Notifications', href: '/console/notifications', icon: Bell, permission: 'notifications.manage' },
     ];

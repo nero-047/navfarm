@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { phase2RuntimeContracts } from './phase2';
 
 export const apiErrorCodeSchema = z.enum([
   'BAD_REQUEST',
@@ -167,6 +168,7 @@ export type RuntimeContract = {
  * runtime validated.
  */
 export const runtimeContracts: RuntimeContract[] = [
+  ...phase2RuntimeContracts,
   { method: 'POST', pattern: /^\/auth\/(login|mfa\/verify|mfa\/recovery)$/, response: authSessionSchema },
   { method: 'GET', pattern: /^\/auth\/session$/, response: authSessionSchema },
   { method: 'PUT', pattern: /^\/auth\/context$/, response: authSessionSchema },

@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { NextResponse } from 'next/server';
 import type { AuthSession, CompanyRole, Permission } from '../../contracts/api';
+import type { CompanySummary } from '../../contracts/phase2';
 import { ROLE_PERMISSIONS } from '../../lib/authorization';
 import { apiErrorResponse } from './errors';
+import { handlePhase2Request, resetPhase2Repository } from './phase2-repository';
 
 type JsonRecord = Record<string, unknown>;
 type FixtureUser = {
@@ -198,6 +200,7 @@ function hasMockMutationAccess(session: AuthSession, path: string) {
 
 export async function handleMockRequest(request: Request, path: string, requestId: string): Promise<NextResponse> {
   const method = request.method;
+  const phase2Request = request.clone();
   const input = await body(request);
 
   if (method === 'POST' && path === '/auth/login') {
@@ -268,14 +271,51 @@ export async function handleMockRequest(request: Request, path: string, requestI
       return apiErrorResponse(404, 'Not found.', requestId);
     }
     state.companies = structuredClone(seedCompanies);
+    state.users = structuredClone(fixtureUsers);
     state.demoStates.clear();
     state.sessions.clear();
+    resetPhase2Repository();
     return json({ success: true });
   }
 
   const found = requireSession(request, requestId);
   if (found instanceof NextResponse) return found;
   const session = sessionPayload(found.record);
+  const phase2Response = await handlePhase2Request(phase2Request, path, requestId, {
+    userId: session.user.userId,
+    fullName: session.user.fullName,
+    platformRole: session.user.platformRole,
+    activeTenantId: session.activeTenantId,
+    activeCompanyId: session.activeCompanyId,
+    tenantAdmin: session.tenants.some(
+      (tenant) => tenant.tenantId === session.activeTenantId && tenant.role === 'TENANT_ADMIN',
+    ),
+    companyManage: Boolean(
+      session.companies.find((company) => company.companyId === session.activeCompanyId)
+        ?.permissions.includes('company.manage'),
+    ),
+    grantCompany: (company: CompanySummary) => {
+      if (!state.companies.some((item) => item.company_id === company.companyId)) {
+        state.companies.push({
+          company_id: company.companyId,
+          tenant_id: company.tenantId,
+          company_code: company.code,
+          company_name: company.name,
+          company_display_name: company.name,
+          industry_type: 'Unconfigured',
+          onboarding_status: 'NOT_STARTED',
+          is_active: true,
+          slug: company.slug,
+          enabled_modules: [],
+        });
+      }
+      const user = state.users.find((item) => item.userId === found.record.userId);
+      if (user && !user.companies.some((membership) => membership.companyId === company.companyId)) {
+        user.companies.push({ companyId: company.companyId, role: 'SUPER_ADMIN' });
+      }
+    },
+  });
+  if (phase2Response) return phase2Response;
   if (!['GET', 'HEAD'].includes(method) && !hasMockMutationAccess(session, path)) {
     return apiErrorResponse(403, 'You do not have permission to perform this operation.', requestId);
   }

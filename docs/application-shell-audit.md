@@ -27,7 +27,8 @@ Phase 1 shell consolidation.
 - Company operations: dashboard, batches and batch details, daily operations,
   quality, traceability, resources, reports, profile, settings, and the public
   trace page.
-- Reusable UI: company cards/switcher, onboarding wizard and step components,
+- Reusable UI: company cards/switcher, legacy onboarding wizard and step
+  components retained as inactive compatibility source,
   farm-demo workflow dialogs/charts, and shared UI primitives.
 
 ## Consolidated shell
@@ -51,5 +52,7 @@ declared in `src/components/shell/navigation.ts`.
 
 Authentication identity is now loaded from `GET /api/v1/auth/session` using a
 same-origin HTTP-only cookie. Only UI preferences (theme, language, collapsed
-sidebar) remain in localStorage. Company onboarding was moved from an embedded
-console-shell gate to `/onboarding`; the existing wizard components remain.
+sidebar) remain in localStorage. Active company onboarding is now the
+contract-backed `/{company}/setup` flow; `/onboarding` is a compatibility
+redirect. The former wizard components remain in source so no capability is
+silently removed, but active setup pages use `components/phase2/company-setup`.

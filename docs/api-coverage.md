@@ -30,15 +30,7 @@ Legend:
 | Currencies | `GET/POST /currency` | Consumed; read runtime contract/seeded, mutation pass-through |
 | NOB | `GET/POST /setup/wizard/nobs`, `DELETE /setup/wizard/nobs/{nobId}` | Consumed; read runtime contract/seeded, mutations pass-through |
 | LOB | `GET /setup/wizard/lobs/{nobId}`, `POST /setup/wizard/lobs`, `DELETE /setup/wizard/lobs/{lobId}` | Consumed; read seeded, mutations pass-through |
-| Setup | `GET /setup/wizard/status/{companyId}` | Consumed, seeded |
-| Setup | `GET /setup/wizard/company-details/{companyId}` | Consumed, seeded |
-| Setup | `POST /setup/wizard/step-1`, `/step-2`, `/step-3`, `/step-7` | Consumed, pass-through |
-| Setup | `POST /setup/wizard/step-4/{companyId}/{languageId}` | Consumed, pass-through |
-| Setup | `POST /setup/wizard/step-5/{companyId}/{currencyId}` | Consumed, pass-through |
-| Setup | `POST /setup/wizard/step-6/{companyId}/{timezone}/{country}` | Consumed, pass-through |
-| Setup | `POST /setup/wizard/step-8/{companyId}` | Consumed, pass-through |
-| Setup | `POST /setup/wizard/complete/{companyId}` | Consumed, pass-through |
-| Setup | `POST /setup/wizard/upload-logo` | Consumed, seeded placeholder |
+| Legacy setup | `/setup/wizard/status`, `/company-details`, `/step-*`, `/complete`, `/upload-logo` | Retained compatibility handlers; inactive after migration to company setup contracts |
 | Users | `GET/PUT/DELETE /user/{userId}`, `GET /user/company/{companyId}` | Consumed; reads partly seeded, mutations pass-through |
 | User-company | `GET /user-company/{userId}/companies`, `GET /user-company/company/{companyId}/members` | Consumed, seeded |
 | User-company | `POST /user-company/assign`, `DELETE /user-company/assign/{assignmentId}` | Consumed, pass-through |
@@ -75,11 +67,13 @@ implementations.
 ## Contract gaps and migration notes
 
 1. The older backend uses singular nouns (`/company`, `/tenant`, `/role`) and
-   setup-step RPC paths. They remain proxied for compatibility. The required
-   resource-oriented endpoints above should be introduced with explicit
-   request/response schemas before pages migrate.
-2. Runtime schemas currently cover auth sessions, companies, NOBs, languages,
-   currencies, normalized errors, and the demo state repository. Other legacy
+   setup-step RPC paths. They remain proxied for compatibility. Active Phase 2
+   pages use the resource-oriented contracts listed below. Admin master-data
+   configuration still consumes `/setup/wizard/nobs` and `/setup/wizard/lobs`;
+   those two legacy areas remain an explicit migration item.
+2. Runtime schemas cover auth sessions, Phase 2 platform and tenant resources,
+   all active company setup resources, companies, NOBs, languages, currencies,
+   normalized errors, and the demo state repository. Other legacy
    calls pass through untyped to avoid silently removing functionality; each is
    listed above so the remaining contract work is visible.
 3. Mock persistence is process memory. Restarting the dev server resets it.
@@ -108,3 +102,62 @@ implementations.
 | `POST /auth/change-password` | `{currentPassword,newPassword}` | `{success}` | Session | Pass-through | Complete | Upstream pending |
 | `PATCH /users/me` | Profile/preferences fields | `AuthSession` | Session | Complete | Complete | Upstream pending |
 | `POST /__mock/reset` | Empty | `{success}` | Development/test configuration only | Complete, production-disabled | Not exposed in UI | Not applicable |
+
+## Phase 2 platform administration APIs
+
+| Method and route | Purpose | Contract/mock/frontend status |
+| --- | --- | --- |
+| `GET /platform/dashboard` | Platform KPIs, trends, alerts, and activity | Complete |
+| `GET/POST /platform/tenants` | Filtered tenant directory and tenant creation | Complete |
+| `GET/PATCH /platform/tenants/{tenantId}` | Tenant overview and profile changes | Complete |
+| `POST /platform/tenants/{tenantId}/{activate|suspend|reactivate}` | Tenant lifecycle | Complete |
+| `GET/PATCH /platform/tenants/{tenantId}/subscription` | Plan and billing state | Complete |
+| `GET/PATCH /platform/tenants/{tenantId}/limits` | Entitlement limits | Complete |
+| `GET /platform/tenants/{tenantId}/{companies|users|audit}` | Tenant drill-down collections | Complete |
+| `GET /platform/{companies|users|usage|audit}` | Cross-tenant platform views | Complete |
+| `GET /platform/plans`, `GET /platform/plans/{planId}` | Plan catalogue and detail | Complete |
+
+All endpoints require a system-administrator session. Collection responses
+support the documented search, filter, sort, and pagination contract.
+
+## Phase 2 tenant administration APIs
+
+| Method and route | Purpose | Contract/mock/frontend status |
+| --- | --- | --- |
+| `GET/PATCH /tenants/{tenantId}` | Tenant profile | Complete |
+| `GET /tenants/{tenantId}/dashboard` | Tenant KPIs and warnings | Complete |
+| `GET /tenants/{tenantId}/{usage|subscription|audit}` | Usage, subscription, audit | Complete |
+| `GET/POST /tenants/{tenantId}/companies` | Company directory and creation | Complete; limit enforced |
+| `GET /tenants/{tenantId}/companies/{companyId}` | Company summary | Complete |
+| `GET /tenants/{tenantId}/users` | Tenant users | Complete |
+| `GET/POST /tenants/{tenantId}/invitations` | Invitation directory and creation | Complete; limit enforced |
+| `POST /tenants/{tenantId}/invitations/{invitationId}/resend` | Resend invitation | Complete |
+| `DELETE /tenants/{tenantId}/invitations/{invitationId}` | Revoke invitation | Complete |
+| `GET /tenants/{tenantId}/roles` | Tenant role catalogue | Complete |
+
+## Phase 2 company setup APIs
+
+All active onboarding requests are below
+`/companies/{companyId}/setup`. Each resource has a shared runtime-validated
+TypeScript request/response contract and uses the normalized API error shape.
+
+| Method and suffix | Purpose | Status |
+| --- | --- | --- |
+| `GET /status`, `POST /complete` | Readiness and final completion | Complete |
+| `GET/PATCH /profile` | Company identity and registration | Complete |
+| `GET/POST /addresses`, `PATCH/DELETE /addresses/{addressId}` | Addresses | Complete |
+| `GET/POST /contacts`, `PATCH/DELETE /contacts/{contactId}` | Contacts | Complete |
+| `GET/PATCH /localization` | Language, currency, timezone, region | Complete |
+| `GET/PATCH /fiscal` | Fiscal calendar and costing defaults | Complete |
+| `GET/PATCH /modules` | Enabled modules | Complete |
+| `GET/PATCH /administrator` | Primary administrator | Complete |
+| `GET/POST /team`, `PATCH/DELETE /team/{memberId}` | Initial team | Complete |
+| `GET/PATCH /chart-of-accounts` | COA/GL readiness | Complete |
+| `GET/PATCH /business-structure` | NOB/LOB configuration | Complete |
+| `GET/PATCH /essential-masters` | UOM, item, breed, location, resource readiness | Complete |
+| `GET/PATCH /notifications` | Notification preferences | Complete |
+
+The temporary readiness split is explicit: steps 1–9 establish workspace
+readiness; chart of accounts, business structure, and essential masters
+establish operations readiness. The policy is centralized in
+`apps/web/src/lib/readiness-policy.ts`.

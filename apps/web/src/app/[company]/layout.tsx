@@ -5,6 +5,7 @@ import { ApplicationShell } from '../../components/shell/application-shell';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCurrentCompany } from '../../modules/company/use-current-company';
 import { DemoStoreProvider } from '../../modules/farm-demo/demo-store';
+import { OperationsReadinessGuard } from '../../components/phase2/operations-readiness-guard';
 
 export default function CompanyLayout({ children }: { children: ReactNode }) {
   const company = useCurrentCompany();
@@ -23,7 +24,11 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
         <span className="font-semibold">Interactive frontend demo</span>
         <span>Seeded process-memory data through the contract-first API; no production backend is connected.</span>
       </div>
-      {company ? <DemoStoreProvider company={company}>{children}</DemoStoreProvider> : children}
+      {company ? (
+        <OperationsReadinessGuard companySlug={company.slug}>
+          <DemoStoreProvider company={company}>{children}</DemoStoreProvider>
+        </OperationsReadinessGuard>
+      ) : children}
     </ApplicationShell>
   );
 }

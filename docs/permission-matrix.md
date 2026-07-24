@@ -20,3 +20,18 @@ checks and a production backend must do the same.
 Canonical permission identifiers are defined in
 `apps/web/src/contracts/api.ts`; role defaults and permission evaluation are in
 `apps/web/src/lib/authorization.ts`.
+
+## Phase 2 administration boundaries
+
+| Action | System administrator | Tenant administrator | Company administrator |
+| --- | --- | --- | --- |
+| View/create/suspend tenants and change subscriptions | Yes | No | No |
+| View platform plans, usage, users, companies, and audit | Yes | No | No |
+| Manage own tenant profile, companies, users, invitations, roles | Yes | Yes | No |
+| Create a company within tenant entitlement limits | Yes | Yes | No |
+| Edit company setup | Yes | Yes, with company membership | Yes, for assigned company |
+| View company setup | Yes | Yes, with company membership | Yes, for assigned company |
+| Enter operations before operations readiness | No; read-only | No; read-only | No; read-only |
+
+The API repository enforces these rules independently of hidden navigation.
+Suspended tenants cannot mutate tenant or company setup data.
