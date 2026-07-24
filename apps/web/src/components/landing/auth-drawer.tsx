@@ -59,7 +59,9 @@ export default function AuthDrawer({ isOpen, onClose, initialTab = 'login' }: Au
       setSuccess(tab === 'login' ? 'Signed in. Opening your workspace…' : 'Workspace created. Opening NAVFarm…');
       setTimeout(() => {
         onClose();
-        router.push(user.userType === 'SYSTEM_ADMIN' ? '/admin' : '/company-selection');
+        router.push(user.mfaRequired && typeof user.challengeId === 'string'
+          ? `/mfa/verify?challengeId=${encodeURIComponent(user.challengeId)}`
+          : user.userType === 'SYSTEM_ADMIN' ? '/admin' : '/context-selection');
       }, 450);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not complete this request.');

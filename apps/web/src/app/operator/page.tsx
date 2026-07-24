@@ -1,2 +1,2 @@
 import { redirect } from 'next/navigation';
-export default function Page() { redirect('/admin'); }
+export default function OperatorPage() { redirect('/admin/masters'); }

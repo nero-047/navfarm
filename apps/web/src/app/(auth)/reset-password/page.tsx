@@ -1,5 +1,3 @@
-import { ResetPasswordForm } from '@/modules/auth';
-
-export default function ResetPasswordPage() {
-  return <ResetPasswordForm />;
-}
+import { AuthWorkflowForm } from '../../../components/auth/auth-workflow-form';
+import { Suspense } from 'react';
+export default function ResetPasswordPage() { return <Suspense><AuthWorkflowForm kind="reset" /></Suspense>; }

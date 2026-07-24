@@ -1,37 +1,12 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import {
-  AUTH_STORAGE,
-  api,
-  clearAuthSession,
-  persistAuthSession,
-} from '@/lib/api-client';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { AuthSession } from '../contracts/api';
+import { destinationForSession } from '../lib/authorization';
+import { ApiError, api } from '../lib/api-client';
+import { setSessionSnapshot } from '../hooks/useAuth';
 
-export interface UserCompany {
-  company_id: string;
-  company_name: string;
-  is_primary: boolean;
-}
-
-export interface User {
-  userId: string;
-  fullName: string;
-  name: string;
-  email: string;
-  userType: string;
-  companyId: string;
-  tenantId: string;
-  companies: UserCompany[];
-  permissions: unknown[];
-}
-
-interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  user: Omit<User, 'name'> & { name?: string };
-  mfa_required?: boolean;
-}
+export type User = AuthSession['user'];
 
 interface SignupInput {
   tenantName: string;
@@ -42,78 +17,78 @@ interface SignupInput {
 }
 
 interface AuthContextType {
+  session: AuthSession | null;
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<User & { mfaRequired?: boolean; challengeId?: string }>;
   signup: (input: SignupInput) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<AuthSession | null>;
+  selectContext: (tenantId: string | null, companyId: string | null) => Promise<AuthSession>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function normalizeUser(user: AuthResponse['user']): User {
-  return {
-    ...user,
-    name: user.fullName || user.name || user.email,
-    companies: user.companies || [],
-    permissions: user.permissions || [],
-  };
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(AUTH_STORAGE.user);
-      if (stored) setUser(normalizeUser(JSON.parse(stored)));
-    } catch {
-      clearAuthSession();
-    } finally {
-      setLoading(false);
-    }
+  const commit = useCallback((value: AuthSession | null) => {
+    setSession(value);
+    setSessionSnapshot(value);
+    return value;
   }, []);
+
+  const refreshSession = useCallback(async () => {
+    try {
+      return commit(await api.get<AuthSession>('/auth/session'));
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) return commit(null);
+      throw cause;
+    }
+  }, [commit]);
+
+  useEffect(() => {
+    refreshSession().finally(() => setLoading(false));
+  }, [refreshSession]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const response = await api.post<AuthResponse>('/auth/login', { email, password });
-    if (!response.access_token || response.mfa_required) {
-      throw new Error('MFA verification is required for this account.');
-    }
-    const nextUser = normalizeUser(response.user);
-    persistAuthSession({ ...response, user: nextUser });
-    setUser(nextUser);
-    return nextUser;
-  }, []);
+    const next = await api.post<AuthSession>('/auth/login', { email, password });
+    commit(next);
+    return { ...next.user, mfaRequired: next.mfaRequired, challengeId: next.challengeId };
+  }, [commit]);
 
   const signup = useCallback(async (input: SignupInput) => {
-    await api.post<{ tenant_id: string }>('/tenant/signup', {
-      tenant_code: input.tenantCode,
-      tenant_name: input.tenantName,
-      tenant_type: 'SME',
-      plan_id: 'PLAN_PRO',
-      billing_email: input.email,
-      admin_name: input.name,
-      admin_email: input.email,
-      admin_password: input.password,
+    await api.post('/tenant/signup', {
+      tenant_code: input.tenantCode, tenant_name: input.tenantName,
+      tenant_type: 'SME', plan_id: 'PLAN_PRO', billing_email: input.email,
+      admin_name: input.name, admin_email: input.email, admin_password: input.password,
     });
     return login(input.email, input.password);
   }, [login]);
 
-  const logout = useCallback(() => {
-    setUser(null);
-    clearAuthSession();
-  }, []);
+  const logout = useCallback(async () => {
+    try { await api.post('/auth/logout'); } finally { commit(null); }
+  }, [commit]);
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const selectContext = useCallback(async (tenantId: string | null, companyId: string | null) => {
+    const next = await api.put<AuthSession>('/auth/context', { tenantId, companyId });
+    commit(next);
+    return next;
+  }, [commit]);
+
+  const value = useMemo(() => ({
+    session, user: session?.user ?? null, loading, login, signup, logout,
+    refreshSession, selectContext,
+  }), [session, loading, login, signup, logout, refreshSession, selectContext]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  const value = useContext(AuthContext);
+  if (!value) throw new Error('useAuth must be used within AuthProvider');
+  return value;
 }
+
+export { destinationForSession };

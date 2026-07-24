@@ -57,22 +57,97 @@ export const currencySchema = z.object({
   symbol: z.string().optional(),
 }).passthrough();
 
-export const authSessionSchema = z.object({
-  access_token: z.string(),
-  refresh_token: z.string(),
-  mfa_required: z.boolean().optional(),
-  user: z.object({
-    userId: z.string(),
-    fullName: z.string(),
-    name: z.string().optional(),
-    email: z.string(),
-    userType: z.string(),
-    companyId: z.string(),
-    tenantId: z.string(),
-    companies: z.array(z.unknown()).default([]),
-    permissions: z.array(z.unknown()).default([]),
-  }).passthrough(),
+export const platformRoleSchema = z.enum(['SYSTEM_ADMIN', 'PLATFORM_SUPPORT']);
+export const companyRoleSchema = z.enum([
+  'SUPER_ADMIN',
+  'ADMIN',
+  'FARM_MANAGER',
+  'ACCOUNTANT',
+  'AUDITOR',
+  'SUPERVISOR',
+  'VIEWER',
+  'CUSTOM',
+]);
+export const permissionSchema = z.enum([
+  'platform.manage',
+  'tenant.view',
+  'tenant.manage',
+  'company.view',
+  'company.manage',
+  'users.view',
+  'users.manage',
+  'roles.view',
+  'roles.manage',
+  'batches.view',
+  'batches.create',
+  'batches.approve',
+  'operations.create',
+  'costs.view',
+  'finance.view',
+  'finance.manage',
+  'quality.view',
+  'quality.manage',
+  'traceability.view',
+  'resources.view',
+  'resources.manage',
+  'reports.export',
+  'audit.view',
+  'notifications.manage',
+]);
+
+export const sessionUserSchema = z.object({
+  userId: z.string(),
+  fullName: z.string(),
+  name: z.string().optional(),
+  email: z.string().email(),
+  platformRole: platformRoleSchema.nullable(),
+  language: z.string(),
+  timezone: z.string(),
+  emailVerified: z.boolean(),
+  mfaEnabled: z.boolean(),
+  userType: z.enum(['SYSTEM_ADMIN', 'TENANT_ADMIN', 'COMPANY_ADMIN', 'STANDARD_USER']),
+  companyId: z.string(),
+  tenantId: z.string(),
+  companies: z.array(z.object({
+    company_id: z.string(),
+    company_name: z.string(),
+    is_primary: z.boolean(),
+  })).default([]),
+  permissions: z.array(z.unknown()).default([]),
+}).passthrough();
+
+export const tenantMembershipSchema = z.object({
+  tenantId: z.string(),
+  tenantName: z.string(),
+  status: z.enum(['ACTIVE', 'SUSPENDED']),
+  role: z.enum(['TENANT_ADMIN', 'TENANT_MEMBER']),
 });
+
+export const companyMembershipSchema = z.object({
+  companyId: z.string(),
+  tenantId: z.string(),
+  companyName: z.string(),
+  companySlug: z.string(),
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+  onboardingStatus: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED']),
+  role: companyRoleSchema,
+  permissions: z.array(permissionSchema),
+  enabledModules: z.array(z.string()),
+});
+
+export const authSessionSchema = z.object({
+  user: sessionUserSchema,
+  tenants: z.array(tenantMembershipSchema),
+  companies: z.array(companyMembershipSchema),
+  activeTenantId: z.string().nullable(),
+  activeCompanyId: z.string().nullable(),
+  expiresAt: z.string(),
+  mfaRequired: z.boolean().optional(),
+  challengeId: z.string().optional(),
+});
+export type AuthSession = z.infer<typeof authSessionSchema>;
+export type Permission = z.infer<typeof permissionSchema>;
+export type CompanyRole = z.infer<typeof companyRoleSchema>;
 
 export const demoStateResponseSchema = z.object({
   state: z.unknown().nullable(),
@@ -92,7 +167,11 @@ export type RuntimeContract = {
  * runtime validated.
  */
 export const runtimeContracts: RuntimeContract[] = [
-  { method: 'POST', pattern: /^\/auth\/(login|refresh)$/, response: authSessionSchema },
+  { method: 'POST', pattern: /^\/auth\/(login|mfa\/verify|mfa\/recovery)$/, response: authSessionSchema },
+  { method: 'GET', pattern: /^\/auth\/session$/, response: authSessionSchema },
+  { method: 'PUT', pattern: /^\/auth\/context$/, response: authSessionSchema },
+  { method: 'PATCH', pattern: /^\/users\/me$/, response: authSessionSchema },
+  { method: 'POST', pattern: /^\/auth\/(logout|forgot-password|reset-password|accept-invitation|verify-email|mfa\/setup)$/, response: successSchema },
   { method: 'GET', pattern: /^\/company\/tenant\/[^/]+$/, response: z.array(companySchema) },
   { method: 'POST', pattern: /^\/company$/, response: companySchema },
   { method: 'GET', pattern: /^\/setup\/wizard\/nobs$/, response: z.array(nobSchema) },

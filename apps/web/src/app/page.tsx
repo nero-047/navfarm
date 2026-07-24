@@ -2,23 +2,15 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../contexts/AuthContext';
+import { destinationForSession } from '../lib/authorization';
 
 export default function Index() {
+  const { session, loading } = useAuth();
   const router = useRouter();
-
   useEffect(() => {
-    const user = localStorage.getItem('navfarm_auth_user');
-    router.replace(user ? '/company-selection' : '/login');
-  }, [router]);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f8f8f8]">
-      <div className="text-center">
-        <p className="text-xl font-bold tracking-tight text-[#0b1248]">
-          NAV<span className="text-[#c24332]">Farm</span>
-        </p>
-        <p className="mt-2 text-sm text-[#707070]">Opening your workspace…</p>
-      </div>
-    </div>
-  );
+    if (loading) return;
+    router.replace(session ? destinationForSession(session) : '/login');
+  }, [loading, router, session]);
+  return <div className="flex min-h-screen items-center justify-center bg-[#f3f5f8] text-sm text-[#707789]">Opening your secure workspace…</div>;
 }

@@ -45,7 +45,7 @@ export default function DashboardPage() {
       ]);
       setTenantPlanInfo(tenant);
 
-      // Use the active company from localStorage (reflects company switch)
+      // Use the active company from the secure server session.
       const activeId = getActiveCompanyId() ||
         storedUser.companyId ||
         (storedUser as any).company_id;

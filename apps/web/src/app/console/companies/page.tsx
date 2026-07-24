@@ -7,7 +7,7 @@ import {
   Settings, ArrowLeft, Activity, Plus,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
-import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, NavUser } from "../../../hooks/useAuth";
+import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
 import CompanyTab from "../../../components/console/console-tabs/company-tab";
 import { Dialog } from "../../../components/ui/dialog";
 
@@ -330,18 +330,7 @@ export default function CompaniesPage() {
                     ) : (
                       <button
                         onClick={() => {
-                          const currentUser = getStoredUser();
-                          if (currentUser) {
-                            const patched = {
-                              ...currentUser,
-                              companyId: co.company_id,
-                              company_id: co.company_id,
-                            };
-                            localStorage.setItem("user", JSON.stringify(patched));
-                            localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
-                          }
-                          setActiveCompanyId(co.company_id);
-                          window.location.reload();
+                          router.push(`/onboarding?tenantId=${encodeURIComponent(tenantId)}&companyId=${encodeURIComponent(co.company_id)}`);
                         }}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
                         style={{ backgroundColor: "var(--surface-raised)", color: "var(--text-primary)", borderColor: "var(--border)" }}>

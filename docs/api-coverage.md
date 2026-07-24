@@ -17,7 +17,7 @@ Legend:
 
 | Area | Method and `/api/v1` path | Coverage |
 | --- | --- | --- |
-| Auth | `POST /auth/login`, `POST /auth/refresh` | Consumed, runtime contract, seeded |
+| Auth | `POST /auth/login`, `GET /auth/session`, `POST /auth/logout` | Consumed, runtime contracts, seeded HTTP-only session |
 | Auth/users | `GET /auth/users`, `POST /auth/register-admin` | Consumed; read seeded, mutation pass-through |
 | Tenants | `GET /tenant`, `POST /tenant/signup` | Consumed, seeded/pass-through |
 | Tenants | `GET/PATCH /tenant/{tenantId}` | Consumed, seeded/pass-through |
@@ -85,6 +85,26 @@ implementations.
 3. Mock persistence is process memory. Restarting the dev server resets it.
    This is deliberate demo behavior and must not be represented as durable
    production persistence.
-4. Hybrid mode first tries the configured upstream and falls back to the seeded
-   repository only for 404/503 responses. It is rejected when
-   `NODE_ENV !== development`.
+4. Hybrid mode never falls back for validation, authentication, permission,
+   network, timeout, or server failures. Development fallback is limited to
+   404/501 responses whose exact `METHOD /path` appears in
+   `NAVFARM_HYBRID_MOCK_ENDPOINTS`.
+
+## Phase 1 authentication and user APIs
+
+| Method and route | Request contract | Response contract | Permission | Mock status | Frontend status | Backend status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `POST /auth/login` | `{email,password}` | `AuthSession` or MFA challenge; sets HTTP-only cookie | Public | Complete | Complete | Proxy-compatible, upstream pending |
+| `POST /auth/logout` | Empty | `{success}`; clears cookie | Session | Complete | Complete | Proxy-compatible, upstream pending |
+| `GET /auth/session` | Cookie | `AuthSession` | Session | Complete | Complete | Proxy-compatible, upstream pending |
+| `PUT /auth/context` | `{tenantId,companyId}` | `AuthSession` | Membership | Complete | Complete | Proxy-compatible, upstream pending |
+| `POST /auth/forgot-password` | `{email}` | `{success}` | Public | Complete, non-enumerating | Complete | Upstream pending |
+| `POST /auth/reset-password` | `{token,password}` | `{success}` | Valid reset token | Complete demo | Complete | Upstream pending |
+| `POST /auth/accept-invitation` | `{token,fullName,password}` | `{success}` | Valid invitation | Complete demo | Complete | Upstream pending |
+| `POST /auth/verify-email` | `{token}` | `{success}` | Valid verification token | Complete demo | Complete | Upstream pending |
+| `POST /auth/mfa/setup` | `{code}` | `{success}` | Session | Complete demo | Complete | Upstream pending |
+| `POST /auth/mfa/verify` | `{challengeId,code}` | `AuthSession`; sets cookie | Valid challenge | Complete (`123456`) | Complete | Upstream pending |
+| `POST /auth/mfa/recovery` | `{challengeId,recoveryCode}` | `AuthSession`; sets cookie | Valid challenge | Complete (`NAVFARM-RECOVERY`) | Complete | Upstream pending |
+| `POST /auth/change-password` | `{currentPassword,newPassword}` | `{success}` | Session | Pass-through | Complete | Upstream pending |
+| `PATCH /users/me` | Profile/preferences fields | `AuthSession` | Session | Complete | Complete | Upstream pending |
+| `POST /__mock/reset` | Empty | `{success}` | Development/test configuration only | Complete, production-disabled | Not exposed in UI | Not applicable |

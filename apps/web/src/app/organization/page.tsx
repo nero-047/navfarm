@@ -1,5 +1,2 @@
-import { TenantAdminPage } from '@/modules/admin-demo/tenant-admin-page';
-
-export default function OrganizationPage() {
-  return <TenantAdminPage />;
-}
+import { redirect } from 'next/navigation';
+export default function OrganizationPage() { redirect('/console/dashboard'); }

@@ -3,6 +3,7 @@ import { apiErrorResponse } from '@/server/api/errors';
 import { getApiMode } from '@/server/api/mode';
 import { handleMockRequest } from '@/server/api/mock-repository';
 import { proxyRequest } from '@/server/api/proxy';
+import { shouldHybridFallback } from '@/server/api/hybrid';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ async function dispatch(request: Request, context: { params: Promise<{ path: str
     const mode = getApiMode();
     if (mode === 'mock') return handleMockRequest(request, path, requestId);
     const proxied = await proxyRequest(request, path, requestId);
-    if (mode === 'hybrid' && (proxied.status === 404 || proxied.status === 503)) {
+    if (mode === 'hybrid' && shouldHybridFallback(request.method, path, proxied.status)) {
       return handleMockRequest(request, path, requestId);
     }
     return proxied;

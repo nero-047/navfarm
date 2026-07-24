@@ -1,18 +1,18 @@
 # NAVFarm web application shell audit
 
-Audited 2026-07-24 before the API architecture change. This file records the
-replacement intent; no route listed below was deleted by the API work.
+Audited 2026-07-24 before the API architecture change and updated after the
+Phase 1 shell consolidation.
 
 ## Findings
 
 | Route family | Current shell/page | Overlap | Decision |
 | --- | --- | --- | --- |
-| `/admin/*` | `src/app/admin/layout.tsx` | System administration overlaps the older `AdminShell` visual vocabulary, but has the complete dashboard, tenant, plan, master-data, and audit navigation. | Retain as the canonical system-admin shell. |
-| `/console/*` | `src/app/console/layout.tsx` | Organization administration overlaps `/organization` and contains an embedded company onboarding shell. | Retain as the canonical tenant/company administration shell. |
-| `/[company]/*` | `src/app/[company]/layout.tsx` | Some settings, company profile, and users concepts also exist in `/console`. This shell is operational, not administrative. | Retain as the canonical company operations workspace. |
-| `/organization` | `TenantAdminPage` inside the legacy `modules/admin-demo` family, rendered through `AdminShell`. | Duplicates company and organization administration covered more fully by `/console/companies`, `/console/users`, and `/console/roles`. | Retain as a compatibility page for now. Replacement target is `/console/dashboard`; do not add new behavior here. |
-| `/operator` | Server redirect to `/admin`. The unused `OperatorPage` component remains under `modules/admin-demo`. | Alias for system-admin master configuration. | Retain redirect. The documented replacement is `/admin/masters`. |
-| `/tenant-admin` | Server redirect to `/console`. | Alias for organization administration. | Retain redirect. |
+| `/admin/*` | Shared `ApplicationShell`, platform scope | Canonical system administration. | Retained. |
+| `/console/*` | Shared `ApplicationShell`, tenant scope | Canonical tenant/organization administration. | Retained. |
+| `/[company]/*` | Shared `ApplicationShell`, company scope | Canonical operational workspace. | Retained with existing operational pages unchanged. |
+| `/organization` | Compatibility redirect | Former legacy `AdminShell` page. | Redirects to `/console/dashboard`. |
+| `/operator` | Compatibility redirect | Former system configuration alias. | Redirects to `/admin/masters`. |
+| `/tenant-admin` | Compatibility redirect | Former tenant alias. | Redirects to `/console/dashboard`. |
 | `/admin` | Client-side role guard and redirect to `/admin/dashboard`. | Root alias only. | Retain. |
 | `/console` | Client-side role guard and redirect to `/console/dashboard`. | Root alias only. | Retain. |
 
@@ -30,11 +30,18 @@ replacement intent; no route listed below was deleted by the API work.
 - Reusable UI: company cards/switcher, onboarding wizard and step components,
   farm-demo workflow dialogs/charts, and shared UI primitives.
 
-## Duplicate code to avoid extending
+## Consolidated shell
+
+`src/components/shell/application-shell.tsx` now owns the responsive sidebar,
+mobile drawer, header, breadcrumbs, secure tenant/company context switcher,
+notifications, profile menu, collapsed-sidebar preference, loading,
+route-transition, and access-denied states. Scope-specific navigation is
+declared in `src/components/shell/navigation.ts`.
+
+## Legacy code to avoid extending
 
 - `modules/admin-demo/admin-shell.tsx`, `tenant-admin-page.tsx`, and
-  `operator-page.tsx` are a legacy shell family. They remain solely to preserve
-  `/organization` compatibility.
+  `operator-page.tsx` are retained source only; no active route renders them.
 - `src/services/api-client.ts` is a compatibility import facade. New code should
   import the typed client from `src/lib/api-client.ts`.
 - `/api/hello` is the original scaffold endpoint and is not part of NAVFarm's
@@ -42,8 +49,7 @@ replacement intent; no route listed below was deleted by the API work.
 
 ## Replacement safeguards
 
-The contract-first migration changes the data boundary, not the user-facing
-route inventory. Legacy local operational persistence is replaced by
-`GET/PUT /api/v1/demo/companies/{companySlug}/state`. Authentication/session,
-theme, and language preferences remain browser session/preferences and are not
-treated as operational records.
+Authentication identity is now loaded from `GET /api/v1/auth/session` using a
+same-origin HTTP-only cookie. Only UI preferences (theme, language, collapsed
+sidebar) remain in localStorage. Company onboarding was moved from an embedded
+console-shell gate to `/onboarding`; the existing wizard components remain.

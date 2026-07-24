@@ -1,101 +1,82 @@
-"use client";
+'use client';
 
-import { AUTH_STORAGE, clearAuthSession } from "@/lib/api-client";
+import type { AuthSession } from '../contracts/api';
+import { can } from '../lib/authorization';
+import { api } from '../lib/api-client';
 
 export interface CompanyRef {
-  company_id:   string;
+  company_id: string;
   company_name: string;
-  is_primary:   boolean;
+  is_primary: boolean;
 }
 
 export interface NavUser {
-  userId:     string;
-  email:      string;
-  fullName:   string;
-  userType:   "SYSTEM_ADMIN" | "TENANT_ADMIN" | "COMPANY_ADMIN" | "STANDARD_USER";
-  companyId?:  string;
+  userId: string;
+  email: string;
+  fullName: string;
+  userType: 'SYSTEM_ADMIN' | 'TENANT_ADMIN' | 'COMPANY_ADMIN' | 'STANDARD_USER';
+  companyId?: string;
   company_id?: string;
-  tenantId?:   string;
-  companies?:  CompanyRef[];
-  permissions?: Array<{
-    moduleCode:  string;
-    resource:    string;
-    canView:     boolean;
-    canCreate:   boolean;
-    canEdit:     boolean;
-    canDelete?:  boolean;
-    canApprove?: boolean;
-  }>;
+  tenantId?: string;
+  companies?: CompanyRef[];
+  permissions?: Array<Record<string, unknown>>;
+}
+
+let currentSession: AuthSession | null = null;
+
+export function setSessionSnapshot(session: AuthSession | null) {
+  currentSession = session;
 }
 
 export function getStoredUser(): NavUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(AUTH_STORAGE.user);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return currentSession?.user as NavUser | null;
 }
 
 export function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(AUTH_STORAGE.accessToken);
+  return currentSession ? 'http-only-session' : null;
 }
 
 export function getStoredTenantId(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(AUTH_STORAGE.tenantId);
+  return currentSession?.activeTenantId ?? null;
 }
 
-/** The company the user is currently "working as" in this browser session */
 export function getActiveCompanyId(): string | null {
-  if (typeof window === "undefined") return null;
-  return (
-    localStorage.getItem("active_company_id") ||
-    localStorage.getItem("company_id") ||
-    null
-  );
+  return currentSession?.activeCompanyId ?? null;
 }
 
 export function setActiveCompanyId(companyId: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("active_company_id", companyId);
+  if (!currentSession) return;
+  currentSession = { ...currentSession, activeCompanyId: companyId };
+  void api.put<AuthSession>('/auth/context', {
+    tenantId: currentSession.activeTenantId,
+    companyId,
+  }).then(setSessionSnapshot);
 }
 
 export function clearSession() {
-  if (typeof window === "undefined") return;
-  clearAuthSession();
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("user");
-  localStorage.removeItem("tenant_id");
-  localStorage.removeItem("active_company_id");
+  currentSession = null;
+  void api.post('/auth/logout');
 }
 
 export function hasPermission(
-  user: NavUser | null,
+  _user: NavUser | null,
   moduleCode: string,
   resource: string,
-  action: "can_view" | "can_create" | "can_edit"
+  action: 'can_view' | 'can_create' | 'can_edit',
 ): boolean {
-  if (!user) return false;
-  if (user.userType === "COMPANY_ADMIN") return true;
-  if (user.userType === "TENANT_ADMIN") {
-    return (
-      (moduleCode === "COMPANY" && resource === "SETTINGS") ||
-      moduleCode === "PLAN" ||
-      (moduleCode === "RBAC" && resource !== "ROLE")
-    );
-  }
-  const perms = user.permissions || [];
-  return perms.some((p) => {
-    const matchModule   = p.moduleCode === "ALL" || p.moduleCode === moduleCode;
-    const matchResource = p.resource   === "ALL" || p.resource   === resource;
-    if (!matchModule || !matchResource) return false;
-    if (action === "can_view")   return !!p.canView;
-    if (action === "can_create") return !!p.canCreate;
-    if (action === "can_edit")   return !!p.canEdit;
-    return false;
-  });
+  const mapping = {
+    'COMPANY:SETTINGS:can_view': 'company.view',
+    'COMPANY:SETTINGS:can_create': 'company.manage',
+    'COMPANY:SETTINGS:can_edit': 'company.manage',
+    'RBAC:USER:can_view': 'users.view',
+    'RBAC:USER:can_create': 'users.manage',
+    'RBAC:USER:can_edit': 'users.manage',
+    'RBAC:ROLE:can_view': 'roles.view',
+    'RBAC:ROLE:can_create': 'roles.manage',
+    'RBAC:ROLE:can_edit': 'roles.manage',
+    'AUDIT:LOGS:can_view': 'audit.view',
+    'NOTIFICATION:SETTINGS:can_view': 'notifications.manage',
+  } as const;
+  const permission = mapping[`${moduleCode}:${resource}:${action}` as keyof typeof mapping];
+  return permission ? can(currentSession, permission) : false;
 }

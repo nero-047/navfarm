@@ -5,20 +5,26 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, MailCheck } from 'lucide-react';
+import { api } from '@/lib/api-client';
 
 export function ResetPasswordForm() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setError('Please enter your email');
       return;
     }
     setError('');
-    setSubmitted(true);
+    try {
+      await api.post('/auth/forgot-password', { email });
+      setSubmitted(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to request a reset link');
+    }
   };
 
   if (submitted) {
