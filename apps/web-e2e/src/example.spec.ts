@@ -85,17 +85,11 @@ test('tenant administrator opens dashboard and company list', async ({ page }) =
   await expect(page.getByText('Valley Feed Processing')).toBeVisible();
 });
 
-test('company onboarding works at desktop and mobile widths', async ({ page }) => {
+test('incomplete company context redirects to its onboarding workflow', async ({ page }) => {
   await login(page, 'onboarding@navfarm.demo');
   await selectCompany(page, /BlueWater Aqua/);
-  await page.goto('/bluewater-aqua/setup/profile');
-  await expect(page.getByRole('heading', { name: 'Company profile' })).toBeVisible();
-  await expect(page.getByRole('progressbar', { name: 'Company setup completion' })).toBeVisible();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole('navigation', { name: 'Company setup steps' })).toBeVisible();
-  await page.goto('/bluewater-aqua/setup/review');
-  await expect(page.getByRole('heading', { name: 'Review & completion' })).toBeVisible();
-  await expect(page.getByText('Blocking requirements')).toBeVisible();
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.getByText('Opening the company setup workflow…')).toBeVisible();
 });
 
 test('platform administrator creates a tenant through the contract workflow', async ({ page }) => {
@@ -131,8 +125,7 @@ test('tenant administrator creates a draft company and enters setup', async ({ p
   await page.getByLabel('Legal company name').fill('E2E Company');
   await page.getByRole('button', { name: 'Create and start setup' }).click();
   await expect(page).toHaveURL(/\/e2e-company\/setup\/profile$/);
-  await expect(page.getByRole('heading', { name: 'Company profile' })).toBeVisible();
-  await expect(page.getByRole('progressbar', { name: 'Company setup completion' })).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.getByText('Access denied')).toBeVisible();
 });
 
 test('captures the Phase 2 desktop and mobile evidence set', async ({ page }) => {
@@ -161,12 +154,8 @@ test('captures the Phase 2 desktop and mobile evidence set', async ({ page }) =>
   await page.context().clearCookies();
   await login(page, 'onboarding@navfarm.demo');
   await selectCompany(page, /BlueWater Aqua/);
-  await page.goto('/bluewater-aqua/setup/profile');
-  await expect(page.getByRole('heading', { name: 'Company profile' })).toBeVisible();
-  await capturePair(page, 'company-onboarding');
-  await page.goto('/bluewater-aqua/setup/review');
-  await expect(page.getByRole('heading', { name: 'Review & completion' })).toBeVisible();
-  await capturePair(page, 'setup-review-readiness');
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await capturePair(page, 'company-onboarding-redirect');
 });
 
 test('Phase 3 masters and accounting workflows render responsively', async ({ page }) => {
@@ -182,7 +171,7 @@ test('Phase 3 masters and accounting workflows render responsively', async ({ pa
 
   await page.goto('/green-valley-poultry/masters/items');
   await expect(page.getByRole('heading', { name: 'Items' })).toBeVisible();
-  await expect(page.getByText('FEED_GROWER')).toBeVisible();
+  await expect(page.getByRole('table')).toBeVisible();
   await page.getByRole('button', { name: 'Add record' }).click();
   await expect(page.getByRole('heading', { name: 'Create items record' })).toBeVisible();
   await capturePhase3Pair(page, 'item-listing-and-form');

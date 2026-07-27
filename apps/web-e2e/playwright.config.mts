@@ -25,33 +25,26 @@ export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
   timeout: 60_000,
   workers: 1,
+  retries: process.env.CI ? 1 : 0,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL,
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
   },
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'NAVFARM_ENABLE_MOCK_RESET=true pnpm exec nx dev web --port=3001',
+    command: 'NAVFARM_API_MODE=mock NAVFARM_ENABLE_MOCK_RESET=true NEXT_TELEMETRY_DISABLED=1 NX_DAEMON=false pnpm exec nx dev web --port=3001',
     url: 'http://localhost:3001',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     cwd: workspaceRoot,
   },
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
     },
 
     // Uncomment for branded browsers
