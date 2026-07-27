@@ -1191,6 +1191,8 @@ export const glAccountMaster = mysqlTable('gl_account_master', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  cost_center_required: boolean('cost_center_required').default(false).notNull(),
+  dimension_required: boolean('dimension_required').default(false).notNull(),
   extension_config: json('extension_config')
 }, (table) => ({
   companyFk: foreignKey({
@@ -2129,3 +2131,274 @@ export const inventoryCountLineRelations = relations(inventoryCountLine, ({ one 
     references: [serialMaster.serial_id]
   })
 }));
+
+// ==========================================
+// 10. FINANCE & ACCOUNTING SCHEMAS
+// ==========================================
+
+export const fiscalYear = mysqlTable('fiscal_year', {
+  fiscal_year_id: varchar('fiscal_year_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  year_code: varchar('year_code', { length: 20 }).notNull(), // e.g. FY2026
+  start_date: date('start_date', { mode: 'string' }).notNull(),
+  end_date: date('end_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 20 }).default('OPEN').notNull(), // OPEN, CLOSED
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_company_fy').on(table.tenant_id, table.company_id, table.year_code),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_fy_comp' }).onDelete('restrict'),
+]);
+
+export const accountingPeriod = mysqlTable('accounting_period', {
+  period_id: varchar('period_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  fiscal_year_id: varchar('fiscal_year_id', { length: 36 }).notNull(),
+  period_name: varchar('period_name', { length: 50 }).notNull(), // e.g. July 2026
+  period_no: int('period_no').notNull(), // 1 to 12
+  start_date: date('start_date', { mode: 'string' }).notNull(),
+  end_date: date('end_date', { mode: 'string' }).notNull(),
+  is_locked: boolean('is_locked').default(false).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_comp_period').on(table.tenant_id, table.company_id, table.fiscal_year_id, table.period_no),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_ap_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.fiscal_year_id], foreignColumns: [fiscalYear.fiscal_year_id], name: 'fk_ap_fy' }).onDelete('cascade'),
+]);
+
+export const financialDimension = mysqlTable('financial_dimension', {
+  dimension_id: varchar('dimension_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  dimension_code: varchar('dimension_code', { length: 50 }).notNull(), // e.g. FARM, PROJECT, DEPT
+  dimension_name: varchar('dimension_name', { length: 100 }).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_comp_dim').on(table.tenant_id, table.company_id, table.dimension_code),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_fd_comp' }).onDelete('restrict'),
+]);
+
+export const financialDimensionValue = mysqlTable('financial_dimension_value', {
+  value_id: varchar('value_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  dimension_id: varchar('dimension_id', { length: 36 }).notNull(),
+  value_code: varchar('value_code', { length: 50 }).notNull(), // e.g. Farm01, ProjB
+  value_name: varchar('value_name', { length: 100 }).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_comp_dim_val').on(table.tenant_id, table.company_id, table.dimension_id, table.value_code),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_fdv_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.dimension_id], foreignColumns: [financialDimension.dimension_id], name: 'fk_fdv_dim' }).onDelete('cascade'),
+]);
+
+export const financialJournal = mysqlTable('financial_journal', {
+  journal_id: varchar('journal_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  journal_no: varchar('journal_no', { length: 50 }).notNull(),
+  journal_type: varchar('journal_type', { length: 30 }).notNull(), // GENERAL, PURCHASE, SALES, INVENTORY, PAYMENT, RECEIPT, ADJUSTMENT
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_fin_journal_no').on(table.tenant_id, table.journal_no),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_fj_comp' }).onDelete('restrict'),
+]);
+
+export const financialJournalLine = mysqlTable('financial_journal_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  journal_id: varchar('journal_id', { length: 36 }).notNull(),
+  gl_account_id: varchar('gl_account_id', { length: 36 }).notNull(),
+  debit: decimal('debit', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  credit: decimal('credit', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  description: varchar('description', { length: 255 }),
+  cost_center_id: varchar('cost_center_id', { length: 36 }),
+  dimension_values: json('dimension_values'), // e.g. { "FARM": "Farm01", "PROJECT": "ProjectX" }
+  ref_doc_type: varchar('ref_doc_type', { length: 50 }),
+  ref_doc_id: varchar('ref_doc_id', { length: 36 }),
+}, (table) => [
+  foreignKey({ columns: [table.journal_id], foreignColumns: [financialJournal.journal_id], name: 'fk_fjl_jour' }).onDelete('cascade'),
+  foreignKey({ columns: [table.gl_account_id], foreignColumns: [glAccountMaster.gl_account_id], name: 'fk_fjl_gl' }).onDelete('restrict'),
+  foreignKey({ columns: [table.cost_center_id], foreignColumns: [costCenterMaster.cost_center_id], name: 'fk_fjl_cc' }).onDelete('restrict'),
+]);
+
+export const generalLedgerEntry = mysqlTable('general_ledger_entry', {
+  entry_id: varchar('entry_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  gl_account_id: varchar('gl_account_id', { length: 36 }).notNull(),
+  debit: decimal('debit', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  credit: decimal('credit', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  running_balance: decimal('running_balance', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  fiscal_year_id: varchar('fiscal_year_id', { length: 36 }).notNull(),
+  period_id: varchar('period_id', { length: 36 }).notNull(),
+  cost_center_id: varchar('cost_center_id', { length: 36 }),
+  dimension_values: json('dimension_values'),
+  ref_doc_type: varchar('ref_doc_type', { length: 50 }).notNull(), // e.g. FinancialJournal, GoodsReceipt, etc
+  ref_doc_id: varchar('ref_doc_id', { length: 36 }).notNull(),
+  ref_doc_line_id: varchar('ref_doc_line_id', { length: 36 }),
+  notes: varchar('notes', { length: 255 }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_gle_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.gl_account_id], foreignColumns: [glAccountMaster.gl_account_id], name: 'fk_gle_gl' }).onDelete('restrict'),
+  foreignKey({ columns: [table.fiscal_year_id], foreignColumns: [fiscalYear.fiscal_year_id], name: 'fk_gle_fy' }).onDelete('restrict'),
+  foreignKey({ columns: [table.period_id], foreignColumns: [accountingPeriod.period_id], name: 'fk_gle_ap' }).onDelete('restrict'),
+  foreignKey({ columns: [table.cost_center_id], foreignColumns: [costCenterMaster.cost_center_id], name: 'fk_gle_cc' }).onDelete('restrict'),
+]);
+
+export const customerLedgerEntry = mysqlTable('customer_ledger_entry', {
+  entry_id: varchar('entry_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  customer_id: varchar('customer_id', { length: 36 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  document_type: varchar('document_type', { length: 30 }).notNull(), // INVOICE, PAYMENT, CREDIT_NOTE
+  document_no: varchar('document_no', { length: 50 }).notNull(),
+  amount: decimal('amount', { precision: 18, scale: 4 }).notNull(), // positive for invoice (debit), negative for payment (credit)
+  remaining_amount: decimal('remaining_amount', { precision: 18, scale: 4 }).notNull(),
+  due_date: date('due_date', { mode: 'string' }),
+  gl_entry_id: varchar('gl_entry_id', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_cle_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.customer_id], foreignColumns: [customerMaster.customer_id], name: 'fk_cle_cust' }).onDelete('restrict'),
+  foreignKey({ columns: [table.gl_entry_id], foreignColumns: [generalLedgerEntry.entry_id], name: 'fk_cle_gle' }).onDelete('set null'),
+]);
+
+export const supplierLedgerEntry = mysqlTable('supplier_ledger_entry', {
+  entry_id: varchar('entry_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  supplier_id: varchar('supplier_id', { length: 36 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  document_type: varchar('document_type', { length: 30 }).notNull(), // INVOICE, PAYMENT, DEBIT_NOTE
+  document_no: varchar('document_no', { length: 50 }).notNull(),
+  amount: decimal('amount', { precision: 18, scale: 4 }).notNull(), // negative for invoice (credit), positive for payment (debit)
+  remaining_amount: decimal('remaining_amount', { precision: 18, scale: 4 }).notNull(),
+  due_date: date('due_date', { mode: 'string' }),
+  gl_entry_id: varchar('gl_entry_id', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_sle_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.supplier_id], foreignColumns: [supplierMaster.supplier_id], name: 'fk_sle_supp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.gl_entry_id], foreignColumns: [generalLedgerEntry.entry_id], name: 'fk_sle_gle' }).onDelete('set null'),
+]);
+
+// RELATIONS DEFINITIONS
+
+export const fiscalYearRelations = relations(fiscalYear, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [fiscalYear.company_id],
+    references: [companyMaster.company_id]
+  }),
+  periods: many(accountingPeriod)
+}));
+
+export const accountingPeriodRelations = relations(accountingPeriod, ({ one }) => ({
+  fiscalYear: one(fiscalYear, {
+    fields: [accountingPeriod.fiscal_year_id],
+    references: [fiscalYear.fiscal_year_id]
+  })
+}));
+
+export const financialDimensionRelations = relations(financialDimension, ({ many }) => ({
+  values: many(financialDimensionValue)
+}));
+
+export const financialDimensionValueRelations = relations(financialDimensionValue, ({ one }) => ({
+  dimension: one(financialDimension, {
+    fields: [financialDimensionValue.dimension_id],
+    references: [financialDimension.dimension_id]
+  })
+}));
+
+export const financialJournalRelations = relations(financialJournal, ({ many }) => ({
+  lines: many(financialJournalLine)
+}));
+
+export const financialJournalLineRelations = relations(financialJournalLine, ({ one }) => ({
+  journal: one(financialJournal, {
+    fields: [financialJournalLine.journal_id],
+    references: [financialJournal.journal_id]
+  }),
+  account: one(glAccountMaster, {
+    fields: [financialJournalLine.gl_account_id],
+    references: [glAccountMaster.gl_account_id]
+  }),
+  costCenter: one(costCenterMaster, {
+    fields: [financialJournalLine.cost_center_id],
+    references: [costCenterMaster.cost_center_id]
+  })
+}));
+
+export const generalLedgerEntryRelations = relations(generalLedgerEntry, ({ one }) => ({
+  account: one(glAccountMaster, {
+    fields: [generalLedgerEntry.gl_account_id],
+    references: [glAccountMaster.gl_account_id]
+  }),
+  costCenter: one(costCenterMaster, {
+    fields: [generalLedgerEntry.cost_center_id],
+    references: [costCenterMaster.cost_center_id]
+  }),
+  fiscalYear: one(fiscalYear, {
+    fields: [generalLedgerEntry.fiscal_year_id],
+    references: [fiscalYear.fiscal_year_id]
+  }),
+  period: one(accountingPeriod, {
+    fields: [generalLedgerEntry.period_id],
+    references: [accountingPeriod.period_id]
+  })
+}));
+
+export const customerLedgerEntryRelations = relations(customerLedgerEntry, ({ one }) => ({
+  customer: one(customerMaster, {
+    fields: [customerLedgerEntry.customer_id],
+    references: [customerMaster.customer_id]
+  }),
+  glEntry: one(generalLedgerEntry, {
+    fields: [customerLedgerEntry.gl_entry_id],
+    references: [generalLedgerEntry.entry_id]
+  })
+}));
+
+export const supplierLedgerEntryRelations = relations(supplierLedgerEntry, ({ one }) => ({
+  supplier: one(supplierMaster, {
+    fields: [supplierLedgerEntry.supplier_id],
+    references: [supplierMaster.supplier_id]
+  }),
+  glEntry: one(generalLedgerEntry, {
+    fields: [supplierLedgerEntry.gl_entry_id],
+    references: [generalLedgerEntry.entry_id]
+  })
+}));
+

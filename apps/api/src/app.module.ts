@@ -32,6 +32,7 @@ import { GlAccountModule } from './modules/gl-account/gl-account.module';
 import { GlMappingModule } from './modules/gl-mapping/gl-mapping.module';
 import { CostCenterModule } from './modules/cost-center/cost-center.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { FinanceModule } from './modules/finance/finance.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -85,6 +86,7 @@ import { SystemController } from './system/system.controller';
     GlMappingModule,
     CostCenterModule,
     InventoryModule,
+    FinanceModule,
   ],
   controllers: [SystemController],
   providers: [],

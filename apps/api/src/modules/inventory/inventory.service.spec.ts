@@ -21,6 +21,7 @@ import { InventoryJournalService } from './services/inventory-journal.service';
 import { PhysicalCountService } from './services/physical-count.service';
 
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { PostingEngineService } from '../finance/services/posting-engine.service';
 import * as schema from '../../core/database/schema';
 
 // Load environment variables
@@ -194,6 +195,12 @@ describe('Inventory Engine Integration Tests', () => {
           provide: AuditLogService,
           useValue: {
             log: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: PostingEngineService,
+          useValue: {
+            postAutomaticEntry: jest.fn().mockResolvedValue({ success: true }),
           },
         },
       ],

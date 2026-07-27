@@ -10,6 +10,7 @@ import { FifoEngineService } from './fifo-engine.service';
 import { LotService } from './lot.service';
 import { SerialService } from './serial.service';
 import { AuditLogService } from '../../audit-log/audit-log.service';
+import { PostingEngineService } from '../../finance/services/posting-engine.service';
 
 @Injectable()
 export class PhysicalCountService {
@@ -20,6 +21,7 @@ export class PhysicalCountService {
     private readonly lotService: LotService,
     private readonly serialService: SerialService,
     private readonly auditService: AuditLogService,
+    private readonly postingEngine: PostingEngineService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -241,6 +243,29 @@ export class PhysicalCountService {
             );
           }
 
+          try {
+            await this.postingEngine.postAutomaticEntry(
+              {
+                company_id: count.company_id,
+                item_category_id: item.category_id,
+                transaction_type: 'ADJUSTMENT',
+                amount: parseFloat(line.variance.toString()) * parseFloat(line.unit_cost.toString()),
+                posting_date: count.count_date,
+                ref_doc_type: 'InventoryCount',
+                ref_doc_id: countId,
+                ref_doc_line_id: line.line_id,
+              },
+              tenantId,
+              userId,
+              trx
+            );
+          } catch (err) {
+            if (err.message && (err.message.includes('GL Mapping') || err.message.includes('No active Accounting Period'))) {
+              console.warn(`[Finance Integration Warning]: ${err.message}`);
+            } else {
+              throw err;
+            }
+          }
         } else {
           // Negative discrepancy: register reduction
           const qtyToIssue = Math.abs(line.variance);
@@ -309,6 +334,30 @@ export class PhysicalCountService {
               total_value: (-totalValue).toFixed(4),
             })
             .where(eq(schema.inventoryLedger.ledger_id, ledgerId));
+
+          try {
+            await this.postingEngine.postAutomaticEntry(
+              {
+                company_id: count.company_id,
+                item_category_id: item.category_id,
+                transaction_type: 'ADJUSTMENT',
+                amount: totalValue,
+                posting_date: count.count_date,
+                ref_doc_type: 'InventoryCount',
+                ref_doc_id: countId,
+                ref_doc_line_id: line.line_id,
+              },
+              tenantId,
+              userId,
+              trx
+            );
+          } catch (err) {
+            if (err.message && (err.message.includes('GL Mapping') || err.message.includes('No active Accounting Period'))) {
+              console.warn(`[Finance Integration Warning]: ${err.message}`);
+            } else {
+              throw err;
+            }
+          }
         }
       }
 

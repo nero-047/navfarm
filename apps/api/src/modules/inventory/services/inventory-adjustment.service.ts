@@ -10,6 +10,7 @@ import { FifoEngineService } from './fifo-engine.service';
 import { LotService } from './lot.service';
 import { SerialService } from './serial.service';
 import { AuditLogService } from '../../audit-log/audit-log.service';
+import { PostingEngineService } from '../../finance/services/posting-engine.service';
 
 @Injectable()
 export class InventoryAdjustmentService {
@@ -20,6 +21,7 @@ export class InventoryAdjustmentService {
     private readonly lotService: LotService,
     private readonly serialService: SerialService,
     private readonly auditService: AuditLogService,
+    private readonly postingEngine: PostingEngineService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -272,6 +274,29 @@ export class InventoryAdjustmentService {
           })
           .where(eq(schema.inventoryAdjustment.adjustment_id, adjustmentId));
 
+        try {
+          await this.postingEngine.postAutomaticEntry(
+            {
+              company_id: adjustment.company_id,
+              item_category_id: item.category_id,
+              transaction_type: 'ADJUSTMENT',
+              amount: parseFloat(adjustment.qty.toString()) * parseFloat(adjustment.unit_cost.toString()),
+              posting_date: adjustment.posting_date,
+              ref_doc_type: 'InventoryAdjustment',
+              ref_doc_id: adjustmentId,
+            },
+            tenantId,
+            userId,
+            trx
+          );
+        } catch (err) {
+          if (err.message && (err.message.includes('GL Mapping') || err.message.includes('No active Accounting Period'))) {
+            console.warn(`[Finance Integration Warning]: ${err.message}`);
+          } else {
+            throw err;
+          }
+        }
+
       } else {
         // NEGATIVE
         // Verify available stock
@@ -365,6 +390,29 @@ export class InventoryAdjustmentService {
             unit_cost: unitCost.toFixed(4),
           })
           .where(eq(schema.inventoryAdjustment.adjustment_id, adjustmentId));
+
+        try {
+          await this.postingEngine.postAutomaticEntry(
+            {
+              company_id: adjustment.company_id,
+              item_category_id: item.category_id,
+              transaction_type: 'ADJUSTMENT',
+              amount: totalValue,
+              posting_date: adjustment.posting_date,
+              ref_doc_type: 'InventoryAdjustment',
+              ref_doc_id: adjustmentId,
+            },
+            tenantId,
+            userId,
+            trx
+          );
+        } catch (err) {
+          if (err.message && (err.message.includes('GL Mapping') || err.message.includes('No active Accounting Period'))) {
+            console.warn(`[Finance Integration Warning]: ${err.message}`);
+          } else {
+            throw err;
+          }
+        }
       }
 
       // Update document status to POSTED

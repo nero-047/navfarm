@@ -10,6 +10,7 @@ import { FifoEngineService } from './fifo-engine.service';
 import { LotService } from './lot.service';
 import { SerialService } from './serial.service';
 import { AuditLogService } from '../../audit-log/audit-log.service';
+import { PostingEngineService } from '../../finance/services/posting-engine.service';
 
 @Injectable()
 export class GoodsReceiptService {
@@ -20,6 +21,7 @@ export class GoodsReceiptService {
     private readonly lotService: LotService,
     private readonly serialService: SerialService,
     private readonly auditService: AuditLogService,
+    private readonly postingEngine: PostingEngineService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -249,6 +251,30 @@ export class GoodsReceiptService {
             tenantId,
             trx
           );
+        }
+
+        try {
+          await this.postingEngine.postAutomaticEntry(
+            {
+              company_id: receipt.company_id,
+              item_category_id: item.category_id,
+              transaction_type: 'PURCHASE',
+              amount: parseFloat(line.qty.toString()) * parseFloat(line.unit_cost.toString()),
+              posting_date: receipt.posting_date,
+              ref_doc_type: 'GoodsReceipt',
+              ref_doc_id: receiptId,
+              ref_doc_line_id: line.line_id,
+            },
+            tenantId,
+            userId,
+            trx
+          );
+        } catch (err) {
+          if (err.message && (err.message.includes('GL Mapping') || err.message.includes('No active Accounting Period'))) {
+            console.warn(`[Finance Integration Warning]: ${err.message}`);
+          } else {
+            throw err;
+          }
         }
       }
 
