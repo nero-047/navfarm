@@ -14,6 +14,23 @@ import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { UserModule } from './modules/user/user.module';
 import { UserCompanyModule } from './modules/user-company/user-company.module';
+import { UomModule } from './modules/uom/uom.module';
+import { BreedModule } from './modules/breed/breed.module';
+import { FarmModule } from './modules/farm/farm.module';
+import { WarehouseModule } from './modules/warehouse/warehouse.module';
+import { LocationModule } from './modules/location/location.module';
+import { ShedModule } from './modules/shed/shed.module';
+import { ItemCategoryModule } from './modules/item-category/item-category.module';
+import { ItemModule } from './modules/item/item.module';
+import { SupplierModule } from './modules/supplier/supplier.module';
+import { CustomerModule } from './modules/customer/customer.module';
+import { ResourceModule } from './modules/resource/resource.module';
+import { DiseaseModule } from './modules/disease/disease.module';
+import { MedicineModule } from './modules/medicine/medicine.module';
+import { FeedFormulaModule } from './modules/feed-formula/feed-formula.module';
+import { GlAccountModule } from './modules/gl-account/gl-account.module';
+import { GlMappingModule } from './modules/gl-mapping/gl-mapping.module';
+import { CostCenterModule } from './modules/cost-center/cost-center.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -49,6 +66,23 @@ import { SystemController } from './system/system.controller';
     NotificationModule,
     UserModule,
     UserCompanyModule,
+    UomModule,
+    BreedModule,
+    FarmModule,
+    WarehouseModule,
+    LocationModule,
+    ShedModule,
+    ItemCategoryModule,
+    ItemModule,
+    SupplierModule,
+    CustomerModule,
+    ResourceModule,
+    DiseaseModule,
+    MedicineModule,
+    FeedFormulaModule,
+    GlAccountModule,
+    GlMappingModule,
+    CostCenterModule,
   ],
   controllers: [SystemController],
   providers: [],

@@ -54,6 +54,8 @@ export const companyMaster = mysqlTable('company_master', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   created_by: varchar('created_by', { length: 36 }),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_by: varchar('updated_by', { length: 36 }),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 });
 
@@ -399,26 +401,58 @@ export const nobLobExtensionConfig = mysqlTable('nob_lob_extension_config', {
 
 export const uomMaster = mysqlTable('uom_master', {
   uom_id: varchar('uom_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
-  tenant_id: varchar('tenant_id', { length: 36 }),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }), // Null for tenant-wide global UOMs
   uom_code: varchar('uom_code', { length: 20 }).notNull(),
   uom_name: varchar('uom_name', { length: 100 }).notNull(),
   uom_type: varchar('uom_type', { length: 20 }).notNull(),
   decimal_places: int('decimal_places').default(0).notNull(),
   is_base_uom: boolean('is_base_uom').default(false).notNull(),
   is_active: boolean('is_active').default(true).notNull(),
-  extension_config: json('extension_config')
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  extension_config: json('extension_config'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' })
 });
+
+export const itemCategoryMaster = mysqlTable('item_category_master', {
+  category_id: varchar('category_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }), // null means global tenant-wide category
+  category_code: varchar('category_code', { length: 50 }).notNull(),
+  category_name: varchar('category_name', { length: 100 }).notNull(),
+  parent_category_id: varchar('parent_category_id', { length: 36 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  parentCategoryFk: foreignKey({
+    columns: [table.parent_category_id],
+    foreignColumns: [table.category_id],
+    name: 'item_cat_master_parent_cat_id_fk'
+  }).onDelete('restrict')
+}));
 
 export const itemMaster = mysqlTable('item_master', {
   item_id: varchar('item_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
+  category_id: varchar('category_id', { length: 36 }).references(() => itemCategoryMaster.category_id, { onDelete: 'restrict' }),
   item_code: varchar('item_code', { length: 50 }).notNull(),
   item_name: varchar('item_name', { length: 200 }).notNull(),
   item_type: varchar('item_type', { length: 30 }).notNull(),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
-  category: varchar('category', { length: 100 }),
-  sub_category: varchar('sub_category', { length: 100 }),
+  category: varchar('category', { length: 100 }), // Legacy text category field
+  sub_category: varchar('sub_category', { length: 100 }), // Legacy text sub_category field
   uom_primary: varchar('uom_primary', { length: 20 }).notNull(),
   uom_secondary: varchar('uom_secondary', { length: 20 }),
   uom_conversion_factor: decimal('uom_conversion_factor', { precision: 18, scale: 6 }),
@@ -438,38 +472,55 @@ export const itemMaster = mysqlTable('item_master', {
   is_qr_enabled: boolean('is_qr_enabled').default(false).notNull(),
   qr_trigger_event: varchar('qr_trigger_event', { length: 30 }),
   is_active: boolean('is_active').default(true).notNull(),
-  extension_config: json('extension_config'),
-  created_by: varchar('created_by', { length: 36 }).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull()
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
 });
 
 export const uomConversionMaster = mysqlTable('uom_conversion_master', {
   conversion_id: varchar('conversion_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   item_id: varchar('item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'cascade' }),
   from_uom: varchar('from_uom', { length: 20 }).notNull(),
   to_uom: varchar('to_uom', { length: 20 }).notNull(),
   conversion_factor: decimal('conversion_factor', { precision: 18, scale: 8 }).notNull(),
   effective_from: date('effective_from', { mode: 'string' }).notNull(),
   effective_to: date('effective_to', { mode: 'string' }),
-  is_active: boolean('is_active').default(true).notNull()
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' })
 });
 
 export const itemAttributeMaster = mysqlTable('item_attribute_master', {
   attribute_id: varchar('attribute_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
-  tenant_id: varchar('tenant_id', { length: 36 }),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'cascade' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'cascade' }),
   attribute_code: varchar('attribute_code', { length: 50 }).notNull(),
   attribute_name: varchar('attribute_name', { length: 100 }).notNull(),
-  data_type: varchar('data_type', { length: 20 }).notNull(),
+  data_type: varchar('data_type', { length: 20 }).notNull(), // STRING, NUMBER, BOOLEAN, LIST
   list_values: json('list_values'),
   unit: varchar('unit', { length: 20 }),
   is_mandatory: boolean('is_mandatory').default(false).notNull(),
   affects_costing: boolean('affects_costing').default(false).notNull(),
+  is_variant: boolean('is_variant').default(false).notNull(),
   is_active: boolean('is_active').default(true).notNull(),
-  is_variant: boolean('is_variant').default(false).notNull()
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' })
 });
 
 export const itemAttributeValues = mysqlTable('item_attribute_values', {
@@ -485,15 +536,32 @@ export const itemAttributeValues = mysqlTable('item_attribute_values', {
   }).onDelete('restrict')
 }));
 
+export const speciesMaster = mysqlTable('species_master', {
+  species_id: varchar('species_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
+  species_code: varchar('species_code', { length: 50 }).notNull(),
+  species_name: varchar('species_name', { length: 100 }).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' })
+});
+
 export const breedMaster = mysqlTable('breed_master', {
   breed_id: varchar('breed_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   breed_code: varchar('breed_code', { length: 50 }).notNull(),
   breed_name: varchar('breed_name', { length: 100 }).notNull(),
-  species: varchar('species', { length: 100 }).notNull(),
-  breed_type: varchar('breed_type', { length: 50 }).notNull(),
+  species_id: varchar('species_id', { length: 36 }).references(() => speciesMaster.species_id, { onDelete: 'restrict' }),
+  species: varchar('species', { length: 100 }), // Legacy text field (nullable now)
+  breed_type: varchar('breed_type', { length: 50 }).notNull(), // BROILER/LAYER/BREEDER/DUAL_PURPOSE/DAIRY/BEEF/TREE/FISH
   avg_growth_rate_g_day: decimal('avg_growth_rate_g_day', { precision: 10, scale: 4 }),
   avg_fcr: decimal('avg_fcr', { precision: 8, scale: 4 }),
   avg_mortality_pct: decimal('avg_mortality_pct', { precision: 6, scale: 2 }),
@@ -507,18 +575,86 @@ export const breedMaster = mysqlTable('breed_master', {
   avg_yield_per_unit: decimal('avg_yield_per_unit', { precision: 10, scale: 4 }),
   description: text('description'),
   is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+});
+
+export const farmMaster = mysqlTable('farm_master', {
+  farm_id: varchar('farm_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  farm_code: varchar('farm_code', { length: 50 }).notNull(),
+  farm_name: varchar('farm_name', { length: 100 }).notNull(),
+  farm_type: varchar('farm_type', { length: 50 }).notNull(), // BREEDER, COMMERCIAL_LAYERS, COMMERCIAL_BROILERS, HATCHERY, REARING, DAIRY, etc.
+  capacity: int('capacity').default(0).notNull(),
+  address_line1: varchar('address_line1', { length: 255 }),
+  city: varchar('city', { length: 100 }),
+  state: varchar('state', { length: 100 }),
+  country: varchar('country', { length: 100 }),
+  pincode: varchar('pincode', { length: 20 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+});
+
+export const warehouseMaster = mysqlTable('warehouse_master', {
+  warehouse_id: varchar('warehouse_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  farm_id: varchar('farm_id', { length: 36 }).references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
+  warehouse_code: varchar('warehouse_code', { length: 50 }).notNull(),
+  warehouse_name: varchar('warehouse_name', { length: 100 }).notNull(),
+  warehouse_type: varchar('warehouse_type', { length: 50 }).notNull(), // COLD_STORAGE, SILO, GENERAL, INGREDIENTS, MEDICINE, etc.
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+});
+
+export const shedMaster = mysqlTable('shed_master', {
+  shed_id: varchar('shed_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  farm_id: varchar('farm_id', { length: 36 }).notNull().references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
+  shed_code: varchar('shed_code', { length: 50 }).notNull(),
+  shed_name: varchar('shed_name', { length: 100 }).notNull(),
+  shed_type: varchar('shed_type', { length: 50 }).notNull(), // OPEN_SIDED, ENVIRONMENTALLY_CONTROLLED, SEMI_EC
+  capacity: int('capacity').default(0).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 });
 
 export const locationMaster = mysqlTable('location_master', {
   location_id: varchar('location_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
   location_code: varchar('location_code', { length: 50 }).notNull(),
   location_name: varchar('location_name', { length: 200 }).notNull(),
   location_level: int('location_level').notNull(),
-  location_type: varchar('location_type', { length: 50 }).notNull(),
+  location_type: varchar('location_type', { length: 50 }).notNull(), // FARM, SHED, AREA, SECTION etc.
   parent_location_id: varchar('parent_location_id', { length: 36 }),
   area_size: decimal('area_size', { precision: 18, scale: 4 }),
   area_unit: varchar('area_unit', { length: 10 }),
@@ -530,6 +666,12 @@ export const locationMaster = mysqlTable('location_master', {
   storage_type: varchar('storage_type', { length: 30 }),
   is_quarantine_zone: boolean('is_quarantine_zone').default(false).notNull(),
   is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 }, (table) => ({
   parentLocationFk: foreignKey({
@@ -634,6 +776,15 @@ export const userCompanyAssignmentsRelations = relations(userCompanyAssignments,
   })
 }));
 
+export const itemCategoryMasterRelations = relations(itemCategoryMaster, ({ one, many }) => ({
+  parent: one(itemCategoryMaster, {
+    fields: [itemCategoryMaster.parent_category_id],
+    references: [itemCategoryMaster.category_id],
+    relationName: 'parentCategory'
+  }),
+  items: many(itemMaster)
+}));
+
 export const itemMasterRelations = relations(itemMaster, ({ one, many }) => ({
   nob: one(nobMaster, {
     fields: [itemMaster.nob_id],
@@ -643,7 +794,30 @@ export const itemMasterRelations = relations(itemMaster, ({ one, many }) => ({
     fields: [itemMaster.lob_id],
     references: [lobMaster.lob_id]
   }),
+  category: one(itemCategoryMaster, {
+    fields: [itemMaster.category_id],
+    references: [itemCategoryMaster.category_id]
+  }),
   attributes: many(itemAttributeValues)
+}));
+
+export const itemAttributeMasterRelations = relations(itemAttributeMaster, ({ many }) => ({
+  values: many(itemAttributeValues)
+}));
+
+export const itemAttributeValuesRelations = relations(itemAttributeValues, ({ one }) => ({
+  item: one(itemMaster, {
+    fields: [itemAttributeValues.item_id],
+    references: [itemMaster.item_id]
+  }),
+  attribute: one(itemAttributeMaster, {
+    fields: [itemAttributeValues.attribute_id],
+    references: [itemAttributeMaster.attribute_id]
+  })
+}));
+
+export const speciesMasterRelations = relations(speciesMaster, ({ many }) => ({
+  breeds: many(breedMaster)
 }));
 
 export const breedMasterRelations = relations(breedMaster, ({ one }) => ({
@@ -654,6 +828,10 @@ export const breedMasterRelations = relations(breedMaster, ({ one }) => ({
   lob: one(lobMaster, {
     fields: [breedMaster.lob_id],
     references: [lobMaster.lob_id]
+  }),
+  species: one(speciesMaster, {
+    fields: [breedMaster.species_id],
+    references: [speciesMaster.species_id]
   })
 }));
 
@@ -666,10 +844,481 @@ export const locationMasterRelations = relations(locationMaster, ({ one }) => ({
     fields: [locationMaster.lob_id],
     references: [lobMaster.lob_id]
   }),
+  warehouse: one(warehouseMaster, {
+    fields: [locationMaster.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
   parent: one(locationMaster, {
     fields: [locationMaster.parent_location_id],
     references: [locationMaster.location_id],
     relationName: 'parentLocation'
+  })
+}));
+
+export const farmMasterRelations = relations(farmMaster, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [farmMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  sheds: many(shedMaster),
+  warehouses: many(warehouseMaster)
+}));
+
+export const warehouseMasterRelations = relations(warehouseMaster, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [warehouseMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  farm: one(farmMaster, {
+    fields: [warehouseMaster.farm_id],
+    references: [farmMaster.farm_id]
+  }),
+  locations: many(locationMaster)
+}));
+
+export const shedMasterRelations = relations(shedMaster, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [shedMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  farm: one(farmMaster, {
+    fields: [shedMaster.farm_id],
+    references: [farmMaster.farm_id]
+  })
+}));
+
+export const supplierMaster = mysqlTable('supplier_master', {
+  supplier_id: varchar('supplier_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  supplier_code: varchar('supplier_code', { length: 50 }).notNull(),
+  supplier_name: varchar('supplier_name', { length: 150 }).notNull(),
+  email: varchar('email', { length: 200 }),
+  phone: varchar('phone', { length: 30 }),
+  tax_number: varchar('tax_number', { length: 50 }),
+  payment_terms: varchar('payment_terms', { length: 50 }), // e.g. COD, NET30
+  address_line1: varchar('address_line1', { length: 255 }),
+  city: varchar('city', { length: 100 }),
+  state: varchar('state', { length: 100 }),
+  country: varchar('country', { length: 100 }),
+  pincode: varchar('pincode', { length: 20 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+});
+
+export const supplierMasterRelations = relations(supplierMaster, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [supplierMaster.company_id],
+    references: [companyMaster.company_id]
+  })
+}));
+
+export const customerMaster = mysqlTable('customer_master', {
+  customer_id: varchar('customer_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  customer_code: varchar('customer_code', { length: 50 }).notNull(),
+  customer_name: varchar('customer_name', { length: 150 }).notNull(),
+  email: varchar('email', { length: 200 }),
+  mobile: varchar('mobile', { length: 30 }).notNull(),
+  tax_number: varchar('tax_number', { length: 50 }),
+  credit_limit: decimal('credit_limit', { precision: 18, scale: 4 }),
+  address_line1: varchar('address_line1', { length: 255 }),
+  city: varchar('city', { length: 100 }),
+  state: varchar('state', { length: 100 }),
+  country: varchar('country', { length: 100 }),
+  pincode: varchar('pincode', { length: 20 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+});
+
+export const customerMasterRelations = relations(customerMaster, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [customerMaster.company_id],
+    references: [companyMaster.company_id]
+  })
+}));
+
+export const resourceMaster = mysqlTable('resource_master', {
+  resource_id: varchar('resource_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  resource_code: varchar('resource_code', { length: 50 }).notNull(),
+  resource_name: varchar('resource_name', { length: 150 }).notNull(),
+  resource_type: varchar('resource_type', { length: 30 }).notNull(), // LABOR, EQUIPMENT, VEHICLE
+  capacity: decimal('capacity', { precision: 18, scale: 4 }),
+  unit: varchar('unit', { length: 20 }),
+  cost_rate: decimal('cost_rate', { precision: 18, scale: 4 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  companyFk: foreignKey({
+    columns: [table.company_id],
+    foreignColumns: [companyMaster.company_id],
+    name: 'res_master_company_id_fk'
+  }).onDelete('restrict')
+}));
+
+export const resourceMaintenanceLog = mysqlTable('resource_maintenance_log', {
+  log_id: varchar('log_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  resource_id: varchar('resource_id', { length: 36 }).notNull(),
+  maintenance_date: date('maintenance_date', { mode: 'string' }).notNull(),
+  maintenance_type: varchar('maintenance_type', { length: 50 }).notNull(), // PREVENTIVE, BREAKDOWN
+  description: text('description'),
+  cost: decimal('cost', { precision: 18, scale: 4 }),
+  performed_by: varchar('performed_by', { length: 100 }),
+  status: varchar('status', { length: 20 }).default('COMPLETED').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  companyFk: foreignKey({
+    columns: [table.company_id],
+    foreignColumns: [companyMaster.company_id],
+    name: 'res_maint_log_company_id_fk'
+  }).onDelete('restrict'),
+  resourceFk: foreignKey({
+    columns: [table.resource_id],
+    foreignColumns: [resourceMaster.resource_id],
+    name: 'res_maint_log_res_id_fk'
+  }).onDelete('cascade')
+}));
+
+export const resourceMasterRelations = relations(resourceMaster, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [resourceMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  maintenanceLogs: many(resourceMaintenanceLog)
+}));
+
+export const resourceMaintenanceLogRelations = relations(resourceMaintenanceLog, ({ one }) => ({
+  resource: one(resourceMaster, {
+    fields: [resourceMaintenanceLog.resource_id],
+    references: [resourceMaster.resource_id]
+  })
+}));
+
+export const diseaseMaster = mysqlTable('disease_master', {
+  disease_id: varchar('disease_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  disease_code: varchar('disease_code', { length: 50 }).notNull(),
+  disease_name: varchar('disease_name', { length: 150 }).notNull(),
+  scientific_name: varchar('scientific_name', { length: 150 }),
+  symptoms: text('symptoms'),
+  treatment_guideline: text('treatment_guideline'),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+});
+
+export const diseaseMasterRelations = relations(diseaseMaster, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [diseaseMaster.company_id],
+    references: [companyMaster.company_id]
+  })
+}));
+
+export const medicineMaster = mysqlTable('medicine_master', {
+  medicine_id: varchar('medicine_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'cascade' }),
+  composition: varchar('composition', { length: 255 }),
+  dosage_guideline: text('dosage_guideline'),
+  withdrawal_period_days: int('withdrawal_period_days'),
+  route_of_administration: varchar('route_of_administration', { length: 50 }), // e.g. ORAL, INJECTION, WATER
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+});
+
+export const medicineMasterRelations = relations(medicineMaster, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [medicineMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  item: one(itemMaster, {
+    fields: [medicineMaster.item_id],
+    references: [itemMaster.item_id]
+  })
+}));
+
+export const feedFormulaMaster = mysqlTable('feed_formula_master', {
+  formula_id: varchar('formula_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  formula_code: varchar('formula_code', { length: 50 }).notNull(),
+  formula_name: varchar('formula_name', { length: 150 }).notNull(),
+  target_item_id: varchar('target_item_id', { length: 36 }).notNull(),
+  batch_size: decimal('batch_size', { precision: 18, scale: 4 }).notNull(),
+  batch_unit: varchar('batch_unit', { length: 20 }).notNull(), // e.g. KG
+  description: text('description'),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  companyFk: foreignKey({
+    columns: [table.company_id],
+    foreignColumns: [companyMaster.company_id],
+    name: 'feed_form_company_id_fk'
+  }).onDelete('restrict'),
+  targetItemFk: foreignKey({
+    columns: [table.target_item_id],
+    foreignColumns: [itemMaster.item_id],
+    name: 'feed_form_target_item_id_fk'
+  }).onDelete('restrict')
+}));
+
+export const feedFormulaIngredients = mysqlTable('feed_formula_ingredients', {
+  ingredient_id: varchar('ingredient_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  formula_id: varchar('formula_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(), // raw ingredient item
+  quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 20 }).notNull(), // e.g. KG
+  inclusion_pct: decimal('inclusion_pct', { precision: 6, scale: 2 }),
+  loss_pct: decimal('loss_pct', { precision: 6, scale: 2 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  companyFk: foreignKey({
+    columns: [table.company_id],
+    foreignColumns: [companyMaster.company_id],
+    name: 'feed_ingr_company_id_fk'
+  }).onDelete('restrict'),
+  formulaFk: foreignKey({
+    columns: [table.formula_id],
+    foreignColumns: [feedFormulaMaster.formula_id],
+    name: 'feed_ingr_formula_id_fk'
+  }).onDelete('cascade'),
+  itemFk: foreignKey({
+    columns: [table.item_id],
+    foreignColumns: [itemMaster.item_id],
+    name: 'feed_ingr_item_id_fk'
+  }).onDelete('restrict')
+}));
+
+export const feedFormulaMasterRelations = relations(feedFormulaMaster, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [feedFormulaMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  targetItem: one(itemMaster, {
+    fields: [feedFormulaMaster.target_item_id],
+    references: [itemMaster.item_id]
+  }),
+  ingredients: many(feedFormulaIngredients)
+}));
+
+export const feedFormulaIngredientsRelations = relations(feedFormulaIngredients, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [feedFormulaIngredients.company_id],
+    references: [companyMaster.company_id]
+  }),
+  formula: one(feedFormulaMaster, {
+    fields: [feedFormulaIngredients.formula_id],
+    references: [feedFormulaMaster.formula_id]
+  }),
+  item: one(itemMaster, {
+    fields: [feedFormulaIngredients.item_id],
+    references: [itemMaster.item_id]
+  })
+}));
+
+export const glAccountMaster = mysqlTable('gl_account_master', {
+  gl_account_id: varchar('gl_account_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  account_code: varchar('account_code', { length: 50 }).notNull(),
+  account_name: varchar('account_name', { length: 150 }).notNull(),
+  account_type: varchar('account_type', { length: 50 }).notNull(), // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
+  parent_account_id: varchar('parent_account_id', { length: 36 }),
+  is_sub_account: boolean('is_sub_account').default(false).notNull(),
+  is_reconciliation: boolean('is_reconciliation').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  companyFk: foreignKey({
+    columns: [table.company_id],
+    foreignColumns: [companyMaster.company_id],
+    name: 'gl_account_company_id_fk'
+  }).onDelete('restrict'),
+  parentAccountFk: foreignKey({
+    columns: [table.parent_account_id],
+    foreignColumns: [table.gl_account_id],
+    name: 'gl_account_parent_id_fk'
+  }).onDelete('restrict')
+}));
+
+export const glAccountMasterRelations = relations(glAccountMaster, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [glAccountMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  parentAccount: one(glAccountMaster, {
+    fields: [glAccountMaster.parent_account_id],
+    references: [glAccountMaster.gl_account_id],
+    relationName: 'gl_account_hierarchy'
+  }),
+  subAccounts: many(glAccountMaster, {
+    relationName: 'gl_account_hierarchy'
+  })
+}));
+
+export const glMappingMaster = mysqlTable('gl_mapping_master', {
+  mapping_id: varchar('mapping_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  item_category_id: varchar('item_category_id', { length: 36 }),
+  transaction_type: varchar('transaction_type', { length: 50 }).notNull(), // PURCHASE, CONSUMPTION, OUTPUT, SALE, ADJUSTMENT, MORTALITY, etc.
+  debit_gl_account_id: varchar('debit_gl_account_id', { length: 36 }),
+  credit_gl_account_id: varchar('credit_gl_account_id', { length: 36 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  companyFk: foreignKey({
+    columns: [table.company_id],
+    foreignColumns: [companyMaster.company_id],
+    name: 'gl_map_company_id_fk'
+  }).onDelete('restrict'),
+  categoryFk: foreignKey({
+    columns: [table.item_category_id],
+    foreignColumns: [itemCategoryMaster.category_id],
+    name: 'gl_map_category_id_fk'
+  }).onDelete('restrict'),
+  debitGlFk: foreignKey({
+    columns: [table.debit_gl_account_id],
+    foreignColumns: [glAccountMaster.gl_account_id],
+    name: 'gl_map_debit_gl_id_fk'
+  }).onDelete('restrict'),
+  creditGlFk: foreignKey({
+    columns: [table.credit_gl_account_id],
+    foreignColumns: [glAccountMaster.gl_account_id],
+    name: 'gl_map_credit_gl_id_fk'
+  }).onDelete('restrict')
+}));
+
+export const glMappingMasterRelations = relations(glMappingMaster, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [glMappingMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  itemCategory: one(itemCategoryMaster, {
+    fields: [glMappingMaster.item_category_id],
+    references: [itemCategoryMaster.category_id]
+  }),
+  debitGlAccount: one(glAccountMaster, {
+    fields: [glMappingMaster.debit_gl_account_id],
+    references: [glAccountMaster.gl_account_id],
+    relationName: 'debit_gl_relation'
+  }),
+  creditGlAccount: one(glAccountMaster, {
+    fields: [glMappingMaster.credit_gl_account_id],
+    references: [glAccountMaster.gl_account_id],
+    relationName: 'credit_gl_relation'
+  })
+}));
+
+export const costCenterMaster = mysqlTable('cost_center_master', {
+  cost_center_id: varchar('cost_center_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  cost_center_code: varchar('cost_center_code', { length: 50 }).notNull(),
+  cost_center_name: varchar('cost_center_name', { length: 150 }).notNull(),
+  cost_center_type: varchar('cost_center_type', { length: 50 }).notNull(), // DEPARTMENT, FARM, WAREHOUSE, PROJECT, OTHER
+  parent_cost_center_id: varchar('parent_cost_center_id', { length: 36 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  companyFk: foreignKey({
+    columns: [table.company_id],
+    foreignColumns: [companyMaster.company_id],
+    name: 'cost_center_company_id_fk'
+  }).onDelete('restrict'),
+  parentCostCenterFk: foreignKey({
+    columns: [table.parent_cost_center_id],
+    foreignColumns: [table.cost_center_id],
+    name: 'cost_center_parent_id_fk'
+  }).onDelete('restrict')
+}));
+
+export const costCenterMasterRelations = relations(costCenterMaster, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [costCenterMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  parentCostCenter: one(costCenterMaster, {
+    fields: [costCenterMaster.parent_cost_center_id],
+    references: [costCenterMaster.cost_center_id],
+    relationName: 'cost_center_hierarchy'
+  }),
+  subCostCenters: many(costCenterMaster, {
+    relationName: 'cost_center_hierarchy'
   })
 }));
 

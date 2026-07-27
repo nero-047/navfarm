@@ -1,5 +1,7 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsNumber, ValidateIf } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsNumber, ValidateIf, IsInt, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+
 
 export class CreateCompanyDto {
   @ApiProperty({ example: 'GREENVALLEY', description: 'Unique company code' })
@@ -133,4 +135,36 @@ export class UpdateCompanyDto {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+}
+
+export class QueryCompanyDto {
+  @ApiProperty({ description: 'Search company code or name', required: false })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({ description: 'Filter by active status', required: false })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isActive?: boolean;
+
+  @ApiProperty({ description: 'Filter by onboarding status', required: false })
+  @IsOptional()
+  @IsString()
+  onboardingStatus?: string;
+
+  @ApiProperty({ description: 'Results per page', default: 50, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @ApiProperty({ description: 'Pagination offset', default: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
 }

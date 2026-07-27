@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, ne, isNull, like, or } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../core/database/schema';
 import * as masterSchema from '../../core/database/master-schema';
 import { MASTER_CONNECTION } from '../../core/database/database.module';
-import { CreateCompanyDto, UpdateCompanyDto } from './dto/company.dto';
+import { CreateCompanyDto, UpdateCompanyDto, QueryCompanyDto } from './dto/company.dto';
 import * as crypto from 'crypto';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) =>
   date.toISOString().slice(0, 19).replace('T', ' ');
@@ -17,6 +18,7 @@ export class CompanyService {
     private readonly cls: ClsService,
     @Inject(MASTER_CONNECTION)
     private readonly masterDb: MySql2Database<typeof masterSchema>,
+    private readonly auditService: AuditLogService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -27,22 +29,49 @@ export class CompanyService {
     return tenantDb;
   }
 
-  async findByTenant(tenantId: string) {
+  async findByTenant(tenantId: string, query?: QueryCompanyDto) {
+    const conditions: any[] = [
+      eq(schema.companyMaster.tenant_id, tenantId),
+      ne(schema.companyMaster.company_code, 'PLACEHOLDER'),
+      isNull(schema.companyMaster.deleted_at),
+    ];
+
+    if (query) {
+      if (query.isActive !== undefined) {
+        conditions.push(eq(schema.companyMaster.is_active, query.isActive));
+      }
+      if (query.onboardingStatus !== undefined) {
+        conditions.push(eq(schema.companyMaster.onboarding_status, query.onboardingStatus));
+      }
+      if (query.search) {
+        conditions.push(
+          or(
+            like(schema.companyMaster.company_code, `%${query.search}%`),
+            like(schema.companyMaster.company_name, `%${query.search}%`)
+          )
+        );
+      }
+    }
+
+    const limit = query?.limit || 50;
+    const offset = query?.offset || 0;
+
     return this.db
       .select()
       .from(schema.companyMaster)
-      .where(and(
-        eq(schema.companyMaster.tenant_id, tenantId),
-        ne(schema.companyMaster.company_code, 'PLACEHOLDER'),
-        eq(schema.companyMaster.is_active, true),
-      ));
+      .where(and(...conditions))
+      .limit(limit)
+      .offset(offset);
   }
 
   async findOne(companyId: string) {
     const [company] = await this.db
       .select()
       .from(schema.companyMaster)
-      .where(eq(schema.companyMaster.company_id, companyId))
+      .where(and(
+        eq(schema.companyMaster.company_id, companyId),
+        isNull(schema.companyMaster.deleted_at)
+      ))
       .limit(1);
 
     if (!company) {
@@ -78,15 +107,27 @@ export class CompanyService {
       );
     }
 
-    // Check for duplicate company_code within tenant
-    const [existing] = await this.db
+    // Check for duplicate company_code or company_name within tenant
+    const existing = await this.db
       .select()
       .from(schema.companyMaster)
-      .where(eq(schema.companyMaster.company_code, dto.company_code))
+      .where(
+        and(
+          eq(schema.companyMaster.tenant_id, tenantId),
+          or(
+            eq(schema.companyMaster.company_code, dto.company_code.toUpperCase()),
+            eq(schema.companyMaster.company_name, dto.company_name)
+          ),
+          isNull(schema.companyMaster.deleted_at)
+        )
+      )
       .limit(1);
 
-    if (existing) {
-      throw new ConflictException(`Company with code '${dto.company_code}' already exists in this tenant.`);
+    if (existing.length > 0) {
+      if (existing[0].company_code === dto.company_code.toUpperCase()) {
+        throw new ConflictException(`Company with code '${dto.company_code}' already exists in this tenant.`);
+      }
+      throw new ConflictException(`Company with name '${dto.company_name}' already exists in this tenant.`);
     }
 
     // Get default language and currency if not specified or invalid UUID format
@@ -349,32 +390,106 @@ export class CompanyService {
     });
   }
 
-  async update(companyId: string, dto: UpdateCompanyDto) {
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(eq(schema.companyMaster.company_id, companyId))
-      .limit(1);
+  async update(companyId: string, dto: UpdateCompanyDto, tenantId?: string, userPayload?: any) {
+    const company = await this.findOne(companyId);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${companyId}' not found.`);
+    // Validate unique code / name if modified
+    if (tenantId && (dto.company_code || dto.company_name)) {
+      const codeOrName = [];
+      if (dto.company_code) codeOrName.push(eq(schema.companyMaster.company_code, dto.company_code.toUpperCase()));
+      if (dto.company_name) codeOrName.push(eq(schema.companyMaster.company_name, dto.company_name));
+
+      const existing = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(
+          and(
+            eq(schema.companyMaster.tenant_id, tenantId),
+            ne(schema.companyMaster.company_id, companyId),
+            or(...codeOrName),
+            isNull(schema.companyMaster.deleted_at)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        if (dto.company_code && existing[0].company_code === dto.company_code.toUpperCase()) {
+          throw new ConflictException(`Company with code '${dto.company_code}' already exists in this tenant.`);
+        }
+        throw new ConflictException(`Company with name '${dto.company_name}' already exists in this tenant.`);
+      }
     }
+
+    const updates: any = {
+      updated_at: toMysqlTimestamp(),
+      updated_by: userPayload?.userId || null,
+    };
+
+    if (dto.company_code !== undefined) updates.company_code = dto.company_code.toUpperCase();
+    if (dto.company_name !== undefined) updates.company_name = dto.company_name;
+    if (dto.company_display_name !== undefined) updates.company_display_name = dto.company_display_name;
+    if (dto.company_type !== undefined) updates.company_type = dto.company_type;
+    if (dto.industry_type !== undefined) updates.industry_type = dto.industry_type;
+    if (dto.base_currency_id !== undefined) updates.base_currency_id = dto.base_currency_id;
+    if (dto.default_language_id !== undefined) updates.default_language_id = dto.default_language_id;
+    if (dto.country_id !== undefined) updates.country_id = dto.country_id;
+    if (dto.default_timezone_id !== undefined) updates.default_timezone_id = dto.default_timezone_id;
+    if (dto.registration_no !== undefined) updates.registration_no = dto.registration_no;
+    if (dto.tax_id !== undefined) updates.tax_id = dto.tax_id;
+    if (dto.primary_color_hex !== undefined) updates.primary_color_hex = dto.primary_color_hex;
+    if (dto.onboarding_status !== undefined) updates.onboarding_status = dto.onboarding_status;
+    if (dto.is_active !== undefined) updates.is_active = dto.is_active;
 
     await this.db
       .update(schema.companyMaster)
-      .set(dto as any)
+      .set(updates)
       .where(eq(schema.companyMaster.company_id, companyId));
 
-    const [updated] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(eq(schema.companyMaster.company_id, companyId))
-      .limit(1);
+    // Audit Log
+    await this.auditService.log({
+      tenantId: tenantId || company.tenant_id,
+      companyId: companyId,
+      userId: userPayload?.userId,
+      action: 'UPDATE',
+      entityName: 'company_master',
+      entityId: companyId,
+      oldValues: company,
+      newValues: updates,
+    });
 
-    return updated;
+    return this.findOne(companyId);
   }
 
-  async remove(companyId: string) {
+  async remove(companyId: string, tenantId?: string, userPayload?: any) {
+    const company = await this.findOne(companyId);
+    const deletedTime = toMysqlTimestamp();
+
+    // Soft-delete
+    await this.db
+      .update(schema.companyMaster)
+      .set({
+        is_active: false,
+        deleted_at: deletedTime as any,
+        updated_by: userPayload?.userId || null,
+      })
+      .where(eq(schema.companyMaster.company_id, companyId));
+
+    // Audit Log
+    await this.auditService.log({
+      tenantId: tenantId || company.tenant_id,
+      companyId: companyId,
+      userId: userPayload?.userId,
+      action: 'DELETE',
+      entityName: 'company_master',
+      entityId: companyId,
+      oldValues: company,
+      newValues: { is_active: false, deleted_at: deletedTime },
+    });
+
+    return { success: true, message: `Company '${company.company_name}' has been soft-deleted.` };
+  }
+
+  async restore(companyId: string, tenantId?: string, userPayload?: any) {
     const [company] = await this.db
       .select()
       .from(schema.companyMaster)
@@ -385,12 +500,31 @@ export class CompanyService {
       throw new NotFoundException(`Company with ID '${companyId}' not found.`);
     }
 
-    // Soft-delete: set inactive
+    if (!company.deleted_at) {
+      return company;
+    }
+
     await this.db
       .update(schema.companyMaster)
-      .set({ is_active: false })
+      .set({
+        is_active: true,
+        deleted_at: null,
+        updated_by: userPayload?.userId || null,
+        updated_at: toMysqlTimestamp(),
+      })
       .where(eq(schema.companyMaster.company_id, companyId));
 
-    return { message: `Company '${companyId}' has been deactivated.` };
+    // Audit Log
+    await this.auditService.log({
+      tenantId: tenantId || company.tenant_id,
+      companyId: companyId,
+      userId: userPayload?.userId,
+      action: 'RESTORE',
+      entityName: 'company_master',
+      entityId: companyId,
+      newValues: { is_active: true, deleted_at: null },
+    });
+
+    return this.findOne(companyId);
   }
 }
