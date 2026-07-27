@@ -71,6 +71,13 @@
       "when": 1785137871360,
       "tag": "0009_graceful_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1785143678028,
+      "tag": "0010_serious_mandarin",
+      "breakpoints": true
     }
   ]
 }

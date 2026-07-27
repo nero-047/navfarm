@@ -50,6 +50,8 @@ export const companyMaster = mysqlTable('company_master', {
   is_multi_farm: boolean('is_multi_farm').default(false).notNull(),
   max_farm_locations: int('max_farm_locations').default(1).notNull(),
   onboarding_status: varchar('onboarding_status', { length: 20 }).default('PENDING').notNull(),
+  default_warehouse_id: varchar('default_warehouse_id', { length: 36 }),
+  default_location_id: varchar('default_location_id', { length: 36 }),
   is_active: boolean('is_active').default(true).notNull(),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -1363,5 +1365,767 @@ export const notificationLogRelations = relations(notificationLog, ({ one }) => 
   company: one(companyMaster, {
     fields: [notificationLog.company_id],
     references: [companyMaster.company_id]
+  })
+}));
+
+// ==========================================
+// 9. INVENTORY ENGINE SCHEMAS
+// ==========================================
+
+export const lotMaster = mysqlTable('lot_master', {
+  lot_id: varchar('lot_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  lot_code: varchar('lot_code', { length: 100 }).notNull(),
+  mfg_date: date('mfg_date', { mode: 'string' }),
+  expiry_date: date('expiry_date', { mode: 'string' }),
+  qty_initial: decimal('qty_initial', { precision: 18, scale: 4 }).notNull(),
+  qty_on_hand: decimal('qty_on_hand', { precision: 18, scale: 4 }).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_item_lot').on(table.tenant_id, table.item_id, table.lot_code),
+]);
+
+export const serialMaster = mysqlTable('serial_master', {
+  serial_id: varchar('serial_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  lot_id: varchar('lot_id', { length: 36 }).references(() => lotMaster.lot_id, { onDelete: 'set null' }),
+  serial_no: varchar('serial_no', { length: 100 }).notNull(),
+  status: varchar('status', { length: 30 }).default('IN_STOCK').notNull(), // IN_STOCK, CONSUMED, RESERVED
+  warranty_expiry_date: date('warranty_expiry_date', { mode: 'string' }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_item_serial').on(table.tenant_id, table.item_id, table.serial_no),
+]);
+
+export const inventoryLedger = mysqlTable('inventory_ledger', {
+  ledger_id: varchar('ledger_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+  transaction_type: varchar('transaction_type', { length: 50 }).notNull(), // GOODS_RECEIPT, GOODS_ISSUE, TRANSFER, ADJUSTMENT, JOURNAL_CORRECTION
+  transaction_date: date('transaction_date', { mode: 'string' }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  qty: decimal('qty', { precision: 18, scale: 4 }).notNull(), // positive = in, negative = out
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).notNull(),
+  total_value: decimal('total_value', { precision: 18, scale: 4 }).notNull(),
+  ref_doc_type: varchar('ref_doc_type', { length: 50 }).notNull(), // GoodsReceipt, GoodsIssue, TransferOrder, InventoryAdjustment, InventoryJournal
+  ref_doc_id: varchar('ref_doc_id', { length: 36 }).notNull(),
+  ref_doc_line_id: varchar('ref_doc_line_id', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_inv_ledg_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_inv_ledg_wh' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_inv_ledg_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_inv_ledg_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_inv_ledg_lot' }).onDelete('restrict'),
+  foreignKey({ columns: [table.serial_id], foreignColumns: [serialMaster.serial_id], name: 'fk_inv_ledg_ser' }).onDelete('restrict'),
+]);
+
+export const inventoryBalance = mysqlTable('inventory_balance', {
+  balance_id: varchar('balance_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+  qty_on_hand: decimal('qty_on_hand', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  qty_reserved: decimal('qty_reserved', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  qty_available: decimal('qty_available', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('uq_tenant_inv_balance_comp_wh_loc_item_lot_serial').on(
+    table.tenant_id,
+    table.company_id,
+    table.warehouse_id,
+    table.location_id,
+    table.item_id,
+    table.lot_id,
+    table.serial_id
+  ),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_inv_bal_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_inv_bal_wh' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_inv_bal_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_inv_bal_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_inv_bal_lot' }).onDelete('cascade'),
+  foreignKey({ columns: [table.serial_id], foreignColumns: [serialMaster.serial_id], name: 'fk_inv_bal_ser' }).onDelete('cascade'),
+]);
+
+export const fifoLayer = mysqlTable('fifo_layer', {
+  layer_id: varchar('layer_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  ledger_id: varchar('ledger_id', { length: 36 }).notNull(),
+  qty_initial: decimal('qty_initial', { precision: 18, scale: 4 }).notNull(),
+  qty_remaining: decimal('qty_remaining', { precision: 18, scale: 4 }).notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  is_exhausted: boolean('is_exhausted').default(false).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_fifo_lay_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_fifo_lay_wh' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_fifo_lay_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_fifo_lay_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_fifo_lay_lot' }).onDelete('restrict'),
+  foreignKey({ columns: [table.ledger_id], foreignColumns: [inventoryLedger.ledger_id], name: 'fk_fifo_lay_ledg' }).onDelete('restrict'),
+]);
+
+export const fifoConsumptionLog = mysqlTable('fifo_consumption_log', {
+  consumption_id: varchar('consumption_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  layer_id: varchar('layer_id', { length: 36 }).notNull(),
+  ledger_id: varchar('ledger_id', { length: 36 }).notNull(), // issue ledger entry
+  qty_consumed: decimal('qty_consumed', { precision: 18, scale: 4 }).notNull(),
+  cost_consumed: decimal('cost_consumed', { precision: 18, scale: 4 }).notNull(),
+  consumed_at: timestamp('consumed_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.layer_id], foreignColumns: [fifoLayer.layer_id], name: 'fk_fcl_layer' }).onDelete('restrict'),
+  foreignKey({ columns: [table.ledger_id], foreignColumns: [inventoryLedger.ledger_id], name: 'fk_fcl_ledger' }).onDelete('restrict'),
+]);
+
+export const stockReservation = mysqlTable('stock_reservation', {
+  reservation_id: varchar('reservation_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+  qty_reserved: decimal('qty_reserved', { precision: 18, scale: 4 }).notNull(),
+  reservation_type: varchar('reservation_type', { length: 30 }).notNull(), // SALES, PRODUCTION, MANUAL
+  ref_doc_type: varchar('ref_doc_type', { length: 50 }),
+  ref_doc_id: varchar('ref_doc_id', { length: 36 }),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(), // ACTIVE, CONSUMED, RELEASED, EXPIRED
+  expires_at: timestamp('expires_at', { mode: 'string' }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_st_res_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_st_res_wh' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_st_res_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_st_res_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_st_res_lot' }).onDelete('set null'),
+  foreignKey({ columns: [table.serial_id], foreignColumns: [serialMaster.serial_id], name: 'fk_st_res_ser' }).onDelete('set null'),
+]);
+
+export const goodsReceipt = mysqlTable('goods_receipt', {
+  receipt_id: varchar('receipt_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  receipt_no: varchar('receipt_no', { length: 50 }).notNull(),
+  receipt_type: varchar('receipt_type', { length: 30 }).notNull(), // MANUAL, PURCHASE, PRODUCTION, ADJUSTMENT, TRANSFER
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_receipt_no').on(table.tenant_id, table.receipt_no),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_gr_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_gr_wh' }).onDelete('restrict'),
+]);
+
+export const goodsReceiptLine = mysqlTable('goods_receipt_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  receipt_id: varchar('receipt_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  qty: decimal('qty', { precision: 18, scale: 4 }).notNull(),
+  uom_code: varchar('uom_code', { length: 20 }).notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).notNull(),
+  total_value: decimal('total_value', { precision: 18, scale: 4 }).notNull(),
+  lot_no: varchar('lot_no', { length: 100 }),
+  serial_no: varchar('serial_no', { length: 100 }),
+  mfg_date: date('mfg_date', { mode: 'string' }),
+  expiry_date: date('expiry_date', { mode: 'string' }),
+}, (table) => [
+  foreignKey({ columns: [table.receipt_id], foreignColumns: [goodsReceipt.receipt_id], name: 'fk_grl_receipt' }).onDelete('cascade'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_grl_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_grl_loc' }).onDelete('restrict'),
+]);
+
+export const goodsIssue = mysqlTable('goods_issue', {
+  issue_id: varchar('issue_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  issue_no: varchar('issue_no', { length: 50 }).notNull(),
+  issue_type: varchar('issue_type', { length: 30 }).notNull(), // CONSUMPTION, SALES, TRANSFER, ADJUSTMENT
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_issue_no').on(table.tenant_id, table.issue_no),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_gi_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_gi_wh' }).onDelete('restrict'),
+]);
+
+export const goodsIssueLine = mysqlTable('goods_issue_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  issue_id: varchar('issue_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  qty: decimal('qty', { precision: 18, scale: 4 }).notNull(),
+  uom_code: varchar('uom_code', { length: 20 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+}, (table) => [
+  foreignKey({ columns: [table.issue_id], foreignColumns: [goodsIssue.issue_id], name: 'fk_gil_issue' }).onDelete('cascade'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_gil_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_gil_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_gil_lot' }).onDelete('restrict'),
+  foreignKey({ columns: [table.serial_id], foreignColumns: [serialMaster.serial_id], name: 'fk_gil_ser' }).onDelete('restrict'),
+]);
+
+export const transferOrder = mysqlTable('transfer_order', {
+  transfer_id: varchar('transfer_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  transfer_no: varchar('transfer_no', { length: 50 }).notNull(),
+  from_warehouse_id: varchar('from_warehouse_id', { length: 36 }).notNull(),
+  to_warehouse_id: varchar('to_warehouse_id', { length: 36 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_transfer_no').on(table.tenant_id, table.transfer_no),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_to_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.from_warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_to_from_wh' }).onDelete('restrict'),
+  foreignKey({ columns: [table.to_warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_to_to_wh' }).onDelete('restrict'),
+]);
+
+export const transferOrderLine = mysqlTable('transfer_order_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  transfer_id: varchar('transfer_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  from_location_id: varchar('from_location_id', { length: 36 }).notNull(),
+  to_location_id: varchar('to_location_id', { length: 36 }).notNull(),
+  qty: decimal('qty', { precision: 18, scale: 4 }).notNull(),
+  uom_code: varchar('uom_code', { length: 20 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+}, (table) => [
+  foreignKey({ columns: [table.transfer_id], foreignColumns: [transferOrder.transfer_id], name: 'fk_tol_transfer' }).onDelete('cascade'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_tol_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.from_location_id], foreignColumns: [locationMaster.location_id], name: 'fk_tol_from_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.to_location_id], foreignColumns: [locationMaster.location_id], name: 'fk_tol_to_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_tol_lot' }).onDelete('restrict'),
+  foreignKey({ columns: [table.serial_id], foreignColumns: [serialMaster.serial_id], name: 'fk_tol_ser' }).onDelete('restrict'),
+]);
+
+export const inventoryAdjustment = mysqlTable('inventory_adjustment', {
+  adjustment_id: varchar('adjustment_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  adjustment_no: varchar('adjustment_no', { length: 50 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  adjustment_type: varchar('adjustment_type', { length: 20 }).notNull(), // POSITIVE, NEGATIVE
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, POSTED
+  reason_code: varchar('reason_code', { length: 50 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  qty: decimal('qty', { precision: 18, scale: 4 }).notNull(),
+  uom_code: varchar('uom_code', { length: 20 }).notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+  lot_no: varchar('lot_no', { length: 100 }),
+  serial_no: varchar('serial_no', { length: 100 }),
+  mfg_date: date('mfg_date', { mode: 'string' }),
+  expiry_date: date('expiry_date', { mode: 'string' }),
+  notes: text('notes'),
+  approved_by: varchar('approved_by', { length: 36 }),
+  approved_at: timestamp('approved_at', { mode: 'string' }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_adjustment_no').on(table.tenant_id, table.adjustment_no),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_inv_adj_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_inv_adj_wh' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_inv_adj_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_inv_adj_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_inv_adj_lot' }).onDelete('restrict'),
+  foreignKey({ columns: [table.serial_id], foreignColumns: [serialMaster.serial_id], name: 'fk_inv_adj_ser' }).onDelete('restrict'),
+]);
+
+export const inventoryJournal = mysqlTable('inventory_journal', {
+  journal_id: varchar('journal_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  journal_no: varchar('journal_no', { length: 50 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_journal_no').on(table.tenant_id, table.journal_no),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_ij_comp' }).onDelete('restrict'),
+]);
+
+export const inventoryJournalLine = mysqlTable('inventory_journal_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  journal_id: varchar('journal_id', { length: 36 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+  qty: decimal('qty', { precision: 18, scale: 4 }).notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).notNull(),
+  reason_code: varchar('reason_code', { length: 50 }).notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.journal_id], foreignColumns: [inventoryJournal.journal_id], name: 'fk_ijl_journal' }).onDelete('cascade'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_ijl_wh' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_ijl_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_ijl_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_ijl_lot' }).onDelete('restrict'),
+  foreignKey({ columns: [table.serial_id], foreignColumns: [serialMaster.serial_id], name: 'fk_ijl_ser' }).onDelete('restrict'),
+]);
+
+export const inventoryCount = mysqlTable('inventory_count', {
+  count_id: varchar('count_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  count_no: varchar('count_no', { length: 50 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  count_date: date('count_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, COUNTED, ADJUSTED, CANCELLED
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_tenant_count_no').on(table.tenant_id, table.count_no),
+  foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fk_ic_comp' }).onDelete('restrict'),
+  foreignKey({ columns: [table.warehouse_id], foreignColumns: [warehouseMaster.warehouse_id], name: 'fk_ic_wh' }).onDelete('restrict'),
+]);
+
+export const inventoryCountLine = mysqlTable('inventory_count_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  count_id: varchar('count_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+  qty_expected: decimal('qty_expected', { precision: 18, scale: 4 }).notNull(),
+  qty_counted: decimal('qty_counted', { precision: 18, scale: 4 }).notNull(),
+  variance: decimal('variance', { precision: 18, scale: 4 }).notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).notNull(),
+  reason_code: varchar('reason_code', { length: 50 }),
+}, (table) => [
+  foreignKey({ columns: [table.count_id], foreignColumns: [inventoryCount.count_id], name: 'fk_icl_count' }).onDelete('cascade'),
+  foreignKey({ columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fk_icl_item' }).onDelete('restrict'),
+  foreignKey({ columns: [table.location_id], foreignColumns: [locationMaster.location_id], name: 'fk_icl_loc' }).onDelete('restrict'),
+  foreignKey({ columns: [table.lot_id], foreignColumns: [lotMaster.lot_id], name: 'fk_icl_lot' }).onDelete('restrict'),
+  foreignKey({ columns: [table.serial_id], foreignColumns: [serialMaster.serial_id], name: 'fk_icl_ser' }).onDelete('restrict'),
+]);
+
+// ==========================================
+// RELATIONSHIPS FOR NEW INVENTORY SCHEMAS
+// ==========================================
+
+export const lotMasterRelations = relations(lotMaster, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [lotMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  item: one(itemMaster, {
+    fields: [lotMaster.item_id],
+    references: [itemMaster.item_id]
+  }),
+  serials: many(serialMaster)
+}));
+
+export const serialMasterRelations = relations(serialMaster, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [serialMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  item: one(itemMaster, {
+    fields: [serialMaster.item_id],
+    references: [itemMaster.item_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [serialMaster.lot_id],
+    references: [lotMaster.lot_id]
+  })
+}));
+
+export const inventoryLedgerRelations = relations(inventoryLedger, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [inventoryLedger.company_id],
+    references: [companyMaster.company_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [inventoryLedger.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  location: one(locationMaster, {
+    fields: [inventoryLedger.location_id],
+    references: [locationMaster.location_id]
+  }),
+  item: one(itemMaster, {
+    fields: [inventoryLedger.item_id],
+    references: [itemMaster.item_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [inventoryLedger.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  serial: one(serialMaster, {
+    fields: [inventoryLedger.serial_id],
+    references: [serialMaster.serial_id]
+  })
+}));
+
+export const inventoryBalanceRelations = relations(inventoryBalance, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [inventoryBalance.company_id],
+    references: [companyMaster.company_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [inventoryBalance.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  location: one(locationMaster, {
+    fields: [inventoryBalance.location_id],
+    references: [locationMaster.location_id]
+  }),
+  item: one(itemMaster, {
+    fields: [inventoryBalance.item_id],
+    references: [itemMaster.item_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [inventoryBalance.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  serial: one(serialMaster, {
+    fields: [inventoryBalance.serial_id],
+    references: [serialMaster.serial_id]
+  })
+}));
+
+export const fifoLayerRelations = relations(fifoLayer, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [fifoLayer.company_id],
+    references: [companyMaster.company_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [fifoLayer.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  location: one(locationMaster, {
+    fields: [fifoLayer.location_id],
+    references: [locationMaster.location_id]
+  }),
+  item: one(itemMaster, {
+    fields: [fifoLayer.item_id],
+    references: [itemMaster.item_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [fifoLayer.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  ledger: one(inventoryLedger, {
+    fields: [fifoLayer.ledger_id],
+    references: [inventoryLedger.ledger_id]
+  }),
+  consumptions: many(fifoConsumptionLog)
+}));
+
+export const fifoConsumptionLogRelations = relations(fifoConsumptionLog, ({ one }) => ({
+  layer: one(fifoLayer, {
+    fields: [fifoConsumptionLog.layer_id],
+    references: [fifoLayer.layer_id]
+  }),
+  ledger: one(inventoryLedger, {
+    fields: [fifoConsumptionLog.ledger_id],
+    references: [inventoryLedger.ledger_id]
+  })
+}));
+
+export const stockReservationRelations = relations(stockReservation, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [stockReservation.company_id],
+    references: [companyMaster.company_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [stockReservation.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  location: one(locationMaster, {
+    fields: [stockReservation.location_id],
+    references: [locationMaster.location_id]
+  }),
+  item: one(itemMaster, {
+    fields: [stockReservation.item_id],
+    references: [itemMaster.item_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [stockReservation.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  serial: one(serialMaster, {
+    fields: [stockReservation.serial_id],
+    references: [serialMaster.serial_id]
+  })
+}));
+
+export const goodsReceiptRelations = relations(goodsReceipt, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [goodsReceipt.company_id],
+    references: [companyMaster.company_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [goodsReceipt.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  lines: many(goodsReceiptLine)
+}));
+
+export const goodsReceiptLineRelations = relations(goodsReceiptLine, ({ one }) => ({
+  receipt: one(goodsReceipt, {
+    fields: [goodsReceiptLine.receipt_id],
+    references: [goodsReceipt.receipt_id]
+  }),
+  item: one(itemMaster, {
+    fields: [goodsReceiptLine.item_id],
+    references: [itemMaster.item_id]
+  }),
+  location: one(locationMaster, {
+    fields: [goodsReceiptLine.location_id],
+    references: [locationMaster.location_id]
+  })
+}));
+
+export const goodsIssueRelations = relations(goodsIssue, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [goodsIssue.company_id],
+    references: [companyMaster.company_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [goodsIssue.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  lines: many(goodsIssueLine)
+}));
+
+export const goodsIssueLineRelations = relations(goodsIssueLine, ({ one }) => ({
+  issue: one(goodsIssue, {
+    fields: [goodsIssueLine.issue_id],
+    references: [goodsIssue.issue_id]
+  }),
+  item: one(itemMaster, {
+    fields: [goodsIssueLine.item_id],
+    references: [itemMaster.item_id]
+  }),
+  location: one(locationMaster, {
+    fields: [goodsIssueLine.location_id],
+    references: [locationMaster.location_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [goodsIssueLine.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  serial: one(serialMaster, {
+    fields: [goodsIssueLine.serial_id],
+    references: [serialMaster.serial_id]
+  })
+}));
+
+export const transferOrderRelations = relations(transferOrder, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [transferOrder.company_id],
+    references: [companyMaster.company_id]
+  }),
+  fromWarehouse: one(warehouseMaster, {
+    fields: [transferOrder.from_warehouse_id],
+    references: [warehouseMaster.warehouse_id],
+    relationName: 'fromWarehouseRelation'
+  }),
+  toWarehouse: one(warehouseMaster, {
+    fields: [transferOrder.to_warehouse_id],
+    references: [warehouseMaster.warehouse_id],
+    relationName: 'toWarehouseRelation'
+  }),
+  lines: many(transferOrderLine)
+}));
+
+export const transferOrderLineRelations = relations(transferOrderLine, ({ one }) => ({
+  transfer: one(transferOrder, {
+    fields: [transferOrderLine.transfer_id],
+    references: [transferOrder.transfer_id]
+  }),
+  item: one(itemMaster, {
+    fields: [transferOrderLine.item_id],
+    references: [itemMaster.item_id]
+  }),
+  fromLocation: one(locationMaster, {
+    fields: [transferOrderLine.from_location_id],
+    references: [locationMaster.location_id],
+    relationName: 'fromLocationRelation'
+  }),
+  toLocation: one(locationMaster, {
+    fields: [transferOrderLine.to_location_id],
+    references: [locationMaster.location_id],
+    relationName: 'toLocationRelation'
+  }),
+  lot: one(lotMaster, {
+    fields: [transferOrderLine.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  serial: one(serialMaster, {
+    fields: [transferOrderLine.serial_id],
+    references: [serialMaster.serial_id]
+  })
+}));
+
+export const inventoryAdjustmentRelations = relations(inventoryAdjustment, ({ one }) => ({
+  company: one(companyMaster, {
+    fields: [inventoryAdjustment.company_id],
+    references: [companyMaster.company_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [inventoryAdjustment.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  location: one(locationMaster, {
+    fields: [inventoryAdjustment.location_id],
+    references: [locationMaster.location_id]
+  }),
+  item: one(itemMaster, {
+    fields: [inventoryAdjustment.item_id],
+    references: [itemMaster.item_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [inventoryAdjustment.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  serial: one(serialMaster, {
+    fields: [inventoryAdjustment.serial_id],
+    references: [serialMaster.serial_id]
+  })
+}));
+
+export const inventoryJournalRelations = relations(inventoryJournal, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [inventoryJournal.company_id],
+    references: [companyMaster.company_id]
+  }),
+  lines: many(inventoryJournalLine)
+}));
+
+export const inventoryJournalLineRelations = relations(inventoryJournalLine, ({ one }) => ({
+  journal: one(inventoryJournal, {
+    fields: [inventoryJournalLine.journal_id],
+    references: [inventoryJournal.journal_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [inventoryJournalLine.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  location: one(locationMaster, {
+    fields: [inventoryJournalLine.location_id],
+    references: [locationMaster.location_id]
+  }),
+  item: one(itemMaster, {
+    fields: [inventoryJournalLine.item_id],
+    references: [itemMaster.item_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [inventoryJournalLine.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  serial: one(serialMaster, {
+    fields: [inventoryJournalLine.serial_id],
+    references: [serialMaster.serial_id]
+  })
+}));
+
+export const inventoryCountRelations = relations(inventoryCount, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [inventoryCount.company_id],
+    references: [companyMaster.company_id]
+  }),
+  warehouse: one(warehouseMaster, {
+    fields: [inventoryCount.warehouse_id],
+    references: [warehouseMaster.warehouse_id]
+  }),
+  lines: many(inventoryCountLine)
+}));
+
+export const inventoryCountLineRelations = relations(inventoryCountLine, ({ one }) => ({
+  count: one(inventoryCount, {
+    fields: [inventoryCountLine.count_id],
+    references: [inventoryCount.count_id]
+  }),
+  item: one(itemMaster, {
+    fields: [inventoryCountLine.item_id],
+    references: [itemMaster.item_id]
+  }),
+  location: one(locationMaster, {
+    fields: [inventoryCountLine.location_id],
+    references: [locationMaster.location_id]
+  }),
+  lot: one(lotMaster, {
+    fields: [inventoryCountLine.lot_id],
+    references: [lotMaster.lot_id]
+  }),
+  serial: one(serialMaster, {
+    fields: [inventoryCountLine.serial_id],
+    references: [serialMaster.serial_id]
   })
 }));
