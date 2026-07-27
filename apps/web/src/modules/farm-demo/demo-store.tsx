@@ -10,7 +10,19 @@ import {
   type ReactNode,
 } from 'react';
 import type { CompanyMeta } from '@/modules/company';
-import { api } from '../../lib/api-client';
+import { operationalClients } from './operational-client';
+import {
+  assertMockClose,
+  assertMockQr,
+  assertMockTransition,
+  mockApplyOperation,
+  mockApplyQualityDisposition,
+  mockApproveBatch,
+  mockCreateBatch,
+  mockFinalizeBatch,
+  mockJournal,
+  mockVariance,
+} from './mock-domain';
 import {
   getDemoBatches,
   getQualityRecords,
@@ -237,46 +249,20 @@ interface DemoStoreValue {
 
 const DemoStoreContext = createContext<DemoStoreValue | null>(null);
 
-function money(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 export function calculateVarianceForBatch(
   batch: WorkflowBatch,
 ): VarianceResult {
-  if (batch.method !== 'STANDARD')
-    return { price: 0, usage: 0, output: 0, overhead: 0, total: 0 };
-  const price = money(
-    (batch.actualRate - batch.standardRate) * batch.actualUsage,
-  );
-  const usage = money(
-    (batch.actualUsage - batch.expectedUsage) * batch.standardRate,
-  );
-  const output = money(
-    Math.max(0, batch.expectedOutput - batch.actualOutput) * batch.standardRate,
-  );
-  const overhead = money(batch.actualOverhead - batch.standardOverhead);
-  return {
-    price,
-    usage,
-    output,
-    overhead,
-    total: money(price + usage + output + overhead),
-  };
+  return mockVariance(batch);
 }
 
 export function validateBatchClose(batch: WorkflowBatch): string | null {
-  if (batch.qcRequired && batch.qcStatus !== 'PASS')
-    return 'Close blocked: mandatory QC has not passed.';
-  if (batch.actualOutput <= 0)
-    return 'Close blocked: record an output or harvest first.';
-  return null;
+  return assertMockClose(batch);
 }
 
 export function canGenerateQr(
   batch: WorkflowBatch | undefined,
 ): batch is WorkflowBatch {
-  return Boolean(batch && batch.qcStatus === 'PASS');
+  return Boolean(batch && !assertMockQr(batch, 1));
 }
 
 function seedState(company: CompanyMeta): DemoState {
@@ -423,15 +409,7 @@ function seedState(company: CompanyMeta): DemoState {
 }
 
 function journalFor(input: NewOperationInput): OperationEntry['journal'] {
-  const amount = money(input.quantity * input.unitCost);
-  if (input.entryType === 'OBSERVATION') return undefined;
-  if (input.entryType === 'OUTPUT')
-    return { debit: '1150 Output Inventory', credit: '1190 Batch WIP', amount };
-  if (input.entryType === 'MORTALITY')
-    return { debit: '7120 Mortality Loss', credit: '1190 Batch WIP', amount };
-  if (input.entryType === 'CONSUMPTION')
-    return { debit: '1190 Batch WIP', credit: '1100 Input Inventory', amount };
-  return { debit: '1190 Batch WIP', credit: '2100 Accounts Payable', amount };
+  return mockJournal(input);
 }
 
 export function DemoStoreProvider({
@@ -447,9 +425,9 @@ export function DemoStoreProvider({
   useEffect(() => {
     let cancelled = false;
     setIsReady(false);
-    api
-      .get<{ state: unknown | null }>(`/demo/companies/${company.slug}/state`)
-      .then(({ state: storedState }) => {
+    operationalClients.workspace
+      .bootstrap<DemoState>(company.slug, seedState(company))
+      .then((storedState) => {
         if (cancelled) return;
         const parsed = storedState as DemoState | null;
         setState(parsed?.version === 6 ? parsed : seedState(company));
@@ -467,7 +445,13 @@ export function DemoStoreProvider({
 
   useEffect(() => {
     if (isReady) {
-      void api.put(`/demo/companies/${company.slug}/state`, { state });
+      void Promise.all([
+        ...state.batches.map((batch) => operationalClients.batches.save(company.slug, batch)),
+        ...state.operations.map((operation) => operationalClients.operations.save(company.slug, operation)),
+        ...state.qualityLots.map((lot) => operationalClients.qualityLots.save(company.slug, lot)),
+        ...state.qrPacks.map((pack) => operationalClients.qrPacks.save(company.slug, pack)),
+        ...state.resources.map((resource) => operationalClients.resources.save(company.slug, resource)),
+      ]).catch(() => undefined);
       window.dispatchEvent(
         new CustomEvent('navfarm-demo-state', {
           detail: { company: company.slug, modules: state.setup.modules },
@@ -488,35 +472,11 @@ export function DemoStoreProvider({
       let created!: WorkflowBatch;
       setState((current) => {
         const nextNumber = current.batches.length + 45;
-        created = {
-          id: `batch-${Date.now()}`,
-          code: `${INDUSTRY_CONFIG[company.nobCode].batchPrefix}-2026-${String(nextNumber).padStart(3, '0')}`,
-          lob: input.lob,
-          method: input.method,
-          status: 'DRAFT',
-          riskStatus: 'ON_TRACK',
-          inventoryStatus: 'BLOCKED',
-          costingStatus: 'DRAFT',
-          stage: 'Draft setup',
+        created = mockCreateBatch(input, {
+          number: nextNumber, prefix: INDUSTRY_CONFIG[company.nobCode].batchPrefix,
           inputName: INDUSTRY_CONFIG[company.nobCode].primaryInput,
-          inputQty: input.inputQty,
           inputUom: INDUSTRY_CONFIG[company.nobCode].unit,
-          expectedOutput: input.expectedOutput,
-          actualOutput: 0,
-          standardRate: 20,
-          actualRate: 20,
-          expectedUsage: input.inputQty * 0.2,
-          actualUsage: 0,
-          standardOverhead: input.inputQty * 5,
-          actualOverhead: 0,
-          wip: 0,
-          sourceBatchId: input.sourceBatchId,
-          qcRequired: true,
-          qcStatus: 'NOT_STARTED',
-          borVersion: input.borVersion,
-          costSplitMethod: input.costSplitMethod,
-          createdAt: new Date().toISOString(),
-        };
+        });
         return {
           ...current,
           batches: [created, ...current.batches],
@@ -535,18 +495,7 @@ export function DemoStoreProvider({
     setState((current) => ({
       ...current,
       batches: current.batches.map((batch) =>
-        batch.id === id
-          ? {
-              ...batch,
-              status: 'APPROVED',
-              stage:
-                batch.method === 'BIO_ASSET'
-                  ? 'Premature / NCA'
-                  : 'Daily operations',
-              wip: money(batch.inputQty * batch.standardRate),
-              costingStatus: 'OPEN',
-            }
-          : batch,
+        batch.id === id ? mockApproveBatch(batch) : batch,
       ),
       auditLog: [
         `Approved batch; costing method and standards locked.`,
@@ -563,21 +512,8 @@ export function DemoStoreProvider({
     ) => {
       const batch = state.batches.find((item) => item.id === id);
       if (!batch) return { ok: false, message: 'Batch not found.' };
-      const allowed =
-        action === 'START'
-          ? batch.status === 'APPROVED'
-          : action === 'PAUSE'
-            ? batch.status === 'ACTIVE'
-            : action === 'RESUME'
-              ? batch.status === 'PAUSED'
-              : ['DRAFT', 'APPROVED', 'PAUSED'].includes(batch.status);
-      if (!allowed)
-        return {
-          ok: false,
-          message: `${action.toLowerCase()} is not allowed from ${batch.status.replaceAll('_', ' ')}.`,
-        };
-      if ((action === 'PAUSE' || action === 'CANCEL') && !reason.trim())
-        return { ok: false, message: 'A reason is required for this action.' };
+      const transitionError = assertMockTransition(batch, action, reason);
+      if (transitionError) return { ok: false, message: transitionError };
       const nextStatus: WorkflowStatus =
         action === 'START' || action === 'RESUME'
           ? 'ACTIVE'
@@ -630,45 +566,7 @@ export function DemoStoreProvider({
       operations: [entry, ...current.operations],
       batches: current.batches.map((batch) => {
         if (batch.id !== input.batchId) return batch;
-        const amount = input.quantity * input.unitCost;
-        return {
-          ...batch,
-          actualUsage:
-            input.entryType === 'CONSUMPTION'
-              ? batch.actualUsage + input.quantity
-              : batch.actualUsage,
-          actualOutput:
-            input.entryType === 'OUTPUT'
-              ? batch.actualOutput + input.quantity
-              : batch.actualOutput,
-          actualOverhead:
-            input.entryType === 'OVERHEAD' || input.entryType === 'RESOURCE'
-              ? batch.actualOverhead + amount
-              : batch.actualOverhead,
-          wip:
-            input.entryType === 'OUTPUT' || input.entryType === 'MORTALITY'
-              ? Math.max(0, batch.wip - amount)
-              : input.entryType === 'OBSERVATION'
-                ? batch.wip
-                : batch.wip + amount,
-          status:
-            input.entryType === 'OUTPUT'
-              ? 'READY_TO_CLOSE'
-              : batch.status === 'APPROVED'
-                ? 'ACTIVE'
-                : batch.status,
-          riskStatus:
-            input.expected !== undefined &&
-            input.quantity > input.expected * 1.05
-              ? 'WARNING'
-              : batch.riskStatus,
-          stage:
-            input.entryType === 'OUTPUT'
-              ? 'Final output'
-              : batch.status === 'APPROVED'
-                ? 'Daily operations'
-                : batch.stage,
-        };
+        return mockApplyOperation(batch, input);
       }),
       auditLog: [
         `Recorded ${input.entryType.toLowerCase()} entry${journal ? ` and balanced journal ₹${journal.amount.toLocaleString('en-IN')}` : ''}.`,
@@ -717,14 +615,7 @@ export function DemoStoreProvider({
           ),
           batches: current.batches.map((batch) =>
             batch.id === lot.batchId
-              ? {
-                  ...batch,
-                  qcStatus: status,
-                  status: status === 'PASS' ? 'READY_TO_CLOSE' : 'QC_HOLD',
-                  inventoryStatus: status === 'PASS' ? 'RELEASED' : 'BLOCKED',
-                  costingStatus:
-                    status === 'FAIL' ? 'CLOSE_BLOCKED' : batch.costingStatus,
-                }
+              ? mockApplyQualityDisposition(batch, status)
               : batch,
           ),
           auditLog: [
@@ -799,17 +690,7 @@ export function DemoStoreProvider({
       setState((current) => ({
         ...current,
         batches: current.batches.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status: 'CLOSED',
-                stage: 'Cost finalized',
-                costingStatus: 'FINALIZED',
-                inventoryStatus: 'RELEASED',
-                wip: 0,
-                closedAt: new Date().toISOString(),
-              }
-            : item,
+          item.id === id ? mockFinalizeBatch(item) : item,
         ),
         auditLog: [
           `${batch.code} closed; ${batch.method === 'STANDARD' ? 'four variances calculated' : batch.method === 'FIFO' ? 'actual FIFO cost finalized with no variances' : 'NCA/harvest cost finalized'} and WIP balanced to zero.`,
@@ -907,6 +788,7 @@ export function DemoStoreProvider({
   const resetDemo = useCallback(() => {
     const next = seedState(company);
     setState(next);
+    void operationalClients.workspace.reset(company.slug, next);
   }, [company]);
 
   const value = useMemo<DemoStoreValue>(

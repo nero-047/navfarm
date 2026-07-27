@@ -7,6 +7,7 @@ import { ROLE_PERMISSIONS } from '../../lib/authorization';
 import { apiErrorResponse } from './errors';
 import { handlePhase2Request, resetPhase2Repository } from './phase2-repository';
 import { handlePhase3Request, resetPhase3Repository } from './phase3-repository';
+import { handleOperationalRequest, resetOperationalRepository } from './operational-repository';
 
 type JsonRecord = Record<string, unknown>;
 type FixtureUser = {
@@ -279,12 +280,26 @@ export async function handleMockRequest(request: Request, path: string, requestI
     state.sessions.clear();
     resetPhase2Repository();
     resetPhase3Repository();
+    resetOperationalRepository();
     return json({ success: true });
   }
 
   const found = requireSession(request, requestId);
   if (found instanceof NextResponse) return found;
   const session = sessionPayload(found.record);
+  if (
+    path.startsWith('/companies/') &&
+    !path.endsWith('/operational-bootstrap') &&
+    !['GET', 'HEAD'].includes(method) &&
+    !session.companies.find((company) => company.companyId === session.activeCompanyId)
+      ?.permissions.includes('operations.create') &&
+    !session.companies.find((company) => company.companyId === session.activeCompanyId)
+      ?.permissions.includes('company.manage')
+  ) {
+    return apiErrorResponse(403, 'You do not have permission to change operational data.', requestId);
+  }
+  const operationalResponse = await handleOperationalRequest(phase2Request, path, requestId);
+  if (operationalResponse) return operationalResponse;
   const phase2Response = await handlePhase2Request(phase2Request, path, requestId, {
     userId: session.user.userId,
     fullName: session.user.fullName,
