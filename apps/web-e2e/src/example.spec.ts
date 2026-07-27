@@ -19,23 +19,21 @@ async function login(page: Page, email: string) {
   await expect(emailInput).toHaveValue(email);
   await expect(password).toHaveValue('Demo123!');
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page).toHaveURL(
-    email === 'system@navfarm.demo' ? /\/admin\/dashboard$/ : /\/context-selection$/,
-  );
-}
-
-async function selectCompany(page: Page, name: RegExp) {
-  await expect(page).toHaveURL(/\/context-selection$/);
-  await page.getByRole('button', { name }).click();
+  const destinations: Record<string, RegExp> = {
+    'system@navfarm.demo': /\/admin\/dashboard$/,
+    'tenant@navfarm.demo': /\/console\/dashboard$/,
+    'manager@navfarm.demo': /\/green-valley-poultry\/dashboard$/,
+    'onboarding@navfarm.demo': /\/bluewater-aqua\/setup\/profile$/,
+    'auditor@navfarm.demo': /\/green-valley-poultry\/dashboard$/,
+  };
+  await expect(page).toHaveURL(destinations[email] ?? /\/context-selection$/);
 }
 
 async function capturePair(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.evaluate(() => new Promise((resolvePromise) => setTimeout(resolvePromise, 250)));
   await page.evaluate('document.fonts.ready');
   await page.screenshot({ path: resolve(screenshotDirectory, `${name}-desktop.png`), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate(() => new Promise((resolvePromise) => setTimeout(resolvePromise, 250)));
   await page.evaluate('document.fonts.ready');
   await expect.poll(() => page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(390);
   await page.screenshot({ path: resolve(screenshotDirectory, `${name}-mobile.png`), fullPage: true });
@@ -43,11 +41,9 @@ async function capturePair(page: Page, name: string) {
 
 async function capturePhase3Pair(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.evaluate(() => new Promise((resolvePromise) => setTimeout(resolvePromise, 250)));
   await page.evaluate('document.fonts.ready');
   await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-desktop.png`), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate(() => new Promise((resolvePromise) => setTimeout(resolvePromise, 250)));
   await page.evaluate('document.fonts.ready');
   await expect.poll(() => page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(390);
   await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-mobile.png`), fullPage: true });
@@ -55,8 +51,6 @@ async function capturePhase3Pair(page: Page, name: string) {
 
 test('authenticates and opens the unified company shell', async ({ page }) => {
   await login(page, 'manager@navfarm.demo');
-
-  await selectCompany(page, /Green Valley Poultry/);
 
   await expect(page).toHaveURL(/\/green-valley-poultry\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Executive dashboard' })).toBeVisible();
@@ -76,7 +70,6 @@ test('system administrator opens the tenant registry and tenant detail', async (
 
 test('tenant administrator opens dashboard and company list', async ({ page }) => {
   await login(page, 'tenant@navfarm.demo');
-  await selectCompany(page, /Green Valley Poultry/);
   await page.goto('/console/dashboard');
   await expect(page.getByRole('heading', { name: 'Tenant dashboard' })).toBeVisible();
   await page.goto('/console/companies');
@@ -85,11 +78,10 @@ test('tenant administrator opens dashboard and company list', async ({ page }) =
   await expect(page.getByText('Valley Feed Processing')).toBeVisible();
 });
 
-test('incomplete company context redirects to its onboarding workflow', async ({ page }) => {
+test('incomplete company context opens its onboarding profile', async ({ page }) => {
   await login(page, 'onboarding@navfarm.demo');
-  await selectCompany(page, /BlueWater Aqua/);
-  await expect(page).toHaveURL(/\/onboarding$/);
-  await expect(page.getByText('Opening the company setup workflow…')).toBeVisible();
+  await expect(page).toHaveURL(/\/bluewater-aqua\/setup\/profile$/);
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Company profile' })).toBeVisible();
 });
 
 test('platform administrator creates a tenant through the contract workflow', async ({ page }) => {
@@ -118,14 +110,13 @@ test('platform administrator creates a tenant through the contract workflow', as
 test('tenant administrator creates a draft company and enters setup', async ({ page }) => {
   expect((await page.request.post('/api/v1/__mock/reset')).ok()).toBe(true);
   await login(page, 'tenant@navfarm.demo');
-  await selectCompany(page, /Green Valley Poultry/);
   await page.goto('/console/companies/new');
   await expect(page.getByRole('heading', { name: 'Create company' })).toBeVisible();
   await page.getByLabel('Company code').fill('E2E_COMPANY');
   await page.getByLabel('Legal company name').fill('E2E Company');
   await page.getByRole('button', { name: 'Create and start setup' }).click();
   await expect(page).toHaveURL(/\/e2e-company\/setup\/profile$/);
-  await expect(page.getByText('Access denied')).toBeVisible();
+  await expect(page.getByRole('banner').getByRole('heading', { name: 'Profile', exact: true })).toBeVisible();
 });
 
 test('captures the Phase 2 desktop and mobile evidence set', async ({ page }) => {
@@ -143,7 +134,6 @@ test('captures the Phase 2 desktop and mobile evidence set', async ({ page }) =>
 
   await page.context().clearCookies();
   await login(page, 'tenant@navfarm.demo');
-  await selectCompany(page, /Green Valley Poultry/);
   await page.goto('/console/dashboard');
   await expect(page.getByRole('heading', { name: 'Tenant dashboard' })).toBeVisible();
   await capturePair(page, 'tenant-dashboard');
@@ -153,9 +143,9 @@ test('captures the Phase 2 desktop and mobile evidence set', async ({ page }) =>
 
   await page.context().clearCookies();
   await login(page, 'onboarding@navfarm.demo');
-  await selectCompany(page, /BlueWater Aqua/);
-  await expect(page).toHaveURL(/\/onboarding$/);
-  await capturePair(page, 'company-onboarding-redirect');
+  await expect(page).toHaveURL(/\/bluewater-aqua\/setup\/profile$/);
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Company profile' })).toBeVisible();
+  await capturePair(page, 'company-onboarding');
 });
 
 test('Phase 3 masters and accounting workflows render responsively', async ({ page }) => {
@@ -163,7 +153,6 @@ test('Phase 3 masters and accounting workflows render responsively', async ({ pa
   expect((await page.request.post('/api/v1/__mock/reset')).ok()).toBe(true);
   await mkdir(phase3ScreenshotDirectory, { recursive: true });
   await login(page, 'tenant@navfarm.demo');
-  await selectCompany(page, /Green Valley Poultry/);
 
   await page.goto('/green-valley-poultry/masters');
   await expect(page.getByRole('heading', { name: 'Master-data dashboard' })).toBeVisible();
@@ -209,7 +198,6 @@ test('Phase 3 masters and accounting workflows render responsively', async ({ pa
 
 test('Phase 3 role restrictions apply to direct URLs and actions', async ({ page }) => {
   await login(page, 'auditor@navfarm.demo');
-  await selectCompany(page, /Green Valley Poultry/);
   await page.goto('/green-valley-poultry/accounting/chart-of-accounts');
   await expect(page.getByRole('heading', { name: 'Chart of accounts' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Add account' })).toHaveCount(0);

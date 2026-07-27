@@ -22,8 +22,32 @@ Phase 7 adds and refreshes Playwright coverage for the NAVFarm web demo only. No
 | `pnpm nx run web:build --skipNxCache` | Passed |
 | `pnpm nx run web-e2e:typecheck --skipNxCache` | Passed |
 | Existing E2E baseline | Reproduced stale onboarding and fixture assertions before their refresh. |
-| Final Playwright run | Requires a fresh port-3001 test server after the interrupted baseline left an unresponsive child dev server. This is an execution-environment runner issue, not the Nx-reset condition. |
+| `pnpm nx run web-e2e:e2e --skipNxCache` | Passed: 11 Chromium tests, 0 failed, 0 skipped, about 1.2 minutes. |
 
 ## Follow-up
 
-Run `pnpm nx run web-e2e:e2e --skipNxCache` from a clean shell with no process listening on port 3001 to produce the final `docs/screenshots/phase7/` capture set. Do not treat the demo mocks as a production backend contract.
+The run created ten responsive screenshots under `docs/screenshots/phase7/`: dashboard (1440x900, 1280x800, 768x1024, 390x844), batches (1440x900, 390x844), QC (768x1024, 390x844), and reports (1440x900, 390x844). Every captured viewport passed the document-level horizontal-overflow assertion.
+
+Two defects were fixed during the final E2E pass:
+
+- The operational mock route matcher intercepted Phase 3 master-data URLs, causing `Operational workspace is not initialized`; it now only claims operational resource paths.
+- Company selection now waits for the real operational-bootstrap response before the suite enters dependent routes, avoiding a mock-state initialization race.
+
+The regenerated Phase 2/3 screenshot files are retained as refreshed evidence from the existing screenshot tests. Two additional Phase 2 onboarding-redirect PNGs are untracked. These are not Phase 7’s primary visual set and should be reviewed before being treated as approved replacements. Do not treat the demo mocks as a production backend contract.
+
+## Phase 7.1 continuation
+
+Phase 7.1 preserves the Phase 7 mock boundary and adds presentation-ready, deterministic account scenarios. The login page now presents mock-only credential-fill cards; it does not sign a user in automatically and the cards are omitted outside mock mode. MFA challenges are not committed to the application session before verification.
+
+| Area | Phase 7.1 result |
+| --- | --- |
+| Role destinations | Platform, tenant, manager, viewer, multi-company, suspended and onboarding accounts use distinct deterministic outcomes. |
+| Permission boundaries | Viewer mutation controls are absent and a direct mock mutation returns 403. Tenant administration retains configuration/accounting access without batch or daily-operation mutation rights. |
+| MFA | Invalid verification leaves protected routes inaccessible; recovery code creates the authenticated session. |
+| Onboarding | Incomplete BlueWater setup opens directly and operational URLs return to setup review while operations readiness is false. |
+| Phase 2/3 regression | The operational adapter has a regression test proving it does not intercept master-data or accounting resources. |
+| Responsive evidence | 11 new PNGs in `docs/screenshots/presentation/`; all required viewports have document-level overflow assertions. |
+
+Readiness remains explicitly defined by the current policy: steps 1–9 establish workspace readiness; accounting/GL, NOB/LOB and essential masters establish operations readiness. No additional accounting-close requirement was invented.
+
+The Phase 2/3 screenshots remain intentionally refreshed by their existing browser evidence tests. The two untracked onboarding-redirect screenshots remain outside the approved Phase 7.1 presentation set and require user review before adoption.

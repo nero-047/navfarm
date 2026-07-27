@@ -73,7 +73,7 @@ const seedCompanies: JsonRecord[] = [
 
 const fixtureUsers: FixtureUser[] = [
   { userId: 'user-system', email: 'system@navfarm.demo', fullName: 'System Administrator', password: 'Demo123!', platformRole: 'SYSTEM_ADMIN', tenantIds: [], companies: [] },
-  { userId: 'user-tenant', email: 'tenant@navfarm.demo', fullName: 'Tenant Administrator', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'SUPER_ADMIN' }] },
+  { userId: 'user-tenant', email: 'tenant@navfarm.demo', fullName: 'Tenant Administrator', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'ACCOUNTANT' }] },
   { userId: 'user-manager', email: 'manager@navfarm.demo', fullName: 'Farm Manager', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'FARM_MANAGER' }] },
   { userId: 'user-accountant', email: 'accountant@navfarm.demo', fullName: 'Company Accountant', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'ACCOUNTANT' }] },
   { userId: 'user-auditor', email: 'auditor@navfarm.demo', fullName: 'Read-only Auditor', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'AUDITOR' }] },
@@ -157,7 +157,7 @@ function sessionPayload(record: SessionRecord): AuthSession {
       tenantId,
       tenantName: tenant.tenant_name,
       status: tenant.status as 'ACTIVE' | 'SUSPENDED',
-      role: user.email.startsWith('tenant@') || user.email.startsWith('onboarding@')
+      role: user.email === 'tenant@navfarm.demo'
         ? 'TENANT_ADMIN' as const
         : 'TENANT_MEMBER' as const,
     };
@@ -287,14 +287,17 @@ export async function handleMockRequest(request: Request, path: string, requestI
   const found = requireSession(request, requestId);
   if (found instanceof NextResponse) return found;
   const session = sessionPayload(found.record);
+  const activeCompany = session.companies.find((company) => company.companyId === session.activeCompanyId);
+  const tenantAdmin = session.tenants.some(
+    (tenant) => tenant.tenantId === session.activeTenantId && tenant.role === 'TENANT_ADMIN',
+  );
   if (
     path.startsWith('/companies/') &&
     !path.endsWith('/operational-bootstrap') &&
     !['GET', 'HEAD'].includes(method) &&
-    !session.companies.find((company) => company.companyId === session.activeCompanyId)
-      ?.permissions.includes('operations.create') &&
-    !session.companies.find((company) => company.companyId === session.activeCompanyId)
-      ?.permissions.includes('company.manage')
+    !activeCompany?.permissions.includes('operations.create') &&
+    !activeCompany?.permissions.includes('company.manage') &&
+    !tenantAdmin
   ) {
     return apiErrorResponse(403, 'You do not have permission to change operational data.', requestId);
   }
@@ -306,12 +309,9 @@ export async function handleMockRequest(request: Request, path: string, requestI
     platformRole: session.user.platformRole,
     activeTenantId: session.activeTenantId,
     activeCompanyId: session.activeCompanyId,
-    tenantAdmin: session.tenants.some(
-      (tenant) => tenant.tenantId === session.activeTenantId && tenant.role === 'TENANT_ADMIN',
-    ),
+    tenantAdmin,
     companyManage: Boolean(
-      session.companies.find((company) => company.companyId === session.activeCompanyId)
-        ?.permissions.includes('company.manage'),
+      activeCompany?.permissions.includes('company.manage') || tenantAdmin,
     ),
     grantCompany: (company: CompanySummary) => {
       if (!state.companies.some((item) => item.company_id === company.companyId)) {
@@ -344,7 +344,7 @@ export async function handleMockRequest(request: Request, path: string, requestI
     platformRole: session.user.platformRole,
     activeCompanyId: session.activeCompanyId,
     companyView: Boolean(activeMembership?.permissions.includes('company.view')),
-    companyManage: Boolean(activeMembership?.permissions.includes('company.manage')),
+    companyManage: Boolean(activeMembership?.permissions.includes('company.manage') || tenantAdmin),
     financeView: Boolean(activeMembership?.permissions.includes('finance.view')),
     financeManage: Boolean(activeMembership?.permissions.includes('finance.manage')),
   });

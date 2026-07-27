@@ -54,7 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const next = await api.post<AuthSession>('/auth/login', { email, password });
-    commit(next);
+    // An MFA challenge is intentionally not an authenticated application session.
+    // The server only creates the real session after verification/recovery succeeds.
+    if (!next.mfaRequired) commit(next);
     return { ...next.user, mfaRequired: next.mfaRequired, challengeId: next.challengeId };
   }, [commit]);
 

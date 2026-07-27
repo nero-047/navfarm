@@ -44,6 +44,20 @@ export async function handleOperationalRequest(
   if (!match) return null;
   const [, companyId, resource, entityId] = match.map((value) => value ? decodeURIComponent(value) : value);
   const method = request.method;
+  const operationalResources = new Set([
+    'operational-bootstrap',
+    'batches',
+    'operations',
+    'quality-lots',
+    'qr-packs',
+    'resources',
+    'resource-usages',
+    'costing',
+    'journals',
+    'variances',
+    'reports',
+  ]);
+  if (!operationalResources.has(resource)) return null;
 
   if (resource === 'operational-bootstrap') {
     const payload = await request.json().catch(() => null) as { state?: OperationalState } | null;

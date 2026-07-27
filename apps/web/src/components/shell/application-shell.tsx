@@ -47,6 +47,9 @@ export function ApplicationShell({
   useEffect(() => {
     if (!loading && !session) router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
   }, [loading, pathname, router, session]);
+  useEffect(() => {
+    if (!loading && session && !canAccessScope(session, scope)) router.replace('/access-denied?reason=forbidden');
+  }, [loading, router, scope, session]);
 
   const nav = useMemo(
     () => filterNavigation(navigationForScope(scope, companySlug), session),

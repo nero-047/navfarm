@@ -1,11 +1,12 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '../../lib/api-client';
 import type { AuthSession } from '../../contracts/api';
 import { destinationForSession } from '../../lib/authorization';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Kind = 'reset' | 'invitation' | 'verify-email' | 'mfa-setup' | 'mfa-verify' | 'mfa-recovery';
 
@@ -22,23 +23,31 @@ export function AuthWorkflowForm({ kind }: { kind: Kind }) {
   const copy = COPY[kind];
   const params = useSearchParams();
   const router = useRouter();
+  const { refreshSession } = useAuth();
   const [value, setValue] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (kind !== 'mfa-verify' && kind !== 'mfa-recovery') return;
+    void refreshSession().then((session) => {
+      if (session) router.replace(destinationForSession(session));
+    });
+  }, [kind, refreshSession, router]);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
     try {
-      let response: AuthSession | { success: boolean };
       if (kind === 'mfa-verify' || kind === 'mfa-recovery') {
-        response = await api.post<AuthSession>(`/auth/${kind === 'mfa-verify' ? 'mfa/verify' : 'mfa/recovery'}`, {
+        await api.post<AuthSession>(`/auth/${kind === 'mfa-verify' ? 'mfa/verify' : 'mfa/recovery'}`, {
           challengeId: params.get('challengeId'),
           ...(kind === 'mfa-verify' ? { code: value } : { recoveryCode: value }),
         });
-        router.push(destinationForSession(response));
+        const session = await refreshSession();
+        router.push(session ? destinationForSession(session) : '/login');
         return;
       }
       const endpoint = {
@@ -47,7 +56,7 @@ export function AuthWorkflowForm({ kind }: { kind: Kind }) {
         'verify-email': '/auth/verify-email',
         'mfa-setup': '/auth/mfa/setup',
       }[kind];
-      response = await api.post(endpoint, { token: params.get('token'), code: value, fullName: name, password });
+      await api.post(endpoint, { token: params.get('token'), code: value, fullName: name, password });
       setStatus('Completed successfully. You can continue to NAVFarm.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to complete this request');

@@ -10,8 +10,6 @@ async function loginAsManager(page: Page) {
   await page.getByLabel('Email').fill('manager@navfarm.demo');
   await page.getByLabel('Password').fill('Demo123!');
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page).toHaveURL(/\/context-selection$/);
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
   await expect(page).toHaveURL(new RegExp(`/${company}/dashboard$`));
 }
 

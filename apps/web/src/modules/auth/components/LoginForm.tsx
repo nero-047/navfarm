@@ -3,18 +3,29 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
+import { destinationForSession, useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
-export function LoginForm() {
+const DEMO_ACCOUNTS = [
+  ['Platform Admin', 'Platform-wide tenant administration', 'system@navfarm.demo'],
+  ['Tenant Admin', 'Tenant console and company setup', 'tenant@navfarm.demo'],
+  ['Operations Manager', 'Green Valley production workspace', 'manager@navfarm.demo'],
+  ['Read-only Viewer', 'View-only company workspace', 'viewer@navfarm.demo'],
+  ['Multi-company User', 'Context selection across companies', 'multi@navfarm.demo'],
+  ['MFA Administrator', 'Verification code 123456 or recovery NAVFARM-RECOVERY', 'mfa@navfarm.demo'],
+  ['Suspended User', 'Protected suspended-tenant outcome', 'suspended@navfarm.demo'],
+  ['Onboarding Admin', 'Incomplete Bluewater setup workflow', 'onboarding@navfarm.demo'],
+] as const;
+
+export function LoginForm({ showDemoAccounts = false }: { showDemoAccounts?: boolean }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { login, refreshSession } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -33,7 +44,8 @@ export function LoginForm() {
         return;
       }
       const returnTo = searchParams.get('returnTo');
-      router.push(returnTo?.startsWith('/') ? returnTo : signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/context-selection');
+      const session = await refreshSession();
+      router.push(returnTo?.startsWith('/') ? returnTo : session ? destinationForSession(session) : '/login');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to sign in');
     } finally {
@@ -99,6 +111,33 @@ export function LoginForm() {
           {submitting ? 'Signing in...' : 'Sign In'}
         </Button>
       </form>
+
+      {showDemoAccounts && (
+        <section aria-labelledby="demo-accounts-title" className="mt-8 border-t border-[#e7e9ee] pt-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <h2 id="demo-accounts-title" className="text-sm font-semibold text-[#2e313f]">Demo accounts</h2>
+              <p className="mt-1 text-xs text-[#707070]">Mock mode only · common password: <span className="font-semibold text-[#2e313f]">Demo123!</span></p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#1c4aa9]">Demo data</span>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {DEMO_ACCOUNTS.map(([name, purpose, demoEmail]) => (
+              <button
+                key={demoEmail}
+                type="button"
+                onClick={() => { setEmail(demoEmail); setPassword('Demo123!'); setError(''); }}
+                className="min-h-24 rounded-xl border border-[#e1e5ec] bg-[#fbfcfe] p-3 text-left transition-colors hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-[#1c4aa9] focus:ring-offset-2"
+                aria-label={`Fill credentials for ${name}`}
+              >
+                <span className="block text-xs font-semibold text-[#2e313f]">{name}</span>
+                <span className="mt-1 block text-[11px] leading-4 text-[#707070]">{purpose}</span>
+                <span className="mt-2 block break-all text-[10px] font-medium text-[#1c4aa9]">{demoEmail}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <p className="mt-8 text-center text-[14px] text-[#707070]">
         Don&apos;t have an account?{' '}

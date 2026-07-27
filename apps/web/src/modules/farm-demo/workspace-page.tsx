@@ -34,6 +34,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { can } from '@/lib/authorization';
 import { useCurrentCompany } from '@/modules/company/use-current-company';
 import {
   getDemoBatches,
@@ -486,6 +487,9 @@ function AlertCard({
 
 function Batches({ company }: { company: Company }) {
   const { state, approveBatch, closeBatch, calculateVariance } = useDemoStore();
+  const { session } = useAuth();
+  const canCreate = can(session, 'batches.create');
+  const canApprove = can(session, 'batches.approve');
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState('');
   const [managing, setManaging] = useState<WorkflowBatch | null>(null);
@@ -509,9 +513,9 @@ function Batches({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton onClick={() => setCreating(true)}>
+            {canCreate ? <PrimaryButton onClick={() => setCreating(true)}>
               New batch
-            </PrimaryButton>
+            </PrimaryButton> : null}
           </>
         }
       />
@@ -655,13 +659,13 @@ function Batches({ company }: { company: Company }) {
                       >
                         View workspace
                       </Link>
-                      <button
+                      {canApprove ? <button
                         onClick={() => setManaging(batch)}
                         className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#0b1248] px-3 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1b2869]"
                       >
                         <Settings2 size={13} /> Manage batch
-                      </button>
-                      {batch.status === 'DRAFT' && (
+                      </button> : null}
+                      {canApprove && batch.status === 'DRAFT' && (
                         <button
                           onClick={() => approveBatch(batch.id)}
                           className="inline-flex h-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-2 text-[10px] font-semibold text-[#1c4aa9] hover:bg-blue-100"
@@ -669,7 +673,7 @@ function Batches({ company }: { company: Company }) {
                           Approve & lock
                         </button>
                       )}
-                      {batch.status === 'READY_TO_CLOSE' && (
+                      {canApprove && batch.status === 'READY_TO_CLOSE' && (
                         <button
                           onClick={() => close(batch)}
                           className="inline-flex h-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-2 text-[10px] font-semibold text-[#c24332] hover:bg-red-100"
@@ -760,6 +764,8 @@ function Operations({ company }: { company: Company }) {
   const tasks = getDemoTasks(company);
   const config = INDUSTRY_CONFIG[company.nobCode];
   const { state } = useDemoStore();
+  const { session } = useAuth();
+  const canRecord = can(session, 'operations.create');
   const [recording, setRecording] = useState(false);
   return (
     <div className="space-y-6 animate-fade-in">
@@ -770,9 +776,9 @@ function Operations({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton onClick={() => setRecording(true)}>
+            {canRecord ? <PrimaryButton onClick={() => setRecording(true)}>
               Record entry
-            </PrimaryButton>
+            </PrimaryButton> : null}
           </>
         }
       />
@@ -993,6 +999,8 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function Quality({ company }: { company: Company }) {
   const { state } = useDemoStore();
+  const { session } = useAuth();
+  const canManage = can(session, 'quality.manage');
   const records = state.qualityLots;
   const config = INDUSTRY_CONFIG[company.nobCode];
   const [creating, setCreating] = useState(false);
@@ -1006,12 +1014,12 @@ function Quality({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton
+            {canManage ? <PrimaryButton
               icon={ClipboardCheck}
               onClick={() => setCreating(true)}
             >
               New QC batch
-            </PrimaryButton>
+            </PrimaryButton> : null}
           </>
         }
       />
@@ -1080,7 +1088,7 @@ function Quality({ company }: { company: Company }) {
                 <TableCell>{record.result}</TableCell>
                 <TableCell>{record.owner}</TableCell>
                 <TableCell>
-                  <button
+                  {canManage ? <button
                     onClick={() => setInspecting(record)}
                     className="flex items-center gap-2"
                   >
@@ -1091,7 +1099,7 @@ function Quality({ company }: { company: Company }) {
                     <span className="text-[10px] font-semibold text-[#1c4aa9]">
                       Inspect
                     </span>
-                  </button>
+                  </button> : <StatusBadge label={record.status} tone={statusTone(record.status)} />}
                 </TableCell>
               </tr>
             ))}
@@ -1174,6 +1182,8 @@ function Quality({ company }: { company: Company }) {
 function Traceability({ company }: { company: Company }) {
   const config = INDUSTRY_CONFIG[company.nobCode];
   const { state } = useDemoStore();
+  const { session } = useAuth();
+  const canGenerate = can(session, 'quality.manage');
   const [generating, setGenerating] = useState(false);
   const workflowBatch =
     state.batches.find((item) => item.qcStatus === 'PASS') ?? state.batches[0];
@@ -1201,9 +1211,9 @@ function Traceability({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={QrCode} onClick={() => setGenerating(true)}>
+            {canGenerate ? <PrimaryButton icon={QrCode} onClick={() => setGenerating(true)}>
               Generate QR pack
-            </PrimaryButton>
+            </PrimaryButton> : null}
           </>
         }
       />
@@ -1340,6 +1350,8 @@ function Resources({ company }: { company: Company }) {
   const { state } = useDemoStore();
   const resources = state.resources;
   const config = INDUSTRY_CONFIG[company.nobCode];
+  const { session } = useAuth();
+  const canManage = can(session, 'resources.manage');
   const [adding, setAdding] = useState(false);
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1350,9 +1362,9 @@ function Resources({ company }: { company: Company }) {
         action={
           <>
             <DemoBadge />
-            <PrimaryButton icon={Wrench} onClick={() => setAdding(true)}>
+            {canManage ? <PrimaryButton icon={Wrench} onClick={() => setAdding(true)}>
               Add resource
-            </PrimaryButton>
+            </PrimaryButton> : null}
           </>
         }
       />

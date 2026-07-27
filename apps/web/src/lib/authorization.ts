@@ -77,6 +77,9 @@ export function destinationForSession(session: AuthSession): string {
   const activeCompany = activeCompanyMembership(session);
   if (!activeCompany && session.companies.length > 1) return '/context-selection';
   if (!activeCompany) return can(session, 'tenant.view') ? '/console/dashboard' : '/access-denied?reason=no-company';
+  // Tenant administrators begin in the tenant console. They can still choose a
+  // company context, but operational permissions remain company-role based.
+  if (activeTenant?.role === 'TENANT_ADMIN') return '/console/dashboard';
   if (activeCompany.status === 'INACTIVE') return '/access-denied?reason=inactive-company';
   if (activeCompany.onboardingStatus !== 'COMPLETED') return '/onboarding';
   return `/${activeCompany.companySlug}/dashboard`;

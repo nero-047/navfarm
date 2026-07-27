@@ -86,4 +86,17 @@ describe('operational server-side mock adapter', () => {
     );
     expect(response?.status).toBe(422);
   });
+
+  it('does not claim Phase 2 or Phase 3 company resources', async () => {
+    await expect(handleOperationalRequest(
+      request('GET'),
+      '/companies/company-1/masters/items',
+      'request-8',
+    )).resolves.toBeNull();
+    await expect(handleOperationalRequest(
+      request('GET'),
+      '/companies/company-1/accounting/readiness',
+      'request-9',
+    )).resolves.toBeNull();
+  });
 });
