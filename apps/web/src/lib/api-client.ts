@@ -84,7 +84,8 @@ async function refreshAccessToken(): Promise<string> {
 export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { body, tenantId = stored(AUTH_STORAGE.tenantId), retry = true, ...init } = options;
   const headers = new Headers(init.headers);
-  if (!(body instanceof FormData)) headers.set('Content-Type', 'application/json');
+  const isFormData = body instanceof FormData || (body && typeof (body as any).append === 'function');
+  if (!isFormData) headers.set('Content-Type', 'application/json');
   const token = stored(AUTH_STORAGE.accessToken);
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (tenantId) headers.set('x-tenant-id', tenantId);
@@ -94,7 +95,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
-    body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body),
+    body: isFormData ? (body as any) : body === undefined ? undefined : JSON.stringify(body),
   });
 
   if (response.status === 401 && token && retry && path !== '/auth/refresh') {

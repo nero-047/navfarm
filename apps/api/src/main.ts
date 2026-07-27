@@ -8,7 +8,9 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
   const uploadsDir = resolve(process.env.UPLOADS_DIR || 'apps/api/uploads');
   mkdirSync(uploadsDir, { recursive: true });
