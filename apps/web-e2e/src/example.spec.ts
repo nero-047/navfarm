@@ -29,22 +29,30 @@ async function login(page: Page, email: string) {
   await expect(page).toHaveURL(destinations[email] ?? /\/context-selection$/);
 }
 
+async function waitForScreenshotReady(page: Page) {
+  await page.addStyleTag({ content: 'nextjs-portal, #__next-build-watcher { display: none !important; }' });
+  await page.evaluate('document.fonts.ready');
+  await expect(page.locator('.animate-pulse')).toHaveCount(0);
+  await expect(page.getByText('Loading your secure workspace')).toHaveCount(0);
+  await expect(page.getByText(/Loading.*…/)).toHaveCount(0);
+}
+
 async function capturePair(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.evaluate('document.fonts.ready');
+  await waitForScreenshotReady(page);
   await page.screenshot({ path: resolve(screenshotDirectory, `${name}-desktop.png`), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate('document.fonts.ready');
+  await waitForScreenshotReady(page);
   await expect.poll(() => page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(390);
   await page.screenshot({ path: resolve(screenshotDirectory, `${name}-mobile.png`), fullPage: true });
 }
 
 async function capturePhase3Pair(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.evaluate('document.fonts.ready');
+  await waitForScreenshotReady(page);
   await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-desktop.png`), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate('document.fonts.ready');
+  await waitForScreenshotReady(page);
   await expect.poll(() => page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(390);
   await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-mobile.png`), fullPage: true });
 }

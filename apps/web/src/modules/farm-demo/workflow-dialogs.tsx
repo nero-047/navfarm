@@ -36,24 +36,25 @@ export function WorkflowDialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]"
+        className="flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]"
       >
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#ededed] bg-white px-6 py-5">
-          <div>
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ededed] bg-white px-6 py-5">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold text-[#2e313f]">{title}</h2>
             <p className="mt-1 text-xs leading-5 text-[#707070]">
               {description}
             </p>
           </div>
           <button
+            type="button"
             aria-label="Close"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-[#707070] hover:bg-slate-100"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#707070] transition hover:bg-slate-100"
           >
             <X size={18} />
           </button>
         </header>
-        <div className="p-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
       </section>
     </FullPageOverlay>
   );

@@ -198,7 +198,7 @@ export function CompanySetup({ companySlug, step }: { companySlug: string; step:
         actions={<><StatusBadge status={status.setupComplete ? 'COMPLETED' : 'IN_PROGRESS'} />{!editable ? <span className="inline-flex items-center rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800"><LockKeyhole className="mr-2 h-4 w-4" />Read only</span> : null}</>}
       />
       <div className="h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Company setup completion" aria-valuenow={status.setupPercentage}><div className="h-full rounded-full bg-blue-600" style={{ width: `${status.setupPercentage}%` }} /></div>
-      <div className="grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
         <nav aria-label="Company setup steps" className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-3 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto">
           <ol className="flex min-w-max gap-2 lg:min-w-0 lg:flex-col">
             {SETUP_ROUTES.map((route, routeIndex) => {

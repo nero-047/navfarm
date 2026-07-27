@@ -143,7 +143,7 @@ export function TenantAdminView({ section }: { section: TenantSection }) {
       ) : null}
 
       {section === 'invitations' ? (
-        <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[0.8fr_1.2fr]">
           <form className="space-y-4 rounded-xl border border-slate-200 bg-white p-5" onSubmit={async (event) => {
             event.preventDefault(); setSubmitting(true); setError(''); setSuccess('');
             const values = new FormData(event.currentTarget);
@@ -169,7 +169,7 @@ export function TenantAdminView({ section }: { section: TenantSection }) {
 
       {section === 'usage' && usage ? <div className="grid gap-4 md:grid-cols-2"><section className="space-y-5 rounded-xl border border-slate-200 bg-white p-5"><UsageBar label="Companies" {...usage.companies} /><UsageBar label="Users" {...usage.users} /><UsageBar label="Monthly batches" {...usage.batches} /></section><section className="space-y-5 rounded-xl border border-slate-200 bg-white p-5"><UsageBar label="API requests / minute" {...usage.apiRequests} />{usage.storageGb.used !== null ? <UsageBar label="Storage GB" used={usage.storageGb.used} limit={usage.storageGb.limit} /> : <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Storage usage is unavailable for this tenant.</div>}</section></div> : null}
 
-      {section === 'audit' ? audit.length ? <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">{audit.map((item) => <article key={item.id} className="grid gap-1 p-4 sm:grid-cols-[11rem_12rem_1fr]"><time className="text-xs text-slate-500">{new Date(item.occurredAt).toLocaleString()}</time><span className="text-xs font-bold text-blue-700">{item.action.replaceAll('_', ' ')}</span><p className="text-sm">{item.summary}</p></article>)}</div> : <EmptyState title="No audit activity" description="Tenant and company administration changes will appear here." /> : null}
+      {section === 'audit' ? audit.length ? <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">{audit.map((item) => <article key={item.id} className="grid grid-cols-1 gap-1 p-4 sm:grid-cols-[11rem_12rem_1fr]"><time className="text-xs text-slate-500">{new Date(item.occurredAt).toLocaleString()}</time><span className="text-xs font-bold text-blue-700">{item.action.replaceAll('_', ' ')}</span><p className="text-sm">{item.summary}</p></article>)}</div> : <EmptyState title="No audit activity" description="Tenant and company administration changes will appear here." /> : null}
     </div>
   );
 }

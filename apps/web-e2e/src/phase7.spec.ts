@@ -18,9 +18,17 @@ async function openWorkspace(page: Page, route: string, heading: string) {
   await expect(page.getByRole('main').getByRole('heading', { name: heading, exact: true })).toBeVisible();
 }
 
+async function waitForScreenshotReady(page: Page) {
+  await page.addStyleTag({ content: 'nextjs-portal, #__next-build-watcher { display: none !important; }' });
+  await expect.poll(() => page.evaluate('document.fonts.status')).toBe('loaded');
+  await expect(page.locator('.animate-pulse')).toHaveCount(0);
+  await expect(page.getByText('Loading your secure workspace')).toHaveCount(0);
+  await expect(page.getByText(/Loading.*…/)).toHaveCount(0);
+}
+
 async function captureViewport(page: Page, name: string, width: number, height: number) {
   await page.setViewportSize({ width, height });
-  await expect.poll(() => page.evaluate('document.fonts.status')).toBe('loaded');
+  await waitForScreenshotReady(page);
   await expect
     .poll(() => page.evaluate('document.documentElement.scrollWidth'))
     .toBeLessThanOrEqual(width);

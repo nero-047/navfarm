@@ -78,8 +78,7 @@ export function ApplicationShell({
     );
   }
 
-  const desktopWidth = collapsed ? 'lg:w-[84px]' : 'lg:w-[252px]';
-  const contentOffset = collapsed ? 'lg:ml-[84px]' : 'lg:ml-[252px]';
+  const sidebarWidth = collapsed ? '84px' : '252px';
   const sidebar = (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,#0a1244,#101a52_60%,#071039)] text-white">
       <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
@@ -134,11 +133,11 @@ export function ApplicationShell({
   );
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f3f5f8]">
+    <div className="min-h-screen overflow-x-hidden bg-[#f3f5f8]" style={{ '--sidebar-width': sidebarWidth } as React.CSSProperties}>
       {transitioning && <div className="fixed inset-x-0 top-0 z-[70] h-0.5 animate-pulse bg-[#e4664d]" />}
-      <aside className={`fixed inset-y-0 left-0 z-40 hidden transition-[width] ${desktopWidth} lg:block`}>{sidebar}</aside>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden transition-[width] lg:block lg:w-[var(--sidebar-width)]">{sidebar}</aside>
       {mobileOpen && <div className="fixed inset-0 z-50 lg:hidden"><button aria-label="Close navigation overlay" className="absolute inset-0 bg-black/45" onClick={() => setMobileOpen(false)} /><aside className="relative h-full w-[min(300px,88vw)]">{sidebar}</aside></div>}
-      <div className={`min-w-0 overflow-x-hidden transition-[margin] ${contentOffset}`}>
+      <div className="min-w-0 overflow-x-hidden transition-[margin] lg:ml-[var(--sidebar-width)]">
         <header className="sticky top-0 z-30 border-b border-[#e1e5ec] bg-white/95 backdrop-blur">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button onClick={() => setMobileOpen(true)} aria-label="Open navigation" className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e1e5ec] lg:hidden"><Menu size={18} /></button>
