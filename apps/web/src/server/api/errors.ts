@@ -8,6 +8,7 @@ const codeByStatus: Record<number, ApiErrorPayload['error']['code']> = {
   404: 'NOT_FOUND',
   409: 'CONFLICT',
   422: 'VALIDATION_ERROR',
+  429: 'RATE_LIMIT',
   502: 'UPSTREAM_ERROR',
   503: 'UPSTREAM_UNAVAILABLE',
 };
@@ -25,6 +26,7 @@ export function apiErrorResponse(
         message,
         status,
         requestId,
+        timestamp: new Date().toISOString(),
         ...(details === undefined ? {} : { details }),
       },
     },

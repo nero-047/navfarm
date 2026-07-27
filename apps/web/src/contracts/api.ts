@@ -9,6 +9,7 @@ export const apiErrorCodeSchema = z.enum([
   'NOT_FOUND',
   'CONFLICT',
   'VALIDATION_ERROR',
+  'RATE_LIMIT',
   'UPSTREAM_ERROR',
   'UPSTREAM_UNAVAILABLE',
   'CONFIGURATION_ERROR',
@@ -22,6 +23,8 @@ export const apiErrorSchema = z.object({
     message: z.string(),
     status: z.number().int(),
     requestId: z.string(),
+    timestamp: z.string().datetime().optional(),
+    fieldErrors: z.record(z.string(), z.array(z.string())).optional(),
     details: z.unknown().optional(),
   }),
 });
