@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, isNull, sum } from 'drizzle-orm';
+import { eq, and, isNull, sum, desc, gte, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -395,5 +395,86 @@ export class InventoryLedgerService {
       qty_reserved: parseFloat(b.qty_reserved),
       qty_available: parseFloat(b.qty_available),
     }));
+  }
+
+  async getLedgerEntries(
+    params: {
+      companyId?: string;
+      itemId?: string;
+      warehouseId?: string;
+      locationId?: string;
+      transactionType?: string;
+      startDate?: string;
+      endDate?: string;
+      limit?: number;
+      offset?: number;
+    },
+    tenantId: string
+  ) {
+    const conditions = [
+      eq(schema.inventoryLedger.tenant_id, tenantId),
+    ];
+
+    if (params.companyId) {
+      conditions.push(eq(schema.inventoryLedger.company_id, params.companyId));
+    }
+    if (params.itemId) {
+      conditions.push(eq(schema.inventoryLedger.item_id, params.itemId));
+    }
+    if (params.warehouseId) {
+      conditions.push(eq(schema.inventoryLedger.warehouse_id, params.warehouseId));
+    }
+    if (params.locationId) {
+      conditions.push(eq(schema.inventoryLedger.location_id, params.locationId));
+    }
+    if (params.transactionType) {
+      conditions.push(eq(schema.inventoryLedger.transaction_type, params.transactionType));
+    }
+    if (params.startDate) {
+      conditions.push(gte(schema.inventoryLedger.posting_date, params.startDate));
+    }
+    if (params.endDate) {
+      conditions.push(lte(schema.inventoryLedger.posting_date, params.endDate));
+    }
+
+    const limit = params.limit ? Number(params.limit) : 50;
+    const offset = params.offset ? Number(params.offset) : 0;
+
+    const entries = await this.db
+      .select({
+        ledger_id: schema.inventoryLedger.ledger_id,
+        tenant_id: schema.inventoryLedger.tenant_id,
+        company_id: schema.inventoryLedger.company_id,
+        item_id: schema.inventoryLedger.item_id,
+        item_code: schema.itemMaster.item_code,
+        item_name: schema.itemMaster.item_name,
+        warehouse_id: schema.inventoryLedger.warehouse_id,
+        warehouse_name: schema.warehouseMaster.warehouse_name,
+        location_id: schema.inventoryLedger.location_id,
+        location_name: schema.locationMaster.location_name,
+        lot_id: schema.inventoryLedger.lot_id,
+        serial_id: schema.inventoryLedger.serial_id,
+        posting_date: schema.inventoryLedger.posting_date,
+        transaction_type: schema.inventoryLedger.transaction_type,
+        ref_doc_type: schema.inventoryLedger.ref_doc_type,
+        ref_doc_id: schema.inventoryLedger.ref_doc_id,
+        qty: schema.inventoryLedger.qty,
+        cost_per_unit: schema.inventoryLedger.cost_per_unit,
+        created_at: schema.inventoryLedger.created_at,
+      })
+      .from(schema.inventoryLedger)
+      .innerJoin(schema.itemMaster, eq(schema.inventoryLedger.item_id, schema.itemMaster.item_id))
+      .innerJoin(schema.warehouseMaster, eq(schema.inventoryLedger.warehouse_id, schema.warehouseMaster.warehouse_id))
+      .innerJoin(schema.locationMaster, eq(schema.inventoryLedger.location_id, schema.locationMaster.location_id))
+      .where(and(...conditions))
+      .orderBy(desc(schema.inventoryLedger.posting_date), desc(schema.inventoryLedger.created_at))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      entries,
+      limit,
+      offset,
+    };
   }
 }

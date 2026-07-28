@@ -3,9 +3,10 @@ import {
   Get, 
   Query, 
   Req, 
-  UseGuards 
+  UseGuards,
+  Param
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { ReportService } from '../services/report.service';
 import { SubledgerService } from '../services/subledger.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -21,6 +22,100 @@ export class ReportController {
     private readonly reportService: ReportService,
     private readonly subledgerService: SubledgerService,
   ) {}
+
+  @Get('ledger')
+  @RequirePermission('FINANCE', 'REPORTS', 'view')
+  @ApiOperation({ summary: 'GL Account drill-down: Query General Ledger entry line items' })
+  @ApiQuery({ name: 'companyId', description: 'Company UUID' })
+  @ApiQuery({ name: 'glAccountId', required: false, description: 'GL Account UUID filter' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Start Date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'End Date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'costCenterId', required: false, description: 'Cost Center UUID filter' })
+  @ApiQuery({ name: 'refDocType', required: false, description: 'Reference document type filter' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Limit' })
+  @ApiQuery({ name: 'offset', required: false, description: 'Offset' })
+  async getGlLedger(
+    @Query('companyId') companyId: string,
+    @Query('glAccountId') glAccountId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('costCenterId') costCenterId?: string,
+    @Query('refDocType') refDocType?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Req() req?: any
+  ) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.reportService.getGlLedgerEntries(
+      { companyId, glAccountId, startDate, endDate, costCenterId, refDocType, limit, offset },
+      tenantId
+    );
+    return {
+      success: true,
+      message: 'General Ledger entries retrieved.',
+      data: result
+    };
+  }
+
+  @Get('ledger/customer/:id')
+  @RequirePermission('FINANCE', 'REPORTS', 'view')
+  @ApiOperation({ summary: 'Customer Accounts Receivable statement / ledger entries' })
+  @ApiParam({ name: 'id', description: 'Customer UUID' })
+  @ApiQuery({ name: 'companyId', description: 'Company UUID' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Start Date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'End Date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'offset', required: false })
+  async getCustomerStatement(
+    @Param('id') customerId: string,
+    @Query('companyId') companyId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Req() req?: any
+  ) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.subledgerService.getCustomerLedgerEntries(
+      { customerId, companyId, startDate, endDate, limit, offset },
+      tenantId
+    );
+    return {
+      success: true,
+      message: 'Customer statement retrieved.',
+      data: result
+    };
+  }
+
+  @Get('ledger/supplier/:id')
+  @RequirePermission('FINANCE', 'REPORTS', 'view')
+  @ApiOperation({ summary: 'Supplier Accounts Payable statement / ledger entries' })
+  @ApiParam({ name: 'id', description: 'Supplier UUID' })
+  @ApiQuery({ name: 'companyId', description: 'Company UUID' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Start Date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'End Date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'offset', required: false })
+  async getSupplierStatement(
+    @Param('id') supplierId: string,
+    @Query('companyId') companyId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Req() req?: any
+  ) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.subledgerService.getSupplierLedgerEntries(
+      { supplierId, companyId, startDate, endDate, limit, offset },
+      tenantId
+    );
+    return {
+      success: true,
+      message: 'Supplier statement retrieved.',
+      data: result
+    };
+  }
 
   @Get('trial-balance')
   @RequirePermission('FINANCE', 'REPORTS', 'view')

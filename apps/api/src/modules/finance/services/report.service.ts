@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, lte, gte, sum, isNull, lt } from 'drizzle-orm';
+import { eq, and, lte, gte, sum, isNull, lt, desc } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 
@@ -265,6 +265,88 @@ export class ReportService {
         total: totalExpenses,
       },
       netProfit: totalRevenue - totalExpenses,
+    };
+  }
+
+  async getGlLedgerEntries(
+    params: {
+      companyId: string;
+      glAccountId?: string;
+      startDate?: string;
+      endDate?: string;
+      costCenterId?: string;
+      refDocType?: string;
+      limit?: number;
+      offset?: number;
+    },
+    tenantId: string
+  ) {
+    const conditions = [
+      eq(schema.generalLedgerEntry.tenant_id, tenantId),
+      eq(schema.generalLedgerEntry.company_id, params.companyId),
+    ];
+
+    if (params.glAccountId) {
+      conditions.push(eq(schema.generalLedgerEntry.gl_account_id, params.glAccountId));
+    }
+    if (params.startDate) {
+      conditions.push(gte(schema.generalLedgerEntry.posting_date, params.startDate));
+    }
+    if (params.endDate) {
+      conditions.push(lte(schema.generalLedgerEntry.posting_date, params.endDate));
+    }
+    if (params.costCenterId) {
+      conditions.push(eq(schema.generalLedgerEntry.cost_center_id, params.costCenterId));
+    }
+    if (params.refDocType) {
+      conditions.push(eq(schema.generalLedgerEntry.ref_doc_type, params.refDocType));
+    }
+
+    const limit = params.limit ? Number(params.limit) : 50;
+    const offset = params.offset ? Number(params.offset) : 0;
+
+    const entries = await this.db
+      .select({
+        entry_id: schema.generalLedgerEntry.entry_id,
+        tenant_id: schema.generalLedgerEntry.tenant_id,
+        company_id: schema.generalLedgerEntry.company_id,
+        gl_account_id: schema.generalLedgerEntry.gl_account_id,
+        account_code: schema.glAccountMaster.account_code,
+        account_name: schema.glAccountMaster.account_name,
+        account_type: schema.glAccountMaster.account_type,
+        debit: schema.generalLedgerEntry.debit,
+        credit: schema.generalLedgerEntry.credit,
+        running_balance: schema.generalLedgerEntry.running_balance,
+        posting_date: schema.generalLedgerEntry.posting_date,
+        cost_center_id: schema.generalLedgerEntry.cost_center_id,
+        dimension_values: schema.generalLedgerEntry.dimension_values,
+        ref_doc_type: schema.generalLedgerEntry.ref_doc_type,
+        ref_doc_id: schema.generalLedgerEntry.ref_doc_id,
+        ref_doc_line_id: schema.generalLedgerEntry.ref_doc_line_id,
+        notes: schema.generalLedgerEntry.notes,
+        created_at: schema.generalLedgerEntry.created_at,
+      })
+      .from(schema.generalLedgerEntry)
+      .innerJoin(schema.glAccountMaster, eq(schema.generalLedgerEntry.gl_account_id, schema.glAccountMaster.gl_account_id))
+      .where(and(...conditions))
+      .orderBy(desc(schema.generalLedgerEntry.posting_date), desc(schema.generalLedgerEntry.created_at))
+      .limit(limit)
+      .offset(offset);
+
+    const [totals] = await this.db
+      .select({
+        totalDebit: sum(schema.generalLedgerEntry.debit),
+        totalCredit: sum(schema.generalLedgerEntry.credit),
+      })
+      .from(schema.generalLedgerEntry)
+      .where(and(...conditions));
+
+    return {
+      entries,
+      totalDebit: totals?.totalDebit ? parseFloat(totals.totalDebit) : 0,
+      totalCredit: totals?.totalCredit ? parseFloat(totals.totalCredit) : 0,
+      limit,
+      offset,
     };
   }
 }

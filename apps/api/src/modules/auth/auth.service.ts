@@ -11,6 +11,7 @@ import { MASTER_CONNECTION } from '../../core/database/database.module';
 import { RegisterAdminDto } from './dto/register-admin.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { ConnectionManagerService } from '../../core/database/connection-manager.service';
 import * as nodemailer from 'nodemailer';
@@ -789,5 +790,77 @@ export class AuthService {
     } catch (err) {
       console.error(`[SMTP Error] Failed to deliver invitation email to ${recipientEmail}:`, err);
     }
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = dto.email.toLowerCase().trim();
+
+    const [user] = await this.db
+      .select()
+      .from(schema.userMaster)
+      .where(eq(schema.userMaster.email, email))
+      .limit(1);
+
+    if (!user) {
+      return {
+        success: true,
+        message: 'If an account exists with this email, password reset instructions have been generated.',
+        reset_token: null,
+      };
+    }
+
+    const resetToken = this.jwtService.sign(
+      {
+        sub: user.user_id,
+        email: user.email,
+        tenantId: user.tenant_id,
+        purpose: 'PASSWORD_RESET',
+      },
+      { expiresIn: '15m' }
+    );
+
+    return {
+      success: true,
+      message: 'Password reset token generated successfully. Valid for 15 minutes.',
+      reset_token: resetToken,
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(dto.reset_token);
+    } catch (err) {
+      throw new UnauthorizedException('Invalid or expired password reset token.');
+    }
+
+    if (payload.purpose !== 'PASSWORD_RESET') {
+      throw new UnauthorizedException('Invalid token purpose.');
+    }
+
+    const newPasswordHash = await bcrypt.hash(dto.new_password, 10);
+
+    await this.db
+      .update(schema.userMaster)
+      .set({
+        password_hash: newPasswordHash,
+        failed_login_count: 0,
+        locked_until: null,
+      })
+      .where(eq(schema.userMaster.user_id, payload.sub));
+
+    await this.auditLogService.log({
+      tenantId: payload.tenantId,
+      userId: payload.sub,
+      action: 'UPDATE',
+      entityName: 'user_master',
+      entityId: payload.sub,
+      newValues: { message: 'Password reset completed via token' },
+    });
+
+    return {
+      success: true,
+      message: 'Password has been reset successfully. You can now login with your new password.',
+    };
   }
 }

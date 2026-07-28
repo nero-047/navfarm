@@ -7,6 +7,8 @@ import { RefreshDto } from './dto/refresh.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
+
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
@@ -46,6 +48,21 @@ export class AuthController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid email or password.' })
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset token via email' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Password reset instructions generated.' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset account password using reset token' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Password updated successfully.' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid or expired token.' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   @Post('refresh')

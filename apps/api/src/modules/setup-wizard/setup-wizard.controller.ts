@@ -221,4 +221,17 @@ export class SetupWizardController {
   async deleteLob(@Param('id') id: string) {
     return this.wizardService.deleteLob(id);
   }
+
+  @Get('countries')
+  @ApiOperation({ summary: 'Retrieve active list of standard global countries reference data' })
+  async listCountries() {
+    return this.wizardService.listCountries();
+  }
+
+  @Get('states')
+  @ApiOperation({ summary: 'Retrieve active list of states/provinces reference data' })
+  @ApiQuery({ name: 'countryId', required: false, description: 'Optional Country ISO code filter (e.g. IND, AO, USA)' })
+  async listStates(@Query('countryId') countryId?: string) {
+    return this.wizardService.listStates(countryId);
+  }
 }

@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CurrencyService } from './currency.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SystemAdminGuard } from '../../common/guards/system-admin.guard';
@@ -18,12 +18,24 @@ export class CurrencyController {
 
   @Get('rates')
   @ApiOperation({ summary: 'Fetch active currency exchange conversion rates' })
-  async listExchangeRates() {
-    return this.currencyService.listExchangeRates();
+  @ApiQuery({ name: 'fromCurrencyId', required: false, description: 'Source Currency UUID' })
+  @ApiQuery({ name: 'toCurrencyId', required: false, description: 'Target Currency UUID' })
+  async listExchangeRates(
+    @Query('fromCurrencyId') fromCurrencyId?: string,
+    @Query('toCurrencyId') toCurrencyId?: string
+  ) {
+    return this.currencyService.listExchangeRates(fromCurrencyId, toCurrencyId);
+  }
+
+  @Get('rate/:id')
+  @ApiOperation({ summary: 'Fetch a single exchange rate entry by ID' })
+  @ApiParam({ name: 'id', description: 'Exchange Rate UUID' })
+  async getExchangeRateById(@Param('id') id: string) {
+    return this.currencyService.getExchangeRateById(id);
   }
 
   @Post('rate')
-  @ApiOperation({ summary: 'Register/Update conversion exchange rate' })
+  @ApiOperation({ summary: 'Register conversion exchange rate' })
   async updateExchangeRate(@Body() body: UpdateExchangeRateDto) {
     return this.currencyService.updateExchangeRate(
       body.fromCurrencyId,
@@ -31,6 +43,23 @@ export class CurrencyController {
       body.rate,
       body.source,
     );
+  }
+
+  @Put('rate/:id')
+  @ApiOperation({ summary: 'Update an existing exchange rate by ID' })
+  @ApiParam({ name: 'id', description: 'Exchange Rate UUID' })
+  async updateExchangeRateById(
+    @Param('id') id: string,
+    @Body() body: { rate: number; source?: string }
+  ) {
+    return this.currencyService.updateExchangeRateById(id, body.rate, body.source);
+  }
+
+  @Delete('rate/:id')
+  @ApiOperation({ summary: 'Delete an exchange rate entry by ID' })
+  @ApiParam({ name: 'id', description: 'Exchange Rate UUID' })
+  async deleteExchangeRateById(@Param('id') id: string) {
+    return this.currencyService.deleteExchangeRateById(id);
   }
 
   @Post()

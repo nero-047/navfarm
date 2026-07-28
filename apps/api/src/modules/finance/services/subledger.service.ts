@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, isNull, sum, asc, sql } from 'drizzle-orm';
+import { eq, and, isNull, sum, asc, sql, desc, gte, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -407,5 +407,141 @@ export class SubledgerService {
     }
 
     return report;
+  }
+
+  async getCustomerLedgerEntries(
+    params: {
+      customerId: string;
+      companyId: string;
+      startDate?: string;
+      endDate?: string;
+      limit?: number;
+      offset?: number;
+    },
+    tenantId: string
+  ) {
+    const conditions = [
+      eq(schema.customerLedgerEntry.tenant_id, tenantId),
+      eq(schema.customerLedgerEntry.company_id, params.companyId),
+      eq(schema.customerLedgerEntry.customer_id, params.customerId),
+    ];
+
+    if (params.startDate) {
+      conditions.push(gte(schema.customerLedgerEntry.posting_date, params.startDate));
+    }
+    if (params.endDate) {
+      conditions.push(lte(schema.customerLedgerEntry.posting_date, params.endDate));
+    }
+
+    const limit = params.limit ? Number(params.limit) : 50;
+    const offset = params.offset ? Number(params.offset) : 0;
+
+    const entries = await this.db
+      .select({
+        entry_id: schema.customerLedgerEntry.entry_id,
+        tenant_id: schema.customerLedgerEntry.tenant_id,
+        company_id: schema.customerLedgerEntry.company_id,
+        customer_id: schema.customerLedgerEntry.customer_id,
+        customer_code: schema.customerMaster.customer_code,
+        customer_name: schema.customerMaster.customer_name,
+        posting_date: schema.customerLedgerEntry.posting_date,
+        document_type: schema.customerLedgerEntry.document_type,
+        document_no: schema.customerLedgerEntry.document_no,
+        amount: schema.customerLedgerEntry.amount,
+        remaining_amount: schema.customerLedgerEntry.remaining_amount,
+        due_date: schema.customerLedgerEntry.due_date,
+        created_at: schema.customerLedgerEntry.created_at,
+      })
+      .from(schema.customerLedgerEntry)
+      .innerJoin(schema.customerMaster, eq(schema.customerLedgerEntry.customer_id, schema.customerMaster.customer_id))
+      .where(and(...conditions))
+      .orderBy(desc(schema.customerLedgerEntry.posting_date), desc(schema.customerLedgerEntry.created_at))
+      .limit(limit)
+      .offset(offset);
+
+    const [totals] = await this.db
+      .select({
+        totalAmount: sum(schema.customerLedgerEntry.amount),
+        totalRemaining: sum(schema.customerLedgerEntry.remaining_amount),
+      })
+      .from(schema.customerLedgerEntry)
+      .where(and(...conditions));
+
+    return {
+      customerId: params.customerId,
+      entries,
+      totalAmount: totals?.totalAmount ? parseFloat(totals.totalAmount) : 0,
+      totalRemaining: totals?.totalRemaining ? parseFloat(totals.totalRemaining) : 0,
+      limit,
+      offset,
+    };
+  }
+
+  async getSupplierLedgerEntries(
+    params: {
+      supplierId: string;
+      companyId: string;
+      startDate?: string;
+      endDate?: string;
+      limit?: number;
+      offset?: number;
+    },
+    tenantId: string
+  ) {
+    const conditions = [
+      eq(schema.supplierLedgerEntry.tenant_id, tenantId),
+      eq(schema.supplierLedgerEntry.company_id, params.companyId),
+      eq(schema.supplierLedgerEntry.supplier_id, params.supplierId),
+    ];
+
+    if (params.startDate) {
+      conditions.push(gte(schema.supplierLedgerEntry.posting_date, params.startDate));
+    }
+    if (params.endDate) {
+      conditions.push(lte(schema.supplierLedgerEntry.posting_date, params.endDate));
+    }
+
+    const limit = params.limit ? Number(params.limit) : 50;
+    const offset = params.offset ? Number(params.offset) : 0;
+
+    const entries = await this.db
+      .select({
+        entry_id: schema.supplierLedgerEntry.entry_id,
+        tenant_id: schema.supplierLedgerEntry.tenant_id,
+        company_id: schema.supplierLedgerEntry.company_id,
+        supplier_id: schema.supplierLedgerEntry.supplier_id,
+        supplier_code: schema.supplierMaster.supplier_code,
+        supplier_name: schema.supplierMaster.supplier_name,
+        posting_date: schema.supplierLedgerEntry.posting_date,
+        document_type: schema.supplierLedgerEntry.document_type,
+        document_no: schema.supplierLedgerEntry.document_no,
+        amount: schema.supplierLedgerEntry.amount,
+        remaining_amount: schema.supplierLedgerEntry.remaining_amount,
+        due_date: schema.supplierLedgerEntry.due_date,
+        created_at: schema.supplierLedgerEntry.created_at,
+      })
+      .from(schema.supplierLedgerEntry)
+      .innerJoin(schema.supplierMaster, eq(schema.supplierLedgerEntry.supplier_id, schema.supplierMaster.supplier_id))
+      .where(and(...conditions))
+      .orderBy(desc(schema.supplierLedgerEntry.posting_date), desc(schema.supplierLedgerEntry.created_at))
+      .limit(limit)
+      .offset(offset);
+
+    const [totals] = await this.db
+      .select({
+        totalAmount: sum(schema.supplierLedgerEntry.amount),
+        totalRemaining: sum(schema.supplierLedgerEntry.remaining_amount),
+      })
+      .from(schema.supplierLedgerEntry)
+      .where(and(...conditions));
+
+    return {
+      supplierId: params.supplierId,
+      entries,
+      totalAmount: totals?.totalAmount ? parseFloat(totals.totalAmount) : 0,
+      totalRemaining: totals?.totalRemaining ? parseFloat(totals.totalRemaining) : 0,
+      limit,
+      offset,
+    };
   }
 }

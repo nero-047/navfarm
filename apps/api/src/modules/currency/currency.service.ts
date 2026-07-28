@@ -21,10 +21,20 @@ export class CurrencyService {
     return this.db.select().from(schema.currencyMaster).where(eq(schema.currencyMaster.is_active, true));
   }
 
-  async listExchangeRates() {
-    return this.db
+  async listExchangeRates(fromCurrencyId?: string, toCurrencyId?: string) {
+    const conditions = [];
+    if (fromCurrencyId) {
+      conditions.push(eq(schema.exchangeRate.from_currency_id, fromCurrencyId));
+    }
+    if (toCurrencyId) {
+      conditions.push(eq(schema.exchangeRate.to_currency_id, toCurrencyId));
+    }
+
+    const query = this.db
       .select({
         rate_id: schema.exchangeRate.rate_id,
+        from_currency_id: schema.exchangeRate.from_currency_id,
+        to_currency_id: schema.exchangeRate.to_currency_id,
         rate: schema.exchangeRate.rate,
         rate_date: schema.exchangeRate.rate_date,
         rate_source: schema.exchangeRate.rate_source,
@@ -32,6 +42,22 @@ export class CurrencyService {
       })
       .from(schema.exchangeRate)
       .innerJoin(schema.currencyMaster, eq(schema.exchangeRate.from_currency_id, schema.currencyMaster.currency_id));
+
+    if (conditions.length > 0) {
+      const andFunc = require('drizzle-orm').and;
+      return query.where(andFunc(...conditions));
+    }
+
+    return query;
+  }
+
+  async getExchangeRateById(id: string) {
+    const [rate] = await this.db
+      .select()
+      .from(schema.exchangeRate)
+      .where(eq(schema.exchangeRate.rate_id, id))
+      .limit(1);
+    return rate || null;
   }
 
   async updateExchangeRate(fromCurrencyId: string, toCurrencyId: string, rate: number, source?: string) {
@@ -53,6 +79,37 @@ export class CurrencyService {
       .where(eq(schema.exchangeRate.rate_id, rateId))
       .limit(1);
     return newRate;
+  }
+
+  async updateExchangeRateById(id: string, rate: number, source?: string) {
+    await this.db
+      .update(schema.exchangeRate)
+      .set({
+        rate: rate.toString(),
+        rate_source: source || 'MANUAL',
+      })
+      .where(eq(schema.exchangeRate.rate_id, id));
+
+    const [updated] = await this.db
+      .select()
+      .from(schema.exchangeRate)
+      .where(eq(schema.exchangeRate.rate_id, id))
+      .limit(1);
+    return updated;
+  }
+
+  async deleteExchangeRateById(id: string) {
+    const [deleted] = await this.db
+      .select()
+      .from(schema.exchangeRate)
+      .where(eq(schema.exchangeRate.rate_id, id))
+      .limit(1);
+
+    await this.db
+      .delete(schema.exchangeRate)
+      .where(eq(schema.exchangeRate.rate_id, id));
+
+    return deleted;
   }
 
   async createCurrency(data: any) {

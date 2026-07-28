@@ -353,6 +353,56 @@ export const useLogin = () => useMutation((payload) => api.post('/auth/login', p
 
 ---
 
+### POST `/auth/forgot-password`
+
+**Summary**: Request password reset instructions / 15-minute token via email.  
+**Auth**: None (public).
+
+**Request Body**:
+```json
+{
+  "email": "admin@greenvalley.com"
+}
+```
+
+**Success Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Password reset token generated successfully. Valid for 15 minutes.",
+  "reset_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+---
+
+### POST `/auth/reset-password`
+
+**Summary**: Reset account password using the reset token.  
+**Auth**: None (uses reset token).
+
+**Request Body**:
+```json
+{
+  "email": "admin@greenvalley.com",
+  "reset_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "new_password": "NewSecurePassword123!"
+}
+```
+
+**Success Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Password has been reset successfully. You can now login with your new password."
+}
+```
+
+**Error Responses**:
+- `401` — Invalid or expired password reset token
+
+---
+
 ### POST `/auth/refresh`
 
 **Summary**: Exchange a valid refresh token for a new access + refresh token pair.  

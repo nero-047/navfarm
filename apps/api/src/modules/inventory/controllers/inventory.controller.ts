@@ -34,6 +34,32 @@ export class InventoryController {
     private readonly reservationService: ReservationService,
   ) {}
 
+  @Get('ledger')
+  @RequirePermission('INVENTORY', 'PORTAL', 'view')
+  @ApiOperation({ summary: 'Retrieve item movement history / inventory ledger audit trail' })
+  async getLedgerEntries(@Query() query: any, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.ledgerService.getLedgerEntries(
+      {
+        companyId: query.companyId,
+        itemId: query.itemId,
+        warehouseId: query.warehouseId,
+        locationId: query.locationId,
+        transactionType: query.transactionType,
+        startDate: query.startDate,
+        endDate: query.endDate,
+        limit: query.limit,
+        offset: query.offset,
+      },
+      tenantId
+    );
+    return {
+      success: true,
+      message: 'Inventory ledger movement entries retrieved.',
+      data: result
+    };
+  }
+
   @Get('balance')
   @RequirePermission('INVENTORY', 'PORTAL', 'view')
   @ApiOperation({ summary: 'Inquire stock balances (on hand, reserved, available)' })

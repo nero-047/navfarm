@@ -591,4 +591,58 @@ export class SetupWizardService implements OnModuleInit {
     
     return deletedLob;
   }
+
+  async listCountries() {
+    return [
+      { country_id: 'IND', country_name: 'India', iso2: 'IN', iso3: 'IND', phone_code: '+91', default_currency: 'INR' },
+      { country_id: 'AO', country_name: 'Angola', iso2: 'AO', iso3: 'AGO', phone_code: '+244', default_currency: 'AOA' },
+      { country_id: 'USA', country_name: 'United States', iso2: 'US', iso3: 'USA', phone_code: '+1', default_currency: 'USD' },
+      { country_id: 'UAE', country_name: 'United Arab Emirates', iso2: 'AE', iso3: 'ARE', phone_code: '+971', default_currency: 'AED' },
+      { country_id: 'GBR', country_name: 'United Kingdom', iso2: 'GB', iso3: 'GBR', phone_code: '+44', default_currency: 'GBP' },
+      { country_id: 'NGA', country_name: 'Nigeria', iso2: 'NG', iso3: 'NGA', phone_code: '+234', default_currency: 'NGN' },
+      { country_id: 'KEN', country_name: 'Kenya', iso2: 'KE', iso3: 'KEN', phone_code: '+254', default_currency: 'KES' },
+      { country_id: 'ZAF', country_name: 'South Africa', iso2: 'ZA', iso3: 'ZAF', phone_code: '+27', default_currency: 'ZAR' },
+    ];
+  }
+
+  async listStates(countryId?: string) {
+    const allStates: Record<string, Array<{ state_id: string; state_name: string; country_id: string }>> = {
+      IND: [
+        { state_id: 'IND-MH', state_name: 'Maharashtra', country_id: 'IND' },
+        { state_id: 'IND-UP', state_name: 'Uttar Pradesh', country_id: 'IND' },
+        { state_id: 'IND-DL', state_name: 'Delhi', country_id: 'IND' },
+        { state_id: 'IND-KA', state_name: 'Karnataka', country_id: 'IND' },
+        { state_id: 'IND-TN', state_name: 'Tamil Nadu', country_id: 'IND' },
+        { state_id: 'IND-GJ', state_name: 'Gujarat', country_id: 'IND' },
+        { state_id: 'IND-PB', state_name: 'Punjab', country_id: 'IND' },
+        { state_id: 'IND-HR', state_name: 'Haryana', country_id: 'IND' },
+      ],
+      AO: [
+        { state_id: 'AO-LUA', state_name: 'Luanda', country_id: 'AO' },
+        { state_id: 'AO-BGO', state_name: 'Bengo', country_id: 'AO' },
+        { state_id: 'AO-BGU', state_name: 'Benguela', country_id: 'AO' },
+        { state_id: 'AO-BIE', state_name: 'Bié', country_id: 'AO' },
+        { state_id: 'AO-CAB', state_name: 'Cabinda', country_id: 'AO' },
+        { state_id: 'AO-HUA', state_name: 'Huambo', country_id: 'AO' },
+        { state_id: 'AO-HUI', state_name: 'Huíla', country_id: 'AO' },
+      ],
+      USA: [
+        { state_id: 'US-CA', state_name: 'California', country_id: 'USA' },
+        { state_id: 'US-TX', state_name: 'Texas', country_id: 'USA' },
+        { state_id: 'US-NY', state_name: 'New York', country_id: 'USA' },
+        { state_id: 'US-FL', state_name: 'Florida', country_id: 'USA' },
+        { state_id: 'US-IL', state_name: 'Illinois', country_id: 'USA' },
+      ],
+      UAE: [
+        { state_id: 'UAE-DXB', state_name: 'Dubai', country_id: 'UAE' },
+        { state_id: 'UAE-AUH', state_name: 'Abu Dhabi', country_id: 'UAE' },
+        { state_id: 'UAE-SHJ', state_name: 'Sharjah', country_id: 'UAE' },
+      ],
+    };
+
+    if (countryId && allStates[countryId]) {
+      return allStates[countryId];
+    }
+    return Object.values(allStates).flat();
+  }
 }
