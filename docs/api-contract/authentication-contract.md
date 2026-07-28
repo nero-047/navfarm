@@ -21,8 +21,10 @@ Response when MFA is required:
   "user": { "...": "minimal user identity" },
   "tenants": [],
   "companies": [],
+  "workspaces": [],
   "activeTenantId": null,
   "activeCompanyId": null,
+  "activeWorkspaceId": null,
   "expiresAt": "2026-07-27T10:05:00.000Z",
   "mfaRequired": true,
   "challengeId": "challenge-id"
@@ -38,13 +40,18 @@ No application session cookie should be established until MFA verification or re
 - `user`
 - `tenants`
 - `companies`
+- `workspaces`
 - `activeTenantId`
 - `activeCompanyId`
+- `activeWorkspaceId`
 - `expiresAt`
 - optional `mfaRequired`
 - optional `challengeId`
 
 Company memberships include `companyId`, `tenantId`, `companyName`, `companySlug`, `status`, `onboardingStatus`, `role`, `permissions`, and `enabledModules`.
+Workspace memberships independently include `workspaceId`, `tenantId`,
+`companyId`, code/slug/name/type/status, role, permissions and enabled modules.
+Company membership does not imply workspace membership.
 
 ## MFA Verification
 
@@ -123,16 +130,22 @@ Response: `AuthSession`.
 Request:
 
 ```json
-{ "tenantId": "tenant-id", "companyId": "company-id" }
+{ "tenantId": "tenant-id", "companyId": "company-id", "workspaceId": "workspace-id" }
 ```
 
 Rules:
 
 - `tenantId` may be null only when the UI intentionally returns to context selection.
 - `companyId` may be null for tenant console context.
-- Backend must verify tenant membership and company membership.
+- `workspaceId` may be null for company configuration or workspace selection.
+- Backend must verify tenant, company and explicit workspace membership and
+  verify that the workspace belongs to the selected tenant/company pair.
+- Changing tenant clears company and workspace. Changing company clears stale
+  workspace state. Logout clears all three context levels.
 - Invalid membership returns 403.
-- Multi-company selection persists in the session.
+- Multi-company/workspace selection persists in the session.
+- MFA verification and recovery return the same complete membership/context
+  structure as ordinary login.
 
 ## Required Security Behavior
 
@@ -145,4 +158,3 @@ Rules:
 - No demo credentials or mock account cards in production mode.
 - Request IDs on every response.
 - Audit events for login, logout, MFA, recovery, context changes and failed permission checks.
-

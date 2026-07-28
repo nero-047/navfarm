@@ -1,13 +1,13 @@
 # Permission matrix
 
-Navigation is derived from permissions and enabled company modules. Hidden
+Navigation is derived from permissions, explicit workspace membership, and enabled workspace modules. Hidden
 navigation is only a UX decision; mock mutations separately enforce permission
 checks and a production backend must do the same.
 
 | Role | Batches create/approve | Costs | Finance | User/role admin | Export | Operational entry |
 | --- | --- | --- | --- | --- | --- | --- |
-| System administrator | Platform-wide | Yes | Yes | Yes | Yes | Yes |
-| Tenant administrator | Via company role | Via company role | Via company role | Tenant/company administration | Audit export | Via company role |
+| System administrator | No implicit workspace access | No implicit workspace access | Platform oversight only | Platform administration | Platform audit | No implicit workspace access |
+| Tenant administrator | Only with workspace role | Only with workspace role | Company configuration | Tenant/company/workspace administration | Audit export | Only with workspace role |
 | Company super administrator | Yes / Yes | Yes | Full | Full | Yes | Yes |
 | Company administrator | Yes / Yes | Yes | Full | Full except immutable super admin | Yes | Yes |
 | Farm manager | Yes / Yes | Own farms | No | No | Yes | Yes |
@@ -34,6 +34,15 @@ The API enforces the same boundary as navigation. Platform reads require
 `SYSTEM_ADMIN`; master mutations require `company.manage`; accounting reads
 require `finance.view` or `company.manage`; accounting mutations require
 `finance.manage` or `company.manage`.
+
+## Workspace operational capabilities
+
+`canViewWorkspace`, `canCreateOperations`, `canManageQuality`,
+`canManageTraceability`, `canManageResources`, `canCloseBatch`, and
+`canViewReports` are derived from the active workspace membership. Company
+`company.manage` is configuration authority and never grants these operational
+capabilities. Switching company clears workspace context; switching workspace
+changes the operational partition.
 
 Canonical permission identifiers are defined in
 `apps/web/src/contracts/api.ts`; role defaults and permission evaluation are in

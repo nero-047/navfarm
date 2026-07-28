@@ -51,3 +51,29 @@ Phase 7.1 preserves the Phase 7 mock boundary and adds presentation-ready, deter
 Readiness remains explicitly defined by the current policy: steps 1–9 establish workspace readiness; accounting/GL, NOB/LOB and essential masters establish operations readiness. No additional accounting-close requirement was invented.
 
 The Phase 2/3 screenshots remain intentionally refreshed by their existing browser evidence tests. The two untracked onboarding-redirect screenshots remain outside the approved Phase 7.1 presentation set and require user review before adoption.
+
+## Phase 9 API-readiness continuation
+
+Phase 9 supersedes the earlier company-only operational mock boundary. Every operational URL, typed client request, repository partition and authorization check now carries `tenantId + companyId + workspaceId`. Repository isolation tests cover two workspaces belonging to the same company and prove both read and mutation separation.
+
+Workspace administration now uses typed same-origin `/api/v1` clients for list, create, detail/edit, enabled modules, membership and readiness. The UI provides explicit loading, empty, error and permission states. Tenant administrators can configure workspaces without acquiring implicit operational permissions.
+
+Legacy company operational routes for dashboard, batches, operations, quality, traceability, resources, costing and reports are compatibility resolvers only:
+
+- one accessible workspace redirects to its canonical `/{company}/workspaces/{workspace}/{section}` route;
+- multiple accessible workspaces render an explicit selector;
+- no accessible workspaces render setup/access guidance.
+
+The old Phase 7/7.1 validation tables above remain historical records. Current quality-gate results and the approved screenshot manifest belong in the Phase 9 audit documents; they must not be inferred from those earlier counts.
+
+### Phase 9 final validation record
+
+| Check | Result |
+| --- | --- |
+| `pnpm nx run web:typecheck --skipNxCache` | Passed |
+| `pnpm nx run web:lint --skipNxCache` | Passed with 148 pre-existing warnings and 0 errors |
+| `pnpm nx run web:test --skipNxCache` | Passed: 18 suites, 80 tests |
+| `pnpm nx run web:build --skipNxCache` | Passed |
+| `pnpm nx run web-e2e:typecheck --skipNxCache` | Passed |
+| `pnpm nx run web-e2e:e2e --skipNxCache` | Passed: 26 Chromium tests |
+| `git diff --check` | Passed after documentation synchronization |

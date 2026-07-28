@@ -14,7 +14,7 @@
 
 | Route | Purpose |
 | --- | --- |
-| `/context-selection` | Explicit tenant/company membership selection |
+| `/context-selection` | Explicit tenant, company, and workspace membership selection |
 | `/onboarding` | Compatibility redirect to the active company's `/{company}/setup` flow |
 | `/profile` | Profile, password, language, timezone, notifications, session |
 | `/access-denied` | Suspended, inactive, membership, or permission failure |
@@ -29,15 +29,17 @@
   `/console/companies/new`, `/console/companies/{companyId}`, `/console/users`,
   `/console/invitations`, `/console/roles`, `/console/subscription`,
   `/console/usage`, `/console/audit`, `/console/notifications`.
-- Company: `/{company}/dashboard`, `/batches`, `/batches/{batch}`,
-  `/operations`, `/quality`, `/traceability`, `/resources`, `/reports`,
-  `/settings`, `/settings/{section}`, `/{company}/setup/{step}`,
+- Company configuration: `/settings`, `/settings/{section}`, `/{company}/setup/{step}`,
   `/{company}/masters`, `/{company}/masters/{resource}`,
   `/{company}/masters/{resource}/import`,
   `/{company}/settings/business-structure`,
   `/{company}/accounting/chart-of-accounts`,
   `/{company}/accounting/chart-of-accounts/{new|accountId}`, and
   `/{company}/accounting/{gl-mappings|costing|readiness}`.
+- Workspace administration: `/{company}/workspaces`,
+  `/{company}/workspaces/new`, and `/{company}/workspaces/{workspace}`.
+- Canonical workspace operations:
+  `/{company}/workspaces/{workspace}/{dashboard|batches|operations|quality|traceability|resources|costing|reports}`.
 
 Company setup step routes are `profile`, `address`, `contacts`,
 `localization`, `accounting`, `modules`, `admin`, `team`, `chart-of-accounts`,
@@ -46,6 +48,12 @@ Company setup step routes are `profile`, `address`, `contacts`,
 Compatibility redirects: `/operator` -> `/admin/masters`; `/organization` and
 `/tenant-admin` -> `/console/dashboard`; `/admin` and `/console` redirect to
 their dashboards.
+
+Legacy company operational routes `/{company}/{dashboard|batches|operations|quality|traceability|resources|costing|reports}`
+are resolvers only. One accessible workspace redirects to its canonical route,
+multiple accessible workspaces redirect to `/{company}/workspaces`, and no
+accessible workspace renders an explicit setup/access state. They never infer
+a workspace from stale browser state.
 
 The static `masters/nobs` and `masters/lobs` routes open the company
 business-structure workspace. Unknown master resources return 404.

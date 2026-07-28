@@ -10,6 +10,7 @@ Build:
 - Login/logout/session refresh.
 - MFA challenge, verify and recovery.
 - Context selection.
+- Tenant/company/workspace memberships and active context.
 - Suspended tenant behavior.
 
 Acceptance criteria:
@@ -17,7 +18,8 @@ Acceptance criteria:
 - `authSessionSchema` responses validate in the frontend client.
 - MFA challenge does not create an authenticated app session.
 - Invalid context selection returns 403.
-- Multi-company session persists selected context.
+- Multi-company/workspace session persists selected context and clears stale
+  workspace state when company changes.
 - No tokens are stored in browser localStorage.
 
 ## 2. Tenant and Company Administration
@@ -43,7 +45,7 @@ Build:
 
 - 15-step setup status.
 - Profile, addresses, contacts, localization, fiscal, modules, administrator, team.
-- Workspace readiness and operations readiness.
+- Company accounting readiness plus separate workspace operational readiness.
 - Setup completion.
 
 Acceptance criteria:
@@ -82,12 +84,19 @@ Build:
 - Operations recording.
 - Resources and resource usage.
 
+All operational tables, repositories, caches and handlers must partition and
+authorize by `tenantId + companyId + workspaceId`; company-only partitioning is
+not contract-compatible.
+
 Acceptance criteria:
 
 - Operations Manager can perform Phase 7 workflow.
 - Viewer cannot create, update or mutate operational resources.
 - Stale transition returns 409.
 - Invalid lifecycle transition returns 409 or 422 as documented.
+- Two workspaces in one company cannot list, read, mutate, aggregate or report
+  each other's batches, operations, QC, QR, resources/usages, costing,
+  journals, variances or reports.
 
 ## 6. QC and QR
 
@@ -133,7 +142,8 @@ Build:
 
 Acceptance criteria:
 
-- Reports reflect company scope only.
+- Reports reflect one explicit workspace scope only; company roll-ups require
+  a separate, authorized aggregation endpoint.
 - Viewer/reporting roles can read but not mutate.
 - Export permissions use `reports.export`.
 
@@ -163,10 +173,9 @@ Build tests for:
 - Masters/accounting import and lifecycle.
 - Batch/QC/QR/close workflow.
 - Viewer read-only restrictions.
-- Multi-company no data leakage.
+- Multi-company and same-company/multi-workspace no data leakage.
 
 Acceptance criteria:
 
 - Frontend Playwright Phase 7.1 suite passes against backend mode.
 - Runtime response contracts pass without client-side schema failures.
-

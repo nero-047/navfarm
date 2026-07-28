@@ -30,6 +30,9 @@ Current granular permissions:
 - `reports.export`
 - `audit.view`
 - `notifications.manage`
+- `workspaces.view`
+- `workspaces.manage`
+- `batches.close`
 
 ## Platform Roles
 
@@ -42,7 +45,7 @@ Current granular permissions:
 
 | Role | Scope | Permissions | Confirmed behavior |
 |---|---|---|---|
-| Tenant Admin (`TENANT_ADMIN`) | Active tenant | `tenant.view`, `tenant.manage`, `company.view`, `company.manage`, `users.view`, `users.manage`, `roles.view`, `roles.manage`, `audit.view`, `notifications.manage` | Lands in tenant console. May manage tenant/company setup and master-data configuration, including import validation. Does not automatically gain batch, QC, QR release, financial mutation or batch close permissions. |
+| Tenant Admin (`TENANT_ADMIN`) | Active tenant | tenant/company/workspace configuration capabilities | May list, create and configure workspaces and memberships. Has no operational workspace membership or mutation capability unless separately assigned. |
 | Tenant Member (`TENANT_MEMBER`) | Active tenant | No tenant-admin permissions by default | Company permissions depend on company membership. |
 | Tenant Viewer/Billing | Tenant | Not represented as a concrete frontend enum yet | If added, split read-only tenant summary and billing/subscription actions explicitly. |
 
@@ -63,7 +66,9 @@ Current granular permissions:
 
 - Platform Admin is outside company RBAC and must not be granted by company membership alone.
 - Tenant Admin setup permissions do not imply operational mutation permissions.
-- Company permissions apply only to `activeCompanyId`.
+- Company configuration permissions apply only to `activeCompanyId`.
+- Operational permissions apply only to an explicit workspace membership and `activeWorkspaceId`.
+- Every operational request validates the complete `(activeTenantId, activeCompanyId, activeWorkspaceId)` tuple and stored workspace ownership.
 - Multi-company users must select context before company work unless a single active company is selected.
 - Backend must filter all company collections by both tenant membership and company membership.
 - A user with one company must not see records from another company unless their membership includes it.
@@ -75,7 +80,7 @@ Current granular permissions:
 |---|---|---|
 | Platform | `/admin/*` | Require `SYSTEM_ADMIN`; otherwise 403. |
 | Tenant | `/console/*` | Require active tenant and `tenant.view`. |
-| Company | `/{company}/*` | Require active company membership, active company, and `company.view`. |
-| Operational mutations | batch/QC/QR/resources close/write routes | Require relevant company operational permissions, not only tenant admin. |
+| Company | `/{company}/settings`, `/masters`, `/accounting`, `/setup` | Require active company membership and company configuration capability. |
+| Workspace | `/{company}/workspaces/{workspace}/*` | Require matching tenant/company/workspace membership and active context. |
+| Operational mutations | workspace batch/QC/QR/resources close/write routes | Require the relevant workspace capability; tenant/company administration alone is insufficient. |
 | Configuration mutations | setup, masters, NOB/LOB, accounting config | Require `company.manage` or explicit tenant-admin setup authority. |
-
