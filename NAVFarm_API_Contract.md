@@ -3313,5 +3313,70 @@ export default api;
 
 ---
 
-*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 32 modules and 45 controllers.*
+## 33. POULTRY INDUSTRY VERTICAL ENDPOINTS (PHASE 6)
+
+### `POST /poultry/rearing/placement`
+- **Summary**: Place Day-Old Chicks (DOC) into rearing shed (Auto-creates Phase 5 Production Batch).
+- **Permission**: `POULTRY:REARING:create`
+- **Body**: `{ company_id, farm_id, shed_id, warehouse_id, location_id, batch_no, placement_date, initial_bird_count: 10000 }`
+
+### `POST /poultry/rearing/daily-entry`
+- **Summary**: Log daily rearing entry (Feed, Water, Mortality, Weight) & issue feed stock via Phase 3.
+- **Permission**: `POULTRY:REARING:edit`
+- **Body**: `{ company_id, farm_id, shed_id, poultry_batch_id, entry_date, feed_item_id, feed_consumed_kg: 250, mortality_count: 5 }`
+
+### `GET /poultry/rearing/batch/:id`
+- **Summary**: Fetch single Poultry Batch details with KPI summary.
+- **Permission**: `POULTRY:REARING:view`
+
+### `GET /poultry/rearing/batch`
+- **Summary**: List all Poultry Batches matching filters (`companyId`, `batchType`, `status`).
+- **Permission**: `POULTRY:REARING:view`
+
+### `GET /poultry/rearing/daily-entry/:batchId`
+- **Summary**: Fetch daily rearing entries history log for a batch.
+- **Permission**: `POULTRY:REARING:view`
+
+### `POST /poultry/layer/egg-production`
+- **Summary**: Log daily egg collection, grading (Good, Cracked, Dirty), HDP %, and receive eggs via Phase 3.
+- **Permission**: `POULTRY:LAYER:edit`
+- **Body**: `{ company_id, poultry_batch_id, warehouse_id, location_id, egg_item_id, uom_id, log_date, good_eggs: 8500, cracked_eggs: 120 }`
+
+### `POST /poultry/hatchery/setting`
+- **Summary**: Record hatching eggs set in incubator.
+- **Permission**: `POULTRY:HATCHERY:create`
+- **Body**: `{ company_id, farm_id, shed_id, warehouse_id, location_id, batch_no, setting_date, eggs_set_qty: 50000 }`
+
+### `POST /poultry/hatchery/hatch-result`
+- **Summary**: Record hatch completion, candling fertility, and hatchability %.
+- **Permission**: `POULTRY:HATCHERY:edit`
+- **Body**: `{ poultry_batch_id, hatch_date, candled_fertile_qty: 46000, chicks_hatched_qty: 43500 }`
+
+### `POST /poultry/broiler/placement`
+- **Summary**: Place commercial broiler chicks.
+- **Permission**: `POULTRY:BROILER:create`
+- **Body**: `{ company_id, farm_id, shed_id, warehouse_id, location_id, batch_no, placement_date, initial_bird_count: 15000 }`
+
+### `GET /poultry/broiler/:id/fcr`
+- **Summary**: Calculate Feed Conversion Ratio (FCR) for broiler batch.
+- **Permission**: `POULTRY:BROILER:view`
+
+### `POST /poultry/slaughter/yield`
+- **Summary**: Record slaughterhouse live bird receiving, dressing, yield %, and finished meat inventory receipt.
+- **Permission**: `POULTRY:SLAUGHTER:edit`
+- **Body**: `{ company_id, poultry_batch_id, warehouse_id, location_id, meat_item_id, uom_id, slaughter_date, live_birds_received: 5000, total_live_weight_kg: 10500, dressed_weight_kg: 7875 }`
+
+### `GET /poultry/report/batch/:id/kpi`
+- **Summary**: Fetch single Poultry Batch KPI performance metrics (FCR, Livability %, HDP %, Hatchability %).
+- **Permission**: `POULTRY:REPORT:view`
+
+### `GET /poultry/report/company/summary`
+- **Summary**: Company-wide Poultry Flock & Performance KPI Summary Dashboard.
+- **Permission**: `POULTRY:REPORT:view`
+- **Query**: `companyId`
+
+---
+
+*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 33 modules and 51 controllers.*
+
 

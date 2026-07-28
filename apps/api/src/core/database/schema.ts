@@ -2564,3 +2564,110 @@ export const productionVariance = mysqlTable('production_variance', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
 });
 
+// ==========================================
+// 13. POULTRY INDUSTRY VERTICAL (PHASE 6)
+// ==========================================
+
+export const poultryBatch = mysqlTable('poultry_batch', {
+  poultry_batch_id: varchar('poultry_batch_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  farm_id: varchar('farm_id', { length: 36 }).notNull().references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
+  shed_id: varchar('shed_id', { length: 36 }).notNull().references(() => shedMaster.shed_id, { onDelete: 'restrict' }),
+  production_batch_id: varchar('production_batch_id', { length: 36 }).notNull().unique().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  batch_type: varchar('batch_type', { length: 30 }).notNull(), // REARING, LAYER, HATCHERY, BROILER, SLAUGHTER
+  breed_id: varchar('breed_id', { length: 36 }),
+  species_id: varchar('species_id', { length: 36 }),
+  placement_date: date('placement_date', { mode: 'string' }).notNull(),
+  initial_bird_count: int('initial_bird_count').notNull(),
+  current_bird_count: int('current_bird_count').notNull(),
+  total_mortality: int('total_mortality').default(0).notNull(),
+  status: varchar('status', { length: 30 }).default('ACTIVE').notNull(), // ACTIVE, TRANSFERRED, COMPLETED, CLOSED
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' })
+});
+
+export const poultryDailyEntry = mysqlTable('poultry_daily_entry', {
+  entry_id: varchar('entry_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  farm_id: varchar('farm_id', { length: 36 }).notNull(),
+  shed_id: varchar('shed_id', { length: 36 }).notNull(),
+  poultry_batch_id: varchar('poultry_batch_id', { length: 36 }).notNull().references(() => poultryBatch.poultry_batch_id, { onDelete: 'cascade' }),
+  entry_date: date('entry_date', { mode: 'string' }).notNull(),
+  feed_item_id: varchar('feed_item_id', { length: 36 }),
+  feed_consumed_kg: decimal('feed_consumed_kg', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  water_consumed_liters: decimal('water_consumed_liters', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  mortality_count: int('mortality_count').default(0).notNull(),
+  culling_count: int('culling_count').default(0).notNull(),
+  avg_weight_grams: decimal('avg_weight_grams', { precision: 10, scale: 2 }).default('0.00').notNull(),
+  temperature_celsius: decimal('temperature_celsius', { precision: 5, scale: 2 }),
+  humidity_pct: decimal('humidity_pct', { precision: 5, scale: 2 }),
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const poultryEggProduction = mysqlTable('poultry_egg_production', {
+  egg_log_id: varchar('egg_log_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  poultry_batch_id: varchar('poultry_batch_id', { length: 36 }).notNull().references(() => poultryBatch.poultry_batch_id, { onDelete: 'cascade' }),
+  log_date: date('log_date', { mode: 'string' }).notNull(),
+  good_eggs: int('good_eggs').default(0).notNull(),
+  cracked_eggs: int('cracked_eggs').default(0).notNull(),
+  dirty_eggs: int('dirty_eggs').default(0).notNull(),
+  double_yolk: int('double_yolk').default(0).notNull(),
+  total_eggs: int('total_eggs').notNull(),
+  hdp_pct: decimal('hdp_pct', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  goods_receipt_id: varchar('goods_receipt_id', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const poultryHatchery = mysqlTable('poultry_hatchery', {
+  hatch_id: varchar('hatch_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  poultry_batch_id: varchar('poultry_batch_id', { length: 36 }).notNull().references(() => poultryBatch.poultry_batch_id, { onDelete: 'cascade' }),
+  setting_date: date('setting_date', { mode: 'string' }).notNull(),
+  hatch_date: date('hatch_date', { mode: 'string' }),
+  eggs_set_qty: int('eggs_set_qty').notNull(),
+  candled_fertile_qty: int('candled_fertile_qty').default(0).notNull(),
+  chicks_hatched_qty: int('chicks_hatched_qty').default(0).notNull(),
+  hatch_loss_qty: int('hatch_loss_qty').default(0).notNull(),
+  hatchability_pct: decimal('hatchability_pct', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const poultrySlaughter = mysqlTable('poultry_slaughter', {
+  slaughter_id: varchar('slaughter_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  poultry_batch_id: varchar('poultry_batch_id', { length: 36 }).notNull().references(() => poultryBatch.poultry_batch_id, { onDelete: 'cascade' }),
+  slaughter_date: date('slaughter_date', { mode: 'string' }).notNull(),
+  live_birds_received: int('live_birds_received').notNull(),
+  total_live_weight_kg: decimal('total_live_weight_kg', { precision: 18, scale: 4 }).notNull(),
+  dressed_weight_kg: decimal('dressed_weight_kg', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  yield_pct: decimal('yield_pct', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  goods_receipt_id: varchar('goods_receipt_id', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const poultryKpi = mysqlTable('poultry_kpi', {
+  kpi_id: varchar('kpi_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  poultry_batch_id: varchar('poultry_batch_id', { length: 36 }).notNull().unique().references(() => poultryBatch.poultry_batch_id, { onDelete: 'cascade' }),
+  fcr: decimal('fcr', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  livability_pct: decimal('livability_pct', { precision: 5, scale: 2 }).default('100.00').notNull(),
+  mortality_rate_pct: decimal('mortality_rate_pct', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  hdp_pct: decimal('hdp_pct', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  hatchability_pct: decimal('hatchability_pct', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  cost_per_bird: decimal('cost_per_bird', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  cost_per_egg: decimal('cost_per_egg', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  cost_per_kg: decimal('cost_per_kg', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull()
+});
+

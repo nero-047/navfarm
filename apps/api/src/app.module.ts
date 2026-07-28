@@ -34,6 +34,7 @@ import { CostCenterModule } from './modules/cost-center/cost-center.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { ProductionModule } from './modules/production/production.module';
+import { PoultryModule } from './modules/poultry/poultry.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -89,6 +90,7 @@ import { SystemController } from './system/system.controller';
     InventoryModule,
     FinanceModule,
     ProductionModule,
+    PoultryModule,
   ],
   controllers: [SystemController],
   providers: [],
