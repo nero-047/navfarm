@@ -3557,6 +3557,122 @@ export default api;
 
 ---
 
-*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 36 modules and 66 controllers.*
+## 37. ENTERPRISE SCHEDULER, ALERTS & KPI ENGINE ENDPOINTS (PHASE 9)
+
+### `POST /scheduler/job`
+- **Summary**: Create Enterprise Scheduled Recurrence Job.
+- **Permission**: `SCHEDULER:JOB:create`
+- **Body**: `{ company_id, job_name: "Daily Feed Reminder", cron_expression: "0 8 * * *", target_service: "OperationalScheduleService", target_method: "triggerDailyFeedDispatch" }`
+
+### `POST /scheduler/job/execute/:id`
+- **Summary**: Execute Scheduled Job on demand & record history log.
+- **Permission**: `SCHEDULER:JOB:edit`
+
+### `GET /scheduler/job`
+- **Summary**: List Scheduled Jobs for a company.
+- **Permission**: `SCHEDULER:JOB:view`
+- **Query**: `companyId`
+
+### `GET /scheduler/job/history/:id`
+- **Summary**: Fetch execution history for a scheduled job.
+- **Permission**: `SCHEDULER:JOB:view`
+
+### `POST /scheduler/operational/vaccination`
+- **Summary**: Schedule Vaccination Calendar Event.
+- **Permission**: `SCHEDULER:VACCINATION:create`
+- **Body**: `{ company_id, batch_id, disease_id, medicine_id, due_date: "2026-08-15T08:00:00Z", assigned_to }`
+
+### `POST /scheduler/operational/vaccination/complete/:id`
+- **Summary**: Mark Vaccination Calendar Event as Completed.
+- **Permission**: `SCHEDULER:VACCINATION:edit`
+
+### `GET /scheduler/operational/vaccination`
+- **Summary**: List Vaccination Schedules for a company.
+- **Permission**: `SCHEDULER:VACCINATION:view`
+- **Query**: `companyId`
+
+### `POST /scheduler/operational/feed`
+- **Summary**: Schedule Daily Feeding Dispatch Plan.
+- **Permission**: `SCHEDULER:FEED:create`
+- **Body**: `{ company_id, batch_id, feed_formula_id, scheduled_qty: 450.5, scheduled_time: "08:00" }`
+
+### `GET /scheduler/operational/feed`
+- **Summary**: List Feed Schedules for a company.
+- **Permission**: `SCHEDULER:FEED:view`
+- **Query**: `companyId`
+
+### `POST /scheduler/growth/weight`
+- **Summary**: Record Flock Weight Sample Log.
+- **Permission**: `SCHEDULER:GROWTH:create`
+- **Body**: `{ company_id, batch_id, sample_count: 50, average_weight_grams: 1850.5, target_weight_grams: 1900.0, daily_gain_grams: 65.2 }`
+
+### `GET /scheduler/growth/weight/:batchId`
+- **Summary**: Fetch Weight Gain History for a batch.
+- **Permission**: `SCHEDULER:GROWTH:view`
+
+### `POST /scheduler/growth/mortality`
+- **Summary**: Record Daily Mortality / Cull Log.
+- **Permission**: `SCHEDULER:GROWTH:create`
+- **Body**: `{ company_id, batch_id, mortality_count: 12, cull_count: 2, disease_id, reason: "Heat stress" }`
+
+### `GET /scheduler/growth/mortality/:batchId`
+- **Summary**: Fetch Mortality History for a batch.
+- **Permission**: `SCHEDULER:GROWTH:view`
+
+### `POST /scheduler/alert/rule`
+- **Summary**: Create Configurable Alert Rule.
+- **Permission**: `SCHEDULER:ALERT:create`
+- **Body**: `{ company_id, rule_name: "High Mortality Trigger", event_type: "MORTALITY_RECORDED", metric_name: "daily_mortality_rate", operator: "GT", threshold_value: 1.5, severity: "CRITICAL" }`
+
+### `POST /scheduler/alert/evaluate`
+- **Summary**: Evaluate metric against Alert Rule & trigger alert event if breached.
+- **Permission**: `SCHEDULER:ALERT:create`
+- **Body**: `{ company_id, rule_id, measured_value: 2.5 }`
+
+### `GET /scheduler/alert/active`
+- **Summary**: List Active Alert Events for a company.
+- **Permission**: `SCHEDULER:ALERT:view`
+- **Query**: `companyId`
+
+### `POST /scheduler/alert/acknowledge/:id`
+- **Summary**: Acknowledge Active Alert Instance.
+- **Permission**: `SCHEDULER:ALERT:edit`
+
+### `POST /scheduler/notification/dispatch`
+- **Summary**: Dispatch Multi-Channel Notification (In-App, Email, Push).
+- **Permission**: `SCHEDULER:NOTIFICATION:create`
+- **Body**: `{ company_id, user_id, title: "Vaccination Reminder", body: "Gumboro vaccination due today", channel: "IN_APP" }`
+
+### `GET /scheduler/notification/my-notifications`
+- **Summary**: Fetch logged-in user notifications.
+- **Permission**: `SCHEDULER:NOTIFICATION:view`
+
+### `POST /scheduler/notification/read/:id`
+- **Summary**: Mark Notification as Read.
+- **Permission**: `SCHEDULER:NOTIFICATION:edit`
+
+### `POST /scheduler/kpi/define`
+- **Summary**: Define Enterprise KPI Metric & Green/Yellow/Red Thresholds.
+- **Permission**: `SCHEDULER:KPI:create`
+- **Body**: `{ company_id, kpi_code: "KPI-FCR-01", kpi_name: "FCR Ratio", category: "POULTRY", unit_of_measure: "RATIO", green_max: 1.4, yellow_max: 1.6, red_min: 1.8 }`
+
+### `POST /scheduler/kpi/evaluate`
+- **Summary**: Evaluate KPI Metric Value & Assign Traffic Light Zone (GREEN, YELLOW, RED).
+- **Permission**: `SCHEDULER:KPI:create`
+- **Body**: `{ kpi_id, metric_value: 1.95 }`
+
+### `GET /scheduler/kpi`
+- **Summary**: List KPI Definitions for a company.
+- **Permission**: `SCHEDULER:KPI:view`
+- **Query**: `companyId`
+
+### `GET /scheduler/dashboard/executive`
+- **Summary**: Executive Real-Time Operations & Alert Summary Dashboard.
+- **Permission**: `SCHEDULER:DASHBOARD:view`
+- **Query**: `companyId`
+
+---
+
+*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 37 modules and 73 controllers.*
 
 

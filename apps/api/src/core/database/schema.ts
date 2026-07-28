@@ -2973,3 +2973,149 @@ export const recallAffectedBatch = mysqlTable('recall_affected_batch', {
   quarantine_hold_id: varchar('quarantine_hold_id', { length: 36 }).references(() => quarantineHold.hold_id, { onDelete: 'set null' })
 });
 
+// ==========================================
+// 17. ENTERPRISE SCHEDULER, ALERTS & KPI ENGINE (PHASE 9)
+// ==========================================
+
+export const schedulerJob = mysqlTable('scheduler_job', {
+  job_id: varchar('job_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  job_name: varchar('job_name', { length: 100 }).notNull(),
+  job_group: varchar('job_group', { length: 50 }).default('OPERATIONAL').notNull(),
+  cron_expression: varchar('cron_expression', { length: 100 }).notNull(),
+  target_service: varchar('target_service', { length: 100 }).notNull(),
+  target_method: varchar('target_method', { length: 100 }).notNull(),
+  is_enabled: boolean('is_enabled').default(true).notNull(),
+  last_run_at: timestamp('last_run_at', { mode: 'string' }),
+  next_run_at: timestamp('next_run_at', { mode: 'string' }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const schedulerHistory = mysqlTable('scheduler_history', {
+  history_id: varchar('history_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  job_id: varchar('job_id', { length: 36 }).notNull().references(() => schedulerJob.job_id, { onDelete: 'cascade' }),
+  status: varchar('status', { length: 20 }).default('SUCCESS').notNull(), // SUCCESS, FAILED, SKIPPED
+  execution_duration_ms: int('execution_duration_ms').default(0).notNull(),
+  error_message: text('error_message'),
+  executed_at: timestamp('executed_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const vaccinationSchedule = mysqlTable('vaccination_schedule', {
+  schedule_id: varchar('schedule_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  disease_id: varchar('disease_id', { length: 36 }),
+  medicine_id: varchar('medicine_id', { length: 36 }),
+  due_date: timestamp('due_date', { mode: 'string' }).notNull(),
+  assigned_to: varchar('assigned_to', { length: 36 }),
+  status: varchar('status', { length: 30 }).default('SCHEDULED').notNull(), // SCHEDULED, COMPLETED, OVERDUE, SKIPPED
+  completed_at: timestamp('completed_at', { mode: 'string' }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const feedSchedule = mysqlTable('feed_schedule', {
+  feed_schedule_id: varchar('feed_schedule_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  feed_formula_id: varchar('feed_formula_id', { length: 36 }),
+  scheduled_qty: decimal('scheduled_qty', { precision: 18, scale: 4 }).notNull(),
+  scheduled_time: varchar('scheduled_time', { length: 20 }).notNull(), // e.g. '08:00', '16:00'
+  status: varchar('status', { length: 30 }).default('PENDING').notNull(), // PENDING, DISPATCHED, COMPLETED
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const weightRecord = mysqlTable('weight_record', {
+  weight_id: varchar('weight_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  record_date: timestamp('record_date', { mode: 'string' }).defaultNow().notNull(),
+  sample_count: int('sample_count').default(1).notNull(),
+  average_weight_grams: decimal('average_weight_grams', { precision: 18, scale: 4 }).notNull(),
+  target_weight_grams: decimal('target_weight_grams', { precision: 18, scale: 4 }),
+  daily_gain_grams: decimal('daily_gain_grams', { precision: 18, scale: 4 })
+});
+
+export const mortalityRecord = mysqlTable('mortality_record', {
+  mortality_id: varchar('mortality_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  record_date: timestamp('record_date', { mode: 'string' }).defaultNow().notNull(),
+  mortality_count: int('mortality_count').notNull(),
+  cull_count: int('cull_count').default(0).notNull(),
+  disease_id: varchar('disease_id', { length: 36 }),
+  reason: varchar('reason', { length: 255 }),
+  cost_impact: decimal('cost_impact', { precision: 18, scale: 4 }).default('0.0000')
+});
+
+export const alertRule = mysqlTable('alert_rule', {
+  rule_id: varchar('rule_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  rule_name: varchar('rule_name', { length: 100 }).notNull(),
+  event_type: varchar('event_type', { length: 50 }).notNull(),
+  metric_name: varchar('metric_name', { length: 50 }).notNull(),
+  operator: varchar('operator', { length: 10 }).default('GT').notNull(), // GT, LT, EQ, GTE, LTE
+  threshold_value: decimal('threshold_value', { precision: 18, scale: 4 }).notNull(),
+  severity: varchar('severity', { length: 20 }).default('WARNING').notNull(), // INFO, WARNING, CRITICAL
+  is_enabled: boolean('is_enabled').default(true).notNull()
+});
+
+export const alertEvent = mysqlTable('alert_event', {
+  alert_id: varchar('alert_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  rule_id: varchar('rule_id', { length: 36 }).references(() => alertRule.rule_id, { onDelete: 'cascade' }),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  severity: varchar('severity', { length: 20 }).notNull(),
+  message: text('message').notNull(),
+  status: varchar('status', { length: 30 }).default('ACTIVE').notNull(), // ACTIVE, ACKNOWLEDGED, RESOLVED
+  acknowledged_by: varchar('acknowledged_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const notificationHistory = mysqlTable('notification_history', {
+  notification_id: varchar('notification_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  user_id: varchar('user_id', { length: 36 }),
+  channel: varchar('channel', { length: 30 }).default('IN_APP').notNull(), // IN_APP, EMAIL, SMS, WEBSOCKET
+  title: varchar('title', { length: 200 }).notNull(),
+  body: text('body').notNull(),
+  is_read: boolean('is_read').default(false).notNull(),
+  dispatched_at: timestamp('dispatched_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const kpiDefinition = mysqlTable('kpi_definition', {
+  kpi_id: varchar('kpi_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  kpi_code: varchar('kpi_code', { length: 50 }).notNull(),
+  kpi_name: varchar('kpi_name', { length: 100 }).notNull(),
+  category: varchar('category', { length: 30 }).default('PRODUCTION').notNull(), // PRODUCTION, INVENTORY, FINANCE, POULTRY, QUALITY
+  unit_of_measure: varchar('unit_of_measure', { length: 30 }).default('PCT').notNull()
+});
+
+export const kpiThreshold = mysqlTable('kpi_threshold', {
+  threshold_id: varchar('threshold_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  kpi_id: varchar('kpi_id', { length: 36 }).notNull().references(() => kpiDefinition.kpi_id, { onDelete: 'cascade' }),
+  green_min: decimal('green_min', { precision: 18, scale: 4 }),
+  green_max: decimal('green_max', { precision: 18, scale: 4 }),
+  yellow_min: decimal('yellow_min', { precision: 18, scale: 4 }),
+  yellow_max: decimal('yellow_max', { precision: 18, scale: 4 }),
+  red_min: decimal('red_min', { precision: 18, scale: 4 }),
+  red_max: decimal('red_max', { precision: 18, scale: 4 })
+});
+
+export const kpiResult = mysqlTable('kpi_result', {
+  result_id: varchar('result_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  kpi_id: varchar('kpi_id', { length: 36 }).notNull().references(() => kpiDefinition.kpi_id, { onDelete: 'cascade' }),
+  evaluated_at: timestamp('evaluated_at', { mode: 'string' }).defaultNow().notNull(),
+  metric_value: decimal('metric_value', { precision: 18, scale: 4 }).notNull(),
+  zone: varchar('zone', { length: 10 }).default('GREEN').notNull() // GREEN, YELLOW, RED
+});
+
+
