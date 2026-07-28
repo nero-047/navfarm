@@ -12,9 +12,15 @@
    - multiple unresolved memberships -> context selection;
    - suspended/inactive/no access -> access-denied;
    - incomplete mandatory setup -> onboarding;
-   - otherwise -> company dashboard or tenant console.
-6. Context changes call `PUT /api/v1/auth/context`; tenant/company identity is
-   held in the server session, never localStorage.
+   - Tenant Admin -> tenant console;
+   - one assigned operational workspace -> its canonical workspace dashboard;
+   - unresolved company/workspace membership -> explicit selection;
+   - company administration selection -> `/{company}/overview`.
+6. Context changes call `PUT /api/v1/auth/context`; tenant/company/workspace
+   identity is held in the server session, never localStorage. Selecting
+   Company administration sends `workspaceId: null`. Selecting a workspace
+   sends the complete tenant/company/workspace tuple atomically. Changing
+   company always clears the previous workspace.
 7. Logout calls `POST /api/v1/auth/logout`, invalidates server state, and
    expires the cookie.
 

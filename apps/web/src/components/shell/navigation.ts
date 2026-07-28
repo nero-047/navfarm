@@ -1,15 +1,21 @@
 import {
   BarChart3, Bell, Boxes, Building2, ClipboardCheck, Database, Gauge,
-  History, LayoutDashboard, Layers, QrCode, Settings, ShieldAlert, UserPlus, Users, Wrench, Landmark,
+  History, LayoutDashboard, Layers, QrCode, Settings, ShieldAlert, UserPlus, Users, Wrench, Landmark, CheckCircle2,
 } from 'lucide-react';
 import type { AppScope, NavigationRule } from '../../lib/authorization';
+import { WORKSPACE_PRESENTATION } from '../../lib/workspace-presentation';
+import type { WorkspaceMembership } from '../../contracts/api';
 
 export interface AppNavItem extends NavigationRule {
   label: string;
   icon: typeof LayoutDashboard;
 }
 
-export function navigationForScope(scope: AppScope, companySlug?: string): AppNavItem[] {
+export function navigationForScope(
+  scope: AppScope,
+  companySlug?: string,
+  workspace?: WorkspaceMembership | null,
+): AppNavItem[] {
   if (scope === 'platform') {
     return [
       { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, permission: 'platform.manage' },
@@ -31,19 +37,34 @@ export function navigationForScope(scope: AppScope, companySlug?: string): AppNa
       { label: 'Usage & limits', href: '/console/usage', icon: Gauge, permission: 'tenant.view' },
       { label: 'Audit ledger', href: '/console/audit', icon: History, permission: 'audit.view' },
       { label: 'Notifications', href: '/console/notifications', icon: Bell, permission: 'notifications.manage' },
+      { label: 'Settings', href: '/console/profile', icon: Settings, permission: 'tenant.manage' },
     ];
   }
   const root = `/${companySlug || 'company'}`;
+  if (scope === 'company') {
+    return [
+      { label: 'Overview', href: `${root}/overview`, icon: LayoutDashboard, permission: 'company.view' },
+      { label: 'Workspaces', href: `${root}/workspaces`, icon: Layers, permission: 'company.view' },
+      { label: 'Company setup', href: `${root}/setup`, icon: Settings, permission: 'company.manage' },
+      { label: 'Shared master data', href: `${root}/masters`, icon: Database, permission: 'company.view' },
+      { label: 'Accounting', href: `${root}/accounting/readiness`, icon: Landmark, permission: 'finance.view' },
+      { label: 'Members and roles', href: `${root}/members`, icon: Users, permission: 'users.view' },
+      { label: 'Readiness', href: `${root}/readiness`, icon: CheckCircle2, permission: 'company.view' },
+      { label: 'Settings', href: `${root}/settings`, icon: Settings, permission: 'company.manage' },
+    ];
+  }
+  const workspaceRoot = `${root}/workspaces/${workspace?.workspaceSlug ?? 'workspace'}`;
+  const productionLabel = workspace ? WORKSPACE_PRESENTATION[workspace.workspaceType].productionLabel : 'Production cycles';
   return [
-    { label: 'Dashboard', href: `${root}/dashboard`, icon: LayoutDashboard, permission: 'company.view' },
-    { label: 'Batches', href: `${root}/batches`, icon: Boxes, permission: 'batches.view', module: 'Batches' },
-    { label: 'Operations', href: `${root}/operations`, icon: Gauge, permission: 'operations.create', module: 'Batches' },
-    { label: 'Quality control', href: `${root}/quality`, icon: ClipboardCheck, permission: 'quality.view', module: 'QC' },
-    { label: 'Traceability', href: `${root}/traceability`, icon: QrCode, permission: 'traceability.view', module: 'QR' },
-    { label: 'Resources & KPIs', href: `${root}/resources`, icon: Wrench, permission: 'resources.view' },
-    { label: 'Master data', href: `${root}/masters`, icon: Database, permission: 'company.view' },
-    { label: 'Accounting', href: `${root}/accounting/readiness`, icon: Landmark, permission: 'finance.view', module: 'Finance' },
-    { label: 'Reports', href: `${root}/reports`, icon: BarChart3, permission: 'finance.view' },
-    { label: 'Settings', href: `${root}/settings`, icon: Settings, permission: 'company.manage' },
+    { label: 'Dashboard', href: `${workspaceRoot}/dashboard`, icon: LayoutDashboard, workspacePermission: 'workspaces.view' },
+    { label: productionLabel, href: `${workspaceRoot}/batches`, icon: Boxes, workspacePermission: 'batches.view', module: 'Batches' },
+    { label: 'Operations', href: `${workspaceRoot}/operations`, icon: Gauge, workspacePermission: 'operations.create', module: 'Batches' },
+    { label: 'Quality', href: `${workspaceRoot}/quality`, icon: ClipboardCheck, workspacePermission: 'quality.view', module: 'QC' },
+    { label: 'Traceability', href: `${workspaceRoot}/traceability`, icon: QrCode, workspacePermission: 'traceability.view', module: 'QR' },
+    { label: 'Resources', href: `${workspaceRoot}/resources`, icon: Wrench, workspacePermission: 'resources.view', module: 'Resources' },
+    { label: 'Costing', href: `${workspaceRoot}/costing`, icon: Landmark, workspacePermission: 'costs.view', module: 'Finance' },
+    { label: 'Reports', href: `${workspaceRoot}/reports`, icon: BarChart3, workspacePermission: 'reports.export', module: 'Analytics' },
+    { label: 'Workspace masters', href: `${workspaceRoot}/masters`, icon: Database, workspacePermission: 'workspaces.view' },
+    { label: 'Workspace settings', href: `${workspaceRoot}/settings`, icon: Settings, workspacePermission: 'workspaces.view' },
   ];
 }

@@ -10,7 +10,9 @@ The Phase 7 demo used company as both legal entity and operational data partitio
 - Tenant Admin configures companies and workspaces but has no implicit operational workspace membership.
 - Operational roles are assigned per workspace.
 - Canonical frontend routes include both company and workspace slugs.
-- Company-only routes are compatibility surfaces, not the future API shape.
+- Company administration routes are canonical for legal entity configuration,
+  shared masters, accounting, memberships and readiness. Only old
+  company-only operational routes are compatibility resolvers.
 - Platform reference masters remain platform-scoped; company and workspace masters cannot be intercepted by that namespace.
 
 ## Migration impact for Arun
@@ -23,3 +25,13 @@ The Phase 7 demo used company as both legal entity and operational data partitio
 6. Implement optimistic concurrency, idempotency and the existing v1.0 error envelope.
 
 No database or NestJS implementation is included in this frontend phase.
+
+## Phase 9.3 shell alignment
+
+- `/{company}/overview` is the canonical company landing route;
+  `/{company}/dashboard` redirects there.
+- The context switcher represents Tenant → Company administration → authorized
+  Workspaces and updates the full server-side context tuple.
+- Company navigation and workspace navigation are separate registries.
+- Workspace presentation is centralized by DTO workspace type and enabled
+  modules without changing identifiers or permission rules.

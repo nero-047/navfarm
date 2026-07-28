@@ -62,7 +62,7 @@ test('authenticates and opens the unified company shell', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Executive dashboard' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Company workspace Green Valley Poultry/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Switch context' })).toBeVisible();
 });
 
 test('system administrator opens the tenant registry and tenant detail', async ({ page }) => {
@@ -124,7 +124,7 @@ test('tenant administrator creates a draft company and enters setup', async ({ p
   await page.getByLabel('Legal company name').fill('E2E Company');
   await page.getByRole('button', { name: 'Create and start setup' }).click();
   await expect(page).toHaveURL(/\/e2e-company\/setup\/profile$/);
-  await expect(page.getByRole('banner').getByRole('heading', { name: 'Profile', exact: true })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Company profile', exact: true })).toBeVisible();
 });
 
 test('captures the Phase 2 desktop and mobile evidence set', async ({ page }) => {
@@ -194,8 +194,8 @@ test('Phase 3 masters and accounting workflows render responsively', async ({ pa
   await capturePhase3Pair(page, 'import-validation');
 
   await page.goto('/green-valley-poultry/accounting/readiness');
-  await expect(page.getByRole('heading', { name: 'Configuration readiness' })).toBeVisible();
-  await expect(page.getByText('Operations ready')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Company accounting readiness' })).toBeVisible();
+  await expect(page.getByText('Accounting configuration ready')).toBeVisible();
   await capturePhase3Pair(page, 'operations-readiness');
 
   await page.goto('/green-valley-poultry/masters');
@@ -207,9 +207,9 @@ test('Phase 3 masters and accounting workflows render responsively', async ({ pa
 test('Phase 3 role restrictions apply to direct URLs and actions', async ({ page }) => {
   await login(page, 'auditor@navfarm.demo');
   await page.goto('/green-valley-poultry/accounting/chart-of-accounts');
-  await expect(page.getByRole('heading', { name: 'Chart of accounts' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Chart of accounts', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Add account' })).toHaveCount(0);
   await page.goto('/green-valley-poultry/masters/items');
-  await expect(page.getByRole('heading', { name: 'Items' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Items', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add record' })).toHaveCount(0);
 });

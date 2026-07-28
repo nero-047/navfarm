@@ -208,7 +208,7 @@ function sessionPayload(record: SessionRecord): AuthSession {
   const workspaces = workspaceAssignments(user).map((membership) => {
     const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId)!;
     const permissions: Permission[] = membership.role === 'MANAGER'
-      ? ['workspaces.view', 'batches.view', 'batches.create', 'batches.approve', 'batches.close', 'operations.create', 'quality.view', 'quality.manage', 'traceability.view', 'resources.view', 'resources.manage', 'reports.export']
+      ? ['workspaces.view', 'batches.view', 'batches.create', 'batches.approve', 'batches.close', 'operations.create', 'costs.view', 'quality.view', 'quality.manage', 'traceability.view', 'resources.view', 'resources.manage', 'reports.export']
       : ['workspaces.view', 'batches.view', 'quality.view', 'traceability.view', 'resources.view'];
     return { ...workspace, role: membership.role, permissions };
   });

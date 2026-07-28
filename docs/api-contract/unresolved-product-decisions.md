@@ -15,6 +15,22 @@ Unresolved:
 - Whether accounting readiness is strictly required for all operational writes or only for close/finalization.
 - Whether some LOBs may operate without Finance enabled.
 
+## Workspace-specific terminology
+
+Known:
+
+- The presentation registry supports `POULTRY`, `AGRICULTURE`, `PIGGERY`,
+  `DAIRY`, `AQUACULTURE`, `FEED_PROCESSING`, and `OTHER`.
+- Registry labels and module availability do not change DTO identity or
+  authorization.
+
+Unresolved:
+
+- Approved industry-specific names beyond the neutral “Production cycles” and
+  existing poultry “Batches” wording.
+- Whether individual workspace types require additional navigation modules or
+  specialized readiness rules.
+
 ## Mandatory Onboarding Steps
 
 Known:
@@ -105,4 +121,3 @@ Unresolved:
 - Whether costing snapshots are continuously authoritative before close.
 - Whether variance generation happens at close, period close or both.
 - BIO_ASSET valuation policy and measurement timing.
-

@@ -24,6 +24,14 @@ function session(options: {
     permissions: ROLE_PERMISSIONS[role],
     enabledModules: ['Batches', 'QC'],
   }));
+  const workspace = {
+    workspaceId: 'workspace-1', tenantId: 'tenant-1', companyId: companies[0]?.companyId ?? 'company-1',
+    workspaceCode: 'WS_1', workspaceSlug: 'workspace-1', workspaceName: 'Workspace 1',
+    workspaceType: 'POULTRY' as const, status: 'ACTIVE' as const,
+    enabledModules: ['Batches', 'QC'],
+    role: 'MANAGER' as const,
+    permissions: ['workspaces.view', 'batches.view', 'batches.create', 'operations.create', 'quality.view', 'quality.manage'] as const,
+  };
   return {
     user: {
       userId: 'user-1', fullName: 'Test User', email: 'test@example.com',
@@ -35,8 +43,10 @@ function session(options: {
     },
     tenants: [{ tenantId: 'tenant-1', tenantName: 'Tenant', status: options.tenantStatus ?? 'ACTIVE', role: 'TENANT_MEMBER' }],
     companies,
+    workspaces: [workspace],
     activeTenantId: 'tenant-1',
     activeCompanyId: options.activeCompany === false ? null : companies[0]?.companyId ?? null,
+    activeWorkspaceId: options.activeCompany === false ? null : workspace.workspaceId,
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
   };
 }
@@ -46,7 +56,7 @@ describe('authorization and context routing', () => {
     expect(can(session(), 'finance.view')).toBe(false);
   });
   it('automatically enters the sole active company', () => {
-    expect(destinationForSession(session())).toBe('/company-1/dashboard');
+    expect(destinationForSession(session())).toBe('/company-1/workspaces/workspace-1/dashboard');
   });
   it('requires selection for multiple companies without an active selection', () => {
     expect(destinationForSession(session({ companies: 2, activeCompany: false }))).toBe('/context-selection');
@@ -64,5 +74,21 @@ describe('authorization and context routing', () => {
       { href: '/qr', permission: 'traceability.view' as const, module: 'QR' },
     ], session());
     expect(visible.map((item) => item.href)).toEqual(['/batches']);
+  });
+  it('does not grant Tenant Admin operational permissions without workspace membership', () => {
+    const value = session();
+    value.tenants[0].role = 'TENANT_ADMIN';
+    value.workspaces = [];
+    value.activeWorkspaceId = null;
+    expect(can(value, 'company.manage')).toBe(true);
+    expect(can(value, 'operations.create')).toBe(false);
+  });
+  it('aligns workspace navigation and mutation permissions', () => {
+    const value = session();
+    expect(can(value, 'operations.create')).toBe(true);
+    expect(filterNavigation([
+      { href: '/operations', workspacePermission: 'operations.create' as const, module: 'Batches' },
+      { href: '/reports', workspacePermission: 'reports.export' as const, module: 'Analytics' },
+    ], value).map((item) => item.href)).toEqual(['/operations']);
   });
 });

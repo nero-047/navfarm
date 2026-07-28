@@ -13,7 +13,11 @@ async function signIn(page: Page, email: string) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('Demo123!');
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  const [response] = await Promise.all([
+    page.waitForResponse((candidate) => candidate.url().includes('/api/v1/auth/login') && candidate.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Sign In' }).click(),
+  ]);
+  expect(response.ok()).toBe(true);
 }
 
 async function capture(page: Page, name: string) {
@@ -58,7 +62,11 @@ test('Multi-company login requires company selection and persists the selected c
   await expect(page.getByRole('heading', { name: 'Where would you like to work?' })).toBeVisible();
   await capture(page, 'multi-company-company-selector');
 
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
+  const [contextResponse] = await Promise.all([
+    page.waitForResponse((candidate) => candidate.url().includes('/api/v1/auth/context') && candidate.request().method() === 'PUT'),
+    page.getByRole('button', { name: /Green Valley Poultry/ }).click(),
+  ]);
+  expect(contextResponse.ok()).toBe(true);
   await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
   await expect(page.getByRole('heading', { name: 'Choose a business area' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Poultry Operations/ })).toBeVisible();

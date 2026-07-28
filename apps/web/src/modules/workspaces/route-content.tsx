@@ -25,12 +25,12 @@ export function CanonicalWorkspaceContent({
   const needsContext = Boolean(workspace && workspace.status === 'ACTIVE' && session?.activeWorkspaceId !== workspace.workspaceId);
 
   useEffect(() => {
-    if (membership && workspace && needsContext) {
+    if (membership && workspace && needsContext && sessionStorage.getItem('navfarm_context_transition') !== 'company') {
       void selectContext(membership.tenantId, membership.companyId, workspace.workspaceId);
     }
   }, [membership, needsContext, selectContext, workspace]);
 
-  if (!section || section === 'settings') return <WorkspaceDetail workspaceSlug={workspaceSlug} />;
+  if (!section) return <WorkspaceDetail workspaceSlug={workspaceSlug} />;
   if (configuredWorkspace && configuredWorkspace.status !== 'ACTIVE') {
     return <AccessState
       reason={membership?.onboardingStatus === 'COMPLETED' ? 'workspace_inactive' : 'onboarding_incomplete'}
@@ -39,7 +39,7 @@ export function CanonicalWorkspaceContent({
   }
   if (!workspace) return <AccessState reason="workspace_not_assigned" companySlug={company} />;
   if (needsContext) return <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">Establishing workspace context…</div>;
-  if (section === 'masters') return <WorkspacePage kind="settings" />;
+  if (section === 'masters' || section === 'settings') return <WorkspacePage kind="settings" />;
   return <WorkspacePage kind={(section === 'costing' ? 'reports' : section) as WorkspacePageKind} />;
 }
 

@@ -128,7 +128,7 @@ test('approved tenant workspace administration evidence', async ({ page }) => {
 test('approved legacy route selector evidence', async ({ page }) => {
   await signIn(page, 'multi@navfarm.demo');
   await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await page.goto('/green-valley-poultry/dashboard');
+  await page.goto('/green-valley-poultry/batches');
   await expect(
     page.getByRole('main').getByRole('heading', { name: 'Choose a business area' }),
   ).toBeVisible();
@@ -136,15 +136,15 @@ test('approved legacy route selector evidence', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Feed Mill/ })).toBeVisible();
   await capture(
     page,
-    resolve(finalDirectory, 'multi-workspace-legacy-dashboard-selector-1440x900.png'),
+    resolve(finalDirectory, 'multi-workspace-legacy-batches-selector-1440x900.png'),
     1440,
     900,
   );
 });
 
-test('replaces rejected onboarding evidence with loaded review and profile screens', async ({ page }) => {
+test('onboarding evidence uses explicitly requested loaded setup screens', async ({ page }) => {
   await signIn(page, 'onboarding@navfarm.demo');
-  await page.goto('/bluewater-aqua/operations');
+  await page.goto('/bluewater-aqua/setup/review');
   await expect(page).toHaveURL(/\/bluewater-aqua\/setup\/review$/);
   await expect(page.getByRole('main').getByRole('heading', { name: 'Review & completion' })).toBeVisible();
   await capture(

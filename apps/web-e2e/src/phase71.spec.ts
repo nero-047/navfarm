@@ -124,8 +124,8 @@ test('suspended and incomplete-onboarding accounts remain in their protected flo
   await signIn(page, 'onboarding@navfarm.demo');
   await expect(page).toHaveURL(/\/bluewater-aqua\/setup\/profile$/);
   await page.goto('/bluewater-aqua/operations');
-  await expect(page).toHaveURL(/\/bluewater-aqua\/setup\/review$/);
-  await expect(page.getByRole('heading', { name: 'Review & completion' })).toBeVisible();
+  await expect(page).toHaveURL(/\/bluewater-aqua\/operations$/);
+  await expect(page.getByRole('heading', { name: 'No workspace assigned' })).toBeVisible();
 });
 
 test('presentation routes are responsive and retain reachable actions', async ({ page }) => {
