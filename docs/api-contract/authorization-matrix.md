@@ -53,9 +53,9 @@ Current granular permissions:
 
 | Role | Scope | Permissions | Confirmed behavior |
 |---|---|---|---|
-| Company Admin (`ADMIN`) | Company | all company permissions | Used by multi-company and MFA demo users. Company scoped only. |
+| Company Admin (`ADMIN`) | Company | company configuration/accounting defaults | Used by multi-company and MFA demo users. Does not itself grant workspace operations. |
 | Super Admin (`SUPER_ADMIN`) | Company | all company permissions | Used for onboarding admin company setup. |
-| Operations Manager (`FARM_MANAGER`) | Company | `company.view`, `batches.view`, `batches.create`, `batches.approve`, `operations.create`, `costs.view`, `quality.view`, `quality.manage`, `traceability.view`, `resources.view`, `resources.manage`, `reports.export` | Can execute Phase 7 batch/operation/QC/QR/close/report flow in Green Valley. No finance view/manage. |
+| Operations Manager (`FARM_MANAGER`) | Company membership plus assigned workspace | `company.view`; operational permissions are resolved from workspace membership | Can execute the Phase 7 flow only in assigned workspaces. No finance view/manage. |
 | Accountant (`ACCOUNTANT`) | Company | `company.view`, `batches.view`, `costs.view`, `finance.view`, `finance.manage`, `reports.export`, `audit.view` | Used by tenant admin active company membership, but tenant-admin setup rights are tenant-scoped. |
 | Auditor (`AUDITOR`) | Company | `company.view`, `batches.view`, `costs.view`, `finance.view`, `quality.view`, `traceability.view`, `resources.view`, `reports.export`, `audit.view` | Read-oriented access to accounting/masters tests; no create controls. |
 | Supervisor (`SUPERVISOR`) | Company | `company.view`, `batches.view`, `batches.create`, `operations.create`, `quality.view`, `traceability.view`, `resources.view` | Existing role, not a Phase 7.1 demo account. |
@@ -81,6 +81,6 @@ Current granular permissions:
 | Platform | `/admin/*` | Require `SYSTEM_ADMIN`; otherwise 403. |
 | Tenant | `/console/*` | Require active tenant and `tenant.view`. |
 | Company | `/{company}/settings`, `/masters`, `/accounting`, `/setup` | Require active company membership and company configuration capability. |
-| Workspace | `/{company}/workspaces/{workspace}/*` | Require matching tenant/company/workspace membership and active context. |
+| Workspace | `/{company}/workspaces/{workspace}/{dashboard|batches|operations|quality|traceability|resources|costing|reports|masters|settings}` | Require matching tenant/company/workspace membership and active context. |
 | Operational mutations | workspace batch/QC/QR/resources close/write routes | Require the relevant workspace capability; tenant/company administration alone is insufficient. |
 | Configuration mutations | setup, masters, NOB/LOB, accounting config | Require `company.manage` or explicit tenant-admin setup authority. |
