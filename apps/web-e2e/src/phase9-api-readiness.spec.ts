@@ -38,7 +38,9 @@ test('tenant administrator creates, edits, and assigns a workspace through typed
 
 test('legacy operational routes resolve by accessible workspace cardinality', async ({ page }) => {
   await signIn(page, 'manager@navfarm.demo');
-  const routes = ['dashboard', 'batches', 'operations', 'quality', 'traceability', 'resources', 'costing', 'reports'];
+  await page.goto('/green-valley-poultry/dashboard');
+  await expect(page).toHaveURL(/\/green-valley-poultry\/overview$/);
+  const routes = ['batches', 'operations', 'quality', 'traceability', 'resources', 'costing', 'reports'];
   for (const route of routes) {
     await page.goto(`/green-valley-poultry/${route}`);
     await expect(page).toHaveURL(new RegExp(`/green-valley-poultry/workspaces/poultry-operations/${route}$`));
