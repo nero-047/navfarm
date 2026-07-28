@@ -1,5 +1,6 @@
-import { LegacyOperationalRedirect } from '@/modules/workspaces/route-content';
+import { redirect } from 'next/navigation';
 
-export default function CompanyDashboardPage() {
-  return <LegacyOperationalRedirect kind="dashboard" />;
+export default async function CompanyDashboardPage({ params }: { params: Promise<{ company: string }> }) {
+  const { company } = await params;
+  redirect(`/${company}/overview`);
 }

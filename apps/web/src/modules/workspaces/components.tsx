@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api-client';
@@ -145,18 +145,26 @@ export function WorkspaceDetail({ workspaceSlug }: { workspaceSlug: string }) {
   const [error, setError] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'MANAGER' | 'OPERATOR' | 'VIEWER'>('VIEWER');
+  const loadGeneration = useRef(0);
   const canManage = session?.tenants.some((tenant) => tenant.tenantId === companyMembership?.tenantId && tenant.role === 'TENANT_ADMIN') ?? false;
 
   const load = useCallback(async () => {
     if (!companyId || !tenantId) return;
+    const generation = ++loadGeneration.current;
     setLoading(true); setError('');
     try {
       const list = await workspaceClient.list(tenantId, companyId);
       const match = list.find((item) => item.workspaceSlug === workspaceSlug);
       if (!match) throw new ApiError('Workspace not found.', 404, 'NOT_FOUND');
       const [detail, membershipRows] = await Promise.all([workspaceClient.get(companyId, match.workspaceId), workspaceClient.members(companyId, match.workspaceId)]);
-      setWorkspace(detail); setMembers(membershipRows);
-    } catch (cause) { setError(message(cause)); } finally { setLoading(false); }
+      if (generation === loadGeneration.current) {
+        setWorkspace(detail); setMembers(membershipRows);
+      }
+    } catch (cause) {
+      if (generation === loadGeneration.current) setError(message(cause));
+    } finally {
+      if (generation === loadGeneration.current) setLoading(false);
+    }
   }, [companyId, tenantId, workspaceSlug]);
   useEffect(() => { void load(); }, [load]);
 

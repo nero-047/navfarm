@@ -1,6 +1,7 @@
 import type { AuthSession, CompanyRole, Permission } from '../contracts/api';
+import { workspaceModuleEnabled } from './workspace-presentation';
 
-export type AppScope = 'platform' | 'tenant' | 'company';
+export type AppScope = 'platform' | 'tenant' | 'company' | 'workspace';
 
 const ALL_COMPANY_PERMISSIONS: Permission[] = [
   'company.view', 'company.manage', 'users.view', 'users.manage', 'roles.view',
@@ -35,12 +36,18 @@ export const ROLE_PERMISSIONS: Record<CompanyRole, Permission[]> = {
   CUSTOM: [],
 };
 
+const WORKSPACE_OPERATIONAL_PERMISSIONS = new Set<Permission>([
+  'workspaces.view', 'batches.view', 'batches.create', 'batches.approve', 'batches.close',
+  'operations.create', 'costs.view', 'quality.view', 'quality.manage',
+  'traceability.view', 'resources.view', 'resources.manage', 'reports.export',
+]);
+
 export function activeCompanyMembership(session: AuthSession | null) {
   return session?.companies.find((company) => company.companyId === session.activeCompanyId) ?? null;
 }
 
 export function activeWorkspaceMembership(session: AuthSession | null) {
-  return session?.workspaces.find((workspace) => workspace.workspaceId === session.activeWorkspaceId) ?? null;
+  return session?.workspaces?.find((workspace) => workspace.workspaceId === session.activeWorkspaceId) ?? null;
 }
 
 export const capabilities = (session: AuthSession | null) => {
@@ -83,6 +90,10 @@ export function grantedPermissions(session: AuthSession | null): Set<Permission>
 }
 
 export function can(session: AuthSession | null, permission: Permission): boolean {
+  if (WORKSPACE_OPERATIONAL_PERMISSIONS.has(permission)) {
+    const workspace = activeWorkspaceMembership(session);
+    return Boolean(workspace?.status === 'ACTIVE' && workspace.permissions.includes(permission));
+  }
   return grantedPermissions(session).has(permission);
 }
 
@@ -116,7 +127,7 @@ export function destinationForSession(session: AuthSession): string {
   if (!session.workspaces) {
     return activeCompany.onboardingStatus !== 'COMPLETED'
       ? '/onboarding'
-      : `/${activeCompany.companySlug}/dashboard`;
+      : `/${activeCompany.companySlug}/overview`;
   }
   const assignedWorkspaces = session.workspaces.filter((workspace) => workspace.companyId === activeCompany.companyId);
   const workspaces = assignedWorkspaces.filter((workspace) => workspace.status === 'ACTIVE');
@@ -132,6 +143,7 @@ export function destinationForSession(session: AuthSession): string {
 export interface NavigationRule {
   href: string;
   permission?: Permission;
+  workspacePermission?: Permission;
   module?: string;
 }
 
@@ -139,10 +151,11 @@ export function filterNavigation<T extends NavigationRule>(
   items: T[],
   session: AuthSession | null,
 ): T[] {
-  const company = activeCompanyMembership(session);
+  const workspace = activeWorkspaceMembership(session);
   return items.filter(
     (item) =>
       (!item.permission || can(session, item.permission)) &&
-      (!item.module || company?.enabledModules.includes(item.module)),
+      (!item.workspacePermission || Boolean(workspace?.permissions.includes(item.workspacePermission))) &&
+      (!item.module || Boolean(workspace && workspaceModuleEnabled(workspace, item.module))),
   );
 }
