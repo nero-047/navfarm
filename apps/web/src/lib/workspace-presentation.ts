@@ -29,4 +29,3 @@ export function workspaceModuleEnabled(workspace: WorkspaceMembership, module?: 
   const presentation = WORKSPACE_PRESENTATION[workspace.workspaceType];
   return presentation.availableModules.includes(module as WorkspaceModule) && workspace.enabledModules.includes(module);
 }
-
