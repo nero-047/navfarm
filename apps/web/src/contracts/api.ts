@@ -99,6 +99,9 @@ export const permissionSchema = z.enum([
   'reports.export',
   'audit.view',
   'notifications.manage',
+  'workspaces.view',
+  'workspaces.manage',
+  'batches.close',
 ]);
 
 export const sessionUserSchema = z.object({
@@ -141,12 +144,62 @@ export const companyMembershipSchema = z.object({
   enabledModules: z.array(z.string()),
 });
 
+export const workspaceTypeSchema = z.enum([
+  'POULTRY',
+  'AGRICULTURE',
+  'PIGGERY',
+  'DAIRY',
+  'AQUACULTURE',
+  'FEED_PROCESSING',
+  'OTHER',
+]);
+
+export const workspaceStatusSchema = z.enum(['DRAFT', 'ACTIVE', 'INACTIVE']);
+export const workspaceRoleSchema = z.enum(['MANAGER', 'OPERATOR', 'VIEWER']);
+
+export const workspaceSchema = z.object({
+  workspaceId: z.string(),
+  tenantId: z.string(),
+  companyId: z.string(),
+  workspaceCode: z.string(),
+  workspaceSlug: z.string(),
+  workspaceName: z.string(),
+  workspaceType: workspaceTypeSchema,
+  status: workspaceStatusSchema,
+  primaryNobId: z.string().nullable(),
+  enabledModules: z.array(z.string()),
+  readiness: z.object({
+    percentage: z.number().min(0).max(100),
+    operationalReady: z.boolean(),
+    blockingRequirements: z.array(z.string()),
+  }),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const workspaceMembershipSchema = workspaceSchema.pick({
+  workspaceId: true,
+  tenantId: true,
+  companyId: true,
+  workspaceCode: true,
+  workspaceSlug: true,
+  workspaceName: true,
+  workspaceType: true,
+  status: true,
+  enabledModules: true,
+}).extend({
+  role: workspaceRoleSchema,
+  permissions: z.array(permissionSchema),
+});
+
 export const authSessionSchema = z.object({
   user: sessionUserSchema,
   tenants: z.array(tenantMembershipSchema),
   companies: z.array(companyMembershipSchema),
+  workspaces: z.array(workspaceMembershipSchema),
   activeTenantId: z.string().nullable(),
   activeCompanyId: z.string().nullable(),
+  activeWorkspaceId: z.string().nullable(),
   expiresAt: z.string(),
   mfaRequired: z.boolean().optional(),
   challengeId: z.string().optional(),
@@ -154,6 +207,8 @@ export const authSessionSchema = z.object({
 export type AuthSession = z.infer<typeof authSessionSchema>;
 export type Permission = z.infer<typeof permissionSchema>;
 export type CompanyRole = z.infer<typeof companyRoleSchema>;
+export type Workspace = z.infer<typeof workspaceSchema>;
+export type WorkspaceMembership = z.infer<typeof workspaceMembershipSchema>;
 
 export const demoStateResponseSchema = z.object({
   state: z.unknown().nullable(),
@@ -187,6 +242,11 @@ export const runtimeContracts: RuntimeContract[] = [
   { method: 'GET', pattern: /^\/currency$/, response: z.array(currencySchema) },
   { method: 'GET', pattern: /^\/demo\/companies\/[^/]+\/state$/, response: demoStateResponseSchema },
   { method: 'PUT', pattern: /^\/demo\/companies\/[^/]+\/state$/, response: successSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces$/, response: z.array(workspaceSchema) },
+  { method: 'POST', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces$/, response: workspaceSchema },
+  { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
+  { method: 'PATCH', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
+  { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+\/readiness$/, response: workspaceSchema.shape.readiness },
 ];
 
 export function responseSchemaFor(method: string, path: string): z.ZodType | undefined {

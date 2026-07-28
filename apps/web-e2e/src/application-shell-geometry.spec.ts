@@ -1,7 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-const BASE = 'http://localhost:3001';
-
 async function waitForScreenshotReady(page: import('@playwright/test').Page) {
   await page.addStyleTag({ content: 'nextjs-portal, #__next-build-watcher { display: none !important; }' });
   await expect.poll(() => page.evaluate('document.fonts.status')).toBe('loaded');
@@ -12,7 +10,7 @@ async function waitForScreenshotReady(page: import('@playwright/test').Page) {
 
 test('shared ApplicationShell geometry assertions', async ({ page }) => {
   // ── Tenant admin context ──
-  await page.goto(`${BASE}/login`);
+  await page.goto('/login');
   await page.getByLabel('Email').fill('tenant@navfarm.demo');
   await page.getByLabel('Password').fill('Demo123!');
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -40,7 +38,7 @@ test('shared ApplicationShell geometry assertions', async ({ page }) => {
   await page.screenshot({ path: 'debug-tenant-dashboard-1280x800.png', fullPage: true });
 
   // ── Mobile 390×844: tenant company list ──
-  await page.goto(`${BASE}/console/companies`);
+  await page.goto('/console/companies');
   await page.setViewportSize({ width: 390, height: 844 });
   await waitForScreenshotReady(page);
 
@@ -60,15 +58,15 @@ test('shared ApplicationShell geometry assertions', async ({ page }) => {
   await page.screenshot({ path: 'debug-company-list-390x844.png', fullPage: true });
 
   // ── Mobile 390×844: Chart of Accounts (company workspace) ──
-  await page.goto(`${BASE}/login`);
+  await page.goto('/login');
   await page.context().clearCookies();
-  await page.goto(`${BASE}/login`);
+  await page.goto('/login');
   await page.getByLabel('Email').fill('manager@navfarm.demo');
   await page.getByLabel('Password').fill('Demo123!');
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page).toHaveURL(/\/green-valley-poultry\/dashboard$/);
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
 
-  await page.goto(`${BASE}/green-valley-poultry/accounting/chart-of-accounts`);
+  await page.goto('/green-valley-poultry/accounting/chart-of-accounts');
   await page.setViewportSize({ width: 390, height: 844 });
   await waitForScreenshotReady(page);
 

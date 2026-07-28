@@ -73,4 +73,20 @@ describe('Phase 2 platform tenant administration', () => {
     );
     expect(response?.status).toBe(403);
   });
+
+  it('explicitly delegates platform masters but keeps unknown platform routes owned', async () => {
+    expect(await handlePhase2Request(
+      new Request('http://localhost/api/v1/platform/masters/nobs'),
+      '/platform/masters/nobs',
+      'phase2-delegate',
+      actor,
+    )).toBeNull();
+    const unknown = await handlePhase2Request(
+      new Request('http://localhost/api/v1/platform/unknown'),
+      '/platform/unknown',
+      'phase2-unknown',
+      actor,
+    );
+    expect(unknown?.status).toBe(404);
+  });
 });

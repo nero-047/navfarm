@@ -39,6 +39,34 @@ export function activeCompanyMembership(session: AuthSession | null) {
   return session?.companies.find((company) => company.companyId === session.activeCompanyId) ?? null;
 }
 
+export function activeWorkspaceMembership(session: AuthSession | null) {
+  return session?.workspaces.find((workspace) => workspace.workspaceId === session.activeWorkspaceId) ?? null;
+}
+
+export const capabilities = (session: AuthSession | null) => {
+  const permissions = grantedPermissions(session);
+  const workspace = activeWorkspaceMembership(session);
+  const tenantAdmin = session?.tenants.some(
+    (tenant) => tenant.tenantId === session.activeTenantId && tenant.role === 'TENANT_ADMIN',
+  ) ?? false;
+  const workspacePermissions = new Set(workspace?.permissions ?? []);
+  return {
+    canManageTenant: permissions.has('tenant.manage'),
+    canManageCompanies: permissions.has('company.manage'),
+    canConfigureCompany: permissions.has('company.manage'),
+    canManageCompanyMasters: permissions.has('company.manage'),
+    canConfigureAccounting: permissions.has('finance.manage') || tenantAdmin,
+    canManageWorkspaces: permissions.has('workspaces.manage') || tenantAdmin,
+    canViewWorkspace: Boolean(workspace && workspace.status === 'ACTIVE'),
+    canCreateOperations: workspacePermissions.has('operations.create'),
+    canManageQuality: workspacePermissions.has('quality.manage'),
+    canManageTraceability: workspacePermissions.has('traceability.view'),
+    canManageResources: workspacePermissions.has('resources.manage'),
+    canCloseBatch: workspacePermissions.has('batches.close'),
+    canViewReports: workspacePermissions.has('reports.export'),
+  };
+};
+
 export function grantedPermissions(session: AuthSession | null): Set<Permission> {
   if (!session) return new Set();
   if (session.user.platformRole === 'SYSTEM_ADMIN') {
@@ -82,7 +110,14 @@ export function destinationForSession(session: AuthSession): string {
   if (activeTenant?.role === 'TENANT_ADMIN') return '/console/dashboard';
   if (activeCompany.status === 'INACTIVE') return '/access-denied?reason=inactive-company';
   if (activeCompany.onboardingStatus !== 'COMPLETED') return '/onboarding';
-  return `/${activeCompany.companySlug}/dashboard`;
+  // Temporary compatibility for stored v1.0 session snapshots during the
+  // frontend migration. Fresh v1.1 sessions always include this collection.
+  if (!session.workspaces) return `/${activeCompany.companySlug}/dashboard`;
+  const workspaces = session.workspaces.filter((workspace) => workspace.companyId === activeCompany.companyId);
+  const activeWorkspace = activeWorkspaceMembership(session);
+  if (!activeWorkspace && workspaces.length !== 1) return `/${activeCompany.companySlug}/workspaces`;
+  const workspace = activeWorkspace ?? workspaces[0];
+  return `/${activeCompany.companySlug}/workspaces/${workspace.workspaceSlug}/dashboard`;
 }
 
 export interface NavigationRule {

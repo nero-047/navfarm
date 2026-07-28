@@ -38,7 +38,7 @@ export default defineConfig({
   webServer: {
     command: 'NAVFARM_API_MODE=mock NAVFARM_ENABLE_MOCK_RESET=true NEXT_TELEMETRY_DISABLED=1 NX_DAEMON=false pnpm exec nx dev web --port=3001',
     url: 'http://localhost:3001',
-    reuseExistingServer: true,
+    reuseExistingServer: process.env['NAVFARM_REUSE_LOCAL_SERVER'] === 'true',
     cwd: workspaceRoot,
   },
   projects: [

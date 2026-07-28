@@ -54,10 +54,10 @@ test('each primary account lands only in its permitted mock scenario', async ({ 
   await expect(page).toHaveURL(/\/access-denied/);
   await reset(page);
   await signIn(page, 'manager@navfarm.demo');
-  await expect(page).toHaveURL(/\/green-valley-poultry\/dashboard$/);
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
   await reset(page);
   await signIn(page, 'viewer@navfarm.demo');
-  await expect(page).toHaveURL(/\/green-valley-poultry\/dashboard$/);
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
 });
 
 test('viewer can inspect but cannot initiate operational mutations', async ({ page }) => {
@@ -78,12 +78,14 @@ test('multi-company context selection switches and persists without cross-compan
   await signIn(page, 'multi@navfarm.demo');
   await expect(page).toHaveURL(/\/context-selection$/);
   await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await expect(page).toHaveURL(/\/green-valley-poultry\/dashboard$/);
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
+  await page.getByRole('button', { name: /Poultry Operations/ }).click();
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
   await page.reload();
-  await expect(page).toHaveURL(/\/green-valley-poultry\/dashboard$/);
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
   await page.goto('/context-selection');
   await page.getByRole('button', { name: /Harvest Ridge Farms/ }).click();
-  await expect(page).toHaveURL(/\/harvest-ridge-farms\/dashboard$/);
+  await expect(page).toHaveURL(/\/harvest-ridge-farms\/workspaces\/crop-production\/dashboard$/);
   await expect(page.getByText('Green Valley Poultry').first()).toHaveCount(0);
 });
 
@@ -99,7 +101,7 @@ test('MFA blocks protected pages until verification and supports recovery', asyn
   await page.getByRole('link', { name: 'Use a recovery code' }).click();
   await page.getByLabel('Recovery code').fill('NAVFARM-RECOVERY');
   await page.getByRole('button', { name: 'Recover account' }).click();
-  await expect(page).toHaveURL(/\/green-valley-poultry\/dashboard$/);
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
 });
 
 test('suspended and incomplete-onboarding accounts remain in their protected flows', async ({ page }) => {

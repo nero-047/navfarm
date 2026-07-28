@@ -14,6 +14,25 @@ describe('mock HTTP-only session authentication', () => {
     expect(response.headers.get('set-cookie')).toContain('HttpOnly');
     expect(payload.access_token).toBeUndefined();
     expect(payload.activeCompanyId).toBe('company-green-valley');
+    expect(payload.activeWorkspaceId).toBe('workspace-green-poultry');
+    expect(payload.workspaces).toHaveLength(1);
+  });
+
+  it('MFA completion returns complete workspace context', async () => {
+    const challenge = await handleMockRequest(new Request('http://localhost/api/v1/auth/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'mfa@navfarm.demo', password: 'Demo123!' }),
+    }), '/auth/login', 'request-mfa');
+    const pending = await challenge.json();
+    expect(challenge.headers.get('set-cookie')).toBeNull();
+    expect(pending.mfaRequired).toBe(true);
+    const verified = await handleMockRequest(new Request('http://localhost/api/v1/auth/mfa/verify', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ challengeId: pending.challengeId, code: '123456' }),
+    }), '/auth/mfa/verify', 'request-mfa-verify');
+    const session = await verified.json();
+    expect(session.activeWorkspaceId).toBe('workspace-green-poultry');
+    expect(session.workspaces[0].companyId).toBe(session.activeCompanyId);
   });
 
   it('rejects invalid credentials', async () => {

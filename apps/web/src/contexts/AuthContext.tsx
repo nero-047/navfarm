@@ -24,7 +24,7 @@ interface AuthContextType {
   signup: (input: SignupInput) => Promise<User>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<AuthSession | null>;
-  selectContext: (tenantId: string | null, companyId: string | null) => Promise<AuthSession>;
+  selectContext: (tenantId: string | null, companyId: string | null, workspaceId?: string | null) => Promise<AuthSession>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -73,8 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try { await api.post('/auth/logout'); } finally { commit(null); }
   }, [commit]);
 
-  const selectContext = useCallback(async (tenantId: string | null, companyId: string | null) => {
-    const next = await api.put<AuthSession>('/auth/context', { tenantId, companyId });
+  const selectContext = useCallback(async (tenantId: string | null, companyId: string | null, workspaceId: string | null = null) => {
+    const next = await api.put<AuthSession>('/auth/context', { tenantId, companyId, workspaceId });
     commit(next);
     return next;
   }, [commit]);

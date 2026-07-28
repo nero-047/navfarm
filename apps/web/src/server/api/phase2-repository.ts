@@ -246,6 +246,10 @@ export async function handlePhase2Request(
   requestId: string,
   actor: Phase2Actor,
 ): Promise<NextResponse | null> {
+  // Platform reference masters are owned by Phase 3. Explicitly decline this
+  // namespace so the top-level router can delegate it without turning every
+  // unknown Phase 2 URL into a permissive fall-through.
+  if (path.startsWith('/platform/masters/')) return null;
   const platformPath = path.startsWith('/platform/');
   const tenantPath = path.startsWith('/tenants/');
   const companySetupPath = /^\/companies\/[^/]+\/setup\//.test(path);

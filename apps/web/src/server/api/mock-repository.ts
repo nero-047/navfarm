@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { NextResponse } from 'next/server';
-import type { AuthSession, CompanyRole, Permission } from '../../contracts/api';
+import { workspaceSchema, type AuthSession, type CompanyRole, type Permission, type Workspace } from '../../contracts/api';
 import type { CompanySummary } from '../../contracts/phase2';
 import { ROLE_PERMISSIONS } from '../../lib/authorization';
 import { apiErrorResponse } from './errors';
@@ -22,12 +22,14 @@ type FixtureUser = {
     role: CompanyRole;
     permissions?: Permission[];
   }>;
+  workspaces?: Array<{ workspaceId: string; role: 'MANAGER' | 'OPERATOR' | 'VIEWER' }>;
   mfaEnabled?: boolean;
 };
 type SessionRecord = {
   userId: string;
   activeTenantId: string | null;
   activeCompanyId: string | null;
+  activeWorkspaceId: string | null;
   expiresAt: string;
 };
 
@@ -71,6 +73,14 @@ const seedCompanies: JsonRecord[] = [
   },
 ];
 
+const fixtureDate = '2026-07-01T00:00:00.000Z';
+const seedWorkspaces: Workspace[] = [
+  { workspaceId: 'workspace-green-poultry', tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceCode: 'GV_POULTRY', workspaceSlug: 'poultry-operations', workspaceName: 'Poultry Operations', workspaceType: 'POULTRY', status: 'ACTIVE', primaryNobId: 'nob-poultry', enabledModules: ['Batches', 'Inventory', 'QC', 'QR', 'Finance', 'Analytics'], readiness: { percentage: 100, operationalReady: true, blockingRequirements: [] }, createdAt: fixtureDate, updatedAt: fixtureDate },
+  { workspaceId: 'workspace-green-feed', tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceCode: 'GV_FEED', workspaceSlug: 'feed-mill', workspaceName: 'Feed Mill', workspaceType: 'FEED_PROCESSING', status: 'ACTIVE', primaryNobId: 'nob-processing', enabledModules: ['Batches', 'Inventory', 'QC', 'Finance'], readiness: { percentage: 82, operationalReady: false, blockingRequirements: ['Complete resource-rate setup'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
+  { workspaceId: 'workspace-harvest-crops', tenantId: 'tenant-demo', companyId: 'company-harvest-ridge', workspaceCode: 'HR_CROPS', workspaceSlug: 'crop-production', workspaceName: 'Crop Production', workspaceType: 'AGRICULTURE', status: 'ACTIVE', primaryNobId: 'nob-agriculture', enabledModules: ['Batches', 'Inventory', 'QC', 'Finance', 'Analytics'], readiness: { percentage: 100, operationalReady: true, blockingRequirements: [] }, createdAt: fixtureDate, updatedAt: fixtureDate },
+  { workspaceId: 'workspace-bluewater-aqua', tenantId: 'tenant-second', companyId: 'company-bluewater', workspaceCode: 'BW_AQUA', workspaceSlug: 'aquaculture', workspaceName: 'Aquaculture', workspaceType: 'AQUACULTURE', status: 'DRAFT', primaryNobId: 'nob-aquaculture', enabledModules: ['Batches', 'Inventory', 'QC', 'QR'], readiness: { percentage: 42, operationalReady: false, blockingRequirements: ['Complete company onboarding', 'Configure QC parameters'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
+];
+
 const fixtureUsers: FixtureUser[] = [
   { userId: 'user-system', email: 'system@navfarm.demo', fullName: 'System Administrator', password: 'Demo123!', platformRole: 'SYSTEM_ADMIN', tenantIds: [], companies: [] },
   { userId: 'user-tenant', email: 'tenant@navfarm.demo', fullName: 'Tenant Administrator', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'ACCOUNTANT' }] },
@@ -104,6 +114,7 @@ type MockState = {
   demoStates: Map<string, unknown>;
   sessions: Map<string, SessionRecord>;
   users: FixtureUser[];
+  workspaces: Workspace[];
 };
 declare global { var __navfarmMockState: MockState | undefined; }
 const state: MockState = globalThis.__navfarmMockState ?? {
@@ -111,6 +122,7 @@ const state: MockState = globalThis.__navfarmMockState ?? {
   demoStates: new Map(),
   sessions: new Map(),
   users: structuredClone(fixtureUsers),
+  workspaces: structuredClone(seedWorkspaces),
 };
 globalThis.__navfarmMockState = state;
 
@@ -133,6 +145,18 @@ function sessionRecord(request: Request) {
 }
 function companyById(id: string) {
   return state.companies.find((company) => company.company_id === id);
+}
+function workspaceAssignments(user: FixtureUser) {
+  if (user.workspaces) return user.workspaces;
+  if (user.email === 'tenant@navfarm.demo' || user.email === 'system@navfarm.demo' || user.email === 'suspended@navfarm.demo' || user.email === 'nocompany@navfarm.demo') return [];
+  if (user.email === 'multi@navfarm.demo') return [
+    { workspaceId: 'workspace-green-poultry', role: 'MANAGER' as const },
+    { workspaceId: 'workspace-green-feed', role: 'VIEWER' as const },
+    { workspaceId: 'workspace-harvest-crops', role: 'MANAGER' as const },
+    { workspaceId: 'workspace-bluewater-aqua', role: 'MANAGER' as const },
+  ];
+  if (user.email === 'onboarding@navfarm.demo') return [{ workspaceId: 'workspace-bluewater-aqua', role: 'MANAGER' as const }];
+  return [{ workspaceId: 'workspace-green-poultry', role: user.email === 'viewer@navfarm.demo' ? 'VIEWER' as const : 'MANAGER' as const }];
 }
 function sessionPayload(record: SessionRecord): AuthSession {
   const user = state.users.find((item) => item.userId === record.userId)!;
@@ -163,6 +187,13 @@ function sessionPayload(record: SessionRecord): AuthSession {
     };
   });
   const activeCompany = companies.find((company) => company.companyId === record.activeCompanyId);
+  const workspaces = workspaceAssignments(user).map((membership) => {
+    const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId)!;
+    const permissions: Permission[] = membership.role === 'MANAGER'
+      ? ['workspaces.view', 'batches.view', 'batches.create', 'batches.approve', 'batches.close', 'operations.create', 'quality.view', 'quality.manage', 'traceability.view', 'resources.view', 'resources.manage', 'reports.export']
+      : ['workspaces.view', 'batches.view', 'quality.view', 'traceability.view', 'resources.view'];
+    return { ...workspace, role: membership.role, permissions };
+  });
   return {
     user: {
       userId: user.userId, fullName: user.fullName, name: user.fullName,
@@ -175,8 +206,10 @@ function sessionPayload(record: SessionRecord): AuthSession {
     },
     tenants,
     companies,
+    workspaces,
     activeTenantId: record.activeTenantId,
     activeCompanyId: record.activeCompanyId,
+    activeWorkspaceId: record.activeWorkspaceId,
     expiresAt: record.expiresAt,
   };
 }
@@ -219,7 +252,7 @@ export async function handleMockRequest(request: Request, path: string, requestI
           userType: 'STANDARD_USER', companyId: '', tenantId: '',
           companies: [], permissions: [],
         },
-        tenants: [], companies: [], activeTenantId: null, activeCompanyId: null,
+        tenants: [], companies: [], workspaces: [], activeTenantId: null, activeCompanyId: null, activeWorkspaceId: null,
         expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
         mfaRequired: true, challengeId: `challenge-${user.userId}`,
       });
@@ -228,7 +261,8 @@ export async function handleMockRequest(request: Request, path: string, requestI
     const eligibleCompanies = user.companies.filter((membership) => String(companyById(membership.companyId)?.tenant_id) === tenantId);
     const companyId = eligibleCompanies.length === 1 ? eligibleCompanies[0].companyId : null;
     const id = randomUUID();
-    const record = { userId: user.userId, activeTenantId: tenantId, activeCompanyId: companyId, expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString() };
+    const eligibleWorkspaces = workspaceAssignments(user).filter((membership) => state.workspaces.find((workspace) => workspace.workspaceId === membership.workspaceId)?.companyId === companyId);
+    const record = { userId: user.userId, activeTenantId: tenantId, activeCompanyId: companyId, activeWorkspaceId: eligibleWorkspaces.length === 1 ? eligibleWorkspaces[0].workspaceId : null, expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString() };
     state.sessions.set(id, record);
     return setSessionCookie(json(sessionPayload(record)), id);
   }
@@ -238,7 +272,9 @@ export async function handleMockRequest(request: Request, path: string, requestI
     const user = state.users.find((item) => item.userId === userId);
     if (!user) return apiErrorResponse(401, 'MFA challenge expired.', requestId);
     const id = randomUUID();
-    const record = { userId, activeTenantId: user.tenantIds[0] ?? null, activeCompanyId: user.companies[0]?.companyId ?? null, expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString() };
+    const companyId = user.companies[0]?.companyId ?? null;
+    const eligibleWorkspaces = workspaceAssignments(user).filter((membership) => state.workspaces.find((workspace) => workspace.workspaceId === membership.workspaceId)?.companyId === companyId);
+    const record = { userId, activeTenantId: user.tenantIds[0] ?? null, activeCompanyId: companyId, activeWorkspaceId: eligibleWorkspaces.length === 1 ? eligibleWorkspaces[0].workspaceId : null, expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString() };
     state.sessions.set(id, record);
     return setSessionCookie(json(sessionPayload(record)), id);
   }
@@ -263,10 +299,16 @@ export async function handleMockRequest(request: Request, path: string, requestI
     const user = state.users.find((item) => item.userId === found.record.userId)!;
     const tenantId = input.tenantId === null ? null : String(input.tenantId || found.record.activeTenantId || '');
     const companyId = input.companyId === null ? null : String(input.companyId || '');
+    const workspaceId = input.workspaceId === null ? null : String(input.workspaceId || '');
     if (tenantId && !user.tenantIds.includes(tenantId)) return apiErrorResponse(403, 'Tenant membership is required.', requestId);
     if (companyId && !user.companies.some((item) => item.companyId === companyId)) return apiErrorResponse(403, 'Company membership is required.', requestId);
+    const workspace = workspaceId ? state.workspaces.find((item) => item.workspaceId === workspaceId) : null;
+    if (workspaceId && (!workspace || workspace.companyId !== companyId || !workspaceAssignments(user).some((item) => item.workspaceId === workspaceId))) {
+      return apiErrorResponse(403, 'Workspace membership is required.', requestId);
+    }
     found.record.activeTenantId = tenantId || null;
     found.record.activeCompanyId = companyId || null;
+    found.record.activeWorkspaceId = workspaceId || null;
     return json(sessionPayload(found.record));
   }
 
@@ -276,6 +318,7 @@ export async function handleMockRequest(request: Request, path: string, requestI
     }
     state.companies = structuredClone(seedCompanies);
     state.users = structuredClone(fixtureUsers);
+    state.workspaces = structuredClone(seedWorkspaces);
     state.demoStates.clear();
     state.sessions.clear();
     resetPhase2Repository();
@@ -291,6 +334,46 @@ export async function handleMockRequest(request: Request, path: string, requestI
   const tenantAdmin = session.tenants.some(
     (tenant) => tenant.tenantId === session.activeTenantId && tenant.role === 'TENANT_ADMIN',
   );
+  const workspaceCollectionMatch = path.match(/^\/tenants\/([^/]+)\/companies\/([^/]+)\/workspaces$/);
+  if (workspaceCollectionMatch) {
+    const [, tenantId, companyId] = workspaceCollectionMatch;
+    if (tenantId !== session.activeTenantId || !session.companies.some((company) => company.companyId === companyId && company.tenantId === tenantId)) {
+      return apiErrorResponse(403, 'Active tenant and company scope is required.', requestId);
+    }
+    if (method === 'GET') {
+      const allowed = new Set(workspaceAssignments(state.users.find((user) => user.userId === session.user.userId)!).map((item) => item.workspaceId));
+      return json(state.workspaces.filter((workspace) => workspace.companyId === companyId && (tenantAdmin || allowed.has(workspace.workspaceId))));
+    }
+    if (method === 'POST' && tenantAdmin) {
+      const now = new Date().toISOString();
+      const created = workspaceSchema.parse({
+        ...input,
+        workspaceId: `workspace-${randomUUID()}`,
+        tenantId,
+        companyId,
+        status: 'DRAFT',
+        readiness: { percentage: 0, operationalReady: false, blockingRequirements: ['Configure NOB/LOB and operational parameters'] },
+        createdAt: now,
+        updatedAt: now,
+      });
+      state.workspaces.push(created);
+      return json(created, 201);
+    }
+  }
+  const workspaceItemMatch = path.match(/^\/companies\/([^/]+)\/workspaces\/([^/]+)(?:\/(readiness))?$/);
+  if (workspaceItemMatch) {
+    const [, companyId, workspaceId, child] = workspaceItemMatch;
+    const workspace = state.workspaces.find((item) => item.companyId === companyId && item.workspaceId === workspaceId);
+    const assigned = workspaceAssignments(state.users.find((user) => user.userId === session.user.userId)!).some((item) => item.workspaceId === workspaceId);
+    if (!workspace || (!tenantAdmin && !assigned)) return apiErrorResponse(404, 'Workspace not found.', requestId);
+    if (method === 'GET') return json(child ? workspace.readiness : workspace);
+    if (method === 'PATCH' && tenantAdmin) {
+      const parsed = workspaceSchema.partial().omit({ workspaceId: true, tenantId: true, companyId: true, createdAt: true }).safeParse(input);
+      if (!parsed.success) return apiErrorResponse(422, 'Workspace changes are invalid.', requestId, parsed.error.flatten());
+      Object.assign(workspace, parsed.data, { updatedAt: new Date().toISOString() });
+      return json(workspace);
+    }
+  }
   if (
     path.startsWith('/companies/') &&
     !path.endsWith('/operational-bootstrap') &&

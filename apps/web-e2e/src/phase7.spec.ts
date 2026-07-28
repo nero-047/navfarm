@@ -10,7 +10,7 @@ async function loginAsManager(page: Page) {
   await page.getByLabel('Email').fill('manager@navfarm.demo');
   await page.getByLabel('Password').fill('Demo123!');
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page).toHaveURL(new RegExp(`/${company}/dashboard$`));
+  await expect(page).toHaveURL(new RegExp(`/${company}/workspaces/poultry-operations/dashboard$`));
 }
 
 async function openWorkspace(page: Page, route: string, heading: string) {

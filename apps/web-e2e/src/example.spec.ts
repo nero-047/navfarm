@@ -22,9 +22,9 @@ async function login(page: Page, email: string) {
   const destinations: Record<string, RegExp> = {
     'system@navfarm.demo': /\/admin\/dashboard$/,
     'tenant@navfarm.demo': /\/console\/dashboard$/,
-    'manager@navfarm.demo': /\/green-valley-poultry\/dashboard$/,
+    'manager@navfarm.demo': /\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/,
     'onboarding@navfarm.demo': /\/bluewater-aqua\/setup\/profile$/,
-    'auditor@navfarm.demo': /\/green-valley-poultry\/dashboard$/,
+    'auditor@navfarm.demo': /\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/,
   };
   await expect(page).toHaveURL(destinations[email] ?? /\/context-selection$/);
 }
@@ -60,7 +60,7 @@ async function capturePhase3Pair(page: Page, name: string) {
 test('authenticates and opens the unified company shell', async ({ page }) => {
   await login(page, 'manager@navfarm.demo');
 
-  await expect(page).toHaveURL(/\/green-valley-poultry\/dashboard$/);
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Executive dashboard' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Company workspace Green Valley Poultry/ })).toBeVisible();
 });
