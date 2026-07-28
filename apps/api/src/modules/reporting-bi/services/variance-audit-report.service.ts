@@ -31,11 +31,11 @@ export class VarianceAuditReportService {
     let totalUnfavorable = 0;
 
     variances.forEach(v => {
-      const val = Math.abs(parseFloat(v.variance_amount));
-      if (v.variance_type === 'FAVORABLE') {
+      const val = parseFloat(v.total_variance || '0');
+      if (val >= 0) {
         totalFavorable += val;
       } else {
-        totalUnfavorable += val;
+        totalUnfavorable += Math.abs(val);
       }
     });
 

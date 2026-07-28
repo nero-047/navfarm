@@ -40,6 +40,25 @@ import { QcModule } from './modules/qc/qc.module';
 import { QualityTraceabilityModule } from './modules/quality-traceability/quality-traceability.module';
 import { SchedulerKpiModule } from './modules/scheduler-kpi/scheduler-kpi.module';
 import { ReportingBiModule } from './modules/reporting-bi/reporting-bi.module';
+// ── Phase 11A — Fast API Gap Closures
+import { UomConversionModule } from './modules/uom-conversion/uom-conversion.module';
+import { ItemAttributeModule } from './modules/item-attribute/item-attribute.module';
+import { NobLobConfigModule } from './modules/nob-lob-config/nob-lob-config.module';
+import { TenantSubscriptionModule } from './modules/tenant-subscription/tenant-subscription.module';
+import { EggGradingModule } from './modules/egg-grading/egg-grading.module';
+// ── Phase 11B — Livestock & Agriculture Verticals
+import { LivestockModule } from './modules/livestock/livestock.module';
+import { AgriModule } from './modules/agri/agri.module';
+import { ParameterMasterModule } from './modules/parameter-master/parameter-master.module';
+// ── Phase 11C — Aqua, Insect & Feed Mill
+import { AquacultureModule } from './modules/aquaculture/aquaculture.module';
+import { InsectFarmingModule } from './modules/insect-farming/insect-farming.module';
+import { FeedMillModule } from './modules/feed-mill/feed-mill.module';
+import { SlaughterSplitModule } from './modules/slaughter-cost-split/slaughter-split.module';
+import { LivestockV2Module } from './modules/livestock-v2/livestock-v2.module';
+import { AgriV2Module } from './modules/agri-v2/agri-v2.module';
+import { AquacultureV2Module } from './modules/aquaculture-v2/aquaculture-v2.module';
+import { FeedProductionV2Module } from './modules/feed-production-v2/feed-production-v2.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -101,6 +120,25 @@ import { SystemController } from './system/system.controller';
     QualityTraceabilityModule,
     SchedulerKpiModule,
     ReportingBiModule,
+    // ── Phase 11A — Fast API Gap Closures
+    UomConversionModule,
+    ItemAttributeModule,
+    NobLobConfigModule,
+    TenantSubscriptionModule,
+    EggGradingModule,
+    // ── Phase 11B — Livestock & Agriculture Verticals
+    LivestockModule,
+    LivestockV2Module,
+    AgriV2Module,
+    AquacultureV2Module,
+    FeedProductionV2Module,
+    AgriModule,
+    ParameterMasterModule,
+    // ── Phase 11C — Aqua, Insect & Feed Mill
+    AquacultureModule,
+    InsectFarmingModule,
+    FeedMillModule,
+    SlaughterSplitModule,
   ],
   controllers: [SystemController],
   providers: [],

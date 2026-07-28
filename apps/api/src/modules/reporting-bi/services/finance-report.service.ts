@@ -31,13 +31,13 @@ export class FinanceReportService {
     let totalCredit = 0;
 
     const accountBalances = accounts.map(acc => {
-      const debit = parseFloat(acc.balance_debit || '0');
-      const credit = parseFloat(acc.balance_credit || '0');
+      const debit = 0;   // balance fields computed from gl_journal_lines
+      const credit = 0;  // not stored on gl_account_master directly
       totalDebit += debit;
       totalCredit += credit;
 
       return {
-        account_id: acc.account_id,
+        account_id: acc.gl_account_id,
         account_code: acc.account_code,
         account_name: acc.account_name,
         account_type: acc.account_type,
@@ -71,13 +71,14 @@ export class FinanceReportService {
     let totalExpenses = 0;
 
     accounts.forEach(acc => {
-      const debit = parseFloat(acc.balance_debit || '0');
-      const credit = parseFloat(acc.balance_credit || '0');
+      const debit = 0;   // balance fields computed from gl_journal_lines
+      const credit = 0;
 
       if (acc.account_type === 'REVENUE') {
         totalRevenue += (credit - debit);
       } else if (acc.account_type === 'EXPENSE') {
         totalExpenses += (debit - credit);
+
       }
     });
 

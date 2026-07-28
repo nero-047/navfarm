@@ -1,3 +1,4 @@
+import { Module } from '@nestjs/common';
 import { QualityPlanController } from './controllers/quality-plan.controller';
 import { QualityInspectionController } from './controllers/quality-inspection.controller';
 import { QrBarcodeController } from './controllers/qr-barcode.controller';
@@ -19,6 +20,7 @@ import { ProductionModule } from '../production/production.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 
 @Module({
+
   imports: [
     InventoryModule,
     ProductionModule,

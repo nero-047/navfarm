@@ -98,9 +98,9 @@ export class LotService {
     companyId: string,
     itemId: string,
     lotCode: string,
+    tenantId: string,
     mfgDate?: string,
     expiryDate?: string,
-    tenantId: string,
     userId?: string,
     tx?: any
   ) {
