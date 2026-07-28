@@ -2,6 +2,19 @@
 import { handleOperationalRequest, resetOperationalRepository } from './operational-repository';
 import type { WorkflowBatch } from '../../modules/farm-demo/operational-contracts';
 
+const scope = {
+  tenantId: 'tenant-1',
+  companyId: 'company-1',
+  workspaceId: 'workspace-1',
+};
+const actor = {
+  activeTenantId: scope.tenantId,
+  activeCompanyId: scope.companyId,
+  activeWorkspaceId: scope.workspaceId,
+  accessibleWorkspaceIds: [scope.workspaceId],
+};
+const root = `/tenants/${scope.tenantId}/companies/${scope.companyId}/workspaces/${scope.workspaceId}`;
+
 const draft: WorkflowBatch = {
   id: 'batch-1', code: 'BATCH-001', lob: 'Rearing', method: 'STANDARD',
   status: 'DRAFT', riskStatus: 'ON_TRACK', inventoryStatus: 'BLOCKED',
@@ -25,8 +38,9 @@ describe('operational server-side mock adapter', () => {
       request('POST', {
         state: { batches: [draft], operations: [], qualityLots: [], qrPacks: [], resources: [] },
       }),
-      '/companies/company-1/operational-bootstrap',
+      `${root}/operational-bootstrap`,
       'request-1',
+      actor,
     );
     expect(response?.status).toBe(201);
   }
@@ -35,8 +49,9 @@ describe('operational server-side mock adapter', () => {
     await bootstrap();
     const response = await handleOperationalRequest(
       request('PUT', { ...draft, status: 'APPROVED' }),
-      '/companies/company-1/batches/batch-1',
+      `${root}/batches/batch-1`,
       'request-2',
+      actor,
     );
     expect(response?.status).toBe(200);
     await expect(response?.json()).resolves.toMatchObject({ id: 'batch-1', status: 'APPROVED' });
@@ -46,8 +61,9 @@ describe('operational server-side mock adapter', () => {
     await bootstrap();
     const response = await handleOperationalRequest(
       request('POST', { action: 'APPROVE', expectedStatus: 'ACTIVE' }),
-      '/companies/company-1/batches/batch-1/transitions',
+      `${root}/batches/batch-1/transitions`,
       'request-3',
+      actor,
     );
     expect(response?.status).toBe(409);
     await expect(response?.json()).resolves.toMatchObject({ error: { requestId: 'request-3' } });
@@ -57,21 +73,24 @@ describe('operational server-side mock adapter', () => {
     await bootstrap();
     const created = await handleOperationalRequest(
       request('POST', { batchId: 'batch-1', parameter: 'Salmonella' }),
-      '/companies/company-1/quality-lots',
+      `${root}/quality-lots`,
       'request-4',
+      actor,
     );
     const lot = await created?.json() as { id: string };
     expect(created?.status).toBe(201);
     const passed = await handleOperationalRequest(
       request('POST', { status: 'PASS', result: 'Not detected' }),
-      `/companies/company-1/quality-lots/${lot.id}/disposition`,
+      `${root}/quality-lots/${lot.id}/disposition`,
       'request-5',
+      actor,
     );
     expect(passed?.status).toBe(200);
     const pack = await handleOperationalRequest(
       request('POST', { batchId: 'batch-1', quantity: 10 }),
-      '/companies/company-1/qr-packs',
+      `${root}/qr-packs`,
       'request-6',
+      actor,
     );
     expect(pack?.status).toBe(201);
     await expect(pack?.json()).resolves.toMatchObject({ batchId: 'batch-1', quantity: 10 });
@@ -81,8 +100,9 @@ describe('operational server-side mock adapter', () => {
     await bootstrap();
     const response = await handleOperationalRequest(
       request('POST', { action: 'CLOSE', expectedStatus: 'DRAFT' }),
-      '/companies/company-1/batches/batch-1/transitions',
+      `${root}/batches/batch-1/transitions`,
       'request-7',
+      actor,
     );
     expect(response?.status).toBe(422);
   });
@@ -90,13 +110,93 @@ describe('operational server-side mock adapter', () => {
   it('does not claim Phase 2 or Phase 3 company resources', async () => {
     await expect(handleOperationalRequest(
       request('GET'),
-      '/companies/company-1/masters/items',
+      `${root}/masters/items`,
       'request-8',
+      actor,
     )).resolves.toBeNull();
     await expect(handleOperationalRequest(
       request('GET'),
-      '/companies/company-1/accounting/readiness',
+      `${root}/accounting/readiness`,
       'request-9',
+      actor,
     )).resolves.toBeNull();
+  });
+
+  it('isolates every operational collection between workspaces in one company', async () => {
+    await bootstrap();
+    const secondScope = { ...scope, workspaceId: 'workspace-2' };
+    const secondActor = {
+      ...actor,
+      activeWorkspaceId: secondScope.workspaceId,
+      accessibleWorkspaceIds: [scope.workspaceId, secondScope.workspaceId],
+    };
+    const secondRoot = `/tenants/${secondScope.tenantId}/companies/${secondScope.companyId}/workspaces/${secondScope.workspaceId}`;
+    const secondBootstrap = await handleOperationalRequest(
+      request('POST', {
+        state: {
+          batches: [{ ...draft, id: 'batch-2', code: 'BATCH-002' }],
+          operations: [],
+          qualityLots: [],
+          qrPacks: [],
+          resources: [],
+          resourceUsages: [],
+        },
+      }),
+      `${secondRoot}/operational-bootstrap`,
+      'request-isolation-bootstrap',
+      secondActor,
+    );
+    expect(secondBootstrap?.status).toBe(201);
+
+    for (const resource of ['batches', 'operations', 'quality-lots', 'qr-packs', 'resources', 'resource-usages', 'costing', 'journals', 'variances']) {
+      const response = await handleOperationalRequest(
+        request('GET'),
+        `${secondRoot}/${resource}`,
+        `request-isolation-${resource}`,
+        secondActor,
+      );
+      expect(response?.status).toBe(200);
+      const payload = await response?.json() as Array<{ id?: string }>;
+      if (resource === 'batches') expect(payload.map((item) => item.id)).toEqual(['batch-2']);
+      else expect(payload).toEqual(resource === 'costing' || resource === 'variances' ? expect.any(Array) : []);
+    }
+
+    const report = await handleOperationalRequest(
+      request('GET'),
+      `${secondRoot}/reports/summary`,
+      'request-isolation-reports',
+      secondActor,
+    );
+    expect(report?.status).toBe(200);
+    await expect(report?.json()).resolves.toMatchObject({
+      tenantId: secondScope.tenantId,
+      companyId: secondScope.companyId,
+      workspaceId: secondScope.workspaceId,
+      batchCount: 1,
+    });
+
+    const crossWorkspaceMutation = await handleOperationalRequest(
+      request('POST', {
+        batchId: 'batch-1',
+        entryType: 'OUTPUT',
+        parameter: 'Harvest',
+        quantity: 1,
+        uom: 'NOS',
+        unitCost: 1,
+        notes: 'Must remain isolated',
+      }),
+      `${secondRoot}/operations`,
+      'request-isolation-mutation',
+      secondActor,
+    );
+    expect(crossWorkspaceMutation?.status).toBe(404);
+
+    const wrongActiveScope = await handleOperationalRequest(
+      request('GET'),
+      `${root}/batches`,
+      'request-wrong-active-scope',
+      secondActor,
+    );
+    expect(wrongActiveScope?.status).toBe(403);
   });
 });

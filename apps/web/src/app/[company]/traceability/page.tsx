@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { LegacyOperationalRedirect } from '@/modules/workspaces/route-content';
 
 export default function TraceabilityPage() {
-  return <WorkspacePage kind="traceability" />;
+  return <LegacyOperationalRedirect kind="traceability" />;
 }

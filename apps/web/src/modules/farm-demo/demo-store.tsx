@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { CompanyMeta } from '@/modules/company';
+import { useAuth } from '../../contexts/AuthContext';
 import { operationalClients } from './operational-client';
 import {
   assertMockClose,
@@ -419,14 +420,33 @@ export function DemoStoreProvider({
   company: CompanyMeta;
   children: ReactNode;
 }) {
+  const { session } = useAuth();
+  const activeWorkspace = session?.workspaces.find(
+    (workspace) => workspace.workspaceId === session.activeWorkspaceId,
+  );
+  const scope = useMemo(() => {
+    if (!session?.activeTenantId || !session.activeCompanyId || !activeWorkspace) return null;
+    return {
+      tenantId: session.activeTenantId,
+      companyId: session.activeCompanyId,
+      workspaceId: activeWorkspace.workspaceId,
+    };
+  }, [activeWorkspace, session?.activeCompanyId, session?.activeTenantId]);
   const [state, setState] = useState<DemoState>(() => seedState(company));
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setIsReady(false);
+    if (!scope) {
+      setState(seedState(company));
+      setIsReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
     operationalClients.workspace
-      .bootstrap<DemoState>(company.slug, seedState(company))
+      .bootstrap<DemoState>(scope, seedState(company))
       .then((storedState) => {
         if (cancelled) return;
         const parsed = storedState as DemoState | null;
@@ -441,16 +461,16 @@ export function DemoStoreProvider({
     return () => {
       cancelled = true;
     };
-  }, [company]);
+  }, [company, scope]);
 
   useEffect(() => {
-    if (isReady) {
+    if (isReady && scope) {
       void Promise.all([
-        ...state.batches.map((batch) => operationalClients.batches.save(company.slug, batch)),
-        ...state.operations.map((operation) => operationalClients.operations.save(company.slug, operation)),
-        ...state.qualityLots.map((lot) => operationalClients.qualityLots.save(company.slug, lot)),
-        ...state.qrPacks.map((pack) => operationalClients.qrPacks.save(company.slug, pack)),
-        ...state.resources.map((resource) => operationalClients.resources.save(company.slug, resource)),
+        ...state.batches.map((batch) => operationalClients.batches.save(scope, batch)),
+        ...state.operations.map((operation) => operationalClients.operations.save(scope, operation)),
+        ...state.qualityLots.map((lot) => operationalClients.qualityLots.save(scope, lot)),
+        ...state.qrPacks.map((pack) => operationalClients.qrPacks.save(scope, pack)),
+        ...state.resources.map((resource) => operationalClients.resources.save(scope, resource)),
       ]).catch(() => undefined);
       window.dispatchEvent(
         new CustomEvent('navfarm-demo-state', {
@@ -458,7 +478,7 @@ export function DemoStoreProvider({
         }),
       );
     }
-  }, [company.slug, isReady, state]);
+  }, [company.slug, isReady, scope, state]);
 
   const calculateVariance = useCallback(
     (batch: WorkflowBatch): VarianceResult => {
@@ -788,8 +808,8 @@ export function DemoStoreProvider({
   const resetDemo = useCallback(() => {
     const next = seedState(company);
     setState(next);
-    void operationalClients.workspace.reset(company.slug, next);
-  }, [company]);
+    if (scope) void operationalClients.workspace.reset(scope, next);
+  }, [company, scope]);
 
   const value = useMemo<DemoStoreValue>(
     () => ({

@@ -2,6 +2,8 @@ import type { NavfarmApiClient } from '../../lib/api-client';
 import { createOperationalClients } from './operational-client';
 import type { WorkflowBatch } from './operational-contracts';
 
+const scope = { tenantId: 'tenant 1', companyId: 'green valley', workspaceId: 'poultry ops' };
+
 const batch: WorkflowBatch = {
   id: 'batch-1', code: 'BATCH-001', lob: 'Rearing', method: 'STANDARD',
   status: 'DRAFT', riskStatus: 'ON_TRACK', inventoryStatus: 'BLOCKED',
@@ -23,18 +25,18 @@ function fakeClient(request: jest.Mock): NavfarmApiClient {
 }
 
 describe('typed operational resource clients', () => {
-  it('uses the proposed company-scoped batch path and parses the entity', async () => {
+  it('uses the tenant, company, and workspace-scoped batch path and parses the entity', async () => {
     const request = jest.fn().mockResolvedValue(batch);
     const clients = createOperationalClients(fakeClient(request));
-    await expect(clients.batches.save('green valley', batch)).resolves.toEqual(batch);
-    expect(request).toHaveBeenCalledWith('/companies/green%20valley/batches/batch-1', {
+    await expect(clients.batches.save(scope, batch)).resolves.toEqual(batch);
+    expect(request).toHaveBeenCalledWith('/tenants/tenant%201/companies/green%20valley/workspaces/poultry%20ops/batches/batch-1', {
       method: 'PUT', body: batch,
     });
   });
 
   it('rejects an invalid resource response at the client boundary', async () => {
     const clients = createOperationalClients(fakeClient(jest.fn().mockResolvedValue({ id: 'broken' })));
-    await expect(clients.batches.list('company-1')).rejects.toThrow();
+    await expect(clients.batches.list(scope)).rejects.toThrow();
   });
 
   it('exposes QC disposition and batch transition result endpoints', async () => {
@@ -42,9 +44,9 @@ describe('typed operational resource clients', () => {
       .mockResolvedValueOnce({ ...batch, status: 'APPROVED' })
       .mockResolvedValueOnce({ batch: { ...batch, status: 'APPROVED' }, message: 'Approved.' });
     const clients = createOperationalClients(fakeClient(request));
-    await clients.qualityLots.disposition('company-1', 'qc-1', { status: 'PASS', result: 'Compliant' }).catch(() => undefined);
-    await expect(clients.batches.transition('company-1', 'batch-1', 'APPROVE')).resolves.toMatchObject({ message: 'Approved.' });
-    expect(request.mock.calls[0][0]).toBe('/companies/company-1/quality-lots/qc-1/disposition');
-    expect(request.mock.calls[1][0]).toBe('/companies/company-1/batches/batch-1/transitions');
+    await clients.qualityLots.disposition(scope, 'qc-1', { status: 'PASS', result: 'Compliant' }).catch(() => undefined);
+    await expect(clients.batches.transition(scope, 'batch-1', 'APPROVE')).resolves.toMatchObject({ message: 'Approved.' });
+    expect(request.mock.calls[0][0]).toBe('/tenants/tenant%201/companies/green%20valley/workspaces/poultry%20ops/quality-lots/qc-1/disposition');
+    expect(request.mock.calls[1][0]).toBe('/tenants/tenant%201/companies/green%20valley/workspaces/poultry%20ops/batches/batch-1/transitions');
   });
 });

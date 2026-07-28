@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { LegacyOperationalRedirect } from '@/modules/workspaces/route-content';
 
 export default function ResourcesPage() {
-  return <WorkspacePage kind="resources" />;
+  return <LegacyOperationalRedirect kind="resources" />;
 }

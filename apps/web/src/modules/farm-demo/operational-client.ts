@@ -10,54 +10,61 @@ import {
   type VarianceResult, type WorkflowBatch,
 } from './operational-contracts';
 
+export type OperationalScope = {
+  tenantId: string;
+  companyId: string;
+  workspaceId: string;
+};
+
 function parse<T>(schema: { parse(value: unknown): T }, value: unknown): T {
   return schema.parse(value);
 }
 
 export function createOperationalClients(client: NavfarmApiClient = api) {
-  const root = (companyId: string) => `/companies/${encodeURIComponent(companyId)}`;
+  const root = ({ tenantId, companyId, workspaceId }: OperationalScope) =>
+    `/tenants/${encodeURIComponent(tenantId)}/companies/${encodeURIComponent(companyId)}/workspaces/${encodeURIComponent(workspaceId)}`;
   return {
     workspace: {
-      bootstrap: async <T>(companyId: string, seed: T) =>
-        client.post<T>(`${root(companyId)}/operational-bootstrap`, { state: seed }),
-      reset: async <T>(companyId: string, seed: T) =>
-        client.put<T>(`${root(companyId)}/operational-bootstrap`, { state: seed }),
+      bootstrap: async <T>(scope: OperationalScope, seed: T) =>
+        client.post<T>(`${root(scope)}/operational-bootstrap`, { state: seed }),
+      reset: async <T>(scope: OperationalScope, seed: T) =>
+        client.put<T>(`${root(scope)}/operational-bootstrap`, { state: seed }),
     },
     batches: {
-      list: async (companyId: string) => parse(workflowBatchSchema.array(), await client.get(`${root(companyId)}/batches`)),
-      create: async (companyId: string, input: NewBatchInput) => parse(workflowBatchSchema, await client.post(`${root(companyId)}/batches`, input)),
-      save: async (companyId: string, batch: WorkflowBatch) => parse(workflowBatchSchema, await client.put(`${root(companyId)}/batches/${encodeURIComponent(batch.id)}`, batch)),
-      transition: async (companyId: string, batchId: string, action: BatchTransitionAction, reason?: string, expectedStatus?: WorkflowBatch['status']) =>
-        parse(transitionResultSchema, await client.post(`${root(companyId)}/batches/${encodeURIComponent(batchId)}/transitions`, { action, reason, expectedStatus })),
+      list: async (scope: OperationalScope) => parse(workflowBatchSchema.array(), await client.get(`${root(scope)}/batches`)),
+      create: async (scope: OperationalScope, input: NewBatchInput) => parse(workflowBatchSchema, await client.post(`${root(scope)}/batches`, input)),
+      save: async (scope: OperationalScope, batch: WorkflowBatch) => parse(workflowBatchSchema, await client.put(`${root(scope)}/batches/${encodeURIComponent(batch.id)}`, batch)),
+      transition: async (scope: OperationalScope, batchId: string, action: BatchTransitionAction, reason?: string, expectedStatus?: WorkflowBatch['status']) =>
+        parse(transitionResultSchema, await client.post(`${root(scope)}/batches/${encodeURIComponent(batchId)}/transitions`, { action, reason, expectedStatus })),
     },
     operations: {
-      list: async (companyId: string) => parse(operationEntrySchema.array(), await client.get(`${root(companyId)}/operations`)),
-      create: async (companyId: string, input: NewOperationInput) => parse(operationEntrySchema, await client.post(`${root(companyId)}/operations`, input)),
-      save: async (companyId: string, operation: OperationEntry) => parse(operationEntrySchema, await client.put(`${root(companyId)}/operations/${encodeURIComponent(operation.id)}`, operation)),
+      list: async (scope: OperationalScope) => parse(operationEntrySchema.array(), await client.get(`${root(scope)}/operations`)),
+      create: async (scope: OperationalScope, input: NewOperationInput) => parse(operationEntrySchema, await client.post(`${root(scope)}/operations`, input)),
+      save: async (scope: OperationalScope, operation: OperationEntry) => parse(operationEntrySchema, await client.put(`${root(scope)}/operations/${encodeURIComponent(operation.id)}`, operation)),
     },
     qualityLots: {
-      list: async (companyId: string) => parse(qualityLotSchema.array(), await client.get(`${root(companyId)}/quality-lots`)),
-      create: async (companyId: string, input: { batchId: string; parameter: string }) => parse(qualityLotSchema, await client.post(`${root(companyId)}/quality-lots`, input)),
-      save: async (companyId: string, lot: QualityLot) => parse(qualityLotSchema, await client.put(`${root(companyId)}/quality-lots/${encodeURIComponent(lot.id)}`, lot)),
-      disposition: async (companyId: string, id: string, input: { status: 'HOLD' | 'PASS' | 'FAIL'; result: string }) =>
-        parse(qualityLotSchema, await client.post(`${root(companyId)}/quality-lots/${encodeURIComponent(id)}/disposition`, input)),
+      list: async (scope: OperationalScope) => parse(qualityLotSchema.array(), await client.get(`${root(scope)}/quality-lots`)),
+      create: async (scope: OperationalScope, input: { batchId: string; parameter: string }) => parse(qualityLotSchema, await client.post(`${root(scope)}/quality-lots`, input)),
+      save: async (scope: OperationalScope, lot: QualityLot) => parse(qualityLotSchema, await client.put(`${root(scope)}/quality-lots/${encodeURIComponent(lot.id)}`, lot)),
+      disposition: async (scope: OperationalScope, id: string, input: { status: 'HOLD' | 'PASS' | 'FAIL'; result: string }) =>
+        parse(qualityLotSchema, await client.post(`${root(scope)}/quality-lots/${encodeURIComponent(id)}/disposition`, input)),
     },
     qrPacks: {
-      list: async (companyId: string) => parse(qrPackSchema.array(), await client.get(`${root(companyId)}/qr-packs`)),
-      create: async (companyId: string, input: { batchId: string; quantity: number }) => parse(qrPackSchema, await client.post(`${root(companyId)}/qr-packs`, input)),
-      save: async (companyId: string, pack: QrPack) => parse(qrPackSchema, await client.put(`${root(companyId)}/qr-packs/${encodeURIComponent(pack.id)}`, pack)),
+      list: async (scope: OperationalScope) => parse(qrPackSchema.array(), await client.get(`${root(scope)}/qr-packs`)),
+      create: async (scope: OperationalScope, input: { batchId: string; quantity: number }) => parse(qrPackSchema, await client.post(`${root(scope)}/qr-packs`, input)),
+      save: async (scope: OperationalScope, pack: QrPack) => parse(qrPackSchema, await client.put(`${root(scope)}/qr-packs/${encodeURIComponent(pack.id)}`, pack)),
     },
     resources: {
-      list: async (companyId: string) => parse(resourceRecordSchema.array(), await client.get(`${root(companyId)}/resources`)),
-      create: async (companyId: string, input: Omit<DemoResourceRecord, 'id'>) => parse(resourceRecordSchema, await client.post(`${root(companyId)}/resources`, input)),
-      save: async (companyId: string, resource: DemoResourceRecord) => parse(resourceRecordSchema, await client.put(`${root(companyId)}/resources/${encodeURIComponent(resource.id)}`, resource)),
-      usages: async (companyId: string) => parse(resourceUsageSchema.array(), await client.get(`${root(companyId)}/resource-usages`)),
-      recordUsage: async (companyId: string, input: Omit<ResourceUsage, 'id' | 'createdAt' | 'cost'>) => parse(resourceUsageSchema, await client.post(`${root(companyId)}/resource-usages`, input)),
+      list: async (scope: OperationalScope) => parse(resourceRecordSchema.array(), await client.get(`${root(scope)}/resources`)),
+      create: async (scope: OperationalScope, input: Omit<DemoResourceRecord, 'id'>) => parse(resourceRecordSchema, await client.post(`${root(scope)}/resources`, input)),
+      save: async (scope: OperationalScope, resource: DemoResourceRecord) => parse(resourceRecordSchema, await client.put(`${root(scope)}/resources/${encodeURIComponent(resource.id)}`, resource)),
+      usages: async (scope: OperationalScope) => parse(resourceUsageSchema.array(), await client.get(`${root(scope)}/resource-usages`)),
+      recordUsage: async (scope: OperationalScope, input: Omit<ResourceUsage, 'id' | 'createdAt' | 'cost'>) => parse(resourceUsageSchema, await client.post(`${root(scope)}/resource-usages`, input)),
     },
-    costing: { get: async (companyId: string) => parse(costingSnapshotSchema.array(), await client.get(`${root(companyId)}/costing`)) as CostingSnapshot[] },
-    journals: { list: async (companyId: string) => parse(journalEntrySchema.array(), await client.get(`${root(companyId)}/journals`)) as JournalEntry[] },
-    variances: { list: async (companyId: string) => parse(varianceResultSchema.array(), await client.get(`${root(companyId)}/variances`)) as VarianceResult[] },
-    reports: { summary: async (companyId: string) => parse(operationalReportSchema, await client.get(`${root(companyId)}/reports/summary`)) as OperationalReport },
+    costing: { get: async (scope: OperationalScope) => parse(costingSnapshotSchema.array(), await client.get(`${root(scope)}/costing`)) as CostingSnapshot[] },
+    journals: { list: async (scope: OperationalScope) => parse(journalEntrySchema.array(), await client.get(`${root(scope)}/journals`)) as JournalEntry[] },
+    variances: { list: async (scope: OperationalScope) => parse(varianceResultSchema.array(), await client.get(`${root(scope)}/variances`)) as VarianceResult[] },
+    reports: { summary: async (scope: OperationalScope) => parse(operationalReportSchema, await client.get(`${root(scope)}/reports/summary`)) as OperationalReport },
   };
 }
 

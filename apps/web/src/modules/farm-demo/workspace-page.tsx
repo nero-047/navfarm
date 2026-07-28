@@ -1353,6 +1353,12 @@ function Resources({ company }: { company: Company }) {
   const { session } = useAuth();
   const canManage = can(session, 'resources.manage');
   const [adding, setAdding] = useState(false);
+  const kpiRows = [
+    [config.dailyParameter, 'Daily', 'Programme ± 5%', 'Farm manager'],
+    [config.qualityParameter, 'Per QC lot', config.qualityTarget, 'Quality + Vet'],
+    ['Resource cost', 'Per shift', 'Budget ± 10%', 'Operations'],
+    ['Output yield', 'At output', 'Standard ≥ 98%', 'Finance + Manager'],
+  ];
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -1405,7 +1411,14 @@ function Resources({ company }: { company: Company }) {
           title="KPI scheduler"
           description="Thresholds are evaluated on operation save"
         >
-          <DataTable>
+          <div className="grid gap-3 p-4 sm:hidden">
+            {kpiRows.map((row, index) => <article key={row[0]} className="rounded-xl border border-[#e5e7eb] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="min-w-0 flex-1 text-sm font-semibold text-[#2e313f]">{row[0]}</h3><StatusBadge label={row[3]} tone={index === 1 ? 'amber' : 'blue'} /></div>
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-[#707070]">Frequency</dt><dd className="mt-1 font-semibold text-[#2e313f]">{row[1]}</dd></div><div><dt className="text-[#707070]">Target</dt><dd className="mt-1 font-semibold text-[#2e313f]">{row[2]}</dd></div></dl>
+            </article>)}
+          </div>
+          <div className="hidden sm:block">
+            <DataTable>
             <thead>
               <tr>
                 <TableHead>Parameter</TableHead>
@@ -1415,27 +1428,7 @@ function Resources({ company }: { company: Company }) {
               </tr>
             </thead>
             <tbody>
-              {[
-                [
-                  config.dailyParameter,
-                  'Daily',
-                  'Programme ± 5%',
-                  'Farm manager',
-                ],
-                [
-                  config.qualityParameter,
-                  'Per QC lot',
-                  config.qualityTarget,
-                  'Quality + Vet',
-                ],
-                ['Resource cost', 'Per shift', 'Budget ± 10%', 'Operations'],
-                [
-                  'Output yield',
-                  'At output',
-                  'Standard ≥ 98%',
-                  'Finance + Manager',
-                ],
-              ].map((row, index) => (
+              {kpiRows.map((row, index) => (
                 <tr key={row[0]}>
                   <TableCell className="font-semibold text-[#2e313f]">
                     {row[0]}
@@ -1451,7 +1444,8 @@ function Resources({ company }: { company: Company }) {
                 </tr>
               ))}
             </tbody>
-          </DataTable>
+            </DataTable>
+          </div>
         </SectionCard>
         <SectionCard
           title="Maintenance schedule"

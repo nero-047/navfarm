@@ -1,7 +1,16 @@
 import { randomUUID } from 'node:crypto';
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { NextResponse } from 'next/server';
-import { workspaceSchema, type AuthSession, type CompanyRole, type Permission, type Workspace } from '../../contracts/api';
+import {
+  workspaceCreateSchema,
+  workspaceMemberCreateSchema,
+  workspaceSchema,
+  type AuthSession,
+  type CompanyRole,
+  type Permission,
+  type Workspace,
+  type WorkspaceMember,
+} from '../../contracts/api';
 import type { CompanySummary } from '../../contracts/phase2';
 import { ROLE_PERMISSIONS } from '../../lib/authorization';
 import { apiErrorResponse } from './errors';
@@ -80,6 +89,11 @@ const seedWorkspaces: Workspace[] = [
   { workspaceId: 'workspace-harvest-crops', tenantId: 'tenant-demo', companyId: 'company-harvest-ridge', workspaceCode: 'HR_CROPS', workspaceSlug: 'crop-production', workspaceName: 'Crop Production', workspaceType: 'AGRICULTURE', status: 'ACTIVE', primaryNobId: 'nob-agriculture', enabledModules: ['Batches', 'Inventory', 'QC', 'Finance', 'Analytics'], readiness: { percentage: 100, operationalReady: true, blockingRequirements: [] }, createdAt: fixtureDate, updatedAt: fixtureDate },
   { workspaceId: 'workspace-bluewater-aqua', tenantId: 'tenant-second', companyId: 'company-bluewater', workspaceCode: 'BW_AQUA', workspaceSlug: 'aquaculture', workspaceName: 'Aquaculture', workspaceType: 'AQUACULTURE', status: 'DRAFT', primaryNobId: 'nob-aquaculture', enabledModules: ['Batches', 'Inventory', 'QC', 'QR'], readiness: { percentage: 42, operationalReady: false, blockingRequirements: ['Complete company onboarding', 'Configure QC parameters'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
 ];
+const seedWorkspaceMembers: WorkspaceMember[] = [
+  { membershipId: 'membership-manager-poultry', workspaceId: 'workspace-green-poultry', userId: 'user-manager', fullName: 'Farm Manager', email: 'manager@navfarm.demo', role: 'MANAGER', status: 'ACTIVE' },
+  { membershipId: 'membership-viewer-poultry', workspaceId: 'workspace-green-poultry', userId: 'user-viewer', fullName: 'Company Viewer', email: 'viewer@navfarm.demo', role: 'VIEWER', status: 'ACTIVE' },
+  { membershipId: 'membership-multi-feed', workspaceId: 'workspace-green-feed', userId: 'user-multi', fullName: 'Multi-company Manager', email: 'multi@navfarm.demo', role: 'VIEWER', status: 'ACTIVE' },
+];
 
 const fixtureUsers: FixtureUser[] = [
   { userId: 'user-system', email: 'system@navfarm.demo', fullName: 'System Administrator', password: 'Demo123!', platformRole: 'SYSTEM_ADMIN', tenantIds: [], companies: [] },
@@ -115,6 +129,7 @@ type MockState = {
   sessions: Map<string, SessionRecord>;
   users: FixtureUser[];
   workspaces: Workspace[];
+  workspaceMembers: WorkspaceMember[];
 };
 declare global { var __navfarmMockState: MockState | undefined; }
 const state: MockState = globalThis.__navfarmMockState ?? {
@@ -123,7 +138,9 @@ const state: MockState = globalThis.__navfarmMockState ?? {
   sessions: new Map(),
   users: structuredClone(fixtureUsers),
   workspaces: structuredClone(seedWorkspaces),
+  workspaceMembers: structuredClone(seedWorkspaceMembers),
 };
+state.workspaceMembers ??= structuredClone(seedWorkspaceMembers);
 globalThis.__navfarmMockState = state;
 
 function json(value: unknown, status = 200) {
@@ -319,6 +336,7 @@ export async function handleMockRequest(request: Request, path: string, requestI
     state.companies = structuredClone(seedCompanies);
     state.users = structuredClone(fixtureUsers);
     state.workspaces = structuredClone(seedWorkspaces);
+    state.workspaceMembers = structuredClone(seedWorkspaceMembers);
     state.demoStates.clear();
     state.sessions.clear();
     resetPhase2Repository();
@@ -345,9 +363,11 @@ export async function handleMockRequest(request: Request, path: string, requestI
       return json(state.workspaces.filter((workspace) => workspace.companyId === companyId && (tenantAdmin || allowed.has(workspace.workspaceId))));
     }
     if (method === 'POST' && tenantAdmin) {
+      const parsed = workspaceCreateSchema.safeParse(input);
+      if (!parsed.success) return apiErrorResponse(422, 'Workspace details are invalid.', requestId, parsed.error.flatten());
       const now = new Date().toISOString();
       const created = workspaceSchema.parse({
-        ...input,
+        ...parsed.data,
         workspaceId: `workspace-${randomUUID()}`,
         tenantId,
         companyId,
@@ -360,13 +380,33 @@ export async function handleMockRequest(request: Request, path: string, requestI
       return json(created, 201);
     }
   }
-  const workspaceItemMatch = path.match(/^\/companies\/([^/]+)\/workspaces\/([^/]+)(?:\/(readiness))?$/);
+  const workspaceItemMatch = path.match(/^\/companies\/([^/]+)\/workspaces\/([^/]+)(?:\/(readiness|members))?$/);
   if (workspaceItemMatch) {
     const [, companyId, workspaceId, child] = workspaceItemMatch;
     const workspace = state.workspaces.find((item) => item.companyId === companyId && item.workspaceId === workspaceId);
     const assigned = workspaceAssignments(state.users.find((user) => user.userId === session.user.userId)!).some((item) => item.workspaceId === workspaceId);
     if (!workspace || (!tenantAdmin && !assigned)) return apiErrorResponse(404, 'Workspace not found.', requestId);
-    if (method === 'GET') return json(child ? workspace.readiness : workspace);
+    if (child === 'members') {
+      if (method === 'GET') return json(state.workspaceMembers.filter((member) => member.workspaceId === workspaceId));
+      if (method === 'POST' && tenantAdmin) {
+        const parsed = workspaceMemberCreateSchema.safeParse(input);
+        if (!parsed.success) return apiErrorResponse(422, 'Workspace membership is invalid.', requestId, parsed.error.flatten());
+        const fixtureUser = state.users.find((user) => user.email === parsed.data.email);
+        const created: WorkspaceMember = {
+          membershipId: `membership-${randomUUID()}`,
+          workspaceId,
+          userId: fixtureUser?.userId ?? `invited-${randomUUID()}`,
+          fullName: fixtureUser?.fullName ?? parsed.data.email.split('@')[0],
+          email: parsed.data.email,
+          role: parsed.data.role,
+          status: 'ACTIVE',
+        };
+        state.workspaceMembers.push(created);
+        return json(created, 201);
+      }
+      return apiErrorResponse(403, 'Tenant workspace administration is required.', requestId);
+    }
+    if (method === 'GET') return json(child === 'readiness' ? workspace.readiness : workspace);
     if (method === 'PATCH' && tenantAdmin) {
       const parsed = workspaceSchema.partial().omit({ workspaceId: true, tenantId: true, companyId: true, createdAt: true }).safeParse(input);
       if (!parsed.success) return apiErrorResponse(422, 'Workspace changes are invalid.', requestId, parsed.error.flatten());
@@ -375,7 +415,7 @@ export async function handleMockRequest(request: Request, path: string, requestI
     }
   }
   if (
-    path.startsWith('/companies/') &&
+    /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\//.test(path) &&
     !path.endsWith('/operational-bootstrap') &&
     !['GET', 'HEAD'].includes(method) &&
     !activeCompany?.permissions.includes('operations.create') &&
@@ -384,7 +424,12 @@ export async function handleMockRequest(request: Request, path: string, requestI
   ) {
     return apiErrorResponse(403, 'You do not have permission to change operational data.', requestId);
   }
-  const operationalResponse = await handleOperationalRequest(phase2Request, path, requestId);
+  const operationalResponse = await handleOperationalRequest(phase2Request, path, requestId, {
+    activeTenantId: session.activeTenantId,
+    activeCompanyId: session.activeCompanyId,
+    activeWorkspaceId: session.activeWorkspaceId,
+    accessibleWorkspaceIds: session.workspaces.map((workspace) => workspace.workspaceId),
+  });
   if (operationalResponse) return operationalResponse;
   const phase2Response = await handlePhase2Request(phase2Request, path, requestId, {
     userId: session.user.userId,

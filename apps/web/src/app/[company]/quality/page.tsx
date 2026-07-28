@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { LegacyOperationalRedirect } from '@/modules/workspaces/route-content';
 
 export default function QualityPage() {
-  return <WorkspacePage kind="quality" />;
+  return <LegacyOperationalRedirect kind="quality" />;
 }

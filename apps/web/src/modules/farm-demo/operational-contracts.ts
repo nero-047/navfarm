@@ -92,7 +92,8 @@ export const journalEntrySchema = z.object({
   authoritative: z.boolean(),
 });
 export const operationalReportSchema = z.object({
-  companyId: z.string(), generatedAt: z.string(), batchCount: z.number(),
+  tenantId: z.string(), companyId: z.string(), workspaceId: z.string(),
+  generatedAt: z.string(), batchCount: z.number(),
   openWip: z.number(), totalVariance: z.number(), authoritative: z.boolean(),
 });
 

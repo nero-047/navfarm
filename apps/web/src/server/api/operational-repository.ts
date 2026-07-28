@@ -16,7 +16,21 @@ type OperationalState = {
   qualityLots: QualityLot[];
   qrPacks: Array<Record<string, unknown>>;
   resources: Array<Record<string, unknown>>;
+  resourceUsages: Array<Record<string, unknown>>;
   [key: string]: unknown;
+};
+
+export type OperationalScope = {
+  tenantId: string;
+  companyId: string;
+  workspaceId: string;
+};
+
+export type OperationalActor = {
+  activeTenantId: string | null;
+  activeCompanyId: string | null;
+  activeWorkspaceId: string | null;
+  accessibleWorkspaceIds: string[];
 };
 
 const workspaces = new Map<string, OperationalState>();
@@ -35,14 +49,27 @@ function collectionConfig(resource: string) {
   return null;
 }
 
+function scopeKey(scope: OperationalScope) {
+  return `${scope.tenantId}:${scope.companyId}:${scope.workspaceId}`;
+}
+
+function hasScope(actor: OperationalActor, scope: OperationalScope) {
+  return actor.activeTenantId === scope.tenantId
+    && actor.activeCompanyId === scope.companyId
+    && actor.activeWorkspaceId === scope.workspaceId
+    && actor.accessibleWorkspaceIds.includes(scope.workspaceId);
+}
+
 export async function handleOperationalRequest(
   request: Request,
   path: string,
   requestId: string,
+  actor: OperationalActor,
 ): Promise<NextResponse | null> {
-  const match = path.match(/^\/companies\/([^/]+)\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/);
+  const match = path.match(/^\/tenants\/([^/]+)\/companies\/([^/]+)\/workspaces\/([^/]+)\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/);
   if (!match) return null;
-  const [, companyId, resource, entityId] = match.map((value) => value ? decodeURIComponent(value) : value);
+  const [, tenantId, companyId, workspaceId, resource, entityId, action] = match.map((value) => value ? decodeURIComponent(value) : value);
+  const scope = { tenantId, companyId, workspaceId };
   const method = request.method;
   const operationalResources = new Set([
     'operational-bootstrap',
@@ -58,19 +85,26 @@ export async function handleOperationalRequest(
     'reports',
   ]);
   if (!operationalResources.has(resource)) return null;
+  if (!hasScope(actor, scope)) {
+    return apiErrorResponse(403, 'Active tenant, company, and workspace scope is required.', requestId);
+  }
+  const key = scopeKey(scope);
 
   if (resource === 'operational-bootstrap') {
     const payload = await request.json().catch(() => null) as { state?: OperationalState } | null;
     if (!payload?.state) return apiErrorResponse(400, 'A seeded operational state is required.', requestId);
-    if (method === 'POST' && workspaces.has(companyId)) return json(workspaces.get(companyId));
+    if (method === 'POST' && workspaces.has(key)) return json(workspaces.get(key));
     if (method === 'POST' || method === 'PUT') {
-      workspaces.set(companyId, structuredClone(payload.state));
-      return json(workspaces.get(companyId), method === 'POST' ? 201 : 200);
+      workspaces.set(key, {
+        ...structuredClone(payload.state),
+        resourceUsages: structuredClone(payload.state.resourceUsages ?? []),
+      });
+      return json(workspaces.get(key), method === 'POST' ? 201 : 200);
     }
     return apiErrorResponse(405, 'Method not allowed.', requestId);
   }
 
-  const state = workspaces.get(companyId);
+  const state = workspaces.get(key);
   if (!state) return apiErrorResponse(409, 'Operational workspace is not initialized.', requestId);
   const config = collectionConfig(resource);
   if (config) {
@@ -106,7 +140,7 @@ export async function handleOperationalRequest(
     return json(created, 201);
   }
 
-  if (method === 'POST' && resource === 'batches' && entityId && match[4] === 'transitions') {
+  if (method === 'POST' && resource === 'batches' && entityId && action === 'transitions') {
     const batch = state.batches.find((item) => item.id === entityId);
     if (!batch) return apiErrorResponse(404, 'Batch not found.', requestId);
     const parsed = transitionRequestSchema.safeParse(await request.json().catch(() => null));
@@ -159,7 +193,7 @@ export async function handleOperationalRequest(
     return json(lot, 201);
   }
 
-  if (method === 'POST' && resource === 'quality-lots' && entityId && match[4] === 'disposition') {
+  if (method === 'POST' && resource === 'quality-lots' && entityId && action === 'disposition') {
     const lot = state.qualityLots.find((item) => item.id === entityId);
     if (!lot) return apiErrorResponse(404, 'Quality lot not found.', requestId);
     const parsed = qualityDispositionRequestSchema.safeParse(await request.json().catch(() => null));
@@ -183,7 +217,7 @@ export async function handleOperationalRequest(
     if (error) return apiErrorResponse(422, error, requestId);
     const pack = qrPackSchema.parse({
       id: `qr-${Date.now()}`, code: `PACK-${Date.now()}`, ...parsed.data,
-      payload: JSON.stringify({ companyId, batchId: batch.id }), createdAt: new Date().toISOString(),
+      payload: JSON.stringify({ tenantId, companyId, workspaceId, batchId: batch.id }), createdAt: new Date().toISOString(),
     });
     state.qrPacks.unshift(pack);
     return json(pack, 201);
@@ -197,7 +231,7 @@ export async function handleOperationalRequest(
     return json(created, 201);
   }
 
-  if (method === 'GET' && resource === 'resource-usages') return json([]);
+  if (method === 'GET' && resource === 'resource-usages') return json(state.resourceUsages);
   if (method === 'POST' && resource === 'resource-usages') {
     const input = await request.json().catch(() => null) as {
       resourceId?: string; batchId?: string; quantity?: number;
@@ -208,10 +242,12 @@ export async function handleOperationalRequest(
     const resourceRecord = state.resources.find((item) => item.id === input.resourceId);
     if (!resourceRecord) return apiErrorResponse(404, 'Resource not found.', requestId);
     if (!state.batches.some((item) => item.id === input.batchId)) return apiErrorResponse(404, 'Batch not found.', requestId);
-    return json({
+    const usage = {
       id: `resource-usage-${Date.now()}`, ...input,
       cost: Number(resourceRecord.costRate) * input.quantity, createdAt: new Date().toISOString(),
-    }, 201);
+    };
+    state.resourceUsages.unshift(usage);
+    return json(usage, 201);
   }
   if (method === 'GET' && resource === 'costing') {
     return json((state.batches as Array<Record<string, unknown>>).map((batch) => ({
@@ -234,7 +270,7 @@ export async function handleOperationalRequest(
   }
   if (method === 'GET' && resource === 'reports' && entityId === 'summary') {
     return json({
-      companyId, generatedAt: new Date().toISOString(), batchCount: state.batches.length,
+      tenantId, companyId, workspaceId, generatedAt: new Date().toISOString(), batchCount: state.batches.length,
       openWip: state.batches.reduce((sum, batch) => sum + batch.wip, 0),
       totalVariance: state.batches.reduce((sum, batch) => sum + mockVariance(batch).total, 0),
       authoritative: false,

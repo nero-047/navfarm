@@ -177,6 +177,34 @@ export const workspaceSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
+export const workspaceCreateSchema = workspaceSchema.pick({
+  workspaceCode: true,
+  workspaceSlug: true,
+  workspaceName: true,
+  workspaceType: true,
+  primaryNobId: true,
+  enabledModules: true,
+});
+
+export const workspaceUpdateSchema = workspaceCreateSchema.partial().extend({
+  status: workspaceStatusSchema.optional(),
+});
+
+export const workspaceMemberSchema = z.object({
+  membershipId: z.string(),
+  workspaceId: z.string(),
+  userId: z.string(),
+  fullName: z.string(),
+  email: z.string().email(),
+  role: workspaceRoleSchema,
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+});
+
+export const workspaceMemberCreateSchema = workspaceMemberSchema.pick({
+  email: true,
+  role: true,
+});
+
 export const workspaceMembershipSchema = workspaceSchema.pick({
   workspaceId: true,
   tenantId: true,
@@ -209,6 +237,7 @@ export type Permission = z.infer<typeof permissionSchema>;
 export type CompanyRole = z.infer<typeof companyRoleSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
 export type WorkspaceMembership = z.infer<typeof workspaceMembershipSchema>;
+export type WorkspaceMember = z.infer<typeof workspaceMemberSchema>;
 
 export const demoStateResponseSchema = z.object({
   state: z.unknown().nullable(),
@@ -247,6 +276,8 @@ export const runtimeContracts: RuntimeContract[] = [
   { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
   { method: 'PATCH', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
   { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+\/readiness$/, response: workspaceSchema.shape.readiness },
+  { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+\/members$/, response: z.array(workspaceMemberSchema) },
+  { method: 'POST', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+\/members$/, response: workspaceMemberSchema },
 ];
 
 export function responseSchemaFor(method: string, path: string): z.ZodType | undefined {
