@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { NavfarmBrand } from '@/components/brand/navfarm-brand';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,14 +12,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="absolute top-1/3 left-1/4 w-40 h-40 rounded-full bg-[#c24332]/10" />
 
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <Link href="/" className="flex items-center gap-1">
-            <span className="text-2xl font-bold text-white tracking-tight">
-              NAV<span className="text-[#c24332]">Farm</span>
-            </span>
+          <Link href="/" aria-label="NAVFarm home">
+            <NavfarmBrand inverse />
           </Link>
 
           <div className="animate-fade-in">
-            <h1 className="text-4xl font-semibold text-white leading-tight tracking-tight mb-4">
+            <h1 className="text-4xl font-semibold !text-white leading-tight tracking-tight mb-4">
               Farm management,
               <br />
               simplified.
@@ -38,10 +37,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex-1 flex flex-col bg-white">
         {/* Mobile logo */}
         <div className="md:hidden px-6 pt-8 pb-4">
-          <Link href="/" className="inline-flex items-center gap-1">
-            <span className="text-xl font-bold text-[#0b1248] tracking-tight">
-              NAV<span className="text-[#c24332]">Farm</span>
-            </span>
+          <Link href="/" aria-label="NAVFarm home">
+            <NavfarmBrand />
           </Link>
         </div>
 

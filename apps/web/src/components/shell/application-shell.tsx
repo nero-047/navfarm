@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { filterNavigation, type AppScope } from '../../lib/authorization';
 import { scopeAccessReason } from '../../lib/access-reasons';
 import { navigationForScope } from './navigation';
+import { NavfarmBrand } from '../brand/navfarm-brand';
 
 const SCOPE_LABEL: Record<AppScope, string> = {
   platform: 'Platform administration',
@@ -73,8 +74,7 @@ export function ApplicationShell({
   const sidebar = (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,#0a1244,#101a52_60%,#071039)] text-white">
       <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#d45b43] text-xs font-black">NF</span>
-        {!collapsed && <span className="text-lg font-bold">NAV<span className="text-[#f16d50]">Farm</span></span>}
+        <NavfarmBrand compact={collapsed} inverse />
         <button className="ml-auto lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation"><X size={18} /></button>
       </div>
       {!collapsed && (
@@ -110,6 +110,7 @@ export function ApplicationShell({
         })}
       </nav>
       <button
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         onClick={() => {
           const next = !collapsed;
           setCollapsed(next);

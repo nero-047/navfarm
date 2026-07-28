@@ -6,6 +6,10 @@ import { LanguageProvider } from '@/hooks/useLanguage';
 export const metadata = {
   title: 'NAVFarm',
   description: 'Universal Farm Management Software for Agriculture',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

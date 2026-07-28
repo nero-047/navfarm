@@ -14,7 +14,11 @@ async function signIn(page: Page, email: string) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  const [response] = await Promise.all([
+    page.waitForResponse((candidate) => candidate.url().includes('/api/v1/auth/login') && candidate.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Sign In' }).click(),
+  ]);
+  expect(response.ok()).toBe(true);
   await expect(page).not.toHaveURL(/\/login$/);
 }
 
