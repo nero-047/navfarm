@@ -3377,6 +3377,101 @@ export default api;
 
 ---
 
-*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 33 modules and 51 controllers.*
+## 34. ENTERPRISE COSTING ENGINE ENDPOINTS (PHASE 7)
+
+### `POST /costing/profile`
+- **Summary**: Create a Costing Method Profile for an Item or Item Category (`STANDARD`, `FIFO`, `WEIGHTED_AVG`, `BIOLOGICAL_ASSET`).
+- **Permission**: `COSTING:PROFILE:create`
+- **Body**: `{ company_id, item_id, item_category_id, costing_method: "STANDARD", standard_cost: 15.50, effective_from: "2026-08-01" }`
+
+### `POST /costing/profile/component`
+- **Summary**: Create a Cost Component breakdown line (Direct Labor, Machine Time, Utility Overhead).
+- **Permission**: `COSTING:PROFILE:create`
+- **Body**: `{ company_id, component_code: "DIRECT_LABOR_LINE", component_name: "Direct Factory Labor", cost_type: "DIRECT_LABOR", gl_account_id }`
+
+### `GET /costing/profile`
+- **Summary**: List Costing Profiles for a company.
+- **Permission**: `COSTING:PROFILE:view`
+- **Query**: `companyId`
+
+### `GET /costing/profile/components`
+- **Summary**: List Cost Components for a company.
+- **Permission**: `COSTING:PROFILE:view`
+- **Query**: `companyId`
+
+### `POST /costing/inventory/revaluate`
+- **Summary**: Revaluate Item Standard/WAVG Cost & Post GL Adjustment Entry via Phase 4 PostingEngine.
+- **Permission**: `COSTING:REVALUATION:edit`
+- **Body**: `{ company_id, item_id, new_cost: 15.00, change_reason: "Quarterly raw material revaluation" }`
+
+### `GET /costing/inventory/history/:itemId`
+- **Summary**: Fetch cost revision history log for an item.
+- **Permission**: `COSTING:REVALUATION:view`
+
+### `GET /costing/batch/:id/summary`
+- **Summary**: Fetch finalized Cost Summary for a Production Batch (Material, Labor, Machine, Overhead, Unit Cost).
+- **Permission**: `COSTING:BATCH:view`
+
+### `POST /costing/biological-asset/:poultryBatchId/calculate`
+- **Summary**: Calculate IAS 41 Living Asset Valuation & Net Asset Value for a living flock.
+- **Permission**: `COSTING:BIOLOGICAL_ASSET:edit`
+
+### `POST /costing/variance/calculate`
+- **Summary**: Calculate 7-dimension variance analysis (Usage, Price, Yield, Labor, Overhead) & post GL journal entry.
+- **Permission**: `COSTING:VARIANCE:edit`
+- **Body**: `{ company_id, batch_id }`
+
+### `GET /costing/report/inventory-valuation`
+- **Summary**: Inventory Valuation Report (Quantity x Standard/WAVG Cost per warehouse/location).
+- **Permission**: `COSTING:REPORT:view`
+- **Query**: `companyId`
+
+### `GET /costing/report/biological-assets`
+- **Summary**: IAS 41 Biological Assets Valuation Summary Dashboard.
+- **Permission**: `COSTING:REPORT:view`
+- **Query**: `companyId`
+
+---
+
+## 35. QUALITY CONTROL, QUARANTINE & RAK DOCS EXTENSION ENDPOINTS
+
+### `POST /qc/template`
+- **Summary**: Create Quality Control Parameter Template (Min/Max acceptable limits).
+- **Permission**: `QC:TEMPLATE:create`
+- **Body**: `{ company_id, template_code: "QC-EGG-WT", template_name: "Egg Weight Inspection", min_acceptable_value: 50.0, max_acceptable_value: 70.0, uom_id }`
+
+### `POST /qc/inspection`
+- **Summary**: Record QC Inspection & Auto-Quarantine Hold on parameter limit failure.
+- **Permission**: `QC:INSPECTION:create`
+- **Body**: `{ company_id, template_id, item_id, batch_id, lot_number, measured_value: 48.5, warehouse_id, location_id, hold_qty: 100, notes }`
+
+### `POST /qc/quarantine/release`
+- **Summary**: Release or Reject Quarantine Hold.
+- **Permission**: `QC:QUARANTINE:edit`
+- **Body**: `{ hold_id, action: "RELEASED" }`
+
+### `GET /qc/templates`
+- **Summary**: List QC Parameter Templates.
+- **Permission**: `QC:TEMPLATE:view`
+- **Query**: `companyId`
+
+### `GET /qc/quarantine`
+- **Summary**: List Quarantine Holds for a company.
+- **Permission**: `QC:QUARANTINE:view`
+- **Query**: `companyId`
+
+### `POST /poultry/slaughter/cost-split-config`
+- **Summary**: Configure joint-cost allocation split % for slaughter products (Main Meat vs Offal/By-products).
+- **Permission**: `POULTRY:SLAUGHTER:create`
+- **Body**: `{ company_id, item_id, is_main_product: true, cost_split_pct: 85.00 }`
+
+### `GET /poultry/slaughter/cost-split-config`
+- **Summary**: Fetch slaughter joint-cost split rules for a company.
+- **Permission**: `POULTRY:SLAUGHTER:view`
+- **Query**: `companyId`
+
+---
+
+*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 35 modules and 59 controllers.*
 
 

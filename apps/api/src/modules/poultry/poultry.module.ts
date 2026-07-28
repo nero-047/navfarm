@@ -4,12 +4,14 @@ import { LayerController } from './controllers/layer.controller';
 import { HatcheryController } from './controllers/hatchery.controller';
 import { BroilerController } from './controllers/broiler.controller';
 import { SlaughterController } from './controllers/slaughter.controller';
+import { SlaughterCostSplitController } from './controllers/slaughter-cost-split.controller';
 import { PoultryReportController } from './controllers/poultry-report.controller';
 import { RearingService } from './services/rearing.service';
 import { LayerService } from './services/layer.service';
 import { HatcheryService } from './services/hatchery.service';
 import { BroilerService } from './services/broiler.service';
 import { SlaughterService } from './services/slaughter.service';
+import { SlaughterCostSplitService } from './services/slaughter-cost-split.service';
 import { PoultryKpiService } from './services/poultry-kpi.service';
 import { ProductionModule } from '../production/production.module';
 import { InventoryModule } from '../inventory/inventory.module';
@@ -29,6 +31,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
     HatcheryController,
     BroilerController,
     SlaughterController,
+    SlaughterCostSplitController,
     PoultryReportController,
   ],
   providers: [
@@ -37,6 +40,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
     HatcheryService,
     BroilerService,
     SlaughterService,
+    SlaughterCostSplitService,
     PoultryKpiService,
   ],
   exports: [
@@ -45,6 +49,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
     HatcheryService,
     BroilerService,
     SlaughterService,
+    SlaughterCostSplitService,
     PoultryKpiService,
   ],
 })

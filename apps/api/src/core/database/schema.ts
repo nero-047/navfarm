@@ -2671,3 +2671,174 @@ export const poultryKpi = mysqlTable('poultry_kpi', {
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull()
 });
 
+// ==========================================
+// 14. ENTERPRISE COSTING ENGINE (PHASE 7)
+// ==========================================
+
+export const costingProfile = mysqlTable('costing_profile', {
+  profile_id: varchar('profile_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  item_id: varchar('item_id', { length: 36 }),
+  item_category_id: varchar('item_category_id', { length: 36 }),
+  costing_method: varchar('costing_method', { length: 30 }).default('FIFO').notNull(), // STANDARD, FIFO, WEIGHTED_AVG, BIOLOGICAL_ASSET
+  standard_cost: decimal('standard_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  effective_from: date('effective_from', { mode: 'string' }).notNull(),
+  effective_to: date('effective_to', { mode: 'string' }),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const costingComponent = mysqlTable('costing_component', {
+  component_id: varchar('component_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  component_code: varchar('component_code', { length: 50 }).notNull(),
+  component_name: varchar('component_name', { length: 100 }).notNull(),
+  cost_type: varchar('cost_type', { length: 30 }).default('DIRECT_MATERIAL').notNull(), // DIRECT_MATERIAL, DIRECT_LABOR, INDIRECT_OVERHEAD, FREIGHT, DUTY
+  gl_account_id: varchar('gl_account_id', { length: 36 }).references(() => glAccountMaster.gl_account_id, { onDelete: 'restrict' }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const itemCostHistory = mysqlTable('item_cost_history', {
+  history_id: varchar('history_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'cascade' }),
+  old_cost: decimal('old_cost', { precision: 18, scale: 4 }).notNull(),
+  new_cost: decimal('new_cost', { precision: 18, scale: 4 }).notNull(),
+  change_reason: varchar('change_reason', { length: 255 }),
+  revaluation_journal_id: varchar('revaluation_journal_id', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const batchCostSummary = mysqlTable('batch_cost_summary', {
+  summary_id: varchar('summary_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().unique().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  opening_wip_cost: decimal('opening_wip_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  material_cost: decimal('material_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  labor_cost: decimal('labor_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  machine_cost: decimal('machine_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  overhead_cost: decimal('overhead_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  total_batch_cost: decimal('total_batch_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  actual_output_qty: decimal('actual_output_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  finalized_at: timestamp('finalized_at', { mode: 'string' })
+});
+
+export const biologicalAssetCost = mysqlTable('biological_asset_cost', {
+  asset_cost_id: varchar('asset_cost_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  poultry_batch_id: varchar('poultry_batch_id', { length: 36 }).notNull().references(() => poultryBatch.poultry_batch_id, { onDelete: 'cascade' }),
+  acquisition_cost: decimal('acquisition_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  feed_cost: decimal('feed_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  medicine_cost: decimal('medicine_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  labor_cost: decimal('labor_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  overhead_cost: decimal('overhead_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  mortality_loss_cost: decimal('mortality_loss_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  net_asset_value: decimal('net_asset_value', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  current_bird_count: int('current_bird_count').default(0).notNull(),
+  cost_per_bird: decimal('cost_per_bird', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const varianceAnalysis = mysqlTable('variance_analysis', {
+  analysis_id: varchar('analysis_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  usage_variance: decimal('usage_variance', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  price_variance: decimal('price_variance', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  yield_variance: decimal('yield_variance', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  labor_variance: decimal('labor_variance', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  overhead_variance: decimal('overhead_variance', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  total_variance: decimal('total_variance', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  posted_journal_id: varchar('posted_journal_id', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+// ==========================================
+// 15. RAK DOCS EXTENSION TABLES (QC/QR, SLAUGHTER SPLIT, PARAMETER SCHEDULER)
+// ==========================================
+
+export const qcParameterTemplate = mysqlTable('qc_parameter_template', {
+  template_id: varchar('template_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  template_code: varchar('template_code', { length: 50 }).notNull(),
+  template_name: varchar('template_name', { length: 100 }).notNull(),
+  item_category_id: varchar('item_category_id', { length: 36 }),
+  min_acceptable_value: decimal('min_acceptable_value', { precision: 18, scale: 4 }),
+  max_acceptable_value: decimal('max_acceptable_value', { precision: 18, scale: 4 }),
+  uom_id: varchar('uom_id', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const qcInspectionResult = mysqlTable('qc_inspection_result', {
+  inspection_id: varchar('inspection_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  template_id: varchar('template_id', { length: 36 }).references(() => qcParameterTemplate.template_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }),
+  lot_number: varchar('lot_number', { length: 100 }),
+  measured_value: decimal('measured_value', { precision: 18, scale: 4 }).notNull(),
+  inspection_status: varchar('inspection_status', { length: 30 }).default('PASSED').notNull(), // PASSED, FAILED, QUARANTINE
+  inspected_by: varchar('inspected_by', { length: 36 }),
+  inspected_at: timestamp('inspected_at', { mode: 'string' }).defaultNow().notNull(),
+  notes: text('notes')
+});
+
+export const quarantineHold = mysqlTable('quarantine_hold', {
+  hold_id: varchar('hold_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  inspection_id: varchar('inspection_id', { length: 36 }).references(() => qcInspectionResult.inspection_id, { onDelete: 'cascade' }),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  hold_qty: decimal('hold_qty', { precision: 18, scale: 4 }).notNull(),
+  hold_reason: varchar('hold_reason', { length: 255 }).notNull(),
+  status: varchar('status', { length: 30 }).default('ON_HOLD').notNull(), // ON_HOLD, RELEASED, REJECTED
+  released_by: varchar('released_by', { length: 36 }),
+  released_at: timestamp('released_at', { mode: 'string' }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const slaughterCostSplitConfig = mysqlTable('slaughter_cost_split_config', {
+  config_id: varchar('config_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'cascade' }),
+  is_main_product: boolean('is_main_product').default(false).notNull(),
+  cost_split_pct: decimal('cost_split_pct', { precision: 5, scale: 2 }).notNull(), // e.g. 85.00 for main meat, 5.00 for offal
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const systemParameter = mysqlTable('system_parameter', {
+  param_id: varchar('param_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }),
+  company_id: varchar('company_id', { length: 36 }),
+  param_key: varchar('param_key', { length: 100 }).notNull().unique(),
+  param_value: text('param_value').notNull(),
+  data_type: varchar('data_type', { length: 30 }).default('STRING').notNull(),
+  description: text('description'),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const jobScheduleMaster = mysqlTable('job_schedule_master', {
+  job_id: varchar('job_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }),
+  company_id: varchar('company_id', { length: 36 }),
+  job_name: varchar('job_name', { length: 100 }).notNull(),
+  cron_expression: varchar('cron_expression', { length: 100 }).notNull(),
+  is_enabled: boolean('is_enabled').default(true).notNull(),
+  last_run_at: timestamp('last_run_at', { mode: 'string' }),
+  next_run_at: timestamp('next_run_at', { mode: 'string' }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
