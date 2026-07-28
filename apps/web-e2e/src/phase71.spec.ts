@@ -15,6 +15,7 @@ async function signIn(page: Page, email: string) {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page).not.toHaveURL(/\/login$/);
 }
 
 async function waitForScreenshotReady(page: Page) {
@@ -29,7 +30,7 @@ async function capture(page: Page, name: string, width: number, height: number) 
   await page.setViewportSize({ width, height });
   await waitForScreenshotReady(page);
   await expect.poll(() => page.evaluate('document.documentElement.scrollWidth')).toBeLessThanOrEqual(width);
-  await page.screenshot({ path: resolve(presentationDirectory, `${name}-${width}x${height}.png`), fullPage: true });
+  await page.screenshot({ path: resolve(presentationDirectory, `${name}-${width}x${height}.png`) });
 }
 
 test.beforeEach(async ({ page }) => reset(page));
@@ -62,15 +63,18 @@ test('each primary account lands only in its permitted mock scenario', async ({ 
 
 test('viewer can inspect but cannot initiate operational mutations', async ({ page }) => {
   await signIn(page, 'viewer@navfarm.demo');
-  await page.goto('/green-valley-poultry/batches');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/batches');
   await expect(page.getByRole('main').getByRole('heading', { name: 'Batches' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'New batch' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Manage batch/ })).toHaveCount(0);
-  await page.goto('/green-valley-poultry/operations');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/operations');
   await expect(page.getByRole('button', { name: 'Record entry' })).toHaveCount(0);
-  await page.goto('/green-valley-poultry/quality');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/quality');
   await expect(page.getByRole('button', { name: 'New QC batch' })).toHaveCount(0);
-  const response = await page.request.post('/api/v1/companies/company-green-valley/batches', { data: {} });
+  const response = await page.request.post(
+    '/api/v1/tenants/tenant-demo/companies/company-green-valley/workspaces/workspace-green-poultry/batches',
+    { data: {} },
+  );
   expect(response.status()).toBe(403);
 });
 
@@ -122,22 +126,22 @@ test('presentation routes are responsive and retain reachable actions', async ({
   await mkdir(presentationDirectory, { recursive: true });
   await signIn(page, 'manager@navfarm.demo');
   await capture(page, 'manager-dashboard', 1440, 900);
-  await page.goto('/green-valley-poultry/batches');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/batches');
   await expect(page.getByRole('button', { name: 'New batch' })).toBeVisible();
   await capture(page, 'manager-batches', 1440, 900);
-  await page.goto('/green-valley-poultry/reports');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/reports');
   await expect(page.getByText('Variance analysis')).toBeVisible();
   await capture(page, 'manager-reports', 1440, 900);
-  await page.goto('/green-valley-poultry/quality');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/quality');
   await expect(page.getByRole('button', { name: 'New QC batch' })).toBeVisible();
   await capture(page, 'manager-quality', 768, 1024);
-  await page.goto('/green-valley-poultry/traceability');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/traceability');
   await expect(page.getByRole('button', { name: 'Generate QR pack' })).toBeVisible();
   await capture(page, 'manager-traceability', 768, 1024);
-  await page.goto('/green-valley-poultry/resources');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/resources');
   await expect(page.getByRole('button', { name: 'Add resource' })).toBeVisible();
   await capture(page, 'manager-resources', 390, 844);
-  await page.goto('/green-valley-poultry/batches');
+  await page.goto('/green-valley-poultry/workspaces/poultry-operations/batches');
   await capture(page, 'manager-batches', 390, 844);
   await page.getByRole('button', { name: 'New batch' }).click();
   await expect(page.getByRole('dialog', { name: 'Create production batch' })).toBeVisible();

@@ -14,7 +14,7 @@ async function loginAsManager(page: Page) {
 }
 
 async function openWorkspace(page: Page, route: string, heading: string) {
-  await page.goto(`/${company}/${route}`);
+  await page.goto(`/${company}/workspaces/poultry-operations/${route}`);
   await expect(page.getByRole('main').getByRole('heading', { name: heading, exact: true })).toBeVisible();
 }
 
