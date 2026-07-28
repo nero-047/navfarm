@@ -3191,6 +3191,40 @@ export interface GlAccount {
   children?: GlAccount[];
 }
 
+// Phase 5 — Production Engine Interfaces
+export interface ProductionOrder {
+  order_id: string;
+  tenant_id: string;
+  company_id: string;
+  order_no: string;
+  item_id: string;
+  warehouse_id: string;
+  location_id: string;
+  planned_qty: number;
+  actual_qty: number;
+  uom_id: string;
+  start_date: string;
+  end_date?: string;
+  status: 'DRAFT' | 'PLANNED' | 'RELEASED' | 'IN_PROGRESS' | 'FINISHED' | 'CLOSED' | 'CANCELLED';
+  cost_center_id?: string;
+  notes?: string;
+}
+
+export interface ProductionBatch {
+  batch_id: string;
+  company_id: string;
+  order_id?: string;
+  batch_no: string;
+  warehouse_id: string;
+  location_id: string;
+  planned_qty: number;
+  actual_qty: number;
+  scrap_qty: number;
+  status: 'DRAFT' | 'PLANNED' | 'RELEASED' | 'MATERIAL_ISSUED' | 'IN_PROGRESS' | 'QUALITY_CHECK' | 'FINISHED' | 'CLOSED';
+  start_time?: string;
+  end_time?: string;
+}
+
 // Axios client setup
 import axios from 'axios';
 const api = axios.create({ baseURL: process.env.API_BASE_URL || 'http://localhost:3000' });
@@ -3214,4 +3248,70 @@ export default api;
 
 ---
 
-*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 31 modules and 42 controllers.*
+## 32. PRODUCTION ENGINE ENDPOINTS (PHASE 5)
+
+### `POST /production/order`
+- **Summary**: Create a new Production Order draft.
+- **Permission**: `PRODUCTION:ORDER:create`
+- **Body**: `{ company_id, order_no, item_id, warehouse_id, location_id, planned_qty, uom_id, start_date }`
+
+### `GET /production/order/:id`
+- **Summary**: Retrieve details for a single Production Order.
+- **Permission**: `PRODUCTION:ORDER:view`
+
+### `GET /production/order`
+- **Summary**: Filtered list of Production Orders (`companyId`, `warehouseId`, `status`, `limit`, `offset`).
+- **Permission**: `PRODUCTION:ORDER:view`
+
+### `POST /production/batch`
+- **Summary**: Create a new Production Batch draft.
+- **Permission**: `PRODUCTION:BATCH:create`
+- **Body**: `{ company_id, batch_no, warehouse_id, location_id, planned_qty }`
+
+### `GET /production/batch/:id`
+- **Summary**: Fetch full Production Batch details including inputs, outputs, and WIP costing.
+- **Permission**: `PRODUCTION:BATCH:view`
+
+### `POST /production/batch/:id/status`
+- **Summary**: State machine transition for batch status (`DRAFT` ➔ `PLANNED` ➔ `RELEASED` ➔ `IN_PROGRESS` ➔ `QUALITY_CHECK` ➔ `FINISHED`).
+- **Permission**: `PRODUCTION:BATCH:edit`
+- **Body**: `{ targetStatus: "RELEASED", notes: "Approved for production" }`
+
+### `POST /production/batch/input`
+- **Summary**: Deplete inventory and issue raw materials for batch (Executes Phase 3 Goods Issue & FIFO posting).
+- **Permission**: `PRODUCTION:BATCH:edit`
+- **Body**: `{ company_id, batch_id, item_id, uom_id, warehouse_id, location_id, planned_qty, actual_qty }`
+
+### `POST /production/batch/output`
+- **Summary**: Receive finished goods / by-products into inventory (Executes Phase 3 Goods Receipt).
+- **Permission**: `PRODUCTION:BATCH:edit`
+- **Body**: `{ company_id, batch_id, item_id, uom_id, warehouse_id, location_id, output_type: "FINISHED_GOOD", qty: 480 }`
+
+### `POST /production/batch/resource`
+- **Summary**: Log resource usage (Labor, Machine hours, Electricity, Overhead costs).
+- **Permission**: `PRODUCTION:BATCH:edit`
+- **Body**: `{ company_id, batch_id, resource_id, usage_type: "LABOR", actual_hours: 8, hourly_rate: 25 }`
+
+### `POST /production/batch/daily-entry`
+- **Summary**: Log daily production progress, mortality, scrap, and downtime.
+- **Permission**: `PRODUCTION:BATCH:edit`
+- **Body**: `{ company_id, batch_id, entry_date: "2026-08-05", produced_qty: 100, scrap_qty: 1 }`
+
+### `POST /production/batch/:id/close`
+- **Summary**: Close Production Batch (Calculates final unit cost, yield variance, and posts financial WIP zero-out).
+- **Permission**: `PRODUCTION:BATCH:edit`
+
+### `GET /production/report/wip`
+- **Summary**: Work In Progress (WIP) costing summary report.
+- **Permission**: `PRODUCTION:REPORT:view`
+- **Query**: `companyId`
+
+### `GET /production/report/variance`
+- **Summary**: Production yield and cost variance analysis report.
+- **Permission**: `PRODUCTION:REPORT:view`
+- **Query**: `companyId`
+
+---
+
+*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 32 modules and 45 controllers.*
+

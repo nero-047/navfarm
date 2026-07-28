@@ -2402,3 +2402,165 @@ export const supplierLedgerEntryRelations = relations(supplierLedgerEntry, ({ on
   })
 }));
 
+// ==========================================
+// 12. PRODUCTION ENGINE (PHASE 5)
+// ==========================================
+
+export const productionOrder = mysqlTable('production_order', {
+  order_id: varchar('order_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  order_no: varchar('order_no', { length: 50 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  location_id: varchar('location_id', { length: 36 }).notNull().references(() => locationMaster.location_id, { onDelete: 'restrict' }),
+  planned_qty: decimal('planned_qty', { precision: 18, scale: 4 }).notNull(),
+  actual_qty: decimal('actual_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  uom_id: varchar('uom_id', { length: 36 }).notNull().references(() => uomMaster.uom_id, { onDelete: 'restrict' }),
+  start_date: date('start_date', { mode: 'string' }).notNull(),
+  end_date: date('end_date', { mode: 'string' }),
+  status: varchar('status', { length: 30 }).default('DRAFT').notNull(), // DRAFT, PLANNED, RELEASED, IN_PROGRESS, FINISHED, CLOSED, CANCELLED
+  cost_center_id: varchar('cost_center_id', { length: 36 }),
+  dimension_values: json('dimension_values'),
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' })
+});
+
+export const productionBatch = mysqlTable('production_batch', {
+  batch_id: varchar('batch_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  order_id: varchar('order_id', { length: 36 }).references(() => productionOrder.order_id, { onDelete: 'cascade' }),
+  batch_no: varchar('batch_no', { length: 50 }).notNull(),
+  parent_batch_id: varchar('parent_batch_id', { length: 36 }),
+  formula_id: varchar('formula_id', { length: 36 }),
+  farm_id: varchar('farm_id', { length: 36 }),
+  shed_id: varchar('shed_id', { length: 36 }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  planned_qty: decimal('planned_qty', { precision: 18, scale: 4 }).notNull(),
+  actual_qty: decimal('actual_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  scrap_qty: decimal('scrap_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  status: varchar('status', { length: 30 }).default('DRAFT').notNull(), // DRAFT, PLANNED, RELEASED, MATERIAL_ISSUED, IN_PROGRESS, QUALITY_CHECK, FINISHED, CLOSED
+  start_time: timestamp('start_time', { mode: 'string' }),
+  end_time: timestamp('end_time', { mode: 'string' }),
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' })
+});
+
+export const productionBatchInput = mysqlTable('production_batch_input', {
+  input_id: varchar('input_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  uom_id: varchar('uom_id', { length: 36 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  serial_id: varchar('serial_id', { length: 36 }),
+  planned_qty: decimal('planned_qty', { precision: 18, scale: 4 }).notNull(),
+  actual_qty: decimal('actual_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  total_cost: decimal('total_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  goods_issue_id: varchar('goods_issue_id', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const productionBatchOutput = mysqlTable('production_batch_output', {
+  output_id: varchar('output_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  uom_id: varchar('uom_id', { length: 36 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull(),
+  lot_id: varchar('lot_id', { length: 36 }),
+  output_type: varchar('output_type', { length: 30 }).default('FINISHED_GOOD').notNull(), // FINISHED_GOOD, BY_PRODUCT, SCRAP, WASTE
+  qty: decimal('qty', { precision: 18, scale: 4 }).notNull(),
+  cost_split_pct: decimal('cost_split_pct', { precision: 5, scale: 2 }).default('100.00').notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  total_cost: decimal('total_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  goods_receipt_id: varchar('goods_receipt_id', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const productionResourceUsage = mysqlTable('production_resource_usage', {
+  usage_id: varchar('usage_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  resource_id: varchar('resource_id', { length: 36 }).notNull(),
+  usage_type: varchar('usage_type', { length: 30 }).default('LABOR').notNull(), // LABOR, MACHINE, ELECTRICITY, WATER, OVERHEAD
+  planned_hours: decimal('planned_hours', { precision: 10, scale: 2 }).default('0.00').notNull(),
+  actual_hours: decimal('actual_hours', { precision: 10, scale: 2 }).default('0.00').notNull(),
+  hourly_rate: decimal('hourly_rate', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  total_cost: decimal('total_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const productionDailyEntry = mysqlTable('production_daily_entry', {
+  entry_id: varchar('entry_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  entry_date: date('entry_date', { mode: 'string' }).notNull(),
+  produced_qty: decimal('produced_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  consumed_qty: decimal('consumed_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  mortality_qty: decimal('mortality_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  scrap_qty: decimal('scrap_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  downtime_minutes: int('downtime_minutes').default(0).notNull(),
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const productionWip = mysqlTable('production_wip', {
+  wip_id: varchar('wip_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().unique().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  material_cost: decimal('material_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  labor_cost: decimal('labor_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  machine_cost: decimal('machine_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  overhead_cost: decimal('overhead_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  total_wip_cost: decimal('total_wip_cost', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  completion_pct: decimal('completion_pct', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const productionCost = mysqlTable('production_cost', {
+  cost_id: varchar('cost_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().unique().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  total_material_cost: decimal('total_material_cost', { precision: 18, scale: 4 }).notNull(),
+  total_resource_cost: decimal('total_resource_cost', { precision: 18, scale: 4 }).notNull(),
+  total_overhead_cost: decimal('total_overhead_cost', { precision: 18, scale: 4 }).notNull(),
+  total_batch_cost: decimal('total_batch_cost', { precision: 18, scale: 4 }).notNull(),
+  actual_yield_qty: decimal('actual_yield_qty', { precision: 18, scale: 4 }).notNull(),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 4 }).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const productionVariance = mysqlTable('production_variance', {
+  variance_id: varchar('variance_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().unique().references(() => productionBatch.batch_id, { onDelete: 'cascade' }),
+  planned_qty: decimal('planned_qty', { precision: 18, scale: 4 }).notNull(),
+  actual_qty: decimal('actual_qty', { precision: 18, scale: 4 }).notNull(),
+  qty_variance: decimal('qty_variance', { precision: 18, scale: 4 }).notNull(),
+  material_cost_variance: decimal('material_cost_variance', { precision: 18, scale: 4 }).notNull(),
+  labor_variance: decimal('labor_variance', { precision: 18, scale: 4 }).notNull(),
+  total_variance_cost: decimal('total_variance_cost', { precision: 18, scale: 4 }).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
