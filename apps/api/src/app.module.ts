@@ -39,6 +39,7 @@ import { CostingModule } from './modules/costing/costing.module';
 import { QcModule } from './modules/qc/qc.module';
 import { QualityTraceabilityModule } from './modules/quality-traceability/quality-traceability.module';
 import { SchedulerKpiModule } from './modules/scheduler-kpi/scheduler-kpi.module';
+import { ReportingBiModule } from './modules/reporting-bi/reporting-bi.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -99,6 +100,7 @@ import { SystemController } from './system/system.controller';
     QcModule,
     QualityTraceabilityModule,
     SchedulerKpiModule,
+    ReportingBiModule,
   ],
   controllers: [SystemController],
   providers: [],

@@ -3118,4 +3118,82 @@ export const kpiResult = mysqlTable('kpi_result', {
   zone: varchar('zone', { length: 10 }).default('GREEN').notNull() // GREEN, YELLOW, RED
 });
 
+// ==========================================
+// 18. ENTERPRISE REPORTING & BUSINESS INTELLIGENCE ENGINE (PHASE 10)
+// ==========================================
+
+export const reportCategory = mysqlTable('report_category', {
+  category_id: varchar('category_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  category_code: varchar('category_code', { length: 50 }).notNull().unique(),
+  category_name: varchar('category_name', { length: 100 }).notNull(),
+  description: text('description'),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const reportDefinition = mysqlTable('report_definition', {
+  report_id: varchar('report_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  category_id: varchar('category_id', { length: 36 }).notNull().references(() => reportCategory.category_id, { onDelete: 'cascade' }),
+  report_code: varchar('report_code', { length: 50 }).notNull(),
+  report_name: varchar('report_name', { length: 100 }).notNull(),
+  data_source_service: varchar('data_source_service', { length: 100 }).notNull(),
+  required_permission: varchar('required_permission', { length: 100 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const reportExecution = mysqlTable('report_execution', {
+  execution_id: varchar('execution_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  report_id: varchar('report_id', { length: 36 }).notNull().references(() => reportDefinition.report_id, { onDelete: 'cascade' }),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  executed_by: varchar('executed_by', { length: 36 }),
+  parameters_json: json('parameters_json'),
+  execution_duration_ms: int('execution_duration_ms').default(0).notNull(),
+  status: varchar('status', { length: 20 }).default('SUCCESS').notNull(), // SUCCESS, FAILED
+  executed_at: timestamp('executed_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const reportExport = mysqlTable('report_export', {
+  export_id: varchar('export_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  execution_id: varchar('execution_id', { length: 36 }).notNull().references(() => reportExecution.execution_id, { onDelete: 'cascade' }),
+  export_format: varchar('export_format', { length: 10 }).default('PDF').notNull(), // PDF, XLSX, CSV
+  file_path: varchar('file_path', { length: 255 }).notNull(),
+  file_name: varchar('file_name', { length: 200 }).notNull(),
+  file_size_bytes: int('file_size_bytes').default(0).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const reportSchedule = mysqlTable('report_schedule', {
+  schedule_id: varchar('schedule_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  report_id: varchar('report_id', { length: 36 }).notNull().references(() => reportDefinition.report_id, { onDelete: 'cascade' }),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  cron_expression: varchar('cron_expression', { length: 100 }).notNull(),
+  export_format: varchar('export_format', { length: 10 }).default('PDF').notNull(),
+  recipient_emails: text('recipient_emails').notNull(),
+  is_enabled: boolean('is_enabled').default(true).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const dashboard = mysqlTable('dashboard', {
+  dashboard_id: varchar('dashboard_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  dashboard_name: varchar('dashboard_name', { length: 100 }).notNull(),
+  dashboard_type: varchar('dashboard_type', { length: 30 }).default('EXECUTIVE').notNull(), // EXECUTIVE, OPERATIONS, FINANCE, INVENTORY, PRODUCTION, POULTRY, QUALITY
+  owner_id: varchar('owner_id', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const dashboardWidget = mysqlTable('dashboard_widget', {
+  widget_id: varchar('widget_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  dashboard_id: varchar('dashboard_id', { length: 36 }).notNull().references(() => dashboard.dashboard_id, { onDelete: 'cascade' }),
+  widget_title: varchar('widget_title', { length: 100 }).notNull(),
+  widget_type: varchar('widget_type', { length: 30 }).default('CARD').notNull(), // CARD, LINE_CHART, BAR_CHART, PIE_CHART, KPI_CARD, TABLE
+  report_id: varchar('report_id', { length: 36 }).references(() => reportDefinition.report_id, { onDelete: 'set null' }),
+  layout_json: json('layout_json')
+});
+
+
 

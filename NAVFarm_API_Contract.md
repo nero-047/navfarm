@@ -3673,6 +3673,79 @@ export default api;
 
 ---
 
-*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 37 modules and 73 controllers.*
+## 38. ENTERPRISE REPORTING & BUSINESS INTELLIGENCE ENGINE ENDPOINTS (PHASE 10)
+
+### `POST /reporting/framework/category`
+- **Summary**: Create Report Category Metadata.
+- **Permission**: `REPORTING:FRAMEWORK:create`
+- **Body**: `{ category_code: "CAT-INV-01", category_name: "Inventory Analytics", description: "Stock movement & valuation reports" }`
+
+### `POST /reporting/framework/register`
+- **Summary**: Register Analytical Report Definition.
+- **Permission**: `REPORTING:FRAMEWORK:create`
+- **Body**: `{ company_id, category_id, report_code: "REP-INV-001", report_name: "Stock Valuation Report", data_source_service: "InventoryReportService" }`
+
+### `GET /reporting/framework`
+- **Summary**: List Registered Report Definitions for a company.
+- **Permission**: `REPORTING:FRAMEWORK:view`
+- **Query**: `companyId`
+
+### `GET /reporting/inventory/summary`
+- **Summary**: Stock Summary Report across warehouses & items.
+- **Permission**: `REPORTING:INVENTORY:view`
+- **Query**: `companyId`
+
+### `GET /reporting/inventory/valuation-fifo`
+- **Summary**: Inventory Valuation & FIFO Layers Report.
+- **Permission**: `REPORTING:INVENTORY:view`
+- **Query**: `companyId`
+
+### `GET /reporting/production/efficiency`
+- **Summary**: Production Efficiency, WIP & Yield Report.
+- **Permission**: `REPORTING:PRODUCTION:view`
+- **Query**: `companyId`
+
+### `GET /reporting/finance/trial-balance`
+- **Summary**: Trial Balance Financial Report.
+- **Permission**: `REPORTING:FINANCE:view`
+- **Query**: `companyId`
+
+### `GET /reporting/finance/profit-loss`
+- **Summary**: Profit & Loss (P&L) Financial Statement Report.
+- **Permission**: `REPORTING:FINANCE:view`
+- **Query**: `companyId`
+
+### `GET /reporting/poultry/performance`
+- **Summary**: Poultry Performance Summary Report (Flocks, Mortality, Weights, FCR).
+- **Permission**: `REPORTING:POULTRY:view`
+- **Query**: `companyId`
+
+### `GET /reporting/variance/analysis`
+- **Summary**: 7-Dimension Enterprise Cost Variance Analysis Report.
+- **Permission**: `REPORTING:VARIANCE:view`
+- **Query**: `companyId`
+
+### `POST /reporting/dashboard`
+- **Summary**: Create Interactive BI Dashboard with Widgets.
+- **Permission**: `REPORTING:DASHBOARD:create`
+- **Body**: `{ company_id, dashboard_name: "Executive Overview", dashboard_type: "EXECUTIVE", widgets: [...] }`
+
+### `GET /reporting/dashboard`
+- **Summary**: List BI Dashboards for a company.
+- **Permission**: `REPORTING:DASHBOARD:view`
+- **Query**: `companyId`
+
+### `GET /reporting/dashboard/:id`
+- **Summary**: Fetch BI Dashboard layout & widget definitions.
+- **Permission**: `REPORTING:DASHBOARD:view`
+
+### `POST /reporting/export`
+- **Summary**: Export Analytical Report into PDF, XLSX (Excel), or CSV format.
+- **Permission**: `REPORTING:EXPORT:create`
+- **Body**: `{ company_id, report_id, export_format: "PDF" }`
+
+---
+
+*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 38 modules and 81 controllers.*
 
 
