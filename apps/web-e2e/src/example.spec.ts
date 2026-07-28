@@ -40,21 +40,21 @@ async function waitForScreenshotReady(page: Page) {
 async function capturePair(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await waitForScreenshotReady(page);
-  await page.screenshot({ path: resolve(screenshotDirectory, `${name}-desktop.png`), fullPage: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path: resolve(screenshotDirectory, `${name}-desktop.png`), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await waitForScreenshotReady(page);
   await expect.poll(() => page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: resolve(screenshotDirectory, `${name}-mobile.png`), fullPage: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path: resolve(screenshotDirectory, `${name}-mobile.png`), fullPage: true });
 }
 
 async function capturePhase3Pair(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await waitForScreenshotReady(page);
-  await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-desktop.png`), fullPage: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-desktop.png`), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await waitForScreenshotReady(page);
   await expect.poll(() => page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-mobile.png`), fullPage: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path: resolve(phase3ScreenshotDirectory, `${name}-mobile.png`), fullPage: true });
 }
 
 test('authenticates and opens the unified company shell', async ({ page }) => {
@@ -201,7 +201,7 @@ test('Phase 3 masters and accounting workflows render responsively', async ({ pa
   await page.goto('/green-valley-poultry/masters');
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('heading', { name: 'Master-data dashboard' })).toBeVisible();
-  await page.screenshot({ path: resolve(phase3ScreenshotDirectory, 'mobile-master-data-navigation.png'), fullPage: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path: resolve(phase3ScreenshotDirectory, 'mobile-master-data-navigation.png'), fullPage: true });
 });
 
 test('Phase 3 role restrictions apply to direct URLs and actions', async ({ page }) => {

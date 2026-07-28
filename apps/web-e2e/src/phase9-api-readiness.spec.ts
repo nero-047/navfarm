@@ -25,7 +25,9 @@ test('tenant administrator creates, edits, and assigns a workspace through typed
   await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/layer-operations$/);
   await expect(page.getByRole('main').getByRole('heading', { name: 'Layer Operations' })).toBeVisible();
   await page.getByLabel('Workspace name').fill('Layer Production');
+  await expect(page.getByLabel('Workspace name')).toHaveValue('Layer Production');
   await page.getByLabel('QR').check();
+  await expect(page.getByLabel('Workspace name')).toHaveValue('Layer Production');
   await page.getByRole('button', { name: 'Save workspace' }).click();
   await expect(page.getByLabel('Workspace name')).toHaveValue('Layer Production');
   await page.getByLabel('Member email').fill('viewer@navfarm.demo');
@@ -52,6 +54,6 @@ test('legacy operational routes resolve by accessible workspace cardinality', as
 test('legacy operational route shows an explicit no-workspace access state', async ({ page }) => {
   await signIn(page, 'tenant@navfarm.demo');
   await page.goto('/green-valley-poultry/reports');
-  await expect(page.getByRole('heading', { name: 'No operational workspace access' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Workspace access not assigned' })).toBeVisible();
   await expect(page).toHaveURL(/\/green-valley-poultry\/reports$/);
 });

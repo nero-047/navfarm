@@ -88,6 +88,7 @@ const seedWorkspaces: Workspace[] = [
   { workspaceId: 'workspace-green-feed', tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceCode: 'GV_FEED', workspaceSlug: 'feed-mill', workspaceName: 'Feed Mill', workspaceType: 'FEED_PROCESSING', status: 'ACTIVE', primaryNobId: 'nob-processing', enabledModules: ['Batches', 'Inventory', 'QC', 'Finance'], readiness: { percentage: 82, operationalReady: false, blockingRequirements: ['Complete resource-rate setup'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
   { workspaceId: 'workspace-harvest-crops', tenantId: 'tenant-demo', companyId: 'company-harvest-ridge', workspaceCode: 'HR_CROPS', workspaceSlug: 'crop-production', workspaceName: 'Crop Production', workspaceType: 'AGRICULTURE', status: 'ACTIVE', primaryNobId: 'nob-agriculture', enabledModules: ['Batches', 'Inventory', 'QC', 'Finance', 'Analytics'], readiness: { percentage: 100, operationalReady: true, blockingRequirements: [] }, createdAt: fixtureDate, updatedAt: fixtureDate },
   { workspaceId: 'workspace-bluewater-aqua', tenantId: 'tenant-second', companyId: 'company-bluewater', workspaceCode: 'BW_AQUA', workspaceSlug: 'aquaculture', workspaceName: 'Aquaculture', workspaceType: 'AQUACULTURE', status: 'DRAFT', primaryNobId: 'nob-aquaculture', enabledModules: ['Batches', 'Inventory', 'QC', 'QR'], readiness: { percentage: 42, operationalReady: false, blockingRequirements: ['Complete company onboarding', 'Configure QC parameters'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
+  { workspaceId: 'workspace-green-inactive', tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceCode: 'GV_ARCHIVE', workspaceSlug: 'archived-operations', workspaceName: 'Archived Operations', workspaceType: 'POULTRY', status: 'INACTIVE', primaryNobId: 'nob-poultry', enabledModules: ['Batches'], readiness: { percentage: 100, operationalReady: false, blockingRequirements: ['Workspace is inactive'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
 ];
 const seedWorkspaceMembers: WorkspaceMember[] = [
   { membershipId: 'membership-manager-poultry', workspaceId: 'workspace-green-poultry', userId: 'user-manager', fullName: 'Farm Manager', email: 'manager@navfarm.demo', role: 'MANAGER', status: 'ACTIVE' },
@@ -102,7 +103,7 @@ const fixtureUsers: FixtureUser[] = [
   { userId: 'user-accountant', email: 'accountant@navfarm.demo', fullName: 'Company Accountant', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'ACCOUNTANT' }] },
   { userId: 'user-auditor', email: 'auditor@navfarm.demo', fullName: 'Read-only Auditor', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'AUDITOR' }] },
   { userId: 'user-viewer', email: 'viewer@navfarm.demo', fullName: 'Company Viewer', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'VIEWER' }] },
-  { userId: 'user-multi', email: 'multi@navfarm.demo', fullName: 'Multi-company Manager', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo', 'tenant-second'], companies: [{ companyId: 'company-green-valley', role: 'ADMIN' }, { companyId: 'company-harvest-ridge', role: 'ADMIN' }, { companyId: 'company-bluewater', role: 'FARM_MANAGER' }] },
+  { userId: 'user-multi', email: 'multi@navfarm.demo', fullName: 'Multi-company Manager', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo', 'tenant-second'], companies: [{ companyId: 'company-green-valley', role: 'ADMIN' }, { companyId: 'company-harvest-ridge', role: 'ADMIN' }, { companyId: 'company-bluewater', role: 'FARM_MANAGER' }, { companyId: 'company-inactive', role: 'ADMIN' }] },
   { userId: 'user-suspended', email: 'suspended@navfarm.demo', fullName: 'Suspended Tenant User', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-suspended'], companies: [] },
   { userId: 'user-onboarding', email: 'onboarding@navfarm.demo', fullName: 'Onboarding Administrator', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-second'], companies: [{ companyId: 'company-bluewater', role: 'SUPER_ADMIN' }] },
   { userId: 'user-no-company', email: 'nocompany@navfarm.demo', fullName: 'Tenant-only User', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [] },
@@ -170,7 +171,7 @@ function workspaceAssignments(user: FixtureUser) {
     { workspaceId: 'workspace-green-poultry', role: 'MANAGER' as const },
     { workspaceId: 'workspace-green-feed', role: 'VIEWER' as const },
     { workspaceId: 'workspace-harvest-crops', role: 'MANAGER' as const },
-    { workspaceId: 'workspace-bluewater-aqua', role: 'MANAGER' as const },
+    { workspaceId: 'workspace-green-inactive', role: 'VIEWER' as const },
   ];
   if (user.email === 'onboarding@navfarm.demo') return [{ workspaceId: 'workspace-bluewater-aqua', role: 'MANAGER' as const }];
   return [{ workspaceId: 'workspace-green-poultry', role: user.email === 'viewer@navfarm.demo' ? 'VIEWER' as const : 'MANAGER' as const }];
@@ -197,7 +198,7 @@ function sessionPayload(record: SessionRecord): AuthSession {
     return {
       tenantId,
       tenantName: tenant.tenant_name,
-      status: tenant.status as 'ACTIVE' | 'SUSPENDED',
+      status: tenant.status as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED',
       role: user.email === 'tenant@navfarm.demo'
         ? 'TENANT_ADMIN' as const
         : 'TENANT_MEMBER' as const,
@@ -278,7 +279,10 @@ export async function handleMockRequest(request: Request, path: string, requestI
     const eligibleCompanies = user.companies.filter((membership) => String(companyById(membership.companyId)?.tenant_id) === tenantId);
     const companyId = eligibleCompanies.length === 1 ? eligibleCompanies[0].companyId : null;
     const id = randomUUID();
-    const eligibleWorkspaces = workspaceAssignments(user).filter((membership) => state.workspaces.find((workspace) => workspace.workspaceId === membership.workspaceId)?.companyId === companyId);
+    const eligibleWorkspaces = workspaceAssignments(user).filter((membership) => {
+      const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId);
+      return workspace?.companyId === companyId && workspace.status === 'ACTIVE';
+    });
     const record = { userId: user.userId, activeTenantId: tenantId, activeCompanyId: companyId, activeWorkspaceId: eligibleWorkspaces.length === 1 ? eligibleWorkspaces[0].workspaceId : null, expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString() };
     state.sessions.set(id, record);
     return setSessionCookie(json(sessionPayload(record)), id);
@@ -290,7 +294,10 @@ export async function handleMockRequest(request: Request, path: string, requestI
     if (!user) return apiErrorResponse(401, 'MFA challenge expired.', requestId);
     const id = randomUUID();
     const companyId = user.companies[0]?.companyId ?? null;
-    const eligibleWorkspaces = workspaceAssignments(user).filter((membership) => state.workspaces.find((workspace) => workspace.workspaceId === membership.workspaceId)?.companyId === companyId);
+    const eligibleWorkspaces = workspaceAssignments(user).filter((membership) => {
+      const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId);
+      return workspace?.companyId === companyId && workspace.status === 'ACTIVE';
+    });
     const record = { userId, activeTenantId: user.tenantIds[0] ?? null, activeCompanyId: companyId, activeWorkspaceId: eligibleWorkspaces.length === 1 ? eligibleWorkspaces[0].workspaceId : null, expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString() };
     state.sessions.set(id, record);
     return setSessionCookie(json(sessionPayload(record)), id);

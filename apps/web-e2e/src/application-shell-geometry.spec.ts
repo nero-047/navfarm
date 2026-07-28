@@ -35,7 +35,7 @@ test('shared ApplicationShell geometry assertions', async ({ page }) => {
   // No horizontal overflow
   const scrollWidthDesktop = await page.evaluate<number>('document.documentElement.scrollWidth');
   expect(scrollWidthDesktop).toBeLessThanOrEqual(1280);
-  await page.screenshot({ path: 'debug-tenant-dashboard-1280x800.png', fullPage: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path: 'debug-tenant-dashboard-1280x800.png', fullPage: true });
 
   // ── Mobile 390×844: tenant company list ──
   await page.goto('/console/companies');
@@ -55,7 +55,7 @@ test('shared ApplicationShell geometry assertions', async ({ page }) => {
   // No horizontal overflow
   const scrollWidthCompanies = await page.evaluate<number>('document.documentElement.scrollWidth');
   expect(scrollWidthCompanies).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: 'debug-company-list-390x844.png', fullPage: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path: 'debug-company-list-390x844.png', fullPage: true });
 
   // ── Mobile 390×844: Chart of Accounts (company workspace) ──
   await page.goto('/login');
@@ -78,5 +78,5 @@ test('shared ApplicationShell geometry assertions', async ({ page }) => {
   expect(mainMobileCoA!.width).toBe(390);
   const scrollWidthCoA = await page.evaluate<number>('document.documentElement.scrollWidth');
   expect(scrollWidthCoA).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: 'debug-coa-390x844.png', fullPage: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path: 'debug-coa-390x844.png', fullPage: true });
 });

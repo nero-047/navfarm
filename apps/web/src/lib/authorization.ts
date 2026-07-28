@@ -100,23 +100,32 @@ export function destinationForSession(session: AuthSession): string {
   if (session.mfaRequired) return '/mfa/verify';
   if (session.user.platformRole === 'SYSTEM_ADMIN') return '/admin/dashboard';
   const activeTenant = session.tenants.find((tenant) => tenant.tenantId === session.activeTenantId);
-  if (activeTenant?.status === 'SUSPENDED') return '/access-denied?reason=suspended-tenant';
-  if (session.tenants.length > 1 && !session.activeTenantId) return '/context-selection';
+  if (activeTenant?.status === 'SUSPENDED' || session.tenants.some((tenant) => tenant.status === 'SUSPENDED')) {
+    return '/access-denied?reason=account_suspended';
+  }
+  if (!session.activeTenantId) return session.tenants.length ? '/context-selection' : '/access-denied?reason=tenant_not_assigned';
   const activeCompany = activeCompanyMembership(session);
-  if (!activeCompany && session.companies.length > 1) return '/context-selection';
-  if (!activeCompany) return can(session, 'tenant.view') ? '/console/dashboard' : '/access-denied?reason=no-company';
+  if (!activeCompany && session.companies.length) return '/context-selection';
+  if (!activeCompany) return can(session, 'tenant.view') ? '/console/dashboard' : '/access-denied?reason=company_not_assigned';
   // Tenant administrators begin in the tenant console. They can still choose a
   // company context, but operational permissions remain company-role based.
   if (activeTenant?.role === 'TENANT_ADMIN') return '/console/dashboard';
-  if (activeCompany.status === 'INACTIVE') return '/access-denied?reason=inactive-company';
-  if (activeCompany.onboardingStatus !== 'COMPLETED') return '/onboarding';
+  if (activeCompany.status === 'INACTIVE') return '/access-denied?reason=company_inactive';
   // Temporary compatibility for stored v1.0 session snapshots during the
   // frontend migration. Fresh v1.1 sessions always include this collection.
-  if (!session.workspaces) return `/${activeCompany.companySlug}/dashboard`;
-  const workspaces = session.workspaces.filter((workspace) => workspace.companyId === activeCompany.companyId);
+  if (!session.workspaces) {
+    return activeCompany.onboardingStatus !== 'COMPLETED'
+      ? '/onboarding'
+      : `/${activeCompany.companySlug}/dashboard`;
+  }
+  const assignedWorkspaces = session.workspaces.filter((workspace) => workspace.companyId === activeCompany.companyId);
+  const workspaces = assignedWorkspaces.filter((workspace) => workspace.status === 'ACTIVE');
   const activeWorkspace = activeWorkspaceMembership(session);
-  if (!activeWorkspace && workspaces.length !== 1) return `/${activeCompany.companySlug}/workspaces`;
-  const workspace = activeWorkspace ?? workspaces[0];
+  if (!assignedWorkspaces.length) return `/${activeCompany.companySlug}/workspaces`;
+  if (activeCompany.onboardingStatus !== 'COMPLETED') return '/onboarding';
+  if (!workspaces.length) return `/${activeCompany.companySlug}/workspaces`;
+  if ((!activeWorkspace || activeWorkspace.status !== 'ACTIVE') && workspaces.length > 1) return `/${activeCompany.companySlug}/workspaces`;
+  const workspace = activeWorkspace?.status === 'ACTIVE' ? activeWorkspace : workspaces[0];
   return `/${activeCompany.companySlug}/workspaces/${workspace.workspaceSlug}/dashboard`;
 }
 

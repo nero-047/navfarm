@@ -37,7 +37,7 @@ async function assertCaptureReady(page: Page, width: number) {
 async function capture(page: Page, path: string, width: number, height: number) {
   await page.setViewportSize({ width, height });
   await assertCaptureReady(page, width);
-  await page.screenshot({ path });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') await page.screenshot({ path });
 }
 
 test.beforeAll(async () => {

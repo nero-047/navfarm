@@ -7,7 +7,7 @@ function session(options: {
   role?: CompanyRole;
   companies?: number;
   activeCompany?: boolean;
-  tenantStatus?: 'ACTIVE' | 'SUSPENDED';
+  tenantStatus?: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
   onboarding?: 'IN_PROGRESS' | 'COMPLETED';
   platform?: boolean;
 } = {}): AuthSession {
@@ -52,7 +52,7 @@ describe('authorization and context routing', () => {
     expect(destinationForSession(session({ companies: 2, activeCompany: false }))).toBe('/context-selection');
   });
   it('blocks suspended tenants', () => {
-    expect(destinationForSession(session({ tenantStatus: 'SUSPENDED' }))).toContain('suspended-tenant');
+    expect(destinationForSession(session({ tenantStatus: 'SUSPENDED' }))).toContain('account_suspended');
   });
   it('continues incomplete onboarding', () => {
     expect(destinationForSession(session({ onboarding: 'IN_PROGRESS' }))).toBe('/onboarding');

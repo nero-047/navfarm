@@ -32,10 +32,12 @@ async function captureViewport(page: Page, name: string, width: number, height: 
   await expect
     .poll(() => page.evaluate('document.documentElement.scrollWidth'))
     .toBeLessThanOrEqual(width);
-  await page.screenshot({
-    path: resolve(screenshotDirectory, `${name}-${width}x${height}.png`),
-    fullPage: true,
-  });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') {
+    await page.screenshot({
+      path: resolve(screenshotDirectory, `${name}-${width}x${height}.png`),
+      fullPage: true,
+    });
+  }
 }
 
 test('manager can create, operate, quality-release, trace, close and report a mock batch', async ({ page }) => {

@@ -30,7 +30,9 @@ async function capture(page: Page, name: string, width: number, height: number) 
   await page.setViewportSize({ width, height });
   await waitForScreenshotReady(page);
   await expect.poll(() => page.evaluate('document.documentElement.scrollWidth')).toBeLessThanOrEqual(width);
-  await page.screenshot({ path: resolve(presentationDirectory, `${name}-${width}x${height}.png`) });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') {
+    await page.screenshot({ path: resolve(presentationDirectory, `${name}-${width}x${height}.png`) });
+  }
 }
 
 test.beforeEach(async ({ page }) => reset(page));
@@ -110,8 +112,8 @@ test('MFA blocks protected pages until verification and supports recovery', asyn
 
 test('suspended and incomplete-onboarding accounts remain in their protected flows', async ({ page }) => {
   await signIn(page, 'suspended@navfarm.demo');
-  await expect(page).toHaveURL(/\/access-denied\?reason=suspended-tenant$/);
-  await expect(page.getByRole('heading', { name: 'Tenant access suspended' })).toBeVisible();
+  await expect(page).toHaveURL(/\/access-denied\?reason=account_suspended$/);
+  await expect(page.getByRole('heading', { name: 'Account suspended' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login$/);

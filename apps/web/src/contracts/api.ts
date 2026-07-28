@@ -128,7 +128,7 @@ export const sessionUserSchema = z.object({
 export const tenantMembershipSchema = z.object({
   tenantId: z.string(),
   tenantName: z.string(),
-  status: z.enum(['ACTIVE', 'SUSPENDED']),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
   role: z.enum(['TENANT_ADMIN', 'TENANT_MEMBER']),
 });
 

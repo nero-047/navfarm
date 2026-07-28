@@ -5,10 +5,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Bell, ChevronDown, ChevronRight, LogOut, Menu, PanelLeftClose,
-  PanelLeftOpen, ShieldX, UserRound, X,
+  PanelLeftOpen, UserRound, X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { canAccessScope, filterNavigation, type AppScope } from '../../lib/authorization';
+import { filterNavigation, type AppScope } from '../../lib/authorization';
+import { scopeAccessReason } from '../../lib/access-reasons';
 import { navigationForScope } from './navigation';
 
 const SCOPE_LABEL: Record<AppScope, string> = {
@@ -34,6 +35,7 @@ export function ApplicationShell({
   const [profileOpen, setProfileOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const accessReason = session ? scopeAccessReason(session, scope, companySlug) : null;
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('navfarm_sidebar_collapsed') === 'true');
@@ -48,8 +50,8 @@ export function ApplicationShell({
     if (!loading && !session) router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
   }, [loading, pathname, router, session]);
   useEffect(() => {
-    if (!loading && session && !canAccessScope(session, scope)) router.replace('/access-denied?reason=forbidden');
-  }, [loading, router, scope, session]);
+    if (!loading && session && accessReason) router.replace(`/access-denied?reason=${accessReason}`);
+  }, [accessReason, loading, router, session]);
 
   const nav = useMemo(
     () => filterNavigation(navigationForScope(scope, companySlug), session),
@@ -65,18 +67,7 @@ export function ApplicationShell({
   if (loading || (!session && !user)) {
     return <div className="flex min-h-screen items-center justify-center bg-[#f3f5f8] text-sm text-[#707789]">Loading your secure workspace…</div>;
   }
-  if (!session || !canAccessScope(session, scope)) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f3f5f8] p-6">
-        <div className="max-w-md rounded-2xl border border-[#e1e5ec] bg-white p-8 text-center shadow-sm">
-          <ShieldX className="mx-auto h-10 w-10 text-[#c24332]" />
-          <h1 className="mt-4 text-xl font-semibold text-[#22283a]">Access denied</h1>
-          <p className="mt-2 text-sm leading-6 text-[#707789]">Your current role or membership does not allow access to this area.</p>
-          <Link href="/context-selection" className="mt-5 inline-flex rounded-xl bg-[#0b1248] px-4 py-2.5 text-xs font-semibold text-white">Choose another workspace</Link>
-        </div>
-      </div>
-    );
-  }
+  if (!session || accessReason) return <div className="min-h-screen bg-[#f3f5f8]" />;
 
   const sidebarWidth = collapsed ? '84px' : '252px';
   const sidebar = (
