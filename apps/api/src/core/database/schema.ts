@@ -2842,3 +2842,134 @@ export const jobScheduleMaster = mysqlTable('job_schedule_master', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
 });
 
+// ==========================================
+// 16. ENTERPRISE QUALITY & TRACEABILITY ENGINE (PHASE 8)
+// ==========================================
+
+export const qualityPlan = mysqlTable('quality_plan', {
+  plan_id: varchar('plan_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  plan_code: varchar('plan_code', { length: 50 }).notNull(),
+  plan_name: varchar('plan_name', { length: 100 }).notNull(),
+  inspection_type: varchar('inspection_type', { length: 30 }).default('INCOMING').notNull(), // INCOMING, IN_PROCESS, FINAL, OUTGOING
+  item_id: varchar('item_id', { length: 36 }),
+  item_category_id: varchar('item_category_id', { length: 36 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const qualityParameter = mysqlTable('quality_parameter', {
+  parameter_id: varchar('parameter_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  plan_id: varchar('plan_id', { length: 36 }).notNull().references(() => qualityPlan.plan_id, { onDelete: 'cascade' }),
+  parameter_name: varchar('parameter_name', { length: 100 }).notNull(),
+  target_value: decimal('target_value', { precision: 18, scale: 4 }),
+  min_value: decimal('min_value', { precision: 18, scale: 4 }),
+  max_value: decimal('max_value', { precision: 18, scale: 4 }),
+  uom_id: varchar('uom_id', { length: 36 }),
+  is_mandatory: boolean('is_mandatory').default(true).notNull()
+});
+
+export const qualityInspection = mysqlTable('quality_inspection', {
+  inspection_id: varchar('inspection_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  plan_id: varchar('plan_id', { length: 36 }).references(() => qualityPlan.plan_id, { onDelete: 'restrict' }),
+  batch_id: varchar('batch_id', { length: 36 }),
+  lot_number: varchar('lot_number', { length: 100 }),
+  sample_size: decimal('sample_size', { precision: 18, scale: 4 }).default('1.0000').notNull(),
+  overall_result: varchar('overall_result', { length: 30 }).default('PASSED').notNull(), // PASSED, FAILED, QUARANTINE, REWORK
+  inspected_by: varchar('inspected_by', { length: 36 }),
+  inspected_at: timestamp('inspected_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const qualityResult = mysqlTable('quality_result', {
+  result_id: varchar('result_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  inspection_id: varchar('inspection_id', { length: 36 }).notNull().references(() => qualityInspection.inspection_id, { onDelete: 'cascade' }),
+  parameter_id: varchar('parameter_id', { length: 36 }).notNull().references(() => qualityParameter.parameter_id, { onDelete: 'cascade' }),
+  measured_value: decimal('measured_value', { precision: 18, scale: 4 }).notNull(),
+  pass_fail_status: varchar('pass_fail_status', { length: 10 }).default('PASS').notNull()
+});
+
+export const qualityNonConformance = mysqlTable('quality_non_conformance', {
+  ncr_id: varchar('ncr_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  inspection_id: varchar('inspection_id', { length: 36 }).references(() => qualityInspection.inspection_id, { onDelete: 'cascade' }),
+  severity: varchar('severity', { length: 20 }).default('MAJOR').notNull(), // CRITICAL, MAJOR, MINOR
+  description: text('description').notNull(),
+  root_cause: text('root_cause'),
+  status: varchar('status', { length: 30 }).default('OPEN').notNull(), // OPEN, INVESTIGATING, CLOSED
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const qualityCapa = mysqlTable('quality_capa', {
+  capa_id: varchar('capa_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  ncr_id: varchar('ncr_id', { length: 36 }).notNull().references(() => qualityNonConformance.ncr_id, { onDelete: 'cascade' }),
+  corrective_action: text('corrective_action').notNull(),
+  preventive_action: text('preventive_action').notNull(),
+  assigned_to: varchar('assigned_to', { length: 36 }),
+  status: varchar('status', { length: 30 }).default('IN_PROGRESS').notNull(), // DRAFT, IN_PROGRESS, VERIFIED, CLOSED
+  closed_at: timestamp('closed_at', { mode: 'string' }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const qrBarcodeMaster = mysqlTable('qr_barcode_master', {
+  qr_id: varchar('qr_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  qr_code_hash: varchar('qr_code_hash', { length: 100 }).notNull().unique(),
+  barcode_type: varchar('barcode_type', { length: 30 }).default('QR_CODE').notNull(), // GS1_128, QR_CODE, EAN_13
+  entity_type: varchar('entity_type', { length: 30 }).notNull(), // BATCH, LOT, PRODUCT, DISPATCH
+  entity_id: varchar('entity_id', { length: 36 }).notNull(),
+  payload_json: json('payload_json'),
+  scanned_count: int('scanned_count').default(0).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const batchTraceability = mysqlTable('batch_traceability', {
+  trace_id: varchar('trace_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  parent_batch_id: varchar('parent_batch_id', { length: 36 }),
+  origin_farm_id: varchar('origin_farm_id', { length: 36 }),
+  origin_shed_id: varchar('origin_shed_id', { length: 36 }),
+  feed_batch_no: varchar('feed_batch_no', { length: 100 }),
+  medicine_batch_no: varchar('medicine_batch_no', { length: 100 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const traceabilityEvent = mysqlTable('traceability_event', {
+  event_id: varchar('event_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  trace_id: varchar('trace_id', { length: 36 }).notNull().references(() => batchTraceability.trace_id, { onDelete: 'cascade' }),
+  event_type: varchar('event_type', { length: 50 }).notNull(), // PLACEMENT, FEEDING, MEDICATION, EGG_HARVEST, SLAUGHTER, PACKAGING, DISPATCH
+  source_location_id: varchar('source_location_id', { length: 36 }),
+  destination_location_id: varchar('destination_location_id', { length: 36 }),
+  event_date: timestamp('event_date', { mode: 'string' }).defaultNow().notNull(),
+  event_details: json('event_details')
+});
+
+export const recallManagement = mysqlTable('recall_management', {
+  recall_id: varchar('recall_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  recall_number: varchar('recall_number', { length: 50 }).notNull().unique(),
+  reason: varchar('reason', { length: 255 }).notNull(),
+  severity: varchar('severity', { length: 30 }).default('CLASS_1_HIGH').notNull(), // CLASS_1_HIGH, CLASS_2_MEDIUM, CLASS_3_LOW
+  status: varchar('status', { length: 30 }).default('INITIATED').notNull(), // INITIATED, STOCK_BLOCKED, NOTIFIED, CLOSED
+  initiated_by: varchar('initiated_by', { length: 36 }),
+  initiated_at: timestamp('initiated_at', { mode: 'string' }).defaultNow().notNull()
+});
+
+export const recallAffectedBatch = mysqlTable('recall_affected_batch', {
+  affected_id: varchar('affected_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  recall_id: varchar('recall_id', { length: 36 }).notNull().references(() => recallManagement.recall_id, { onDelete: 'cascade' }),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  lot_number: varchar('lot_number', { length: 100 }),
+  blocked_qty: decimal('blocked_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  quarantine_hold_id: varchar('quarantine_hold_id', { length: 36 }).references(() => quarantineHold.hold_id, { onDelete: 'set null' })
+});
+

@@ -37,6 +37,7 @@ import { ProductionModule } from './modules/production/production.module';
 import { PoultryModule } from './modules/poultry/poultry.module';
 import { CostingModule } from './modules/costing/costing.module';
 import { QcModule } from './modules/qc/qc.module';
+import { QualityTraceabilityModule } from './modules/quality-traceability/quality-traceability.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -95,6 +96,7 @@ import { SystemController } from './system/system.controller';
     PoultryModule,
     CostingModule,
     QcModule,
+    QualityTraceabilityModule,
   ],
   controllers: [SystemController],
   providers: [],

@@ -3472,6 +3472,91 @@ export default api;
 
 ---
 
-*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 35 modules and 59 controllers.*
+## 36. ENTERPRISE QUALITY & TRACEABILITY ENGINE ENDPOINTS (PHASE 8)
+
+### `POST /quality/plan`
+- **Summary**: Create Quality Inspection Plan with test parameters (Min/Max acceptable values).
+- **Permission**: `QUALITY:PLAN:create`
+- **Body**: `{ company_id, plan_code: "PLAN-EGG-01", plan_name: "Egg Quality Plan", inspection_type: "INCOMING", parameters: [...] }`
+
+### `GET /quality/plan`
+- **Summary**: List Quality Inspection Plans for a company.
+- **Permission**: `QUALITY:PLAN:view`
+- **Query**: `companyId`
+
+### `POST /quality/inspection/execute`
+- **Summary**: Execute Quality Inspection & evaluate parameter pass/fail criteria (Auto-quarantine on failure).
+- **Permission**: `QUALITY:INSPECTION:create`
+- **Body**: `{ company_id, plan_id, batch_id, lot_number, sample_size: 1.0, results: [{ parameter_id, measured_value: 11.5 }], warehouse_id, location_id, hold_qty }`
+
+### `GET /quality/inspection/:id`
+- **Summary**: Fetch Quality Inspection details with parameter results.
+- **Permission**: `QUALITY:INSPECTION:view`
+
+### `GET /quality/inspection`
+- **Summary**: List Quality Inspections for a company.
+- **Permission**: `QUALITY:INSPECTION:view`
+- **Query**: `companyId`
+
+### `POST /quality/qr-barcode/generate`
+- **Summary**: Generate secure cryptographic QR / GS1-128 Barcode Hash.
+- **Permission**: `QUALITY:QR_BARCODE:create`
+- **Body**: `{ company_id, barcode_type: "QR_CODE", entity_type: "BATCH", entity_id: "batch-uuid", payload_metadata: {...} }`
+
+### `GET /quality/qr-barcode/scan/:qrHash`
+- **Summary**: Scan & Resolve cryptographic QR / Barcode Hash payload.
+- **Permission**: `QUALITY:QR_BARCODE:view`
+
+### `POST /quality/traceability/event`
+- **Summary**: Record supply chain traceability movement event step.
+- **Permission**: `QUALITY:TRACEABILITY:create`
+- **Body**: `{ company_id, batch_id, event_type: "EGG_HARVEST", source_location_id, destination_location_id, event_details: {...} }`
+
+### `GET /quality/traceability/genealogy/:batchId`
+- **Summary**: Fetch full forward & backward batch genealogy lineage.
+- **Permission**: `QUALITY:TRACEABILITY:view`
+
+### `GET /quality/farm-to-fork/:batchId`
+- **Summary**: Compile end-to-end Farm-to-Fork supply chain journey map.
+- **Permission**: `QUALITY:FARM_TO_FORK:view`
+
+### `POST /quality/recall/initiate`
+- **Summary**: Initiate Product Recall & Block Affected Warehouse Inventory on Quarantine Hold.
+- **Permission**: `QUALITY:RECALL:create`
+- **Body**: `{ company_id, recall_number: "RECALL-2026-001", reason: "Pathogen risk", severity: "CLASS_1_HIGH", affected_batch_ids: [...] }`
+
+### `GET /quality/recall`
+- **Summary**: List Product Recalls for a company.
+- **Permission**: `QUALITY:RECALL:view`
+- **Query**: `companyId`
+
+### `POST /quality/capa/ncr`
+- **Summary**: Log Non-Conformance Report (NCR).
+- **Permission**: `QUALITY:CAPA:create`
+- **Body**: `{ company_id, inspection_id, severity: "MAJOR", description: "Feed lot contamination", root_cause: "Supplier storage leak" }`
+
+### `POST /quality/capa`
+- **Summary**: Create Corrective & Preventive Action (CAPA) plan.
+- **Permission**: `QUALITY:CAPA:create`
+- **Body**: `{ company_id, ncr_id, corrective_action: "Reject lot", preventive_action: "Supplier audit requirement", assigned_to }`
+
+### `GET /quality/capa/ncrs`
+- **Summary**: List Non-Conformance Reports for a company.
+- **Permission**: `QUALITY:CAPA:view`
+- **Query**: `companyId`
+
+### `GET /quality/capa/capas`
+- **Summary**: List CAPA Plans for a company.
+- **Permission**: `QUALITY:CAPA:view`
+- **Query**: `companyId`
+
+### `GET /quality/report/summary`
+- **Summary**: Enterprise Quality & Food Safety Summary Dashboard (NCR, CAPA, Recall Counts).
+- **Permission**: `QUALITY:REPORT:view`
+- **Query**: `companyId`
+
+---
+
+*End of NAVFarm_API_Contract.md — Generated from full backend analysis of 36 modules and 66 controllers.*
 
 
