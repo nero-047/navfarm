@@ -96,6 +96,23 @@ export const operationalReportSchema = z.object({
   generatedAt: z.string(), batchCount: z.number(),
   openWip: z.number(), totalVariance: z.number(), authoritative: z.boolean(),
 });
+export const workspaceDashboardSchema = z.object({
+  tenantId: z.string(),
+  companyId: z.string(),
+  workspaceId: z.string(),
+  generatedAt: z.string(),
+  activeBatchCount: z.number().int().nonnegative(),
+  operationCount: z.number().int().nonnegative(),
+  quality: z.object({
+    pass: z.number().int().nonnegative(),
+    hold: z.number().int().nonnegative(),
+    fail: z.number().int().nonnegative(),
+  }),
+  qrPackCount: z.number().int().nonnegative(),
+  resourceCount: z.number().int().nonnegative(),
+  openWip: z.number().nonnegative(),
+  authoritative: z.literal(false),
+});
 
 export type CostingMethod = z.infer<typeof costingMethodSchema>;
 export type WorkflowStatus = z.infer<typeof workflowStatusSchema>;
@@ -113,3 +130,4 @@ export type ResourceUsage = z.infer<typeof resourceUsageSchema>;
 export type CostingSnapshot = z.infer<typeof costingSnapshotSchema>;
 export type JournalEntry = z.infer<typeof journalEntrySchema>;
 export type OperationalReport = z.infer<typeof operationalReportSchema>;
+export type WorkspaceDashboard = z.infer<typeof workspaceDashboardSchema>;

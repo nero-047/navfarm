@@ -1,6 +1,42 @@
 # Unresolved Product Decisions
 
-These items are intentionally not decided in Phase 8.
+These items remain intentionally unresolved after Demo Completion Milestone 3.
+Milestone 1 settled the frontend mock policy that tenant is session
+established, the visible selector switches Company/Workspace only, memberships
+and permissions are explicit, and company/tenant roles do not authorize
+workspace mutations. Milestone 2 settled the frontend mock ownership and route
+boundary for Company Members, Roles, Settings and Readiness. Milestone 3
+settled the frontend demo convention that a Workspace is a company-owned,
+addressable operational partition with one configured NOB and one or more
+enabled LOBs. That convention drives routing, labels, module availability and
+typed mock responses; it is not a claim that the durable backend domain model
+has been approved.
+
+## Durable Workspace, NOB and LOB Relationship
+
+Known:
+
+- The documented product hierarchy is
+  `Tenant -> Company -> Workspace -> NOB/LOB -> Operations`.
+- The Milestone 3 frontend gives each workspace exactly one configured NOB and
+  an explicit list of enabled LOBs.
+- The switcher exposes Company administration and assigned Workspaces; it never
+  exposes Tenant as a selectable option.
+- Operational endpoints and browser state are partitioned by the complete
+  tenant/company/workspace tuple.
+
+Unresolved:
+
+- Whether the durable Workspace represents a site, branch, operational
+  partition, legal sub-entity, NOB container, or another business concept.
+- Whether a production workspace may contain more than one NOB.
+- Whether LOB enablement belongs directly to Workspace, through a separate
+  Workspace/LOB assignment, or through a site/location model.
+- Workspace lifecycle, archival, transfer, member migration and cross-workspace
+  reporting rules.
+
+The frontend must keep workspace, NOB and LOB identifiers distinct until those
+decisions are signed off.
 
 ## Workspace vs Operational vs Accounting Readiness
 
@@ -14,6 +50,31 @@ Unresolved:
 
 - Whether accounting readiness is strictly required for all operational writes or only for close/finalization.
 - Whether some LOBs may operate without Finance enabled.
+- Industry-specific readiness requirements and responsible owners beyond the
+  documented shared mock checks.
+
+The company readiness aggregate labels these rules `POLICY_PENDING`; it does
+not count them as blockers.
+
+## Custom company roles
+
+Known:
+
+- The mock exposes the standard company-role and workspace-role catalogues
+  separately.
+- Standard company-role assignment occurs through Company Members.
+- `CUSTOM` remains in the compatibility enum with no default permissions.
+
+Unresolved:
+
+- Final custom-role catalogue, permission-combination constraints, naming,
+  delegation, audit and lifecycle rules.
+- Whether custom roles may include workspace permissions or only company
+  permissions.
+- Durable backend endpoints and versioning for custom role definitions.
+
+The frontend displays custom roles as planned and never pretends to persist a
+custom definition.
 
 ## Workspace-specific terminology
 
@@ -35,7 +96,8 @@ Unresolved:
 
 Known:
 
-- The frontend models a 15-step onboarding flow.
+- The functional document defines a 15-step onboarding flow, while the current
+  frontend exposes 13 named setup routes.
 - Foundational profile/address/contact/localization/fiscal/modules/admin steps are mandatory for workspace readiness.
 - COA, NOB/LOB and essential masters affect operations readiness.
 
@@ -56,6 +118,26 @@ Unresolved:
 
 - Whether Tenant Admin can directly edit company accounting config without explicit company finance role.
 - Whether Tenant Admin can override readiness blockers.
+
+The settled interim rule is narrower: Tenant Admin may administer workspaces
+and company setup only through explicit tenant/company permissions and receives
+no automatic workspace operational access.
+
+## Session transport and tenant selection
+
+Known:
+
+- The frontend contract and mock use a same-origin HTTP-only cookie.
+- Tenant is part of the authenticated isolation tuple and is not a visible
+  selector option; a Company choice supplies its authorized tenant ID to the
+  atomic context request.
+
+Unresolved:
+
+- Whether production implements this contract directly or provides a
+  server-side adapter over the reference backend's JWT/refresh model.
+- The canonical backend tenancy/database strategy for a user with explicit
+  company memberships in more than one tenant.
 
 ## Tenant Summary Visibility vs Company Detail Access
 
@@ -121,3 +203,11 @@ Unresolved:
 - Whether costing snapshots are continuously authoritative before close.
 - Whether variance generation happens at close, period close or both.
 - BIO_ASSET valuation policy and measurement timing.
+
+## Milestone 4 disposition
+
+The final presentation milestone resolves no product or backend policy. Visual
+readiness must not be read as resolution of custom-role semantics, the
+15-step/13-route setup alignment, authoritative costing timing, notification
+delivery, report as-of semantics, public trace signing, retention, or
+compliance rules. Those decisions remain backend/product blockers.

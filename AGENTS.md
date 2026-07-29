@@ -51,14 +51,61 @@
 ## Web Demo Conventions
 
 - The web app is Next.js 16 + React 19 under `apps/web` and normally runs at `http://localhost:3001` during local development.
-- The demo currently uses local browser state for authentication (`navfarm_auth_user`) and custom companies (`navfarm_custom_companies`); there is no real authentication or persistence layer.
+- The web demo uses the cookie-backed `AuthProvider` plus same-origin
+  `/api/v1/auth/*` mock endpoints as its only live browser session source.
+  Authentication and the active tenant/company/workspace tuple must not be
+  mirrored to `localStorage`, `sessionStorage`, or a module-global snapshot.
+  Mock sessions are process-memory fixtures, not durable or production
+  authentication.
+- The authenticated session establishes the tenant. Visible context selection
+  is limited to Company administration and explicitly assigned Workspaces;
+  never add tenant/organisation switching to the company/workspace selector.
+- Company roles and tenant-administration permissions never grant workspace
+  operational capabilities. Operational reads and mutations require a matching
+  active tenant/company/workspace tuple, explicit workspace membership, and
+  the requested workspace capability.
+- Company administration is independent of operational demo state.
+  `apps/web/src/app/[company]/layout.tsx` owns the company shell only;
+  `DemoStoreProvider` is mounted exclusively by
+  `apps/web/src/app/[company]/workspaces/[workspace]/layout.tsx`.
+- Canonical company administration routes include `/{company}/profile`,
+  `/members`, `/roles`, `/readiness`, and `/settings`. Their screens use the
+  typed `modules/company-admin/client.ts` boundary and must never import mock
+  repositories or farm-demo state directly.
+- Company roles and workspace roles are separate assignments. Member changes
+  must update the canonical explicit identity fixture, while workspace access
+  is added/changed/removed only through an explicit workspace assignment.
+- Company readiness aggregates company foundation, onboarding, shared masters,
+  accounting, workspace creation/membership, NOB/LOB, and per-workspace
+  operational readiness. Accounting readiness remains a separate detailed
+  route. Unresolved readiness rules must stay informational, recommended, or
+  policy-pending rather than becoming invented blockers.
 - Company workspaces use `/{company}/...`. The company selector must show company entities, not industries or LOBs. Each company is assigned a documented NOB; piggery, dairy, rearing, laying, hatching, slaughter, crops, seeds, etc. belong inside the company as LOBs.
 - Seed/demo NOB options must follow the docs: Poultry, Livestock, Agriculture, Aquaculture, Insect Farming, and Feed & Processing. New NOBs/LOBs should remain configuration-driven.
 - Keep company-scoped navigation and UI reusable across industries. Prefer domain configuration and typed metadata over duplicating pages per company/LOB.
 - Preserve the existing visual language unless the user asks for a redesign: navy navigation, white/light-gray content surfaces, restrained red/blue accents, compact typography, and card-based layouts.
 - The frontend demo information architecture should cover: dashboard/overview, batches, daily operations, QC, QR traceability, resources and KPI schedules, financial/variance reports, and settings/onboarding/master data.
-- Settings should reflect the documented setup domains: company profile and addresses/contacts, language and currency, timezone and fiscal rules, enabled modules/NOB/LOB configuration, users/roles, notifications, GL/item mappings, and master data.
+- Settings should reflect the documented setup domains: company profile and addresses/contacts, language and currency, timezone and fiscal rules, enabled modules/NOB/LOB configuration, users/roles, notifications, GL/item mappings, and master data. The current mock settings resource supports profile links, localization, fiscal configuration, modules, notifications, business-structure links, and setup status; do not invent additional persisted preferences.
 - Treat incomplete pages as demo placeholders to be progressively backed by realistic local fixtures from the RAK docs, with visible `Demo data` labelling where users could otherwise mistake values for live records.
+
+### Company and workspace context
+
+- The authenticated session establishes the tenant; tenant/organisation is an
+  isolation dimension and must not appear as a visible switchable option.
+- The one live application switcher groups accessible active Workspaces beneath
+  accessible active Companies. Its choices are Company administration
+  (`activeWorkspaceId: null`) or an explicitly assigned Workspace.
+- Context changes use the complete tenant/company/workspace tuple and commit
+  only after the context API succeeds. Do not persist business context in
+  browser storage.
+- For the frontend demo, a Workspace is an operational partition inside one
+  Company. It owns explicit membership/roles, configured NOB and enabled LOBs,
+  enabled operational modules, readiness, operational records, and
+  workspace-specific masters/settings. Workspace, NOB, and LOB remain distinct
+  concepts; their durable backend relationship is unresolved.
+- Workspace navigation and record links must remain under
+  `/{company}/workspaces/{workspace}/...`. Equivalent list modules may be
+  preserved during a safe switch, but record IDs must never cross workspaces.
 
 ## Mobile App Conventions
 
@@ -70,3 +117,12 @@
 - The user may have active route migrations or other uncommitted frontend changes. Inspect `git status` and preserve unrelated work.
 - Run web and mobile validation through their Nx targets with `pnpm nx ...` as required by the workspace guidance above.
 - For frontend demo work, verify the rendered UI at desktop and relevant mobile viewport sizes, not only types or source code.
+
+## Final Demo Presentation Baseline
+
+- Canonical web routes use the shared semantic tokens in `apps/web/src/app/global.css`; new components should not reintroduce light-only surfaces.
+- Light/dark persistence is a UI preference only (`navfarm_theme`) and must never carry authentication, authorization, tenant, company, workspace, or business state.
+- Platform and Tenant scopes show static scope identity. The interactive switcher remains Company/Workspace only.
+- Preserve labelled internal table scrolling, 44px touch targets, visible focus, reduced motion, and focus containment/restoration in dialogs and drawers.
+- Public trace must remain public-safe, visibly demo data, and free of certification or compliance claims.
+- The Milestone 4 evidence inventory and demonstration sequence are documented in `docs/frontend-api-readiness/demo-completion-status.md` and `docs/demo-presentation-guide.md`.

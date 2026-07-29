@@ -1,5 +1,9 @@
 /** @jest-environment node */
-import { handleOperationalRequest, resetOperationalRepository } from './operational-repository';
+import {
+  handleOperationalRequest,
+  resetOperationalRepository,
+  type OperationalActor,
+} from './operational-repository';
 import type { WorkflowBatch } from '../../modules/farm-demo/operational-contracts';
 
 const scope = {
@@ -12,7 +16,11 @@ const actor = {
   activeCompanyId: scope.companyId,
   activeWorkspaceId: scope.workspaceId,
   accessibleWorkspaceIds: [scope.workspaceId],
-};
+  workspacePermissions: [
+    'batches.create', 'batches.approve', 'batches.close', 'operations.create',
+    'quality.manage', 'traceability.manage', 'resources.manage',
+  ],
+} satisfies OperationalActor;
 const root = `/tenants/${scope.tenantId}/companies/${scope.companyId}/workspaces/${scope.workspaceId}`;
 
 const draft: WorkflowBatch = {
@@ -55,6 +63,25 @@ describe('operational server-side mock adapter', () => {
     );
     expect(response?.status).toBe(200);
     await expect(response?.json()).resolves.toMatchObject({ id: 'batch-1', status: 'APPROVED' });
+  });
+
+  it('derives a typed dashboard summary from the isolated workspace state', async () => {
+    await bootstrap();
+    const response = await handleOperationalRequest(
+      request('GET'),
+      `${root}/dashboard`,
+      'request-dashboard',
+      actor,
+    );
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      workspaceId: scope.workspaceId,
+      activeBatchCount: 0,
+      quality: { pass: 0, hold: 0, fail: 0 },
+      authoritative: false,
+    });
   });
 
   it('returns a conflict for a stale lifecycle transition', async () => {

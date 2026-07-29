@@ -15,6 +15,8 @@ Current granular permissions:
 - `users.manage`
 - `roles.view`
 - `roles.manage`
+- `masters.view`
+- `masters.manage`
 - `batches.view`
 - `batches.create`
 - `batches.approve`
@@ -25,6 +27,7 @@ Current granular permissions:
 - `quality.view`
 - `quality.manage`
 - `traceability.view`
+- `traceability.manage`
 - `resources.view`
 - `resources.manage`
 - `reports.export`
@@ -53,14 +56,14 @@ Current granular permissions:
 
 | Role | Scope | Permissions | Confirmed behavior |
 |---|---|---|---|
-| Company Admin (`ADMIN`) | Company | company configuration/accounting defaults | Used by multi-company and MFA demo users. Does not itself grant workspace operations. |
+| Company Admin (`ADMIN`) | Company | company, users, roles, masters, accounting and workspace-administration permissions | Used by company, tenant, multi-company and MFA demo users. Does not itself grant workspace operations. |
 | Super Admin (`SUPER_ADMIN`) | Company | all company permissions | Used for onboarding admin company setup. |
 | Operations Manager (`FARM_MANAGER`) | Company membership plus assigned workspace | `company.view`; operational permissions are resolved from workspace membership | Can execute the Phase 7 flow only in assigned workspaces. No finance view/manage. |
-| Accountant (`ACCOUNTANT`) | Company | `company.view`, `batches.view`, `costs.view`, `finance.view`, `finance.manage`, `reports.export`, `audit.view` | Used by tenant admin active company membership, but tenant-admin setup rights are tenant-scoped. |
-| Auditor (`AUDITOR`) | Company | `company.view`, `batches.view`, `costs.view`, `finance.view`, `quality.view`, `traceability.view`, `resources.view`, `reports.export`, `audit.view` | Read-oriented access to accounting/masters tests; no create controls. |
-| Supervisor (`SUPERVISOR`) | Company | `company.view`, `batches.view`, `batches.create`, `operations.create`, `quality.view`, `traceability.view`, `resources.view` | Existing role, not a Phase 7.1 demo account. |
-| Viewer (`VIEWER`) | Company | `company.view`, `batches.view`, `quality.view`, `traceability.view`, `resources.view` | Genuinely read-only. No batch create/manage, operation recording, QC creation, or mutation API access. |
-| Custom (`CUSTOM`) | Company | Explicit permissions array | No default permissions. |
+| Accountant (`ACCOUNTANT`) | Company | Fixture: `company.view`, `masters.view`, `costs.view`, `finance.view`, `finance.manage`, `audit.view` | No workspace membership or operational capability. |
+| Auditor (`AUDITOR`) | Company | Fixture: `company.view`, `masters.view`, `costs.view`, `finance.view`, `audit.view` | Read-only company/audit scope; no workspace membership. |
+| Supervisor (`SUPERVISOR`) | Company | Catalogue role only | Company role does not confer operations; an explicit workspace membership must carry capabilities. |
+| Viewer (`VIEWER`) | Company | Fixture: `company.view` | Workspace read capabilities exist only on the separate Viewer workspace membership. |
+| Custom (`CUSTOM`) | Company | No demo assignment/default permissions | Planned only; final custom-role catalogue and persistence remain unresolved. |
 
 ## Scope Rules
 
@@ -73,6 +76,12 @@ Current granular permissions:
 - Backend must filter all company collections by both tenant membership and company membership.
 - A user with one company must not see records from another company unless their membership includes it.
 - Suspended tenants cannot access tenant/company workspaces.
+- Role names are descriptive metadata. The mock session and mutation repository
+  authorize only the explicit permission arrays on the active membership; there
+  is no tenant-role or company-role operational fallback.
+- Company-role changes and workspace-role changes are independent mutations.
+  Company membership must be active before any recorded workspace assignment
+  can authorize session visibility.
 
 ## Route Guard Expectations
 
@@ -80,7 +89,38 @@ Current granular permissions:
 |---|---|---|
 | Platform | `/admin/*` | Require `SYSTEM_ADMIN`; otherwise 403. |
 | Tenant | `/console/*` | Require active tenant and `tenant.view`. |
-| Company | `/{company}/settings`, `/masters`, `/accounting`, `/setup` | Require active company membership and company configuration capability. |
+| Company read | `/{company}/{overview,profile,readiness,settings}`, `/setup` | Require active company membership and `company.view`; no active workspace is required. |
+| Company members/roles | `/{company}/{members,roles}` | Require `users.view` or `roles.view`; mutations require the exact `users.manage`, `roles.manage`, and/or `workspaces.manage` combination. |
+| Company masters/accounting | `/{company}/{masters,accounting}` | Require `masters.view` or `finance.view`; mutations require the matching manage capability. |
 | Workspace | `/{company}/workspaces/{workspace}/{dashboard|batches|operations|quality|traceability|resources|costing|reports|masters|settings}` | Require matching tenant/company/workspace membership and active context. |
 | Operational mutations | workspace batch/QC/QR/resources close/write routes | Require the relevant workspace capability; tenant/company administration alone is insufficient. |
 | Configuration mutations | setup, masters, NOB/LOB, accounting config | Require `company.manage` or explicit tenant-admin setup authority. |
+
+Operational API denials use `CAPABILITY_REQUIRED`. Scope failures use
+`TENANT_MEMBERSHIP_REQUIRED`, `COMPANY_NOT_IN_TENANT`,
+`COMPANY_MEMBERSHIP_REQUIRED`, `WORKSPACE_NOT_IN_COMPANY`,
+`WORKSPACE_MEMBERSHIP_REQUIRED`, the relevant inactive/suspended code, or
+`STALE_CONTEXT`.
+
+This matrix is implemented in the mock frontend boundary and documents the
+future backend contract; the real backend enforcement is still missing.
+
+## Switcher and workspace-page enforcement
+
+The visible shell switcher contains Company administration and explicitly
+assigned active Workspaces only. Tenant is supplied from the authenticated
+membership and is never a row. Inactive/mismatched tuples are rejected before
+the client changes session state. A failed switch leaves the previous tuple and
+route usable.
+
+Workspace settings and masters reads require the active nested
+tenant/company/workspace tuple plus explicit workspace membership. Their
+canonical mock endpoints do not grant configuration writes to Workspace
+Manager/Viewer. Company/Tenant administrators configure through the
+company-administration workspace endpoint and `workspaces.manage`.
+
+Milestone 4 presentation controls are authorization-neutral. Theme toggle,
+mobile drawer, scope identity cards, badges, and responsive table/card
+variants never alter the active tuple or capability set. `aria-current`,
+selected switcher state, and hidden mutation controls reflect the existing
+authorization result; they are not enforcement by themselves.

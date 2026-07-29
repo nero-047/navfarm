@@ -4,23 +4,37 @@ Implementation sequence for the NestJS backend.
 
 ## 1. Authentication and Context
 
-Build:
+Frontend mock/contract status:
 
-- Cookie-session auth.
-- Login/logout/session refresh.
-- MFA challenge, verify and recovery.
-- Context selection.
-- Tenant/company/workspace memberships and active context.
-- Suspended tenant behavior.
+- Implemented in the frontend mock: cookie login/logout/session refresh; an
+  unauthenticated MFA challenge followed by a complete session; suspended
+  state; explicit membership fixtures; atomic context tuple validation; and
+  specific context/capability error codes.
+- Contract ready: `authLoginRequestSchema`, `mfaChallengeSchema`,
+  `authSessionSchema`, `authContextRequestSchema`, and same-origin
+  `/api/v1/auth/*` calls.
+- Retired in the frontend: module-global/browser-token session helpers,
+  browser-storage auth/context, and the second `/company-selection` flow.
+
+Backend must build:
+
+- Durable secure cookie-session auth, login/logout/session refresh.
+- MFA challenge, verify and one-time recovery.
+- Tenant/company/workspace membership persistence and active context.
+- Suspended account/tenant/resource enforcement.
+- CSRF, rate limiting, credential/recovery-code security and audit events.
 
 Acceptance criteria:
 
 - `authSessionSchema` responses validate in the frontend client.
 - MFA challenge does not create an authenticated app session.
-- Invalid context selection returns 403.
+- Invalid context selection returns the documented stable ownership,
+  membership, inactive/suspended, or stale-tuple code.
 - Multi-company/workspace session persists selected context and clears stale
   workspace state when company changes.
 - No tokens are stored in browser localStorage.
+- Tenant/company administration alone never passes an operational mutation
+  guard; the active workspace membership must carry the exact capability.
 
 ## 2. Tenant and Company Administration
 
@@ -31,12 +45,25 @@ Build:
 - Plans, usage, tenant audit.
 - Tenant dashboard, users, roles and invitations.
 - Company create/list/detail.
+- Company profile/settings aggregate and documented section mutations.
+- Company members, invitations, active/inactive membership lifecycle.
+- Standard company-role catalogue and assignment.
+- Explicit workspace assignment add/change/remove with company/workspace role
+  independence.
 
 Acceptance criteria:
 
 - Platform Admin can access `/admin/*`.
 - Tenant Admin cannot access `/admin/*`.
 - Tenant Admin can create a draft company and enter setup.
+- Company administration works with `activeWorkspaceId: null`.
+- Member/invitation/role/settings mutations require the exact documented
+  capability combination and update the same membership model used by session
+  restoration.
+- Company-role changes never mutate workspace roles; workspace-role changes
+  never mutate company roles.
+- Workspace assignment appears in the restored session, and removal revokes
+  workspace visibility.
 - Suspended tenant access is blocked.
 
 ## 3. Onboarding and Readiness
@@ -46,6 +73,8 @@ Build:
 - 15-step setup status.
 - Profile, addresses, contacts, localization, fiscal, modules, administrator, team.
 - Company accounting readiness plus separate workspace operational readiness.
+- Company readiness aggregate covering foundation, setup, masters, accounting,
+  workspace creation/membership, NOB/LOB and per-workspace operations.
 - Setup completion.
 
 Acceptance criteria:
@@ -53,6 +82,7 @@ Acceptance criteria:
 - Incomplete onboarding routes to setup profile/review.
 - Operations routes redirect when `operationsReady` is false.
 - Readiness calculation is server-driven.
+- Policy-pending readiness rules remain non-blocking until product approval.
 
 ## 4. Masters and Accounting Configuration
 
@@ -79,6 +109,7 @@ Acceptance criteria:
 
 Build:
 
+- Workspace dashboard summary.
 - Batches list/create/update.
 - Batch transitions.
 - Operations recording.
@@ -97,6 +128,9 @@ Acceptance criteria:
 - Two workspaces in one company cannot list, read, mutate, aggregate or report
   each other's batches, operations, QC, QR, resources/usages, costing,
   journals, variances or reports.
+- Dashboard, Workspace Masters and Workspace Settings responses validate
+  against the frontend schemas and use the same membership/ownership source as
+  session restoration.
 
 ## 6. QC and QR
 
@@ -179,3 +213,14 @@ Acceptance criteria:
 
 - Frontend Playwright Phase 7.1 suite passes against backend mode.
 - Runtime response contracts pass without client-side schema failures.
+
+## Frontend presentation handoff
+
+- Preserve the canonical scope hierarchy and Company/Workspace-only switcher.
+- Do not bind theme/sidebar UI preference storage to session or business state.
+- Map real responses through the existing typed clients; do not bypass
+  loading, error, empty, and specific access-reason components.
+- Keep costing/reports and unsigned trace values labelled non-authoritative
+  until backend policies and signed payloads are accepted.
+- Run the full Nx validation gate and the five-viewport canonical-route audit
+  with mock fallback disabled before claiming integration readiness.

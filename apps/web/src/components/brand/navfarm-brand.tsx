@@ -21,7 +21,7 @@ export function NavfarmBrand({
       {!compact && (
         <span
           className={`whitespace-nowrap text-lg font-bold tracking-tight ${
-            inverse ? 'text-white' : 'text-[#0b1248]'
+            inverse ? 'text-white' : 'text-[var(--brand-word)]'
           }`}
         >
           NAV<span className="text-[#e4664d]">Farm</span>

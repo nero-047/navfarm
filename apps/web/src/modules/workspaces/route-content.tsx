@@ -6,6 +6,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { WorkspacePage, type WorkspacePageKind } from '@/modules/farm-demo/workspace-page';
 import { WorkspaceDetail } from './components';
 import { AccessState } from '@/components/access/access-state';
+import { filterNavigation } from '@/lib/authorization';
+import { navigationForScope } from '@/components/shell/navigation';
+import {
+  WorkspaceCostingPage,
+  WorkspaceMastersPage,
+  WorkspaceSettingsPage,
+} from './operational-support-pages';
 
 export type OperationalRouteKind = 'dashboard' | 'batches' | 'operations' | 'quality' | 'traceability' | 'resources' | 'costing' | 'reports';
 
@@ -17,18 +24,12 @@ export function CanonicalWorkspaceContent({
   section?: string;
 }) {
   const { company } = useParams<{ company: string }>();
-  const { session, selectContext } = useAuth();
+  const { session } = useAuth();
   const membership = session?.companies.find((item) => item.companySlug === company);
   const assignedWorkspace = session?.workspaces.find((item) => item.companyId === membership?.companyId && item.workspaceSlug === workspaceSlug);
   const configuredWorkspace = session?.workspaces.find((item) => item.companyId === membership?.companyId && item.workspaceSlug === workspaceSlug);
   const workspace = assignedWorkspace;
   const needsContext = Boolean(workspace && workspace.status === 'ACTIVE' && session?.activeWorkspaceId !== workspace.workspaceId);
-
-  useEffect(() => {
-    if (membership && workspace && needsContext && sessionStorage.getItem('navfarm_context_transition') !== 'company') {
-      void selectContext(membership.tenantId, membership.companyId, workspace.workspaceId);
-    }
-  }, [membership, needsContext, selectContext, workspace]);
 
   if (!section) return <WorkspaceDetail workspaceSlug={workspaceSlug} />;
   if (configuredWorkspace && configuredWorkspace.status !== 'ACTIVE') {
@@ -38,12 +39,66 @@ export function CanonicalWorkspaceContent({
     />;
   }
   if (!workspace) return <AccessState reason="workspace_not_assigned" companySlug={company} />;
-  if (needsContext) return <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">Establishing workspace context…</div>;
-  if (section === 'masters' || section === 'settings') return <WorkspacePage kind="settings" />;
-  return <WorkspacePage kind={(section === 'costing' ? 'reports' : section) as WorkspacePageKind} />;
+  if (needsContext) return <AccessState reason="workspace_selection_required" companySlug={company} />;
+  const route = navigationForScope('workspace', company, workspace).find(
+    (item) => item.href.endsWith(`/${section}`),
+  );
+  if (!route || filterNavigation([route], session).length === 0) {
+    return <AccessState reason="insufficient_permission" companySlug={company} />;
+  }
+  if (section === 'costing') return <WorkspaceCostingPage />;
+  if (section === 'masters') return <WorkspaceMastersPage />;
+  if (section === 'settings') return <WorkspaceSettingsPage />;
+  return <WorkspacePage kind={section as WorkspacePageKind} />;
 }
 
-export function LegacyOperationalRedirect({ kind }: { kind: OperationalRouteKind }) {
+export function WorkspaceIdentityBanner() {
+  const { company, workspace: workspaceSlug } = useParams<{
+    company: string;
+    workspace: string;
+  }>();
+  const { session } = useAuth();
+  const companyMembership = session?.companies.find(
+    (item) => item.companySlug === company,
+  );
+  const workspace = session?.workspaces.find(
+    (item) =>
+      item.companyId === companyMembership?.companyId &&
+      item.workspaceSlug === workspaceSlug,
+  );
+
+  if (!companyMembership || !workspace) return null;
+  return (
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--shadow-sm)]">
+      <div className="min-w-0">
+        <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
+          {companyMembership.companyName}
+          <span className="px-2 text-[var(--text-muted)]">/</span>
+          {workspace.workspaceName}
+        </p>
+        <p className="mt-1 truncate text-[10px] text-[var(--text-secondary)]">
+          {workspace.configuredNob.name} · {workspace.enabledLobs.join(', ')}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="nf-info-state rounded-full border px-2.5 py-1 text-[10px] font-semibold">
+          Operational role · {workspace.role}
+        </span>
+        <span className="nf-warning-state rounded-full border px-2.5 py-1 text-[10px] font-semibold">
+          Demo data
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function LegacyOperationalRedirect({
+  kind,
+  suffix,
+}: {
+  kind: OperationalRouteKind;
+  suffix?: string;
+}) {
   const { company } = useParams<{ company: string }>();
   const { session, selectContext } = useAuth();
   const router = useRouter();
@@ -60,7 +115,9 @@ export function LegacyOperationalRedirect({ kind }: { kind: OperationalRouteKind
     if (!membership) return;
     if (workspaces.length === 1) {
       const workspace = workspaces[0];
-      const destination = `/${company}/workspaces/${workspace.workspaceSlug}/${kind}`;
+      const destination = `/${company}/workspaces/${workspace.workspaceSlug}/${kind}${
+        suffix ? `/${encodeURIComponent(suffix)}` : ''
+      }`;
       if (session?.activeWorkspaceId === workspace.workspaceId) {
         router.replace(destination);
       } else {
@@ -69,9 +126,15 @@ export function LegacyOperationalRedirect({ kind }: { kind: OperationalRouteKind
     } else if (workspaces.length > 1) {
       router.replace(`/${company}/workspaces`);
     }
-  }, [company, kind, membership, router, selectContext, session?.activeWorkspaceId, workspaces]);
+  }, [
+    company, kind, membership, router, selectContext,
+    session?.activeWorkspaceId, suffix, workspaces,
+  ]);
 
-  if (!membership) return <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-sm text-red-800">Company access is not assigned.</div>;
+  if (!membership) return <div role="alert" className="nf-danger-state rounded-2xl border p-8 text-sm">Company access is not assigned.</div>;
+  if (membership.onboardingStatus !== 'COMPLETED') {
+    return <AccessState reason="onboarding_incomplete" companySlug={company} />;
+  }
   if (!workspaces.length) return <AccessState reason="workspace_not_assigned" companySlug={company} noWorkspaceAssigned={!tenantAdmin} />;
-  return <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">{workspaces.length === 1 ? 'Opening your assigned workspace…' : 'Opening workspace selection…'}</div>;
+  return <div role="status" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 text-sm text-[var(--text-secondary)]">{workspaces.length === 1 ? 'Opening your assigned workspace…' : 'Opening workspace selection…'}</div>;
 }

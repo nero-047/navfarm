@@ -31,6 +31,7 @@ async function assertBrandAsset(page: Page) {
 }
 
 async function capture(page: Page, name: string, width = 1440, height = 900) {
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS !== 'true') return;
   await page.setViewportSize({ width, height });
   await page.addStyleTag({ content: 'nextjs-portal, #__next-build-watcher { display: none !important; }' });
   await expect.poll(() => page.evaluate('document.fonts.status')).toBe('loaded');
@@ -40,7 +41,9 @@ async function capture(page: Page, name: string, width = 1440, height = 900) {
 }
 
 test.beforeAll(async () => {
-  await mkdir(evidenceDirectory, { recursive: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') {
+    await mkdir(evidenceDirectory, { recursive: true });
+  }
 });
 
 test.beforeEach(async ({ page }) => reset(page));
@@ -55,12 +58,12 @@ test('focused local-brand evidence', async ({ page }) => {
   await assertBrandAsset(page);
   await capture(page, 'expanded-desktop-sidebar');
 
-  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await page.getByRole('button', { name: 'Collapse sidebar' }).press('Enter');
   await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
   await assertBrandAsset(page);
   await capture(page, 'collapsed-desktop-sidebar');
 
-  await page.getByRole('button', { name: 'Expand sidebar' }).click();
+  await page.getByRole('button', { name: 'Expand sidebar' }).press('Enter');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await expect(page.getByRole('navigation')).toBeVisible();
@@ -72,8 +75,10 @@ test('focused local-brand evidence', async ({ page }) => {
 
   await reset(page);
   await signIn(page, 'multi@navfarm.demo');
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await expect(page.getByRole('heading', { name: 'Choose a business area' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where would you like to work?' })).toBeVisible();
+  await expect(page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  })).toBeVisible();
   await capture(page, 'workspace-selector');
 
   await reset(page);

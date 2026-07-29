@@ -15,7 +15,7 @@ export function AccessState({
   companySlug?: string;
   noWorkspaceAssigned?: boolean;
 }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const content = accessReasonContent[reason];
   const heading = noWorkspaceAssigned && reason === 'workspace_not_assigned'
@@ -30,28 +30,33 @@ export function AccessState({
     : content.actions;
 
   return (
-    <div className="rounded-2xl border border-[#e1e5ec] bg-white p-8 text-center shadow-sm">
-      <ShieldX className="mx-auto h-11 w-11 text-[#c24332]" />
-      <h1 className="mt-4 text-2xl font-semibold text-[#252b3d]">{heading}</h1>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#707789]">{description}</p>
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center shadow-[var(--shadow-sm)] sm:p-8">
+      <ShieldX className="mx-auto h-11 w-11 text-[var(--danger)]" aria-hidden />
+      <h1 className="mt-4 text-2xl font-semibold text-[var(--text-primary)]">{heading}</h1>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+      {reason === 'account_suspended' && user ? (
+        <p className="mt-3 text-xs font-medium text-[var(--text-secondary)]">
+          Signed in as {user.fullName} · {user.email}
+        </p>
+      ) : null}
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         {workspaceAccess && companySlug ? (
           <>
-            <Link href={`/${companySlug}/settings`} className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 text-xs font-semibold">Back to company</Link>
+            <Link href={`/${companySlug}/settings`} className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border)] px-4 text-xs font-semibold">Back to company</Link>
             <Link href={`/${companySlug}/workspaces`} className="inline-flex min-h-11 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white">Manage workspace access</Link>
           </>
         ) : null}
         {actions.includes('choose_company') ? (
-          <Link href="/context-selection" className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 text-xs font-semibold">Choose another company</Link>
+          <Link href="/context-selection" className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border)] px-4 text-xs font-semibold">Choose another company</Link>
         ) : null}
         {actions.includes('back_to_company') && companySlug && !workspaceAccess ? (
-          <Link href={`/${companySlug}/settings`} className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 text-xs font-semibold">Back to company</Link>
+          <Link href={`/${companySlug}/settings`} className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border)] px-4 text-xs font-semibold">Back to company</Link>
         ) : null}
         {actions.includes('continue_onboarding') && companySlug ? (
           <Link href={`/${companySlug}/setup/review`} className="inline-flex min-h-11 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white">Continue company setup</Link>
         ) : null}
         {actions.includes('go_back') ? (
-          <button onClick={() => router.back()} className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 text-xs font-semibold">Go back</button>
+          <button onClick={() => router.back()} className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border)] px-4 text-xs font-semibold">Go back</button>
         ) : null}
         {actions.includes('sign_out') ? (
           <button onClick={() => void logout().then(() => router.replace('/login'))} className="inline-flex min-h-11 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white">Sign out</button>

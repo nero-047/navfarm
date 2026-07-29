@@ -28,6 +28,7 @@ async function signIn(page: Page, email: string) {
 }
 
 async function capture(page: Page, name: string) {
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS !== 'true') return;
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addStyleTag({
@@ -54,7 +55,11 @@ async function openSwitcher(page: Page) {
   ).toBeVisible();
 }
 
-test.beforeAll(async () => mkdir(evidenceDirectory, { recursive: true }));
+test.beforeAll(async () => {
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') {
+    await mkdir(evidenceDirectory, { recursive: true });
+  }
+});
 test.beforeEach(async ({ page }) => reset(page));
 
 test('audited mobile hierarchical context drawer evidence', async ({
@@ -64,8 +69,10 @@ test('audited mobile hierarchical context drawer evidence', async ({
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await signIn(page, 'multi@navfarm.demo');
   await expect(page).toHaveURL(/\/context-selection$/);
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry company administration',
+  }).click();
+  await expect(page).toHaveURL(/\/green-valley-poultry\/overview$/);
 
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('button', { name: 'Switch context' }).click();
@@ -107,12 +114,14 @@ test('audited mobile hierarchical context drawer evidence', async ({
   await expect
     .poll(() => page.evaluate('document.documentElement.scrollWidth'))
     .toBeLessThanOrEqual(390);
-  await page.screenshot({
-    path: resolve(
-      evidenceDirectory,
-      'hierarchical-switcher-mobile-390x844.png',
-    ),
-  });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') {
+    await page.screenshot({
+      path: resolve(
+        evidenceDirectory,
+        'hierarchical-switcher-mobile-390x844.png',
+      ),
+    });
+  }
 });
 
 test('company dashboard resolves to overview with company-only navigation and accounting', async ({
@@ -161,10 +170,9 @@ test('company and workspace selections update the full context tuple atomically'
   await signIn(page, 'multi@navfarm.demo');
   await expect(page).toHaveURL(/\/context-selection$/);
   await capture(page, 'multi-company-company-selection');
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
-  await capture(page, 'multi-company-workspace-selection');
-  await page.getByRole('button', { name: /Poultry Operations/ }).click();
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  }).click();
   await expect(page).toHaveURL(
     /\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/,
   );
@@ -210,8 +218,9 @@ test('hierarchical switcher lists only authorized contexts and preserves support
   page,
 }) => {
   await signIn(page, 'multi@navfarm.demo');
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await page.getByRole('button', { name: /Poultry Operations/ }).click();
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  }).click();
   await page.goto(
     '/green-valley-poultry/workspaces/poultry-operations/reports',
   );
@@ -230,8 +239,9 @@ test('workspace navigation follows type, modules and workspace permissions', asy
   page,
 }) => {
   await signIn(page, 'multi@navfarm.demo');
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await page.getByRole('button', { name: /Poultry Operations/ }).click();
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  }).click();
   let nav = page.getByRole('navigation', {
     name: 'Workspace operations navigation',
   });
@@ -269,12 +279,14 @@ test('explicit workspace membership and stale company-workspace pairs are reject
 
   await reset(page);
   await signIn(page, 'multi@navfarm.demo');
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  }).click();
   await page.goto(
     '/harvest-ridge-farms/workspaces/poultry-operations/dashboard',
   );
   await expect(
-    page.getByRole('heading', { name: 'Workspace access not assigned' }),
+    page.getByRole('heading', { name: 'Choose a company' }),
   ).toBeVisible();
 });
 

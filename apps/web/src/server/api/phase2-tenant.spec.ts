@@ -8,7 +8,7 @@ import {
 const tenantAdmin: Phase2Actor = {
   userId: 'user-tenant', fullName: 'Tenant Administrator',
   platformRole: null, activeTenantId: 'tenant-demo', activeCompanyId: 'company-green-valley',
-  tenantAdmin: true, companyManage: true,
+  tenantAdmin: true, companyView: true, companyManage: true,
 };
 
 async function call(actor: Phase2Actor, method: string, path: string, input?: unknown) {

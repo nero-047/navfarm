@@ -24,7 +24,7 @@ async function login(page: Page, email: string) {
     'tenant@navfarm.demo': /\/console\/dashboard$/,
     'manager@navfarm.demo': /\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/,
     'onboarding@navfarm.demo': /\/bluewater-aqua\/setup\/profile$/,
-    'auditor@navfarm.demo': /\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/,
+    'auditor@navfarm.demo': /\/green-valley-poultry\/overview$/,
   };
   await expect(page).toHaveURL(destinations[email] ?? /\/context-selection$/);
 }

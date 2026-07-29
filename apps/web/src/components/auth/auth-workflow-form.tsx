@@ -4,7 +4,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '../../lib/api-client';
-import type { AuthSession } from '../../contracts/api';
 import { destinationForSession } from '../../lib/authorization';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -23,7 +22,7 @@ export function AuthWorkflowForm({ kind }: { kind: Kind }) {
   const copy = COPY[kind];
   const params = useSearchParams();
   const router = useRouter();
-  const { refreshSession } = useAuth();
+  const { completeMfa, refreshSession } = useAuth();
   const [value, setValue] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -42,12 +41,10 @@ export function AuthWorkflowForm({ kind }: { kind: Kind }) {
     setError('');
     try {
       if (kind === 'mfa-verify' || kind === 'mfa-recovery') {
-        await api.post<AuthSession>(`/auth/${kind === 'mfa-verify' ? 'mfa/verify' : 'mfa/recovery'}`, {
-          challengeId: params.get('challengeId'),
+        const session = await completeMfa(params.get('challengeId') || '', {
           ...(kind === 'mfa-verify' ? { code: value } : { recoveryCode: value }),
         });
-        const session = await refreshSession();
-        router.push(session ? destinationForSession(session) : '/login');
+        router.push(destinationForSession(session));
         return;
       }
       const endpoint = {
@@ -65,20 +62,24 @@ export function AuthWorkflowForm({ kind }: { kind: Kind }) {
 
   const needsPassword = kind === 'reset' || kind === 'invitation';
   const needsCode = kind.startsWith('mfa');
+  const codeLabel = kind === 'mfa-recovery' ? 'Recovery code' : 'Verification code';
   return (
-    <div>
-      <h1 className="text-3xl font-semibold tracking-tight text-[#2e313f]">{copy.title}</h1>
-      <p className="mt-2 text-sm leading-6 text-[#707070]">{copy.description}</p>
-      {status ? <div className="mt-7 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{status}<Link href="/login" className="mt-4 block font-semibold">Continue to sign in</Link></div> : (
+    <div className="mx-auto max-w-md">
+      <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)]">{copy.title}</h1>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{copy.description}</p>
+      {status ? <div role="status" className="nf-success-state mt-7 rounded-xl border p-4 text-sm">{status}<Link href="/login" className="mt-4 block font-semibold">Continue to sign in</Link></div> : (
         <form onSubmit={submit} className="mt-7 space-y-4">
-          {error && <div role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-700">{error}</div>}
-          {kind === 'invitation' && <input aria-label="Full name" value={name} onChange={(event) => setName(event.target.value)} required placeholder="Full name" className="h-12 w-full rounded-xl border border-[#dfe3ea] px-4 text-sm" />}
-          {needsPassword && <input aria-label="New password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} placeholder="New password" className="h-12 w-full rounded-xl border border-[#dfe3ea] px-4 text-sm" />}
-          {needsCode && <input aria-label={kind === 'mfa-recovery' ? 'Recovery code' : 'Verification code'} value={value} onChange={(event) => setValue(event.target.value)} required placeholder={kind === 'mfa-recovery' ? 'NAVFARM-RECOVERY' : '123456'} className="h-12 w-full rounded-xl border border-[#dfe3ea] px-4 text-sm tracking-widest" />}
+          {error && <div id="workflow-error" role="alert" className="nf-danger-state rounded-xl border p-3 text-xs">{error}</div>}
+          {kind === 'invitation' && <label className="block text-sm font-semibold text-[var(--text-primary)]">Full name<input aria-describedby={error ? 'workflow-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} required autoComplete="name" className="mt-1 h-12 w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 text-sm text-[var(--input-text)]" /></label>}
+          {needsPassword && <label className="block text-sm font-semibold text-[var(--text-primary)]">New password<input aria-describedby={error ? 'workflow-error' : undefined} type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} autoComplete="new-password" className="mt-1 h-12 w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 text-sm text-[var(--input-text)]" /></label>}
+          {needsCode && <label className="block text-sm font-semibold text-[var(--text-primary)]">{codeLabel}<input aria-describedby={error ? 'workflow-error' : undefined} value={value} onChange={(event) => setValue(event.target.value)} required autoComplete="one-time-code" placeholder={kind === 'mfa-recovery' ? 'NAVFARM-RECOVERY' : '123456'} className="mt-1 h-12 w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 text-sm tracking-widest text-[var(--input-text)]" /></label>}
           <button className="h-12 w-full rounded-xl bg-[#0b1248] text-sm font-semibold text-white">{copy.action}</button>
-          {kind === 'mfa-verify' && <Link href={`/mfa/recovery?challengeId=${encodeURIComponent(params.get('challengeId') || '')}`} className="block text-center text-xs font-medium text-[#1c4aa9]">Use a recovery code</Link>}
+          {kind === 'mfa-verify' && <Link href={`/mfa/recovery?challengeId=${encodeURIComponent(params.get('challengeId') || '')}`} className="block min-h-11 py-3 text-center text-xs font-medium text-[var(--accent)]">Use a recovery code</Link>}
         </form>
       )}
+      <p className="mt-6 text-xs leading-5 text-[var(--text-muted)]">
+        This demo uses typed local mock responses; no production email, identity provider, or authenticator service is connected.
+      </p>
     </div>
   );
 }

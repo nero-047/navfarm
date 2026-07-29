@@ -28,11 +28,15 @@ function session(options: {
     workspaceId: 'workspace-1', tenantId: 'tenant-1', companyId: companies[0]?.companyId ?? 'company-1',
     workspaceCode: 'WS_1', workspaceSlug: 'workspace-1', workspaceName: 'Workspace 1',
     workspaceType: 'POULTRY' as const, status: 'ACTIVE' as const,
+    configuredNob: { nobId: 'nob-poultry', code: 'POULTRY' as const, name: 'Poultry' },
+    enabledLobs: ['Rearing & Breeding'],
     enabledModules: ['Batches', 'QC'],
+    memberCount: 1,
     role: 'MANAGER' as const,
     permissions: ['workspaces.view', 'batches.view', 'batches.create', 'operations.create', 'quality.view', 'quality.manage'] as const,
   };
   return {
+    state: options.tenantStatus === 'SUSPENDED' ? 'SUSPENDED' : 'AUTHENTICATED',
     user: {
       userId: 'user-1', fullName: 'Test User', email: 'test@example.com',
       platformRole: options.platform ? 'SYSTEM_ADMIN' : null, language: 'en',
@@ -41,7 +45,13 @@ function session(options: {
       companyId: options.activeCompany === false ? '' : companies[0]?.companyId ?? '',
       tenantId: 'tenant-1', companies: [], permissions: [],
     },
-    tenants: [{ tenantId: 'tenant-1', tenantName: 'Tenant', status: options.tenantStatus ?? 'ACTIVE', role: 'TENANT_MEMBER' }],
+    tenants: [{
+      tenantId: 'tenant-1',
+      tenantName: 'Tenant',
+      status: options.tenantStatus ?? 'ACTIVE',
+      role: 'TENANT_MEMBER',
+      permissions: [],
+    }],
     companies,
     workspaces: [workspace],
     activeTenantId: 'tenant-1',
@@ -78,9 +88,28 @@ describe('authorization and context routing', () => {
   it('does not grant Tenant Admin operational permissions without workspace membership', () => {
     const value = session();
     value.tenants[0].role = 'TENANT_ADMIN';
+    value.tenants[0].permissions = ['tenant.view', 'tenant.manage', 'company.manage'];
     value.workspaces = [];
     value.activeWorkspaceId = null;
     expect(can(value, 'company.manage')).toBe(true);
+    expect(can(value, 'operations.create')).toBe(false);
+  });
+  it('does not infer permissions from a tenant or company role label', () => {
+    const value = session({ role: 'ADMIN' });
+    value.companies[0].permissions = [];
+    value.tenants[0].role = 'TENANT_ADMIN';
+    value.tenants[0].permissions = [];
+    value.workspaces = [];
+    value.activeWorkspaceId = null;
+    expect(can(value, 'company.manage')).toBe(false);
+    expect(can(value, 'operations.create')).toBe(false);
+  });
+  it('does not let Company Admin authority escalate a Viewer workspace', () => {
+    const value = session({ role: 'ADMIN' });
+    value.workspaces[0].role = 'VIEWER';
+    value.workspaces[0].permissions = ['workspaces.view', 'batches.view'];
+    expect(can(value, 'company.manage')).toBe(true);
+    expect(can(value, 'batches.create')).toBe(false);
     expect(can(value, 'operations.create')).toBe(false);
   });
   it('aligns workspace navigation and mutation permissions', () => {

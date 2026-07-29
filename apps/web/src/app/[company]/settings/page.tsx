@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation';
+import { CompanySettingsPage } from '@/modules/company-admin/settings-page';
 
-export default async function SettingsPage({ params }: { params: Promise<{ company: string }> }) {
-  const { company } = await params;
-  redirect(`/${company}/settings/setup`);
+export default function SettingsPage() {
+  return <CompanySettingsPage />;
 }

@@ -39,6 +39,29 @@ describe('typed operational resource clients', () => {
     await expect(clients.batches.list(scope)).rejects.toThrow();
   });
 
+  it('validates the typed workspace dashboard summary', async () => {
+    const dashboard = {
+      tenantId: 'tenant 1',
+      companyId: 'green valley',
+      workspaceId: 'poultry ops',
+      generatedAt: '2026-07-29T00:00:00.000Z',
+      activeBatchCount: 1,
+      operationCount: 0,
+      quality: { pass: 1, hold: 0, fail: 0 },
+      qrPackCount: 0,
+      resourceCount: 2,
+      openWip: 100,
+      authoritative: false as const,
+    };
+    const request = jest.fn().mockResolvedValue(dashboard);
+    const clients = createOperationalClients(fakeClient(request));
+    await expect(clients.dashboard.get(scope)).resolves.toEqual(dashboard);
+    expect(request).toHaveBeenCalledWith(
+      '/tenants/tenant%201/companies/green%20valley/workspaces/poultry%20ops/dashboard',
+      { method: 'GET' },
+    );
+  });
+
   it('exposes QC disposition and batch transition result endpoints', async () => {
     const request = jest.fn()
       .mockResolvedValueOnce({ ...batch, status: 'APPROVED' })

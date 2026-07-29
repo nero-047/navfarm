@@ -26,6 +26,19 @@ function ErrorState({ text, retry }: { text: string; retry: () => void }) {
   return <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800"><p>{text}</p><button onClick={retry} className="mt-4 min-h-11 rounded-xl border border-red-300 bg-white px-4 font-semibold">Retry</button></div>;
 }
 
+function canManageCompanyWorkspaces(
+  session: ReturnType<typeof useAuth>['session'],
+  companyId?: string,
+  tenantId?: string,
+) {
+  const company = session?.companies.find((item) => item.companyId === companyId);
+  const tenant = session?.tenants.find((item) => item.tenantId === tenantId);
+  return Boolean(
+    company?.permissions.includes('workspaces.manage') ||
+    tenant?.permissions.includes('workspaces.manage'),
+  );
+}
+
 export function WorkspaceList() {
   const { company } = useParams<{ company: string }>();
   const { session, selectContext } = useAuth();
@@ -34,7 +47,9 @@ export function WorkspaceList() {
   const [items, setItems] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const canManage = session?.tenants.some((tenant) => tenant.tenantId === companyMembership?.tenantId && tenant.role === 'TENANT_ADMIN') ?? false;
+  const canManage = canManageCompanyWorkspaces(
+    session, companyMembership?.companyId, companyMembership?.tenantId,
+  );
   const visibleItems = canManage ? items : items.filter((workspace) => workspace.status === 'ACTIVE');
 
   const load = useCallback(async () => {
@@ -89,6 +104,9 @@ export function WorkspaceCreateForm() {
   const { session } = useAuth();
   const router = useRouter();
   const companyMembership = session?.companies.find((item) => item.companySlug === company);
+  const canManage = canManageCompanyWorkspaces(
+    session, companyMembership?.companyId, companyMembership?.tenantId,
+  );
   const [input, setInput] = useState<WorkspaceCreateInput>({
     workspaceCode: '',
     workspaceSlug: '',
@@ -118,6 +136,8 @@ export function WorkspaceCreateForm() {
     }
   }
 
+  if (!canManage) return <AccessState reason="insufficient_permission" companySlug={company} />;
+
   return <form onSubmit={(event) => void submit(event)} className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6">
     <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">Workspace setup</p><h1 className="mt-2 text-2xl font-bold">Create workspace</h1>
     {error ? <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
@@ -146,7 +166,7 @@ export function WorkspaceDetail({ workspaceSlug }: { workspaceSlug: string }) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'MANAGER' | 'OPERATOR' | 'VIEWER'>('VIEWER');
   const loadGeneration = useRef(0);
-  const canManage = session?.tenants.some((tenant) => tenant.tenantId === companyMembership?.tenantId && tenant.role === 'TENANT_ADMIN') ?? false;
+  const canManage = canManageCompanyWorkspaces(session, companyId, tenantId);
 
   const load = useCallback(async () => {
     if (!companyId || !tenantId) return;
@@ -156,7 +176,10 @@ export function WorkspaceDetail({ workspaceSlug }: { workspaceSlug: string }) {
       const list = await workspaceClient.list(tenantId, companyId);
       const match = list.find((item) => item.workspaceSlug === workspaceSlug);
       if (!match) throw new ApiError('Workspace not found.', 404, 'NOT_FOUND');
-      const [detail, membershipRows] = await Promise.all([workspaceClient.get(companyId, match.workspaceId), workspaceClient.members(companyId, match.workspaceId)]);
+      const [detail, membershipRows] = await Promise.all([
+        workspaceClient.get(tenantId, companyId, match.workspaceId),
+        workspaceClient.members(tenantId, companyId, match.workspaceId),
+      ]);
       if (generation === loadGeneration.current) {
         setWorkspace(detail); setMembers(membershipRows);
       }
@@ -177,7 +200,7 @@ export function WorkspaceDetail({ workspaceSlug }: { workspaceSlug: string }) {
     if (!companyMembership) return;
     setSaving(true); setError('');
     try {
-      setWorkspace(await workspaceClient.update(companyMembership.companyId, configuredWorkspace.workspaceId, {
+      setWorkspace(await workspaceClient.update(companyMembership.tenantId, companyMembership.companyId, configuredWorkspace.workspaceId, {
         workspaceName: configuredWorkspace.workspaceName,
         status: configuredWorkspace.status,
         enabledModules: configuredWorkspace.enabledModules,
@@ -188,7 +211,7 @@ export function WorkspaceDetail({ workspaceSlug }: { workspaceSlug: string }) {
     event.preventDefault();
     if (!companyMembership) return;
     try {
-      const created = await workspaceClient.addMember(companyMembership.companyId, configuredWorkspace.workspaceId, { email: inviteEmail, role: inviteRole });
+      const created = await workspaceClient.addMember(companyMembership.tenantId, companyMembership.companyId, configuredWorkspace.workspaceId, { email: inviteEmail, role: inviteRole });
       setMembers((current) => [...current, created]); setInviteEmail('');
     } catch (cause) { setError(message(cause)); }
   }

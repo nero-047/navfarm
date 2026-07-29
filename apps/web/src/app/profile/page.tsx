@@ -5,6 +5,7 @@ import { ApplicationShell } from '../../components/shell/application-shell';
 import { useAuth } from '../../contexts/AuthContext';
 import { activeCompanyMembership } from '../../lib/authorization';
 import { api } from '../../lib/api-client';
+import { inputClass, primaryButtonClass, secondaryButtonClass } from '../../components/phase2/common';
 
 export default function ProfilePage() {
   const { session, refreshSession } = useAuth();
@@ -34,26 +35,27 @@ export default function ProfilePage() {
   return (
     <ApplicationShell scope={scope} companySlug={company?.companySlug}>
       <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-2">
-        {message && <div className="lg:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{message}</div>}
-        <form onSubmit={saveProfile} className="rounded-2xl border border-[#e1e5ec] bg-white p-6 shadow-sm">
+        {message && <div role="status" className="nf-success-state rounded-xl border p-3 text-xs lg:col-span-2">{message}</div>}
+        <form onSubmit={saveProfile} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)]">
           <h2 className="text-lg font-semibold">My profile</h2>
-          <p className="mt-1 text-xs text-[#707789]">{session.user.email}</p>
-          <label className="mt-5 block text-xs font-medium">Full name<input value={fullName} onChange={(event) => setFullName(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[#dfe3ea] px-3 text-sm" /></label>
-          <label className="mt-4 block text-xs font-medium">Language<select value={language} onChange={(event) => setLanguage(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[#dfe3ea] px-3 text-sm"><option value="en">English</option><option value="hi">Hindi</option></select></label>
-          <label className="mt-4 block text-xs font-medium">Timezone<select value={timezone} onChange={(event) => setTimezone(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[#dfe3ea] px-3 text-sm"><option>Asia/Kolkata</option><option>UTC</option></select></label>
-          <label className="mt-4 flex items-center gap-2 text-xs"><input type="checkbox" defaultChecked /> Receive operational notifications</label>
-          <button className="mt-5 rounded-xl bg-[#0b1248] px-4 py-2.5 text-xs font-semibold text-white">Save preferences</button>
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">{session.user.email}</p>
+          <label className="mt-5 block text-xs font-medium">Full name<input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" className={`${inputClass} mt-2`} /></label>
+          <label className="mt-4 block text-xs font-medium">Language<select value={language} onChange={(event) => setLanguage(event.target.value)} className={`${inputClass} mt-2`}><option value="en">English</option><option value="hi">Hindi</option></select></label>
+          <label className="mt-4 block text-xs font-medium">Timezone<select value={timezone} onChange={(event) => setTimezone(event.target.value)} className={`${inputClass} mt-2`}><option>Asia/Kolkata</option><option>UTC</option></select></label>
+          <label className="mt-4 flex min-h-11 items-center gap-2 text-xs"><input type="checkbox" defaultChecked /> Receive operational notifications</label>
+          <button className={`${primaryButtonClass} mt-5`}>Save preferences</button>
         </form>
         <div className="space-y-5">
-          <form onSubmit={changePassword} className="rounded-2xl border border-[#e1e5ec] bg-white p-6 shadow-sm">
+          <form onSubmit={changePassword} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)]">
             <h2 className="text-lg font-semibold">Security</h2>
-            <input name="currentPassword" type="password" required placeholder="Current password" className="mt-5 h-11 w-full rounded-xl border border-[#dfe3ea] px-3 text-sm" />
-            <input name="newPassword" type="password" required minLength={8} placeholder="New password" className="mt-3 h-11 w-full rounded-xl border border-[#dfe3ea] px-3 text-sm" />
-            <button className="mt-4 rounded-xl border border-[#dfe3ea] px-4 py-2.5 text-xs font-semibold">Change password</button>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Demo mock only · no production identity provider is connected.</p>
+            <label className="mt-5 block text-xs font-medium">Current password<input name="currentPassword" type="password" required autoComplete="current-password" className={`${inputClass} mt-2`} /></label>
+            <label className="mt-3 block text-xs font-medium">New password<input name="newPassword" type="password" required minLength={8} autoComplete="new-password" className={`${inputClass} mt-2`} /></label>
+            <button className={`${secondaryButtonClass} mt-4`}>Change password</button>
           </form>
-          <section className="rounded-2xl border border-[#e1e5ec] bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)]">
             <h2 className="text-lg font-semibold">Active session</h2>
-            <dl className="mt-4 space-y-2 text-xs"><div className="flex justify-between"><dt className="text-[#707789]">Expires</dt><dd>{new Date(session.expiresAt).toLocaleString()}</dd></div><div className="flex justify-between"><dt className="text-[#707789]">MFA</dt><dd>{session.user.mfaEnabled ? 'Enabled' : 'Not enabled'}</dd></div></dl>
+            <dl className="mt-4 space-y-2 text-xs"><div className="flex justify-between"><dt className="text-[var(--text-secondary)]">Expires</dt><dd>{new Date(session.expiresAt).toLocaleString()}</dd></div><div className="flex justify-between"><dt className="text-[var(--text-secondary)]">MFA</dt><dd>{session.user.mfaEnabled ? 'Enabled' : 'Not enabled'}</dd></div></dl>
           </section>
         </div>
       </div>

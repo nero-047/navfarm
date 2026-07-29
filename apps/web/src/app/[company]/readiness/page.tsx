@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation';
+import { CompanyReadinessPage } from '@/modules/company-admin/readiness-page';
 
-export default async function CompanyReadinessPage({ params }: { params: Promise<{ company: string }> }) {
-  const { company } = await params;
-  redirect(`/${company}/accounting/readiness`);
+export default function ReadinessPage() {
+  return <CompanyReadinessPage />;
 }

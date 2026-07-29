@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
+import { destinationForSession, useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle } from 'lucide-react';
@@ -16,7 +16,7 @@ export function SignupForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { signup } = useAuth();
+  const { signup, refreshSession } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,7 +38,8 @@ export function SignupForm() {
     setSubmitting(true);
     try {
       await signup({ tenantName, tenantCode, name, email, password });
-      router.push('/company-selection');
+      const session = await refreshSession();
+      router.push(session ? destinationForSession(session) : '/context-selection');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to create workspace');
     } finally {

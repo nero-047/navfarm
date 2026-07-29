@@ -3,7 +3,9 @@ import {
   workspaceCreateSchema,
   workspaceMemberCreateSchema,
   workspaceMemberSchema,
+  workspaceMasterSchema,
   workspaceSchema,
+  workspaceSettingsSchema,
   workspaceUpdateSchema,
   type Workspace,
   type WorkspaceMember,
@@ -17,21 +19,27 @@ export type WorkspaceMemberCreateInput = z.infer<typeof workspaceMemberCreateSch
 const parse = <T>(schema: { parse(value: unknown): T }, value: unknown) => schema.parse(value);
 
 export function createWorkspaceClient(client: NavfarmApiClient = api) {
+  const root = (tenantId: string, companyId: string) =>
+    `/tenants/${encodeURIComponent(tenantId)}/companies/${encodeURIComponent(companyId)}/workspaces`;
   return {
     list: async (tenantId: string, companyId: string): Promise<Workspace[]> =>
-      parse(workspaceSchema.array(), await client.get(`/tenants/${encodeURIComponent(tenantId)}/companies/${encodeURIComponent(companyId)}/workspaces`)),
+      parse(workspaceSchema.array(), await client.get(root(tenantId, companyId))),
     create: async (tenantId: string, companyId: string, input: WorkspaceCreateInput): Promise<Workspace> =>
-      parse(workspaceSchema, await client.post(`/tenants/${encodeURIComponent(tenantId)}/companies/${encodeURIComponent(companyId)}/workspaces`, workspaceCreateSchema.parse(input))),
-    get: async (companyId: string, workspaceId: string): Promise<Workspace> =>
-      parse(workspaceSchema, await client.get(`/companies/${encodeURIComponent(companyId)}/workspaces/${encodeURIComponent(workspaceId)}`)),
-    update: async (companyId: string, workspaceId: string, input: WorkspaceUpdateInput): Promise<Workspace> =>
-      parse(workspaceSchema, await client.patch(`/companies/${encodeURIComponent(companyId)}/workspaces/${encodeURIComponent(workspaceId)}`, workspaceUpdateSchema.parse(input))),
-    readiness: async (companyId: string, workspaceId: string): Promise<Workspace['readiness']> =>
-      parse(workspaceSchema.shape.readiness, await client.get(`/companies/${encodeURIComponent(companyId)}/workspaces/${encodeURIComponent(workspaceId)}/readiness`)),
-    members: async (companyId: string, workspaceId: string): Promise<WorkspaceMember[]> =>
-      parse(workspaceMemberSchema.array(), await client.get(`/companies/${encodeURIComponent(companyId)}/workspaces/${encodeURIComponent(workspaceId)}/members`)),
-    addMember: async (companyId: string, workspaceId: string, input: WorkspaceMemberCreateInput): Promise<WorkspaceMember> =>
-      parse(workspaceMemberSchema, await client.post(`/companies/${encodeURIComponent(companyId)}/workspaces/${encodeURIComponent(workspaceId)}/members`, workspaceMemberCreateSchema.parse(input))),
+      parse(workspaceSchema, await client.post(root(tenantId, companyId), workspaceCreateSchema.parse(input))),
+    get: async (tenantId: string, companyId: string, workspaceId: string): Promise<Workspace> =>
+      parse(workspaceSchema, await client.get(`${root(tenantId, companyId)}/${encodeURIComponent(workspaceId)}`)),
+    update: async (tenantId: string, companyId: string, workspaceId: string, input: WorkspaceUpdateInput): Promise<Workspace> =>
+      parse(workspaceSchema, await client.patch(`${root(tenantId, companyId)}/${encodeURIComponent(workspaceId)}`, workspaceUpdateSchema.parse(input))),
+    readiness: async (tenantId: string, companyId: string, workspaceId: string): Promise<Workspace['readiness']> =>
+      parse(workspaceSchema.shape.readiness, await client.get(`${root(tenantId, companyId)}/${encodeURIComponent(workspaceId)}/readiness`)),
+    members: async (tenantId: string, companyId: string, workspaceId: string): Promise<WorkspaceMember[]> =>
+      parse(workspaceMemberSchema.array(), await client.get(`${root(tenantId, companyId)}/${encodeURIComponent(workspaceId)}/members`)),
+    addMember: async (tenantId: string, companyId: string, workspaceId: string, input: WorkspaceMemberCreateInput): Promise<WorkspaceMember> =>
+      parse(workspaceMemberSchema, await client.post(`${root(tenantId, companyId)}/${encodeURIComponent(workspaceId)}/members`, workspaceMemberCreateSchema.parse(input))),
+    settings: async (tenantId: string, companyId: string, workspaceId: string) =>
+      parse(workspaceSettingsSchema, await client.get(`${root(tenantId, companyId)}/${encodeURIComponent(workspaceId)}/settings`)),
+    masters: async (tenantId: string, companyId: string, workspaceId: string) =>
+      parse(workspaceMasterSchema.array(), await client.get(`${root(tenantId, companyId)}/${encodeURIComponent(workspaceId)}/masters`)),
   };
 }
 

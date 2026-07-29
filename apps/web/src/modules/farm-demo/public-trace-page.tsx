@@ -5,11 +5,13 @@ import QRCode from 'react-qr-code';
 import {
   CheckCircle2,
   ChevronRight,
+  Database,
   MapPin,
   PackageCheck,
-  ShieldCheck,
 } from 'lucide-react';
-import { getAllCompanies } from '@/modules/company/use-current-company';
+import { COMPANIES } from '@/modules/company/types';
+import ThemeToggle from '@/components/source-ui/theme-toggle';
+import { NavfarmBrand } from '@/components/brand/navfarm-brand';
 import { INDUSTRY_CONFIG } from './data';
 
 export function PublicTracePage({
@@ -19,15 +21,15 @@ export function PublicTracePage({
   companySlug: string;
   packCode: string;
 }) {
-  const company = getAllCompanies()[companySlug];
+  const company = COMPANIES[companySlug];
   if (!company)
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f3f5f8] p-6">
-        <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-[#252b3d]">
+      <main className="nf-public-page flex min-h-screen items-center justify-center bg-[var(--bg)] p-6">
+        <div className="max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center shadow-[var(--shadow-sm)]">
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">
             Trace record not found
           </h1>
-          <p className="mt-2 text-sm text-[#73798a]">
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Check the pack code and try again.
           </p>
         </div>
@@ -41,15 +43,18 @@ export function PublicTracePage({
     'Pack issued',
   ];
   return (
-    <main className="min-h-screen bg-[#f3f5f8] text-[#30364b]">
-      <header className="border-b border-[#e3e7ee] bg-white">
+    <main className="nf-public-page min-h-screen bg-[var(--bg)] text-[var(--text-secondary)]">
+      <header className="border-b border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-          <Link href="/" className="text-lg font-bold text-[#0b1248]">
-            NAV<span className="text-[#c24332]">Farm</span>
+          <Link href="/" aria-label="NAVFarm home">
+            <NavfarmBrand />
           </Link>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-700">
-            <ShieldCheck size={13} /> Verified trace record
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="nf-info-state inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold">
+              <Database size={13} aria-hidden /> Demo trace record
+            </span>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <div className="mx-auto max-w-5xl px-5 py-8 sm:py-12">
@@ -76,7 +81,7 @@ export function PublicTracePage({
           </div>
         </div>
         <div className="mt-6 grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
-          <section className="rounded-2xl border border-[#e3e7ee] bg-white p-6">
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
             <h2 className="text-base font-semibold">Trace summary</h2>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               {[
@@ -87,24 +92,24 @@ export function PublicTracePage({
                 ['Produced', '15 Jul 2026'],
                 ['Best before', '22 Jul 2026'],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-[#f7f8fa] p-4">
-                  <p className="text-[10px] uppercase tracking-wide text-[#9298a8]">
+                <div key={label} className="rounded-xl bg-[var(--surface-raised)] p-4">
+                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     {label}
                   </p>
-                  <p className="mt-1.5 text-sm font-semibold text-[#30364b]">
+                  <p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
                     {value}
                   </p>
                 </div>
               ))}
             </div>
           </section>
-          <section className="rounded-2xl border border-[#e3e7ee] bg-white p-6">
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
             <h2 className="text-base font-semibold">Origin & assurance</h2>
             <div className="mt-5 flex gap-3">
               <MapPin className="mt-0.5 text-[#1c4aa9]" size={18} />
               <div>
                 <p className="text-sm font-semibold">{company.location}</p>
-                <p className="mt-1 text-xs text-[#7d8290]">
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
                   Registered production location
                 </p>
               </div>
@@ -112,15 +117,15 @@ export function PublicTracePage({
             <div className="mt-5 flex gap-3">
               <PackageCheck className="mt-0.5 text-emerald-600" size={18} />
               <div>
-                <p className="text-sm font-semibold">Quality checks passed</p>
-                <p className="mt-1 text-xs text-[#7d8290]">
-                  Released for packing and distribution
+                <p className="text-sm font-semibold">Mock release recorded</p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Demo fixture released for packing and distribution
                 </p>
               </div>
             </div>
           </section>
         </div>
-        <section className="mt-6 rounded-2xl border border-[#e3e7ee] bg-white p-6">
+        <section className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
           <h2 className="text-base font-semibold">Journey</h2>
           <div className="mt-6 grid gap-3 sm:grid-cols-4">
             {stages.map((stage, index) => (
@@ -146,9 +151,9 @@ export function PublicTracePage({
             ))}
           </div>
         </section>
-        <p className="mt-6 text-center text-[10px] text-[#9298a8]">
-          This record presents the product information associated with the
-          scanned pack code.
+        <p className="mt-6 text-center text-[10px] leading-5 text-[var(--text-muted)]">
+          Demo data only. This trace record illustrates associated product
+          information and is not a certification or compliance statement.
         </p>
       </div>
     </main>

@@ -1,6 +1,21 @@
 import { z } from 'zod';
 import { phase2RuntimeContracts } from './phase2';
 import { phase3RuntimeContracts } from './phase3';
+import { companyAdminRuntimeContracts } from './company-admin';
+import {
+  companyRoleSchema,
+  permissionSchema,
+  platformRoleSchema,
+  workspaceRoleSchema,
+} from './authorization';
+export {
+  companyRoleSchema,
+  permissionSchema,
+  platformRoleSchema,
+  workspaceRoleSchema,
+  type CompanyRole,
+  type Permission,
+} from './authorization';
 
 export const apiErrorCodeSchema = z.enum([
   'BAD_REQUEST',
@@ -14,6 +29,18 @@ export const apiErrorCodeSchema = z.enum([
   'UPSTREAM_UNAVAILABLE',
   'CONFIGURATION_ERROR',
   'INTERNAL_ERROR',
+  'ACCOUNT_SUSPENDED',
+  'TENANT_MEMBERSHIP_REQUIRED',
+  'TENANT_INACTIVE',
+  'TENANT_SUSPENDED',
+  'COMPANY_MEMBERSHIP_REQUIRED',
+  'COMPANY_NOT_IN_TENANT',
+  'COMPANY_INACTIVE',
+  'WORKSPACE_MEMBERSHIP_REQUIRED',
+  'WORKSPACE_NOT_IN_COMPANY',
+  'WORKSPACE_INACTIVE',
+  'STALE_CONTEXT',
+  'CAPABILITY_REQUIRED',
   'resource_in_use',
 ]);
 
@@ -63,47 +90,6 @@ export const currencySchema = z.object({
   symbol: z.string().optional(),
 }).passthrough();
 
-export const platformRoleSchema = z.enum(['SYSTEM_ADMIN', 'PLATFORM_SUPPORT']);
-export const companyRoleSchema = z.enum([
-  'SUPER_ADMIN',
-  'ADMIN',
-  'FARM_MANAGER',
-  'ACCOUNTANT',
-  'AUDITOR',
-  'SUPERVISOR',
-  'VIEWER',
-  'CUSTOM',
-]);
-export const permissionSchema = z.enum([
-  'platform.manage',
-  'tenant.view',
-  'tenant.manage',
-  'company.view',
-  'company.manage',
-  'users.view',
-  'users.manage',
-  'roles.view',
-  'roles.manage',
-  'batches.view',
-  'batches.create',
-  'batches.approve',
-  'operations.create',
-  'costs.view',
-  'finance.view',
-  'finance.manage',
-  'quality.view',
-  'quality.manage',
-  'traceability.view',
-  'resources.view',
-  'resources.manage',
-  'reports.export',
-  'audit.view',
-  'notifications.manage',
-  'workspaces.view',
-  'workspaces.manage',
-  'batches.close',
-]);
-
 export const sessionUserSchema = z.object({
   userId: z.string(),
   fullName: z.string(),
@@ -122,7 +108,7 @@ export const sessionUserSchema = z.object({
     company_name: z.string(),
     is_primary: z.boolean(),
   })).default([]),
-  permissions: z.array(z.unknown()).default([]),
+  permissions: z.array(permissionSchema).default([]),
 }).passthrough();
 
 export const tenantMembershipSchema = z.object({
@@ -130,6 +116,7 @@ export const tenantMembershipSchema = z.object({
   tenantName: z.string(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
   role: z.enum(['TENANT_ADMIN', 'TENANT_MEMBER']),
+  permissions: z.array(permissionSchema),
 });
 
 export const companyMembershipSchema = z.object({
@@ -138,6 +125,7 @@ export const companyMembershipSchema = z.object({
   companyName: z.string(),
   companySlug: z.string(),
   status: z.enum(['ACTIVE', 'INACTIVE']),
+  membershipStatus: z.enum(['ACTIVE', 'INACTIVE']).optional(),
   onboardingStatus: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED']),
   role: companyRoleSchema,
   permissions: z.array(permissionSchema),
@@ -155,8 +143,18 @@ export const workspaceTypeSchema = z.enum([
 ]);
 
 export const workspaceStatusSchema = z.enum(['DRAFT', 'ACTIVE', 'INACTIVE']);
-export const workspaceRoleSchema = z.enum(['MANAGER', 'OPERATOR', 'VIEWER']);
-
+export const workspaceNobSchema = z.object({
+  nobId: z.string(),
+  code: z.enum([
+    'POULTRY',
+    'LIVESTOCK',
+    'AGRICULTURE',
+    'AQUACULTURE',
+    'INSECT',
+    'PROCESSING',
+  ]),
+  name: z.string(),
+});
 export const workspaceSchema = z.object({
   workspaceId: z.string(),
   tenantId: z.string(),
@@ -167,7 +165,10 @@ export const workspaceSchema = z.object({
   workspaceType: workspaceTypeSchema,
   status: workspaceStatusSchema,
   primaryNobId: z.string().nullable(),
+  configuredNob: workspaceNobSchema,
+  enabledLobs: z.array(z.string()),
   enabledModules: z.array(z.string()),
+  memberCount: z.number().int().nonnegative(),
   readiness: z.object({
     percentage: z.number().min(0).max(100),
     operationalReady: z.boolean(),
@@ -214,13 +215,17 @@ export const workspaceMembershipSchema = workspaceSchema.pick({
   workspaceName: true,
   workspaceType: true,
   status: true,
+  configuredNob: true,
+  enabledLobs: true,
   enabledModules: true,
+  memberCount: true,
 }).extend({
   role: workspaceRoleSchema,
   permissions: z.array(permissionSchema),
 });
 
 export const authSessionSchema = z.object({
+  state: z.enum(['AUTHENTICATED', 'SUSPENDED']),
   user: sessionUserSchema,
   tenants: z.array(tenantMembershipSchema),
   companies: z.array(companyMembershipSchema),
@@ -229,15 +234,62 @@ export const authSessionSchema = z.object({
   activeCompanyId: z.string().nullable(),
   activeWorkspaceId: z.string().nullable(),
   expiresAt: z.string(),
-  mfaRequired: z.boolean().optional(),
-  challengeId: z.string().optional(),
 });
 export type AuthSession = z.infer<typeof authSessionSchema>;
-export type Permission = z.infer<typeof permissionSchema>;
-export type CompanyRole = z.infer<typeof companyRoleSchema>;
+export const mfaChallengeSchema = z.object({
+  state: z.literal('MFA_PENDING'),
+  challengeId: z.string(),
+  expiresAt: z.string().datetime(),
+  user: sessionUserSchema,
+});
+export const authLoginResponseSchema = z.union([authSessionSchema, mfaChallengeSchema]);
+export const authLoginRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+export const authContextRequestSchema = z.object({
+  tenantId: z.string().nullable(),
+  companyId: z.string().nullable(),
+  workspaceId: z.string().nullable(),
+}).superRefine((value, context) => {
+  if (value.companyId && !value.tenantId) {
+    context.addIssue({ code: 'custom', message: 'Company context requires a tenant.' });
+  }
+  if (value.workspaceId && !value.companyId) {
+    context.addIssue({ code: 'custom', message: 'Workspace context requires a company.' });
+  }
+});
+export const mfaCompletionRequestSchema = z.object({
+  challengeId: z.string().min(1),
+  code: z.string().optional(),
+  recoveryCode: z.string().optional(),
+}).refine((value) => Boolean(value.code || value.recoveryCode), {
+  message: 'A verification or recovery code is required.',
+});
+export type AuthLoginResponse = z.infer<typeof authLoginResponseSchema>;
+export type MfaChallenge = z.infer<typeof mfaChallengeSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
 export type WorkspaceMembership = z.infer<typeof workspaceMembershipSchema>;
 export type WorkspaceMember = z.infer<typeof workspaceMemberSchema>;
+
+export const workspaceMasterSchema = z.object({
+  masterId: z.string(),
+  type: z.enum(['OPERATIONAL_PARAMETER', 'QC_PARAMETER', 'LOCATION', 'RESOURCE']),
+  code: z.string(),
+  name: z.string(),
+  nobCode: workspaceNobSchema.shape.code,
+  lobName: z.string().nullable(),
+  scope: z.literal('WORKSPACE'),
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+});
+export type WorkspaceMaster = z.infer<typeof workspaceMasterSchema>;
+
+export const workspaceSettingsSchema = workspaceSchema.extend({
+  companyName: z.string(),
+  currentUserRole: workspaceRoleSchema,
+  currentUserPermissions: z.array(permissionSchema),
+});
+export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;
 
 export const demoStateResponseSchema = z.object({
   state: z.unknown().nullable(),
@@ -257,9 +309,11 @@ export type RuntimeContract = {
  * runtime validated.
  */
 export const runtimeContracts: RuntimeContract[] = [
+  ...companyAdminRuntimeContracts,
   ...phase3RuntimeContracts,
   ...phase2RuntimeContracts,
-  { method: 'POST', pattern: /^\/auth\/(login|mfa\/verify|mfa\/recovery)$/, response: authSessionSchema },
+  { method: 'POST', pattern: /^\/auth\/login$/, response: authLoginResponseSchema },
+  { method: 'POST', pattern: /^\/auth\/mfa\/(verify|recovery)$/, response: authSessionSchema },
   { method: 'GET', pattern: /^\/auth\/session$/, response: authSessionSchema },
   { method: 'PUT', pattern: /^\/auth\/context$/, response: authSessionSchema },
   { method: 'PATCH', pattern: /^\/users\/me$/, response: authSessionSchema },
@@ -273,6 +327,13 @@ export const runtimeContracts: RuntimeContract[] = [
   { method: 'PUT', pattern: /^\/demo\/companies\/[^/]+\/state$/, response: successSchema },
   { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces$/, response: z.array(workspaceSchema) },
   { method: 'POST', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces$/, response: workspaceSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
+  { method: 'PATCH', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/readiness$/, response: workspaceSchema.shape.readiness },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/members$/, response: z.array(workspaceMemberSchema) },
+  { method: 'POST', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/members$/, response: workspaceMemberSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/settings$/, response: workspaceSettingsSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/masters$/, response: z.array(workspaceMasterSchema) },
   { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
   { method: 'PATCH', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
   { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+\/readiness$/, response: workspaceSchema.shape.readiness },

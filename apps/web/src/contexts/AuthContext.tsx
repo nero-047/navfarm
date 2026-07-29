@@ -1,12 +1,21 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { AuthSession } from '../contracts/api';
+import {
+  authContextRequestSchema,
+  authLoginRequestSchema,
+  mfaCompletionRequestSchema,
+  type AuthLoginResponse,
+  type AuthSession,
+} from '../contracts/api';
 import { destinationForSession } from '../lib/authorization';
 import { ApiError, api } from '../lib/api-client';
-import { setSessionSnapshot } from '../hooks/useAuth';
 
 export type User = AuthSession['user'];
+export type SessionStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'suspended' | 'mfa_pending';
+export type LoginResult =
+  | { status: 'authenticated' | 'suspended'; user: User; session: AuthSession }
+  | { status: 'mfa_pending'; user: User; challengeId: string };
 
 interface SignupInput {
   tenantName: string;
@@ -19,8 +28,11 @@ interface SignupInput {
 interface AuthContextType {
   session: AuthSession | null;
   user: User | null;
+  status: SessionStatus;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User & { mfaRequired?: boolean; challengeId?: string }>;
+  mfaChallengeId: string | null;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  completeMfa: (challengeId: string, credential: { code?: string; recoveryCode?: string }) => Promise<AuthSession>;
   signup: (input: SignupInput) => Promise<User>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<AuthSession | null>;
@@ -31,11 +43,13 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<SessionStatus>('loading');
+  const [mfaChallengeId, setMfaChallengeId] = useState<string | null>(null);
 
   const commit = useCallback((value: AuthSession | null) => {
     setSession(value);
-    setSessionSnapshot(value);
+    setMfaChallengeId(null);
+    setStatus(value?.state === 'SUSPENDED' ? 'suspended' : value ? 'authenticated' : 'unauthenticated');
     return value;
   }, []);
 
@@ -49,15 +63,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [commit]);
 
   useEffect(() => {
-    refreshSession().finally(() => setLoading(false));
+    void refreshSession().catch(() => commit(null));
   }, [refreshSession]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const next = await api.post<AuthSession>('/auth/login', { email, password });
-    // An MFA challenge is intentionally not an authenticated application session.
-    // The server only creates the real session after verification/recovery succeeds.
-    if (!next.mfaRequired) commit(next);
-    return { ...next.user, mfaRequired: next.mfaRequired, challengeId: next.challengeId };
+    const input = authLoginRequestSchema.parse({ email: email.trim().toLowerCase(), password });
+    const next = await api.post<AuthLoginResponse>('/auth/login', input);
+    if (next.state === 'MFA_PENDING') {
+      setSession(null);
+      setMfaChallengeId(next.challengeId);
+      setStatus('mfa_pending');
+      return { status: 'mfa_pending' as const, user: next.user, challengeId: next.challengeId };
+    }
+    commit(next);
+    return {
+      status: next.state === 'SUSPENDED' ? 'suspended' as const : 'authenticated' as const,
+      user: next.user,
+      session: next,
+    };
+  }, [commit]);
+
+  const completeMfa = useCallback(async (
+    challengeId: string,
+    credential: { code?: string; recoveryCode?: string },
+  ) => {
+    const input = mfaCompletionRequestSchema.parse({ challengeId, ...credential });
+    const next = await api.post<AuthSession>(
+      credential.recoveryCode ? '/auth/mfa/recovery' : '/auth/mfa/verify',
+      input,
+    );
+    return commit(next) as AuthSession;
   }, [commit]);
 
   const signup = useCallback(async (input: SignupInput) => {
@@ -66,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       tenant_type: 'SME', plan_id: 'PLAN_PRO', billing_email: input.email,
       admin_name: input.name, admin_email: input.email, admin_password: input.password,
     });
-    return login(input.email, input.password);
+    const result = await login(input.email, input.password);
+    return result.user;
   }, [login]);
 
   const logout = useCallback(async () => {
@@ -74,15 +110,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [commit]);
 
   const selectContext = useCallback(async (tenantId: string | null, companyId: string | null, workspaceId: string | null = null) => {
-    const next = await api.put<AuthSession>('/auth/context', { tenantId, companyId, workspaceId });
+    const input = authContextRequestSchema.parse({ tenantId, companyId, workspaceId });
+    const next = await api.put<AuthSession>('/auth/context', input);
     commit(next);
     return next;
   }, [commit]);
 
+  const loading = status === 'loading';
   const value = useMemo(() => ({
-    session, user: session?.user ?? null, loading, login, signup, logout,
-    refreshSession, selectContext,
-  }), [session, loading, login, signup, logout, refreshSession, selectContext]);
+    session, user: session?.user ?? null, status, loading, mfaChallengeId,
+    login, completeMfa, signup, logout, refreshSession, selectContext,
+  }), [
+    session, status, loading, mfaChallengeId, login, completeMfa, signup,
+    logout, refreshSession, selectContext,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
