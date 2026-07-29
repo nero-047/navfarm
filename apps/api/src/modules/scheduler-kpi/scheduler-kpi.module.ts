@@ -13,8 +13,15 @@ import { AlertEngineService } from './services/alert-engine.service';
 import { NotificationDeliveryService } from './services/notification-delivery.service';
 import { KpiMonitoringService } from './services/kpi-monitoring.service';
 import { DashboardEngineService } from './services/dashboard-engine.service';
+// FIX-039 (GAP-051): Import data modules so scheduler/KPI services can read domain data
+import { InventoryModule } from '../inventory/inventory.module';
+import { ProductionModule } from '../production/production.module';
 
 @Module({
+  imports: [
+    InventoryModule,    // FIX-039: Access inventory ledger, balance for KPI computation
+    ProductionModule,   // FIX-039: Access production batches for KPI tracking
+  ],
   controllers: [
     SchedulerController,
     OperationalScheduleController,
@@ -44,3 +51,4 @@ import { DashboardEngineService } from './services/dashboard-engine.service';
   ],
 })
 export class SchedulerKpiModule {}
+

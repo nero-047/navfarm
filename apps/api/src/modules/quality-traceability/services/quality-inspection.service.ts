@@ -78,13 +78,14 @@ export class QualityInspectionService {
     }
 
     // Auto-create Quarantine Hold if overall result is QUARANTINE
+    // FIX-026 (GAP-035): Use dto.item_id instead of dto.plan_id for correct item tracking
     if (overallStatus === 'QUARANTINE' && dto.warehouse_id && dto.location_id && dto.hold_qty) {
       await this.db.insert(schema.quarantineHold).values({
         hold_id: randomUUID(),
         tenant_id: tenantId,
         company_id: dto.company_id,
         inspection_id: inspectionId,
-        item_id: dto.plan_id || 'quality-item',
+        item_id: dto.item_id || dto.plan_id || 'quality-item',
         warehouse_id: dto.warehouse_id,
         location_id: dto.location_id,
         hold_qty: dto.hold_qty.toFixed(4),

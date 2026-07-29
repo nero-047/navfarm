@@ -16,12 +16,18 @@ export class LivestockV2ReportService {
   async getLivestockSummaryReport(tenantId: string, companyId?: string) {
     const conditions: any[] = [eq(schema.lvsHerd.tenant_id, tenantId)];
     if (companyId) conditions.push(eq(schema.lvsHerd.company_id, companyId));
-    const herds = await this.db.select().from(schema.lvsHerd).where(and(...conditions));
-    const animals = await this.db.select().from(schema.lvsAnimal).where(eq(schema.lvsAnimal.tenant_id, tenantId));
-    const milkRecords = await this.db.select().from(schema.lvsMilkProduction).where(eq(schema.lvsMilkProduction.tenant_id, tenantId));
-    const mortalities = await this.db.select().from(schema.lvsMortalityRecord).where(eq(schema.lvsMortalityRecord.tenant_id, tenantId));
-    const purchases = await this.db.select().from(schema.lvsAnimalPurchase).where(eq(schema.lvsAnimalPurchase.tenant_id, tenantId));
-    const sales = await this.db.select().from(schema.lvsAnimalSale).where(eq(schema.lvsAnimalSale.tenant_id, tenantId));
+    const herdsRaw = await this.db.select().from(schema.lvsHerd).where(and(...conditions));
+    const herds = Array.isArray(herdsRaw) ? herdsRaw : [];
+    const animalsRaw = await this.db.select().from(schema.lvsAnimal).where(eq(schema.lvsAnimal.tenant_id, tenantId));
+    const animals = Array.isArray(animalsRaw) ? animalsRaw : [];
+    const milkRecordsRaw = await this.db.select().from(schema.lvsMilkProduction).where(eq(schema.lvsMilkProduction.tenant_id, tenantId));
+    const milkRecords = Array.isArray(milkRecordsRaw) ? milkRecordsRaw : [];
+    const mortalitiesRaw = await this.db.select().from(schema.lvsMortalityRecord).where(eq(schema.lvsMortalityRecord.tenant_id, tenantId));
+    const mortalities = Array.isArray(mortalitiesRaw) ? mortalitiesRaw : [];
+    const purchasesRaw = await this.db.select().from(schema.lvsAnimalPurchase).where(eq(schema.lvsAnimalPurchase.tenant_id, tenantId));
+    const purchases = Array.isArray(purchasesRaw) ? purchasesRaw : [];
+    const salesRaw = await this.db.select().from(schema.lvsAnimalSale).where(eq(schema.lvsAnimalSale.tenant_id, tenantId));
+    const sales = Array.isArray(salesRaw) ? salesRaw : [];
 
     const totalMilkLitres = milkRecords.reduce((s, r) => s + Number(r.litres || 0), 0);
     const totalPurchaseCost = purchases.reduce((s, p) => s + Number(p.total_cost || 0), 0);

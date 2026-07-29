@@ -32,6 +32,10 @@ export class StockPondDto {
   @ApiProperty({ example: 2.5, required: false, description: 'Unit cost per fingerling' }) @IsNumber() @IsOptional() unit_cost?: number;
   @ApiProperty({ required: false }) @IsString() @IsOptional() batch_id?: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() notes?: string;
+  // FIX-003: Inventory integration — provide these to auto-create Goods Receipt on stocking
+  @ApiProperty({ required: false, description: 'Item ID from item master (fingerling item) for auto-GR' }) @IsString() @IsOptional() item_id?: string;
+  @ApiProperty({ required: false, description: 'Target warehouse for auto-GR' }) @IsString() @IsOptional() warehouse_id?: string;
+  @ApiProperty({ required: false, description: 'Target location for auto-GR' }) @IsString() @IsOptional() location_id?: string;
 }
 
 export class WaterQualityDto {
@@ -87,3 +91,44 @@ export class PondTreatmentDto {
   @ApiProperty({ required: false }) @IsNumber() @IsOptional() cost?: number;
   @ApiProperty({ required: false }) @IsString() @IsOptional() notes?: string;
 }
+
+// ── FIX-004: Harvest DTO ──────────────────────────────────────────────────────
+export class HarvestDto {
+  @ApiProperty({ description: 'Aqua batch ID' }) @IsString() @IsNotEmpty() batch_id: string;
+  @ApiProperty({ example: '2026-07-28' }) @IsString() @IsNotEmpty() harvest_date: string;
+  @ApiProperty({ example: 'PARTIAL', description: 'PARTIAL or FULL harvest' }) @IsString() @IsOptional() harvest_type?: string;
+  @ApiProperty({ example: 5000.0, description: 'Total live fish weight in kg' }) @IsNumber() live_fish_kg: number;
+  @ApiProperty({ example: 0.35, required: false, description: 'Average weight per fish in kg' }) @IsNumber() @IsOptional() avg_weight_kg?: number;
+  @ApiProperty({ example: 180.0, required: false, description: 'Unit cost per kg' }) @IsNumber() @IsOptional() unit_cost?: number;
+  @ApiProperty({ required: false }) @IsString() @IsOptional() lot_no?: string;
+  @ApiProperty({ required: false }) @IsString() @IsOptional() notes?: string;
+  // Inventory integration for auto-GR
+  @ApiProperty({ required: false, description: 'Item ID for harvested fish (from item master) for auto-GR' }) @IsString() @IsOptional() item_id?: string;
+  @ApiProperty({ required: false, description: 'Warehouse ID for auto-GR' }) @IsString() @IsOptional() warehouse_id?: string;
+  @ApiProperty({ required: false, description: 'Location ID for auto-GR' }) @IsString() @IsOptional() location_id?: string;
+}
+
+// ── FIX-015: Feeding Schedule DTO ─────────────────────────────────────────────
+export class FeedingScheduleDto {
+  @ApiProperty({ required: false }) @IsString() @IsOptional() batch_id?: string;
+  @ApiProperty({ required: false, description: 'Feed item from item master' }) @IsString() @IsOptional() feed_item_id?: string;
+  @ApiProperty({ example: 3.5, required: false, description: '% of biomass per day' }) @IsNumber() @IsOptional() daily_rate_pct?: number;
+  @ApiProperty({ example: 2, required: false }) @IsInt() @IsOptional() feeds_per_day?: number;
+  @ApiProperty({ example: '08:00,17:00', required: false }) @IsString() @IsOptional() feed_times?: string;
+  @ApiProperty({ example: '2026-07-28' }) @IsString() @IsNotEmpty() effective_from: string;
+  @ApiProperty({ required: false }) @IsString() @IsOptional() effective_to?: string;
+  @ApiProperty({ required: false }) @IsString() @IsOptional() notes?: string;
+}
+
+// ── FIX-016: Batch Transfer DTO ───────────────────────────────────────────────
+export class BatchTransferDto {
+  @ApiProperty({ required: false }) @IsString() @IsOptional() batch_id?: string;
+  @ApiProperty({ description: 'Source pond ID' }) @IsString() @IsNotEmpty() from_pond_id: string;
+  @ApiProperty({ description: 'Destination pond ID' }) @IsString() @IsNotEmpty() to_pond_id: string;
+  @ApiProperty({ example: '2026-07-28' }) @IsString() @IsNotEmpty() transfer_date: string;
+  @ApiProperty({ example: 5000, description: 'Number of fish transferred' }) @IsInt() qty_transferred: number;
+  @ApiProperty({ example: 18.5, required: false, description: 'Avg weight grams at transfer' }) @IsNumber() @IsOptional() avg_weight_g?: number;
+  @ApiProperty({ example: 'THINNING', description: 'THINNING/GROW_OUT/DISEASE_MANAGEMENT' }) @IsString() @IsOptional() reason?: string;
+  @ApiProperty({ required: false }) @IsString() @IsOptional() notes?: string;
+}
+

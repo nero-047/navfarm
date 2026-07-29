@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -24,6 +24,15 @@ export class SlaughterCostSplitService {
     costSplitPct: number,
     tenantId: string
   ) {
+    // FIX-033 (GAP-044): Validate total cost_split_pct doesn't exceed 100%
+    const existingConfigs = await this.getCostSplitConfigs(companyId, tenantId);
+    const currentTotal = existingConfigs.reduce((sum, c) => sum + Number(c.cost_split_pct), 0);
+    if (currentTotal + costSplitPct > 100.01) { // 0.01 tolerance for float rounding
+      throw new BadRequestException(
+        `Total cost split would be ${(currentTotal + costSplitPct).toFixed(2)}% which exceeds 100%. Current total: ${currentTotal.toFixed(2)}%. Max remaining: ${(100 - currentTotal).toFixed(2)}%.`
+      );
+    }
+
     const configId = randomUUID();
     const newConfig = {
       config_id: configId,

@@ -32,6 +32,10 @@ export class QcInspectionDto {
   @ApiProperty({ required: false }) @IsString() @IsOptional() rejection_reason?: string;
   @ApiProperty({ example: 'RELEASE', description: 'RELEASE/QUARANTINE/REWORK/DESTROY' }) @IsString() @IsNotEmpty() disposition: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() inspector?: string;
+  // FIX-005: Inventory integration — provide these for auto-GR on QC PASS / auto-quarantine on FAIL
+  @ApiProperty({ required: false, description: 'Feed item ID for auto-GR of produced feed' }) @IsString() @IsOptional() feed_item_id?: string;
+  @ApiProperty({ required: false, description: 'Target warehouse for auto-GR' }) @IsString() @IsOptional() warehouse_id?: string;
+  @ApiProperty({ required: false, description: 'Target location for auto-GR' }) @IsString() @IsOptional() location_id?: string;
 }
 
 export class CreateDeliveryDto {

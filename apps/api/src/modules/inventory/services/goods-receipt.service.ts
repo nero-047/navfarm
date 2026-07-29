@@ -172,6 +172,17 @@ export class GoodsReceiptService {
           .where(eq(schema.itemMaster.item_id, line.item_id))
           .limit(1);
 
+        // FIX-030 (GAP-041): Reject already-expired goods at receipt
+        if (line.expiry_date && receipt.posting_date) {
+          const expiryDate = new Date(line.expiry_date);
+          const postingDate = new Date(receipt.posting_date);
+          if (expiryDate < postingDate) {
+            throw new BadRequestException(
+              `Item '${item?.item_code || line.item_id}' lot '${line.lot_no || 'N/A'}' has expiry date ${line.expiry_date} which is before posting date ${receipt.posting_date}. Cannot receive expired goods.`
+            );
+          }
+        }
+
         let lotId: string | null = null;
         let serialId: string | null = null;
 

@@ -168,6 +168,24 @@ export class GoodsIssueService {
           .where(eq(schema.itemMaster.item_id, line.item_id))
           .limit(1);
 
+        // 0. Check Quarantine Hold — block issuance of QC-held items (FIX-001)
+        const holdConditions = [
+          eq(schema.quarantineHold.item_id, line.item_id),
+          eq(schema.quarantineHold.warehouse_id, issue.warehouse_id),
+          eq(schema.quarantineHold.location_id, line.location_id),
+          eq(schema.quarantineHold.status, 'ON_HOLD'),
+        ];
+        const [activeHold] = await trx
+          .select()
+          .from(schema.quarantineHold)
+          .where(and(...holdConditions))
+          .limit(1);
+        if (activeHold) {
+          throw new ConflictException(
+            `Item '${item.item_code}' at Location '${line.location_id}' is under QC Quarantine Hold (Hold ID: ${activeHold.hold_id}). Resolve the hold before issuing.`
+          );
+        }
+
         // 1. Verify available stock (including reservation logic)
         const available = await this.ledgerService.getAvailableStock(
           line.item_id,

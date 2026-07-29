@@ -45,6 +45,29 @@ export class PostingEngineService {
       return { success: true, message: 'Zero-amount operational transaction skipped for financial posting.' };
     }
 
+    // FIX-032 (GAP-043): Validate posting_date falls within an OPEN accounting period
+    const allPeriods = await trx
+      .select()
+      .from(schema.accountingPeriod)
+      .where(
+        and(
+          eq(schema.accountingPeriod.tenant_id, tenantId),
+          eq(schema.accountingPeriod.company_id, params.company_id),
+        )
+      );
+
+    if (allPeriods.length > 0) {
+      const postingDate = params.posting_date;
+      const matchingPeriod = allPeriods.find(p =>
+        p.start_date && p.end_date && postingDate >= p.start_date && postingDate <= p.end_date
+      );
+      if (matchingPeriod && matchingPeriod.status !== 'OPEN') {
+        throw new BadRequestException(
+          `Cannot post to date ${postingDate}. Accounting period '${matchingPeriod.period_name || matchingPeriod.period_id}' is ${matchingPeriod.status}.`
+        );
+      }
+    }
+
     // 1. Resolve GL Mapping rules
     let mapping: typeof schema.glMappingMaster.$inferSelect | undefined;
 

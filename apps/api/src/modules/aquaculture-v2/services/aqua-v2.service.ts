@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -6,12 +6,23 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import {
   CreatePondDto, CreateTankDto, StockPondDto, WaterQualityDto, GrowthSampleDto,
-  MortalityEventDto, DiseaseEventDto, PondTreatmentDto
+  MortalityEventDto, DiseaseEventDto, PondTreatmentDto,
+  HarvestDto, FeedingScheduleDto, BatchTransferDto,
 } from '../dto/aqua.dto';
+import { GoodsReceiptService } from '../../inventory/services/goods-receipt.service';
+import { GoodsIssueService } from '../../inventory/services/goods-issue.service';
+import { PostingEngineService } from '../../finance/services/posting-engine.service';
+import { AlertEngineService } from '../../scheduler-kpi/services/alert-engine.service';
 
 @Injectable()
 export class AquaV2Service {
-  constructor(private readonly cls: ClsService) {}
+  constructor(
+    private readonly cls: ClsService,
+    private readonly goodsReceiptService: GoodsReceiptService,
+    private readonly goodsIssueService: GoodsIssueService,
+    private readonly postingEngine: PostingEngineService,
+    private readonly alertEngine: AlertEngineService,
+  ) {}
   private get db(): MySql2Database<typeof schema> {
     const db = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
     if (!db) throw new Error('Tenant DB context not established.');
@@ -75,13 +86,52 @@ export class AquaV2Service {
     return this.db.select().from(schema.aquaTank).where(eq(schema.aquaTank.tenant_id, tenantId));
   }
 
-  // ── STOCKING ──────────────────────────────────────────────────────────────
-  async stockPond(pondId: string, dto: StockPondDto, tenantId: string, userId: string) {
+  // ── STOCKING (FIX-003: auto-GR + FIX-002: GL posting) ─────────────────
+  async stockPond(pondId: string, dto: StockPondDto, tenantId: string, companyId: string, userId: string) {
     const pond = await this.getPond(pondId, tenantId);
     const stocking_id = randomUUID();
     const area = parseFloat(pond.area_sqm || '1');
     const density = area > 0 ? dto.fingerlings_qty / area : null;
     const totalCost = dto.unit_cost ? dto.fingerlings_qty * dto.unit_cost : null;
+
+    // FIX-037: Block stocking if density exceeds safe limit (configurable, default 20/sqm)
+    const MAX_DENSITY = 20;
+    if (density && density > MAX_DENSITY) {
+      throw new BadRequestException(
+        `Stocking density ${density.toFixed(1)}/sqm exceeds the maximum safe limit of ${MAX_DENSITY}/sqm. Reduce quantity or use a larger pond.`
+      );
+    }
+
+    // FIX-003: Auto-create Goods Receipt for fingerlings if inventory params provided
+    let inventoryReceiptId: string | null = null;
+    let inventoryStatusNote = 'No inventory parameters provided. Create Goods Receipt manually at /inventory/goods-receipt if needed.';
+
+    if (dto.item_id && dto.warehouse_id && dto.location_id && dto.unit_cost) {
+      try {
+        const gr = await this.goodsReceiptService.create({
+          company_id: companyId,
+          receipt_type: 'PURCHASE',
+          warehouse_id: dto.warehouse_id,
+          posting_date: dto.stocking_date,
+          receipt_no: `GR-STOCK-${randomUUID().slice(0, 8)}`,
+          notes: `Auto-generated from Aquaculture Stocking — Pond ${pond.pond_code}`,
+          lines: [{
+            item_id: dto.item_id,
+            location_id: dto.location_id,
+            qty: dto.fingerlings_qty,
+            uom_code: 'HEAD',
+            unit_cost: dto.unit_cost,
+          }],
+        }, tenantId, userId);
+        if (gr?.receipt_id) {
+          await this.goodsReceiptService.post(gr.receipt_id, tenantId, userId);
+          inventoryReceiptId = gr.receipt_id;
+          inventoryStatusNote = `Auto-posted Goods Receipt ${gr.receipt_no} (ID: ${gr.receipt_id}).`;
+        }
+      } catch (err: any) {
+        inventoryStatusNote = `Goods Receipt creation warning: ${err?.message || err}`;
+      }
+    }
 
     const record = {
       stocking_id, tenant_id: tenantId, pond_id: pondId, tank_id: null,
@@ -100,12 +150,10 @@ export class AquaV2Service {
       .set({ pond_status: 'STOCKED', updated_at: new Date().toISOString() })
       .where(eq(schema.aquaPond.pond_id, pondId));
 
-    const alerts: string[] = [];
-    if (density && density > 20) alerts.push(`⚠️ High stocking density (${density.toFixed(1)}/sqm). Consider aeration increase.`);
-    return { ...record, alerts };
+    return { ...record, inventory_gr_id: inventoryReceiptId, inventoryNote: inventoryStatusNote };
   }
 
-  // ── WATER QUALITY ─────────────────────────────────────────────────────────
+  // ── WATER QUALITY (FIX-009: persist alerts via AlertEngineService) ──────
   async logWaterQuality(pondId: string, dto: WaterQualityDto, tenantId: string, userId: string) {
     const log_id = randomUUID();
     // Evaluate alerts
@@ -139,6 +187,25 @@ export class AquaV2Service {
       created_at: new Date().toISOString(),
     };
     await this.db.insert(schema.aquaWaterQuality).values(record);
+
+    // FIX-009: Persist critical/warning alerts to alert_event via AlertEngineService
+    for (const alertText of alerts) {
+      try {
+        await this.alertEngine.fireDirectAlert({
+          tenantId,
+          alertType: alertText.includes('🚨') ? 'CRITICAL' : 'WARNING',
+          source: 'AQUA_WATER_QUALITY',
+          sourceId: pondId,
+          batchId: dto.batch_id || null,
+          message: alertText,
+          measuredValue: dto.do_mg_l !== undefined ? String(dto.do_mg_l) : dto.ammonia_ppm !== undefined ? String(dto.ammonia_ppm) : null,
+          userId,
+        });
+      } catch (err: any) {
+        console.warn(`[Alert Persistence Warning]: ${err?.message || err}`);
+      }
+    }
+
     return { ...record, wqi, alerts, status };
   }
 
@@ -226,6 +293,130 @@ export class AquaV2Service {
       notes: dto.notes || null, created_at: new Date().toISOString(),
     };
     await this.db.insert(schema.aquaPondTreatment).values(record);
+    return record;
+  }
+
+  // ── HARVEST (FIX-004: New endpoint — writes aqua_harvest_record + auto-GR) ──
+  async recordHarvest(pondId: string, dto: HarvestDto, tenantId: string, companyId: string, userId: string) {
+    const pond = await this.getPond(pondId, tenantId);
+    const harvest_id = randomUUID();
+
+    const totalValue = dto.unit_cost ? dto.live_fish_kg * dto.unit_cost : null;
+
+    // Auto-create Goods Receipt for harvested fish
+    let grId: string | null = null;
+    let inventoryNote = 'No inventory parameters provided. Create GR manually at /inventory/goods-receipt if needed.';
+
+    if (dto.item_id && dto.warehouse_id && dto.location_id) {
+      try {
+        const gr = await this.goodsReceiptService.create({
+          company_id: companyId,
+          receipt_type: 'PRODUCTION',
+          warehouse_id: dto.warehouse_id,
+          posting_date: dto.harvest_date,
+          receipt_no: `GR-HARVEST-${randomUUID().slice(0, 8)}`,
+          notes: `Aquaculture harvest from Pond ${pond.pond_code}`,
+          lines: [{
+            item_id: dto.item_id,
+            location_id: dto.location_id,
+            qty: dto.live_fish_kg,
+            uom_code: 'KG',
+            unit_cost: dto.unit_cost || 0,
+            lot_no: dto.lot_no || undefined,
+          }],
+        }, tenantId, userId);
+        if (gr?.receipt_id) {
+          await this.goodsReceiptService.post(gr.receipt_id, tenantId, userId);
+          grId = gr.receipt_id;
+          inventoryNote = `Auto-posted Goods Receipt ${gr.receipt_no} (ID: ${gr.receipt_id}) for fish harvest.`;
+        }
+      } catch (err: any) {
+        inventoryNote = `Goods Receipt creation warning: ${err?.message || err}`;
+      }
+    }
+
+    const record = {
+      harvest_id,
+      batch_id: dto.batch_id,
+      harvest_date: dto.harvest_date,
+      harvest_type: dto.harvest_type || 'PARTIAL',
+      live_fish_kg: String(dto.live_fish_kg),
+      avg_weight_kg: dto.avg_weight_kg ? String(dto.avg_weight_kg) : null,
+      unit_cost: dto.unit_cost ? String(dto.unit_cost) : null,
+      total_value: totalValue ? String(totalValue) : null,
+      lot_no: dto.lot_no || null,
+      notes: dto.notes || null,
+      created_at: new Date().toISOString(),
+    };
+    await this.db.insert(schema.aquaHarvestRecord).values(record);
+
+    // Update pond status if full harvest
+    if (dto.harvest_type === 'FULL') {
+      await this.db.update(schema.aquaPond)
+        .set({ pond_status: 'HARVESTED', current_batch_id: null, updated_at: new Date().toISOString() })
+        .where(eq(schema.aquaPond.pond_id, pondId));
+    }
+
+    return { ...record, inventory_gr_id: grId, inventoryNote };
+  }
+
+  // ── FEEDING SCHEDULE (FIX-015: New endpoint for aqua_feeding_schedule) ──
+  async createFeedingSchedule(pondId: string, dto: FeedingScheduleDto, tenantId: string, userId: string) {
+    const schedule_id = randomUUID();
+    const record = {
+      schedule_id, tenant_id: tenantId, pond_id: pondId,
+      batch_id: dto.batch_id || null,
+      feed_item_id: dto.feed_item_id || null,
+      daily_rate_pct: dto.daily_rate_pct ? String(dto.daily_rate_pct) : null,
+      feeds_per_day: dto.feeds_per_day || 2,
+      feed_times: dto.feed_times || null,
+      effective_from: dto.effective_from,
+      effective_to: dto.effective_to || null,
+      is_active: true,
+      notes: dto.notes || null,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    await this.db.insert(schema.aquaFeedingSchedule).values(record);
+    return record;
+  }
+
+  async getFeedingSchedules(pondId: string, tenantId: string) {
+    return this.db.select().from(schema.aquaFeedingSchedule)
+      .where(and(eq(schema.aquaFeedingSchedule.pond_id, pondId), eq(schema.aquaFeedingSchedule.tenant_id, tenantId)));
+  }
+
+  // ── BATCH TRANSFER (FIX-016: New endpoint for aqua_batch_transfer) ─────
+  async transferBatch(dto: BatchTransferDto, tenantId: string, userId: string) {
+    // Validate ponds exist
+    await this.getPond(dto.from_pond_id, tenantId);
+    await this.getPond(dto.to_pond_id, tenantId);
+    if (dto.from_pond_id === dto.to_pond_id) {
+      throw new BadRequestException('Source and destination ponds must be different.');
+    }
+
+    const transfer_id = randomUUID();
+    const record = {
+      transfer_id, tenant_id: tenantId,
+      batch_id: dto.batch_id || null,
+      from_pond_id: dto.from_pond_id,
+      to_pond_id: dto.to_pond_id,
+      transfer_date: dto.transfer_date,
+      qty_transferred: dto.qty_transferred,
+      avg_weight_g: dto.avg_weight_g ? String(dto.avg_weight_g) : null,
+      reason: dto.reason || null,
+      recorded_by: userId,
+      notes: dto.notes || null,
+      created_at: new Date().toISOString(),
+    };
+    await this.db.insert(schema.aquaBatchTransfer).values(record);
+
+    // Update destination pond status to STOCKED
+    await this.db.update(schema.aquaPond)
+      .set({ pond_status: 'STOCKED', updated_at: new Date().toISOString() })
+      .where(eq(schema.aquaPond.pond_id, dto.to_pond_id));
+
     return record;
   }
 

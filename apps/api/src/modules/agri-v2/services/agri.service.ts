@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -292,6 +292,21 @@ export class AgriV2Service {
     const [field] = cropPlan?.field_id
       ? await this.db.select().from(schema.agriField).where(eq(schema.agriField.field_id, cropPlan.field_id)).limit(1)
       : [null];
+
+    // FIX-027 (GAP-036): PHI Safety Check — block harvest if within pesticide safe_harvest_date
+    if (cropPlan?.plan_id) {
+      const pesticideApps = await this.db.select().from(schema.agriPesticideApp)
+        .where(eq(schema.agriPesticideApp.plan_id, cropPlan.plan_id));
+      const today = new Date().toISOString().split('T')[0];
+      const unsafeApp = pesticideApps.find(p => p.safe_harvest_date && p.safe_harvest_date > today);
+      if (unsafeApp) {
+        const safeDate = unsafeApp.safe_harvest_date!;
+        const daysRemaining = Math.ceil((new Date(safeDate).getTime() - Date.now()) / 86400000);
+        throw new BadRequestException(
+          `🚫 Harvest BLOCKED by PHI safety check. Pesticide '${unsafeApp.pesticide_name || unsafeApp.pesticide_item_id}' applied on ${unsafeApp.app_date} has safe harvest date ${safeDate}. Today (${today}) is before the safe date. Wait ${daysRemaining} more days.`
+        );
+      }
+    }
 
     const fieldArea = field ? parseFloat(field.area_acres) : 1;
     const yieldPerAcre = dto.actual_yield_kg / fieldArea;

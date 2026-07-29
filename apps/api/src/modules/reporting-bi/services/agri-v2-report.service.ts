@@ -14,10 +14,12 @@ export class AgriV2ReportService {
   }
 
   async getCropYieldReport(tenantId: string, season?: string) {
-    let plans = await this.db.select().from(schema.agriCropPlan).where(eq(schema.agriCropPlan.tenant_id, tenantId));
+    const plansRaw = await this.db.select().from(schema.agriCropPlan).where(eq(schema.agriCropPlan.tenant_id, tenantId));
+    let plans = Array.isArray(plansRaw) ? plansRaw : [];
     if (season) plans = plans.filter(p => p.season === season);
 
-    const analyses = await this.db.select().from(schema.agriYieldAnalysis).where(eq(schema.agriYieldAnalysis.tenant_id, tenantId));
+    const analysesRaw = await this.db.select().from(schema.agriYieldAnalysis).where(eq(schema.agriYieldAnalysis.tenant_id, tenantId));
+    const analyses = Array.isArray(analysesRaw) ? analysesRaw : [];
     const totalActualYield = analyses.reduce((s, a) => s + Number(a.actual_yield_kg || 0), 0);
     const totalRevenue = analyses.reduce((s, a) => s + Number(a.total_revenue || 0), 0);
     const totalCost = analyses.reduce((s, a) => s + Number(a.total_production_cost || 0), 0);

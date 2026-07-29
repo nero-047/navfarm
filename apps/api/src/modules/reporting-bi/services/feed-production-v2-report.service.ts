@@ -14,10 +14,14 @@ export class FeedProductionV2ReportService {
   }
 
   async getFeedProductionReport(tenantId: string) {
-    const mos = await this.db.select().from(schema.feedManufacturingOrder).where(eq(schema.feedManufacturingOrder.tenant_id, tenantId));
-    const qcList = await this.db.select().from(schema.feedQcInspection).where(eq(schema.feedQcInspection.tenant_id, tenantId));
-    const costs = await this.db.select().from(schema.feedCostBreakdown).where(eq(schema.feedCostBreakdown.tenant_id, tenantId));
-    const deliveries = await this.db.select().from(schema.feedDeliveryNote).where(eq(schema.feedDeliveryNote.tenant_id, tenantId));
+    const mosRaw = await this.db.select().from(schema.feedManufacturingOrder).where(eq(schema.feedManufacturingOrder.tenant_id, tenantId));
+    const mos = Array.isArray(mosRaw) ? mosRaw : [];
+    const qcListRaw = await this.db.select().from(schema.feedQcInspection).where(eq(schema.feedQcInspection.tenant_id, tenantId));
+    const qcList = Array.isArray(qcListRaw) ? qcListRaw : [];
+    const costsRaw = await this.db.select().from(schema.feedCostBreakdown).where(eq(schema.feedCostBreakdown.tenant_id, tenantId));
+    const costs = Array.isArray(costsRaw) ? costsRaw : [];
+    const deliveriesRaw = await this.db.select().from(schema.feedDeliveryNote).where(eq(schema.feedDeliveryNote.tenant_id, tenantId));
+    const deliveries = Array.isArray(deliveriesRaw) ? deliveriesRaw : [];
 
     const completed = mos.filter(m => m.mo_status === 'COMPLETED');
     const totalProduced = completed.reduce((s, m) => s + Number(m.actual_qty_mt || 0), 0);

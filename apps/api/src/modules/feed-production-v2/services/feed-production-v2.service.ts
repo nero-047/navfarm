@@ -8,6 +8,7 @@ import {
   CreateMODto, UpdateStageDto, QcInspectionDto, CreateDeliveryDto, IngredientPriceDto, CostBreakdownDto
 } from '../dto/feed-production.dto';
 import { GoodsIssueService } from '../../inventory/services/goods-issue.service';
+import { GoodsReceiptService } from '../../inventory/services/goods-receipt.service';
 
 const STAGES = [
   { name: 'GRINDING', seq: 1 },
@@ -22,6 +23,7 @@ export class FeedProductionV2Service {
   constructor(
     private readonly cls: ClsService,
     private readonly goodsIssueService: GoodsIssueService,
+    private readonly goodsReceiptService: GoodsReceiptService,
   ) {}
   private get db(): MySql2Database<typeof schema> {
     const db = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
@@ -129,8 +131,8 @@ export class FeedProductionV2Service {
     return { stageId, status: dto.status, duration_minutes: duration };
   }
 
-  // ── QC ────────────────────────────────────────────────────────────────────
-  async recordQcInspection(moId: string, dto: QcInspectionDto, tenantId: string) {
+  // ── QC (FIX-005: auto-GR on PASS + FIX-029: quarantine on aflatoxin FAIL) ──
+  async recordQcInspection(moId: string, dto: QcInspectionDto, tenantId: string, companyId?: string, userId?: string) {
     const inspection_id = randomUUID();
     // Auto-flag alerts
     const alerts: string[] = [];
@@ -157,10 +159,65 @@ export class FeedProductionV2Service {
     const nextStage = dto.qc_result === 'PASS' ? 'COMPLETED' : dto.qc_result === 'FAIL' ? 'QUALITY_REJECTED' : 'CONDITIONAL_RELEASE';
     await this.db.update(schema.feedManufacturingOrder).set({
       current_stage: nextStage, mo_status: dto.qc_result === 'PASS' ? 'COMPLETED' : 'IN_PROGRESS',
+      actual_end_date: dto.qc_result === 'PASS' ? new Date().toISOString().split('T')[0] : null,
       updated_at: new Date().toISOString(),
     }).where(eq(schema.feedManufacturingOrder.mo_id, moId));
 
-    return { ...record, alerts, message: `QC ${dto.qc_result}: ${dto.disposition}` };
+    let inventoryNote: string | null = null;
+
+    // FIX-005: Auto-GR for produced feed when QC PASS
+    if (dto.qc_result === 'PASS' && dto.feed_item_id && dto.warehouse_id && dto.location_id) {
+      const [mo] = await this.db.select().from(schema.feedManufacturingOrder)
+        .where(eq(schema.feedManufacturingOrder.mo_id, moId)).limit(1);
+      const producedQtyKg = mo?.actual_qty_mt ? parseFloat(mo.actual_qty_mt) * 1000 : 0;
+      if (producedQtyKg > 0) {
+        try {
+          const gr = await this.goodsReceiptService.create({
+            company_id: companyId || mo?.company_id || '',
+            receipt_type: 'PRODUCTION',
+            warehouse_id: dto.warehouse_id,
+            posting_date: dto.inspection_date,
+            receipt_no: `GR-FEED-${mo?.mo_no || moId.slice(0, 8)}`,
+            notes: `Auto-generated from Feed MO ${mo?.mo_no} QC PASS`,
+            lines: [{
+              item_id: dto.feed_item_id,
+              location_id: dto.location_id,
+              qty: producedQtyKg,
+              uom_code: 'KG',
+              unit_cost: 0,  // Will be updated by cost breakdown
+            }],
+          }, tenantId, userId || '');
+          if (gr?.receipt_id) {
+            await this.goodsReceiptService.post(gr.receipt_id, tenantId, userId || '');
+            inventoryNote = `Auto-posted Goods Receipt ${gr.receipt_no} for ${producedQtyKg} KG of produced feed.`;
+          }
+        } catch (err: any) {
+          inventoryNote = `Goods Receipt creation warning: ${err?.message || err}`;
+        }
+      }
+    }
+
+    // FIX-029: Auto-quarantine on aflatoxin FAIL
+    if (dto.qc_result === 'FAIL' && dto.aflatoxin_ppb && dto.aflatoxin_ppb > 10 && dto.feed_item_id && dto.warehouse_id && dto.location_id && companyId) {
+      try {
+        await this.db.insert(schema.quarantineHold).values({
+          tenant_id: tenantId,
+          company_id: companyId,
+          inspection_id: null,  // feedQcInspection is not the same as qcInspectionResult — FK mismatch
+          item_id: dto.feed_item_id,
+          warehouse_id: dto.warehouse_id,
+          location_id: dto.location_id,
+          hold_qty: '0',
+          hold_reason: `Aflatoxin ${dto.aflatoxin_ppb} ppb exceeds 10 ppb safety limit. Feed batch quarantined.`,
+          status: 'ON_HOLD',
+        });
+        alerts.push(`🔒 Feed batch auto-quarantined due to aflatoxin contamination.`);
+      } catch (err: any) {
+        alerts.push(`Quarantine hold warning: ${err?.message || err}`);
+      }
+    }
+
+    return { ...record, alerts, inventoryNote, message: `QC ${dto.qc_result}: ${dto.disposition}` };
   }
 
   // ── INGREDIENT PRICE ──────────────────────────────────────────────────────

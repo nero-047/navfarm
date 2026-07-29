@@ -180,9 +180,16 @@ export class LivestockCommercialService {
     const mortalities = await this.db.select().from(schema.lvsMortalityRecord)
       .where(and(eq(schema.lvsMortalityRecord.herd_id, herdId)));
 
-    // Get milk summary
-    const milkRecords = await this.db.select().from(schema.lvsMilkProduction)
-      .where(and(eq(schema.lvsMilkProduction.tenant_id, tenantId), eq(schema.lvsMilkProduction.tenant_id, tenantId)));
+    // Get milk summary — FIX-031 (GAP-042): lvsMilkProduction has animal_id, not herd_id.
+    // Query milk records for animals belonging to this herd.
+    const animalIds = animals.map(a => a.animal_id);
+    let milkRecords: any[] = [];
+    if (animalIds.length > 0) {
+      // Fetch milk for each animal in the herd (lvsMilkProduction.animal_id)
+      const allMilk = await this.db.select().from(schema.lvsMilkProduction)
+        .where(eq(schema.lvsMilkProduction.tenant_id, tenantId));
+      milkRecords = allMilk.filter(m => m.animal_id && animalIds.includes(m.animal_id));
+    }
     const totalMilk = milkRecords.reduce((s, r) => s + Number(r.litres || 0), 0);
     const activeCows = animals.filter(a => a.sex === 'FEMALE' && (a.lactation_no ?? 0) > 0).length;
 

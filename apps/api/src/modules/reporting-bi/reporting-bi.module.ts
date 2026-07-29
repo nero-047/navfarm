@@ -15,23 +15,36 @@ import { PoultryReportService } from './services/poultry-report.service';
 import { VarianceAuditReportService } from './services/variance-audit-report.service';
 import { DashboardBiService } from './services/dashboard-bi.service';
 import { ReportExporterService } from './services/report-exporter.service';
+// FIX-007: V2 Vertical Report Services (were dead code — now registered)
+import { AgriV2ReportService } from './services/agri-v2-report.service';
+import { AquaV2ReportService } from './services/aqua-v2-report.service';
+import { LivestockV2ReportService } from './services/livestock-v2-report.service';
+import { FeedProductionV2ReportService } from './services/feed-production-v2-report.service';
 import { InventoryModule } from '../inventory/inventory.module';
-import { FinanceModule } from '../finance/finance.module';
 import { ProductionModule } from '../production/production.module';
 import { PoultryModule } from '../poultry/poultry.module';
 import { CostingModule } from '../costing/costing.module';
 import { QualityTraceabilityModule } from '../quality-traceability/quality-traceability.module';
 import { SchedulerKpiModule } from '../scheduler-kpi/scheduler-kpi.module';
+// FIX-007: V2 Vertical Module imports for BI data access
+import { LivestockV2Module } from '../livestock-v2/livestock-v2.module';
+import { AgriV2Module } from '../agri-v2/agri-v2.module';
+import { AquacultureV2Module } from '../aquaculture-v2/aquaculture-v2.module';
+import { FeedProductionV2Module } from '../feed-production-v2/feed-production-v2.module';
 
 @Module({
   imports: [
     InventoryModule,
-    FinanceModule,
     ProductionModule,
     PoultryModule,
     CostingModule,
     QualityTraceabilityModule,
     SchedulerKpiModule,
+    // FIX-007 (GAP-010): V2 vertical modules now imported for BI reporting
+    LivestockV2Module,
+    AgriV2Module,
+    AquacultureV2Module,
+    FeedProductionV2Module,
   ],
   controllers: [
     ReportFrameworkController,
@@ -52,6 +65,11 @@ import { SchedulerKpiModule } from '../scheduler-kpi/scheduler-kpi.module';
     VarianceAuditReportService,
     DashboardBiService,
     ReportExporterService,
+    // FIX-007 (GAP-052): V2 report services — previously dead code, now registered
+    AgriV2ReportService,
+    AquaV2ReportService,
+    LivestockV2ReportService,
+    FeedProductionV2ReportService,
   ],
   exports: [
     ReportFrameworkService,
@@ -62,6 +80,10 @@ import { SchedulerKpiModule } from '../scheduler-kpi/scheduler-kpi.module';
     VarianceAuditReportService,
     DashboardBiService,
     ReportExporterService,
+    AgriV2ReportService,
+    AquaV2ReportService,
+    LivestockV2ReportService,
+    FeedProductionV2ReportService,
   ],
 })
 export class ReportingBiModule {}

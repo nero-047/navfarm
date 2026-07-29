@@ -136,4 +136,36 @@ export class AlertEngineService {
       acknowledged_by: userId || null,
     };
   }
+
+  /**
+   * Fire a direct alert without a pre-existing alert rule.
+   * Used by verticals (Aqua water quality, Feed QC, Agri PHI) to persist
+   * inline-computed alerts into the alert_event table for notification delivery.
+   * FIX-009: Enables cross-phase alert persistence from vertical services.
+   */
+  async fireDirectAlert(params: {
+    tenantId: string;
+    companyId?: string;
+    alertType: string;      // 'CRITICAL' | 'WARNING' | 'INFO'
+    source: string;         // e.g. 'AQUA_WATER_QUALITY', 'FEED_QC', 'AGRI_PHI'
+    sourceId: string;       // pond_id, mo_id, plan_id etc.
+    batchId?: string | null;
+    message: string;
+    measuredValue?: string | null;
+    userId?: string;
+  }) {
+    const alertId = randomUUID();
+    const alertInstance = {
+      alert_id: alertId,
+      // rule_id omitted — $defaultFn handles PK; FK to alertRule is optional
+      tenant_id: params.tenantId,
+      company_id: params.companyId || 'SYSTEM',  // alertEvent.company_id is notNull
+      severity: params.alertType,
+      message: params.message,
+      status: 'ACTIVE',
+    };
+
+    await this.db.insert(schema.alertEvent).values(alertInstance);
+    return alertInstance;
+  }
 }

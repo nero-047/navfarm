@@ -14,10 +14,14 @@ export class AquaV2ReportService {
   }
 
   async getPondProductionReport(tenantId: string) {
-    const ponds = await this.db.select().from(schema.aquaPond).where(eq(schema.aquaPond.tenant_id, tenantId));
-    const wqLogs = await this.db.select().from(schema.aquaWaterQuality).where(eq(schema.aquaWaterQuality.tenant_id, tenantId));
-    const growth = await this.db.select().from(schema.aquaGrowthSample).where(eq(schema.aquaGrowthSample.tenant_id, tenantId));
-    const mortalities = await this.db.select().from(schema.aquaMortalityEvent).where(eq(schema.aquaMortalityEvent.tenant_id, tenantId));
+    const pondsRaw = await this.db.select().from(schema.aquaPond).where(eq(schema.aquaPond.tenant_id, tenantId));
+    const ponds = Array.isArray(pondsRaw) ? pondsRaw : [];
+    const wqLogsRaw = await this.db.select().from(schema.aquaWaterQuality).where(eq(schema.aquaWaterQuality.tenant_id, tenantId));
+    const wqLogs = Array.isArray(wqLogsRaw) ? wqLogsRaw : [];
+    const growthRaw = await this.db.select().from(schema.aquaGrowthSample).where(eq(schema.aquaGrowthSample.tenant_id, tenantId));
+    const growth = Array.isArray(growthRaw) ? growthRaw : [];
+    const mortalitiesRaw = await this.db.select().from(schema.aquaMortalityEvent).where(eq(schema.aquaMortalityEvent.tenant_id, tenantId));
+    const mortalities = Array.isArray(mortalitiesRaw) ? mortalitiesRaw : [];
 
     const criticalWQ = wqLogs.filter(w => w.status === 'CRITICAL').length;
     const avgWqi = wqLogs.length > 0 ? wqLogs.reduce((s, w) => s + Number(w.water_quality_index || 0), 0) / wqLogs.length : 0;

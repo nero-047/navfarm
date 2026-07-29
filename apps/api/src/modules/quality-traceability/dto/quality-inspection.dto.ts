@@ -46,6 +46,12 @@ export class ExecuteQualityInspectionDto {
   @Type(() => RecordParameterResultDto)
   results: RecordParameterResultDto[];
 
+  // FIX-026 (GAP-035): Actual item ID for correct quarantine hold tracking
+  @ApiProperty({ example: 'item-uuid', required: false, description: 'Item ID for quarantine hold' })
+  @IsString()
+  @IsOptional()
+  item_id?: string;
+
   @ApiProperty({ example: 'wh-quarantine', required: false })
   @IsString()
   @IsOptional()
