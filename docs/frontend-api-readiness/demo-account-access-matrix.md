@@ -1,19 +1,27 @@
 # Demo Account Access Matrix
 
-Source of fixture facts: `apps/web/src/server/api/mock-repository.ts`, `docs/demo-account-scenarios.md`, and `docs/permission-matrix.md`. “Implicit” means the fixture derives membership by email in `workspaceAssignments()` rather than an explicit membership row.
+Status: implemented mock-demo fixtures. Source:
+`apps/web/src/server/api/mock-repository.ts`. “Explicit” means the fixture
+declares the membership and permission array directly; none are derived from
+email, username, tenant/company role fallback, or a default workspace.
 
-| Email | Intended scenario | Tenant membership | Company membership | Workspace membership | Landing route | Allowed company routes | Allowed workspace routes / mutations | Intentional denials | Observed mismatch | Required correction |
-|---|---|---|---|---|---|---|---|---|---|---|
-| `system@navfarm.demo` | Platform Admin | none | none | none | `/admin/dashboard` | platform only | none | company/workspace implicit access | global platform permissions are synthetic | retain explicit platform fixture; no implicit company access |
-| `tenant@navfarm.demo` | Tenant Admin | `tenant-demo` admin | Green Valley Accountant | none | `/console/dashboard` | tenant/company setup, workspace admin | no operations | workspace operations | mock mutation precheck permits tenant-admin before adapter scope check | ensure no operational capability without workspace role |
-| `manager@navfarm.demo` | Operations Manager | `tenant-demo` member | Green Valley FARM_MANAGER | Poultry Operations MANAGER (explicit seed row and fallback) | poultry dashboard | company view | batches/operations/QC/QR/resources/reports mutations | finance/company configuration | company role and workspace role overlap but fixture source is duplicated | use one explicit workspace membership |
-| `viewer@navfarm.demo` | read-only workspace user | `tenant-demo` member | Green Valley VIEWER | Poultry Operations VIEWER (explicit + fallback) | poultry dashboard | company view | workspace reads only | all operational writes | navigation is correct; server policy must remain scope-capability based | add negative mutation tests for every resource |
-| `multi@navfarm.demo` | multi-company/workspace selector | `tenant-demo`, `tenant-second` | Green Valley/Harvest/BlueWater/Inactive ADMIN or FARM_MANAGER | Poultry MANAGER, Feed VIEWER, Crops MANAGER, inactive workspace VIEWER (email fallback) | `/context-selection` | assigned active companies | operational rights vary by workspace | BlueWater/Inactive operation | tenant/company context can form stale mismatched tuple; ADMIN + Feed VIEWER risks write escalation | explicit rows; enforce tuple and workspace capability |
-| `mfa@navfarm.demo` | MFA success into Poultry | `tenant-demo` member | Green Valley ADMIN | Poultry MANAGER by generic fallback | `/mfa/verify`, then poultry dashboard | company admin | full manager operations | pre-MFA app session | membership is implicit, not scenario fixture | define explicit MFA membership and recovery policy |
-| `suspended@navfarm.demo` | suspended tenant | `tenant-suspended` | none | none | `/access-denied?reason=account_suspended` | none | none | all protected access | login creates session solely to show denial, as documented | preserve explicit behavior in real contract |
-| `onboarding@navfarm.demo` | incomplete BlueWater setup | `tenant-second` member | BlueWater SUPER_ADMIN | Aquaculture MANAGER by explicit special fallback | BlueWater setup profile | setup company routes | operations denied until readiness | direct operations | route resolver shows no-workspace rather than a dedicated operations-readiness policy in some legacy paths | model company/workspace readiness explicitly |
-| `accountant@navfarm.demo` | internal fixture | `tenant-demo` member | Green Valley ACCOUNTANT | Poultry MANAGER by generic fallback | poultry dashboard | accounting | unintended operational manager rights | none documented | violates least privilege/demo clarity | explicit role or remove account |
-| `auditor@navfarm.demo` | internal fixture | `tenant-demo` member | Green Valley AUDITOR | Poultry MANAGER by generic fallback | poultry dashboard | read accounting | unintended operational manager rights | none documented | explicit read-only workspace membership or remove |
-| `nocompany@navfarm.demo` | tenant-only internal fixture | `tenant-demo` member | none | none | tenant console | tenant view only if granted | none | company/workspace | not listed in scenario documentation | document or remove |
+| Email | Explicit scopes | Landing route | Operational result | Intentional denial |
+| --- | --- | --- | --- | --- |
+| `system@navfarm.demo` | Platform only | `/admin/dashboard` | None | All company/workspace access |
+| `tenant@navfarm.demo` | Tenant Admin + Green Valley company administration; no workspace | `/console/dashboard` | None | Workspace operations/mutations |
+| `companyadmin@navfarm.demo` | Green Valley company administration; no workspace | `/green-valley-poultry/overview` | None | Workspace operations/mutations |
+| `accountant@navfarm.demo` | Green Valley finance/readiness; no workspace | `/green-valley-poultry/accounting/readiness` | None | Batch/QC/QR/resource mutations |
+| `auditor@navfarm.demo` | Green Valley company/finance/audit read; no workspace | `/green-valley-poultry/overview` | None | All operational mutations |
+| `manager@navfarm.demo` | Green Valley + Poultry Operations Manager | `/green-valley-poultry/workspaces/poultry-operations/dashboard` | Explicit batch, operation, quality, traceability, resource, report capabilities | Other companies/workspaces |
+| `viewer@navfarm.demo` | Green Valley + Poultry Operations Viewer | same workspace dashboard | Explicit reads only | Mutation controls hidden; API returns `CAPABILITY_REQUIRED` |
+| `multi@navfarm.demo` | Explicit active/inactive companies and explicit per-workspace roles across two tenant memberships | `/context-selection` | Only selected active assigned workspace capabilities | Inactive/mismatched/unassigned contexts |
+| `mfa@navfarm.demo` | Green Valley Admin + Poultry Manager, disclosed only after MFA | `/context-selection` after verification | Explicit workspace capabilities after selection | All protected access before verification |
+| `onboarding@navfarm.demo` | BlueWater company Admin + draft Aquaculture workspace | `/bluewater-aqua/setup/profile` | Blocked by setup/readiness | Operational routes |
+| `suspended@navfarm.demo` | Suspended tenant membership | `/access-denied?reason=account_suspended` | None | All protected data/navigation |
+| `noworkspace@navfarm.demo` | Green Valley company Viewer; no workspace | `/green-valley-poultry/workspaces` | None | No-workspace state |
+| `nocompany@navfarm.demo` | Tenant read only | `/console/dashboard` | None | Company/workspace access |
 
-Refresh uses `AuthProvider` session hydration for canonical pages. Legacy pages relying on `getStored*` helpers can redirect after refresh. Logout calls `/auth/logout` and clears the React/module snapshot in canonical flow; the legacy helpers can still issue asynchronous logout without UI coordination.
+Refresh restores the complete valid tuple through `AuthProvider`. Logout
+destroys the process-memory session/cookie and clears all context. These are
+frontend mock behaviors; persistent accounts, memberships, and permissions
+remain a backend requirement.

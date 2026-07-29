@@ -21,6 +21,7 @@ async function signIn(page: Page, email: string) {
 }
 
 async function capture(page: Page, name: string) {
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS !== 'true') return;
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addStyleTag({ content: 'nextjs-portal, #__next-build-watcher { display: none !important; }' });
   await expect.poll(() => page.evaluate('document.fonts.status')).toBe('loaded');
@@ -30,7 +31,9 @@ async function capture(page: Page, name: string) {
 }
 
 test.beforeAll(async () => {
-  await mkdir(evidenceDirectory, { recursive: true });
+  if (process.env.NAVFARM_CAPTURE_BROAD_SCREENSHOTS === 'true') {
+    await mkdir(evidenceDirectory, { recursive: true });
+  }
 });
 
 test.beforeEach(async ({ page }) => reset(page));
@@ -60,26 +63,31 @@ test('Multi-company login requires company selection and persists the selected c
   await signIn(page, 'multi@navfarm.demo');
   await expect(page).toHaveURL(/\/context-selection$/);
   await expect(page.getByRole('heading', { name: 'Where would you like to work?' })).toBeVisible();
+  await expect(page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  })).toBeVisible();
+  await expect(page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Feed Mill',
+  })).toBeVisible();
   await capture(page, 'multi-company-company-selector');
 
   const [contextResponse] = await Promise.all([
     page.waitForResponse((candidate) => candidate.url().includes('/api/v1/auth/context') && candidate.request().method() === 'PUT'),
-    page.getByRole('button', { name: /Green Valley Poultry/ }).click(),
+    page.getByRole('button', {
+      name: 'Green Valley Poultry company administration',
+    }).click(),
   ]);
   expect(contextResponse.ok()).toBe(true);
-  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
-  await expect(page.getByRole('heading', { name: 'Choose a business area' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Poultry Operations/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Feed Mill/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/green-valley-poultry\/overview$/);
+  await expect(page.getByRole('heading', { name: 'Green Valley Poultry' })).toBeVisible();
   await capture(page, 'multi-company-workspace-selector');
   await page.reload();
-  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
+  await expect(page).toHaveURL(/\/green-valley-poultry\/overview$/);
 });
 
 test('Multi-company user sees the correct no-workspace state', async ({ page }) => {
-  await signIn(page, 'multi@navfarm.demo');
-  await page.getByRole('button', { name: /BlueWater Aqua/ }).click();
-  await expect(page).toHaveURL(/\/bluewater-aqua\/workspaces$/);
+  await signIn(page, 'noworkspace@navfarm.demo');
+  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
   await expect(page.getByRole('heading', { name: 'No workspace assigned' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Choose another company' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
@@ -98,10 +106,11 @@ test('Suspended account is isolated and can sign out', async ({ page }) => {
 
 test('Logout clears tenant, company, and workspace context', async ({ page }) => {
   await signIn(page, 'multi@navfarm.demo');
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await page.getByRole('button', { name: /Poultry Operations/ }).click();
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  }).click();
   await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
-  await page.getByRole('button', { name: /Multi-company Manager/ }).click();
+  await page.getByRole('button', { name: /Multi-company User/ }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
   expect((await page.context().cookies()).some((cookie) => cookie.name === 'navfarm_session')).toBe(false);
@@ -119,7 +128,9 @@ test('Permission and inactive-resource reasons remain distinct', async ({ page }
 
   await reset(page);
   await signIn(page, 'multi@navfarm.demo');
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry company administration',
+  }).click();
   await page.goto('/inactive-farm/workspaces');
   await expect(page).toHaveURL(/\/access-denied\?reason=company_inactive$/);
   await expect(page.getByRole('heading', { name: 'Company inactive' })).toBeVisible();

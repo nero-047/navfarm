@@ -78,7 +78,7 @@ test('manager can create, operate, quality-release, trace, close and report a mo
   await expect(page.getByText(/QR pack .*generated/)).toBeVisible();
 
   await openWorkspace(page, 'batches', 'Batches');
-  await page.getByRole('button', { name: 'Run close' }).click();
+  await page.getByRole('button', { name: 'Run close' }).last().click();
   await expect(page.getByText(/closed with a zero WIP balance/)).toBeVisible();
 
   await openWorkspace(page, 'reports', 'Reports');

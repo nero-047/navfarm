@@ -1,5 +1,5 @@
 import type { AuthSession } from '../contracts/api';
-import { can, type AppScope } from './authorization';
+import type { AppScope } from './authorization';
 
 export const accessReasonCodes = [
   'account_suspended',
@@ -81,24 +81,50 @@ export function scopeAccessReason(
   session: AuthSession,
   scope: AppScope,
   companySlug?: string,
+  workspaceSlug?: string,
 ): AccessReason | null {
   const activeTenant = session.tenants.find((tenant) => tenant.tenantId === session.activeTenantId);
   if (activeTenant?.status === 'SUSPENDED' || session.tenants.some((tenant) => tenant.status === 'SUSPENDED')) {
     return 'account_suspended';
   }
   if (scope === 'platform') {
-    return session.user.platformRole === 'SYSTEM_ADMIN' ? null : 'insufficient_permission';
+    return session.user.platformRole === 'SYSTEM_ADMIN' &&
+      session.user.permissions.includes('platform.manage')
+      ? null
+      : 'insufficient_permission';
   }
   if (!session.activeTenantId) return session.tenants.length ? 'company_selection_required' : 'tenant_not_assigned';
   if (!activeTenant) return 'tenant_not_assigned';
   if (activeTenant.status !== 'ACTIVE') return 'tenant_inactive';
-  if (scope === 'tenant') return can(session, 'tenant.view') ? null : 'insufficient_permission';
+  if (scope === 'tenant') {
+    return activeTenant.permissions.includes('tenant.view') ? null : 'insufficient_permission';
+  }
 
   const company = companySlug
     ? session.companies.find((item) => item.companySlug === companySlug)
     : session.companies.find((item) => item.companyId === session.activeCompanyId);
   if (!company) return 'company_not_assigned';
   if (company.status !== 'ACTIVE') return 'company_inactive';
-  if (!can(session, 'company.view')) return 'insufficient_permission';
+  if (
+    company.tenantId !== session.activeTenantId ||
+    company.companyId !== session.activeCompanyId
+  ) {
+    return 'company_selection_required';
+  }
+  if (!company.permissions.includes('company.view')) return 'insufficient_permission';
+  if (scope !== 'workspace') return null;
+
+  const workspace = workspaceSlug
+    ? session.workspaces.find(
+      (item) =>
+        item.companyId === company.companyId &&
+        item.workspaceSlug === workspaceSlug,
+    )
+    : session.workspaces.find((item) => item.workspaceId === session.activeWorkspaceId);
+  if (!workspace) return 'workspace_not_assigned';
+  if (workspace.status !== 'ACTIVE') return 'workspace_inactive';
+  if (workspace.workspaceId !== session.activeWorkspaceId) return 'workspace_selection_required';
+  if (!workspace.permissions.includes('workspaces.view')) return 'insufficient_permission';
+  if (company.onboardingStatus !== 'COMPLETED') return 'onboarding_incomplete';
   return null;
 }

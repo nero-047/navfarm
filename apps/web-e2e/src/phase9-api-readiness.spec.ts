@@ -48,6 +48,9 @@ test('legacy operational routes resolve by accessible workspace cardinality', as
 
   await reset(page);
   await signIn(page, 'multi@navfarm.demo');
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry company administration',
+  }).click();
   await page.goto('/green-valley-poultry/batches');
   await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
   await expect(page.getByRole('heading', { name: 'Choose a business area' })).toBeVisible();

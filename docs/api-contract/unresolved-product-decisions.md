@@ -1,6 +1,10 @@
 # Unresolved Product Decisions
 
-These items are intentionally not decided in Phase 8.
+These items remain intentionally unresolved after Demo Completion Milestone 1.
+Milestone 1 did settle the frontend mock policy that tenant is session
+established, the visible selector switches Company/Workspace only, memberships
+and permissions are explicit, and company/tenant roles do not authorize
+workspace mutations. The items below still require product/backend agreement.
 
 ## Workspace vs Operational vs Accounting Readiness
 
@@ -35,7 +39,8 @@ Unresolved:
 
 Known:
 
-- The frontend models a 15-step onboarding flow.
+- The functional document defines a 15-step onboarding flow, while the current
+  frontend exposes 13 named setup routes.
 - Foundational profile/address/contact/localization/fiscal/modules/admin steps are mandatory for workspace readiness.
 - COA, NOB/LOB and essential masters affect operations readiness.
 
@@ -56,6 +61,26 @@ Unresolved:
 
 - Whether Tenant Admin can directly edit company accounting config without explicit company finance role.
 - Whether Tenant Admin can override readiness blockers.
+
+The settled interim rule is narrower: Tenant Admin may administer workspaces
+and company setup only through explicit tenant/company permissions and receives
+no automatic workspace operational access.
+
+## Session transport and tenant selection
+
+Known:
+
+- The frontend contract and mock use a same-origin HTTP-only cookie.
+- Tenant is part of the authenticated isolation tuple and is not a visible
+  selector option; a Company choice supplies its authorized tenant ID to the
+  atomic context request.
+
+Unresolved:
+
+- Whether production implements this contract directly or provides a
+  server-side adapter over the reference backend's JWT/refresh model.
+- The canonical backend tenancy/database strategy for a user with explicit
+  company memberships in more than one tenant.
 
 ## Tenant Summary Visibility vs Company Detail Access
 

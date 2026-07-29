@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { NextResponse } from 'next/server';
 import {
+  authContextRequestSchema,
+  authLoginRequestSchema,
+  mfaCompletionRequestSchema,
   workspaceCreateSchema,
   workspaceMemberCreateSchema,
   workspaceSchema,
@@ -12,27 +15,48 @@ import {
   type WorkspaceMember,
 } from '../../contracts/api';
 import type { CompanySummary } from '../../contracts/phase2';
-import { ROLE_PERMISSIONS } from '../../lib/authorization';
 import { apiErrorResponse } from './errors';
 import { handlePhase2Request, resetPhase2Repository } from './phase2-repository';
 import { handlePhase3Request, resetPhase3Repository } from './phase3-repository';
 import { handleOperationalRequest, resetOperationalRepository } from './operational-repository';
 
 type JsonRecord = Record<string, unknown>;
-type FixtureUser = {
+type ExplicitTenantMembership = {
+  tenantId: string;
+  role: 'TENANT_ADMIN' | 'TENANT_MEMBER';
+  permissions: Permission[];
+};
+type ExplicitCompanyMembership = {
+  companyId: string;
+  role: CompanyRole;
+  permissions: Permission[];
+};
+type ExplicitWorkspaceMembership = {
+  workspaceId: string;
+  role: 'MANAGER' | 'OPERATOR' | 'VIEWER';
+  status: 'ACTIVE' | 'INACTIVE';
+  permissions: Permission[];
+};
+export type DemoIdentityFixture = {
   userId: string;
   email: string;
   fullName: string;
   password: string;
   platformRole: 'SYSTEM_ADMIN' | 'PLATFORM_SUPPORT' | null;
-  tenantIds: string[];
-  companies: Array<{
-    companyId: string;
-    role: CompanyRole;
-    permissions?: Permission[];
-  }>;
-  workspaces?: Array<{ workspaceId: string; role: 'MANAGER' | 'OPERATOR' | 'VIEWER' }>;
-  mfaEnabled?: boolean;
+  userType: 'SYSTEM_ADMIN' | 'TENANT_ADMIN' | 'COMPANY_ADMIN' | 'STANDARD_USER';
+  authenticationState: 'AUTHENTICATED' | 'MFA_REQUIRED' | 'SUSPENDED';
+  mfaEnabled: boolean;
+  suspended: boolean;
+  tenantMemberships: ExplicitTenantMembership[];
+  companies: ExplicitCompanyMembership[];
+  workspaces: ExplicitWorkspaceMembership[];
+  allowedCapabilities: Permission[];
+  initialContext: {
+    tenantId: string | null;
+    companyId: string | null;
+    workspaceId: string | null;
+  };
+  expectedLandingRoute: string;
 };
 type SessionRecord = {
   userId: string;
@@ -90,25 +114,205 @@ const seedWorkspaces: Workspace[] = [
   { workspaceId: 'workspace-bluewater-aqua', tenantId: 'tenant-second', companyId: 'company-bluewater', workspaceCode: 'BW_AQUA', workspaceSlug: 'aquaculture', workspaceName: 'Aquaculture', workspaceType: 'AQUACULTURE', status: 'DRAFT', primaryNobId: 'nob-aquaculture', enabledModules: ['Batches', 'Inventory', 'QC', 'QR'], readiness: { percentage: 42, operationalReady: false, blockingRequirements: ['Complete company onboarding', 'Configure QC parameters'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
   { workspaceId: 'workspace-green-inactive', tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceCode: 'GV_ARCHIVE', workspaceSlug: 'archived-operations', workspaceName: 'Archived Operations', workspaceType: 'POULTRY', status: 'INACTIVE', primaryNobId: 'nob-poultry', enabledModules: ['Batches'], readiness: { percentage: 100, operationalReady: false, blockingRequirements: ['Workspace is inactive'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
 ];
-const seedWorkspaceMembers: WorkspaceMember[] = [
-  { membershipId: 'membership-manager-poultry', workspaceId: 'workspace-green-poultry', userId: 'user-manager', fullName: 'Farm Manager', email: 'manager@navfarm.demo', role: 'MANAGER', status: 'ACTIVE' },
-  { membershipId: 'membership-viewer-poultry', workspaceId: 'workspace-green-poultry', userId: 'user-viewer', fullName: 'Company Viewer', email: 'viewer@navfarm.demo', role: 'VIEWER', status: 'ACTIVE' },
-  { membershipId: 'membership-multi-feed', workspaceId: 'workspace-green-feed', userId: 'user-multi', fullName: 'Multi-company Manager', email: 'multi@navfarm.demo', role: 'VIEWER', status: 'ACTIVE' },
+const PLATFORM_PERMISSIONS: Permission[] = ['platform.manage', 'tenant.view', 'tenant.manage'];
+const TENANT_ADMIN_PERMISSIONS: Permission[] = [
+  'tenant.view', 'tenant.manage', 'company.view', 'company.manage',
+  'users.view', 'users.manage', 'roles.view', 'roles.manage',
+  'workspaces.view', 'workspaces.manage', 'finance.view', 'finance.manage',
+  'audit.view', 'notifications.manage',
+];
+const COMPANY_ADMIN_PERMISSIONS: Permission[] = [
+  'company.view', 'company.manage', 'users.view', 'users.manage',
+  'roles.view', 'roles.manage', 'workspaces.view', 'workspaces.manage',
+  'finance.view', 'finance.manage', 'audit.view', 'notifications.manage',
+];
+const ACCOUNTANT_PERMISSIONS: Permission[] = [
+  'company.view', 'costs.view', 'finance.view', 'finance.manage', 'audit.view',
+];
+const AUDITOR_PERMISSIONS: Permission[] = [
+  'company.view', 'costs.view', 'finance.view', 'audit.view',
+];
+const WORKSPACE_MANAGER_PERMISSIONS: Permission[] = [
+  'workspaces.view', 'batches.view', 'batches.create', 'batches.approve',
+  'batches.close', 'operations.create', 'costs.view', 'quality.view',
+  'quality.manage', 'traceability.view', 'traceability.manage',
+  'resources.view', 'resources.manage', 'reports.export',
+];
+const WORKSPACE_VIEWER_PERMISSIONS: Permission[] = [
+  'workspaces.view', 'batches.view', 'quality.view', 'traceability.view',
+  'resources.view',
 ];
 
-const fixtureUsers: FixtureUser[] = [
-  { userId: 'user-system', email: 'system@navfarm.demo', fullName: 'System Administrator', password: 'Demo123!', platformRole: 'SYSTEM_ADMIN', tenantIds: [], companies: [] },
-  { userId: 'user-tenant', email: 'tenant@navfarm.demo', fullName: 'Tenant Administrator', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'ACCOUNTANT' }] },
-  { userId: 'user-manager', email: 'manager@navfarm.demo', fullName: 'Farm Manager', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'FARM_MANAGER' }] },
-  { userId: 'user-accountant', email: 'accountant@navfarm.demo', fullName: 'Company Accountant', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'ACCOUNTANT' }] },
-  { userId: 'user-auditor', email: 'auditor@navfarm.demo', fullName: 'Read-only Auditor', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'AUDITOR' }] },
-  { userId: 'user-viewer', email: 'viewer@navfarm.demo', fullName: 'Company Viewer', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'VIEWER' }] },
-  { userId: 'user-multi', email: 'multi@navfarm.demo', fullName: 'Multi-company Manager', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo', 'tenant-second'], companies: [{ companyId: 'company-green-valley', role: 'ADMIN' }, { companyId: 'company-harvest-ridge', role: 'ADMIN' }, { companyId: 'company-bluewater', role: 'FARM_MANAGER' }, { companyId: 'company-inactive', role: 'ADMIN' }] },
-  { userId: 'user-suspended', email: 'suspended@navfarm.demo', fullName: 'Suspended Tenant User', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-suspended'], companies: [] },
-  { userId: 'user-onboarding', email: 'onboarding@navfarm.demo', fullName: 'Onboarding Administrator', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-second'], companies: [{ companyId: 'company-bluewater', role: 'SUPER_ADMIN' }] },
-  { userId: 'user-no-company', email: 'nocompany@navfarm.demo', fullName: 'Tenant-only User', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [] },
-  { userId: 'user-mfa', email: 'mfa@navfarm.demo', fullName: 'MFA Administrator', password: 'Demo123!', platformRole: null, tenantIds: ['tenant-demo'], companies: [{ companyId: 'company-green-valley', role: 'ADMIN' }], mfaEnabled: true },
+const fixtureUsers: DemoIdentityFixture[] = [
+  {
+    userId: 'user-system', email: 'system@navfarm.demo', fullName: 'System Administrator',
+    password: 'Demo123!', platformRole: 'SYSTEM_ADMIN', userType: 'SYSTEM_ADMIN',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [], companies: [], workspaces: [],
+    allowedCapabilities: [...PLATFORM_PERMISSIONS],
+    initialContext: { tenantId: null, companyId: null, workspaceId: null },
+    expectedLandingRoute: '/admin/dashboard',
+  },
+  {
+    userId: 'user-tenant', email: 'tenant@navfarm.demo', fullName: 'Tenant Administrator',
+    password: 'Demo123!', platformRole: null, userType: 'TENANT_ADMIN',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_ADMIN', permissions: [...TENANT_ADMIN_PERMISSIONS] }],
+    companies: [{ companyId: 'company-green-valley', role: 'ADMIN', permissions: [...COMPANY_ADMIN_PERMISSIONS] }],
+    workspaces: [],
+    allowedCapabilities: [...new Set([...TENANT_ADMIN_PERMISSIONS, ...COMPANY_ADMIN_PERMISSIONS])],
+    initialContext: { tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceId: null },
+    expectedLandingRoute: '/console/dashboard',
+  },
+  {
+    userId: 'user-company-admin', email: 'companyadmin@navfarm.demo', fullName: 'Company Administrator',
+    password: 'Demo123!', platformRole: null, userType: 'COMPANY_ADMIN',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: ['tenant.view'] }],
+    companies: [{ companyId: 'company-green-valley', role: 'ADMIN', permissions: [...COMPANY_ADMIN_PERMISSIONS] }],
+    workspaces: [],
+    allowedCapabilities: [...new Set<Permission>(['tenant.view', ...COMPANY_ADMIN_PERMISSIONS])],
+    initialContext: { tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceId: null },
+    expectedLandingRoute: '/green-valley-poultry/overview',
+  },
+  {
+    userId: 'user-accountant', email: 'accountant@navfarm.demo', fullName: 'Company Accountant',
+    password: 'Demo123!', platformRole: null, userType: 'STANDARD_USER',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: [] }],
+    companies: [{ companyId: 'company-green-valley', role: 'ACCOUNTANT', permissions: [...ACCOUNTANT_PERMISSIONS] }],
+    workspaces: [],
+    allowedCapabilities: [...ACCOUNTANT_PERMISSIONS],
+    initialContext: { tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceId: null },
+    expectedLandingRoute: '/green-valley-poultry/accounting/readiness',
+  },
+  {
+    userId: 'user-auditor', email: 'auditor@navfarm.demo', fullName: 'Read-only Auditor',
+    password: 'Demo123!', platformRole: null, userType: 'STANDARD_USER',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: [] }],
+    companies: [{ companyId: 'company-green-valley', role: 'AUDITOR', permissions: [...AUDITOR_PERMISSIONS] }],
+    workspaces: [],
+    allowedCapabilities: [...AUDITOR_PERMISSIONS],
+    initialContext: { tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceId: null },
+    expectedLandingRoute: '/green-valley-poultry/overview',
+  },
+  {
+    userId: 'user-manager', email: 'manager@navfarm.demo', fullName: 'Workspace Manager',
+    password: 'Demo123!', platformRole: null, userType: 'STANDARD_USER',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: [] }],
+    companies: [{ companyId: 'company-green-valley', role: 'FARM_MANAGER', permissions: ['company.view'] }],
+    workspaces: [{ workspaceId: 'workspace-green-poultry', role: 'MANAGER', status: 'ACTIVE', permissions: [...WORKSPACE_MANAGER_PERMISSIONS] }],
+    allowedCapabilities: [...new Set<Permission>(['company.view', ...WORKSPACE_MANAGER_PERMISSIONS])],
+    initialContext: { tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceId: 'workspace-green-poultry' },
+    expectedLandingRoute: '/green-valley-poultry/workspaces/poultry-operations/dashboard',
+  },
+  {
+    userId: 'user-viewer', email: 'viewer@navfarm.demo', fullName: 'Workspace Viewer',
+    password: 'Demo123!', platformRole: null, userType: 'STANDARD_USER',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: [] }],
+    companies: [{ companyId: 'company-green-valley', role: 'VIEWER', permissions: ['company.view'] }],
+    workspaces: [{ workspaceId: 'workspace-green-poultry', role: 'VIEWER', status: 'ACTIVE', permissions: [...WORKSPACE_VIEWER_PERMISSIONS] }],
+    allowedCapabilities: [...new Set<Permission>(['company.view', ...WORKSPACE_VIEWER_PERMISSIONS])],
+    initialContext: { tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceId: 'workspace-green-poultry' },
+    expectedLandingRoute: '/green-valley-poultry/workspaces/poultry-operations/dashboard',
+  },
+  {
+    userId: 'user-multi', email: 'multi@navfarm.demo', fullName: 'Multi-company User',
+    password: 'Demo123!', platformRole: null, userType: 'COMPANY_ADMIN',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [
+      { tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: [] },
+      { tenantId: 'tenant-second', role: 'TENANT_MEMBER', permissions: [] },
+    ],
+    companies: [
+      { companyId: 'company-green-valley', role: 'ADMIN', permissions: [...COMPANY_ADMIN_PERMISSIONS] },
+      { companyId: 'company-harvest-ridge', role: 'ADMIN', permissions: [...COMPANY_ADMIN_PERMISSIONS] },
+      { companyId: 'company-bluewater', role: 'FARM_MANAGER', permissions: ['company.view'] },
+      { companyId: 'company-inactive', role: 'ADMIN', permissions: [...COMPANY_ADMIN_PERMISSIONS] },
+    ],
+    workspaces: [
+      { workspaceId: 'workspace-green-poultry', role: 'MANAGER', status: 'ACTIVE', permissions: [...WORKSPACE_MANAGER_PERMISSIONS] },
+      { workspaceId: 'workspace-green-feed', role: 'VIEWER', status: 'ACTIVE', permissions: [...WORKSPACE_VIEWER_PERMISSIONS] },
+      { workspaceId: 'workspace-harvest-crops', role: 'MANAGER', status: 'ACTIVE', permissions: [...WORKSPACE_MANAGER_PERMISSIONS] },
+      { workspaceId: 'workspace-bluewater-aqua', role: 'MANAGER', status: 'ACTIVE', permissions: [...WORKSPACE_MANAGER_PERMISSIONS] },
+      { workspaceId: 'workspace-green-inactive', role: 'VIEWER', status: 'ACTIVE', permissions: [...WORKSPACE_VIEWER_PERMISSIONS] },
+    ],
+    allowedCapabilities: [...new Set<Permission>([
+      ...COMPANY_ADMIN_PERMISSIONS, ...WORKSPACE_MANAGER_PERMISSIONS,
+    ])],
+    initialContext: { tenantId: null, companyId: null, workspaceId: null },
+    expectedLandingRoute: '/context-selection',
+  },
+  {
+    userId: 'user-mfa', email: 'mfa@navfarm.demo', fullName: 'MFA Administrator',
+    password: 'Demo123!', platformRole: null, userType: 'COMPANY_ADMIN',
+    authenticationState: 'MFA_REQUIRED', mfaEnabled: true, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: [] }],
+    companies: [{ companyId: 'company-green-valley', role: 'ADMIN', permissions: [...COMPANY_ADMIN_PERMISSIONS] }],
+    workspaces: [{ workspaceId: 'workspace-green-poultry', role: 'MANAGER', status: 'ACTIVE', permissions: [...WORKSPACE_MANAGER_PERMISSIONS] }],
+    allowedCapabilities: [...new Set<Permission>([
+      ...COMPANY_ADMIN_PERMISSIONS, ...WORKSPACE_MANAGER_PERMISSIONS,
+    ])],
+    initialContext: { tenantId: null, companyId: null, workspaceId: null },
+    expectedLandingRoute: '/context-selection',
+  },
+  {
+    userId: 'user-onboarding', email: 'onboarding@navfarm.demo', fullName: 'Onboarding Administrator',
+    password: 'Demo123!', platformRole: null, userType: 'COMPANY_ADMIN',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-second', role: 'TENANT_MEMBER', permissions: [] }],
+    companies: [{ companyId: 'company-bluewater', role: 'SUPER_ADMIN', permissions: [...COMPANY_ADMIN_PERMISSIONS] }],
+    workspaces: [{ workspaceId: 'workspace-bluewater-aqua', role: 'MANAGER', status: 'ACTIVE', permissions: [...WORKSPACE_MANAGER_PERMISSIONS] }],
+    allowedCapabilities: [...new Set<Permission>([
+      ...COMPANY_ADMIN_PERMISSIONS, ...WORKSPACE_MANAGER_PERMISSIONS,
+    ])],
+    initialContext: { tenantId: 'tenant-second', companyId: 'company-bluewater', workspaceId: null },
+    expectedLandingRoute: '/bluewater-aqua/setup/profile',
+  },
+  {
+    userId: 'user-suspended', email: 'suspended@navfarm.demo', fullName: 'Suspended User',
+    password: 'Demo123!', platformRole: null, userType: 'STANDARD_USER',
+    authenticationState: 'SUSPENDED', mfaEnabled: false, suspended: true,
+    tenantMemberships: [{ tenantId: 'tenant-suspended', role: 'TENANT_MEMBER', permissions: [] }],
+    companies: [], workspaces: [], allowedCapabilities: [],
+    initialContext: { tenantId: 'tenant-suspended', companyId: null, workspaceId: null },
+    expectedLandingRoute: '/access-denied?reason=account_suspended',
+  },
+  {
+    userId: 'user-no-workspace', email: 'noworkspace@navfarm.demo', fullName: 'No-workspace User',
+    password: 'Demo123!', platformRole: null, userType: 'STANDARD_USER',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: [] }],
+    companies: [{ companyId: 'company-green-valley', role: 'VIEWER', permissions: ['company.view'] }],
+    workspaces: [], allowedCapabilities: ['company.view'],
+    initialContext: { tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceId: null },
+    expectedLandingRoute: '/green-valley-poultry/workspaces',
+  },
+  {
+    userId: 'user-no-company', email: 'nocompany@navfarm.demo', fullName: 'Tenant-only User',
+    password: 'Demo123!', platformRole: null, userType: 'STANDARD_USER',
+    authenticationState: 'AUTHENTICATED', mfaEnabled: false, suspended: false,
+    tenantMemberships: [{ tenantId: 'tenant-demo', role: 'TENANT_MEMBER', permissions: ['tenant.view'] }],
+    companies: [], workspaces: [], allowedCapabilities: ['tenant.view'],
+    initialContext: { tenantId: 'tenant-demo', companyId: null, workspaceId: null },
+    expectedLandingRoute: '/console/dashboard',
+  },
 ];
+
+const seedWorkspaceMembers: WorkspaceMember[] = fixtureUsers.flatMap((user) =>
+  user.workspaces.map((membership) => ({
+    membershipId: `membership-${user.userId}-${membership.workspaceId}`,
+    workspaceId: membership.workspaceId,
+    userId: user.userId,
+    fullName: user.fullName,
+    email: user.email,
+    role: membership.role,
+    status: membership.status,
+  })),
+);
 
 const languages = [
   { lang_id: 'lang-en', lang_code: 'en', lang_name: 'English' },
@@ -128,7 +332,7 @@ type MockState = {
   companies: JsonRecord[];
   demoStates: Map<string, unknown>;
   sessions: Map<string, SessionRecord>;
-  users: FixtureUser[];
+  users: DemoIdentityFixture[];
   workspaces: Workspace[];
   workspaceMembers: WorkspaceMember[];
 };
@@ -164,23 +368,10 @@ function sessionRecord(request: Request) {
 function companyById(id: string) {
   return state.companies.find((company) => company.company_id === id);
 }
-function workspaceAssignments(user: FixtureUser) {
-  if (user.workspaces) return user.workspaces;
-  if (user.email === 'tenant@navfarm.demo' || user.email === 'system@navfarm.demo' || user.email === 'suspended@navfarm.demo' || user.email === 'nocompany@navfarm.demo') return [];
-  if (user.email === 'multi@navfarm.demo') return [
-    { workspaceId: 'workspace-green-poultry', role: 'MANAGER' as const },
-    { workspaceId: 'workspace-green-feed', role: 'VIEWER' as const },
-    { workspaceId: 'workspace-harvest-crops', role: 'MANAGER' as const },
-    { workspaceId: 'workspace-green-inactive', role: 'VIEWER' as const },
-  ];
-  if (user.email === 'onboarding@navfarm.demo') return [{ workspaceId: 'workspace-bluewater-aqua', role: 'MANAGER' as const }];
-  return [{ workspaceId: 'workspace-green-poultry', role: user.email === 'viewer@navfarm.demo' ? 'VIEWER' as const : 'MANAGER' as const }];
-}
 function sessionPayload(record: SessionRecord): AuthSession {
   const user = state.users.find((item) => item.userId === record.userId)!;
   const companies = user.companies.map((membership) => {
     const company = companyById(membership.companyId)!;
-    const rolePermissions = ROLE_PERMISSIONS[membership.role];
     return {
       companyId: membership.companyId,
       tenantId: String(company.tenant_id),
@@ -189,38 +380,34 @@ function sessionPayload(record: SessionRecord): AuthSession {
       status: company.is_active ? 'ACTIVE' as const : 'INACTIVE' as const,
       onboardingStatus: String(company.onboarding_status) as 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED',
       role: membership.role,
-      permissions: membership.role === 'CUSTOM' ? membership.permissions ?? [] : rolePermissions,
+      permissions: membership.permissions,
       enabledModules: company.enabled_modules as string[],
     };
   });
-  const tenants = user.tenantIds.map((tenantId) => {
-    const tenant = seedTenants.find((item) => item.tenant_id === tenantId)!;
+  const tenants = user.tenantMemberships.map((membership) => {
+    const tenant = seedTenants.find((item) => item.tenant_id === membership.tenantId)!;
     return {
-      tenantId,
+      tenantId: membership.tenantId,
       tenantName: tenant.tenant_name,
       status: tenant.status as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED',
-      role: user.email === 'tenant@navfarm.demo'
-        ? 'TENANT_ADMIN' as const
-        : 'TENANT_MEMBER' as const,
+      role: membership.role,
+      permissions: membership.permissions,
     };
   });
-  const activeCompany = companies.find((company) => company.companyId === record.activeCompanyId);
-  const workspaces = workspaceAssignments(user).map((membership) => {
-    const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId)!;
-    const permissions: Permission[] = membership.role === 'MANAGER'
-      ? ['workspaces.view', 'batches.view', 'batches.create', 'batches.approve', 'batches.close', 'operations.create', 'costs.view', 'quality.view', 'quality.manage', 'traceability.view', 'resources.view', 'resources.manage', 'reports.export']
-      : ['workspaces.view', 'batches.view', 'quality.view', 'traceability.view', 'resources.view'];
-    return { ...workspace, role: membership.role, permissions };
+  const workspaces = user.workspaces.flatMap((membership) => {
+    const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId);
+    return workspace ? [{ ...workspace, role: membership.role, permissions: membership.permissions }] : [];
   });
   return {
+    state: user.suspended ? 'SUSPENDED' : 'AUTHENTICATED',
     user: {
       userId: user.userId, fullName: user.fullName, name: user.fullName,
       email: user.email, platformRole: user.platformRole, language: 'en',
-      timezone: 'Asia/Kolkata', emailVerified: true, mfaEnabled: Boolean(user.mfaEnabled),
-      userType: user.platformRole === 'SYSTEM_ADMIN' ? 'SYSTEM_ADMIN' : tenants.some((tenant) => tenant.role === 'TENANT_ADMIN') ? 'TENANT_ADMIN' : activeCompany?.role === 'ADMIN' || activeCompany?.role === 'SUPER_ADMIN' ? 'COMPANY_ADMIN' : 'STANDARD_USER',
+      timezone: 'Asia/Kolkata', emailVerified: true, mfaEnabled: user.mfaEnabled,
+      userType: user.userType,
       companyId: record.activeCompanyId ?? '', tenantId: record.activeTenantId ?? '',
       companies: companies.map((company) => ({ company_id: company.companyId, company_name: company.companyName, is_primary: false })),
-      permissions: activeCompany?.permissions ?? [],
+      permissions: user.platformRole ? user.allowedCapabilities : [],
     },
     tenants,
     companies,
@@ -243,14 +430,118 @@ function requireSession(request: Request, requestId: string) {
   return found ?? apiErrorResponse(401, 'Your session has expired. Sign in again.', requestId);
 }
 function hasMockMutationAccess(session: AuthSession, path: string) {
-  if (session.user.platformRole === 'SYSTEM_ADMIN') return true;
+  if (session.user.permissions.includes('platform.manage')) return true;
   const company = session.companies.find((item) => item.companyId === session.activeCompanyId);
-  if (/^\/(plan|tenant)/.test(path)) return session.tenants.some((tenant) => tenant.role === 'TENANT_ADMIN');
+  const tenant = session.tenants.find((item) => item.tenantId === session.activeTenantId);
+  const workspace = session.workspaces.find((item) => item.workspaceId === session.activeWorkspaceId);
+  if (/^\/(plan|tenant)/.test(path)) return Boolean(tenant?.permissions.includes('tenant.manage'));
   if (/^\/(role|user|company|notification|setup)/.test(path)) {
     return Boolean(company?.permissions.some((permission) => ['company.manage', 'users.manage', 'roles.manage', 'notifications.manage'].includes(permission)));
   }
-  if (/^\/demo\//.test(path)) return Boolean(company?.permissions.includes('operations.create') || company?.permissions.includes('company.manage'));
+  if (/^\/demo\//.test(path)) return Boolean(workspace?.permissions.includes('operations.create'));
   return true;
+}
+
+type ContextTuple = {
+  tenantId: string | null;
+  companyId: string | null;
+  workspaceId: string | null;
+};
+
+function validateContextTuple(user: DemoIdentityFixture, tuple: ContextTuple) {
+  if (user.suspended) {
+    return {
+      status: 403, code: 'ACCOUNT_SUSPENDED' as const,
+      message: 'This account is suspended.',
+    };
+  }
+  if (!tuple.tenantId) {
+    if (tuple.companyId || tuple.workspaceId) {
+      return {
+        status: 409, code: 'STALE_CONTEXT' as const,
+        message: 'Company or workspace context cannot exist without a tenant.',
+      };
+    }
+    return null;
+  }
+  const tenantMembership = user.tenantMemberships.find(
+    (membership) => membership.tenantId === tuple.tenantId,
+  );
+  if (!tenantMembership) {
+    return {
+      status: 403, code: 'TENANT_MEMBERSHIP_REQUIRED' as const,
+      message: 'Tenant membership is required.',
+    };
+  }
+  const tenant = seedTenants.find((item) => item.tenant_id === tuple.tenantId);
+  if (!tenant || tenant.status === 'INACTIVE') {
+    return {
+      status: 403, code: 'TENANT_INACTIVE' as const,
+      message: 'The selected tenant is inactive.',
+    };
+  }
+  if (tenant.status === 'SUSPENDED') {
+    return {
+      status: 403, code: 'TENANT_SUSPENDED' as const,
+      message: 'The selected tenant is suspended.',
+    };
+  }
+  if (!tuple.companyId) {
+    if (tuple.workspaceId) {
+      return {
+        status: 409, code: 'STALE_CONTEXT' as const,
+        message: 'Workspace context cannot exist without a company.',
+      };
+    }
+    return null;
+  }
+  const company = companyById(tuple.companyId);
+  if (!company || String(company.tenant_id) !== tuple.tenantId) {
+    return {
+      status: 403, code: 'COMPANY_NOT_IN_TENANT' as const,
+      message: 'The selected company does not belong to the active tenant.',
+    };
+  }
+  if (!user.companies.some((membership) => membership.companyId === tuple.companyId)) {
+    return {
+      status: 403, code: 'COMPANY_MEMBERSHIP_REQUIRED' as const,
+      message: 'Company membership is required.',
+    };
+  }
+  if (!company.is_active) {
+    return {
+      status: 403, code: 'COMPANY_INACTIVE' as const,
+      message: 'The selected company is inactive.',
+    };
+  }
+  if (!tuple.workspaceId) return null;
+  const workspace = state.workspaces.find((item) => item.workspaceId === tuple.workspaceId);
+  if (
+    !workspace ||
+    workspace.tenantId !== tuple.tenantId ||
+    workspace.companyId !== tuple.companyId
+  ) {
+    return {
+      status: 403, code: 'WORKSPACE_NOT_IN_COMPANY' as const,
+      message: 'The selected workspace does not belong to the active company.',
+    };
+  }
+  const workspaceMembership = user.workspaces.find(
+    (membership) => membership.workspaceId === tuple.workspaceId,
+  );
+  if (!workspaceMembership || workspaceMembership.status !== 'ACTIVE') {
+    return {
+      status: 403, code: 'WORKSPACE_MEMBERSHIP_REQUIRED' as const,
+      message: 'Active workspace membership is required.',
+    };
+  }
+  if (workspace.status !== 'ACTIVE') {
+    return {
+      status: 403, code: 'WORKSPACE_INACTIVE' as const,
+      message: 'The selected workspace is inactive or not operationally active.',
+    };
+  }
+  return null;
 }
 
 export async function handleMockRequest(request: Request, path: string, requestId: string): Promise<NextResponse> {
@@ -259,46 +550,60 @@ export async function handleMockRequest(request: Request, path: string, requestI
   const input = await body(request);
 
   if (method === 'POST' && path === '/auth/login') {
-    const user = state.users.find((item) => item.email === String(input.email).toLowerCase());
-    if (!user || user.password !== input.password) return apiErrorResponse(401, 'Invalid email or password.', requestId);
-    if (user.mfaEnabled) {
+    const parsed = authLoginRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return apiErrorResponse(422, 'Login details are invalid.', requestId, parsed.error.flatten());
+    }
+    const user = state.users.find((item) => item.email === parsed.data.email.toLowerCase());
+    if (!user || user.password !== parsed.data.password) {
+      return apiErrorResponse(401, 'Invalid email or password.', requestId);
+    }
+    if (user.authenticationState === 'MFA_REQUIRED') {
       return json({
+        state: 'MFA_PENDING',
+        challengeId: `challenge-${user.userId}`,
+        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
         user: {
           userId: user.userId, fullName: user.fullName, name: user.fullName,
           email: user.email, platformRole: user.platformRole, language: 'en',
           timezone: 'Asia/Kolkata', emailVerified: true, mfaEnabled: true,
-          userType: 'STANDARD_USER', companyId: '', tenantId: '',
+          userType: user.userType, companyId: '', tenantId: '',
           companies: [], permissions: [],
         },
-        tenants: [], companies: [], workspaces: [], activeTenantId: null, activeCompanyId: null, activeWorkspaceId: null,
-        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
-        mfaRequired: true, challengeId: `challenge-${user.userId}`,
       });
     }
-    const tenantId = user.tenantIds.length === 1 ? user.tenantIds[0] : null;
-    const eligibleCompanies = user.companies.filter((membership) => String(companyById(membership.companyId)?.tenant_id) === tenantId);
-    const companyId = eligibleCompanies.length === 1 ? eligibleCompanies[0].companyId : null;
     const id = randomUUID();
-    const eligibleWorkspaces = workspaceAssignments(user).filter((membership) => {
-      const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId);
-      return workspace?.companyId === companyId && workspace.status === 'ACTIVE';
-    });
-    const record = { userId: user.userId, activeTenantId: tenantId, activeCompanyId: companyId, activeWorkspaceId: eligibleWorkspaces.length === 1 ? eligibleWorkspaces[0].workspaceId : null, expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString() };
+    const record = {
+      userId: user.userId,
+      activeTenantId: user.initialContext.tenantId,
+      activeCompanyId: user.initialContext.companyId,
+      activeWorkspaceId: user.initialContext.workspaceId,
+      expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString(),
+    };
     state.sessions.set(id, record);
     return setSessionCookie(json(sessionPayload(record)), id);
   }
   if (method === 'POST' && (path === '/auth/mfa/verify' || path === '/auth/mfa/recovery')) {
-    if (input.code !== '123456' && input.recoveryCode !== 'NAVFARM-RECOVERY') return apiErrorResponse(401, 'Invalid verification code.', requestId);
-    const userId = String(input.challengeId || '').replace('challenge-', '');
+    const parsed = mfaCompletionRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return apiErrorResponse(422, 'MFA completion details are invalid.', requestId, parsed.error.flatten());
+    }
+    if (parsed.data.code !== '123456' && parsed.data.recoveryCode !== 'NAVFARM-RECOVERY') {
+      return apiErrorResponse(401, 'Invalid verification code.', requestId);
+    }
+    const userId = parsed.data.challengeId.replace('challenge-', '');
     const user = state.users.find((item) => item.userId === userId);
-    if (!user) return apiErrorResponse(401, 'MFA challenge expired.', requestId);
+    if (!user || user.authenticationState !== 'MFA_REQUIRED') {
+      return apiErrorResponse(401, 'MFA challenge expired.', requestId);
+    }
     const id = randomUUID();
-    const companyId = user.companies[0]?.companyId ?? null;
-    const eligibleWorkspaces = workspaceAssignments(user).filter((membership) => {
-      const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId);
-      return workspace?.companyId === companyId && workspace.status === 'ACTIVE';
-    });
-    const record = { userId, activeTenantId: user.tenantIds[0] ?? null, activeCompanyId: companyId, activeWorkspaceId: eligibleWorkspaces.length === 1 ? eligibleWorkspaces[0].workspaceId : null, expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString() };
+    const record = {
+      userId,
+      activeTenantId: user.initialContext.tenantId,
+      activeCompanyId: user.initialContext.companyId,
+      activeWorkspaceId: user.initialContext.workspaceId,
+      expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000).toISOString(),
+    };
     state.sessions.set(id, record);
     return setSessionCookie(json(sessionPayload(record)), id);
   }
@@ -315,24 +620,39 @@ export async function handleMockRequest(request: Request, path: string, requestI
   if (method === 'GET' && path === '/auth/session') {
     const found = requireSession(request, requestId);
     if (found instanceof NextResponse) return found;
+    const user = state.users.find((item) => item.userId === found.record.userId)!;
+    if (!user.suspended) {
+      const failure = validateContextTuple(user, {
+        tenantId: found.record.activeTenantId,
+        companyId: found.record.activeCompanyId,
+        workspaceId: found.record.activeWorkspaceId,
+      });
+      if (failure) {
+        state.sessions.delete(found.id);
+        return apiErrorResponse(
+          failure.status, failure.message, requestId, undefined, failure.code,
+        );
+      }
+    }
     return json(sessionPayload(found.record));
   }
   if (method === 'PUT' && path === '/auth/context') {
     const found = requireSession(request, requestId);
     if (found instanceof NextResponse) return found;
     const user = state.users.find((item) => item.userId === found.record.userId)!;
-    const tenantId = input.tenantId === null ? null : String(input.tenantId || found.record.activeTenantId || '');
-    const companyId = input.companyId === null ? null : String(input.companyId || '');
-    const workspaceId = input.workspaceId === null ? null : String(input.workspaceId || '');
-    if (tenantId && !user.tenantIds.includes(tenantId)) return apiErrorResponse(403, 'Tenant membership is required.', requestId);
-    if (companyId && !user.companies.some((item) => item.companyId === companyId)) return apiErrorResponse(403, 'Company membership is required.', requestId);
-    const workspace = workspaceId ? state.workspaces.find((item) => item.workspaceId === workspaceId) : null;
-    if (workspaceId && (!workspace || workspace.companyId !== companyId || !workspaceAssignments(user).some((item) => item.workspaceId === workspaceId))) {
-      return apiErrorResponse(403, 'Workspace membership is required.', requestId);
+    const parsed = authContextRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return apiErrorResponse(422, 'Context tuple is invalid.', requestId, parsed.error.flatten());
     }
-    found.record.activeTenantId = tenantId || null;
-    found.record.activeCompanyId = companyId || null;
-    found.record.activeWorkspaceId = workspaceId || null;
+    const failure = validateContextTuple(user, parsed.data);
+    if (failure) {
+      return apiErrorResponse(
+        failure.status, failure.message, requestId, undefined, failure.code,
+      );
+    }
+    found.record.activeTenantId = parsed.data.tenantId;
+    found.record.activeCompanyId = parsed.data.companyId;
+    found.record.activeWorkspaceId = parsed.data.workspaceId;
     return json(sessionPayload(found.record));
   }
 
@@ -355,9 +675,25 @@ export async function handleMockRequest(request: Request, path: string, requestI
   const found = requireSession(request, requestId);
   if (found instanceof NextResponse) return found;
   const session = sessionPayload(found.record);
+  if (session.state === 'SUSPENDED') {
+    return apiErrorResponse(
+      403,
+      'This account is suspended and cannot access protected application data.',
+      requestId,
+      undefined,
+      'ACCOUNT_SUSPENDED',
+    );
+  }
   const activeCompany = session.companies.find((company) => company.companyId === session.activeCompanyId);
   const tenantAdmin = session.tenants.some(
-    (tenant) => tenant.tenantId === session.activeTenantId && tenant.role === 'TENANT_ADMIN',
+    (tenant) =>
+      tenant.tenantId === session.activeTenantId &&
+      tenant.permissions.includes('tenant.manage'),
+  );
+  const workspaceAdmin = Boolean(
+    activeCompany?.permissions.includes('workspaces.manage') ||
+    session.tenants.find((tenant) => tenant.tenantId === session.activeTenantId)
+      ?.permissions.includes('workspaces.manage'),
   );
   const workspaceCollectionMatch = path.match(/^\/tenants\/([^/]+)\/companies\/([^/]+)\/workspaces$/);
   if (workspaceCollectionMatch) {
@@ -366,10 +702,14 @@ export async function handleMockRequest(request: Request, path: string, requestI
       return apiErrorResponse(403, 'Active tenant and company scope is required.', requestId);
     }
     if (method === 'GET') {
-      const allowed = new Set(workspaceAssignments(state.users.find((user) => user.userId === session.user.userId)!).map((item) => item.workspaceId));
-      return json(state.workspaces.filter((workspace) => workspace.companyId === companyId && (tenantAdmin || allowed.has(workspace.workspaceId))));
+      const allowed = new Set(
+        state.users.find((user) => user.userId === session.user.userId)!.workspaces
+          .filter((membership) => membership.status === 'ACTIVE')
+          .map((membership) => membership.workspaceId),
+      );
+      return json(state.workspaces.filter((workspace) => workspace.companyId === companyId && (workspaceAdmin || allowed.has(workspace.workspaceId))));
     }
-    if (method === 'POST' && tenantAdmin) {
+    if (method === 'POST' && workspaceAdmin) {
       const parsed = workspaceCreateSchema.safeParse(input);
       if (!parsed.success) return apiErrorResponse(422, 'Workspace details are invalid.', requestId, parsed.error.flatten());
       const now = new Date().toISOString();
@@ -391,11 +731,12 @@ export async function handleMockRequest(request: Request, path: string, requestI
   if (workspaceItemMatch) {
     const [, companyId, workspaceId, child] = workspaceItemMatch;
     const workspace = state.workspaces.find((item) => item.companyId === companyId && item.workspaceId === workspaceId);
-    const assigned = workspaceAssignments(state.users.find((user) => user.userId === session.user.userId)!).some((item) => item.workspaceId === workspaceId);
-    if (!workspace || (!tenantAdmin && !assigned)) return apiErrorResponse(404, 'Workspace not found.', requestId);
+    const assigned = state.users.find((user) => user.userId === session.user.userId)!.workspaces
+      .some((item) => item.workspaceId === workspaceId && item.status === 'ACTIVE');
+    if (!workspace || (!workspaceAdmin && !assigned)) return apiErrorResponse(404, 'Workspace not found.', requestId);
     if (child === 'members') {
       if (method === 'GET') return json(state.workspaceMembers.filter((member) => member.workspaceId === workspaceId));
-      if (method === 'POST' && tenantAdmin) {
+      if (method === 'POST' && workspaceAdmin) {
         const parsed = workspaceMemberCreateSchema.safeParse(input);
         if (!parsed.success) return apiErrorResponse(422, 'Workspace membership is invalid.', requestId, parsed.error.flatten());
         const fixtureUser = state.users.find((user) => user.email === parsed.data.email);
@@ -414,28 +755,24 @@ export async function handleMockRequest(request: Request, path: string, requestI
       return apiErrorResponse(403, 'Tenant workspace administration is required.', requestId);
     }
     if (method === 'GET') return json(child === 'readiness' ? workspace.readiness : workspace);
-    if (method === 'PATCH' && tenantAdmin) {
+    if (method === 'PATCH' && workspaceAdmin) {
       const parsed = workspaceSchema.partial().omit({ workspaceId: true, tenantId: true, companyId: true, createdAt: true }).safeParse(input);
       if (!parsed.success) return apiErrorResponse(422, 'Workspace changes are invalid.', requestId, parsed.error.flatten());
       Object.assign(workspace, parsed.data, { updatedAt: new Date().toISOString() });
       return json(workspace);
     }
   }
-  if (
-    /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\//.test(path) &&
-    !path.endsWith('/operational-bootstrap') &&
-    !['GET', 'HEAD'].includes(method) &&
-    !activeCompany?.permissions.includes('operations.create') &&
-    !activeCompany?.permissions.includes('company.manage') &&
-    !tenantAdmin
-  ) {
-    return apiErrorResponse(403, 'You do not have permission to change operational data.', requestId);
-  }
+  const activeWorkspace = session.workspaces.find(
+    (workspace) => workspace.workspaceId === session.activeWorkspaceId,
+  );
   const operationalResponse = await handleOperationalRequest(phase2Request, path, requestId, {
     activeTenantId: session.activeTenantId,
     activeCompanyId: session.activeCompanyId,
     activeWorkspaceId: session.activeWorkspaceId,
-    accessibleWorkspaceIds: session.workspaces.map((workspace) => workspace.workspaceId),
+    accessibleWorkspaceIds: session.workspaces
+      .filter((workspace) => workspace.status === 'ACTIVE')
+      .map((workspace) => workspace.workspaceId),
+    workspacePermissions: activeWorkspace?.permissions ?? [],
   });
   if (operationalResponse) return operationalResponse;
   const phase2Response = await handlePhase2Request(phase2Request, path, requestId, {
@@ -465,7 +802,11 @@ export async function handleMockRequest(request: Request, path: string, requestI
       }
       const user = state.users.find((item) => item.userId === found.record.userId);
       if (user && !user.companies.some((membership) => membership.companyId === company.companyId)) {
-        user.companies.push({ companyId: company.companyId, role: 'SUPER_ADMIN' });
+        user.companies.push({
+          companyId: company.companyId,
+          role: 'SUPER_ADMIN',
+          permissions: [...COMPANY_ADMIN_PERMISSIONS],
+        });
       }
     },
   });

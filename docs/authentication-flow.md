@@ -1,29 +1,43 @@
 # Authentication and context flow
 
-1. The browser posts credentials to same-origin `POST /api/v1/auth/login`.
-2. Mock mode creates an opaque process-memory session and issues
-   `navfarm_session` as `HttpOnly`, `SameSite=Lax`, path `/`. Proxy mode
-   forwards upstream `Set-Cookie` without exposing tokens to JavaScript.
-3. `AuthProvider` loads `GET /api/v1/auth/session` with credentials included.
-4. MFA-enabled accounts continue through `/mfa/verify` or `/mfa/recovery`.
-5. `destinationForSession` evaluates platform access, tenant status,
-   memberships, company status, and onboarding:
-   - platform user -> platform dashboard;
-   - multiple unresolved memberships -> context selection;
-   - suspended/inactive/no access -> access-denied;
-   - incomplete mandatory setup -> onboarding;
-   - Tenant Admin -> tenant console;
-   - one assigned operational workspace -> its canonical workspace dashboard;
-   - unresolved company/workspace membership -> explicit selection;
-   - company administration selection -> `/{company}/overview`.
-6. Context changes call `PUT /api/v1/auth/context`; tenant/company/workspace
-   identity is held in the server session, never localStorage. Selecting
-   Company administration sends `workspaceId: null`. Selecting a workspace
-   sends the complete tenant/company/workspace tuple atomically. Changing
-   company always clears the previous workspace.
-7. Logout calls `POST /api/v1/auth/logout`, invalidates server state, and
-   expires the cookie.
+Status: implemented for the frontend mock demo; the matching backend session
+service is not implemented.
 
-Mock process memory, including sessions, resets on Next.js restart. The optional
-reset endpoint requires `NAVFARM_ENABLE_MOCK_RESET=true`, is absent in
-production, and is intended only for development/tests.
+1. The browser posts validated credentials to same-origin
+   `POST /api/v1/auth/login`.
+2. A non-MFA success creates an opaque process-memory session and issues
+   `navfarm_session` as `HttpOnly`, `SameSite=Lax`, path `/`. The response is a
+   complete `AuthSession`.
+3. An MFA login returns a validated `MfaChallenge` and does not issue an
+   application session cookie. Verification or recovery creates the complete
+   session and enters `/context-selection`.
+4. `AuthProvider` is the sole live browser session source. On mount it remains
+   `loading` while `GET /api/v1/auth/session` restores the cookie session.
+   Guards must not decide access during that state. Its other explicit states
+   are `authenticated`, `unauthenticated`, `suspended`, and `mfa_pending`.
+5. `destinationForSession` resolves deterministic landings:
+   Platform Administrator -> platform dashboard; Tenant Administrator ->
+   tenant console; Company Administrator/Auditor -> company overview;
+   Accountant -> accounting readiness; assigned operational role -> its
+   explicit workspace; unresolved multi-company/MFA context ->
+   `/context-selection`; incomplete setup -> company setup.
+6. The authenticated session establishes `activeTenantId`. Users can select
+   only Company administration or an assigned Workspace. The visible selector
+   never offers tenant or organisation switching.
+7. Every `PUT /api/v1/auth/context` sends the complete
+   `(tenantId, companyId, workspaceId)` tuple. Company administration sends
+   `workspaceId: null`. The server verifies resource ownership, explicit
+   memberships, and active status before returning a new session; the client
+   commits it only after success.
+8. `GET /api/v1/auth/session` rejects a stored stale tuple rather than silently
+   repairing it. `POST /api/v1/auth/logout` invalidates server state, expires
+   the cookie, and clears tenant/company/workspace state in `AuthProvider`.
+
+`/company-selection` is retired and redirects to `/context-selection`.
+Legacy token, browser-storage, and module-global session helpers have no live
+consumer.
+
+Mock process memory resets on Next.js restart. The optional reset endpoint
+requires `NAVFARM_ENABLE_MOCK_RESET=true`, is absent in production, and is for
+development/tests only. None of this represents durable authentication,
+production authorization, or a connected backend.

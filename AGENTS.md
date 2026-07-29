@@ -51,7 +51,19 @@
 ## Web Demo Conventions
 
 - The web app is Next.js 16 + React 19 under `apps/web` and normally runs at `http://localhost:3001` during local development.
-- The demo currently uses local browser state for authentication (`navfarm_auth_user`) and custom companies (`navfarm_custom_companies`); there is no real authentication or persistence layer.
+- The web demo uses the cookie-backed `AuthProvider` plus same-origin
+  `/api/v1/auth/*` mock endpoints as its only live browser session source.
+  Authentication and the active tenant/company/workspace tuple must not be
+  mirrored to `localStorage`, `sessionStorage`, or a module-global snapshot.
+  Mock sessions are process-memory fixtures, not durable or production
+  authentication.
+- The authenticated session establishes the tenant. Visible context selection
+  is limited to Company administration and explicitly assigned Workspaces;
+  never add tenant/organisation switching to the company/workspace selector.
+- Company roles and tenant-administration permissions never grant workspace
+  operational capabilities. Operational reads and mutations require a matching
+  active tenant/company/workspace tuple, explicit workspace membership, and
+  the requested workspace capability.
 - Company workspaces use `/{company}/...`. The company selector must show company entities, not industries or LOBs. Each company is assigned a documented NOB; piggery, dairy, rearing, laying, hatching, slaughter, crops, seeds, etc. belong inside the company as LOBs.
 - Seed/demo NOB options must follow the docs: Poultry, Livestock, Agriculture, Aquaculture, Insect Farming, and Feed & Processing. New NOBs/LOBs should remain configuration-driven.
 - Keep company-scoped navigation and UI reusable across industries. Prefer domain configuration and typed metadata over duplicating pages per company/LOB.

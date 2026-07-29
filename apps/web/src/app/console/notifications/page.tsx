@@ -1,11 +1,33 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Bell, RefreshCw, AlertCircle, CheckCircle, Save, Send, Mail, Globe, Eye, EyeOff } from "lucide-react";
-import { api } from "../../../services/api-client";
-import { getStoredToken, getStoredUser, getStoredTenantId, type NavUser } from "../../../hooks/useAuth";
+import { api } from "../../../lib/api-client";
+import { useAuth } from "../../../contexts/AuthContext";
 import { Dialog } from "../../../components/ui/dialog";
+
+type ActiveCompany = { companyId: string; companyName: string };
+type NotificationConfig = {
+  notif_id: string;
+  channel: "EMAIL" | "WEBHOOK";
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password_enc?: string;
+  from_email?: string;
+  from_name?: string;
+  webhook_url?: string;
+  webhook_secret_enc?: string;
+};
+type NotificationLog = {
+  log_id?: string;
+  sent_at: string;
+  channel?: string;
+  recipient?: string;
+  message?: string;
+  status?: string;
+  error_message?: string;
+};
 
 // Reusable labelled input for this page
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -27,8 +49,8 @@ const inputStyle = {
 };
 
 export default function NotificationsPage() {
-  const router = useRouter();
-  const [activeCompany, setActiveCompany] = useState<any>(null);
+  const { session, status } = useAuth();
+  const [activeCompany, setActiveCompany] = useState<ActiveCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -46,36 +68,41 @@ export default function NotificationsPage() {
   const [testRecipient, setTestRecipient] = useState("");
   const [testMessage, setTestMessage] = useState("This is a live test notification from your NAVFarm workspace.");
 
-  const [configs, setConfigs] = useState<any[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [configs, setConfigs] = useState<NotificationConfig[]>([]);
+  const [logs, setLogs] = useState<NotificationLog[]>([]);
 
   useEffect(() => {
-    const token = getStoredToken();
-    const storedUser = getStoredUser();
-    const tid = getStoredTenantId();
-    if (!token || !storedUser || !tid) { router.replace("/"); return; }
-    loadData(storedUser, tid);
-  }, [router]);
+    if (status !== 'authenticated' || !session) return;
+    const membership = session.companies.find(
+      (company) => company.companyId === session.activeCompanyId,
+    );
+    if (!membership) {
+      setError('Select a company before configuring notifications.');
+      setLoading(false);
+      return;
+    }
+    const company = {
+      companyId: membership.companyId,
+      companyName: membership.companyName,
+    };
+    setActiveCompany(company);
+    void loadData(company);
+  }, [session, status]);
 
-  const loadData = async (storedUser: NavUser, tid: string) => {
+  const loadData = async (company: ActiveCompany) => {
     setLoading(true);
     setError("");
     try {
-      const companiesList = await api.get(`/company/tenant/${tid}`);
-      const myId = storedUser.companyId || (storedUser as any).company_id;
-      const myCompany = companiesList.find((c: any) => c.company_id === myId) || companiesList[0];
-      setActiveCompany(myCompany || null);
-
-      if (myCompany?.company_id) {
+      if (company.companyId) {
         const [configs, logsList] = await Promise.all([
-          api.get(`/notification/company/${myCompany.company_id}`).catch(() => []),
-          api.get(`/notification/logs/${myCompany.company_id}`).catch(() => [])
+          api.get<NotificationConfig[]>(`/notification/company/${company.companyId}`),
+          api.get<NotificationLog[]>(`/notification/logs/${company.companyId}`),
         ]);
-        setConfigs(Array.isArray(configs) ? configs : []);
-        setLogs(Array.isArray(logsList) ? logsList.reverse() : []);
+        setConfigs(configs);
+        setLogs([...logsList].reverse());
 
-        const emailCfg = configs?.find((c: any) => c.channel === "EMAIL");
-        const webhookCfg = configs?.find((c: any) => c.channel === "WEBHOOK");
+        const emailCfg = configs.find((config) => config.channel === "EMAIL");
+        const webhookCfg = configs.find((config) => config.channel === "WEBHOOK");
         if (emailCfg) setEmailForm({
           smtp_host: emailCfg.smtp_host || "", smtp_port: emailCfg.smtp_port || 587,
           smtp_user: emailCfg.smtp_user || "", smtp_password_enc: emailCfg.smtp_password_enc || "",
@@ -85,8 +112,8 @@ export default function NotificationsPage() {
           webhook_url: webhookCfg.webhook_url || "", webhook_secret_enc: webhookCfg.webhook_secret_enc || "",
         });
       }
-    } catch (e: any) {
-      setError(e?.message || "Failed to load notification config.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Failed to load notification config.");
     } finally {
       setLoading(false);
     }
@@ -101,11 +128,11 @@ export default function NotificationsPage() {
       if (existing) {
         await api.put(`/notification/${existing.notif_id}`, emailForm);
       } else {
-        const created = await api.post("/notification", { company_id: activeCompany.company_id, channel: "EMAIL", ...emailForm });
+        const created = await api.post<NotificationConfig>("/notification", { company_id: activeCompany.companyId, channel: "EMAIL", ...emailForm });
         setConfigs((current) => [...current, created]);
       }
       setSuccess("Email notification settings saved.");
-    } catch (err: any) { setError(err?.message || "Failed to save."); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Failed to save."); }
     finally { setSaving(false); }
   };
 
@@ -118,11 +145,11 @@ export default function NotificationsPage() {
       if (existing) {
         await api.put(`/notification/${existing.notif_id}`, webhookForm);
       } else {
-        const created = await api.post("/notification", { company_id: activeCompany.company_id, channel: "WEBHOOK", ...webhookForm });
+        const created = await api.post<NotificationConfig>("/notification", { company_id: activeCompany.companyId, channel: "WEBHOOK", ...webhookForm });
         setConfigs((current) => [...current, created]);
       }
       setSuccess("Webhook settings saved.");
-    } catch (err: any) { setError(err?.message || "Failed to save."); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Failed to save."); }
     finally { setSaving(false); }
   };
 
@@ -132,8 +159,8 @@ export default function NotificationsPage() {
     setTesting(true); setError(""); setSuccess("");
     try {
       // Find the email config to get the correct configId
-      const configs = await api.get(`/notification/company/${activeCompany.company_id}`).catch(() => []);
-      const emailCfg = configs?.find((c: any) => c.channel === "EMAIL");
+      const configs = await api.get<NotificationConfig[]>(`/notification/company/${activeCompany.companyId}`);
+      const emailCfg = configs.find((config) => config.channel === "EMAIL");
       if (!emailCfg) {
         throw new Error("Please configure and save SMTP details first before sending a test notification.");
       }
@@ -143,9 +170,9 @@ export default function NotificationsPage() {
       setShowTestDialog(false);
 
       // Reload logs
-      const updatedLogs = await api.get(`/notification/logs/${activeCompany.company_id}`).catch(() => []);
-      setLogs(Array.isArray(updatedLogs) ? updatedLogs.reverse() : []);
-    } catch (err: any) { setError(err?.message || "Failed to send test."); }
+      const updatedLogs = await api.get<NotificationLog[]>(`/notification/logs/${activeCompany.companyId}`);
+      setLogs([...updatedLogs].reverse());
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Failed to send test."); }
     finally { setTesting(false); }
   };
 
@@ -170,7 +197,7 @@ export default function NotificationsPage() {
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Notification Engine</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
-          Configure outbound alert channels for <span className="font-medium">{activeCompany?.company_name || "—"}</span>
+          Configure outbound alert channels for <span className="font-medium">{activeCompany?.companyName || "—"}</span>
         </p>
       </div>
 

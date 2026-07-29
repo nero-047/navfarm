@@ -14,6 +14,18 @@ export const apiErrorCodeSchema = z.enum([
   'UPSTREAM_UNAVAILABLE',
   'CONFIGURATION_ERROR',
   'INTERNAL_ERROR',
+  'ACCOUNT_SUSPENDED',
+  'TENANT_MEMBERSHIP_REQUIRED',
+  'TENANT_INACTIVE',
+  'TENANT_SUSPENDED',
+  'COMPANY_MEMBERSHIP_REQUIRED',
+  'COMPANY_NOT_IN_TENANT',
+  'COMPANY_INACTIVE',
+  'WORKSPACE_MEMBERSHIP_REQUIRED',
+  'WORKSPACE_NOT_IN_COMPANY',
+  'WORKSPACE_INACTIVE',
+  'STALE_CONTEXT',
+  'CAPABILITY_REQUIRED',
   'resource_in_use',
 ]);
 
@@ -94,6 +106,7 @@ export const permissionSchema = z.enum([
   'quality.view',
   'quality.manage',
   'traceability.view',
+  'traceability.manage',
   'resources.view',
   'resources.manage',
   'reports.export',
@@ -122,7 +135,7 @@ export const sessionUserSchema = z.object({
     company_name: z.string(),
     is_primary: z.boolean(),
   })).default([]),
-  permissions: z.array(z.unknown()).default([]),
+  permissions: z.array(permissionSchema).default([]),
 }).passthrough();
 
 export const tenantMembershipSchema = z.object({
@@ -130,6 +143,7 @@ export const tenantMembershipSchema = z.object({
   tenantName: z.string(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
   role: z.enum(['TENANT_ADMIN', 'TENANT_MEMBER']),
+  permissions: z.array(permissionSchema),
 });
 
 export const companyMembershipSchema = z.object({
@@ -221,6 +235,7 @@ export const workspaceMembershipSchema = workspaceSchema.pick({
 });
 
 export const authSessionSchema = z.object({
+  state: z.enum(['AUTHENTICATED', 'SUSPENDED']),
   user: sessionUserSchema,
   tenants: z.array(tenantMembershipSchema),
   companies: z.array(companyMembershipSchema),
@@ -229,10 +244,40 @@ export const authSessionSchema = z.object({
   activeCompanyId: z.string().nullable(),
   activeWorkspaceId: z.string().nullable(),
   expiresAt: z.string(),
-  mfaRequired: z.boolean().optional(),
-  challengeId: z.string().optional(),
 });
 export type AuthSession = z.infer<typeof authSessionSchema>;
+export const mfaChallengeSchema = z.object({
+  state: z.literal('MFA_PENDING'),
+  challengeId: z.string(),
+  expiresAt: z.string().datetime(),
+  user: sessionUserSchema,
+});
+export const authLoginResponseSchema = z.union([authSessionSchema, mfaChallengeSchema]);
+export const authLoginRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+export const authContextRequestSchema = z.object({
+  tenantId: z.string().nullable(),
+  companyId: z.string().nullable(),
+  workspaceId: z.string().nullable(),
+}).superRefine((value, context) => {
+  if (value.companyId && !value.tenantId) {
+    context.addIssue({ code: 'custom', message: 'Company context requires a tenant.' });
+  }
+  if (value.workspaceId && !value.companyId) {
+    context.addIssue({ code: 'custom', message: 'Workspace context requires a company.' });
+  }
+});
+export const mfaCompletionRequestSchema = z.object({
+  challengeId: z.string().min(1),
+  code: z.string().optional(),
+  recoveryCode: z.string().optional(),
+}).refine((value) => Boolean(value.code || value.recoveryCode), {
+  message: 'A verification or recovery code is required.',
+});
+export type AuthLoginResponse = z.infer<typeof authLoginResponseSchema>;
+export type MfaChallenge = z.infer<typeof mfaChallengeSchema>;
 export type Permission = z.infer<typeof permissionSchema>;
 export type CompanyRole = z.infer<typeof companyRoleSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
@@ -259,7 +304,8 @@ export type RuntimeContract = {
 export const runtimeContracts: RuntimeContract[] = [
   ...phase3RuntimeContracts,
   ...phase2RuntimeContracts,
-  { method: 'POST', pattern: /^\/auth\/(login|mfa\/verify|mfa\/recovery)$/, response: authSessionSchema },
+  { method: 'POST', pattern: /^\/auth\/login$/, response: authLoginResponseSchema },
+  { method: 'POST', pattern: /^\/auth\/mfa\/(verify|recovery)$/, response: authSessionSchema },
   { method: 'GET', pattern: /^\/auth\/session$/, response: authSessionSchema },
   { method: 'PUT', pattern: /^\/auth\/context$/, response: authSessionSchema },
   { method: 'PATCH', pattern: /^\/users\/me$/, response: authSessionSchema },

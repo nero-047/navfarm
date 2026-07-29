@@ -1,17 +1,23 @@
 # Recommended Implementation Sequence
 
-These milestones are corrective planning, not authorization to begin implementation.
+These milestones are corrective planning. Milestone 1 is implemented for the
+frontend mock demo and contract boundary only; it does not claim backend
+delivery. Do not begin later milestones merely because this status changed.
 
 ## Milestone 1: Session and context consolidation
 
-- **Scope:** one `AuthContext` session source; remove live legacy helper callers; define cookie-session or JWT bridge; atomic tuple validation.
-- **Dependencies:** agreed auth response, logout, MFA/recovery and context contract.
-- **Likely modules:** `contexts/AuthContext.tsx`, `hooks/useAuth.ts`, auth forms, shell, access states; `origin/arun.pratap:apps/api/src/modules/auth/*`.
-- **Acceptance:** refresh has no false denial; logout clears all context; invalid tenant/company/workspace tuple is rejected; MFA has no app session before success.
-- **Tests:** browser refresh/logout/MFA/context matrix against non-mock backend; unit tuple validation.
-- **Backend dependency:** new or adapter auth session endpoints.
-- **Product decision:** session transport and multi-company identity model.
-- **Complexity:** very high.
+- **Status:** complete for the frontend mock demo; backend implementation
+  remains missing.
+- **Delivered:** one `AuthContext` source; explicit hydration/MFA/suspension
+  states; retired live helpers and `/company-selection`; Company/Workspace-only
+  selector; atomic authorized context; explicit account fixtures; exact
+  workspace mutation capabilities; unit and Playwright matrices.
+- **Contract ready:** typed login/challenge/session/context/logout responses and
+  stable denial codes at the same-origin `/api/v1` boundary.
+- **Backend dependency:** durable session/MFA/membership/context endpoints and
+  production enforcement are required before non-mock integration.
+- **Remaining product decision:** production session adapter/transport and
+  cross-tenant membership/tenancy model.
 
 ## Milestone 2: Company administration decoupling
 
@@ -24,12 +30,15 @@ These milestones are corrective planning, not authorization to begin implementat
 - **Product decision:** final setup/readiness taxonomy.
 - **Complexity:** high.
 
-## Milestone 3: Authorization and explicit fixtures
+## Milestone 3: Extended authorization policy
 
-- **Scope:** one capability resolver; explicit fixtures; no company role grants workspace operations.
+- **Scope:** extend the now-explicit Milestone 1 mock policy into the complete
+  product role catalogue, backend persistence/guards, invitations and custom
+  roles.
 - **Dependencies:** Workspace membership persistence decision.
 - **Likely modules:** authorization, access reasons, mock repository, operational repository, E2E fixtures.
-- **Acceptance:** Viewer/Company Admin/Tenant Admin negative mutation matrix passes; no email fallback membership.
+- **Acceptance:** production contract/backend role and custom-permission matrix
+  matches the already passing frontend negative mutation tests.
 - **Tests:** unit capability table, mock API and browser negative cases.
 - **Backend dependency:** workspace roles/permissions tables and guards.
 - **Product decision:** workspace role catalogue and Tenant Admin override rules.

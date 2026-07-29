@@ -9,7 +9,7 @@ import {
   PackageCheck,
   ShieldCheck,
 } from 'lucide-react';
-import { getAllCompanies } from '@/modules/company/use-current-company';
+import { COMPANIES } from '@/modules/company/types';
 import { INDUSTRY_CONFIG } from './data';
 
 export function PublicTracePage({
@@ -19,7 +19,7 @@ export function PublicTracePage({
   companySlug: string;
   packCode: string;
 }) {
-  const company = getAllCompanies()[companySlug];
+  const company = COMPANIES[companySlug];
   if (!company)
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f3f5f8] p-6">

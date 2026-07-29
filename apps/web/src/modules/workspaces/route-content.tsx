@@ -17,18 +17,12 @@ export function CanonicalWorkspaceContent({
   section?: string;
 }) {
   const { company } = useParams<{ company: string }>();
-  const { session, selectContext } = useAuth();
+  const { session } = useAuth();
   const membership = session?.companies.find((item) => item.companySlug === company);
   const assignedWorkspace = session?.workspaces.find((item) => item.companyId === membership?.companyId && item.workspaceSlug === workspaceSlug);
   const configuredWorkspace = session?.workspaces.find((item) => item.companyId === membership?.companyId && item.workspaceSlug === workspaceSlug);
   const workspace = assignedWorkspace;
   const needsContext = Boolean(workspace && workspace.status === 'ACTIVE' && session?.activeWorkspaceId !== workspace.workspaceId);
-
-  useEffect(() => {
-    if (membership && workspace && needsContext && sessionStorage.getItem('navfarm_context_transition') !== 'company') {
-      void selectContext(membership.tenantId, membership.companyId, workspace.workspaceId);
-    }
-  }, [membership, needsContext, selectContext, workspace]);
 
   if (!section) return <WorkspaceDetail workspaceSlug={workspaceSlug} />;
   if (configuredWorkspace && configuredWorkspace.status !== 'ACTIVE') {
@@ -38,7 +32,7 @@ export function CanonicalWorkspaceContent({
     />;
   }
   if (!workspace) return <AccessState reason="workspace_not_assigned" companySlug={company} />;
-  if (needsContext) return <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">Establishing workspace context…</div>;
+  if (needsContext) return <AccessState reason="workspace_selection_required" companySlug={company} />;
   if (section === 'masters' || section === 'settings') return <WorkspacePage kind="settings" />;
   return <WorkspacePage kind={(section === 'costing' ? 'reports' : section) as WorkspacePageKind} />;
 }
@@ -72,6 +66,9 @@ export function LegacyOperationalRedirect({ kind }: { kind: OperationalRouteKind
   }, [company, kind, membership, router, selectContext, session?.activeWorkspaceId, workspaces]);
 
   if (!membership) return <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-sm text-red-800">Company access is not assigned.</div>;
+  if (membership.onboardingStatus !== 'COMPLETED') {
+    return <AccessState reason="onboarding_incomplete" companySlug={company} />;
+  }
   if (!workspaces.length) return <AccessState reason="workspace_not_assigned" companySlug={company} noWorkspaceAssigned={!tenantAdmin} />;
   return <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">{workspaces.length === 1 ? 'Opening your assigned workspace…' : 'Opening workspace selection…'}</div>;
 }

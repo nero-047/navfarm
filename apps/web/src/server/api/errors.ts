@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { ApiErrorPayload } from '@/contracts/api';
 
+type ApiErrorCode = ApiErrorPayload['error']['code'];
+
 const codeByStatus: Record<number, ApiErrorPayload['error']['code']> = {
   400: 'BAD_REQUEST',
   401: 'UNAUTHORIZED',
@@ -18,11 +20,12 @@ export function apiErrorResponse(
   message: string,
   requestId: string,
   details?: unknown,
+  code?: ApiErrorCode,
 ) {
   return NextResponse.json<ApiErrorPayload>(
     {
       error: {
-        code: codeByStatus[status] ?? 'INTERNAL_ERROR',
+        code: code ?? codeByStatus[status] ?? 'INTERNAL_ERROR',
         message,
         status,
         requestId,
