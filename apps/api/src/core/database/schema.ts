@@ -4432,7 +4432,7 @@ export const feedManufacturingOrder = mysqlTable('feed_manufacturing_order', {
   priority: varchar('priority', { length: 10 }).default('NORMAL'),  // LOW / NORMAL / HIGH / URGENT
   current_stage: varchar('current_stage', { length: 30 }).default('CREATED'), // CREATED / GRINDING / MIXING / PELLETIZING / PACKING / QUALITY_CHECK / COMPLETED / CLOSED
   mo_status: varchar('mo_status', { length: 20 }).default('OPEN'),  // OPEN / IN_PROGRESS / COMPLETED / CLOSED / CANCELLED
-  production_batch_id: varchar('production_batch_id', { length: 36 }), // Link to feed_production_batch
+  production_batch_id: varchar('production_batch_id', { length: 36 }), // Link to productionBatch table
   notes: text('notes'),
   created_by: varchar('created_by', { length: 36 }),
   approved_by: varchar('approved_by', { length: 36 }),

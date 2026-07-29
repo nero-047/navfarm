@@ -15,9 +15,9 @@ import { FarmToForkTrackerService } from './services/farm-to-fork-tracker.servic
 import { RecallManagementService } from './services/recall-management.service';
 import { CapaService } from './services/capa.service';
 import { QualityReportService } from './services/quality-report.service';
-import { InventoryModule } from '../inventory/inventory.module';
-import { ProductionModule } from '../production/production.module';
-import { AuditLogModule } from '../audit-log/audit-log.module';
+import { InventoryModule } from '../inventory-logistics/inventory/inventory.module';
+import { ProductionModule } from '../production-costing/production/production.module';
+import { AuditLogModule } from '../platform-identity/audit-log/audit-log.module';
 
 @Module({
 

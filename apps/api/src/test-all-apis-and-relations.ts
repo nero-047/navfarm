@@ -2,27 +2,27 @@ import { Test } from '@nestjs/testing';
 import { ClsService } from 'nestjs-cls';
 
 // Import All Phase Services
-import { LivestockV2Module } from './modules/livestock-v2/livestock-v2.module';
-import { AgriV2Module } from './modules/agri-v2/agri-v2.module';
-import { AquacultureV2Module } from './modules/aquaculture-v2/aquaculture-v2.module';
-import { FeedProductionV2Module } from './modules/feed-production-v2/feed-production-v2.module';
-import { ReportingBiModule } from './modules/reporting-bi/reporting-bi.module';
-import { InventoryModule } from './modules/inventory/inventory.module';
-import { FinanceModule } from './modules/finance/finance.module';
-import { SchedulerKpiModule } from './modules/scheduler-kpi/scheduler-kpi.module';
-import { AuditLogModule } from './modules/audit-log/audit-log.module';
+import { LivestockV2Module } from './modules/verticals/livestock-v2/livestock-v2.module';
+import { AgriV2Module } from './modules/verticals/agri-v2/agri-v2.module';
+import { AquacultureV2Module } from './modules/verticals/aquaculture-v2/aquaculture-v2.module';
+import { FeedProductionV2Module } from './modules/verticals/feed-production-v2/feed-production-v2.module';
+import { ReportingBiModule } from './modules/intelligence-reporting/reporting-bi/reporting-bi.module';
+import { InventoryModule } from './modules/inventory-logistics/inventory/inventory.module';
+import { FinanceModule } from './modules/finance-accounting/finance/finance.module';
+import { SchedulerKpiModule } from './modules/intelligence-reporting/scheduler-kpi/scheduler-kpi.module';
+import { AuditLogModule } from './modules/platform-identity/audit-log/audit-log.module';
 
 // Services
-import { LivestockCommercialService } from './modules/livestock-v2/services/livestock-commercial.service';
-import { AgriV2Service } from './modules/agri-v2/services/agri.service';
-import { AquaV2Service } from './modules/aquaculture-v2/services/aqua-v2.service';
-import { FeedProductionV2Service } from './modules/feed-production-v2/services/feed-production-v2.service';
-import { LivestockV2ReportService } from './modules/reporting-bi/services/livestock-v2-report.service';
-import { AgriV2ReportService } from './modules/reporting-bi/services/agri-v2-report.service';
-import { AquaV2ReportService } from './modules/reporting-bi/services/aqua-v2-report.service';
-import { FeedProductionV2ReportService } from './modules/reporting-bi/services/feed-production-v2-report.service';
-import { GoodsReceiptService } from './modules/inventory/services/goods-receipt.service';
-import { GoodsIssueService } from './modules/inventory/services/goods-issue.service';
+import { LivestockCommercialService } from './modules/verticals/livestock-v2/services/livestock-commercial.service';
+import { AgriV2Service } from './modules/verticals/agri-v2/services/agri.service';
+import { AquaV2Service } from './modules/verticals/aquaculture-v2/services/aqua-v2.service';
+import { FeedProductionV2Service } from './modules/verticals/feed-production-v2/services/feed-production-v2.service';
+import { LivestockV2ReportService } from './modules/intelligence-reporting/reporting-bi/services/livestock-v2-report.service';
+import { AgriV2ReportService } from './modules/intelligence-reporting/reporting-bi/services/agri-v2-report.service';
+import { AquaV2ReportService } from './modules/intelligence-reporting/reporting-bi/services/aqua-v2-report.service';
+import { FeedProductionV2ReportService } from './modules/intelligence-reporting/reporting-bi/services/feed-production-v2-report.service';
+import { GoodsReceiptService } from './modules/inventory-logistics/inventory/services/goods-receipt.service';
+import { GoodsIssueService } from './modules/inventory-logistics/inventory/services/goods-issue.service';
 
 import { ClsModule } from 'nestjs-cls';
 

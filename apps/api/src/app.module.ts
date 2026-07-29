@@ -2,63 +2,73 @@ import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ClsModule } from 'nestjs-cls';
 import { DatabaseModule } from './core/database/database.module';
-import { TenantModule } from './modules/tenant/tenant.module';
-import { CompanyModule } from './modules/company/company.module';
-import { PlanModule } from './modules/plan/plan.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { SetupWizardModule } from './modules/setup-wizard/setup-wizard.module';
-import { RoleModule } from './modules/role/role.module';
-import { LanguageModule } from './modules/language/language.module';
-import { CurrencyModule } from './modules/currency/currency.module';
-import { AuditLogModule } from './modules/audit-log/audit-log.module';
-import { NotificationModule } from './modules/notification/notification.module';
-import { UserModule } from './modules/user/user.module';
-import { UserCompanyModule } from './modules/user-company/user-company.module';
-import { UomModule } from './modules/uom/uom.module';
-import { BreedModule } from './modules/breed/breed.module';
-import { FarmModule } from './modules/farm/farm.module';
-import { WarehouseModule } from './modules/warehouse/warehouse.module';
-import { LocationModule } from './modules/location/location.module';
-import { ShedModule } from './modules/shed/shed.module';
-import { ItemCategoryModule } from './modules/item-category/item-category.module';
-import { ItemModule } from './modules/item/item.module';
-import { SupplierModule } from './modules/supplier/supplier.module';
-import { CustomerModule } from './modules/customer/customer.module';
-import { ResourceModule } from './modules/resource/resource.module';
-import { DiseaseModule } from './modules/disease/disease.module';
-import { MedicineModule } from './modules/medicine/medicine.module';
-import { FeedFormulaModule } from './modules/feed-formula/feed-formula.module';
-import { GlAccountModule } from './modules/gl-account/gl-account.module';
-import { GlMappingModule } from './modules/gl-mapping/gl-mapping.module';
-import { CostCenterModule } from './modules/cost-center/cost-center.module';
-import { InventoryModule } from './modules/inventory/inventory.module';
-import { FinanceModule } from './modules/finance/finance.module';
-import { ProductionModule } from './modules/production/production.module';
-import { PoultryModule } from './modules/poultry/poultry.module';
-import { CostingModule } from './modules/costing/costing.module';
-import { QcModule } from './modules/qc/qc.module';
+
+// ── 1. PLATFORM & IDENTITY BOUNDED CONTEXT
+import { TenantModule } from './modules/platform-identity/tenant/tenant.module';
+import { CompanyModule } from './modules/platform-identity/company/company.module';
+import { PlanModule } from './modules/platform-identity/plan/plan.module';
+import { AuthModule } from './modules/platform-identity/auth/auth.module';
+import { SetupWizardModule } from './modules/platform-identity/setup-wizard/setup-wizard.module';
+import { RoleModule } from './modules/platform-identity/role/role.module';
+import { LanguageModule } from './modules/platform-identity/language/language.module';
+import { CurrencyModule } from './modules/platform-identity/currency/currency.module';
+import { AuditLogModule } from './modules/platform-identity/audit-log/audit-log.module';
+import { NotificationModule } from './modules/platform-identity/notification/notification.module';
+import { UserModule } from './modules/platform-identity/user/user.module';
+import { UserCompanyModule } from './modules/platform-identity/user-company/user-company.module';
+import { TenantSubscriptionModule } from './modules/platform-identity/tenant-subscription/tenant-subscription.module';
+
+// ── 2. MASTER DATA BOUNDED CONTEXT
+import { UomModule } from './modules/master-data/uom/uom.module';
+import { BreedModule } from './modules/master-data/breed/breed.module';
+import { FarmModule } from './modules/master-data/farm/farm.module';
+import { WarehouseModule } from './modules/master-data/warehouse/warehouse.module';
+import { LocationModule } from './modules/master-data/location/location.module';
+import { ShedModule } from './modules/master-data/shed/shed.module';
+import { ItemCategoryModule } from './modules/master-data/item-category/item-category.module';
+import { ItemModule } from './modules/master-data/item/item.module';
+import { SupplierModule } from './modules/master-data/supplier/supplier.module';
+import { CustomerModule } from './modules/master-data/customer/customer.module';
+import { ResourceModule } from './modules/master-data/resource/resource.module';
+import { DiseaseModule } from './modules/master-data/disease/disease.module';
+import { MedicineModule } from './modules/master-data/medicine/medicine.module';
+import { UomConversionModule } from './modules/master-data/uom-conversion/uom-conversion.module';
+import { ItemAttributeModule } from './modules/master-data/item-attribute/item-attribute.module';
+import { NobLobConfigModule } from './modules/master-data/nob-lob-config/nob-lob-config.module';
+import { ParameterMasterModule } from './modules/master-data/parameter-master/parameter-master.module';
+
+// ── 3. FINANCE & ACCOUNTING BOUNDED CONTEXT
+import { GlAccountModule } from './modules/finance-accounting/gl-account/gl-account.module';
+import { GlMappingModule } from './modules/finance-accounting/gl-mapping/gl-mapping.module';
+import { CostCenterModule } from './modules/finance-accounting/cost-center/cost-center.module';
+import { FinanceModule } from './modules/finance-accounting/finance/finance.module';
+
+// ── 4. INVENTORY & LOGISTICS BOUNDED CONTEXT
+import { InventoryModule } from './modules/inventory-logistics/inventory/inventory.module';
+
+// ── 5. PRODUCTION & COSTING BOUNDED CONTEXT
+import { ProductionModule } from './modules/production-costing/production/production.module';
+import { CostingModule } from './modules/production-costing/costing/costing.module';
+import { SlaughterSplitModule } from './modules/production-costing/slaughter-cost-split/slaughter-split.module';
+
+// ── 6. QUALITY & TRACEABILITY BOUNDED CONTEXT
 import { QualityTraceabilityModule } from './modules/quality-traceability/quality-traceability.module';
-import { SchedulerKpiModule } from './modules/scheduler-kpi/scheduler-kpi.module';
-import { ReportingBiModule } from './modules/reporting-bi/reporting-bi.module';
-// ── Phase 11A — Fast API Gap Closures
-import { UomConversionModule } from './modules/uom-conversion/uom-conversion.module';
-import { ItemAttributeModule } from './modules/item-attribute/item-attribute.module';
-import { NobLobConfigModule } from './modules/nob-lob-config/nob-lob-config.module';
-import { TenantSubscriptionModule } from './modules/tenant-subscription/tenant-subscription.module';
-import { EggGradingModule } from './modules/egg-grading/egg-grading.module';
-// ── Phase 11B — Livestock & Agriculture Verticals
-import { LivestockModule } from './modules/livestock/livestock.module';
-import { AgriModule } from './modules/agri/agri.module';
-import { ParameterMasterModule } from './modules/parameter-master/parameter-master.module';
-// ── Phase 11C — Aqua, Insect & Feed Mill
-import { AquacultureModule } from './modules/aquaculture/aquaculture.module';
-import { InsectFarmingModule } from './modules/insect-farming/insect-farming.module';
-import { FeedMillModule } from './modules/feed-mill/feed-mill.module';
-import { SlaughterSplitModule } from './modules/slaughter-cost-split/slaughter-split.module';
-import { LivestockV2Module } from './modules/livestock-v2/livestock-v2.module';
-import { AgriV2Module } from './modules/agri-v2/agri-v2.module';
-import { AquacultureV2Module } from './modules/aquaculture-v2/aquaculture-v2.module';
-import { FeedProductionV2Module } from './modules/feed-production-v2/feed-production-v2.module';
+import { QcModule } from './modules/quality-traceability/qc/qc.module';
+
+// ── 7. OPERATIONAL VERTICALS BOUNDED CONTEXT
+import { PoultryModule } from './modules/verticals/poultry/poultry.module';
+import { EggGradingModule } from './modules/verticals/egg-grading/egg-grading.module';
+import { LivestockV2Module } from './modules/verticals/livestock-v2/livestock-v2.module';
+import { AgriV2Module } from './modules/verticals/agri-v2/agri-v2.module';
+import { AquacultureV2Module } from './modules/verticals/aquaculture-v2/aquaculture-v2.module';
+import { FeedProductionV2Module } from './modules/verticals/feed-production-v2/feed-production-v2.module';
+import { FeedFormulaModule } from './modules/verticals/feed-formula/feed-formula.module';
+import { InsectFarmingModule } from './modules/verticals/insect-farming/insect-farming.module';
+
+// ── 8. INTELLIGENCE & REPORTING BOUNDED CONTEXT
+import { SchedulerKpiModule } from './modules/intelligence-reporting/scheduler-kpi/scheduler-kpi.module';
+import { ReportingBiModule } from './modules/intelligence-reporting/reporting-bi/reporting-bi.module';
+
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -82,6 +92,7 @@ import { SystemController } from './system/system.controller';
     // Global Drizzle Database connection pool
     DatabaseModule,
 
+    // 1. Platform & Identity
     TenantModule,
     CompanyModule,
     PlanModule,
@@ -94,6 +105,9 @@ import { SystemController } from './system/system.controller';
     NotificationModule,
     UserModule,
     UserCompanyModule,
+    TenantSubscriptionModule,
+
+    // 2. Master Data
     UomModule,
     BreedModule,
     FarmModule,
@@ -107,44 +121,49 @@ import { SystemController } from './system/system.controller';
     ResourceModule,
     DiseaseModule,
     MedicineModule,
-    FeedFormulaModule,
-    GlAccountModule,
-    GlMappingModule,
-    CostCenterModule,
-    InventoryModule,
-    FinanceModule,
-    ProductionModule,
-    PoultryModule,
-    CostingModule,
-    QcModule,
-    QualityTraceabilityModule,
-    SchedulerKpiModule,
-    ReportingBiModule,
-    // ── Phase 11A — Fast API Gap Closures
     UomConversionModule,
     ItemAttributeModule,
     NobLobConfigModule,
-    TenantSubscriptionModule,
+    ParameterMasterModule,
+
+    // 3. Finance & Accounting
+    GlAccountModule,
+    GlMappingModule,
+    CostCenterModule,
+    FinanceModule,
+
+    // 4. Inventory & Logistics
+    InventoryModule,
+
+    // 5. Production & Costing
+    ProductionModule,
+    CostingModule,
+    SlaughterSplitModule,
+
+    // 6. Quality & Traceability
+    QualityTraceabilityModule,
+    QcModule,
+
+    // 7. Verticals
+    PoultryModule,
     EggGradingModule,
-    // ── Phase 11B — Livestock & Agriculture Verticals
-    LivestockModule,
     LivestockV2Module,
     AgriV2Module,
     AquacultureV2Module,
     FeedProductionV2Module,
-    AgriModule,
-    ParameterMasterModule,
-    // ── Phase 11C — Aqua, Insect & Feed Mill
-    AquacultureModule,
+    FeedFormulaModule,
     InsectFarmingModule,
-    FeedMillModule,
-    SlaughterSplitModule,
+
+    // 8. Intelligence & Reporting
+    SchedulerKpiModule,
+    ReportingBiModule,
   ],
   controllers: [SystemController],
-  providers: [],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantMiddleware).forRoutes('*path');
+    consumer
+      .apply(TenantMiddleware)
+      .forRoutes('*');
   }
 }
