@@ -27,7 +27,7 @@ export function AdminShell({
       ? [{ href: '/admin', label: 'System admin', icon: ShieldCheck }]
       : [{ href: '/organization', label: 'Organization', icon: Building2 }]),
     {
-      href: '/company-selection',
+      href: '/context-selection',
       label: 'Company workspaces',
       icon: Settings2,
     },
@@ -37,7 +37,7 @@ export function AdminShell({
       <header className="border-b border-white/10 bg-[#0b1248] text-white">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div>
-            <Link href="/company-selection" className="text-xl font-bold">
+            <Link href="/context-selection" className="text-xl font-bold">
               NAV<span className="text-[#c24332]">Farm</span>
             </Link>
             <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/45">

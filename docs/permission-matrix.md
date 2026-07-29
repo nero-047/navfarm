@@ -44,9 +44,28 @@ from the active company membership, while operational permissions are read
 only from the active workspace membership. `workspaceType`, enabled modules and
 that permission set jointly filter workspace navigation.
 
+The mock does not derive permissions from role names at runtime. Each demo
+membership carries an explicit permission list. Role tables below document the
+intended catalogue; the session and API authorize the actual explicit list.
+
 Canonical permission identifiers are defined in
 `apps/web/src/contracts/api.ts`; role defaults and permission evaluation are in
 `apps/web/src/lib/authorization.ts`.
+
+Operational mutation checks are resource-specific:
+
+| Mutation | Required active-workspace capability |
+| --- | --- |
+| Create/update batch | `batches.create` |
+| Approve batch | `batches.approve` |
+| Close batch | `batches.close` |
+| Record daily operation | `operations.create` |
+| Change QC state | `quality.manage` |
+| Generate/update QR traceability | `traceability.manage` |
+| Create/update resource or usage | `resources.manage` |
+
+A missing permission returns `403 CAPABILITY_REQUIRED`; a mismatched
+tenant/company/workspace or missing membership returns its specific scope code.
 
 ## Phase 2 administration boundaries
 

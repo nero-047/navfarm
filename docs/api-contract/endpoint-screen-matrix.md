@@ -4,12 +4,13 @@ This matrix maps implemented web screens and actions to required API endpoints. 
 
 | Frontend route | Screen/action | Endpoint | Method | Permission | Request schema | Response schema | Loading/error/empty behavior | Mock implementation |
 |---|---|---:|---|---|---|---|---|---|
-| `/login` | Sign in | `/api/v1/auth/login` | POST | none | `{ email, password }` | `authSessionSchema` | Shows auth error; MFA redirects to verify | `mock-repository.ts` |
+| `/login` | Sign in | `/api/v1/auth/login` | POST | none | `authLoginRequestSchema` | `authSessionSchema \| mfaChallengeSchema` | Shows auth error; MFA challenge redirects to verify without creating an app session | `mock-repository.ts` |
 | `/mfa/verify` | Verify MFA | `/api/v1/auth/mfa/verify` | POST | MFA challenge | `{ challengeId, code }` | `authSessionSchema` | Invalid code alert | `mock-repository.ts` |
 | `/mfa/recovery` | Recovery code | `/api/v1/auth/mfa/recovery` | POST | MFA challenge | `{ challengeId, recoveryCode }` | `authSessionSchema` | Invalid code alert | `mock-repository.ts` |
 | all protected routes | Refresh session | `/api/v1/auth/session` | GET | authenticated | none | `authSessionSchema` | Loading shell; 401 returns to login | `mock-repository.ts` |
 | shell/profile menu | Logout | `/api/v1/auth/logout` | POST | authenticated | none | `successSchema` | Redirects to login | `mock-repository.ts` |
-| `/context-selection` | Select tenant/company/workspace | `/api/v1/auth/context` | PUT | explicit membership | `{ tenantId, companyId, workspaceId }` | `authSessionSchema` | Changing company clears workspace; forbidden on mismatched membership | `mock-repository.ts` |
+| `/context-selection` | Select Company administration or assigned Workspace (no tenant selector) | `/api/v1/auth/context` | PUT | explicit membership | `authContextRequestSchema`: full `{ tenantId, companyId, workspaceId }` tuple | `authSessionSchema` | Client commits only after success; specific ownership/membership/status error codes | `mock-repository.ts` |
+| `/company-selection` | Retired selection flow | n/a | redirect | authenticated | n/a | n/a | Server redirect to `/context-selection` only | n/a |
 | `/profile` | Update profile | `/api/v1/users/me` | PATCH | authenticated | `{ fullName, language, timezone }` | `authSessionSchema` | Shows form error | `mock-repository.ts` |
 | `/admin/dashboard` | Platform dashboard | `/api/v1/platform/dashboard` | GET | `platform.manage` | none | `platformDashboardSchema` | Loading/error/metric cards | `phase2-repository.ts` |
 | `/admin/tenants` | Tenant registry | `/api/v1/platform/tenants` | GET | `tenant.view` plus platform | query page/filter | `platformTenantListSchema` | Empty table when no tenants | `phase2-repository.ts` |
@@ -54,4 +55,10 @@ This matrix maps implemented web screens and actions to required API endpoints. 
 | canonical workspace operations/QC/QR | Daily operations, QC disposition, QR packs | same scoped root plus `/operations`, `/quality-lots`, `/qr-packs` | GET/POST/PUT | workspace operation/QC/traceability capabilities | operational schemas | operational schemas | Mutation controls follow workspace role | `operational-repository.ts` |
 | canonical workspace resources/costing/reports | Resources/usages, costing, journals, variances, summary | same scoped root plus `/resources`, `/resource-usages`, `/costing`, `/journals`, `/variances`, `/reports/summary` | GET/POST/PUT | workspace resource/report capabilities | operational schemas | operational schemas | Empty collections and typed errors | `operational-repository.ts` |
 
-Legacy frontend dependencies still present in older console components: `/company/tenant/{tenantId}`, `/language`, `/currency`, `/setup/wizard/*`, `/notification/*`, `/role/*`, `/user-company/*`, `/auth/change-password`, `/auth/register-admin`. These should either be mapped to the v1 endpoints above or explicitly retired before backend integration.
+Milestone 1 migrated `/admin/audit` and `/console/notifications` off the legacy
+authentication helpers and removed the legacy company-selection client/cache
+from live use. Other pre-existing legacy endpoints outside the changed
+session/context surface remain: `/language`, `/currency`, `/setup/wizard/*`,
+`/role/*`, `/user-company/*`, `/auth/change-password`, and
+`/auth/register-admin`. They require later typed-contract migration or explicit
+retirement before backend integration.

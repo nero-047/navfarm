@@ -1,5 +1,9 @@
 /** @jest-environment node */
-import { handleOperationalRequest, resetOperationalRepository } from './operational-repository';
+import {
+  handleOperationalRequest,
+  resetOperationalRepository,
+  type OperationalActor,
+} from './operational-repository';
 import type { WorkflowBatch } from '../../modules/farm-demo/operational-contracts';
 
 const scope = {
@@ -12,7 +16,11 @@ const actor = {
   activeCompanyId: scope.companyId,
   activeWorkspaceId: scope.workspaceId,
   accessibleWorkspaceIds: [scope.workspaceId],
-};
+  workspacePermissions: [
+    'batches.create', 'batches.approve', 'batches.close', 'operations.create',
+    'quality.manage', 'traceability.manage', 'resources.manage',
+  ],
+} satisfies OperationalActor;
 const root = `/tenants/${scope.tenantId}/companies/${scope.companyId}/workspaces/${scope.workspaceId}`;
 
 const draft: WorkflowBatch = {

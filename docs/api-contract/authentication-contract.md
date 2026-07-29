@@ -14,19 +14,13 @@ Request:
 
 Response when MFA is not required: `authSessionSchema`, plus HTTP-only session cookie.
 
-Response when MFA is required:
+Response when MFA is required: `mfaChallengeSchema`.
 
 ```json
 {
-  "user": { "...": "minimal user identity" },
-  "tenants": [],
-  "companies": [],
-  "workspaces": [],
-  "activeTenantId": null,
-  "activeCompanyId": null,
-  "activeWorkspaceId": null,
+  "state": "MFA_PENDING",
+  "user": { "...": "minimal user identity with no memberships" },
   "expiresAt": "2026-07-27T10:05:00.000Z",
-  "mfaRequired": true,
   "challengeId": "challenge-id"
 }
 ```
@@ -37,6 +31,7 @@ No application session cookie should be established until MFA verification or re
 
 `AuthSession` contains:
 
+- `state`: `AUTHENTICATED` or `SUSPENDED`
 - `user`
 - `tenants`
 - `companies`
@@ -45,13 +40,14 @@ No application session cookie should be established until MFA verification or re
 - `activeCompanyId`
 - `activeWorkspaceId`
 - `expiresAt`
-- optional `mfaRequired`
-- optional `challengeId`
 
 Company memberships include `companyId`, `tenantId`, `companyName`, `companySlug`, `status`, `onboardingStatus`, `role`, `permissions`, and `enabledModules`.
 Workspace memberships independently include `workspaceId`, `tenantId`,
 `companyId`, code/slug/name/type/status, role, permissions and enabled modules.
 Company membership does not imply workspace membership.
+
+`MFA_PENDING` is deliberately not an `AuthSession`. It contains no tenant,
+company, workspace, or protected-data membership payload.
 
 ## MFA Verification
 
@@ -88,11 +84,11 @@ Backend responsibilities:
 
 ## Suspended Account
 
-If the active tenant is suspended:
+If the account or its active tenant is suspended:
 
 - Login may return a session so the UI can show the suspended access page.
 - Protected tenant/company API calls must return 403.
-- Frontend routes redirect to `/access-denied?reason=suspended-tenant`.
+- Frontend routes redirect to `/access-denied?reason=account_suspended`.
 - Logout must clear the session.
 
 ## Incomplete Onboarding
@@ -135,17 +131,24 @@ Request:
 
 Rules:
 
-- `tenantId` may be null only when the UI intentionally returns to context selection.
+- The session determines which tenant IDs are available. The visible selector
+  never renders a tenant/organisation choice.
+- `tenantId` may be null only for platform scope or an unresolved explicit
+  company choice.
 - `companyId` may be null for tenant console context.
 - `workspaceId` may be null for company configuration or workspace selection.
-- Backend must verify tenant, company and explicit workspace membership and
-  verify that the workspace belongs to the selected tenant/company pair.
+- The complete tuple is sent atomically. Backend must verify the user's tenant
+  membership, tenant status, company ownership and explicit membership, company
+  status, workspace ownership and explicit membership, and workspace status.
 - Changing tenant clears company and workspace. Changing company clears stale
   workspace state. Logout clears all three context levels.
-- Invalid membership returns 403.
+- Invalid membership, ownership, inactive state, suspension, and stale tuple
+  return specific stable error codes.
 - Multi-company/workspace selection persists in the session.
 - MFA verification and recovery return the same complete membership/context
   structure as ordinary login.
+- The browser must not update its active context until the successful response
+  validates as `authSessionSchema`.
 
 ## Required Security Behavior
 
@@ -158,3 +161,16 @@ Rules:
 - No demo credentials or mock account cards in production mode.
 - Request IDs on every response.
 - Audit events for login, logout, MFA, recovery, context changes and failed permission checks.
+
+## Delivery status
+
+- Implemented mock demo: typed login/challenge/session/context/logout flows,
+  opaque HTTP-only cookie, restore/hydration states, deterministic fixtures,
+  and specific context failure codes.
+- Frontend contract ready: Zod request/response schemas and same-origin
+  `/api/v1` client boundary.
+- Backend missing: durable identity/session store, credential security,
+  CSRF/rate limiting/audit, membership persistence, and production
+  authorization.
+- Retired: browser token/local-storage auth, module-global session snapshot,
+  and `/company-selection` business logic.

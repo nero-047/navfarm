@@ -4,23 +4,37 @@ Implementation sequence for the NestJS backend.
 
 ## 1. Authentication and Context
 
-Build:
+Frontend mock/contract status:
 
-- Cookie-session auth.
-- Login/logout/session refresh.
-- MFA challenge, verify and recovery.
-- Context selection.
-- Tenant/company/workspace memberships and active context.
-- Suspended tenant behavior.
+- Implemented in the frontend mock: cookie login/logout/session refresh; an
+  unauthenticated MFA challenge followed by a complete session; suspended
+  state; explicit membership fixtures; atomic context tuple validation; and
+  specific context/capability error codes.
+- Contract ready: `authLoginRequestSchema`, `mfaChallengeSchema`,
+  `authSessionSchema`, `authContextRequestSchema`, and same-origin
+  `/api/v1/auth/*` calls.
+- Retired in the frontend: module-global/browser-token session helpers,
+  browser-storage auth/context, and the second `/company-selection` flow.
+
+Backend must build:
+
+- Durable secure cookie-session auth, login/logout/session refresh.
+- MFA challenge, verify and one-time recovery.
+- Tenant/company/workspace membership persistence and active context.
+- Suspended account/tenant/resource enforcement.
+- CSRF, rate limiting, credential/recovery-code security and audit events.
 
 Acceptance criteria:
 
 - `authSessionSchema` responses validate in the frontend client.
 - MFA challenge does not create an authenticated app session.
-- Invalid context selection returns 403.
+- Invalid context selection returns the documented stable ownership,
+  membership, inactive/suspended, or stale-tuple code.
 - Multi-company/workspace session persists selected context and clears stale
   workspace state when company changes.
 - No tokens are stored in browser localStorage.
+- Tenant/company administration alone never passes an operational mutation
+  guard; the active workspace membership must carry the exact capability.
 
 ## 2. Tenant and Company Administration
 

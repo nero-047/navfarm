@@ -29,7 +29,9 @@ export function ApplicationShell({
   companySlug?: string;
   children: ReactNode;
 }) {
-  const { session, user, loading, logout, selectContext } = useAuth();
+  const {
+    session, user, status, loading, mfaChallengeId, logout, selectContext,
+  } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -38,6 +40,7 @@ export function ApplicationShell({
   const [contextOpen, setContextOpen] = useState(false);
   const [contextQuery, setContextQuery] = useState('');
   const [transitioning, setTransitioning] = useState(false);
+  const [contextChanging, setContextChanging] = useState(false);
   const contextButtonRef = useRef<HTMLButtonElement>(null);
   const workspaceMatch = companySlug
     ? pathname.match(new RegExp(`^/${companySlug}/workspaces/([^/]+)/(dashboard|batches|operations|quality|traceability|resources|costing|reports|masters|settings)(?:/|$)`))
@@ -48,23 +51,37 @@ export function ApplicationShell({
     (item) => item.workspaceSlug === routeWorkspaceSlug && item.companyId === requestedCompany?.companyId,
   );
   const effectiveScope: AppScope = scope === 'company' && routeWorkspaceSlug ? 'workspace' : scope;
-  const accessReason = session ? scopeAccessReason(session, effectiveScope, companySlug) : null;
+  const accessReason = session
+    ? scopeAccessReason(session, effectiveScope, companySlug, routeWorkspaceSlug)
+    : null;
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('navfarm_sidebar_collapsed') === 'true');
   }, []);
   useEffect(() => {
     setTransitioning(true);
+    setContextChanging(false);
     setMobileOpen(false);
     const timer = window.setTimeout(() => setTransitioning(false), 240);
     return () => window.clearTimeout(timer);
   }, [pathname]);
   useEffect(() => {
-    if (!loading && !session) router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
-  }, [loading, pathname, router, session]);
+    if (status === 'mfa_pending') {
+      router.replace(`/mfa/verify?challengeId=${encodeURIComponent(mfaChallengeId || '')}`);
+    } else if (status === 'unauthenticated') {
+      router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
+    }
+  }, [mfaChallengeId, pathname, router, status]);
   useEffect(() => {
-    if (!loading && session && accessReason) router.replace(`/access-denied?reason=${accessReason}`);
-  }, [accessReason, loading, router, session]);
+    if (!loading && session && accessReason && !contextChanging) {
+      const companyQuery =
+        companySlug &&
+        ['workspace_inactive', 'workspace_not_assigned', 'onboarding_incomplete'].includes(accessReason)
+          ? `&company=${encodeURIComponent(companySlug)}`
+          : '';
+      router.replace(`/access-denied?reason=${accessReason}${companyQuery}`);
+    }
+  }, [accessReason, companySlug, contextChanging, loading, router, session]);
   useEffect(() => {
     if (!contextOpen) return;
     const close = (event: KeyboardEvent) => {
@@ -82,7 +99,6 @@ export function ApplicationShell({
     [companySlug, effectiveScope, routeWorkspace, session],
   );
   const activeCompany = session?.companies.find((item) => item.companyId === session.activeCompanyId);
-  const activeTenant = session?.tenants.find((item) => item.tenantId === session.activeTenantId);
   const crumbs = pathname.split('/').filter(Boolean).map((value) =>
     value.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
   );
@@ -98,11 +114,15 @@ export function ApplicationShell({
   ) ?? [];
 
   async function chooseCompany(tenantId: string, companyId: string, slug: string) {
-    sessionStorage.setItem('navfarm_context_transition', 'company');
-    await selectContext(tenantId, companyId, null);
-    setContextOpen(false);
-    router.push(`/${slug}/overview`);
-    window.setTimeout(() => sessionStorage.removeItem('navfarm_context_transition'), 500);
+    setContextChanging(true);
+    try {
+      await selectContext(tenantId, companyId, null);
+      setContextOpen(false);
+      router.push(`/${slug}/overview`);
+    } catch (cause) {
+      setContextChanging(false);
+      throw cause;
+    }
   }
 
   async function chooseWorkspace(
@@ -112,22 +132,30 @@ export function ApplicationShell({
     workspace: NonNullable<typeof session>['workspaces'][number],
   ) {
     if (!session) return;
-    await selectContext(tenantId, companyId, workspace.workspaceId);
-    setContextOpen(false);
-    const desired = navigationForScope('workspace', slug, workspace).find((item) => item.href.endsWith(`/${currentSection}`));
-    const supported = desired && filterNavigation([desired], {
-      ...session,
-      activeTenantId: tenantId,
-      activeCompanyId: companyId,
-      activeWorkspaceId: workspace.workspaceId,
-    }).length;
-    router.push(`/${slug}/workspaces/${workspace.workspaceSlug}/${supported ? currentSection : 'dashboard'}`);
+    setContextChanging(true);
+    try {
+      await selectContext(tenantId, companyId, workspace.workspaceId);
+      setContextOpen(false);
+      const desired = navigationForScope('workspace', slug, workspace).find((item) => item.href.endsWith(`/${currentSection}`));
+      const supported = desired && filterNavigation([desired], {
+        ...session,
+        activeTenantId: tenantId,
+        activeCompanyId: companyId,
+        activeWorkspaceId: workspace.workspaceId,
+      }).length;
+      router.push(`/${slug}/workspaces/${workspace.workspaceSlug}/${supported ? currentSection : 'dashboard'}`);
+    } catch (cause) {
+      setContextChanging(false);
+      throw cause;
+    }
   }
 
-  if (loading || (!session && !user)) {
+  if (loading || status === 'mfa_pending' || (!session && !user)) {
     return <div className="flex min-h-screen items-center justify-center bg-[#f3f5f8] text-sm text-[#707789]">Loading your secure workspace…</div>;
   }
-  if (!session || accessReason) return <div className="min-h-screen bg-[#f3f5f8]" />;
+  if (!session || (accessReason && !contextChanging)) {
+    return <div className="min-h-screen bg-[#f3f5f8]" />;
+  }
 
   const sidebarWidth = collapsed ? '84px' : '252px';
   const sidebar = (
@@ -141,7 +169,7 @@ export function ApplicationShell({
           <button ref={contextButtonRef} aria-label="Switch context" aria-expanded={contextOpen} onClick={() => setContextOpen(!contextOpen)} className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] p-3 text-left">
             <span className="min-w-0 flex-1">
               <span className="block text-[9px] uppercase tracking-[0.16em] text-white/40">{SCOPE_LABEL[effectiveScope]}</span>
-              <span className="mt-1 block truncate text-xs font-semibold">{effectiveScope === 'platform' ? 'NAVFarm Platform' : routeWorkspace?.workspaceName || activeCompany?.companyName || activeTenant?.tenantName || 'Select context'}</span>
+              <span className="mt-1 block truncate text-xs font-semibold">{effectiveScope === 'platform' ? 'NAVFarm Platform' : routeWorkspace?.workspaceName || activeCompany?.companyName || 'Select company or workspace'}</span>
             </span>
             <ChevronDown size={14} />
           </button>
@@ -163,28 +191,25 @@ export function ApplicationShell({
               </div>
               <label className="relative block">
                 <Search size={14} className="absolute left-3 top-3.5 text-white/40" />
-                <input autoFocus aria-label="Search organisations, companies and workspaces" value={contextQuery} onChange={(event) => setContextQuery(event.target.value)} className="min-h-11 w-full rounded-lg border border-white/10 bg-white/[0.06] pl-9 pr-3 text-xs text-white placeholder:text-white/35" placeholder="Search contexts" />
+                <input autoFocus aria-label="Search companies and workspaces" value={contextQuery} onChange={(event) => setContextQuery(event.target.value)} className="min-h-11 w-full rounded-lg border border-white/10 bg-white/[0.06] pl-9 pr-3 text-xs text-white placeholder:text-white/35" placeholder="Search companies and workspaces" />
               </label>
-              {session.tenants.filter((tenant) => tenant.status === 'ACTIVE').map((tenant) => (
-                <div key={tenant.tenantId} className="mt-3">
-                  <p className="px-2 text-[9px] font-bold uppercase tracking-[0.16em] text-white/40">{tenant.tenantName}</p>
-                  {visibleCompanies.filter((company) => company.tenantId === tenant.tenantId).map((company) => (
-                    <div key={company.companyId} className="mt-2 rounded-lg border border-white/10 p-1">
+              <div className="mt-3 space-y-2">
+                {visibleCompanies.map((company) => (
+                    <div key={company.companyId} className="rounded-lg border border-white/10 p-1">
                       <p className="flex min-h-9 items-center gap-2 px-2 text-xs font-semibold"><Building2 size={14} />{company.companyName}</p>
-                      <button onClick={() => void chooseCompany(tenant.tenantId, company.companyId, company.companySlug)} className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-left text-xs hover:bg-white/10">
+                      <button onClick={() => void chooseCompany(company.tenantId, company.companyId, company.companySlug)} className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-left text-xs hover:bg-white/10">
                         <Settings2 size={14} />Company administration
                         {session.activeCompanyId === company.companyId && !session.activeWorkspaceId ? <Check size={14} className="ml-auto" /> : null}
                       </button>
                       {session.workspaces.filter((workspace) => workspace.companyId === company.companyId && workspace.status === 'ACTIVE' && (!normalizedQuery || workspace.workspaceName.toLowerCase().includes(normalizedQuery) || company.companyName.toLowerCase().includes(normalizedQuery))).map((workspace) => (
-                        <button key={workspace.workspaceId} onClick={() => void chooseWorkspace(tenant.tenantId, company.companyId, company.companySlug, workspace)} className="flex min-h-11 w-full items-center gap-2 rounded-md pl-7 pr-3 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white">
+                        <button key={workspace.workspaceId} onClick={() => void chooseWorkspace(company.tenantId, company.companyId, company.companySlug, workspace)} className="flex min-h-11 w-full items-center gap-2 rounded-md pl-7 pr-3 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white">
                           <ChevronRight size={13} />{workspace.workspaceName}
                           {session.activeWorkspaceId === workspace.workspaceId ? <Check size={14} className="ml-auto" /> : null}
                         </button>
                       ))}
                     </div>
-                  ))}
-                </div>
-              ))}
+                ))}
+              </div>
               {capabilities(session).canManageCompanies ? <div className="mt-3 border-t border-white/10 pt-2">
                 <Link href="/console/companies" onClick={() => setContextOpen(false)} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs hover:bg-white/10"><Settings2 size={14} />Manage companies</Link>
                 {activeCompany ? <Link href={`/${activeCompany.companySlug}/workspaces/new`} onClick={() => setContextOpen(false)} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs hover:bg-white/10"><Plus size={14} />Create workspace</Link> : null}

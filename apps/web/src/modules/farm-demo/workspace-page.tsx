@@ -1183,7 +1183,7 @@ function Traceability({ company }: { company: Company }) {
   const config = INDUSTRY_CONFIG[company.nobCode];
   const { state } = useDemoStore();
   const { session } = useAuth();
-  const canGenerate = can(session, 'quality.manage');
+  const canGenerate = can(session, 'traceability.manage');
   const [generating, setGenerating] = useState(false);
   const workflowBatch =
     state.batches.find((item) => item.qcStatus === 'PASS') ?? state.batches[0];

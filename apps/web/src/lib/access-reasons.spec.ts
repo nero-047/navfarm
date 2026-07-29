@@ -3,13 +3,17 @@ import { accessReasonCodes, accessReasonContent, scopeAccessReason } from './acc
 
 function baseSession(): AuthSession {
   return {
+    state: 'AUTHENTICATED',
     user: {
       userId: 'user-1', fullName: 'User', email: 'user@example.com',
       platformRole: null, language: 'en', timezone: 'UTC', emailVerified: true,
       mfaEnabled: false, userType: 'STANDARD_USER', companyId: 'company-1',
       tenantId: 'tenant-1', companies: [], permissions: [],
     },
-    tenants: [{ tenantId: 'tenant-1', tenantName: 'Tenant', status: 'ACTIVE', role: 'TENANT_MEMBER' }],
+    tenants: [{
+      tenantId: 'tenant-1', tenantName: 'Tenant', status: 'ACTIVE',
+      role: 'TENANT_MEMBER', permissions: [],
+    }],
     companies: [{
       companyId: 'company-1', tenantId: 'tenant-1', companyName: 'Company',
       companySlug: 'company', status: 'ACTIVE', onboardingStatus: 'COMPLETED',

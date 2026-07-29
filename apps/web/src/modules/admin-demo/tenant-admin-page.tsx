@@ -8,7 +8,6 @@ import { AdminShell } from './admin-shell';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api-client';
 import { fetchTenantCompanies } from '@/modules/company';
-import { saveApiCompanies } from '@/modules/company/use-current-company';
 import type { CompanyMeta } from '@/modules/company';
 
 interface TenantDetails {
@@ -51,7 +50,6 @@ export function TenantAdminPage() {
       .then(([tenantDetails, companyRows, userRows]) => {
         setTenant(tenantDetails);
         setCompanies(companyRows);
-        saveApiCompanies(companyRows);
         setMembers(userRows);
       })
       .catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not load organization'));

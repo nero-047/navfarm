@@ -87,14 +87,16 @@ test('viewer can inspect but cannot initiate operational mutations', async ({ pa
 test('multi-company context selection switches and persists without cross-company leakage', async ({ page }) => {
   await signIn(page, 'multi@navfarm.demo');
   await expect(page).toHaveURL(/\/context-selection$/);
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
-  await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces$/);
-  await page.getByRole('button', { name: /Poultry Operations/ }).click();
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  }).click();
   await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
   await page.reload();
   await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
   await page.goto('/context-selection');
-  await page.getByRole('button', { name: /Harvest Ridge Farms/ }).click();
+  await page.getByRole('button', {
+    name: 'Harvest Ridge Farms workspace Crop Production',
+  }).click();
   await expect(page).toHaveURL(/\/harvest-ridge-farms\/workspaces\/crop-production\/dashboard$/);
   await expect(page.getByText('Green Valley Poultry').first()).toHaveCount(0);
 });
@@ -111,6 +113,10 @@ test('MFA blocks protected pages until verification and supports recovery', asyn
   await page.getByRole('link', { name: 'Use a recovery code' }).click();
   await page.getByLabel('Recovery code').fill('NAVFARM-RECOVERY');
   await page.getByRole('button', { name: 'Recover account' }).click();
+  await expect(page).toHaveURL(/\/context-selection$/);
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry workspace Poultry Operations',
+  }).click();
   await expect(page).toHaveURL(/\/green-valley-poultry\/workspaces\/poultry-operations\/dashboard$/);
 });
 
@@ -125,7 +131,7 @@ test('suspended and incomplete-onboarding accounts remain in their protected flo
   await expect(page).toHaveURL(/\/bluewater-aqua\/setup\/profile$/);
   await page.goto('/bluewater-aqua/operations');
   await expect(page).toHaveURL(/\/bluewater-aqua\/operations$/);
-  await expect(page.getByRole('heading', { name: 'No workspace assigned' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Company setup incomplete' })).toBeVisible();
 });
 
 test('presentation routes are responsive and retain reachable actions', async ({ page }) => {

@@ -127,7 +127,9 @@ test('approved tenant workspace administration evidence', async ({ page }) => {
 
 test('approved legacy route selector evidence', async ({ page }) => {
   await signIn(page, 'multi@navfarm.demo');
-  await page.getByRole('button', { name: /Green Valley Poultry/ }).click();
+  await page.getByRole('button', {
+    name: 'Green Valley Poultry company administration',
+  }).click();
   await page.goto('/green-valley-poultry/batches');
   await expect(
     page.getByRole('main').getByRole('heading', { name: 'Choose a business area' }),

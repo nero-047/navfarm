@@ -4,7 +4,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '../../lib/api-client';
-import type { AuthSession } from '../../contracts/api';
 import { destinationForSession } from '../../lib/authorization';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -23,7 +22,7 @@ export function AuthWorkflowForm({ kind }: { kind: Kind }) {
   const copy = COPY[kind];
   const params = useSearchParams();
   const router = useRouter();
-  const { refreshSession } = useAuth();
+  const { completeMfa, refreshSession } = useAuth();
   const [value, setValue] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -42,12 +41,10 @@ export function AuthWorkflowForm({ kind }: { kind: Kind }) {
     setError('');
     try {
       if (kind === 'mfa-verify' || kind === 'mfa-recovery') {
-        await api.post<AuthSession>(`/auth/${kind === 'mfa-verify' ? 'mfa/verify' : 'mfa/recovery'}`, {
-          challengeId: params.get('challengeId'),
+        const session = await completeMfa(params.get('challengeId') || '', {
           ...(kind === 'mfa-verify' ? { code: value } : { recoveryCode: value }),
         });
-        const session = await refreshSession();
-        router.push(session ? destinationForSession(session) : '/login');
+        router.push(destinationForSession(session));
         return;
       }
       const endpoint = {

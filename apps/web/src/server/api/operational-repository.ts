@@ -8,6 +8,7 @@ import {
 import {
   assertMockClose, assertMockQr, assertMockTransition, mockJournal, mockVariance,
 } from '../../modules/farm-demo/mock-domain';
+import type { Permission } from '../../contracts/api';
 import { apiErrorResponse } from './errors';
 
 type OperationalState = {
@@ -31,6 +32,7 @@ export type OperationalActor = {
   activeCompanyId: string | null;
   activeWorkspaceId: string | null;
   accessibleWorkspaceIds: string[];
+  workspacePermissions: Permission[];
 };
 
 const workspaces = new Map<string, OperationalState>();
@@ -60,6 +62,22 @@ function hasScope(actor: OperationalActor, scope: OperationalScope) {
     && actor.accessibleWorkspaceIds.includes(scope.workspaceId);
 }
 
+function requireCapability(
+  actor: OperationalActor,
+  permission: Permission,
+  requestId: string,
+) {
+  return actor.workspacePermissions.includes(permission)
+    ? null
+    : apiErrorResponse(
+      403,
+      `Workspace capability ${permission} is required for this operation.`,
+      requestId,
+      { requiredCapability: permission },
+      'CAPABILITY_REQUIRED',
+    );
+}
+
 export async function handleOperationalRequest(
   request: Request,
   path: string,
@@ -87,6 +105,19 @@ export async function handleOperationalRequest(
   if (!operationalResources.has(resource)) return null;
   if (!hasScope(actor, scope)) {
     return apiErrorResponse(403, 'Active tenant, company, and workspace scope is required.', requestId);
+  }
+  if (!['GET', 'HEAD'].includes(method) && resource !== 'operational-bootstrap') {
+    const required: Permission | null = resource === 'batches'
+      ? entityId && action === 'transitions' ? null : 'batches.create'
+      : resource === 'operations' ? 'operations.create'
+      : resource === 'quality-lots' ? 'quality.manage'
+      : resource === 'qr-packs' ? 'traceability.manage'
+      : resource === 'resources' || resource === 'resource-usages' ? 'resources.manage'
+      : null;
+    if (required) {
+      const denied = requireCapability(actor, required, requestId);
+      if (denied) return denied;
+    }
   }
   const key = scopeKey(scope);
 
@@ -149,6 +180,16 @@ export async function handleOperationalRequest(
       return apiErrorResponse(409, 'Batch status changed; refresh and retry.', requestId, { currentStatus: batch.status });
     }
     const action = parsed.data.action;
+    const denied = requireCapability(
+      actor,
+      action === 'APPROVE'
+        ? 'batches.approve'
+        : action === 'CLOSE'
+          ? 'batches.close'
+          : 'operations.create',
+      requestId,
+    );
+    if (denied) return denied;
     if (action === 'CLOSE') {
       const error = assertMockClose(batch);
       if (error) return apiErrorResponse(422, error, requestId);

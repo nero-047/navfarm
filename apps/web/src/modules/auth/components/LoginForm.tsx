@@ -12,12 +12,16 @@ import { useSearchParams } from 'next/navigation';
 const DEMO_ACCOUNTS = [
   ['Platform Admin', 'Platform-wide tenant administration', 'system@navfarm.demo'],
   ['Tenant Admin', 'Tenant console and company setup', 'tenant@navfarm.demo'],
+  ['Company Admin', 'Company administration without operational access', 'companyadmin@navfarm.demo'],
+  ['Accountant', 'Company accounting without operational access', 'accountant@navfarm.demo'],
+  ['Auditor', 'Company audit and read-only finance access', 'auditor@navfarm.demo'],
   ['Operations Manager', 'Green Valley production workspace', 'manager@navfarm.demo'],
   ['Read-only Viewer', 'View-only company workspace', 'viewer@navfarm.demo'],
   ['Multi-company User', 'Context selection across companies', 'multi@navfarm.demo'],
   ['MFA Administrator', 'Verification code 123456 or recovery NAVFARM-RECOVERY', 'mfa@navfarm.demo'],
   ['Suspended User', 'Protected suspended-tenant outcome', 'suspended@navfarm.demo'],
   ['Onboarding Admin', 'Incomplete Bluewater setup workflow', 'onboarding@navfarm.demo'],
+  ['No-workspace User', 'Company access with no operational assignment', 'noworkspace@navfarm.demo'],
 ] as const;
 
 export function LoginForm({ showDemoAccounts = false }: { showDemoAccounts?: boolean }) {
@@ -38,14 +42,18 @@ export function LoginForm({ showDemoAccounts = false }: { showDemoAccounts?: boo
     }
     setSubmitting(true);
     try {
-      const signedInUser = await login(email, password);
-      if (signedInUser.mfaRequired && signedInUser.challengeId) {
-        router.push(`/mfa/verify?challengeId=${encodeURIComponent(signedInUser.challengeId)}`);
+      const result = await login(email, password);
+      if (result.status === 'mfa_pending') {
+        router.push(`/mfa/verify?challengeId=${encodeURIComponent(result.challengeId)}`);
         return;
       }
       const returnTo = searchParams.get('returnTo');
-      const session = await refreshSession();
-      router.push(returnTo?.startsWith('/') ? returnTo : session ? destinationForSession(session) : '/login');
+      const session = result.session ?? await refreshSession();
+      router.push(
+        result.status !== 'suspended' && returnTo?.startsWith('/')
+          ? returnTo
+          : session ? destinationForSession(session) : '/login',
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to sign in');
     } finally {

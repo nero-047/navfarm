@@ -14,7 +14,8 @@
 
 | Route | Purpose |
 | --- | --- |
-| `/context-selection` | Explicit tenant, company, and workspace membership selection |
+| `/context-selection` | Canonical Company administration and Workspace selection; tenant is session-established and is not selectable |
+| `/company-selection` | Retired compatibility redirect to `/context-selection` |
 | `/onboarding` | Compatibility redirect to the active company's `/{company}/setup` flow |
 | `/profile` | Profile, password, language, timezone, notifications, session |
 | `/access-denied` | Suspended, inactive, membership, or permission failure |
@@ -49,7 +50,8 @@ Company setup step routes are `profile`, `address`, `contacts`,
 
 Compatibility redirects: `/operator` -> `/admin/masters`; `/organization` and
 `/tenant-admin` -> `/console/dashboard`; `/admin` and `/console` redirect to
-their dashboards.
+their dashboards. `/company-selection` redirects server-side to
+`/context-selection` and contains no selection/cache business logic.
 
 `/{company}/dashboard` redirects to the canonical company administration
 overview at `/{company}/overview`. Other legacy company operational routes
@@ -62,7 +64,8 @@ a workspace from stale browser state.
 The shell has distinct platform, tenant, company-administration and workspace
 navigation models. Company mode never renders operational navigation. Workspace
 mode is derived only from a canonical workspace URL plus the matching active
-workspace membership.
+workspace membership. Session restoration completes before these guards run;
+company administration does not require an active workspace.
 
 The static `masters/nobs` and `masters/lobs` routes open the company
 business-structure workspace. Unknown master resources return 404.

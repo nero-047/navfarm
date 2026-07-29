@@ -1,27 +1,33 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { RefreshCw, AlertCircle, Search } from "lucide-react";
-import { api } from "../../../services/api-client";
-import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
+import { api } from "../../../lib/api-client";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useLanguage } from "../../../hooks/useLanguage";
 
+type AuditLog = {
+  audit_id?: string;
+  action?: string;
+  entity_name?: string;
+  entity_id?: string;
+  user_name?: string;
+  created_at?: string;
+};
+
 export default function AdminAuditPage() {
-  const router = useRouter();
+  const { session, status } = useAuth();
   const { t } = useLanguage();
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [filtered, setFiltered] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    const token = getStoredToken();
-    const user = getStoredUser();
-    if (!token || !user || user.userType !== "SYSTEM_ADMIN") { router.replace("/"); return; }
-    loadLogs();
-  }, [router]);
+    if (status !== 'authenticated' || session?.user.platformRole !== 'SYSTEM_ADMIN') return;
+    void loadLogs();
+  }, [session?.user.platformRole, status]);
 
   useEffect(() => {
     if (!search.trim()) { setFiltered(auditLogs); return; }
@@ -36,9 +42,9 @@ export default function AdminAuditPage() {
   const loadLogs = async () => {
     setLoading(true); setError("");
     try {
-      const list = await api.get("/audit-log");
+      const list = await api.get<AuditLog[]>("/audit-log");
       setAuditLogs(list); setFiltered(list);
-    } catch (e: any) { setError(e?.message || t("failedToLoadAuditLogs")); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t("failedToLoadAuditLogs")); }
     finally { setLoading(false); }
   };
 
@@ -107,7 +113,7 @@ export default function AdminAuditPage() {
                   <td className="px-5 py-3.5 font-mono text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                     {log.created_at ? new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—"}
                   </td>
-                  <td className="px-5 py-3.5">{actionBadge(log.action)}</td>
+                  <td className="px-5 py-3.5">{actionBadge(log.action || 'UNKNOWN')}</td>
                   <td className="px-5 py-3.5 font-medium" style={{ color: "var(--text-primary)" }}>
                     {log.entity_name} <span className="font-mono text-[10px]" style={{ color: "var(--text-muted)" }}>({log.entity_id?.substring(0, 8)}…)</span>
                   </td>

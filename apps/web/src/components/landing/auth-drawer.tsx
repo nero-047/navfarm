@@ -5,6 +5,7 @@ import type { FormEvent, InputHTMLAttributes } from 'react';
 import { AlertCircle, ArrowRight, Building2, CheckCircle2, Lock, Mail, UserRound, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { destinationForSession } from '@/lib/authorization';
 
 interface AuthDrawerProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ function Field({ icon: Icon, label, ...props }: InputHTMLAttributes<HTMLInputEle
 
 export default function AuthDrawer({ isOpen, onClose, initialTab = 'login' }: AuthDrawerProps) {
   const router = useRouter();
-  const { login, signup } = useAuth();
+  const { login, signup, refreshSession } = useAuth();
   const [tab, setTab] = useState<'login' | 'signup'>(initialTab);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -53,15 +54,21 @@ export default function AuthDrawer({ isOpen, onClose, initialTab = 'login' }: Au
     event.preventDefault();
     setBusy(true); setError(''); setSuccess('');
     try {
-      const user = tab === 'login'
-        ? await login(email, password)
-        : await signup({ tenantName, tenantCode, name, email, password });
+      const result = tab === 'login' ? await login(email, password) : null;
+      if (tab === 'signup') {
+        await signup({ tenantName, tenantCode, name, email, password });
+      }
       setSuccess(tab === 'login' ? 'Signed in. Opening your workspace…' : 'Workspace created. Opening NAVFarm…');
       setTimeout(() => {
-        onClose();
-        router.push(user.mfaRequired && typeof user.challengeId === 'string'
-          ? `/mfa/verify?challengeId=${encodeURIComponent(user.challengeId)}`
-          : user.userType === 'SYSTEM_ADMIN' ? '/admin' : '/context-selection');
+        void (async () => {
+          onClose();
+          if (result?.status === 'mfa_pending') {
+            router.push(`/mfa/verify?challengeId=${encodeURIComponent(result.challengeId)}`);
+            return;
+          }
+          const session = result?.session ?? await refreshSession();
+          router.push(session ? destinationForSession(session) : '/login');
+        })();
       }, 450);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not complete this request.');
