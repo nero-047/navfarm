@@ -83,6 +83,25 @@ Operational mutation checks are resource-specific:
 A missing permission returns `403 CAPABILITY_REQUIRED`; a mismatched
 tenant/company/workspace or missing membership returns its specific scope code.
 
+Workspace navigation uses these read requirements:
+
+| Workspace page | Module requirement | Read/navigation requirement |
+| --- | --- | --- |
+| Dashboard | none | `workspaces.view` |
+| Batches | `Batches` | `batches.view` |
+| Operations | `Batches` | `workspaces.view`; writes still require `operations.create` |
+| Quality | `QC` | `quality.view` |
+| Traceability | `QR` | `traceability.view` |
+| Resources | `Resources` | `resources.view` |
+| Costing | `Finance` | `costs.view` |
+| Reports | `Analytics` | `reports.export` |
+| Workspace Masters / Settings | none | `workspaces.view` |
+
+Company/Tenant administrators may configure a workspace only through
+`workspaces.manage`. That capability does not create an operational membership.
+Workspace Manager/Viewer roles do not receive Company Members, Roles, shared
+masters or accounting authority.
+
 ## Phase 2 administration boundaries
 
 | Action | System administrator | Tenant administrator | Company administrator |

@@ -88,6 +88,25 @@
 - Settings should reflect the documented setup domains: company profile and addresses/contacts, language and currency, timezone and fiscal rules, enabled modules/NOB/LOB configuration, users/roles, notifications, GL/item mappings, and master data. The current mock settings resource supports profile links, localization, fiscal configuration, modules, notifications, business-structure links, and setup status; do not invent additional persisted preferences.
 - Treat incomplete pages as demo placeholders to be progressively backed by realistic local fixtures from the RAK docs, with visible `Demo data` labelling where users could otherwise mistake values for live records.
 
+### Company and workspace context
+
+- The authenticated session establishes the tenant; tenant/organisation is an
+  isolation dimension and must not appear as a visible switchable option.
+- The one live application switcher groups accessible active Workspaces beneath
+  accessible active Companies. Its choices are Company administration
+  (`activeWorkspaceId: null`) or an explicitly assigned Workspace.
+- Context changes use the complete tenant/company/workspace tuple and commit
+  only after the context API succeeds. Do not persist business context in
+  browser storage.
+- For the frontend demo, a Workspace is an operational partition inside one
+  Company. It owns explicit membership/roles, configured NOB and enabled LOBs,
+  enabled operational modules, readiness, operational records, and
+  workspace-specific masters/settings. Workspace, NOB, and LOB remain distinct
+  concepts; their durable backend relationship is unresolved.
+- Workspace navigation and record links must remain under
+  `/{company}/workspaces/{workspace}/...`. Equivalent list modules may be
+  preserved during a safe switch, but record IDs must never cross workspaces.
+
 ## Mobile App Conventions
 
 - `apps/mobile` is a Flutter application. Keep mobile work in Flutter/Dart and align its terminology, flows, and fixtures with the web demo and the RAK docs.

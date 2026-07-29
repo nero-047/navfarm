@@ -60,7 +60,7 @@ export function navigationForScope(
   return [
     { label: 'Dashboard', href: `${workspaceRoot}/dashboard`, icon: LayoutDashboard, workspacePermission: 'workspaces.view' },
     { label: productionLabel, href: `${workspaceRoot}/batches`, icon: Boxes, workspacePermission: 'batches.view', module: 'Batches' },
-    { label: 'Operations', href: `${workspaceRoot}/operations`, icon: Gauge, workspacePermission: 'operations.create', module: 'Batches' },
+    { label: 'Operations', href: `${workspaceRoot}/operations`, icon: Gauge, workspacePermission: 'workspaces.view', module: 'Batches' },
     { label: 'Quality', href: `${workspaceRoot}/quality`, icon: ClipboardCheck, workspacePermission: 'quality.view', module: 'QC' },
     { label: 'Traceability', href: `${workspaceRoot}/traceability`, icon: QrCode, workspacePermission: 'traceability.view', module: 'QR' },
     { label: 'Resources', href: `${workspaceRoot}/resources`, icon: Wrench, workspacePermission: 'resources.view', module: 'Resources' },

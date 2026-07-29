@@ -176,7 +176,10 @@ export function WorkspaceDetail({ workspaceSlug }: { workspaceSlug: string }) {
       const list = await workspaceClient.list(tenantId, companyId);
       const match = list.find((item) => item.workspaceSlug === workspaceSlug);
       if (!match) throw new ApiError('Workspace not found.', 404, 'NOT_FOUND');
-      const [detail, membershipRows] = await Promise.all([workspaceClient.get(companyId, match.workspaceId), workspaceClient.members(companyId, match.workspaceId)]);
+      const [detail, membershipRows] = await Promise.all([
+        workspaceClient.get(tenantId, companyId, match.workspaceId),
+        workspaceClient.members(tenantId, companyId, match.workspaceId),
+      ]);
       if (generation === loadGeneration.current) {
         setWorkspace(detail); setMembers(membershipRows);
       }
@@ -197,7 +200,7 @@ export function WorkspaceDetail({ workspaceSlug }: { workspaceSlug: string }) {
     if (!companyMembership) return;
     setSaving(true); setError('');
     try {
-      setWorkspace(await workspaceClient.update(companyMembership.companyId, configuredWorkspace.workspaceId, {
+      setWorkspace(await workspaceClient.update(companyMembership.tenantId, companyMembership.companyId, configuredWorkspace.workspaceId, {
         workspaceName: configuredWorkspace.workspaceName,
         status: configuredWorkspace.status,
         enabledModules: configuredWorkspace.enabledModules,
@@ -208,7 +211,7 @@ export function WorkspaceDetail({ workspaceSlug }: { workspaceSlug: string }) {
     event.preventDefault();
     if (!companyMembership) return;
     try {
-      const created = await workspaceClient.addMember(companyMembership.companyId, configuredWorkspace.workspaceId, { email: inviteEmail, role: inviteRole });
+      const created = await workspaceClient.addMember(companyMembership.tenantId, companyMembership.companyId, configuredWorkspace.workspaceId, { email: inviteEmail, role: inviteRole });
       setMembers((current) => [...current, created]); setInviteEmail('');
     } catch (cause) { setError(message(cause)); }
   }

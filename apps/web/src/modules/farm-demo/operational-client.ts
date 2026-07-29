@@ -3,11 +3,12 @@ import {
   costingSnapshotSchema, journalEntrySchema, operationEntrySchema,
   operationalReportSchema, qualityLotSchema, qrPackSchema, resourceRecordSchema,
   resourceUsageSchema, transitionResultSchema, varianceResultSchema,
-  workflowBatchSchema, type BatchTransitionAction, type CostingSnapshot,
+  workflowBatchSchema, workspaceDashboardSchema,
+  type BatchTransitionAction, type CostingSnapshot,
   type DemoResourceRecord, type JournalEntry, type NewBatchInput,
   type NewOperationInput, type OperationalReport, type OperationEntry,
   type QrPack, type QualityLot, type ResourceUsage,
-  type VarianceResult, type WorkflowBatch,
+  type VarianceResult, type WorkflowBatch, type WorkspaceDashboard,
 } from './operational-contracts';
 
 export type OperationalScope = {
@@ -29,6 +30,13 @@ export function createOperationalClients(client: NavfarmApiClient = api) {
         client.post<T>(`${root(scope)}/operational-bootstrap`, { state: seed }),
       reset: async <T>(scope: OperationalScope, seed: T) =>
         client.put<T>(`${root(scope)}/operational-bootstrap`, { state: seed }),
+    },
+    dashboard: {
+      get: async (scope: OperationalScope) =>
+        parse(
+          workspaceDashboardSchema,
+          await client.get(`${root(scope)}/dashboard`),
+        ) as WorkspaceDashboard,
     },
     batches: {
       list: async (scope: OperationalScope) => parse(workflowBatchSchema.array(), await client.get(`${root(scope)}/batches`)),

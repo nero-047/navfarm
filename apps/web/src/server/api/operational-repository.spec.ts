@@ -65,6 +65,25 @@ describe('operational server-side mock adapter', () => {
     await expect(response?.json()).resolves.toMatchObject({ id: 'batch-1', status: 'APPROVED' });
   });
 
+  it('derives a typed dashboard summary from the isolated workspace state', async () => {
+    await bootstrap();
+    const response = await handleOperationalRequest(
+      request('GET'),
+      `${root}/dashboard`,
+      'request-dashboard',
+      actor,
+    );
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      workspaceId: scope.workspaceId,
+      activeBatchCount: 0,
+      quality: { pass: 0, hold: 0, fail: 0 },
+      authoritative: false,
+    });
+  });
+
   it('returns a conflict for a stale lifecycle transition', async () => {
     await bootstrap();
     const response = await handleOperationalRequest(

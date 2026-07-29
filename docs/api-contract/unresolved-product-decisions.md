@@ -1,12 +1,42 @@
 # Unresolved Product Decisions
 
-These items remain intentionally unresolved after Demo Completion Milestone 2.
+These items remain intentionally unresolved after Demo Completion Milestone 3.
 Milestone 1 settled the frontend mock policy that tenant is session
 established, the visible selector switches Company/Workspace only, memberships
 and permissions are explicit, and company/tenant roles do not authorize
 workspace mutations. Milestone 2 settled the frontend mock ownership and route
-boundary for Company Members, Roles, Settings and Readiness, while leaving the
-items below for product/backend agreement.
+boundary for Company Members, Roles, Settings and Readiness. Milestone 3
+settled the frontend demo convention that a Workspace is a company-owned,
+addressable operational partition with one configured NOB and one or more
+enabled LOBs. That convention drives routing, labels, module availability and
+typed mock responses; it is not a claim that the durable backend domain model
+has been approved.
+
+## Durable Workspace, NOB and LOB Relationship
+
+Known:
+
+- The documented product hierarchy is
+  `Tenant -> Company -> Workspace -> NOB/LOB -> Operations`.
+- The Milestone 3 frontend gives each workspace exactly one configured NOB and
+  an explicit list of enabled LOBs.
+- The switcher exposes Company administration and assigned Workspaces; it never
+  exposes Tenant as a selectable option.
+- Operational endpoints and browser state are partitioned by the complete
+  tenant/company/workspace tuple.
+
+Unresolved:
+
+- Whether the durable Workspace represents a site, branch, operational
+  partition, legal sub-entity, NOB container, or another business concept.
+- Whether a production workspace may contain more than one NOB.
+- Whether LOB enablement belongs directly to Workspace, through a separate
+  Workspace/LOB assignment, or through a site/location model.
+- Workspace lifecycle, archival, transfer, member migration and cross-workspace
+  reporting rules.
+
+The frontend must keep workspace, NOB and LOB identifiers distinct until those
+decisions are signed off.
 
 ## Workspace vs Operational vs Accounting Readiness
 

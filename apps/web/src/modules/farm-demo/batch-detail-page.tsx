@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import {
   ArrowLeft,
   Boxes,
@@ -11,11 +12,9 @@ import {
   GitBranch,
   PackageCheck,
 } from 'lucide-react';
-import { useCurrentCompany } from '@/modules/company/use-current-company';
 import {
   DataTable,
   DemoBadge,
-  EmptyCompany,
   PageHeader,
   SectionCard,
   StatCard,
@@ -36,10 +35,17 @@ const TABS = [
 type BatchTab = (typeof TABS)[number];
 
 export function BatchDetailWorkspacePage({ batchKey }: { batchKey: string }) {
-  const company = useCurrentCompany();
-  const { state, calculateVariance } = useDemoStore();
+  const { company, state, calculateVariance, isReady } = useDemoStore();
+  const { workspace } = useParams<{ workspace: string }>();
+  const workspaceRoot = `/${company.slug}/workspaces/${workspace}`;
   const [tab, setTab] = useState<BatchTab>('Overview');
-  if (!company) return <EmptyCompany />;
+  if (!isReady) {
+    return (
+      <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">
+        Loading batch details…
+      </div>
+    );
+  }
   const decodedKey = decodeURIComponent(batchKey);
   const batch = state.batches.find(
     (item) => item.id === decodedKey || item.code === decodedKey,
@@ -55,7 +61,7 @@ export function BatchDetailWorkspacePage({ batchKey }: { batchKey: string }) {
             The demo record may have been reset in this browser.
           </p>
           <Link
-            href={`/${company.slug}/batches`}
+            href={`${workspaceRoot}/batches`}
             className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"
           >
             Return to batches
@@ -75,7 +81,7 @@ export function BatchDetailWorkspacePage({ batchKey }: { batchKey: string }) {
   return (
     <div className="space-y-6 animate-fade-in">
       <Link
-        href={`/${company.slug}/batches`}
+        href={`${workspaceRoot}/batches`}
         className="inline-flex items-center gap-2 text-xs font-semibold text-[#1c4aa9]"
       >
         <ArrowLeft size={14} /> Batch register
@@ -249,7 +255,7 @@ export function BatchDetailWorkspacePage({ batchKey }: { batchKey: string }) {
           {!operations.length && (
             <EmptyDetail
               text="No operation entries have been recorded for this batch yet."
-              action={`/${company.slug}/operations`}
+              action={`${workspaceRoot}/operations`}
               label="Record an operation"
             />
           )}
@@ -297,7 +303,7 @@ export function BatchDetailWorkspacePage({ batchKey }: { batchKey: string }) {
           {!quality.length && (
             <EmptyDetail
               text="No QC lot is linked to this batch."
-              action={`/${company.slug}/quality`}
+              action={`${workspaceRoot}/quality`}
               label="Open quality control"
             />
           )}
@@ -402,7 +408,7 @@ export function BatchDetailWorkspacePage({ batchKey }: { batchKey: string }) {
           {!packs.length && (
             <EmptyDetail
               text="No QR pack has been generated from this batch."
-              action={`/${company.slug}/traceability`}
+              action={`${workspaceRoot}/traceability`}
               label="Open traceability"
             />
           )}

@@ -213,6 +213,12 @@ export interface NewOperationInput {
 }
 
 interface DemoStoreValue {
+  company: CompanyMeta;
+  scope: {
+    tenantId: string;
+    companyId: string;
+    workspaceId: string;
+  } | null;
   state: DemoState;
   isReady: boolean;
   createBatch: (input: NewBatchInput) => WorkflowBatch;
@@ -414,7 +420,7 @@ function journalFor(input: NewOperationInput): OperationEntry['journal'] {
 }
 
 export function DemoStoreProvider({
-  company,
+  company: baseCompany,
   children,
 }: {
   company: CompanyMeta;
@@ -423,6 +429,18 @@ export function DemoStoreProvider({
   const { session } = useAuth();
   const activeWorkspace = session?.workspaces.find(
     (workspace) => workspace.workspaceId === session.activeWorkspaceId,
+  );
+  const company = useMemo<CompanyMeta>(
+    () =>
+      activeWorkspace
+        ? {
+            ...baseCompany,
+            nobCode: activeWorkspace.configuredNob.code,
+            nobName: activeWorkspace.configuredNob.name,
+            lobs: activeWorkspace.enabledLobs,
+          }
+        : baseCompany,
+    [activeWorkspace, baseCompany],
   );
   const scope = useMemo(() => {
     if (!session?.activeTenantId || !session.activeCompanyId || !activeWorkspace) return null;
@@ -813,6 +831,8 @@ export function DemoStoreProvider({
 
   const value = useMemo<DemoStoreValue>(
     () => ({
+      company,
+      scope,
       state,
       isReady,
       createBatch,
@@ -833,6 +853,8 @@ export function DemoStoreProvider({
       resetDemo,
     }),
     [
+      company,
+      scope,
       state,
       isReady,
       createBatch,

@@ -91,6 +91,7 @@ export async function handleOperationalRequest(
   const method = request.method;
   const operationalResources = new Set([
     'operational-bootstrap',
+    'dashboard',
     'batches',
     'operations',
     'quality-lots',
@@ -137,6 +138,30 @@ export async function handleOperationalRequest(
 
   const state = workspaces.get(key);
   if (!state) return apiErrorResponse(409, 'Operational workspace is not initialized.', requestId);
+  if (method === 'GET' && resource === 'dashboard') {
+    const qualityCounts = state.qualityLots.reduce(
+      (counts, lot) => ({
+        ...counts,
+        [lot.status.toLowerCase()]: counts[lot.status.toLowerCase() as 'pass' | 'hold' | 'fail'] + 1,
+      }),
+      { pass: 0, hold: 0, fail: 0 },
+    );
+    return json({
+      ...scope,
+      generatedAt: new Date().toISOString(),
+      activeBatchCount: state.batches.filter((batch) =>
+        ['APPROVED', 'ACTIVE', 'PAUSED', 'QC_HOLD', 'READY_TO_CLOSE'].includes(
+          batch.status,
+        ),
+      ).length,
+      operationCount: state.operations.length,
+      quality: qualityCounts,
+      qrPackCount: state.qrPacks.length,
+      resourceCount: state.resources.length,
+      openWip: state.batches.reduce((sum, batch) => sum + batch.wip, 0),
+      authoritative: false,
+    });
+  }
   const config = collectionConfig(resource);
   if (config) {
     const collection = state[config.key] as Array<{ id?: string }>;

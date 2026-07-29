@@ -104,3 +104,17 @@ Operational API denials use `CAPABILITY_REQUIRED`. Scope failures use
 
 This matrix is implemented in the mock frontend boundary and documents the
 future backend contract; the real backend enforcement is still missing.
+
+## Switcher and workspace-page enforcement
+
+The visible shell switcher contains Company administration and explicitly
+assigned active Workspaces only. Tenant is supplied from the authenticated
+membership and is never a row. Inactive/mismatched tuples are rejected before
+the client changes session state. A failed switch leaves the previous tuple and
+route usable.
+
+Workspace settings and masters reads require the active nested
+tenant/company/workspace tuple plus explicit workspace membership. Their
+canonical mock endpoints do not grant configuration writes to Workspace
+Manager/Viewer. Company/Tenant administrators configure through the
+company-administration workspace endpoint and `workspaces.manage`.

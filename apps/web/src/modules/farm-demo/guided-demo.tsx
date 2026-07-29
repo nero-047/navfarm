@@ -6,7 +6,13 @@ import type { CompanyMeta } from '@/modules/company';
 import { ProgressBar, SectionCard, StatusBadge } from './components';
 import { useDemoStore } from './demo-store';
 
-export function GuidedPoultryDemo({ company }: { company: CompanyMeta }) {
+export function GuidedPoultryDemo({
+  company,
+  workspaceRoot,
+}: {
+  company: CompanyMeta;
+  workspaceRoot: string;
+}) {
   const { state } = useDemoStore();
   if (company.nobCode !== 'POULTRY') return null;
   const batch = state.batches[0];
@@ -16,37 +22,37 @@ export function GuidedPoultryDemo({ company }: { company: CompanyMeta }) {
       label: 'Open the production batch',
       detail: 'Review source, standards and lifecycle controls',
       done: batch.status !== 'DRAFT',
-      href: `/${company.slug}/batches/${encodeURIComponent(batch.code)}`,
+      href: `${workspaceRoot}/batches/${encodeURIComponent(batch.code)}`,
     },
     {
       label: 'Record daily feed or mortality',
       detail: 'See inventory and WIP journal impact',
       done: state.operations.some((item) => item.batchId === batch.id),
-      href: `/${company.slug}/operations`,
+      href: `${workspaceRoot}/operations`,
     },
     {
       label: 'Record the production output',
       detail: 'Move the batch toward close readiness',
       done: batch.actualOutput > 0,
-      href: `/${company.slug}/operations`,
+      href: `${workspaceRoot}/operations`,
     },
     {
       label: 'Inspect and release quality',
       detail: 'PASS unlocks inventory and QR generation',
       done: batch.qcStatus === 'PASS',
-      href: `/${company.slug}/quality`,
+      href: `${workspaceRoot}/quality`,
     },
     {
       label: 'Generate a traceable QR pack',
       detail: 'Open the consumer farm-to-fork record',
       done: state.qrPacks.some((item) => item.batchId === batch.id),
-      href: `/${company.slug}/traceability`,
+      href: `${workspaceRoot}/traceability`,
     },
     {
       label: 'Validate close and variances',
       detail: 'Finalize STANDARD cost and clear WIP',
       done: batch.status === 'CLOSED',
-      href: `/${company.slug}/batches/${encodeURIComponent(batch.code)}`,
+      href: `${workspaceRoot}/batches/${encodeURIComponent(batch.code)}`,
     },
   ];
   const complete = steps.filter((item) => item.done).length;
@@ -66,7 +72,10 @@ export function GuidedPoultryDemo({ company }: { company: CompanyMeta }) {
       <div className="grid gap-5 p-5 lg:grid-cols-[.72fr_1.28fr] lg:p-6">
         <div className="rounded-2xl bg-[linear-gradient(135deg,#0b1248,#1c4aa9)] p-5 text-white">
           <PlayCircle size={26} />
-          <h3 className="mt-4 text-lg font-semibold">
+          <h3
+            className="mt-4 text-lg font-semibold"
+            style={{ color: '#ffffff' }}
+          >
             Follow one complete story
           </h3>
           <p className="mt-2 text-xs leading-5 text-white/70">

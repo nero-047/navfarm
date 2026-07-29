@@ -143,6 +143,18 @@ export const workspaceTypeSchema = z.enum([
 ]);
 
 export const workspaceStatusSchema = z.enum(['DRAFT', 'ACTIVE', 'INACTIVE']);
+export const workspaceNobSchema = z.object({
+  nobId: z.string(),
+  code: z.enum([
+    'POULTRY',
+    'LIVESTOCK',
+    'AGRICULTURE',
+    'AQUACULTURE',
+    'INSECT',
+    'PROCESSING',
+  ]),
+  name: z.string(),
+});
 export const workspaceSchema = z.object({
   workspaceId: z.string(),
   tenantId: z.string(),
@@ -153,7 +165,10 @@ export const workspaceSchema = z.object({
   workspaceType: workspaceTypeSchema,
   status: workspaceStatusSchema,
   primaryNobId: z.string().nullable(),
+  configuredNob: workspaceNobSchema,
+  enabledLobs: z.array(z.string()),
   enabledModules: z.array(z.string()),
+  memberCount: z.number().int().nonnegative(),
   readiness: z.object({
     percentage: z.number().min(0).max(100),
     operationalReady: z.boolean(),
@@ -200,7 +215,10 @@ export const workspaceMembershipSchema = workspaceSchema.pick({
   workspaceName: true,
   workspaceType: true,
   status: true,
+  configuredNob: true,
+  enabledLobs: true,
   enabledModules: true,
+  memberCount: true,
 }).extend({
   role: workspaceRoleSchema,
   permissions: z.array(permissionSchema),
@@ -254,6 +272,25 @@ export type Workspace = z.infer<typeof workspaceSchema>;
 export type WorkspaceMembership = z.infer<typeof workspaceMembershipSchema>;
 export type WorkspaceMember = z.infer<typeof workspaceMemberSchema>;
 
+export const workspaceMasterSchema = z.object({
+  masterId: z.string(),
+  type: z.enum(['OPERATIONAL_PARAMETER', 'QC_PARAMETER', 'LOCATION', 'RESOURCE']),
+  code: z.string(),
+  name: z.string(),
+  nobCode: workspaceNobSchema.shape.code,
+  lobName: z.string().nullable(),
+  scope: z.literal('WORKSPACE'),
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+});
+export type WorkspaceMaster = z.infer<typeof workspaceMasterSchema>;
+
+export const workspaceSettingsSchema = workspaceSchema.extend({
+  companyName: z.string(),
+  currentUserRole: workspaceRoleSchema,
+  currentUserPermissions: z.array(permissionSchema),
+});
+export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;
+
 export const demoStateResponseSchema = z.object({
   state: z.unknown().nullable(),
 });
@@ -290,6 +327,13 @@ export const runtimeContracts: RuntimeContract[] = [
   { method: 'PUT', pattern: /^\/demo\/companies\/[^/]+\/state$/, response: successSchema },
   { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces$/, response: z.array(workspaceSchema) },
   { method: 'POST', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces$/, response: workspaceSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
+  { method: 'PATCH', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/readiness$/, response: workspaceSchema.shape.readiness },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/members$/, response: z.array(workspaceMemberSchema) },
+  { method: 'POST', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/members$/, response: workspaceMemberSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/settings$/, response: workspaceSettingsSchema },
+  { method: 'GET', pattern: /^\/tenants\/[^/]+\/companies\/[^/]+\/workspaces\/[^/]+\/masters$/, response: z.array(workspaceMasterSchema) },
   { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
   { method: 'PATCH', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+$/, response: workspaceSchema },
   { method: 'GET', pattern: /^\/companies\/[^/]+\/workspaces\/[^/]+\/readiness$/, response: workspaceSchema.shape.readiness },

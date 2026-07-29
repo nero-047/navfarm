@@ -82,3 +82,27 @@ documented `localization`, `fiscal`, `modules`, and `notifications` sections;
 
 The static `masters/nobs` and `masters/lobs` routes open the company
 business-structure workspace. Unknown master resources return 404.
+
+## Milestone 3 workspace route status
+
+The shell switcher is the one live in-application Company/Workspace switcher.
+`/context-selection` remains the post-login selection screen and delegates
+context mutation to the same `AuthContext`; it is not a second persistent shell
+switcher. The closed shell trigger shows Company plus either `Company
+administration` or the active Workspace. No tenant/organisation option is
+rendered.
+
+All eleven canonical workspace URLs listed above are implemented. Dashboard,
+Batches/detail, Operations, Quality, Traceability, Resources and Reports use
+the workspace provider and typed nested operational client. Costing, Workspace
+Masters and Workspace Settings are distinct pages. Workspace Masters reads
+workspace-owned operational values and links to, but does not mutate, Company
+shared masters. Workspace Settings is read-only for operational roles and
+links authorized Company/Tenant administrators to the company-scoped
+configuration page.
+
+Workspace navigation requires an active matching membership, active workspace,
+enabled module and exact workspace capability. A switch preserves only a
+supported canonical module list. Any record-detail route drops the record ID;
+an unsupported destination opens the target Dashboard. Legacy company-only
+operational routes remain resolver-only compatibility routes.

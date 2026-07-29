@@ -30,8 +30,19 @@ No database or NestJS implementation is included in this frontend phase.
 
 - `/{company}/overview` is the canonical company landing route;
   `/{company}/dashboard` redirects there.
-- The context switcher represents Tenant → Company administration → authorized
-  Workspaces and updates the full server-side context tuple.
+- Tenant is established by the authenticated session and is never a visible
+  switcher row. The switcher displays Company administration → authorized
+  Workspaces and updates the full server-side tuple atomically.
 - Company navigation and workspace navigation are separate registries.
 - Workspace presentation is centralized by DTO workspace type and enabled
   modules without changing identifiers or permission rules.
+
+## Demo Completion Milestone 3 alignment
+
+The frontend demo defines Workspace as the operational partition inside a
+Company. Explicit metadata now includes owner Company, configured NOB, enabled
+LOBs/modules, readiness, member count and current user's workspace role.
+Workspace Masters and Settings are distinct typed resources; Company shared
+masters and accounting remain company-scoped. The durable Workspace/NOB/LOB
+backend policy is still unresolved and this frontend mapping is not a database
+contract.

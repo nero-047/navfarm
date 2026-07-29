@@ -47,7 +47,14 @@ const restoredSession: AuthSession = {
     workspaceName: 'Poultry Operations',
     workspaceType: 'POULTRY',
     status: 'ACTIVE',
+    configuredNob: {
+      nobId: 'nob-poultry',
+      code: 'POULTRY',
+      name: 'Poultry',
+    },
+    enabledLobs: ['Rearing & Breeding'],
     enabledModules: ['Batches'],
+    memberCount: 1,
     role: 'MANAGER',
     permissions: ['workspaces.view', 'batches.view', 'batches.create'],
   }],
@@ -58,7 +65,7 @@ const restoredSession: AuthSession = {
 };
 
 function Harness() {
-  const { status, session, login, logout } = useAuth();
+  const { status, session, login, logout, selectContext } = useAuth();
   return (
     <div>
       <span data-testid="status">{status}</span>
@@ -70,6 +77,17 @@ function Harness() {
         ].join('|')}
       </span>
       <button onClick={() => void login('mfa@navfarm.demo', 'Demo123!')}>Login MFA</button>
+      <button
+        onClick={() =>
+          void selectContext(
+            'tenant-demo',
+            'company-green-valley',
+            null,
+          ).catch(() => undefined)
+        }
+      >
+        Select company
+      </button>
       <button onClick={() => void logout()}>Logout</button>
     </div>
   );
@@ -116,6 +134,25 @@ describe('AuthProvider canonical session lifecycle', () => {
       expect(screen.getByTestId('status').textContent).toBe('unauthenticated');
     });
     expect(screen.getByTestId('tuple').textContent).toBe('none|none|none');
+  });
+
+  it('preserves the previous valid tuple when context selection fails', async () => {
+    jest.spyOn(api, 'get').mockResolvedValue(restoredSession);
+    jest.spyOn(api, 'put').mockRejectedValue(
+      new ApiError('Context rejected.', 409, 'STALE_CONTEXT'),
+    );
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => {
+      expect(screen.getByTestId('status').textContent).toBe('authenticated');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select company' }));
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalled();
+    });
+    expect(screen.getByTestId('tuple').textContent).toBe(
+      'tenant-demo|company-green-valley|workspace-green-poultry',
+    );
   });
 
   it('keeps an MFA challenge outside the authenticated application session', async () => {

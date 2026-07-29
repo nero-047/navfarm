@@ -1,7 +1,7 @@
 # Recommended Implementation Sequence
 
-These milestones are corrective planning. Milestones 1 and 2 are implemented
-for the frontend mock demo and contract boundary only; neither claims backend
+These milestones are corrective planning. Milestones 1, 2 and 3 are complete
+for the frontend mock demo and contract boundary only; none claims backend
 delivery. Do not begin later milestones merely because this status changed.
 
 ## Milestone 1: Session and context consolidation
@@ -34,18 +34,27 @@ delivery. Do not begin later milestones merely because this status changed.
 - **Remaining product decision:** custom roles plus final readiness taxonomy and
   accounting gate.
 
-## Milestone 3: Extended authorization policy
+## Milestone 3: Company/Workspace switcher and workspace demo completion
 
-- **Scope:** extend the now-explicit Milestone 1 mock policy into the complete
-  product role catalogue, backend persistence/guards, invitations and custom
-  roles.
-- **Dependencies:** Workspace membership persistence decision.
-- **Likely modules:** authorization, access reasons, mock repository, operational repository, E2E fixtures.
-- **Acceptance:** production contract/backend role and custom-permission matrix
-  matches the already passing frontend negative mutation tests.
-- **Tests:** unit capability table, mock API and browser negative cases.
-- **Backend dependency:** workspace roles/permissions tables and guards.
-- **Product decision:** workspace role catalogue and Tenant Admin override rules.
+- **Status:** complete for the frontend mock demo; the recorded validation gate
+  and focused screenshot audit pass. Backend implementation remains missing.
+- **Delivered:** one searchable Company/Workspace hierarchy in the application
+  shell; no visible tenant selector; atomic tuple switching; safe list-route
+  preservation and record-route fallback; active membership filtering;
+  keyboard/mobile behavior; workspace-aware NOB/LOB/module identity; canonical
+  Dashboard, Batches, Operations, Quality, Traceability, Resources, Costing,
+  Reports, Masters and Settings routes; distinct typed Dashboard, Masters and
+  Settings mock resources; role/module-aware navigation and actions.
+- **Contract ready:** nested
+  `/tenants/[t]/companies/[c]/workspaces/[w]` workspace detail, readiness,
+  members, dashboard, settings and masters responses plus existing operational
+  resource schemas.
+- **Backend dependency:** durable Workspace/WorkspaceMembership persistence,
+  metadata, settings, master ownership, dashboard projection and exact
+  authorization enforcement.
+- **Remaining product decision:** durable Workspace/NOB/LOB cardinality,
+  lifecycle and cross-workspace reporting, plus authoritative costing/report
+  semantics.
 - **Complexity:** high.
 
 ## Milestone 4: Strict API boundary cleanup

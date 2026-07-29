@@ -6,6 +6,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { WorkspacePage, type WorkspacePageKind } from '@/modules/farm-demo/workspace-page';
 import { WorkspaceDetail } from './components';
 import { AccessState } from '@/components/access/access-state';
+import { filterNavigation } from '@/lib/authorization';
+import { navigationForScope } from '@/components/shell/navigation';
+import {
+  WorkspaceCostingPage,
+  WorkspaceMastersPage,
+  WorkspaceSettingsPage,
+} from './operational-support-pages';
 
 export type OperationalRouteKind = 'dashboard' | 'batches' | 'operations' | 'quality' | 'traceability' | 'resources' | 'costing' | 'reports';
 
@@ -33,8 +40,56 @@ export function CanonicalWorkspaceContent({
   }
   if (!workspace) return <AccessState reason="workspace_not_assigned" companySlug={company} />;
   if (needsContext) return <AccessState reason="workspace_selection_required" companySlug={company} />;
-  if (section === 'masters' || section === 'settings') return <WorkspacePage kind="settings" />;
-  return <WorkspacePage kind={(section === 'costing' ? 'reports' : section) as WorkspacePageKind} />;
+  const route = navigationForScope('workspace', company, workspace).find(
+    (item) => item.href.endsWith(`/${section}`),
+  );
+  if (!route || filterNavigation([route], session).length === 0) {
+    return <AccessState reason="insufficient_permission" companySlug={company} />;
+  }
+  if (section === 'costing') return <WorkspaceCostingPage />;
+  if (section === 'masters') return <WorkspaceMastersPage />;
+  if (section === 'settings') return <WorkspaceSettingsPage />;
+  return <WorkspacePage kind={section as WorkspacePageKind} />;
+}
+
+export function WorkspaceIdentityBanner() {
+  const { company, workspace: workspaceSlug } = useParams<{
+    company: string;
+    workspace: string;
+  }>();
+  const { session } = useAuth();
+  const companyMembership = session?.companies.find(
+    (item) => item.companySlug === company,
+  );
+  const workspace = session?.workspaces.find(
+    (item) =>
+      item.companyId === companyMembership?.companyId &&
+      item.workspaceSlug === workspaceSlug,
+  );
+
+  if (!companyMembership || !workspace) return null;
+  return (
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
+      <div className="min-w-0">
+        <p className="truncate text-xs font-semibold text-slate-950">
+          {companyMembership.companyName}
+          <span className="px-2 text-slate-300">/</span>
+          {workspace.workspaceName}
+        </p>
+        <p className="mt-1 truncate text-[10px] text-slate-500">
+          {workspace.configuredNob.name} · {workspace.enabledLobs.join(', ')}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-800">
+          {workspace.role}
+        </span>
+        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">
+          Demo data
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function LegacyOperationalRedirect({

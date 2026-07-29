@@ -109,6 +109,7 @@ Acceptance criteria:
 
 Build:
 
+- Workspace dashboard summary.
 - Batches list/create/update.
 - Batch transitions.
 - Operations recording.
@@ -127,6 +128,9 @@ Acceptance criteria:
 - Two workspaces in one company cannot list, read, mutate, aggregate or report
   each other's batches, operations, QC, QR, resources/usages, costing,
   journals, variances or reports.
+- Dashboard, Workspace Masters and Workspace Settings responses validate
+  against the frontend schemas and use the same membership/ownership source as
+  session restoration.
 
 ## 6. QC and QR
 

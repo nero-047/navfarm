@@ -31,3 +31,11 @@ may administer explicit workspace assignments but still receives no implicit
 operational membership. Accountant, Auditor and Viewer member/assignment
 mutations return `CAPABILITY_REQUIRED`; Auditor may view documented company
 settings/readiness in a read-only state.
+
+Milestone 3 uses the same fixture graph as the authenticated session,
+Company/Workspace switcher, workspace administration, workspace settings and
+operational mock APIs. Reset restores that one canonical graph. A context
+change is committed only after `PUT /auth/context` returns a valid session;
+failed selections retain the previous complete tuple. Safe workspace switches
+preserve only supported list-level modules and intentionally drop record IDs
+or fall back to the destination workspace dashboard.

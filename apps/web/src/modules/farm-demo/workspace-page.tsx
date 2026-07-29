@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import QRCode from 'react-qr-code';
 import {
   Activity,
@@ -35,7 +36,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { can } from '@/lib/authorization';
-import { useCurrentCompany } from '@/modules/company/use-current-company';
+import { workspaceModuleEnabled } from '@/lib/workspace-presentation';
 import {
   getDemoBatches,
   getDemoTasks,
@@ -46,7 +47,6 @@ import {
 import {
   DataTable,
   DemoBadge,
-  EmptyCompany,
   PageHeader,
   ProgressBar,
   SectionCard,
@@ -74,6 +74,8 @@ import {
 } from './workflow-dialogs';
 import { DashboardCharts } from './dashboard-charts';
 import { GuidedPoultryDemo } from './guided-demo';
+import { operationalClients } from './operational-client';
+import type { WorkspaceDashboard } from './operational-contracts';
 
 export type WorkspacePageKind =
   | 'dashboard'
@@ -86,9 +88,14 @@ export type WorkspacePageKind =
   | 'settings';
 
 export function WorkspacePage({ kind }: { kind: WorkspacePageKind }) {
-  const company = useCurrentCompany();
-  const { state } = useDemoStore();
-  if (!company) return <EmptyCompany />;
+  const { company, state, isReady } = useDemoStore();
+  if (!isReady) {
+    return (
+      <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">
+        Loading workspace demo data…
+      </div>
+    );
+  }
 
   if (
     state.setup.completedSteps < 9 &&
@@ -118,14 +125,12 @@ export function WorkspacePage({ kind }: { kind: WorkspacePageKind }) {
 }
 
 export function SettingsWorkspacePage({ section }: { section: string }) {
-  const company = useCurrentCompany();
-  if (!company) return <EmptyCompany />;
+  const { company } = useDemoStore();
   return <Settings company={company} section={section} />;
 }
 
 export function ProfileWorkspacePage() {
-  const company = useCurrentCompany();
-  if (!company) return <EmptyCompany />;
+  const { company } = useDemoStore();
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -140,6 +145,7 @@ export function ProfileWorkspacePage() {
 
 function LockedWorkspace({ company }: { company: Company }) {
   const { state } = useDemoStore();
+  const workspaceRoot = useWorkspaceRoot(company);
   return (
     <div className="flex min-h-[65vh] items-center justify-center">
       <SectionCard className="max-w-xl">
@@ -155,7 +161,7 @@ function LockedWorkspace({ company }: { company: Company }) {
             data. Current progress: {state.setup.completedSteps}/15 steps.
           </p>
           <Link
-            href={`/${company.slug}/settings`}
+            href={`${workspaceRoot}/settings`}
             className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"
           >
             Continue company setup
@@ -166,7 +172,12 @@ function LockedWorkspace({ company }: { company: Company }) {
   );
 }
 
-type Company = NonNullable<ReturnType<typeof useCurrentCompany>>;
+type Company = ReturnType<typeof useDemoStore>['company'];
+
+function useWorkspaceRoot(company: Company) {
+  const { workspace } = useParams<{ workspace: string }>();
+  return `/${company.slug}/workspaces/${workspace}`;
+}
 
 function PrimaryButton({
   icon: Icon = Plus,
@@ -191,24 +202,89 @@ function PrimaryButton({
 }
 
 function Dashboard({ company }: { company: Company }) {
+  const workspaceRoot = useWorkspaceRoot(company);
   const batches = getDemoBatches(company);
   const tasks = getDemoTasks(company);
   const config = INDUSTRY_CONFIG[company.nobCode];
-  const { state, calculateVariance } = useDemoStore();
-  const activeCount = state.batches.filter((batch) =>
-    ['APPROVED', 'ACTIVE', 'PAUSED', 'QC_HOLD', 'READY_TO_CLOSE'].includes(
-      batch.status,
-    ),
-  ).length;
-  const passRate = state.qualityLots.length
-    ? (state.qualityLots.filter((lot) => lot.status === 'PASS').length /
-        state.qualityLots.length) *
+  const { state, calculateVariance, scope } = useDemoStore();
+  const [summary, setSummary] = useState<WorkspaceDashboard | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState('');
+  const loadSummary = useCallback(async () => {
+    if (!scope) {
+      setSummaryError('Select an active workspace to load its dashboard.');
+      setSummaryLoading(false);
+      return;
+    }
+    setSummaryLoading(true);
+    setSummaryError('');
+    try {
+      setSummary(await operationalClients.dashboard.get(scope));
+    } catch (cause) {
+      setSummaryError(
+        cause instanceof Error
+          ? cause.message
+          : 'Workspace dashboard data could not be loaded.',
+      );
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, [scope]);
+  useEffect(() => {
+    void loadSummary();
+  }, [loadSummary]);
+  const { session } = useAuth();
+  const activeWorkspace = session?.workspaces.find(
+    (workspace) => workspace.workspaceId === session.activeWorkspaceId,
+  );
+  const hasBatches = Boolean(
+    activeWorkspace &&
+    workspaceModuleEnabled(activeWorkspace, 'Batches') &&
+    can(session, 'batches.view'),
+  );
+  const hasQuality = Boolean(
+    activeWorkspace &&
+    workspaceModuleEnabled(activeWorkspace, 'QC') &&
+    can(session, 'quality.view'),
+  );
+  const hasFinance = Boolean(
+    activeWorkspace &&
+    workspaceModuleEnabled(activeWorkspace, 'Finance') &&
+    can(session, 'costs.view'),
+  );
+  const hasAnalytics = Boolean(
+    activeWorkspace &&
+    workspaceModuleEnabled(activeWorkspace, 'Analytics') &&
+    can(session, 'reports.export'),
+  );
+  const qualityCount = summary
+    ? summary.quality.pass + summary.quality.hold + summary.quality.fail
+    : 0;
+  const passRate = qualityCount
+    ? ((summary?.quality.pass ?? 0) / qualityCount) *
       100
     : 0;
   const totalVariance = state.batches.reduce(
     (sum, batch) => sum + calculateVariance(batch).total,
     0,
   );
+  if (summaryLoading) {
+    return (
+      <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">
+        Loading workspace dashboard…
+      </div>
+    );
+  }
+  if (summaryError || !summary) {
+    return (
+      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+        <p>{summaryError || 'Workspace dashboard data was not returned.'}</p>
+        <button onClick={() => void loadSummary()} className="mt-4 min-h-11 rounded-xl border border-red-300 bg-white px-4 font-semibold">
+          Retry
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -226,12 +302,14 @@ function Dashboard({ company }: { company: Company }) {
               <option>This month</option>
               <option>This fiscal year</option>
             </select>
-            <Link
-              href={`/${company.slug}/reports`}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"
-            >
-              <FileBarChart size={14} /> View reports
-            </Link>
+            {hasAnalytics ? (
+              <Link
+                href={`${workspaceRoot}/reports`}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white"
+              >
+                <FileBarChart size={14} /> View reports
+              </Link>
+            ) : null}
           </>
         }
       />
@@ -281,7 +359,7 @@ function Dashboard({ company }: { company: Company }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Active batches"
-          value={String(activeCount)}
+          value={String(summary.activeBatchCount)}
           detail={`${state.batches.filter((batch) => batch.status === 'READY_TO_CLOSE').length} approaching close`}
           icon={Boxes}
           tone="blue"
@@ -295,30 +373,34 @@ function Dashboard({ company }: { company: Company }) {
           icon={CalendarClock}
           tone="amber"
         />
-        <StatCard
-          label="QC release rate"
-          value={`${passRate.toFixed(1)}%`}
-          detail="Across the last 30 QC lots"
-          icon={ShieldCheck}
-          tone="green"
-        />
-        <StatCard
-          label="Cost variance"
-          value={`₹ ${(totalVariance / 100000).toFixed(2)}L`}
-          detail="Projected STANDARD close variance"
-          icon={TrendingUp}
-          tone="red"
-        />
+        {hasQuality ? (
+          <StatCard
+            label="QC release rate"
+            value={`${passRate.toFixed(1)}%`}
+            detail="Across represented workspace QC lots"
+            icon={ShieldCheck}
+            tone="green"
+          />
+        ) : null}
+        {hasFinance ? (
+          <StatCard
+            label="Cost variance"
+            value={`₹ ${(totalVariance / 100000).toFixed(2)}L`}
+            detail="Projected STANDARD close variance"
+            icon={TrendingUp}
+            tone="red"
+          />
+        ) : null}
       </div>
-      <GuidedPoultryDemo company={company} />
-      <DashboardCharts company={company} state={state} />
+      <GuidedPoultryDemo company={company} workspaceRoot={workspaceRoot} />
+      {hasAnalytics ? <DashboardCharts company={company} state={state} /> : null}
 
-      <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr]">
+      {hasBatches ? <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr]">
         <SectionCard
           title="Batch performance"
           description="Live stage, cost and output position by LOB"
           action={
-            <Link href={`/${company.slug}/batches`}>
+            <Link href={`${workspaceRoot}/batches`}>
               <TextButton>View batches</TextButton>
             </Link>
           }
@@ -394,14 +476,14 @@ function Dashboard({ company }: { company: Company }) {
             )}
           </div>
         </SectionCard>
-      </div>
+      </div> : null}
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+      {hasBatches ? <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
         <SectionCard
           title="Today’s operations"
           description="Entries scheduled from the active batch programmes"
           action={
-            <Link href={`/${company.slug}/operations`}>
+            <Link href={`${workspaceRoot}/operations`}>
               <TextButton>Open daily entry</TextButton>
             </Link>
           }
@@ -452,7 +534,7 @@ function Dashboard({ company }: { company: Company }) {
             ))}
           </div>
         </SectionCard>
-      </div>
+      </div> : null}
     </div>
   );
 }
@@ -486,6 +568,7 @@ function AlertCard({
 }
 
 function Batches({ company }: { company: Company }) {
+  const workspaceRoot = useWorkspaceRoot(company);
   const { state, approveBatch, closeBatch, calculateVariance } = useDemoStore();
   const { session } = useAuth();
   const canCreate = can(session, 'batches.create');
@@ -574,7 +657,7 @@ function Batches({ company }: { company: Company }) {
                 <tr key={batch.code} className="hover:bg-[#fcfcfc]">
                   <TableCell>
                     <Link
-                      href={`/${company.slug}/batches/${encodeURIComponent(batch.code)}`}
+                      href={`${workspaceRoot}/batches/${encodeURIComponent(batch.code)}`}
                       className="font-semibold text-[#1c4aa9] hover:text-[#c24332]"
                     >
                       {batch.code}
@@ -654,7 +737,7 @@ function Batches({ company }: { company: Company }) {
                   <TableCell>
                     <div className="flex min-w-32 flex-col gap-2">
                       <Link
-                        href={`/${company.slug}/batches/${encodeURIComponent(batch.code)}`}
+                        href={`${workspaceRoot}/batches/${encodeURIComponent(batch.code)}`}
                         className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-[11px] font-semibold text-[#1c4aa9] hover:bg-blue-100"
                       >
                         View workspace
@@ -1486,6 +1569,7 @@ function Resources({ company }: { company: Company }) {
 }
 
 function Reports({ company }: { company: Company }) {
+  const workspaceRoot = useWorkspaceRoot(company);
   const config = INDUSTRY_CONFIG[company.nobCode];
   const { state, calculateVariance } = useDemoStore();
   const totals = state.batches.reduce(
@@ -1562,9 +1646,9 @@ function Reports({ company }: { company: Company }) {
           tone="red"
         />
         <StatCard
-          label="Gross margin"
-          value="18.6%"
-          detail="Current operating estimate"
+          label="Report mode"
+          value="Preview"
+          detail="No durable generation or export"
           icon={BarChart3}
           tone="blue"
         />
@@ -1598,7 +1682,7 @@ function Reports({ company }: { company: Company }) {
         </SectionCard>
         <SectionCard
           title="Management reports"
-          description="Operational and financial reports available for export"
+          description="Supported previews; production generation and downloads are not connected"
         >
           <div className="grid gap-3 p-5">
             {[
@@ -1606,17 +1690,9 @@ function Reports({ company }: { company: Company }) {
               ['Variance report', 'Price, usage, output and overhead'],
               ['Quality summary', 'QC pass, hold, fail and parameter trends'],
               ['Traceability register', 'Source batch to QR pack lineage'],
-              ['Profit & loss', 'LOB and company contribution view'],
-            ].map(([title, text], index) => (
-              <button
-                key={title}
-                onClick={() =>
-                  index === 3
-                    ? window.location.assign(`/${company.slug}/traceability`)
-                    : downloadDemoReport(title, state)
-                }
-                className="flex items-center gap-3 rounded-xl border border-[#ededed] p-3.5 text-left transition-colors hover:border-[#1c4aa9]"
-              >
+            ].map(([title, text], index) => {
+              const content = (
+                <>
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-[#1c4aa9]">
                   {index === 3 ? (
                     <QrCode size={16} />
@@ -1632,9 +1708,30 @@ function Reports({ company }: { company: Company }) {
                     {text}
                   </p>
                 </div>
-                <ChevronRight size={15} className="text-[#aaa]" />
-              </button>
-            ))}
+                {index === 3 ? (
+                  <ChevronRight size={15} className="text-[#aaa]" />
+                ) : (
+                  <StatusBadge label="Preview" tone="gray" />
+                )}
+                </>
+              );
+              return index === 3 ? (
+                <Link
+                  key={title}
+                  href={`${workspaceRoot}/traceability`}
+                  className="flex items-center gap-3 rounded-xl border border-[#ededed] p-3.5 text-left transition-colors hover:border-[#1c4aa9]"
+                >
+                  {content}
+                </Link>
+              ) : (
+                <div
+                  key={title}
+                  className="flex items-center gap-3 rounded-xl border border-[#ededed] p-3.5 text-left"
+                >
+                  {content}
+                </div>
+              );
+            })}
           </div>
         </SectionCard>
       </div>
@@ -1699,41 +1796,6 @@ function Reports({ company }: { company: Company }) {
       </SectionCard>
     </div>
   );
-}
-
-function downloadDemoReport(
-  title: string,
-  state: ReturnType<typeof useDemoStore>['state'],
-) {
-  const header = [
-    'Report',
-    'Batch',
-    'LOB',
-    'Method',
-    'Status',
-    'WIP',
-    'Actual output',
-  ];
-  const rows = state.batches.map((batch) => [
-    title,
-    batch.code,
-    batch.lob,
-    batch.method,
-    batch.status,
-    batch.wip,
-    batch.actualOutput,
-  ]);
-  const csv = [header, ...rows]
-    .map((row) =>
-      row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','),
-    )
-    .join('\n');
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `navfarm-${title.toLowerCase().replaceAll(' ', '-')}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 const SETTINGS_SECTIONS = [

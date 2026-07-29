@@ -54,3 +54,12 @@ Known blockers remain blocking; missing first-workspace/member actions are
 recommended, and unresolved accounting/industry policy is labelled
 `POLICY_PENDING`. The detailed accounting checks remain at
 `/{company}/accounting/readiness`.
+
+After setup creates a Workspace, operational entry is through its canonical
+Dashboard. Workspace Settings displays its owner Company, status, configured
+NOB, enabled LOBs/modules, member count and readiness. Authorized Company or
+Tenant administrators follow the explicit configuration link to
+`/{company}/workspaces/{workspace}`; an operational Manager does not acquire
+that company-level configuration authority. The application switcher is the
+primary route back to Company administration and clears workspace context
+atomically.

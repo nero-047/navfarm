@@ -57,11 +57,13 @@ This matrix maps implemented web screens and actions to required API endpoints. 
 | `/{company}/accounting/readiness` | Company accounting readiness | `/api/v1/companies/{companyId}/accounting/readiness` | GET | `company.view` | none | `operationsReadinessSchema` | Accounting configuration ready/incomplete | `phase3-repository.ts` |
 | `/{company}/workspaces` | List/select workspaces | `/api/v1/tenants/{tenantId}/companies/{companyId}/workspaces` | GET | tenant admin or explicit workspace membership | none | `workspaceSchema[]` | Loading, retry, empty/access state | `mock-repository.ts` |
 | `/{company}/workspaces/new` | Create workspace | `/api/v1/tenants/{tenantId}/companies/{companyId}/workspaces` | POST | `canManageWorkspaces` | `workspaceCreateSchema` | `workspaceSchema` | Field/error/saving states | `mock-repository.ts` |
-| `/{company}/workspaces/{workspace}` | Detail/edit/readiness/members | `/api/v1/companies/{companyId}/workspaces/{workspaceId}`, `/readiness`, `/members` | GET/PATCH/POST | explicit workspace view; tenant admin for mutation | workspace update/member schemas | workspace/readiness/member schemas | Loading, retry, empty members | `mock-repository.ts` |
+| `/{company}/workspaces/{workspace}` | Detail/edit/readiness/members | `/api/v1/tenants/{tenantId}/companies/{companyId}/workspaces/{workspaceId}`, `/readiness`, `/members` | GET/PATCH/POST | explicit workspace view; Company/Tenant admin for mutation | workspace update/member schemas | workspace/readiness/member schemas | Loading, retry, empty members | `mock-repository.ts`; old `/companies/...` form is compatibility-only |
 | shell context switcher | Select Company administration or a workspace | `/api/v1/auth/context` | PUT | authorized tenant/company/workspace membership | full `{ tenantId, companyId, workspaceId }` tuple; `workspaceId: null` for company mode | `authSessionSchema` | Searchable authorized hierarchy; atomic context change | `mock-repository.ts` |
-| canonical workspace dashboard/batches | Bootstrap/list/create/save/transition | `/api/v1/tenants/{tenantId}/companies/{companyId}/workspaces/{workspaceId}/operational-bootstrap`, `/batches`, `/batches/{batchId}/transitions` | GET/POST/PUT | workspace batch capabilities | operational schemas | operational schemas | Workspace-isolated loading/errors | `operational-repository.ts` |
+| canonical workspace dashboard/batches | Dashboard/bootstrap/list/create/save/transition | `/api/v1/tenants/{tenantId}/companies/{companyId}/workspaces/{workspaceId}/dashboard`, `/operational-bootstrap`, `/batches`, `/batches/{batchId}/transitions` | GET/POST/PUT | workspace view/batch capabilities | operational schemas | `workspaceDashboardSchema` and operational schemas | Workspace-isolated loading/errors | `operational-repository.ts` |
 | canonical workspace operations/QC/QR | Daily operations, QC disposition, QR packs | same scoped root plus `/operations`, `/quality-lots`, `/qr-packs` | GET/POST/PUT | workspace operation/QC/traceability capabilities | operational schemas | operational schemas | Mutation controls follow workspace role | `operational-repository.ts` |
 | canonical workspace resources/costing/reports | Resources/usages, costing, journals, variances, summary | same scoped root plus `/resources`, `/resource-usages`, `/costing`, `/journals`, `/variances`, `/reports/summary` | GET/POST/PUT | workspace resource/report capabilities | operational schemas | operational schemas | Empty collections and typed errors | `operational-repository.ts` |
+| canonical Workspace Masters | Read workspace-owned operational masters | same scoped root plus `/masters` | GET | explicit active workspace membership | none | `workspaceMasterSchema[]` | Loading, retry, empty; no Company master mutation | `mock-repository.ts` |
+| canonical Workspace Settings | Read identity, ownership, NOB/LOB/modules/readiness/member summary/current role | same scoped root plus `/settings` | GET | explicit active workspace membership | none | `workspaceSettingsSchema` | Loading, retry, read-only role state | `mock-repository.ts` |
 
 Milestone 1 migrated `/admin/audit` and `/console/notifications` off the legacy
 authentication helpers and removed the legacy company-selection client/cache
@@ -77,3 +79,11 @@ and runtime response validation are ready; durable users, invitations,
 memberships, roles, settings, and readiness endpoints are not implemented by
 the real backend. Final backend route/DTO mapping remains a handoff item rather
 than a direct dependency on Arun's current routes.
+
+Milestone 3 uses the nested tenant/company/workspace convention for every
+changed workspace client call. The older company-only workspace-detail
+endpoints remain response-compatible adapters for Milestone 2 callers but are
+not the canonical backend handoff. Dashboard, Workspace Masters and Workspace
+Settings endpoints are implemented only in the mock boundary; their durable
+backend resources are missing. Costing/report values remain non-authoritative
+demo projections and no production export is claimed.

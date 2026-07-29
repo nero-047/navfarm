@@ -28,7 +28,10 @@ function session(options: {
     workspaceId: 'workspace-1', tenantId: 'tenant-1', companyId: companies[0]?.companyId ?? 'company-1',
     workspaceCode: 'WS_1', workspaceSlug: 'workspace-1', workspaceName: 'Workspace 1',
     workspaceType: 'POULTRY' as const, status: 'ACTIVE' as const,
+    configuredNob: { nobId: 'nob-poultry', code: 'POULTRY' as const, name: 'Poultry' },
+    enabledLobs: ['Rearing & Breeding'],
     enabledModules: ['Batches', 'QC'],
+    memberCount: 1,
     role: 'MANAGER' as const,
     permissions: ['workspaces.view', 'batches.view', 'batches.create', 'operations.create', 'quality.view', 'quality.manage'] as const,
   };

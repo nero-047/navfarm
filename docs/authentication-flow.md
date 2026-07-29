@@ -37,6 +37,19 @@ service is not implemented.
 Legacy token, browser-storage, and module-global session helpers have no live
 consumer.
 
+The authenticated shell uses the same context operation as
+`/context-selection`. It groups active accessible companies and their active
+assigned workspaces, prevents duplicate submissions, marks the selected row,
+and preserves the previous tuple when the API rejects a change. Company
+administration always sends `workspaceId: null`. Workspace selection sends the
+workspace's owning tenant and company in the same request. Search, open/close,
+Escape, focus restoration, focus containment and native button keyboard
+activation are UI behavior only and create no second context store.
+
+After a successful workspace change, only a supported canonical module list
+may be retained. Record identifiers are stripped. A module hidden by the target
+workspace's enabled-module or capability set falls back to Dashboard.
+
 Mock process memory resets on Next.js restart. The optional reset endpoint
 requires `NAVFARM_ENABLE_MOCK_RESET=true`, is absent in production, and is for
 development/tests only. None of this represents durable authentication,

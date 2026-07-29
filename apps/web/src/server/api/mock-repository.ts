@@ -114,11 +114,65 @@ const seedCompanies: JsonRecord[] = [
 
 const fixtureDate = '2026-07-01T00:00:00.000Z';
 const seedWorkspaces: Workspace[] = [
-  { workspaceId: 'workspace-green-poultry', tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceCode: 'GV_POULTRY', workspaceSlug: 'poultry-operations', workspaceName: 'Poultry Operations', workspaceType: 'POULTRY', status: 'ACTIVE', primaryNobId: 'nob-poultry', enabledModules: ['Batches', 'Inventory', 'QC', 'QR', 'Finance', 'Analytics'], readiness: { percentage: 100, operationalReady: true, blockingRequirements: [] }, createdAt: fixtureDate, updatedAt: fixtureDate },
-  { workspaceId: 'workspace-green-feed', tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceCode: 'GV_FEED', workspaceSlug: 'feed-mill', workspaceName: 'Feed Mill', workspaceType: 'FEED_PROCESSING', status: 'ACTIVE', primaryNobId: 'nob-processing', enabledModules: ['Batches', 'Inventory', 'QC', 'Finance'], readiness: { percentage: 82, operationalReady: false, blockingRequirements: ['Complete resource-rate setup'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
-  { workspaceId: 'workspace-harvest-crops', tenantId: 'tenant-demo', companyId: 'company-harvest-ridge', workspaceCode: 'HR_CROPS', workspaceSlug: 'crop-production', workspaceName: 'Crop Production', workspaceType: 'AGRICULTURE', status: 'ACTIVE', primaryNobId: 'nob-agriculture', enabledModules: ['Batches', 'Inventory', 'QC', 'Finance', 'Analytics'], readiness: { percentage: 100, operationalReady: true, blockingRequirements: [] }, createdAt: fixtureDate, updatedAt: fixtureDate },
-  { workspaceId: 'workspace-bluewater-aqua', tenantId: 'tenant-second', companyId: 'company-bluewater', workspaceCode: 'BW_AQUA', workspaceSlug: 'aquaculture', workspaceName: 'Aquaculture', workspaceType: 'AQUACULTURE', status: 'DRAFT', primaryNobId: 'nob-aquaculture', enabledModules: ['Batches', 'Inventory', 'QC', 'QR'], readiness: { percentage: 42, operationalReady: false, blockingRequirements: ['Complete company onboarding', 'Configure QC parameters'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
-  { workspaceId: 'workspace-green-inactive', tenantId: 'tenant-demo', companyId: 'company-green-valley', workspaceCode: 'GV_ARCHIVE', workspaceSlug: 'archived-operations', workspaceName: 'Archived Operations', workspaceType: 'POULTRY', status: 'INACTIVE', primaryNobId: 'nob-poultry', enabledModules: ['Batches'], readiness: { percentage: 100, operationalReady: false, blockingRequirements: ['Workspace is inactive'] }, createdAt: fixtureDate, updatedAt: fixtureDate },
+  {
+    workspaceId: 'workspace-green-poultry', tenantId: 'tenant-demo',
+    companyId: 'company-green-valley', workspaceCode: 'GV_POULTRY',
+    workspaceSlug: 'poultry-operations', workspaceName: 'Poultry Operations',
+    workspaceType: 'POULTRY', status: 'ACTIVE', primaryNobId: 'nob-poultry',
+    configuredNob: { nobId: 'nob-poultry', code: 'POULTRY', name: 'Poultry' },
+    enabledLobs: ['Rearing & Breeding', 'Laying', 'Commercial Broiler'],
+    enabledModules: ['Batches', 'Inventory', 'QC', 'QR', 'Resources', 'Finance', 'Analytics'],
+    memberCount: 4,
+    readiness: { percentage: 100, operationalReady: true, blockingRequirements: [] },
+    createdAt: fixtureDate, updatedAt: fixtureDate,
+  },
+  {
+    workspaceId: 'workspace-green-feed', tenantId: 'tenant-demo',
+    companyId: 'company-green-valley', workspaceCode: 'GV_FEED',
+    workspaceSlug: 'feed-mill', workspaceName: 'Feed Mill',
+    workspaceType: 'FEED_PROCESSING', status: 'ACTIVE', primaryNobId: 'nob-processing',
+    configuredNob: { nobId: 'nob-processing', code: 'PROCESSING', name: 'Feed & Processing' },
+    enabledLobs: ['Feed Production'],
+    enabledModules: ['Batches', 'Inventory', 'QC', 'Finance'],
+    memberCount: 1,
+    readiness: { percentage: 82, operationalReady: false, blockingRequirements: ['Complete resource-rate setup'] },
+    createdAt: fixtureDate, updatedAt: fixtureDate,
+  },
+  {
+    workspaceId: 'workspace-harvest-crops', tenantId: 'tenant-demo',
+    companyId: 'company-harvest-ridge', workspaceCode: 'HR_CROPS',
+    workspaceSlug: 'crop-production', workspaceName: 'Crop Production',
+    workspaceType: 'AGRICULTURE', status: 'ACTIVE', primaryNobId: 'nob-agriculture',
+    configuredNob: { nobId: 'nob-agriculture', code: 'AGRICULTURE', name: 'Agriculture' },
+    enabledLobs: ['Crop Farming'],
+    enabledModules: ['Batches', 'Inventory', 'QC', 'Resources', 'Finance', 'Analytics'],
+    memberCount: 1,
+    readiness: { percentage: 100, operationalReady: true, blockingRequirements: [] },
+    createdAt: fixtureDate, updatedAt: fixtureDate,
+  },
+  {
+    workspaceId: 'workspace-bluewater-aqua', tenantId: 'tenant-second',
+    companyId: 'company-bluewater', workspaceCode: 'BW_AQUA',
+    workspaceSlug: 'aquaculture', workspaceName: 'Aquaculture Operations',
+    workspaceType: 'AQUACULTURE', status: 'DRAFT', primaryNobId: 'nob-aquaculture',
+    configuredNob: { nobId: 'nob-aquaculture', code: 'AQUACULTURE', name: 'Aquaculture' },
+    enabledLobs: ['Fish Farming', 'Aqua Slaughter'],
+    enabledModules: ['Batches', 'Inventory', 'QC', 'QR'],
+    memberCount: 2,
+    readiness: { percentage: 42, operationalReady: false, blockingRequirements: ['Complete company onboarding', 'Configure QC parameters'] },
+    createdAt: fixtureDate, updatedAt: fixtureDate,
+  },
+  {
+    workspaceId: 'workspace-green-inactive', tenantId: 'tenant-demo',
+    companyId: 'company-green-valley', workspaceCode: 'GV_ARCHIVE',
+    workspaceSlug: 'archived-operations', workspaceName: 'Archived Operations',
+    workspaceType: 'POULTRY', status: 'INACTIVE', primaryNobId: 'nob-poultry',
+    configuredNob: { nobId: 'nob-poultry', code: 'POULTRY', name: 'Poultry' },
+    enabledLobs: ['Rearing & Breeding'], enabledModules: ['Batches'],
+    memberCount: 1,
+    readiness: { percentage: 100, operationalReady: false, blockingRequirements: ['Workspace is inactive'] },
+    createdAt: fixtureDate, updatedAt: fixtureDate,
+  },
 ];
 const PLATFORM_PERMISSIONS: Permission[] = ['platform.manage', 'tenant.view', 'tenant.manage'];
 const TENANT_ADMIN_PERMISSIONS: Permission[] = [
@@ -380,6 +434,60 @@ function sessionRecord(request: Request) {
 function companyById(id: string) {
   return state.companies.find((company) => company.company_id === id);
 }
+function workspacePayload(workspace: Workspace): Workspace {
+  return {
+    ...workspace,
+    memberCount: state.workspaceMembers.filter(
+      (member) =>
+        member.workspaceId === workspace.workspaceId &&
+        member.status === 'ACTIVE',
+    ).length,
+  };
+}
+function defaultWorkspaceDomain(workspaceType: Workspace['workspaceType']) {
+  if (workspaceType === 'AGRICULTURE') {
+    return {
+      primaryNobId: 'nob-agriculture',
+      configuredNob: {
+        nobId: 'nob-agriculture' as const,
+        code: 'AGRICULTURE' as const,
+        name: 'Agriculture',
+      },
+      enabledLobs: ['Crop Farming'],
+    };
+  }
+  if (workspaceType === 'AQUACULTURE') {
+    return {
+      primaryNobId: 'nob-aquaculture',
+      configuredNob: {
+        nobId: 'nob-aquaculture' as const,
+        code: 'AQUACULTURE' as const,
+        name: 'Aquaculture',
+      },
+      enabledLobs: ['Fish Farming'],
+    };
+  }
+  if (workspaceType === 'FEED_PROCESSING') {
+    return {
+      primaryNobId: 'nob-processing',
+      configuredNob: {
+        nobId: 'nob-processing' as const,
+        code: 'PROCESSING' as const,
+        name: 'Feed & Processing',
+      },
+      enabledLobs: ['Feed Production'],
+    };
+  }
+  return {
+    primaryNobId: 'nob-poultry',
+    configuredNob: {
+      nobId: 'nob-poultry' as const,
+      code: 'POULTRY' as const,
+      name: 'Poultry',
+    },
+    enabledLobs: ['Rearing & Breeding'],
+  };
+}
 function sessionPayload(record: SessionRecord): AuthSession {
   const user = state.users.find((item) => item.userId === record.userId)!;
   const companies = user.companies.map((membership) => {
@@ -409,7 +517,13 @@ function sessionPayload(record: SessionRecord): AuthSession {
   });
   const workspaces = user.workspaces.flatMap((membership) => {
     const workspace = state.workspaces.find((item) => item.workspaceId === membership.workspaceId);
-    return workspace ? [{ ...workspace, role: membership.role, permissions: membership.permissions }] : [];
+    return workspace
+      ? [{
+          ...workspacePayload(workspace),
+          role: membership.role,
+          permissions: membership.permissions,
+        }]
+      : [];
   });
   return {
     state: user.suspended ? 'SUSPENDED' : 'AUTHENTICATED',
@@ -724,18 +838,30 @@ export async function handleMockRequest(request: Request, path: string, requestI
           .filter((membership) => membership.status === 'ACTIVE')
           .map((membership) => membership.workspaceId),
       );
-      return json(state.workspaces.filter((workspace) => workspace.companyId === companyId && (workspaceAdmin || allowed.has(workspace.workspaceId))));
+      return json(
+        state.workspaces
+          .filter(
+            (workspace) =>
+              workspace.companyId === companyId &&
+              (workspaceAdmin || allowed.has(workspace.workspaceId)),
+          )
+          .map(workspacePayload),
+      );
     }
     if (method === 'POST' && workspaceAdmin) {
       const parsed = workspaceCreateSchema.safeParse(input);
       if (!parsed.success) return apiErrorResponse(422, 'Workspace details are invalid.', requestId, parsed.error.flatten());
       const now = new Date().toISOString();
+      const domain = defaultWorkspaceDomain(parsed.data.workspaceType);
       const created = workspaceSchema.parse({
         ...parsed.data,
+        ...domain,
+        primaryNobId: parsed.data.primaryNobId ?? domain.primaryNobId,
         workspaceId: `workspace-${randomUUID()}`,
         tenantId,
         companyId,
         status: 'DRAFT',
+        memberCount: 0,
         readiness: { percentage: 0, operationalReady: false, blockingRequirements: ['Configure NOB/LOB and operational parameters'] },
         createdAt: now,
         updatedAt: now,
@@ -744,13 +870,40 @@ export async function handleMockRequest(request: Request, path: string, requestI
       return json(created, 201);
     }
   }
-  const workspaceItemMatch = path.match(/^\/companies\/([^/]+)\/workspaces\/([^/]+)(?:\/(readiness|members))?$/);
+  const nestedWorkspaceItemMatch = path.match(
+    /^\/tenants\/([^/]+)\/companies\/([^/]+)\/workspaces\/([^/]+)(?:\/(readiness|members|settings|masters))?$/,
+  );
+  const legacyWorkspaceItemMatch = path.match(
+    /^\/companies\/([^/]+)\/workspaces\/([^/]+)(?:\/(readiness|members))?$/,
+  );
+  const workspaceItemMatch = nestedWorkspaceItemMatch
+    ? {
+        tenantId: nestedWorkspaceItemMatch[1],
+        companyId: nestedWorkspaceItemMatch[2],
+        workspaceId: nestedWorkspaceItemMatch[3],
+        child: nestedWorkspaceItemMatch[4],
+      }
+    : legacyWorkspaceItemMatch
+      ? {
+          tenantId: session.activeTenantId,
+          companyId: legacyWorkspaceItemMatch[1],
+          workspaceId: legacyWorkspaceItemMatch[2],
+          child: legacyWorkspaceItemMatch[3],
+        }
+      : null;
   if (workspaceItemMatch) {
-    const [, companyId, workspaceId, child] = workspaceItemMatch;
+    const { tenantId, companyId, workspaceId, child } = workspaceItemMatch;
     const workspace = state.workspaces.find((item) => item.companyId === companyId && item.workspaceId === workspaceId);
     const assigned = state.users.find((user) => user.userId === session.user.userId)!.workspaces
       .some((item) => item.workspaceId === workspaceId && item.status === 'ACTIVE');
-    if (!workspace || (!workspaceAdmin && !assigned)) return apiErrorResponse(404, 'Workspace not found.', requestId);
+    if (
+      !workspace ||
+      workspace.tenantId !== tenantId ||
+      tenantId !== session.activeTenantId ||
+      (!workspaceAdmin && !assigned)
+    ) {
+      return apiErrorResponse(404, 'Workspace not found.', requestId);
+    }
     if (child === 'members') {
       if (method === 'GET') return json(state.workspaceMembers.filter((member) => member.workspaceId === workspaceId));
       if (method === 'POST' && workspaceAdmin) {
@@ -767,11 +920,72 @@ export async function handleMockRequest(request: Request, path: string, requestI
           status: 'ACTIVE',
         };
         state.workspaceMembers.push(created);
+        workspace.memberCount = workspacePayload(workspace).memberCount;
         return json(created, 201);
       }
       return apiErrorResponse(403, 'Tenant workspace administration is required.', requestId);
     }
-    if (method === 'GET') return json(child === 'readiness' ? workspace.readiness : workspace);
+    if (child === 'settings' && method === 'GET') {
+      const company = companyById(companyId)!;
+      const membership = session.workspaces.find(
+        (item) => item.workspaceId === workspaceId,
+      );
+      if (!membership) {
+        return apiErrorResponse(403, 'Workspace membership is required.', requestId);
+      }
+      return json({
+        ...workspacePayload(workspace),
+        companyName: String(company.company_display_name || company.company_name),
+        currentUserRole: membership.role,
+        currentUserPermissions: membership.permissions,
+      });
+    }
+    if (child === 'masters' && method === 'GET') {
+      const masters = [
+        {
+          masterId: `${workspaceId}-location`,
+          type: 'LOCATION',
+          code: 'PRIMARY_SITE',
+          name: workspace.enabledLobs[0]
+            ? `${workspace.enabledLobs[0]} primary site`
+            : 'Primary operational site',
+          nobCode: workspace.configuredNob.code,
+          lobName: workspace.enabledLobs[0] ?? null,
+          scope: 'WORKSPACE',
+          status: 'ACTIVE',
+        },
+        {
+          masterId: `${workspaceId}-parameter`,
+          type: 'OPERATIONAL_PARAMETER',
+          code: 'DAILY_OUTPUT',
+          name: `${workspace.configuredNob.name} daily output`,
+          nobCode: workspace.configuredNob.code,
+          lobName: workspace.enabledLobs[0] ?? null,
+          scope: 'WORKSPACE',
+          status: 'ACTIVE',
+        },
+        ...(workspace.enabledModules.includes('QC')
+          ? [{
+              masterId: `${workspaceId}-qc`,
+              type: 'QC_PARAMETER',
+              code: 'QC_RELEASE',
+              name: 'QC release check',
+              nobCode: workspace.configuredNob.code,
+              lobName: workspace.enabledLobs[0] ?? null,
+              scope: 'WORKSPACE',
+              status: 'ACTIVE',
+            }]
+          : []),
+      ];
+      return json(masters);
+    }
+    if (method === 'GET') {
+      return json(
+        child === 'readiness'
+          ? workspace.readiness
+          : workspacePayload(workspace),
+      );
+    }
     if (method === 'PATCH' && workspaceAdmin) {
       const parsed = workspaceSchema.partial().omit({ workspaceId: true, tenantId: true, companyId: true, createdAt: true }).safeParse(input);
       if (!parsed.success) return apiErrorResponse(422, 'Workspace changes are invalid.', requestId, parsed.error.flatten());

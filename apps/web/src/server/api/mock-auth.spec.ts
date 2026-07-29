@@ -199,6 +199,45 @@ describe('mock HTTP-only session authentication', () => {
     });
   });
 
+  it('serves workspace metadata, settings, and masters from the canonical nested scope', async () => {
+    const login = await handleMockRequest(new Request('http://localhost/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'manager@navfarm.demo', password: 'Demo123!' }),
+    }), '/auth/login', 'request-workspace-metadata-login');
+    const cookie = login.headers.get('set-cookie')!.split(';')[0];
+    const root = '/tenants/tenant-demo/companies/company-green-valley/workspaces/workspace-green-poultry';
+
+    const settings = await handleMockRequest(
+      new Request(`http://localhost/api/v1${root}/settings`, {
+        headers: { cookie },
+      }),
+      `${root}/settings`,
+      'request-workspace-settings',
+    );
+    expect(settings.status).toBe(200);
+    await expect(settings.json()).resolves.toMatchObject({
+      companyId: 'company-green-valley',
+      workspaceName: 'Poultry Operations',
+      configuredNob: { code: 'POULTRY', name: 'Poultry' },
+      enabledLobs: ['Rearing & Breeding', 'Laying', 'Commercial Broiler'],
+      currentUserRole: 'MANAGER',
+      memberCount: 4,
+    });
+
+    const masters = await handleMockRequest(
+      new Request(`http://localhost/api/v1${root}/masters`, {
+        headers: { cookie },
+      }),
+      `${root}/masters`,
+      'request-workspace-masters',
+    );
+    expect(masters.status).toBe(200);
+    const payload = await masters.json() as Array<{ scope: string }>;
+    expect(payload.length).toBeGreaterThan(0);
+    expect(payload.every((master) => master.scope === 'WORKSPACE')).toBe(true);
+  });
+
   it('declares every demo identity and all memberships explicitly', () => {
     for (const identity of mockFixtures.fixtureUsers) {
       expect(identity.authenticationState).toMatch(/AUTHENTICATED|MFA_REQUIRED|SUSPENDED/);

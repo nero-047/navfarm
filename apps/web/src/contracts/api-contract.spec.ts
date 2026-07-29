@@ -83,7 +83,11 @@ describe('frozen API contract primitives', () => {
       ['GET', '/companies/company-1/setup/status', responseSchemaFor('GET', '/companies/company-1/setup/status')],
       ['POST', '/companies/company-1/masters/items/import/validate', responseSchemaFor('POST', '/companies/company-1/masters/items/import/validate')],
       ['GET', '/companies/company-1/accounting/readiness', responseSchemaFor('GET', '/companies/company-1/accounting/readiness')],
+      ['GET', '/tenants/tenant-1/companies/company-1/workspaces/workspace-1/settings', responseSchemaFor('GET', '/tenants/tenant-1/companies/company-1/workspaces/workspace-1/settings')],
+      ['GET', '/tenants/tenant-1/companies/company-1/workspaces/workspace-1/masters', responseSchemaFor('GET', '/tenants/tenant-1/companies/company-1/workspaces/workspace-1/masters')],
     ];
-    expect(routes.map(([, , schema]) => Boolean(schema))).toEqual([true, true, true, true, true]);
+    expect(routes.map(([, , schema]) => Boolean(schema))).toEqual([
+      true, true, true, true, true, true, true,
+    ]);
   });
 });

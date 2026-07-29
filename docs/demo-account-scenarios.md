@@ -36,3 +36,18 @@ sessions. Assigning a workspace makes it visible on session refresh; removing
 the assignment revokes it. Changing a company role leaves every workspace role
 unchanged, and changing a workspace role leaves the company role unchanged.
 Mock reset restores the canonical membership, role, and invitation fixtures.
+
+Milestone 3 switcher outcomes:
+
+- `multi@navfarm.demo` sees Green Valley, Harvest Ridge and BlueWater company
+  administration choices, but only active explicitly assigned workspaces.
+  Inactive company/workspace rows and BlueWater's draft workspace are absent.
+- Poultry Operations is configured as Poultry with Rearing & Breeding, Laying
+  and Commercial Broiler LOBs. Feed Mill is Feed & Processing / Feed
+  Production. Crop Production is Agriculture / Crop Farming.
+- `manager@navfarm.demo` and `viewer@navfarm.demo` see the same assigned
+  workspace identity but different mutation controls. Viewer can read the
+  supported Operations page; only Manager can record.
+- Company Administrator, Tenant Administrator, Accountant, Auditor and
+  no-workspace fixtures gain no operational entry from the switcher without a
+  separate active workspace membership.
