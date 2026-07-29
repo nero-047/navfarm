@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { AuthSession } from '../../contracts/api';
+import ThemeToggle from '../../components/source-ui/theme-toggle';
 
 export default function ContextSelectionPage() {
   const {
@@ -30,7 +31,7 @@ export default function ContextSelectionPage() {
     return (
       <div
         role="status"
-        className="flex min-h-screen items-center justify-center bg-[#f3f5f8] text-sm"
+        className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-sm text-[var(--text-secondary)]"
       >
         Loading companies and workspaces…
       </div>
@@ -78,27 +79,28 @@ export default function ContextSelectionPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f5f8] px-5 py-10 sm:py-12">
+    <main className="nf-context-page min-h-screen bg-[var(--bg)] px-5 py-8 text-[var(--text-secondary)] sm:py-12">
       <div className="mx-auto max-w-5xl">
+        <div className="mb-6 flex justify-end"><ThemeToggle /></div>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1c4aa9]">
               Company and workspace
             </p>
-            <h1 className="mt-2 text-3xl font-semibold text-[#252b3d]">
+            <h1 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">
               Where would you like to work?
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#707789]">
+            <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
               Open company administration or choose an assigned operational workspace.
               The full context is validated before navigation.
             </p>
-            <p className="mt-3 text-xs font-medium text-[#4f5668]">
+            <p className="mt-3 text-xs font-medium text-[var(--text-secondary)]">
               Signed in as {session.user.fullName} · {session.user.email}
             </p>
           </div>
           <button
             onClick={() => void logout().then(() => router.replace('/login'))}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dfe4ec] bg-white px-4 text-xs font-semibold text-[#4f5668]"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-semibold text-[var(--text-primary)]"
           >
             <LogOut size={15} /> Sign out
           </button>
@@ -113,7 +115,7 @@ export default function ContextSelectionPage() {
         {session.user.platformRole === 'SYSTEM_ADMIN' ? (
           <button
             onClick={() => router.push('/admin/dashboard')}
-            className="mt-8 flex w-full items-center gap-4 rounded-2xl border border-[#dfe4ec] bg-white p-5 text-left shadow-sm"
+            className="mt-8 flex min-h-20 w-full items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 text-left shadow-[var(--shadow-sm)]"
           >
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0b1248] text-white">
               <ShieldAlert size={20} />
@@ -136,7 +138,7 @@ export default function ContextSelectionPage() {
             return (
               <section
                 key={company.companyId}
-                className="rounded-2xl border border-[#dfe4ec] bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)]"
               >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#1c4aa9]">
@@ -160,7 +162,7 @@ export default function ContextSelectionPage() {
                       company.companySlug,
                       company.onboardingStatus,
                     )}
-                    className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#e7eaf0] px-3 text-left text-xs enabled:hover:border-[#1c4aa9] disabled:opacity-60"
+                    className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[var(--border)] px-3 text-left text-xs enabled:hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Settings2 size={15} className="text-[#1c4aa9]" />
                     <span className="flex-1">
@@ -180,7 +182,7 @@ export default function ContextSelectionPage() {
                       aria-label={`${company.companyName} workspace ${workspace.workspaceName}`}
                       disabled={selecting !== null}
                       onClick={() => void chooseWorkspace(company, workspace)}
-                      className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#e7eaf0] px-3 text-left text-xs enabled:hover:border-[#1c4aa9] disabled:opacity-60"
+                      className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[var(--border)] px-3 text-left text-xs enabled:hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Layers3 size={15} className="text-[#1c4aa9]" />
                       <span className="flex-1">
@@ -194,7 +196,7 @@ export default function ContextSelectionPage() {
                   ))}
 
                   {!workspaces.length ? (
-                    <p className="rounded-xl bg-[#f7f8fa] px-3 py-3 text-[11px] leading-5 text-[#707789]">
+                    <p className="rounded-xl bg-[var(--surface-raised)] px-3 py-3 text-[11px] leading-5 text-[var(--text-secondary)]">
                       No active operational workspace is assigned. Company administration
                       remains available when permitted.
                     </p>
@@ -206,9 +208,9 @@ export default function ContextSelectionPage() {
         </div>
 
         {!companies.length && session.user.platformRole !== 'SYSTEM_ADMIN' ? (
-          <div className="mt-8 rounded-2xl border border-[#dfe4ec] bg-white p-8 text-center">
-            <h2 className="text-lg font-semibold text-[#252b3d]">No company assigned</h2>
-            <p className="mt-2 text-sm text-[#707789]">
+          <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">No company assigned</h2>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
               Your account has no active company membership. Contact an administrator for access.
             </p>
           </div>

@@ -203,3 +203,11 @@ Unresolved:
 - Whether costing snapshots are continuously authoritative before close.
 - Whether variance generation happens at close, period close or both.
 - BIO_ASSET valuation policy and measurement timing.
+
+## Milestone 4 disposition
+
+The final presentation milestone resolves no product or backend policy. Visual
+readiness must not be read as resolution of custom-role semantics, the
+15-step/13-route setup alignment, authoritative costing timing, notification
+delivery, report as-of semantics, public trace signing, retention, or
+compliance rules. Those decisions remain backend/product blockers.

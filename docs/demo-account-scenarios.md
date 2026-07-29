@@ -51,3 +51,16 @@ Milestone 3 switcher outcomes:
 - Company Administrator, Tenant Administrator, Accountant, Auditor and
   no-workspace fixtures gain no operational entry from the switcher without a
   separate active workspace membership.
+
+## Presentation scenarios
+
+- `system@navfarm.demo`, `tenant@navfarm.demo`, `companyadmin@navfarm.demo`,
+  and `manager@navfarm.demo` are the representative Platform, Tenant, Company,
+  and Workspace theme checks.
+- `viewer@navfarm.demo` is the final mobile/read-only evidence account.
+- `multi@navfarm.demo` is the Company/Workspace switcher evidence account; the
+  switcher must never display Tenant/Organisation rows.
+- `mfa@navfarm.demo` and `suspended@navfarm.demo` remain presentation examples,
+  not production security fixtures.
+- Every demo credential and account card is labelled mock-only. Theme choice
+  persists independently and does not change any account’s session outcome.

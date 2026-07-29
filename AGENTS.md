@@ -117,3 +117,12 @@
 - The user may have active route migrations or other uncommitted frontend changes. Inspect `git status` and preserve unrelated work.
 - Run web and mobile validation through their Nx targets with `pnpm nx ...` as required by the workspace guidance above.
 - For frontend demo work, verify the rendered UI at desktop and relevant mobile viewport sizes, not only types or source code.
+
+## Final Demo Presentation Baseline
+
+- Canonical web routes use the shared semantic tokens in `apps/web/src/app/global.css`; new components should not reintroduce light-only surfaces.
+- Light/dark persistence is a UI preference only (`navfarm_theme`) and must never carry authentication, authorization, tenant, company, workspace, or business state.
+- Platform and Tenant scopes show static scope identity. The interactive switcher remains Company/Workspace only.
+- Preserve labelled internal table scrolling, 44px touch targets, visible focus, reduced motion, and focus containment/restoration in dialogs and drawers.
+- Public trace must remain public-safe, visibly demo data, and free of certification or compliance claims.
+- The Milestone 4 evidence inventory and demonstration sequence are documented in `docs/frontend-api-readiness/demo-completion-status.md` and `docs/demo-presentation-guide.md`.

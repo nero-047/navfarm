@@ -166,6 +166,8 @@ export function CompanyReadinessPage() {
                     role="progressbar"
                     aria-label={`${section.title} progress`}
                     aria-valuenow={section.percentage}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
                   >
                     <div
                       className={`h-full rounded-full ${
@@ -232,7 +234,14 @@ export function CompanyReadinessPage() {
                     <strong className="text-2xl text-slate-950">
                       {workspace.percentage}%
                     </strong>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"
+                      role="progressbar"
+                      aria-label={`${workspace.workspaceName} readiness`}
+                      aria-valuenow={workspace.percentage}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
                       <div
                         className={`h-full rounded-full ${
                           workspace.status === 'READY'
@@ -267,24 +276,24 @@ export function CompanyReadinessPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
+      <section className="nf-warning-state rounded-2xl border p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-800" />
           <div className="min-w-0">
-            <h2 className="font-black text-amber-950">
+            <h2 className="font-black text-[var(--text-primary)]">
               Policy decisions pending
             </h2>
-            <p className="mt-1 text-sm text-amber-900">
+            <p className="mt-1 text-sm">
               These unresolved rules are explicitly non-blocking in the demo.
             </p>
             <div className="mt-4 space-y-3">
               {readiness.policyNotes.map((note) => (
                 <div
                   key={note.code}
-                  className="rounded-xl border border-amber-200 bg-white/70 p-4"
+                  className="rounded-xl border border-[var(--warning-border)] bg-[var(--surface)] p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-amber-950">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
                       {note.label}
                     </p>
                     <CompanyAdminBadge value={note.policy} />

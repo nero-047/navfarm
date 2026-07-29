@@ -69,22 +69,22 @@ export function WorkspaceIdentityBanner() {
 
   if (!companyMembership || !workspace) return null;
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--shadow-sm)]">
       <div className="min-w-0">
-        <p className="truncate text-xs font-semibold text-slate-950">
+        <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
           {companyMembership.companyName}
-          <span className="px-2 text-slate-300">/</span>
+          <span className="px-2 text-[var(--text-muted)]">/</span>
           {workspace.workspaceName}
         </p>
-        <p className="mt-1 truncate text-[10px] text-slate-500">
+        <p className="mt-1 truncate text-[10px] text-[var(--text-secondary)]">
           {workspace.configuredNob.name} · {workspace.enabledLobs.join(', ')}
         </p>
       </div>
       <div className="flex items-center gap-2">
-        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-800">
-          {workspace.role}
+        <span className="nf-info-state rounded-full border px-2.5 py-1 text-[10px] font-semibold">
+          Operational role · {workspace.role}
         </span>
-        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">
+        <span className="nf-warning-state rounded-full border px-2.5 py-1 text-[10px] font-semibold">
           Demo data
         </span>
       </div>
@@ -131,10 +131,10 @@ export function LegacyOperationalRedirect({
     session?.activeWorkspaceId, suffix, workspaces,
   ]);
 
-  if (!membership) return <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-sm text-red-800">Company access is not assigned.</div>;
+  if (!membership) return <div role="alert" className="nf-danger-state rounded-2xl border p-8 text-sm">Company access is not assigned.</div>;
   if (membership.onboardingStatus !== 'COMPLETED') {
     return <AccessState reason="onboarding_incomplete" companySlug={company} />;
   }
   if (!workspaces.length) return <AccessState reason="workspace_not_assigned" companySlug={company} noWorkspaceAssigned={!tenantAdmin} />;
-  return <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">{workspaces.length === 1 ? 'Opening your assigned workspace…' : 'Opening workspace selection…'}</div>;
+  return <div role="status" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 text-sm text-[var(--text-secondary)]">{workspaces.length === 1 ? 'Opening your assigned workspace…' : 'Opening workspace selection…'}</div>;
 }

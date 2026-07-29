@@ -63,3 +63,9 @@ Tenant administrators follow the explicit configuration link to
 that company-level configuration authority. The application switcher is the
 primary route back to Company administration and clears workspace context
 atomically.
+
+Milestone 4 does not change the documented onboarding steps, mandatory flags,
+readiness math, or workspace creation rules. It normalizes the responsive and
+theme presentation of those existing routes. Company readiness continues to
+describe `POLICY_PENDING` notes as non-blocking demo decisions, and Company
+administration continues to require no active workspace.

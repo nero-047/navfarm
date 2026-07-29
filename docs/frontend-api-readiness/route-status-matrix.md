@@ -40,3 +40,9 @@
 All routes under `apps/web/src/app` not named separately above are covered by
 their dynamic route family. `/{company}/roles` is the canonical company role
 catalogue; legacy settings/users aliases are absent from canonical navigation.
+
+Milestone 4 does not change canonicality or endpoint status. The same route
+families now share theme-aware presentation, explicit scope identity, specific
+access states, and responsive overflow coverage. Public trace remains a
+separate public-safe demo route, and compatibility operational routes remain
+redirect-only.

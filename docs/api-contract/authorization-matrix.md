@@ -118,3 +118,9 @@ tenant/company/workspace tuple plus explicit workspace membership. Their
 canonical mock endpoints do not grant configuration writes to Workspace
 Manager/Viewer. Company/Tenant administrators configure through the
 company-administration workspace endpoint and `workspaces.manage`.
+
+Milestone 4 presentation controls are authorization-neutral. Theme toggle,
+mobile drawer, scope identity cards, badges, and responsive table/card
+variants never alter the active tuple or capability set. `aria-current`,
+selected switcher state, and hidden mutation controls reflect the existing
+authorization result; they are not enforcement by themselves.

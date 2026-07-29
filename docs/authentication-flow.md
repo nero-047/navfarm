@@ -54,3 +54,13 @@ Mock process memory resets on Next.js restart. The optional reset endpoint
 requires `NAVFARM_ENABLE_MOCK_RESET=true`, is absent in production, and is for
 development/tests only. None of this represents durable authentication,
 production authorization, or a connected backend.
+
+## Final presentation behavior
+
+The root layout applies the saved light/dark preference before hydration to
+avoid a theme flash. That preference is independent of the mock session.
+Login and workflow inputs have visible labels and announced errors; demo
+credentials explicitly disclaim production authentication and email delivery.
+The mobile navigation drawer, context switcher, company dialogs, and account
+menu handle Escape and restore focus. Suspended accounts retain their specific
+reason and sign-out action in both themes and at mobile width.

@@ -284,7 +284,7 @@ export function CompanyMembersPage() {
               Invite member
             </button>
           ) : (
-            <span className="inline-flex min-h-10 items-center rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-900">
+            <span className="nf-warning-state inline-flex min-h-11 items-center rounded-lg border px-3 text-xs font-bold">
               <LockKeyhole className="mr-2 h-4 w-4" />
               Read only
             </span>
@@ -295,7 +295,7 @@ export function CompanyMembersPage() {
       {success ? <SuccessNotice message={success} /> : null}
       {error ? <ErrorState message={error} /> : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)] sm:p-5">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_190px_210px_auto]">
           <label className="relative">
             <span className="sr-only">Search members</span>
@@ -353,7 +353,7 @@ export function CompanyMembersPage() {
 
       {filteredMembers.length ? (
         <>
-          <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm lg:block">
+          <div role="region" aria-label="Company members table" tabIndex={0} className="hidden overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-sm)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] lg:block">
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
                 <tr>

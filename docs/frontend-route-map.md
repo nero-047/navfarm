@@ -106,3 +106,14 @@ enabled module and exact workspace capability. A switch preserves only a
 supported canonical module list. Any record-detail route drops the record ID;
 an unsupported destination opens the target Dashboard. Legacy company-only
 operational routes remain resolver-only compatibility routes.
+
+## Milestone 4 presentation state
+
+All canonical families above now share the same theme-aware shell and
+presentation primitives. Platform and Tenant show static scope ownership;
+Company pages explicitly remain usable without a workspace; Workspace pages
+show company, workspace, NOB/LOB, and operational role. The interactive
+switcher remains Company/Workspace only. Canonical route families are audited
+for document overflow at 1440×900, 1280×800, 1024×768, 768×1024, and 390×844.
+`/trace/{company}/{pack}` uses a separate public-safe surface with no protected
+navigation.

@@ -58,12 +58,12 @@ test('focused local-brand evidence', async ({ page }) => {
   await assertBrandAsset(page);
   await capture(page, 'expanded-desktop-sidebar');
 
-  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await page.getByRole('button', { name: 'Collapse sidebar' }).press('Enter');
   await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
   await assertBrandAsset(page);
   await capture(page, 'collapsed-desktop-sidebar');
 
-  await page.getByRole('button', { name: 'Expand sidebar' }).click();
+  await page.getByRole('button', { name: 'Expand sidebar' }).press('Enter');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await expect(page.getByRole('navigation')).toBeVisible();

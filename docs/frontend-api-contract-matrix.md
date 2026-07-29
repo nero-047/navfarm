@@ -41,3 +41,9 @@ Status: Web Phase 6 frontend proposal. These contracts are not evidence of backe
 | Reports page | derived from `state` | filters implicit | Totals/KPIs | Aggregations | Authoritative query/as-of semantics | `reports.view` | reports |
 
 All mutations must use the standard API error envelope, provide request IDs, and return the resulting typed entity or transition result. A generic `{ "success": true }` is not sufficient for these operational contracts.
+
+Milestone 4 adds no endpoint, payload, or production claim. Loading, empty,
+error, access, and theme states are now normalized at the presentation layer
+while preserving every contract boundary above. Public trace remains an
+illustrative unsigned demo payload until the backend defines signed public
+trace semantics.

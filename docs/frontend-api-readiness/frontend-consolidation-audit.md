@@ -167,3 +167,13 @@ Milestone 3 is complete for the frontend mock demo. Its recorded validation
 gate and focused screenshot audit pass. Real API integration remains blocked
 by the backend and later milestones; no production authentication,
 persistence, authorization, costing or reporting is claimed.
+
+## Milestone 4 presentation audit
+
+The canonical demo now uses one theme-aware visual system and shared
+interaction states across Platform, Tenant, Company, Workspace, authentication,
+and public trace. Static scope identity avoids reintroducing Tenant switching.
+All canonical route groups pass document-overflow checks at the five required
+viewports, and focused keyboard tests cover the mobile drawer, switcher, and
+company dialogs. The canonical demo estimate rises to 96%; API-boundary
+readiness remains 72% because no backend contract was added or reconciled.

@@ -22,6 +22,7 @@
   --color-navy-light: #18225f;
   --color-blue-accent: #2457b7;
   --color-blue-soft: #eef4ff;
+  --brand-word: #0b1248;
 
   /* Semantic design tokens */
   --bg: #f5f5f7;
@@ -40,6 +41,14 @@
   --success: #248a3d;
   --warning: #9a6700;
   --info: #0066cc;
+  --danger-soft: #fff1f0;
+  --danger-border: #f3c5c1;
+  --success-soft: #edf9f0;
+  --success-border: #bfe2c7;
+  --warning-soft: #fff8e6;
+  --warning-border: #ead8a1;
+  --info-soft: #eef4ff;
+  --info-border: #bfd1f2;
 
   --sidebar-bg: #0b1248;
   --sidebar-border: rgba(255, 255, 255, 0.1);
@@ -115,7 +124,135 @@ input, select, textarea {
 .nf-glass { background: var(--surface-overlay); backdrop-filter: blur(20px) saturate(160%); }
 .nf-card { border: 1px solid var(--card-border); background: var(--card-bg); border-radius: var(--radius-lg); }
 .nf-touch { min-height: 44px; min-width: 44px; }
+.nf-page { color: var(--text-secondary); background: var(--bg); }
+.nf-surface { color: var(--text-secondary); background: var(--surface); border-color: var(--border); }
+.nf-panel { color: var(--text-secondary); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.nf-muted-surface { background: var(--surface-raised); }
+.nf-primary-text { color: var(--text-primary); }
+.nf-secondary-text { color: var(--text-secondary); }
+.nf-muted-text { color: var(--text-muted); }
+.nf-accent-text { color: var(--accent); }
+.nf-danger-state { color: var(--danger); background: var(--danger-soft); border-color: var(--danger-border); }
+.nf-success-state { color: var(--success); background: var(--success-soft); border-color: var(--success-border); }
+.nf-warning-state { color: var(--warning); background: var(--warning-soft); border-color: var(--warning-border); }
+.nf-info-state { color: var(--info); background: var(--info-soft); border-color: var(--info-border); }
+.nf-table-region {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
 .nf-onboarding :is(h1, h2, h3, h4, h5, h6) { color: #f5f7fb; }
+
+/*
+ * Milestone 4 compatibility boundary.
+ *
+ * Older feature screens still carry light Tailwind utilities. Keeping the
+ * mapping scoped to themed presentation regions lets those routes participate
+ * in dark mode without changing their data, permissions, or route contracts.
+ * Shared primitives use semantic tokens directly and remain the preferred
+ * implementation for new UI.
+ */
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) {
+  color: var(--text-secondary);
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) :is(
+  [class~='bg-white'],
+  [class~='bg-[#fbfcfe]']
+) {
+  background-color: var(--surface) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) :is(
+  [class~='bg-slate-50'],
+  [class~='bg-slate-100'],
+  [class~='bg-[#fafafa]'],
+  [class~='bg-[#f8f8f8]'],
+  [class~='bg-[#f7f8fa]'],
+  [class~='bg-[#f5f7fa]']
+) {
+  background-color: var(--surface-raised) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) :is(
+  [class~='text-slate-950'],
+  [class~='text-slate-900'],
+  [class~='text-slate-800'],
+  [class~='text-[#252b3d]'],
+  [class~='text-[#2e313f]'],
+  [class~='text-[#30364b]']
+) {
+  color: var(--text-primary) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) :is(
+  [class~='text-slate-700'],
+  [class~='text-slate-600'],
+  [class~='text-slate-500'],
+  [class~='text-[#4f5668]'],
+  [class~='text-[#515463]'],
+  [class~='text-[#51586a]'],
+  [class~='text-[#646b7c]'],
+  [class~='text-[#606372]'],
+  [class~='text-[#606779]'],
+  [class~='text-[#707070]'],
+  [class~='text-[#707789]'],
+  [class~='text-[#73798a]'],
+  [class~='text-[#7c8393]'],
+  [class~='text-[#7d8290]'],
+  [class~='text-[#8a91a1]'],
+  [class~='text-[#9298a8]']
+) {
+  color: var(--text-secondary) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) :is(
+  [class~='text-[#1c4aa9]'],
+  [class~='text-blue-600'],
+  [class~='text-blue-700'],
+  [class~='text-blue-800'],
+  [class~='text-blue-900']
+) {
+  color: var(--accent) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) :is(
+  [class~='border-slate-100'],
+  [class~='border-slate-200'],
+  [class~='border-slate-300'],
+  [class~='border-[#dfe3ea]'],
+  [class~='border-[#dfe4ec]'],
+  [class~='border-[#e1e5ec]'],
+  [class~='border-[#e3e7ee]'],
+  [class~='border-[#e5e5e5]'],
+  [class~='border-[#e7e7e7]'],
+  [class~='border-[#e7e9ee]'],
+  [class~='border-[#e7eaf0]'],
+  [class~='border-[#ededed]'],
+  [class~='border-[#edf0f4]']
+) {
+  border-color: var(--border) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) :is(
+  [class~='divide-slate-100'],
+  [class~='divide-slate-200']
+) > :not(:last-child) {
+  border-color: var(--border-subtle) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) :is(
+  [class~='bg-emerald-50'],
+  [class~='bg-green-50']
+) {
+  background-color: var(--success-soft) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) [class~='bg-red-50'] {
+  background-color: var(--danger-soft) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) [class~='bg-amber-50'] {
+  background-color: var(--warning-soft) !important;
+}
+html[data-theme='dark'] :is(.nf-content, .nf-auth-content, .nf-context-page, .nf-public-page) [class~='bg-blue-50'] {
+  background-color: var(--info-soft) !important;
+}
+.nf-inverse-action {
+  background: #fff !important;
+  color: #0b1248 !important;
+}
 
 /* Legacy company settings content is kept functional but presented in the
    same light NAVFarm workspace language as the surrounding console. */
@@ -166,6 +303,15 @@ html[data-theme='dark'] {
   --success: #30d158;
   --warning: #ffd60a;
   --info: #64d2ff;
+  --danger-soft: rgba(255, 69, 58, 0.13);
+  --danger-border: rgba(255, 69, 58, 0.36);
+  --success-soft: rgba(48, 209, 88, 0.12);
+  --success-border: rgba(48, 209, 88, 0.34);
+  --warning-soft: rgba(255, 214, 10, 0.12);
+  --warning-border: rgba(255, 214, 10, 0.34);
+  --info-soft: rgba(10, 132, 255, 0.14);
+  --info-border: rgba(10, 132, 255, 0.36);
+  --brand-word: #f5f5f7;
   --sidebar-bg: #090d31;
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-text: rgba(255, 255, 255, 0.7);

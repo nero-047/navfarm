@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  Bell, Building2, Check, ChevronDown, ChevronRight, LogOut, Menu, PanelLeftClose,
+  Building2, Check, ChevronDown, ChevronRight, LogOut, Menu, PanelLeftClose,
   PanelLeftOpen, Plus, Search, Settings2, UserRound, X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,18 +12,13 @@ import { capabilities, filterNavigation, type AppScope } from '../../lib/authori
 import { scopeAccessReason } from '../../lib/access-reasons';
 import { navigationForScope } from './navigation';
 import { NavfarmBrand } from '../brand/navfarm-brand';
+import ThemeToggle from '../source-ui/theme-toggle';
 import {
   buildContextSwitcherGroups,
   currentContextSelection,
   workspaceSwitchDestination,
 } from './context-switcher';
-
-const SCOPE_LABEL: Record<AppScope, string> = {
-  platform: 'Platform administration',
-  tenant: 'Organization administration',
-  company: 'Company administration',
-  workspace: 'Workspace operations',
-};
+import { SCOPE_PRESENTATION, scopeLabel } from './scope-presentation';
 
 export function ApplicationShell({
   scope,
@@ -49,6 +44,12 @@ export function ApplicationShell({
   const [contextError, setContextError] = useState('');
   const contextButtonRef = useRef<HTMLButtonElement>(null);
   const contextDialogRef = useRef<HTMLDivElement>(null);
+  const contextOpenRef = useRef(contextOpen);
+  const mobileButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileDialogRef = useRef<HTMLDivElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  contextOpenRef.current = contextOpen;
   const workspaceMatch = companySlug
     ? pathname.match(new RegExp(`^/${companySlug}/workspaces/([^/]+)/(dashboard|batches|operations|quality|traceability|resources|costing|reports|masters|settings)(?:/|$)`))
     : null;
@@ -140,6 +141,65 @@ export function ApplicationShell({
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
   }, [contextOpen]);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const drawer = mobileDialogRef.current;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    drawer?.querySelector<HTMLElement>('button:not([tabindex="-1"]), a[href]')?.focus();
+    const handleKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !contextOpenRef.current) {
+        event.preventDefault();
+        setMobileOpen(false);
+        mobileButtonRef.current?.focus();
+        return;
+      }
+      if (event.key !== 'Tab' || contextOpenRef.current || !drawer) return;
+      const focusable = Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyboard);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyboard);
+    };
+  }, [mobileOpen]);
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handleDismiss = (event: KeyboardEvent | PointerEvent) => {
+      if (event instanceof KeyboardEvent && event.key === 'Escape') {
+        setProfileOpen(false);
+        profileButtonRef.current?.focus();
+        return;
+      }
+      if (
+        event instanceof PointerEvent &&
+        !profileMenuRef.current?.contains(event.target as Node) &&
+        !profileButtonRef.current?.contains(event.target as Node)
+      ) {
+        setProfileOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleDismiss);
+    window.addEventListener('pointerdown', handleDismiss);
+    return () => {
+      window.removeEventListener('keydown', handleDismiss);
+      window.removeEventListener('pointerdown', handleDismiss);
+    };
+  }, [profileOpen]);
 
   const nav = useMemo(
     () => filterNavigation(navigationForScope(effectiveScope, companySlug, routeWorkspace), session),
@@ -149,7 +209,7 @@ export function ApplicationShell({
   const crumbs = pathname.split('/').filter(Boolean).map((value) =>
     value.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
   );
-  const pageTitle = nav.find((item) => pathname.startsWith(item.href))?.label ?? crumbs.at(-1) ?? SCOPE_LABEL[effectiveScope];
+  const pageTitle = nav.find((item) => pathname.startsWith(item.href))?.label ?? crumbs.at(-1) ?? scopeLabel(effectiveScope);
   const visibleCompanies = session
     ? buildContextSwitcherGroups(session, contextQuery)
     : [];
@@ -206,10 +266,10 @@ export function ApplicationShell({
   }
 
   if (loading || status === 'mfa_pending' || (!session && !user)) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#f3f5f8] text-sm text-[#707789]">Loading your secure workspace…</div>;
+    return <div role="status" className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-sm text-[var(--text-secondary)]">Loading your secure workspace…</div>;
   }
   if (!session || (accessReason && !contextChanging)) {
-    return <div className="min-h-screen bg-[#f3f5f8]" />;
+    return <div className="min-h-screen bg-[var(--bg)]" />;
   }
 
   const sidebarWidth = collapsed ? '84px' : '252px';
@@ -373,12 +433,25 @@ export function ApplicationShell({
           )}
         </div>
       )}
-      <nav aria-label={`${SCOPE_LABEL[effectiveScope]} navigation`} className="flex-1 space-y-1 overflow-y-auto p-3">
+      {!collapsed && !switcherVisible ? (
+        <div className="border-b border-white/10 p-3">
+          <div className="rounded-xl border border-white/10 bg-white/[0.06] p-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+              Current scope
+            </p>
+            <p className="mt-1 text-xs font-semibold">{scopeLabel(effectiveScope)}</p>
+            <p className="mt-1 text-[10px] text-white/55">
+              {SCOPE_PRESENTATION[effectiveScope].description}
+            </p>
+          </div>
+        </div>
+      ) : null}
+      <nav aria-label={`${scopeLabel(effectiveScope)} navigation`} className="flex-1 space-y-1 overflow-y-auto p-3">
         {!collapsed && <p className="px-3 pb-2 pt-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/35">Navigation</p>}
         {nav.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
-            <Link key={item.href} href={item.href} title={collapsed ? item.label : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium ${active ? 'bg-white text-[#101849] shadow-lg' : 'text-white/65 hover:bg-white/[0.07] hover:text-white'}`}>
+            <Link key={`${item.label}:${item.href}`} href={item.href} aria-current={active ? 'page' : undefined} title={collapsed ? item.label : undefined} className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium ${active ? 'bg-white text-[#101849] shadow-lg' : 'text-white/65 hover:bg-white/[0.07] hover:text-white'}`}>
               <item.icon size={17} className="shrink-0" />
               {!collapsed && item.label}
             </Link>
@@ -401,39 +474,61 @@ export function ApplicationShell({
   );
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f3f5f8]" style={{ '--sidebar-width': sidebarWidth } as React.CSSProperties}>
+    <div className="min-h-screen overflow-x-hidden bg-[var(--bg)]" style={{ '--sidebar-width': sidebarWidth } as React.CSSProperties}>
       {transitioning && <div className="fixed inset-x-0 top-0 z-[70] h-0.5 animate-pulse bg-[#e4664d]" />}
       <aside className="fixed inset-y-0 left-0 z-40 hidden transition-[width] lg:block lg:w-[var(--sidebar-width)]">{sidebar}</aside>
-      {mobileOpen && <div className="fixed inset-0 z-50 lg:hidden"><button aria-label="Close navigation overlay" className="absolute inset-0 bg-black/45" onClick={() => setMobileOpen(false)} /><aside className="relative h-full w-[min(300px,88vw)]">{sidebar}</aside></div>}
+      {mobileOpen && (
+        <div
+          ref={mobileDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Application navigation"
+          className="fixed inset-0 z-50 lg:hidden"
+        >
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="absolute inset-0 bg-black/55"
+            onClick={() => {
+              setMobileOpen(false);
+              mobileButtonRef.current?.focus();
+            }}
+          />
+          <aside className="relative h-full w-[min(300px,88vw)] pb-[env(safe-area-inset-bottom)]">
+            {sidebar}
+          </aside>
+        </div>
+      )}
       <div className="min-w-0 overflow-x-hidden transition-[margin] lg:ml-[var(--sidebar-width)]">
-        <header className="sticky top-0 z-30 border-b border-[#e1e5ec] bg-white/95 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--header-bg)] backdrop-blur">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
-            <button onClick={() => setMobileOpen(true)} aria-label="Open navigation" className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e1e5ec] lg:hidden"><Menu size={18} /></button>
+            <button ref={mobileButtonRef} onClick={() => setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} className="nf-touch flex items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-secondary)] lg:hidden"><Menu size={18} aria-hidden /></button>
             <div className="min-w-0 flex-1">
-              <div className="hidden items-center gap-1 text-[10px] text-[#8a91a1] sm:flex">
-                <Link href={effectiveScope === 'platform' ? '/admin' : effectiveScope === 'tenant' ? '/console' : `/${companySlug}/overview`}>{SCOPE_LABEL[effectiveScope]}</Link>
+              <div className="hidden items-center gap-1 text-[10px] text-[var(--text-muted)] sm:flex">
+                <Link href={effectiveScope === 'platform' ? '/admin' : effectiveScope === 'tenant' ? '/console' : `/${companySlug}/overview`}>{scopeLabel(effectiveScope)}</Link>
                 {crumbs.slice(1).map((crumb) => <span key={crumb} className="flex items-center"><ChevronRight size={11} />{crumb}</span>)}
               </div>
-              <h1 className="truncate text-sm font-semibold text-[#252b3d] sm:mt-1">{pageTitle}</h1>
+              <p className="truncate text-sm font-semibold text-[var(--text-primary)] sm:mt-1">{pageTitle}</p>
             </div>
-            <button aria-label="Notifications" className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#e1e5ec] text-[#646b7c]"><Bell size={17} /><span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-[#e55b43]" /></button>
+            <ThemeToggle />
             <div className="relative">
-              <button onClick={() => setProfileOpen(!profileOpen)} aria-expanded={profileOpen} className="flex h-10 items-center gap-2 rounded-xl border border-[#e1e5ec] px-2">
+              <button ref={profileButtonRef} onClick={() => setProfileOpen(!profileOpen)} aria-label={`${user?.fullName ?? 'Account'} account menu`} aria-controls="account-popover" aria-expanded={profileOpen} className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border)] px-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0b1248] text-[10px] font-bold text-white">{user?.fullName?.charAt(0) || '?'}</span>
-                <span className="hidden max-w-32 truncate text-xs font-semibold text-[#30364b] md:block">{user?.fullName}</span>
+                <span className="hidden max-w-32 truncate text-xs font-semibold text-[var(--text-primary)] md:block">{user?.fullName}</span>
                 <ChevronDown size={13} />
               </button>
               {profileOpen && (
-                <div className="absolute right-0 top-12 w-64 rounded-2xl border border-[#e1e5ec] bg-white p-2 shadow-2xl">
-                  <div className="border-b border-[#edf0f4] px-3 py-3"><p className="text-sm font-semibold">{user?.fullName}</p><p className="mt-1 truncate text-[10px] text-[#8a91a1]">{user?.email}</p></div>
-                  <Link href="/profile" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs hover:bg-[#f5f7fa]"><UserRound size={15} /> My profile</Link>
-                  <button onClick={() => void logout().then(() => router.replace('/login'))} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-xs text-[#c24332] hover:bg-red-50"><LogOut size={15} /> Sign out</button>
+                <div id="account-popover" ref={profileMenuRef} className="absolute right-0 top-12 w-64 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-[var(--shadow-md)]">
+                  <div className="border-b border-[var(--border-subtle)] px-3 py-3"><p className="text-sm font-semibold text-[var(--text-primary)]">{user?.fullName}</p><p className="mt-1 truncate text-[10px] text-[var(--text-muted)]">{user?.email}</p></div>
+                  <Link href="/profile" onClick={() => setProfileOpen(false)} className="mt-1 flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-raised)]"><UserRound size={15} aria-hidden /> My profile</Link>
+                  <button onClick={() => void logout().then(() => router.replace('/login'))} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-xs text-[var(--danger)] hover:bg-[var(--danger-soft)]"><LogOut size={15} aria-hidden /> Sign out</button>
                 </div>
               )}
             </div>
           </div>
         </header>
-        <main className="min-h-[calc(100vh-4rem)] p-4 sm:p-6 xl:p-8">{children}</main>
+        <main className="nf-content min-h-[calc(100vh-4rem)] p-4 text-[var(--text-secondary)] sm:p-6 xl:p-8">{children}</main>
       </div>
     </div>
   );

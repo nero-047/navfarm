@@ -57,7 +57,23 @@ delivery. Do not begin later milestones merely because this status changed.
   semantics.
 - **Complexity:** high.
 
-## Milestone 4: Strict API boundary cleanup
+## Milestone 4: Final presentation readiness
+
+- **Status:** complete for the frontend mock demo; the full validation gate and
+  exact 25-image manual evidence audit pass. Backend implementation remains
+  missing.
+- **Scope:** shared visual system, light/dark themes, responsive canonical
+  routes, accessible shell/dialog/drawer behavior, public trace presentation,
+  final evidence, and demonstration guide.
+- **Dependencies:** completed auth/context, company administration, and
+  canonical workspace milestones.
+- **Acceptance:** full Nx validation gate, configured accessibility checks,
+  five-viewport canonical-route audit, exactly 25 manually inspected evidence
+  PNGs, and no Tenant/Organisation switch control.
+- **Boundary:** no backend contract expansion; API-boundary cleanup and
+  incremental integration remain later phases.
+
+## Milestone 5: Strict API boundary cleanup
 
 - **Scope:** migrate or retire every legacy endpoint/client; require request/response schemas; disable hybrid fallback in compatibility testing.
 - **Dependencies:** signed canonical endpoint map.
@@ -68,10 +84,10 @@ delivery. Do not begin later milestones merely because this status changed.
 - **Product decision:** whether legacy endpoints get a temporary adapter.
 - **Complexity:** high.
 
-## Milestone 5: Backend foundation reconciliation
+## Milestone 6: Backend foundation reconciliation
 
 - **Scope:** resolve JWT/cookie, per-tenant DB/context, Workspace persistence/membership, error envelope, and duplicate vertical module ownership.
-- **Dependencies:** milestones 1–4 contracts.
+- **Dependencies:** milestones 1–5 contracts.
 - **Likely modules:** `origin/arun.pratap:apps/api/src/{main.ts,common,core,d rizzle,modules}`.
 - **Acceptance:** OpenAPI/contract tests expose canonical auth, tenancy, company, workspace and error resources; no ambiguous vertical endpoint owner.
 - **Tests:** backend unit, database tenancy/isolation, auth/MFA, role guard and API E2E suites.
@@ -79,7 +95,7 @@ delivery. Do not begin later milestones merely because this status changed.
 - **Product decision:** tenancy model and Workspace meaning.
 - **Complexity:** very high.
 
-## Milestone 6: Incremental API integration
+## Milestone 7: Incremental API integration
 
 - **Scope:** integrate in slices: auth/context, company setup, workspace admin, batches/operations, QC/QR, resources, finance/reports.
 - **Dependencies:** all previous milestones and contract test environment.

@@ -87,7 +87,7 @@ export function GuidedPoultryDemo({
           </div>
           <Link
             href={next.href}
-            className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-[#0b1248]"
+            className="nf-inverse-action mt-5 inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-semibold"
           >
             {complete === 0
               ? 'Start walkthrough'

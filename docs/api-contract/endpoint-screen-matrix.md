@@ -87,3 +87,9 @@ not the canonical backend handoff. Dashboard, Workspace Masters and Workspace
 Settings endpoints are implemented only in the mock boundary; their durable
 backend resources are missing. Costing/report values remain non-authoritative
 demo projections and no production export is claimed.
+
+Milestone 4 is a presentation-only consumer of this matrix. It introduces no
+backend endpoints. Representative light/dark, responsive, loading/error, and
+permission-state tests exercise the existing typed mock boundary, while real
+session, workspace, costing, report, and public-trace implementations remain
+missing.

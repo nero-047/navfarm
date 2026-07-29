@@ -119,3 +119,9 @@ masters or accounting authority.
 
 The API repository enforces these rules independently of hidden navigation.
 Suspended tenants cannot mutate tenant or company setup data.
+
+Milestone 4 changes presentation only. Theme, responsive layout, mobile
+navigation, dialogs, badges, and access-state copy do not grant capabilities.
+Manager and Viewer controls remain derived from the same permission model, and
+the Company/Workspace switcher still filters by explicit active memberships.
+Static Platform/Tenant scope labels are not switch controls.

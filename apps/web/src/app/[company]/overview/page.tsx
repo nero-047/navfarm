@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import { Building2, CheckCircle2, Landmark, Layers } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { capabilities } from '@/lib/authorization';
+import { PageHeader } from '@/components/phase2/common';
+import { DemoDataNotice } from '@/modules/company-admin/shared';
 
 export default function CompanyOverviewPage() {
   const { company } = useParams<{ company: string }>();
@@ -14,11 +16,13 @@ export default function CompanyOverviewPage() {
   const canManageWorkspaces = capabilities(session).canManageWorkspaces;
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Company administration</p>
-        <h1 className="mt-2 text-3xl font-semibold">{membership?.companyName ?? 'Company overview'}</h1>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">Manage company configuration, shared master data, accounting, memberships and operational workspaces. Workspace records remain available only inside an assigned workspace.</p>
-      </header>
+      <PageHeader
+        eyebrow="Company administration"
+        title={membership?.companyName ?? 'Company overview'}
+        description="Manage company configuration, shared master data, accounting, memberships and operational workspaces. Company administration does not require an active workspace."
+        actions={<span className="nf-info-state inline-flex min-h-11 items-center rounded-full border px-3 text-xs font-bold">Company scope</span>}
+      />
+      <DemoDataNotice />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ['Workspaces', canManageWorkspaces ? 'Manage' : String(workspaces.length), Layers],

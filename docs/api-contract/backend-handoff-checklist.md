@@ -213,3 +213,14 @@ Acceptance criteria:
 
 - Frontend Playwright Phase 7.1 suite passes against backend mode.
 - Runtime response contracts pass without client-side schema failures.
+
+## Frontend presentation handoff
+
+- Preserve the canonical scope hierarchy and Company/Workspace-only switcher.
+- Do not bind theme/sidebar UI preference storage to session or business state.
+- Map real responses through the existing typed clients; do not bypass
+  loading, error, empty, and specific access-reason components.
+- Keep costing/reports and unsigned trace values labelled non-authoritative
+  until backend policies and signed payloads are accepted.
+- Run the full Nx validation gate and the five-viewport canonical-route audit
+  with mock fallback disabled before claiming integration readiness.

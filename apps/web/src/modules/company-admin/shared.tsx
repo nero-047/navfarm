@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import { X } from 'lucide-react';
 import { useParams } from 'next/navigation';
+import { Dialog } from '../../components/ui/dialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { can } from '../../lib/authorization';
 
@@ -49,15 +49,15 @@ export function CompanyAdminBadge({
 }) {
   const tone =
     value === 'ACTIVE' || value === 'ACCEPTED' || value === 'READY'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      ? 'nf-success-state'
       : value === 'INACTIVE' || value === 'SUSPENDED' ||
           value === 'EXPIRED' || value === 'CANCELLED' ||
           value === 'ACTION_NEEDED' || value === 'BLOCKING'
-        ? 'border-red-200 bg-red-50 text-red-700'
+        ? 'nf-danger-state'
         : value === 'PENDING' || value === 'IN_PROGRESS' ||
             value === 'RECOMMENDED' || value === 'POLICY_PENDING'
-          ? 'border-amber-200 bg-amber-50 text-amber-800'
-          : 'border-slate-200 bg-slate-50 text-slate-700';
+          ? 'nf-warning-state'
+          : 'border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-secondary)]';
   return (
     <span
       className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${tone}`}
@@ -73,7 +73,7 @@ export function DemoDataNotice({
   children?: ReactNode;
 }) {
   return (
-    <p className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-900">
+    <p className="nf-info-state rounded-xl border px-4 py-3 text-xs">
       {children}
     </p>
   );
@@ -94,58 +94,16 @@ export function AdminDialog({
   footer?: ReactNode;
   wide?: boolean;
 }) {
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
-  }, [onClose]);
-
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <Dialog
+      open
+      onClose={onClose}
+      title={title}
+      description={description}
+      footer={footer}
+      maxWidth={wide ? 'lg' : 'md'}
     >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="company-admin-dialog-title"
-        className={`max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl ${
-          wide ? 'sm:max-w-4xl' : 'sm:max-w-xl'
-        }`}
-      >
-        <header className="sticky top-0 z-10 flex items-start gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
-          <div className="min-w-0 flex-1">
-            <h2
-              id="company-admin-dialog-title"
-              className="text-lg font-black text-slate-950"
-            >
-              {title}
-            </h2>
-            {description ? (
-              <p className="mt-1 text-sm text-slate-600">{description}</p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <div className="p-5 sm:p-6">{children}</div>
-        {footer ? (
-          <footer className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
-            {footer}
-          </footer>
-        ) : null}
-      </section>
-    </div>
+      {children}
+    </Dialog>
   );
 }

@@ -179,7 +179,7 @@ export function CompanySettingsPage({
       <div className="grid min-w-0 gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <nav
           aria-label="Company settings sections"
-          className="flex min-w-0 gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 lg:flex-col lg:overflow-visible"
+          className="flex min-w-0 snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 pb-4 shadow-[var(--shadow-sm)] lg:flex-col lg:overflow-visible lg:pb-3"
         >
           {navigation.map(([slug, label, Icon]) => (
             <Link
@@ -196,10 +196,10 @@ export function CompanySettingsPage({
                   event.preventDefault();
                 }
               }}
-              className={`flex min-h-11 shrink-0 items-center gap-3 rounded-xl px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-300 lg:w-full ${
+              className={`flex min-h-11 shrink-0 snap-start items-center gap-3 rounded-xl px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-300 lg:w-full ${
                 section === slug
                   ? 'bg-[#101b52] text-white'
-                  : 'text-slate-600 hover:bg-slate-50'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--surface-raised)]'
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -208,7 +208,7 @@ export function CompanySettingsPage({
           ))}
         </nav>
 
-        <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+        <section className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] sm:p-7">
           {section === 'overview' ? (
             <SettingsOverview
               companySlug={companySlug}
@@ -316,6 +316,8 @@ function SettingsOverview({
           role="progressbar"
           aria-label="Company setup progress"
           aria-valuenow={settings.setupStatus.setupPercentage}
+          aria-valuemin={0}
+          aria-valuemax={100}
         >
           <div
             className="h-full rounded-full bg-blue-600"

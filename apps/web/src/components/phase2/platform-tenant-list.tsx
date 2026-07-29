@@ -56,7 +56,7 @@ export function PlatformTenantListView() {
         actions={<Link href="/admin/tenants/new" className={primaryButtonClass}><Plus className="mr-2 h-4 w-4" />Create tenant</Link>}
       />
 
-      <section aria-label="Tenant filters" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
+      <section aria-label="Tenant filters" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
         <label className="relative sm:col-span-2">
           <span className="sr-only">Search tenants</span>
           <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" aria-hidden />
@@ -103,8 +103,13 @@ export function PlatformTenantListView() {
 
       {data && data.items.length > 0 ? (
         <>
-          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
-            <table className="w-full text-left text-sm">
+          <div
+            role="region"
+            aria-label="Tenant registry table"
+            tabIndex={0}
+            className="hidden min-w-0 max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] xl:block [contain:inline-size]"
+          >
+            <table className="w-full min-w-[790px] text-left text-sm">
               <caption className="sr-only">NAVFarm tenants</caption>
               <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
@@ -132,7 +137,7 @@ export function PlatformTenantListView() {
               </tbody>
             </table>
           </div>
-          <div className="grid gap-3 md:hidden">
+          <div className="grid gap-3 xl:hidden">
             {data.items.map((tenant) => (
               <article key={tenant.tenantId} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
