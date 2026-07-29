@@ -1,12 +1,13 @@
 # NAVFarm Frontend/API Readiness Consolidation Audit
 
-## Post-Milestone 1 verdict
+## Post-Milestone 2 verdict
 
-Demo Completion Milestone 1 is implemented for the web mock: authentication,
-session restoration, the active context tuple, demo identities, and operational
-mutation authorization now have one internally consistent policy. This does
-not make the product ready for real API integration. The reference backend
-still lacks the frontend cookie-session/context/workspace contract, and later
+Demo Completion Milestones 1 and 2 are implemented for the web mock.
+Authentication/session/context remains the Milestone 1 foundation. Company
+administration now has a separate provider boundary plus typed Profile,
+Members, Roles, Settings and Readiness resources. This does not make the
+product ready for real API integration: the reference backend still lacks the
+cookie-session/context/workspace and company-admin contracts, and later
 frontend consolidation milestones remain.
 
 ## Scope and evidence
@@ -49,7 +50,16 @@ contains only Company administration and assigned Workspaces.
   and exact capability. Tenant/company administration never substitutes for a
   workspace capability.
 - Runtime Zod contracts cover the changed login/MFA/session/context responses
-  through the typed same-origin `/api/v1` client.
+  and company members, invitations, roles, settings and readiness resources
+  through typed same-origin `/api/v1` clients.
+- The company layout no longer mounts `DemoStoreProvider`. Operational state is
+  mounted only beneath `/{company}/workspaces/{workspace}`.
+- `/{company}/members`, `/roles`, `/readiness`, `/profile`, and `/settings`
+  are canonical company pages with no farm-demo dependency or active-workspace
+  requirement.
+- Member mutations update the explicit session membership model. Company role
+  and workspace role mutations are independent, and reset restores canonical
+  fixtures.
 
 ## Milestone 1 findings resolved
 
@@ -63,13 +73,25 @@ contains only Company administration and assigned Workspaces.
    may select explicitly before navigation.
 7. MFA challenge creating an incomplete application session: removed.
 
+## Milestone 2 findings resolved
+
+1. Company-wide operational provider coupling: resolved with a workspace-only
+   provider layout.
+2. Profile/settings farm-demo dependency: replaced by typed company modules.
+3. Members/settings redirect and missing roles route: replaced with canonical
+   typed pages.
+4. Company readiness aliasing accounting: replaced by a multi-section
+   aggregate linked to the dedicated accounting page.
+5. Company/workspace role conflation: explicit independent mutation paths and
+   tests.
+6. Legacy company batch detail ownership: converted to a canonical workspace
+   page plus compatibility redirect.
+
 ## Remaining frontend gaps
 
-- Company administration is still coupled to some farm-demo presentation/state
-  and dedicated company members/readiness/settings resources remain incomplete.
 - Workspace costing, masters, and settings still reuse demo pages rather than
   distinct final resources.
-- Profile/password, invitations, setup helpers, and other older non-Milestone-1
+- User profile/password, setup helpers, and other older non-Milestone-2
   workflows still need strict request/response contract migration.
 - Hybrid fallback can mask absent upstream endpoints and must be disabled for
   compatibility/integration runs.
@@ -93,20 +115,22 @@ contains only Company administration and assigned Workspaces.
 - Tenant Administrator accounting/readiness override policy.
 - Production cookie-session adapter versus JWT transport and tenancy/database
   strategy for multi-tenant memberships.
-- Final workspace role catalogue, custom roles, and industry-specific labels.
+- Final custom-role catalogue, readiness policy, and industry-specific labels.
 
-## Readiness estimates after Milestone 1
+## Readiness estimates after Milestone 2
 
 | Area | Estimate | Basis |
 | --- | ---: | --- |
 | Demo authentication/context consistency | 95% | One live source, deterministic hydration/MFA/logout/context, and negative scope coverage; production security is out of scope. |
-| Demo permission consistency | 92% | Explicit fixtures and exact operational capability checks; complete future RBAC/custom-role policy is unresolved. |
-| Overall demo webapp completion | 72% | Core demo flows are broad, but company-resource decoupling, final UX, and later consolidation remain. |
-| Frontend API-boundary readiness | 48% | Milestone 1 auth/context is typed; several non-M1 legacy workflows and backend DTO mismatches remain. |
+| Company administration completion | 94% | Provider boundary and presentation-ready mock Profile, Members, Roles, Readiness and Settings are implemented; durable backend/custom-role policy remains. |
+| Demo permission consistency | 96% | Explicit fixtures, exact company/workspace mutation capabilities and role-independence tests pass; final custom-role policy is unresolved. |
+| Overall demo webapp completion | 82% | Core company and workspace demo flows are broad; final visual design and later strict boundary cleanup remain. |
+| Frontend API-boundary readiness | 64% | Auth/context and Milestone 2 company-admin resources are typed; remaining legacy workflows/backend DTO mismatches remain. |
 | Combined backend integration readiness | 25% | Workspace persistence, session/context transport, and shared contracts are not reconciled. |
 
 ## Verdict
 
-Milestone 1 is complete for the frontend mock demo. Real API integration
-remains blocked by the backend and later frontend milestones; no production
-authentication, persistence, or authorization is claimed.
+Milestone 2 is complete for the frontend mock demo once its recorded validation
+gate and focused screenshot audit pass. Real API integration remains blocked by
+the backend and later milestones; no production authentication, persistence or
+authorization is claimed.

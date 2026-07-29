@@ -1,4 +1,4 @@
-import { BatchDetailWorkspacePage } from '@/modules/farm-demo/batch-detail-page';
+import { LegacyOperationalRedirect } from '@/modules/workspaces/route-content';
 
 export default async function BatchDetail({
   params,
@@ -6,5 +6,5 @@ export default async function BatchDetail({
   params: Promise<{ batch: string }>;
 }) {
   const { batch } = await params;
-  return <BatchDetailWorkspacePage batchKey={batch} />;
+  return <LegacyOperationalRedirect kind="batches" suffix={batch} />;
 }

@@ -1,6 +1,21 @@
 import { z } from 'zod';
 import { phase2RuntimeContracts } from './phase2';
 import { phase3RuntimeContracts } from './phase3';
+import { companyAdminRuntimeContracts } from './company-admin';
+import {
+  companyRoleSchema,
+  permissionSchema,
+  platformRoleSchema,
+  workspaceRoleSchema,
+} from './authorization';
+export {
+  companyRoleSchema,
+  permissionSchema,
+  platformRoleSchema,
+  workspaceRoleSchema,
+  type CompanyRole,
+  type Permission,
+} from './authorization';
 
 export const apiErrorCodeSchema = z.enum([
   'BAD_REQUEST',
@@ -75,48 +90,6 @@ export const currencySchema = z.object({
   symbol: z.string().optional(),
 }).passthrough();
 
-export const platformRoleSchema = z.enum(['SYSTEM_ADMIN', 'PLATFORM_SUPPORT']);
-export const companyRoleSchema = z.enum([
-  'SUPER_ADMIN',
-  'ADMIN',
-  'FARM_MANAGER',
-  'ACCOUNTANT',
-  'AUDITOR',
-  'SUPERVISOR',
-  'VIEWER',
-  'CUSTOM',
-]);
-export const permissionSchema = z.enum([
-  'platform.manage',
-  'tenant.view',
-  'tenant.manage',
-  'company.view',
-  'company.manage',
-  'users.view',
-  'users.manage',
-  'roles.view',
-  'roles.manage',
-  'batches.view',
-  'batches.create',
-  'batches.approve',
-  'operations.create',
-  'costs.view',
-  'finance.view',
-  'finance.manage',
-  'quality.view',
-  'quality.manage',
-  'traceability.view',
-  'traceability.manage',
-  'resources.view',
-  'resources.manage',
-  'reports.export',
-  'audit.view',
-  'notifications.manage',
-  'workspaces.view',
-  'workspaces.manage',
-  'batches.close',
-]);
-
 export const sessionUserSchema = z.object({
   userId: z.string(),
   fullName: z.string(),
@@ -152,6 +125,7 @@ export const companyMembershipSchema = z.object({
   companyName: z.string(),
   companySlug: z.string(),
   status: z.enum(['ACTIVE', 'INACTIVE']),
+  membershipStatus: z.enum(['ACTIVE', 'INACTIVE']).optional(),
   onboardingStatus: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED']),
   role: companyRoleSchema,
   permissions: z.array(permissionSchema),
@@ -169,8 +143,6 @@ export const workspaceTypeSchema = z.enum([
 ]);
 
 export const workspaceStatusSchema = z.enum(['DRAFT', 'ACTIVE', 'INACTIVE']);
-export const workspaceRoleSchema = z.enum(['MANAGER', 'OPERATOR', 'VIEWER']);
-
 export const workspaceSchema = z.object({
   workspaceId: z.string(),
   tenantId: z.string(),
@@ -278,8 +250,6 @@ export const mfaCompletionRequestSchema = z.object({
 });
 export type AuthLoginResponse = z.infer<typeof authLoginResponseSchema>;
 export type MfaChallenge = z.infer<typeof mfaChallengeSchema>;
-export type Permission = z.infer<typeof permissionSchema>;
-export type CompanyRole = z.infer<typeof companyRoleSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
 export type WorkspaceMembership = z.infer<typeof workspaceMembershipSchema>;
 export type WorkspaceMember = z.infer<typeof workspaceMemberSchema>;
@@ -302,6 +272,7 @@ export type RuntimeContract = {
  * runtime validated.
  */
 export const runtimeContracts: RuntimeContract[] = [
+  ...companyAdminRuntimeContracts,
   ...phase3RuntimeContracts,
   ...phase2RuntimeContracts,
   { method: 'POST', pattern: /^\/auth\/login$/, response: authLoginResponseSchema },

@@ -31,7 +31,8 @@
   `/console/invitations`, `/console/roles`, `/console/subscription`,
   `/console/usage`, `/console/audit`, `/console/notifications`.
 - Company administration: `/{company}/overview`, `/{company}/workspaces`,
-  `/{company}/setup`, `/{company}/members`, `/{company}/readiness`,
+  `/{company}/profile`, `/{company}/setup`, `/{company}/members`,
+  `/{company}/roles`, `/{company}/readiness`,
   `/{company}/settings`, `/{company}/settings/{section}`, `/{company}/setup/{step}`,
   `/{company}/masters`, `/{company}/masters/{resource}`,
   `/{company}/masters/{resource}/import`,
@@ -42,7 +43,8 @@
 - Workspace administration: `/{company}/workspaces`,
   `/{company}/workspaces/new`, and `/{company}/workspaces/{workspace}`.
 - Canonical workspace operations:
-  `/{company}/workspaces/{workspace}/{dashboard|batches|operations|quality|traceability|resources|costing|reports|masters|settings}`.
+  `/{company}/workspaces/{workspace}/{dashboard|batches|operations|quality|traceability|resources|costing|reports|masters|settings}`
+  and `/{company}/workspaces/{workspace}/batches/{batch}`.
 
 Company setup step routes are `profile`, `address`, `contacts`,
 `localization`, `accounting`, `modules`, `admin`, `team`, `chart-of-accounts`,
@@ -56,16 +58,27 @@ their dashboards. `/company-selection` redirects server-side to
 `/{company}/dashboard` redirects to the canonical company administration
 overview at `/{company}/overview`. Other legacy company operational routes
 `/{company}/{batches|operations|quality|traceability|resources|costing|reports}`
-are resolvers only. One accessible workspace redirects to its canonical route,
-multiple accessible workspaces redirect to `/{company}/workspaces`, and no
-accessible workspace renders an explicit setup/access state. They never infer
-a workspace from stale browser state.
+and `/{company}/batches/{batch}` are resolvers only. One accessible workspace
+redirects to its canonical route, multiple accessible workspaces redirect to
+`/{company}/workspaces`, and no accessible workspace renders an explicit
+setup/access state. They never infer a workspace from stale browser state.
 
 The shell has distinct platform, tenant, company-administration and workspace
 navigation models. Company mode never renders operational navigation. Workspace
 mode is derived only from a canonical workspace URL plus the matching active
 workspace membership. Session restoration completes before these guards run;
 company administration does not require an active workspace.
+
+The company layout owns only `ApplicationShell`; operational
+`DemoStoreProvider` state is mounted by the canonical
+`/{company}/workspaces/{workspace}` layout. Profile, Members, Roles &
+permissions, Readiness, Settings, setup, masters, accounting, and workspace
+administration therefore render with `activeWorkspaceId: null`.
+
+`/{company}/members`, `/{company}/roles`, and `/{company}/readiness` are
+canonical pages, not settings/accounting aliases. Settings supports the
+documented `localization`, `fiscal`, `modules`, and `notifications` sections;
+`settings/business-structure` remains the canonical NOB/LOB configuration page.
 
 The static `masters/nobs` and `masters/lobs` routes open the company
 business-structure workspace. Unknown master resources return 404.

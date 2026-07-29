@@ -27,6 +27,11 @@ import {
   type SetupProfile,
   type TeamMember,
 } from '../../contracts/phase2';
+import {
+  companySettingsMutationSchema,
+  companySettingsSchema,
+  type CompanySettings,
+} from '../../contracts/company-admin';
 import { COMPANY_SETUP_STEPS, evaluateReadiness, type ReadinessInput } from '../../lib/readiness-policy';
 import { apiErrorResponse } from './errors';
 import { phase3ReadinessSnapshot } from './phase3-repository';
@@ -37,6 +42,7 @@ export interface CompanySetupActor {
   activeTenantId: string | null;
   activeCompanyId: string | null;
   tenantAdmin: boolean;
+  companyView: boolean;
   companyManage: boolean;
 }
 
@@ -163,6 +169,18 @@ function statusFor(companyId: string, record: SetupRecord) {
   });
 }
 
+function settingsFor(company: CompanySummary, record: SetupRecord): CompanySettings {
+  return companySettingsSchema.parse({
+    companyId: company.companyId,
+    profile: record.profile,
+    localization: record.localization,
+    fiscal: record.fiscal,
+    modules: record.modules,
+    notifications: record.notifications,
+    setupStatus: statusFor(company.companyId, record),
+  });
+}
+
 function mark(record: SetupRecord, ...ids: string[]) {
   record.completed = Array.from(new Set([...record.completed, ...ids]));
   record.setupComplete = false;
@@ -176,6 +194,93 @@ export function resetCompanySetupRepository() {
   setupState.records = {};
 }
 
+export function companySetupReadinessSnapshot(company: CompanySummary) {
+  const record = ensureCompanySetupRecord(company);
+  return {
+    completed: [...record.completed],
+    setupComplete: record.setupComplete,
+    status: statusFor(company.companyId, record),
+  };
+}
+
+export async function handleCompanySettingsRequest(
+  request: Request,
+  requestId: string,
+  actor: CompanySetupActor,
+  company: CompanySummary,
+  updateCompany: (changes: Partial<CompanySummary>) => void,
+): Promise<NextResponse> {
+  if (company.tenantId !== actor.activeTenantId || company.companyId !== actor.activeCompanyId) {
+    return apiErrorResponse(
+      403,
+      'Active tenant and company context is required.',
+      requestId,
+      undefined,
+      'COMPANY_MEMBERSHIP_REQUIRED',
+    );
+  }
+  if (!actor.companyView && !actor.tenantAdmin) {
+    return apiErrorResponse(
+      403,
+      'Company view permission is required.',
+      requestId,
+      { requiredCapability: 'company.view' },
+      'CAPABILITY_REQUIRED',
+    );
+  }
+  const record = ensureCompanySetupRecord(company);
+  if (request.method === 'GET') return json(settingsFor(company, record));
+  if (request.method !== 'PATCH') {
+    return apiErrorResponse(404, 'Company settings resource not found.', requestId);
+  }
+  if (!actor.companyManage && !actor.tenantAdmin) {
+    return apiErrorResponse(
+      403,
+      'Company management permission is required.',
+      requestId,
+      { requiredCapability: 'company.manage' },
+      'CAPABILITY_REQUIRED',
+    );
+  }
+  const input = request.headers.get('content-type')?.includes('application/json')
+    ? await request.json().catch(() => ({}))
+    : {};
+  const parsed = companySettingsMutationSchema.safeParse(input);
+  if (!parsed.success) {
+    return apiErrorResponse(
+      422,
+      'Review the company settings fields.',
+      requestId,
+      parsed.error.flatten(),
+      'VALIDATION_ERROR',
+    );
+  }
+  if (parsed.data.localization) {
+    record.localization = parsed.data.localization;
+    mark(record, 'language', 'currency', 'timezone');
+  }
+  if (parsed.data.fiscal) {
+    record.fiscal = parsed.data.fiscal;
+    mark(record, 'accounting');
+  }
+  if (parsed.data.modules) {
+    record.modules = parsed.data.modules;
+    mark(record, 'modules');
+  }
+  if (parsed.data.notifications) {
+    record.notifications = parsed.data.notifications;
+    mark(record, 'notifications');
+  }
+  const next = settingsFor(company, record);
+  updateCompany({
+    setupPercentage: next.setupStatus.setupPercentage,
+    workspaceReady: next.setupStatus.workspaceReady,
+    operationsReady: next.setupStatus.operationsReady,
+    status: next.setupStatus.setupComplete ? 'ACTIVE' : 'DRAFT',
+  });
+  return json(next);
+}
+
 export async function handleCompanySetupRequest(
   request: Request,
   path: string,
@@ -186,13 +291,33 @@ export async function handleCompanySetupRequest(
 ): Promise<NextResponse> {
   if (company.tenantId !== actor.activeTenantId) return apiErrorResponse(403, 'Active tenant context does not match this company.', requestId);
   const canEdit = actor.tenantAdmin || (actor.activeCompanyId === company.companyId && actor.companyManage);
-  if (!canEdit) return apiErrorResponse(403, 'Company setup permission is required.', requestId);
+  const canView = actor.tenantAdmin || (
+    actor.activeCompanyId === company.companyId && actor.companyView
+  );
+  const method = request.method;
+  if (method === 'GET' && !canView) {
+    return apiErrorResponse(
+      403,
+      'Company view permission is required.',
+      requestId,
+      { requiredCapability: 'company.view' },
+      'CAPABILITY_REQUIRED',
+    );
+  }
+  if (method !== 'GET' && !canEdit) {
+    return apiErrorResponse(
+      403,
+      'Company setup permission is required.',
+      requestId,
+      { requiredCapability: 'company.manage' },
+      'CAPABILITY_REQUIRED',
+    );
+  }
   const record = ensureCompanySetupRecord(company);
   const match = path.match(/^\/companies\/[^/]+\/setup\/([^/]+)(?:\/([^/]+))?$/);
   if (!match) return apiErrorResponse(404, 'Company setup resource not found.', requestId);
   const resource = match[1];
   const itemId = match[2];
-  const method = request.method;
   const input = request.headers.get('content-type')?.includes('application/json')
     ? await request.json().catch(() => ({}))
     : {};

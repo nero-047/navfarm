@@ -40,3 +40,17 @@ workspace cardinality.
 The three Phase 3 readiness steps now link to their canonical workspaces.
 Legacy setup summaries remain response-compatible for inactive clients but
 cannot make operations ready. Setup review recalculates from Phase 3 state.
+
+## Company readiness aggregate
+
+`/{company}/readiness` is the company-level aggregate and is not an alias for
+accounting readiness. It reports company foundation, the documented setup
+catalogue, shared masters, accounting, workspace creation, workspace
+membership, NOB/LOB configuration, and each workspace's operational readiness.
+Every section links to its responsible route.
+
+Percentages are displayed only when the current mock resource supports one.
+Known blockers remain blocking; missing first-workspace/member actions are
+recommended, and unresolved accounting/industry policy is labelled
+`POLICY_PENDING`. The detailed accounting checks remain at
+`/{company}/accounting/readiness`.

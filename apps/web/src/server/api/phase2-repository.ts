@@ -14,6 +14,7 @@ import {
 } from '../../contracts/phase2';
 import { apiErrorResponse } from './errors';
 import {
+  handleCompanySettingsRequest,
   handleCompanySetupRequest,
   resetCompanySetupRepository,
 } from './company-setup-repository';
@@ -25,6 +26,7 @@ export interface Phase2Actor {
   activeTenantId: string | null;
   activeCompanyId: string | null;
   tenantAdmin: boolean;
+  companyView: boolean;
   companyManage: boolean;
   grantCompany?: (company: CompanySummary) => void;
 }
@@ -253,7 +255,8 @@ export async function handlePhase2Request(
   const platformPath = path.startsWith('/platform/');
   const tenantPath = path.startsWith('/tenants/');
   const companySetupPath = /^\/companies\/[^/]+\/setup\//.test(path);
-  if (!platformPath && !tenantPath && !companySetupPath) return null;
+  const companySettingsPath = /^\/companies\/[^/]+\/settings$/.test(path);
+  if (!platformPath && !tenantPath && !companySetupPath && !companySettingsPath) return null;
   if (platformPath) {
     const forbidden = requirePlatform(actor, requestId);
     if (forbidden) return forbidden;
@@ -262,22 +265,33 @@ export async function handlePhase2Request(
   const method = request.method;
   const url = new URL(request.url);
 
-  if (companySetupPath) {
+  if (companySetupPath || companySettingsPath) {
     const companyId = path.split('/')[2];
     const company = phase2State.companies.find((item) => item.companyId === companyId);
     if (!company) return apiErrorResponse(404, 'Company not found.', requestId);
+    const setupActor = {
+      userId: actor.userId,
+      fullName: actor.fullName,
+      activeTenantId: actor.activeTenantId,
+      activeCompanyId: actor.activeCompanyId,
+      tenantAdmin: actor.tenantAdmin,
+      companyView: actor.companyView,
+      companyManage: actor.companyManage,
+    };
+    if (companySettingsPath) {
+      return handleCompanySettingsRequest(
+        request,
+        requestId,
+        setupActor,
+        company,
+        (changes) => Object.assign(company, changes),
+      );
+    }
     return handleCompanySetupRequest(
       request,
       path,
       requestId,
-      {
-        userId: actor.userId,
-        fullName: actor.fullName,
-        activeTenantId: actor.activeTenantId,
-        activeCompanyId: actor.activeCompanyId,
-        tenantAdmin: actor.tenantAdmin,
-        companyManage: actor.companyManage,
-      },
+      setupActor,
       company,
       (changes) => Object.assign(company, changes),
     );

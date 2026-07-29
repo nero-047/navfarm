@@ -1,7 +1,7 @@
 # Recommended Implementation Sequence
 
-These milestones are corrective planning. Milestone 1 is implemented for the
-frontend mock demo and contract boundary only; it does not claim backend
+These milestones are corrective planning. Milestones 1 and 2 are implemented
+for the frontend mock demo and contract boundary only; neither claims backend
 delivery. Do not begin later milestones merely because this status changed.
 
 ## Milestone 1: Session and context consolidation
@@ -21,14 +21,18 @@ delivery. Do not begin later milestones merely because this status changed.
 
 ## Milestone 2: Company administration decoupling
 
-- **Scope:** remove company-wide `DemoStoreProvider`; implement typed company settings, members/roles and readiness pages; retire settings aliases.
-- **Dependencies:** milestone 1 company context and company API resource decisions.
-- **Likely modules:** `[company]/layout.tsx`, settings/members/readiness routes, Phase 2/3 components, farm-demo boundaries.
-- **Acceptance:** company routes do not import farm-demo state or active workspace; each readiness type has its own view.
-- **Tests:** route/render isolation and company-only access tests.
-- **Backend dependency:** company member/role/readiness resource design.
-- **Product decision:** final setup/readiness taxonomy.
-- **Complexity:** high.
+- **Status:** complete for the frontend mock demo; backend implementation
+  remains missing.
+- **Delivered:** workspace-only `DemoStoreProvider`; typed company Profile,
+  Members, invitations, Roles, Settings and Readiness pages; independent
+  company/workspace role mutations; canonical fixture updates/reset; company
+  navigation and legacy redirect cleanup; desktop/mobile acceptance coverage.
+- **Contract ready:** `/companies/[c]/{members,invitations,roles,settings,readiness}`
+  request/response schemas and typed client.
+- **Backend dependency:** durable company member/invitation/role/settings/
+  readiness resources and enforcement.
+- **Remaining product decision:** custom roles plus final readiness taxonomy and
+  accounting gate.
 
 ## Milestone 3: Extended authorization policy
 

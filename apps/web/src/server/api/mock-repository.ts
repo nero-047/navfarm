@@ -16,6 +16,11 @@ import {
 } from '../../contracts/api';
 import type { CompanySummary } from '../../contracts/phase2';
 import { apiErrorResponse } from './errors';
+import {
+  handleCompanyAdminRequest,
+  seedCompanyInvitations,
+  type CompanyAdminState,
+} from './company-admin-repository';
 import { handlePhase2Request, resetPhase2Repository } from './phase2-repository';
 import { handlePhase3Request, resetPhase3Repository } from './phase3-repository';
 import { handleOperationalRequest, resetOperationalRepository } from './operational-repository';
@@ -30,6 +35,7 @@ type ExplicitCompanyMembership = {
   companyId: string;
   role: CompanyRole;
   permissions: Permission[];
+  status?: 'ACTIVE' | 'INACTIVE';
 };
 type ExplicitWorkspaceMembership = {
   workspaceId: string;
@@ -118,19 +124,22 @@ const PLATFORM_PERMISSIONS: Permission[] = ['platform.manage', 'tenant.view', 't
 const TENANT_ADMIN_PERMISSIONS: Permission[] = [
   'tenant.view', 'tenant.manage', 'company.view', 'company.manage',
   'users.view', 'users.manage', 'roles.view', 'roles.manage',
+  'masters.view', 'masters.manage',
   'workspaces.view', 'workspaces.manage', 'finance.view', 'finance.manage',
   'audit.view', 'notifications.manage',
 ];
 const COMPANY_ADMIN_PERMISSIONS: Permission[] = [
   'company.view', 'company.manage', 'users.view', 'users.manage',
   'roles.view', 'roles.manage', 'workspaces.view', 'workspaces.manage',
+  'masters.view', 'masters.manage',
   'finance.view', 'finance.manage', 'audit.view', 'notifications.manage',
 ];
 const ACCOUNTANT_PERMISSIONS: Permission[] = [
-  'company.view', 'costs.view', 'finance.view', 'finance.manage', 'audit.view',
+  'company.view', 'masters.view', 'costs.view', 'finance.view', 'finance.manage',
+  'audit.view',
 ];
 const AUDITOR_PERMISSIONS: Permission[] = [
-  'company.view', 'costs.view', 'finance.view', 'audit.view',
+  'company.view', 'masters.view', 'costs.view', 'finance.view', 'audit.view',
 ];
 const WORKSPACE_MANAGER_PERMISSIONS: Permission[] = [
   'workspaces.view', 'batches.view', 'batches.create', 'batches.approve',
@@ -335,6 +344,7 @@ type MockState = {
   users: DemoIdentityFixture[];
   workspaces: Workspace[];
   workspaceMembers: WorkspaceMember[];
+  companyInvitations: typeof seedCompanyInvitations;
 };
 declare global { var __navfarmMockState: MockState | undefined; }
 const state: MockState = globalThis.__navfarmMockState ?? {
@@ -344,8 +354,10 @@ const state: MockState = globalThis.__navfarmMockState ?? {
   users: structuredClone(fixtureUsers),
   workspaces: structuredClone(seedWorkspaces),
   workspaceMembers: structuredClone(seedWorkspaceMembers),
+  companyInvitations: structuredClone(seedCompanyInvitations),
 };
 state.workspaceMembers ??= structuredClone(seedWorkspaceMembers);
+state.companyInvitations ??= structuredClone(seedCompanyInvitations);
 globalThis.__navfarmMockState = state;
 
 function json(value: unknown, status = 200) {
@@ -378,6 +390,7 @@ function sessionPayload(record: SessionRecord): AuthSession {
       companyName: String(company.company_display_name || company.company_name),
       companySlug: String(company.slug),
       status: company.is_active ? 'ACTIVE' as const : 'INACTIVE' as const,
+      membershipStatus: membership.status ?? 'ACTIVE',
       onboardingStatus: String(company.onboarding_status) as 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED',
       role: membership.role,
       permissions: membership.permissions,
@@ -502,7 +515,11 @@ function validateContextTuple(user: DemoIdentityFixture, tuple: ContextTuple) {
       message: 'The selected company does not belong to the active tenant.',
     };
   }
-  if (!user.companies.some((membership) => membership.companyId === tuple.companyId)) {
+  if (!user.companies.some(
+    (membership) =>
+      membership.companyId === tuple.companyId &&
+      membership.status !== 'INACTIVE',
+  )) {
     return {
       status: 403, code: 'COMPANY_MEMBERSHIP_REQUIRED' as const,
       message: 'Company membership is required.',
@@ -660,15 +677,7 @@ export async function handleMockRequest(request: Request, path: string, requestI
     if (process.env.NODE_ENV === 'production' || process.env.NAVFARM_ENABLE_MOCK_RESET !== 'true') {
       return apiErrorResponse(404, 'Not found.', requestId);
     }
-    state.companies = structuredClone(seedCompanies);
-    state.users = structuredClone(fixtureUsers);
-    state.workspaces = structuredClone(seedWorkspaces);
-    state.workspaceMembers = structuredClone(seedWorkspaceMembers);
-    state.demoStates.clear();
-    state.sessions.clear();
-    resetPhase2Repository();
-    resetPhase3Repository();
-    resetOperationalRepository();
+    resetMockRepositoryState();
     return json({ success: true });
   }
 
@@ -695,6 +704,14 @@ export async function handleMockRequest(request: Request, path: string, requestI
     session.tenants.find((tenant) => tenant.tenantId === session.activeTenantId)
       ?.permissions.includes('workspaces.manage'),
   );
+  const companyAdminResponse = await handleCompanyAdminRequest(
+    phase2Request,
+    path,
+    requestId,
+    session,
+    state as CompanyAdminState,
+  );
+  if (companyAdminResponse) return companyAdminResponse;
   const workspaceCollectionMatch = path.match(/^\/tenants\/([^/]+)\/companies\/([^/]+)\/workspaces$/);
   if (workspaceCollectionMatch) {
     const [, tenantId, companyId] = workspaceCollectionMatch;
@@ -782,6 +799,9 @@ export async function handleMockRequest(request: Request, path: string, requestI
     activeTenantId: session.activeTenantId,
     activeCompanyId: session.activeCompanyId,
     tenantAdmin,
+    companyView: Boolean(
+      activeCompany?.permissions.includes('company.view') || tenantAdmin,
+    ),
     companyManage: Boolean(
       activeCompany?.permissions.includes('company.manage') || tenantAdmin,
     ),
@@ -865,3 +885,16 @@ export async function handleMockRequest(request: Request, path: string, requestI
 }
 
 export const mockFixtures = { seedTenants, seedCompanies, fixtureUsers };
+
+export function resetMockRepositoryState() {
+  state.companies = structuredClone(seedCompanies);
+  state.users = structuredClone(fixtureUsers);
+  state.workspaces = structuredClone(seedWorkspaces);
+  state.workspaceMembers = structuredClone(seedWorkspaceMembers);
+  state.companyInvitations = structuredClone(seedCompanyInvitations);
+  state.demoStates.clear();
+  state.sessions.clear();
+  resetPhase2Repository();
+  resetPhase3Repository();
+  resetOperationalRepository();
+}

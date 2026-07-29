@@ -1,10 +1,12 @@
 # Unresolved Product Decisions
 
-These items remain intentionally unresolved after Demo Completion Milestone 1.
-Milestone 1 did settle the frontend mock policy that tenant is session
+These items remain intentionally unresolved after Demo Completion Milestone 2.
+Milestone 1 settled the frontend mock policy that tenant is session
 established, the visible selector switches Company/Workspace only, memberships
 and permissions are explicit, and company/tenant roles do not authorize
-workspace mutations. The items below still require product/backend agreement.
+workspace mutations. Milestone 2 settled the frontend mock ownership and route
+boundary for Company Members, Roles, Settings and Readiness, while leaving the
+items below for product/backend agreement.
 
 ## Workspace vs Operational vs Accounting Readiness
 
@@ -18,6 +20,31 @@ Unresolved:
 
 - Whether accounting readiness is strictly required for all operational writes or only for close/finalization.
 - Whether some LOBs may operate without Finance enabled.
+- Industry-specific readiness requirements and responsible owners beyond the
+  documented shared mock checks.
+
+The company readiness aggregate labels these rules `POLICY_PENDING`; it does
+not count them as blockers.
+
+## Custom company roles
+
+Known:
+
+- The mock exposes the standard company-role and workspace-role catalogues
+  separately.
+- Standard company-role assignment occurs through Company Members.
+- `CUSTOM` remains in the compatibility enum with no default permissions.
+
+Unresolved:
+
+- Final custom-role catalogue, permission-combination constraints, naming,
+  delegation, audit and lifecycle rules.
+- Whether custom roles may include workspace permissions or only company
+  permissions.
+- Durable backend endpoints and versioning for custom role definitions.
+
+The frontend displays custom roles as planned and never pretends to persist a
+custom definition.
 
 ## Workspace-specific terminology
 

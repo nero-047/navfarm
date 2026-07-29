@@ -64,12 +64,28 @@
   operational capabilities. Operational reads and mutations require a matching
   active tenant/company/workspace tuple, explicit workspace membership, and
   the requested workspace capability.
+- Company administration is independent of operational demo state.
+  `apps/web/src/app/[company]/layout.tsx` owns the company shell only;
+  `DemoStoreProvider` is mounted exclusively by
+  `apps/web/src/app/[company]/workspaces/[workspace]/layout.tsx`.
+- Canonical company administration routes include `/{company}/profile`,
+  `/members`, `/roles`, `/readiness`, and `/settings`. Their screens use the
+  typed `modules/company-admin/client.ts` boundary and must never import mock
+  repositories or farm-demo state directly.
+- Company roles and workspace roles are separate assignments. Member changes
+  must update the canonical explicit identity fixture, while workspace access
+  is added/changed/removed only through an explicit workspace assignment.
+- Company readiness aggregates company foundation, onboarding, shared masters,
+  accounting, workspace creation/membership, NOB/LOB, and per-workspace
+  operational readiness. Accounting readiness remains a separate detailed
+  route. Unresolved readiness rules must stay informational, recommended, or
+  policy-pending rather than becoming invented blockers.
 - Company workspaces use `/{company}/...`. The company selector must show company entities, not industries or LOBs. Each company is assigned a documented NOB; piggery, dairy, rearing, laying, hatching, slaughter, crops, seeds, etc. belong inside the company as LOBs.
 - Seed/demo NOB options must follow the docs: Poultry, Livestock, Agriculture, Aquaculture, Insect Farming, and Feed & Processing. New NOBs/LOBs should remain configuration-driven.
 - Keep company-scoped navigation and UI reusable across industries. Prefer domain configuration and typed metadata over duplicating pages per company/LOB.
 - Preserve the existing visual language unless the user asks for a redesign: navy navigation, white/light-gray content surfaces, restrained red/blue accents, compact typography, and card-based layouts.
 - The frontend demo information architecture should cover: dashboard/overview, batches, daily operations, QC, QR traceability, resources and KPI schedules, financial/variance reports, and settings/onboarding/master data.
-- Settings should reflect the documented setup domains: company profile and addresses/contacts, language and currency, timezone and fiscal rules, enabled modules/NOB/LOB configuration, users/roles, notifications, GL/item mappings, and master data.
+- Settings should reflect the documented setup domains: company profile and addresses/contacts, language and currency, timezone and fiscal rules, enabled modules/NOB/LOB configuration, users/roles, notifications, GL/item mappings, and master data. The current mock settings resource supports profile links, localization, fiscal configuration, modules, notifications, business-structure links, and setup status; do not invent additional persisted preferences.
 - Treat incomplete pages as demo placeholders to be progressively backed by realistic local fixtures from the RAK docs, with visible `Demo data` labelling where users could otherwise mistake values for live records.
 
 ## Mobile App Conventions

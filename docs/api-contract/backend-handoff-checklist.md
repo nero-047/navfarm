@@ -45,12 +45,25 @@ Build:
 - Plans, usage, tenant audit.
 - Tenant dashboard, users, roles and invitations.
 - Company create/list/detail.
+- Company profile/settings aggregate and documented section mutations.
+- Company members, invitations, active/inactive membership lifecycle.
+- Standard company-role catalogue and assignment.
+- Explicit workspace assignment add/change/remove with company/workspace role
+  independence.
 
 Acceptance criteria:
 
 - Platform Admin can access `/admin/*`.
 - Tenant Admin cannot access `/admin/*`.
 - Tenant Admin can create a draft company and enter setup.
+- Company administration works with `activeWorkspaceId: null`.
+- Member/invitation/role/settings mutations require the exact documented
+  capability combination and update the same membership model used by session
+  restoration.
+- Company-role changes never mutate workspace roles; workspace-role changes
+  never mutate company roles.
+- Workspace assignment appears in the restored session, and removal revokes
+  workspace visibility.
 - Suspended tenant access is blocked.
 
 ## 3. Onboarding and Readiness
@@ -60,6 +73,8 @@ Build:
 - 15-step setup status.
 - Profile, addresses, contacts, localization, fiscal, modules, administrator, team.
 - Company accounting readiness plus separate workspace operational readiness.
+- Company readiness aggregate covering foundation, setup, masters, accounting,
+  workspace creation/membership, NOB/LOB and per-workspace operations.
 - Setup completion.
 
 Acceptance criteria:
@@ -67,6 +82,7 @@ Acceptance criteria:
 - Incomplete onboarding routes to setup profile/review.
 - Operations routes redirect when `operationsReady` is false.
 - Readiness calculation is server-driven.
+- Policy-pending readiness rules remain non-blocking until product approval.
 
 ## 4. Masters and Accounting Configuration
 

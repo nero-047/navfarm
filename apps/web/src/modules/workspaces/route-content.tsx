@@ -37,7 +37,13 @@ export function CanonicalWorkspaceContent({
   return <WorkspacePage kind={(section === 'costing' ? 'reports' : section) as WorkspacePageKind} />;
 }
 
-export function LegacyOperationalRedirect({ kind }: { kind: OperationalRouteKind }) {
+export function LegacyOperationalRedirect({
+  kind,
+  suffix,
+}: {
+  kind: OperationalRouteKind;
+  suffix?: string;
+}) {
   const { company } = useParams<{ company: string }>();
   const { session, selectContext } = useAuth();
   const router = useRouter();
@@ -54,7 +60,9 @@ export function LegacyOperationalRedirect({ kind }: { kind: OperationalRouteKind
     if (!membership) return;
     if (workspaces.length === 1) {
       const workspace = workspaces[0];
-      const destination = `/${company}/workspaces/${workspace.workspaceSlug}/${kind}`;
+      const destination = `/${company}/workspaces/${workspace.workspaceSlug}/${kind}${
+        suffix ? `/${encodeURIComponent(suffix)}` : ''
+      }`;
       if (session?.activeWorkspaceId === workspace.workspaceId) {
         router.replace(destination);
       } else {
@@ -63,7 +71,10 @@ export function LegacyOperationalRedirect({ kind }: { kind: OperationalRouteKind
     } else if (workspaces.length > 1) {
       router.replace(`/${company}/workspaces`);
     }
-  }, [company, kind, membership, router, selectContext, session?.activeWorkspaceId, workspaces]);
+  }, [
+    company, kind, membership, router, selectContext,
+    session?.activeWorkspaceId, suffix, workspaces,
+  ]);
 
   if (!membership) return <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-sm text-red-800">Company access is not assigned.</div>;
   if (membership.onboardingStatus !== 'COMPLETED') {

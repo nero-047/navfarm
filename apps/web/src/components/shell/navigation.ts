@@ -1,6 +1,7 @@
 import {
   BarChart3, Bell, Boxes, Building2, ClipboardCheck, Database, Gauge,
-  History, LayoutDashboard, Layers, QrCode, Settings, ShieldAlert, UserPlus, Users, Wrench, Landmark, CheckCircle2,
+  History, LayoutDashboard, Layers, QrCode, Settings, ShieldAlert, UserPlus,
+  Users, Wrench, Landmark, CheckCircle2, ShieldCheck,
 } from 'lucide-react';
 import type { AppScope, NavigationRule } from '../../lib/authorization';
 import { WORKSPACE_PRESENTATION } from '../../lib/workspace-presentation';
@@ -44,13 +45,14 @@ export function navigationForScope(
   if (scope === 'company') {
     return [
       { label: 'Overview', href: `${root}/overview`, icon: LayoutDashboard, permission: 'company.view' },
-      { label: 'Workspaces', href: `${root}/workspaces`, icon: Layers, permission: 'company.view' },
-      { label: 'Company setup', href: `${root}/setup`, icon: Settings, permission: 'company.manage' },
-      { label: 'Shared master data', href: `${root}/masters`, icon: Database, permission: 'company.view' },
+      { label: 'Setup', href: `${root}/setup`, icon: Building2, permission: 'company.view' },
+      { label: 'Workspaces', href: `${root}/workspaces`, icon: Layers, permission: 'workspaces.view' },
+      { label: 'Masters', href: `${root}/masters`, icon: Database, permission: 'masters.view' },
       { label: 'Accounting', href: `${root}/accounting/readiness`, icon: Landmark, permission: 'finance.view' },
-      { label: 'Members and roles', href: `${root}/members`, icon: Users, permission: 'users.view' },
+      { label: 'Members', href: `${root}/members`, icon: Users, permission: 'users.view' },
+      { label: 'Roles & permissions', href: `${root}/roles`, icon: ShieldCheck, permission: 'roles.view' },
       { label: 'Readiness', href: `${root}/readiness`, icon: CheckCircle2, permission: 'company.view' },
-      { label: 'Settings', href: `${root}/settings`, icon: Settings, permission: 'company.manage' },
+      { label: 'Settings', href: `${root}/settings`, icon: Settings, permission: 'company.view' },
     ];
   }
   const workspaceRoot = `${root}/workspaces/${workspace?.workspaceSlug ?? 'workspace'}`;

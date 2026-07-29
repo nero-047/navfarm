@@ -104,6 +104,7 @@ export function scopeAccessReason(
     ? session.companies.find((item) => item.companySlug === companySlug)
     : session.companies.find((item) => item.companyId === session.activeCompanyId);
   if (!company) return 'company_not_assigned';
+  if (company.membershipStatus === 'INACTIVE') return 'company_not_assigned';
   if (company.status !== 'ACTIVE') return 'company_inactive';
   if (
     company.tenantId !== session.activeTenantId ||

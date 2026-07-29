@@ -8,8 +8,8 @@ email, username, tenant/company role fallback, or a default workspace.
 | Email | Explicit scopes | Landing route | Operational result | Intentional denial |
 | --- | --- | --- | --- | --- |
 | `system@navfarm.demo` | Platform only | `/admin/dashboard` | None | All company/workspace access |
-| `tenant@navfarm.demo` | Tenant Admin + Green Valley company administration; no workspace | `/console/dashboard` | None | Workspace operations/mutations |
-| `companyadmin@navfarm.demo` | Green Valley company administration; no workspace | `/green-valley-poultry/overview` | None | Workspace operations/mutations |
+| `tenant@navfarm.demo` | Tenant Admin + Green Valley Profile/Members/Roles/Settings/Readiness/workspace administration; no workspace | `/console/dashboard` | None | Workspace operations/mutations |
+| `companyadmin@navfarm.demo` | Green Valley Profile/Members/Roles/Settings/Readiness/workspace administration; no workspace | `/green-valley-poultry/overview` | None until explicitly assigned | Workspace operations/mutations without explicit assignment |
 | `accountant@navfarm.demo` | Green Valley finance/readiness; no workspace | `/green-valley-poultry/accounting/readiness` | None | Batch/QC/QR/resource mutations |
 | `auditor@navfarm.demo` | Green Valley company/finance/audit read; no workspace | `/green-valley-poultry/overview` | None | All operational mutations |
 | `manager@navfarm.demo` | Green Valley + Poultry Operations Manager | `/green-valley-poultry/workspaces/poultry-operations/dashboard` | Explicit batch, operation, quality, traceability, resource, report capabilities | Other companies/workspaces |
@@ -25,3 +25,9 @@ Refresh restores the complete valid tuple through `AuthProvider`. Logout
 destroys the process-memory session/cookie and clears all context. These are
 frontend mock behaviors; persistent accounts, memberships, and permissions
 remain a backend requirement.
+
+Milestone 2 mutations reuse these same fixture records. Tenant/Company Admin
+may administer explicit workspace assignments but still receives no implicit
+operational membership. Accountant, Auditor and Viewer member/assignment
+mutations return `CAPABILITY_REQUIRED`; Auditor may view documented company
+settings/readiness in a read-only state.

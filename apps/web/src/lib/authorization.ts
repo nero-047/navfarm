@@ -6,7 +6,8 @@ export type AppScope = 'platform' | 'tenant' | 'company' | 'workspace';
 const ALL_COMPANY_PERMISSIONS: Permission[] = [
   'company.view', 'company.manage', 'users.view', 'users.manage', 'roles.view',
   'roles.manage', 'workspaces.view', 'workspaces.manage', 'costs.view',
-  'finance.view', 'finance.manage', 'audit.view', 'notifications.manage',
+  'finance.view', 'finance.manage', 'masters.view', 'masters.manage',
+  'audit.view', 'notifications.manage',
 ];
 
 export const ROLE_PERMISSIONS: Record<CompanyRole, Permission[]> = {
@@ -16,10 +17,11 @@ export const ROLE_PERMISSIONS: Record<CompanyRole, Permission[]> = {
     'company.view',
   ],
   ACCOUNTANT: [
-    'company.view', 'costs.view', 'finance.view', 'finance.manage', 'audit.view',
+    'company.view', 'masters.view', 'costs.view', 'finance.view', 'finance.manage',
+    'audit.view',
   ],
   AUDITOR: [
-    'company.view', 'costs.view', 'finance.view', 'audit.view',
+    'company.view', 'masters.view', 'costs.view', 'finance.view', 'audit.view',
   ],
   SUPERVISOR: [
     'company.view',
@@ -29,7 +31,7 @@ export const ROLE_PERMISSIONS: Record<CompanyRole, Permission[]> = {
 };
 
 const WORKSPACE_OPERATIONAL_PERMISSIONS = new Set<Permission>([
-  'workspaces.view', 'batches.view', 'batches.create', 'batches.approve', 'batches.close',
+  'batches.view', 'batches.create', 'batches.approve', 'batches.close',
   'operations.create', 'costs.view', 'quality.view', 'quality.manage',
   'traceability.view', 'traceability.manage', 'resources.view', 'resources.manage', 'reports.export',
 ]);
@@ -69,7 +71,9 @@ export function grantedPermissions(session: AuthSession | null): Set<Permission>
   const company = activeCompanyMembership(session);
   const values: Permission[] = [...session.user.permissions];
   if (tenant) values.push(...tenant.permissions);
-  if (company) values.push(...company.permissions);
+  if (company && company.membershipStatus !== 'INACTIVE') {
+    values.push(...company.permissions);
+  }
   return new Set(values);
 }
 
@@ -88,7 +92,12 @@ export function canAccessScope(session: AuthSession | null, scope: AppScope): bo
     return session.tenants.some((tenant) => tenant.status === 'ACTIVE') && can(session, 'tenant.view');
   }
   const company = activeCompanyMembership(session);
-  return Boolean(company && company.status === 'ACTIVE' && can(session, 'company.view'));
+  return Boolean(
+    company &&
+    company.status === 'ACTIVE' &&
+    company.membershipStatus !== 'INACTIVE' &&
+    can(session, 'company.view'),
+  );
 }
 
 export function destinationForSession(session: AuthSession): string {

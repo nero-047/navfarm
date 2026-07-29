@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation';
+import { CompanyMembersPage } from '@/modules/company-admin/members-page';
 
-export default async function CompanyMembersPage({ params }: { params: Promise<{ company: string }> }) {
-  const { company } = await params;
-  redirect(`/${company}/settings/users`);
+export default function MembersPage() {
+  return <CompanyMembersPage />;
 }

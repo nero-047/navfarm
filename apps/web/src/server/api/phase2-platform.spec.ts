@@ -12,6 +12,7 @@ const actor: Phase2Actor = {
   activeTenantId: null,
   activeCompanyId: null,
   tenantAdmin: false,
+  companyView: false,
   companyManage: false,
 };
 

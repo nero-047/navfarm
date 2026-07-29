@@ -13,8 +13,8 @@ tenant-role fallback, company-role fallback, or default workspace.
 | Account | Deterministic result |
 | --- | --- |
 | `system@navfarm.demo` | Platform Administrator -> `/admin/dashboard`; platform administration only, with no company or workspace membership. |
-| `tenant@navfarm.demo` | Tenant Administrator -> `/console/dashboard`; explicit tenant/company setup, membership, accounting, and workspace-administration permissions; no workspace membership and no operational access. |
-| `companyadmin@navfarm.demo` | Company Administrator -> `/green-valley-poultry/overview`; company setup/accounting/workspace administration only; no operational access. |
+| `tenant@navfarm.demo` | Tenant Administrator -> `/console/dashboard`; explicit tenant/company setup, Members, Roles, Settings, Readiness, accounting, and workspace-administration permissions; no workspace membership and no operational access. |
+| `companyadmin@navfarm.demo` | Company Administrator -> `/green-valley-poultry/overview`; company profile/setup, Members, Roles, Settings, Readiness, accounting, and workspace administration; no operational access until a separate workspace assignment is made. |
 | `accountant@navfarm.demo` | Accountant -> `/green-valley-poultry/accounting/readiness`; company accounting/readiness access; no workspace membership or operational mutation. |
 | `auditor@navfarm.demo` | Auditor -> `/green-valley-poultry/overview`; read-only company/accounting/audit access; no workspace membership or operational mutation. |
 | `manager@navfarm.demo` | Workspace Manager -> Poultry Operations dashboard; sees only its assigned workspace and can use the explicitly listed batch, operation, QC, traceability, resource, and report capabilities. |
@@ -30,3 +30,9 @@ Operational mock state is partitioned by the complete
 tenant/company/workspace scope. Company or tenant administration never implies
 batch, operations, quality, traceability, resource, costing, or report
 capabilities.
+
+Member and role mutations use the same explicit identity records as restored
+sessions. Assigning a workspace makes it visible on session refresh; removing
+the assignment revokes it. Changing a company role leaves every workspace role
+unchanged, and changing a workspace role leaves the company role unchanged.
+Mock reset restores the canonical membership, role, and invitation fixtures.

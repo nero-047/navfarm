@@ -38,6 +38,14 @@ This matrix maps implemented web screens and actions to required API endpoints. 
 | `/{company}/setup/administrator` | Admin account | `/api/v1/companies/{companyId}/setup/administrator` | GET/PATCH | `company.manage` | `administratorSchema` | `administratorSchema` | Form errors | `company-setup-repository.ts` |
 | `/{company}/setup/team` | Team | `/api/v1/companies/{companyId}/setup/team` | GET/POST/PATCH/DELETE | `users.manage` | `teamMemberSchema` | `teamMemberSchema[]`/`teamMemberSchema` | Empty list | `company-setup-repository.ts` |
 | `/{company}/setup/review` | Complete setup | `/api/v1/companies/{companyId}/setup/complete` | POST | `company.manage` | none | `setupStatusSchema` | Disabled until ready | `company-setup-repository.ts` |
+| `/{company}/profile` | View/edit legal company profile | `/api/v1/companies/{companyId}/setup/profile` | GET/PATCH | `company.view`; `company.manage` for PATCH | `setupProfileSchema` | `setupProfileSchema` | Loading, empty, validation, error, read-only, saved/dirty states | `company-setup-repository.ts` via `companyAdminClient` |
+| `/{company}/settings`, `/settings/{section}` | Aggregate/edit localisation, fiscal, modules and notifications | `/api/v1/companies/{companyId}/settings` | GET/PATCH | `company.view`; `company.manage` for PATCH | `companySettingsMutationSchema` (one section) | `companySettingsSchema` | Loading/error/read-only/save confirmation/unsaved warning | `company-setup-repository.ts` via `companyAdminClient` |
+| `/{company}/members` | Member list/detail and workspace summaries | `/api/v1/companies/{companyId}/members`, `/members/{userId}` | GET | `users.view` | none | `companyMemberListResponseSchema`, `companyMemberSchema` | Search/filter, desktop table, mobile cards, loading/error/empty | `company-admin-repository.ts` |
+| `/{company}/members` | Invite/resend/cancel | `/api/v1/companies/{companyId}/invitations`, `/invitations/{invitationId}/{resend}` | GET/POST/DELETE | `users.view/manage` | `inviteCompanyMemberRequestSchema` | invitation schemas | Duplicate, validation, status, destructive confirmation | `company-admin-repository.ts` |
+| `/{company}/members` | Company role/membership mutation | `/api/v1/companies/{companyId}/members/{userId}/{role|membership}` | PATCH | `users.manage`; role also `roles.manage` | company role/membership mutation schemas | `companyMemberSchema` | Reserved/custom role validation and confirmation | `company-admin-repository.ts` |
+| `/{company}/members` | Add/change/remove workspace assignment | `/api/v1/companies/{companyId}/members/{userId}/workspace-assignments/{workspaceId?}` | POST/PATCH/DELETE | `users.manage` + `workspaces.manage` | workspace assignment/role mutation schemas | `companyMemberSchema` | Cross-company rejection, independent roles, destructive confirmation | `company-admin-repository.ts` |
+| `/{company}/roles` | Company and workspace role catalogue | `/api/v1/companies/{companyId}/roles` | GET | `roles.view` | none | `companyRoleCatalogueSchema` | Permission matrix, role detail, custom role planned state | `company-admin-repository.ts` |
+| `/{company}/readiness` | Company readiness aggregate | `/api/v1/companies/{companyId}/readiness` | GET | `company.view` | none | `companyReadinessAggregateSchema` | Separate sections, workspace links, non-blocking policy pending notes | `company-admin-repository.ts` |
 | `/{company}/masters` | Master dashboard | `/api/v1/companies/{companyId}/masters` | GET | `company.view` | none | `masterDashboardSchema` | Loading/error category cards | `phase3-repository.ts` |
 | `/{company}/masters/{resource}` | Master list/create/edit/status | `/api/v1/companies/{companyId}/masters/{resource}` and `/{recordId}` | GET/POST/PATCH | `company.view`; `company.manage` for mutation | resource schema | `masterListResponseSchema` or resource schema | Empty table/errors | `phase3-repository.ts` |
 | `/{company}/masters/{resource}/import` | Import validation | `/api/v1/companies/{companyId}/masters/{resource}/import/validate` | POST | `company.manage`; Tenant Admin allowed setup config | `{ scenario }` now; production file metadata pending | `importPreviewSchema` | Preview or validation error | `phase3-repository.ts` |
@@ -62,3 +70,10 @@ session/context surface remain: `/language`, `/currency`, `/setup/wizard/*`,
 `/role/*`, `/user-company/*`, `/auth/change-password`, and
 `/auth/register-admin`. They require later typed-contract migration or explicit
 retirement before backend integration.
+
+The Milestone 2 company-admin paths above are one documented frontend/mock
+convention behind `companyAdminClient`. Their Zod request/response contracts
+and runtime response validation are ready; durable users, invitations,
+memberships, roles, settings, and readiness endpoints are not implemented by
+the real backend. Final backend route/DTO mapping remains a handoff item rather
+than a direct dependency on Arun's current routes.

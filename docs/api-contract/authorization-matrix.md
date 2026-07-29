@@ -15,6 +15,8 @@ Current granular permissions:
 - `users.manage`
 - `roles.view`
 - `roles.manage`
+- `masters.view`
+- `masters.manage`
 - `batches.view`
 - `batches.create`
 - `batches.approve`
@@ -54,14 +56,14 @@ Current granular permissions:
 
 | Role | Scope | Permissions | Confirmed behavior |
 |---|---|---|---|
-| Company Admin (`ADMIN`) | Company | company configuration/accounting defaults | Used by multi-company and MFA demo users. Does not itself grant workspace operations. |
+| Company Admin (`ADMIN`) | Company | company, users, roles, masters, accounting and workspace-administration permissions | Used by company, tenant, multi-company and MFA demo users. Does not itself grant workspace operations. |
 | Super Admin (`SUPER_ADMIN`) | Company | all company permissions | Used for onboarding admin company setup. |
 | Operations Manager (`FARM_MANAGER`) | Company membership plus assigned workspace | `company.view`; operational permissions are resolved from workspace membership | Can execute the Phase 7 flow only in assigned workspaces. No finance view/manage. |
-| Accountant (`ACCOUNTANT`) | Company | Fixture: `company.view`, `costs.view`, `finance.view`, `finance.manage`, `audit.view` | No workspace membership or operational capability. |
-| Auditor (`AUDITOR`) | Company | Fixture: `company.view`, `costs.view`, `finance.view`, `audit.view` | Read-only company/audit scope; no workspace membership. |
+| Accountant (`ACCOUNTANT`) | Company | Fixture: `company.view`, `masters.view`, `costs.view`, `finance.view`, `finance.manage`, `audit.view` | No workspace membership or operational capability. |
+| Auditor (`AUDITOR`) | Company | Fixture: `company.view`, `masters.view`, `costs.view`, `finance.view`, `audit.view` | Read-only company/audit scope; no workspace membership. |
 | Supervisor (`SUPERVISOR`) | Company | Catalogue role only | Company role does not confer operations; an explicit workspace membership must carry capabilities. |
 | Viewer (`VIEWER`) | Company | Fixture: `company.view` | Workspace read capabilities exist only on the separate Viewer workspace membership. |
-| Custom (`CUSTOM`) | Company | Explicit permissions array | No default permissions. |
+| Custom (`CUSTOM`) | Company | No demo assignment/default permissions | Planned only; final custom-role catalogue and persistence remain unresolved. |
 
 ## Scope Rules
 
@@ -77,6 +79,9 @@ Current granular permissions:
 - Role names are descriptive metadata. The mock session and mutation repository
   authorize only the explicit permission arrays on the active membership; there
   is no tenant-role or company-role operational fallback.
+- Company-role changes and workspace-role changes are independent mutations.
+  Company membership must be active before any recorded workspace assignment
+  can authorize session visibility.
 
 ## Route Guard Expectations
 
@@ -84,7 +89,9 @@ Current granular permissions:
 |---|---|---|
 | Platform | `/admin/*` | Require `SYSTEM_ADMIN`; otherwise 403. |
 | Tenant | `/console/*` | Require active tenant and `tenant.view`. |
-| Company | `/{company}/settings`, `/masters`, `/accounting`, `/setup` | Require active company membership and company configuration capability. |
+| Company read | `/{company}/{overview,profile,readiness,settings}`, `/setup` | Require active company membership and `company.view`; no active workspace is required. |
+| Company members/roles | `/{company}/{members,roles}` | Require `users.view` or `roles.view`; mutations require the exact `users.manage`, `roles.manage`, and/or `workspaces.manage` combination. |
+| Company masters/accounting | `/{company}/{masters,accounting}` | Require `masters.view` or `finance.view`; mutations require the matching manage capability. |
 | Workspace | `/{company}/workspaces/{workspace}/{dashboard|batches|operations|quality|traceability|resources|costing|reports|masters|settings}` | Require matching tenant/company/workspace membership and active context. |
 | Operational mutations | workspace batch/QC/QR/resources close/write routes | Require the relevant workspace capability; tenant/company administration alone is insufficient. |
 | Configuration mutations | setup, masters, NOB/LOB, accounting config | Require `company.manage` or explicit tenant-admin setup authority. |
