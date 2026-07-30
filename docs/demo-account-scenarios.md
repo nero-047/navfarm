@@ -36,6 +36,23 @@ sessions. Assigning a workspace makes it visible on session refresh; removing
 the assignment revokes it. Changing a company role leaves every workspace role
 unchanged, and changing a workspace role leaves the company role unchanged.
 Mock reset restores the canonical membership, role, and invitation fixtures.
+It also restores company settings/readiness, workspace configuration,
+notification read state, batches, operations, QC, traceability, resources,
+costing/report projections, and every other mutable demo fixture. All active
+mock sessions are invalidated, so a cookie issued before reset cannot restore
+stale roles or context.
+
+Normal sign-out preserves business mutations and always opens clean `/login`.
+On the next login, a stale `returnTo` is accepted only when the new account can
+enter the complete route scope; record-detail URLs are never reused. The
+focused sequential scenarios cover Manager → Accountant, Tenant Admin →
+Viewer, Multi-company → Company Admin, Company Admin → Auditor, MFA user →
+Manager, Suspended user → Tenant Admin, and Manager mutation → reset → Viewer.
+Each second account receives only its own explicit memberships and landing.
+
+Seeded notifications are filtered by the signed-in identity and accessible
+scope. Read/unread state is per account, normal sign-out preserves it, and
+Reset demo data restores the original unread set.
 
 Milestone 3 switcher outcomes:
 

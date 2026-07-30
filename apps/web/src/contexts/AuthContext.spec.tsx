@@ -3,6 +3,13 @@ import type { AuthSession } from '../contracts/api';
 import { ApiError, api } from '../lib/api-client';
 import { AuthProvider, useAuth } from './AuthContext';
 
+const mockRouterReplace = jest.fn();
+
+jest.mock('next/navigation', () => ({
+  usePathname: () => '/login',
+  useRouter: () => ({ replace: mockRouterReplace }),
+}));
+
 const restoredSession: AuthSession = {
   state: 'AUTHENTICATED',
   user: {
@@ -94,7 +101,10 @@ function Harness() {
 }
 
 describe('AuthProvider canonical session lifecycle', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+    mockRouterReplace.mockReset();
+  });
 
   it('keeps loading distinct from an unauthenticated restore outcome', async () => {
     let rejectRestore!: (cause: unknown) => void;
@@ -134,6 +144,7 @@ describe('AuthProvider canonical session lifecycle', () => {
       expect(screen.getByTestId('status').textContent).toBe('unauthenticated');
     });
     expect(screen.getByTestId('tuple').textContent).toBe('none|none|none');
+    expect(mockRouterReplace).toHaveBeenCalledWith('/login');
   });
 
   it('preserves the previous valid tuple when context selection fails', async () => {

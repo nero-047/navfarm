@@ -297,6 +297,37 @@ export const demoStateResponseSchema = z.object({
 
 export const successSchema = z.object({ success: z.boolean() }).passthrough();
 
+export const demoResetResponseSchema = z.object({
+  success: z.literal(true),
+  invalidatedSessions: z.number().int().nonnegative(),
+});
+export type DemoResetResponse = z.infer<typeof demoResetResponseSchema>;
+
+export const notificationContextSchema = z.object({
+  scope: z.enum(['PLATFORM', 'TENANT', 'COMPANY', 'WORKSPACE']),
+  label: z.string().min(1),
+  href: z.string().startsWith('/').optional(),
+});
+export const notificationSchema = z.object({
+  notificationId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  occurredAt: z.string().datetime(),
+  context: notificationContextSchema,
+  read: z.boolean(),
+});
+export const notificationListResponseSchema = z.object({
+  items: z.array(notificationSchema),
+  unreadCount: z.number().int().nonnegative(),
+});
+export const notificationUnreadCountSchema = z.object({
+  unreadCount: z.number().int().nonnegative(),
+});
+export type NotificationItem = z.infer<typeof notificationSchema>;
+export type NotificationListResponse = z.infer<
+  typeof notificationListResponseSchema
+>;
+
 export type RuntimeContract = {
   method: string;
   pattern: RegExp;
@@ -318,6 +349,11 @@ export const runtimeContracts: RuntimeContract[] = [
   { method: 'PUT', pattern: /^\/auth\/context$/, response: authSessionSchema },
   { method: 'PATCH', pattern: /^\/users\/me$/, response: authSessionSchema },
   { method: 'POST', pattern: /^\/auth\/(logout|forgot-password|reset-password|accept-invitation|verify-email|mfa\/setup)$/, response: successSchema },
+  { method: 'POST', pattern: /^\/__mock\/reset$/, response: demoResetResponseSchema },
+  { method: 'GET', pattern: /^\/notifications$/, response: notificationListResponseSchema },
+  { method: 'GET', pattern: /^\/notifications\/unread-count$/, response: notificationUnreadCountSchema },
+  { method: 'PATCH', pattern: /^\/notifications\/[^/]+\/read$/, response: notificationSchema },
+  { method: 'POST', pattern: /^\/notifications\/read-all$/, response: notificationListResponseSchema },
   { method: 'GET', pattern: /^\/company\/tenant\/[^/]+$/, response: z.array(companySchema) },
   { method: 'POST', pattern: /^\/company$/, response: companySchema },
   { method: 'GET', pattern: /^\/setup\/wizard\/nobs$/, response: z.array(nobSchema) },

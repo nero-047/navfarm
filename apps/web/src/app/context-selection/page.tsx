@@ -99,7 +99,7 @@ export default function ContextSelectionPage() {
             </p>
           </div>
           <button
-            onClick={() => void logout().then(() => router.replace('/login'))}
+            onClick={() => void logout()}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-semibold text-[var(--text-primary)]"
           >
             <LogOut size={15} /> Sign out

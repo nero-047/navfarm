@@ -183,7 +183,13 @@ function formatCell(value: unknown) {
   return String(value);
 }
 
-export function BusinessStructureView({ companySlug }: { companySlug: string }) {
+export function BusinessStructureView({
+  companySlug,
+  section = 'nobs',
+}: {
+  companySlug: string;
+  section?: 'nobs' | 'lobs';
+}) {
   const { companyId, editable } = useCompany(companySlug);
   const [structure, setStructure] = useState<{ completeness: number; blockingIssues: string[]; nobs: CompanyNob[]; lobs: CompanyLob[] } | null>(null);
   const [templates, setTemplates] = useState<Array<{ lobTemplateId: string; nobTemplateId: string; code: string; name: string; defaultCostingMethod: string }>>([]);
@@ -212,15 +218,42 @@ export function BusinessStructureView({ companySlug }: { companySlug: string }) 
   };
   return (
     <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 xl:p-8">
-      <PageHeader eyebrow="Company settings" title="NOB & LOB business structure" description="Platform templates are enabled into company-owned records with stable IDs, independent status and audit history." />
+      <PageHeader eyebrow="Company settings" title="NOB & LOB business structure" description="Review the company’s enabled business areas and operating lines." />
+      <nav aria-label="Business structure sections" className="flex flex-wrap gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
+        <Link
+          href={`/${companySlug}/settings/business-structure?section=nobs`}
+          aria-current={section === 'nobs' ? 'page' : undefined}
+          className={`inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-semibold ${
+            section === 'nobs'
+              ? 'bg-[#0b1248] text-white'
+              : 'text-[var(--text-secondary)] hover:bg-[var(--surface-raised)]'
+          }`}
+        >
+          Nature of Business
+        </Link>
+        <Link
+          href={`/${companySlug}/settings/business-structure?section=lobs`}
+          aria-current={section === 'lobs' ? 'page' : undefined}
+          className={`inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-semibold ${
+            section === 'lobs'
+              ? 'bg-[#0b1248] text-white'
+              : 'text-[var(--text-secondary)] hover:bg-[var(--surface-raised)]'
+          }`}
+        >
+          Lines of Business
+        </Link>
+      </nav>
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       {!structure ? <LoadingState label="Loading business structure…" /> : <>
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><h2 className="font-black">Setup completeness</h2><strong className="text-2xl text-blue-800">{structure.completeness}%</strong></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-blue-700" style={{ width: `${structure.completeness}%` }} /></div>{structure.blockingIssues.map((issue) => <p key={issue} className="mt-2 text-sm text-amber-800">{issue}</p>)}</div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Enabled NOBs</h2>{structure.nobs.map((nob) => <article key={nob.companyNobId} className="mt-4 rounded-lg border border-slate-200 p-4"><div className="flex justify-between"><span><strong>{nob.name}</strong><br /><span className="font-mono text-xs text-slate-500">{nob.code} · {nob.companyNobId}</span></span><StatusBadge status={nob.status} /></div><p className="mt-3 text-xs text-slate-500">Updated {new Date(nob.audit.updatedAt).toLocaleDateString()} by {nob.audit.updatedBy}</p></article>)}</section>
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Enabled LOBs</h2>{structure.lobs.map((lob) => <article key={lob.companyLobId} className="mt-4 rounded-lg border border-slate-200 p-4"><div className="flex justify-between"><span><strong>{lob.name}</strong><br /><span className="font-mono text-xs text-slate-500">{lob.code} · {lob.costingMethod}</span></span><StatusBadge status={lob.status} /></div><p className="mt-3 text-xs text-slate-500">QC {lob.qcRequired ? 'required' : 'optional'} · QR {lob.qrRequired ? 'required' : 'optional'}</p></article>)}</section>
-        </div>
-        {editable ? <section className="rounded-xl border border-dashed border-blue-300 bg-blue-50/50 p-5"><h2 className="font-black">Available LOB templates</h2><div className="mt-3 flex flex-wrap gap-3">{templates.filter((template) => !structure.lobs.some((lob) => lob.lobTemplateId === template.lobTemplateId)).map((template) => <button key={template.lobTemplateId} onClick={() => void addLob(template)} className={secondaryButtonClass}><Plus className="h-4 w-4" /> Enable {template.name}</button>)}</div></section> : null}
+        {section === 'nobs' ? (
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Enabled NOBs</h2>{structure.nobs.map((nob) => <article key={nob.companyNobId} className="mt-4 rounded-lg border border-slate-200 p-4"><div className="flex justify-between"><span><strong>{nob.name}</strong><br /><span className="text-xs text-slate-500">{nob.code}</span></span><StatusBadge status={nob.status} /></div><p className="mt-3 text-xs text-slate-500">Updated {new Date(nob.audit.updatedAt).toLocaleDateString()} by {nob.audit.updatedBy}</p></article>)}</section>
+        ) : (
+          <>
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Enabled LOBs</h2>{structure.lobs.map((lob) => <article key={lob.companyLobId} className="mt-4 rounded-lg border border-slate-200 p-4"><div className="flex justify-between"><span><strong>{lob.name}</strong><br /><span className="text-xs text-slate-500">{lob.code} · {lob.costingMethod}</span></span><StatusBadge status={lob.status} /></div><p className="mt-3 text-xs text-slate-500">QC {lob.qcRequired ? 'required' : 'optional'} · QR {lob.qrRequired ? 'required' : 'optional'}</p></article>)}</section>
+            {editable ? <section className="rounded-xl border border-dashed border-blue-300 bg-blue-50/50 p-5"><h2 className="font-black">Available Lines of Business</h2><div className="mt-3 flex flex-wrap gap-3">{templates.filter((template) => !structure.lobs.some((lob) => lob.lobTemplateId === template.lobTemplateId)).map((template) => <button key={template.lobTemplateId} onClick={() => void addLob(template)} className={secondaryButtonClass}><Plus className="h-4 w-4" /> Enable {template.name}</button>)}</div></section> : null}
+          </>
+        )}
       </>}
     </div>
   );

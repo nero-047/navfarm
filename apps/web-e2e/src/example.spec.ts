@@ -175,7 +175,11 @@ test('Phase 3 masters and accounting workflows render responsively', async ({ pa
 
   await page.goto('/green-valley-poultry/settings/business-structure');
   await expect(page.getByRole('heading', { name: 'NOB & LOB business structure' })).toBeVisible();
-  await expect(page.getByText('company-nob-poultry')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Enabled NOBs' })
+      .locator('..')
+      .getByText('Poultry', { exact: true }),
+  ).toBeVisible();
   await capturePhase3Pair(page, 'nob-lob-configuration');
 
   await page.goto('/green-valley-poultry/accounting/chart-of-accounts');

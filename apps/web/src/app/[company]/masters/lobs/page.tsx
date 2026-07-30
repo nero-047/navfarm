@@ -1,5 +1,5 @@
-import { BusinessStructureView } from '@/components/phase3/company-masters';
+import { redirect } from 'next/navigation';
 export default async function CompanyLobsPage({ params }: { params: Promise<{ company: string }> }) {
   const { company } = await params;
-  return <BusinessStructureView companySlug={company} />;
+  redirect(`/${company}/settings/business-structure?section=lobs`);
 }

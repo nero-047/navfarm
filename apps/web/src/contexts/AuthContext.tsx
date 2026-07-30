@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   authContextRequestSchema,
   authLoginRequestSchema,
@@ -8,11 +9,17 @@ import {
   type AuthLoginResponse,
   type AuthSession,
 } from '../contracts/api';
-import { destinationForSession } from '../lib/authorization';
+import { authorizedReturnTo, destinationForSession } from '../lib/authorization';
 import { ApiError, api } from '../lib/api-client';
 
 export type User = AuthSession['user'];
-export type SessionStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'suspended' | 'mfa_pending';
+export type SessionStatus =
+  | 'loading'
+  | 'authenticated'
+  | 'unauthenticated'
+  | 'suspended'
+  | 'mfa_pending'
+  | 'signing_out';
 export type LoginResult =
   | { status: 'authenticated' | 'suspended'; user: User; session: AuthSession }
   | { status: 'mfa_pending'; user: User; challengeId: string };
@@ -35,6 +42,7 @@ interface AuthContextType {
   completeMfa: (challengeId: string, credential: { code?: string; recoveryCode?: string }) => Promise<AuthSession>;
   signup: (input: SignupInput) => Promise<User>;
   logout: () => Promise<void>;
+  resetDemo: () => Promise<void>;
   refreshSession: () => Promise<AuthSession | null>;
   selectContext: (tenantId: string | null, companyId: string | null, workspaceId?: string | null) => Promise<AuthSession>;
 }
@@ -42,6 +50,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [session, setSession] = useState<AuthSession | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [mfaChallengeId, setMfaChallengeId] = useState<string | null>(null);
@@ -65,6 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void refreshSession().catch(() => commit(null));
   }, [refreshSession]);
+  useEffect(() => {
+    if (status === 'signing_out' && pathname === '/login') {
+      setStatus('unauthenticated');
+    }
+  }, [pathname, status]);
 
   const login = useCallback(async (email: string, password: string) => {
     const input = authLoginRequestSchema.parse({ email: email.trim().toLowerCase(), password });
@@ -105,9 +120,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return result.user;
   }, [login]);
 
+  const beginSessionExit = useCallback(() => {
+    setSession(null);
+    setMfaChallengeId(null);
+    setStatus('signing_out');
+  }, []);
+
   const logout = useCallback(async () => {
-    try { await api.post('/auth/logout'); } finally { commit(null); }
-  }, [commit]);
+    beginSessionExit();
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      router.replace('/login');
+    }
+  }, [beginSessionExit, router]);
+
+  const resetDemo = useCallback(async () => {
+    beginSessionExit();
+    try {
+      await api.post('/__mock/reset');
+      router.replace('/login');
+    } catch (cause) {
+      await refreshSession().catch(() => commit(null));
+      throw cause;
+    }
+  }, [beginSessionExit, commit, refreshSession, router]);
 
   const selectContext = useCallback(async (tenantId: string | null, companyId: string | null, workspaceId: string | null = null) => {
     const input = authContextRequestSchema.parse({ tenantId, companyId, workspaceId });
@@ -116,13 +153,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return next;
   }, [commit]);
 
-  const loading = status === 'loading';
+  const loading = status === 'loading' || status === 'signing_out';
   const value = useMemo(() => ({
     session, user: session?.user ?? null, status, loading, mfaChallengeId,
-    login, completeMfa, signup, logout, refreshSession, selectContext,
+    login, completeMfa, signup, logout, resetDemo, refreshSession, selectContext,
   }), [
     session, status, loading, mfaChallengeId, login, completeMfa, signup,
-    logout, refreshSession, selectContext,
+    logout, resetDemo, refreshSession, selectContext,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -134,4 +171,4 @@ export function useAuth() {
   return value;
 }
 
-export { destinationForSession };
+export { authorizedReturnTo, destinationForSession };

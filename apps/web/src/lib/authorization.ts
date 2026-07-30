@@ -132,6 +132,195 @@ export function destinationForSession(session: AuthSession): string {
   return `/${activeCompany.companySlug}/workspaces`;
 }
 
+const COMPANY_SETUP_STEPS = new Set([
+  'profile', 'address', 'contacts', 'localization', 'accounting', 'modules',
+  'admin', 'team', 'chart-of-accounts', 'business-structure', 'masters',
+  'notifications', 'review',
+]);
+const COMPANY_SETTINGS_SECTIONS = new Set([
+  'localization', 'fiscal', 'modules', 'notifications', 'business-structure',
+]);
+const WORKSPACE_SECTIONS: Record<
+  string,
+  { permission: Permission; module?: string }
+> = {
+  dashboard: { permission: 'workspaces.view' },
+  batches: { permission: 'batches.view', module: 'Batches' },
+  operations: { permission: 'workspaces.view', module: 'Batches' },
+  quality: { permission: 'quality.view', module: 'QC' },
+  traceability: { permission: 'traceability.view', module: 'QR' },
+  resources: { permission: 'resources.view', module: 'Resources' },
+  costing: { permission: 'costs.view', module: 'Finance' },
+  reports: { permission: 'reports.export', module: 'Analytics' },
+  masters: { permission: 'workspaces.view' },
+  settings: { permission: 'workspaces.view' },
+};
+
+function normalizeReturnTo(candidate: string | null | undefined): URL | null {
+  if (
+    !candidate ||
+    !candidate.startsWith('/') ||
+    candidate.startsWith('//') ||
+    candidate.includes('\\')
+  ) {
+    return null;
+  }
+  try {
+    const parsed = new URL(candidate, 'https://navfarm.demo');
+    if (parsed.origin !== 'https://navfarm.demo') return null;
+    if (parsed.searchParams.has('returnTo')) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolves a protected return destination only when the newly authenticated
+ * session already owns the complete route scope. Record-detail and
+ * compatibility URLs are intentionally excluded from cross-session reuse.
+ */
+export function authorizedReturnTo(
+  session: AuthSession,
+  candidate: string | null | undefined,
+): string | null {
+  if (session.state !== 'AUTHENTICATED') return null;
+  const parsed = normalizeReturnTo(candidate);
+  if (!parsed) return null;
+  const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+  const segments = pathname.split('/').filter(Boolean);
+
+  if (pathname === '/profile' || pathname === '/context-selection') {
+    return pathname;
+  }
+
+  if (segments[0] === 'admin') {
+    if (!canAccessScope(session, 'platform')) return null;
+    const allowed = new Set([
+      '/admin/dashboard',
+      '/admin/tenants',
+      '/admin/tenants/new',
+      '/admin/plans',
+      '/admin/masters',
+      '/admin/masters/nobs',
+      '/admin/masters/lobs',
+      '/admin/masters/modules',
+      '/admin/masters/reference-data',
+      '/admin/audit',
+    ]);
+    return allowed.has(pathname) ? pathname : null;
+  }
+
+  if (segments[0] === 'console') {
+    if (!canAccessScope(session, 'tenant')) return null;
+    const allowed = new Set([
+      '/console/dashboard',
+      '/console/profile',
+      '/console/companies',
+      '/console/companies/new',
+      '/console/users',
+      '/console/invitations',
+      '/console/roles',
+      '/console/subscription',
+      '/console/usage',
+      '/console/audit',
+      '/console/notifications',
+    ]);
+    return allowed.has(pathname) ? pathname : null;
+  }
+
+  const company = session.companies.find(
+    (membership) =>
+      membership.companySlug === segments[0] &&
+      membership.companyId === session.activeCompanyId &&
+      membership.tenantId === session.activeTenantId &&
+      membership.status === 'ACTIVE' &&
+      membership.membershipStatus !== 'INACTIVE',
+  );
+  if (!company || !segments[1]) return null;
+
+  const companyRoot = `/${company.companySlug}`;
+  const section = segments[1];
+  if (section === 'overview' && segments.length === 2 && can(session, 'company.view')) {
+    return pathname;
+  }
+  if (section === 'profile' && segments.length === 2 && can(session, 'company.view')) {
+    return pathname;
+  }
+  if (
+    section === 'setup' &&
+    (segments.length === 2 ||
+      (segments.length === 3 && COMPANY_SETUP_STEPS.has(segments[2]))) &&
+    can(session, 'company.view')
+  ) {
+    return pathname;
+  }
+  if (
+    section === 'settings' &&
+    (segments.length === 2 ||
+      (segments.length === 3 && COMPANY_SETTINGS_SECTIONS.has(segments[2]))) &&
+    can(session, 'company.view')
+  ) {
+    const search = segments[2] === 'business-structure' &&
+      ['nobs', 'lobs'].includes(parsed.searchParams.get('section') ?? '')
+      ? `?section=${parsed.searchParams.get('section')}`
+      : '';
+    return `${pathname}${search}`;
+  }
+  if (section === 'masters' && segments.length === 2 && can(session, 'masters.view')) {
+    return pathname;
+  }
+  if (section === 'members' && segments.length === 2 && can(session, 'users.view')) {
+    return pathname;
+  }
+  if (section === 'roles' && segments.length === 2 && can(session, 'roles.view')) {
+    return pathname;
+  }
+  if (section === 'readiness' && segments.length === 2 && can(session, 'company.view')) {
+    return pathname;
+  }
+  if (section === 'accounting' && can(session, 'finance.view')) {
+    const accountingPage = segments.slice(2).join('/');
+    if (
+      ['readiness', 'chart-of-accounts', 'gl-mappings', 'costing'].includes(
+        accountingPage,
+      )
+    ) {
+      return pathname;
+    }
+    return null;
+  }
+  if (section !== 'workspaces') return null;
+  if (segments.length === 2 && can(session, 'workspaces.view')) return pathname;
+  if (
+    segments.length === 3 &&
+    segments[2] === 'new' &&
+    can(session, 'workspaces.manage')
+  ) {
+    return pathname;
+  }
+  if (segments.length !== 4) return null;
+
+  const workspace = session.workspaces.find(
+    (membership) =>
+      membership.workspaceSlug === segments[2] &&
+      membership.workspaceId === session.activeWorkspaceId &&
+      membership.companyId === company.companyId &&
+      membership.tenantId === company.tenantId &&
+      membership.status === 'ACTIVE',
+  );
+  const routeRule = WORKSPACE_SECTIONS[segments[3]];
+  if (
+    !workspace ||
+    !routeRule ||
+    !workspace.permissions.includes(routeRule.permission) ||
+    (routeRule.module && !workspaceModuleEnabled(workspace, routeRule.module))
+  ) {
+    return null;
+  }
+  return `${companyRoot}/workspaces/${workspace.workspaceSlug}/${segments[3]}`;
+}
+
 export interface NavigationRule {
   href: string;
   permission?: Permission;

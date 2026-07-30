@@ -5,8 +5,8 @@
 | Route | Scope | Intended owner | Current page/component | Current endpoint | Context requirement | Permission requirement | Classification | Known problem | Recommended action | Priority |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `/` | public | web shell | root redirect | session GET | none | none | compatibility redirect | destination depends on hydration only | retain after guarded hydration | M |
-| `/login`, `/signup` | public | auth | `LoginForm`, `SignupForm` | `/auth/login`, legacy signup | none | none | canonical but incomplete | signup uses legacy tenant contract | define v1 signup or retire | H |
-| `/forgot-password`, `/reset-password`, `/accept-invitation`, `/verify-email` | public | auth | auth forms | legacy auth endpoints | token/query | none | canonical but incomplete | success-only mock; DTO/response mismatch | contract each lifecycle | H |
+| `/login`, `/signup` | public | auth | `LoginForm`, `SignupForm` | `/auth/login`, legacy signup | none | none | login canonical; signup compatibility-only in presentation | signup uses legacy tenant contract and is hidden from primary login | define v1 signup or retire | H |
+| `/forgot-password`, `/reset-password`, `/accept-invitation`, `/verify-email` | public | auth | auth forms | legacy auth endpoints | token/query | none | compatibility-only in presentation | success-only mock; DTO/response mismatch; no primary login links | contract each lifecycle before exposing | H |
 | `/mfa/setup`, `/mfa/verify`, `/mfa/recovery` | auth | auth | `AuthWorkflowForm` | `/auth/mfa/*` | challenge/session | MFA | canonical but incomplete | recovery contract absent on Arun | reconcile challenge/cookie vs JWT | H |
 | `/access-denied` | public | auth | `AccessState` | none | reason query | none | canonical and implemented | reason mapping can diverge from guards | centralize reason mapping | M |
 | `/context-selection` | authenticated | session/context | canonical page | `/auth/context` | authenticated tenant memberships; complete atomic tuple | explicit company/workspace membership | canonical and implemented | backend persistence missing | retain as sole Company/Workspace selector | complete in mock |
@@ -21,11 +21,11 @@
 | `/console`, `/organization`, `/tenant-admin` | tenant | tenant console | redirects | none | tenant context | tenant.view | compatibility redirect | legacy naming retained | retain one canonical `/console` | L |
 | `/console/dashboard`, `/console/profile`, `/console/companies`, `/console/companies/new`, `/console/companies/[id]` | tenant | tenant administration | `TenantAdminView`/Phase 2 | `/tenants/[id]/*` | active tenant | tenant/company permission | canonical but incomplete | Arun uses legacy company/tenant DTOs | adapter/contract work | H |
 | `/console/users`, `/console/invitations`, `/console/roles`, `/console/subscription`, `/console/usage`, `/console/audit` | tenant | tenant RBAC/billing | `TenantAdminView` | `/tenants/[id]/*` | active tenant | users/roles/audit | canonical but incomplete | company/workspace membership lifecycle not modeled end-to-end | define assignment resources | H |
-| `/console/notifications` | tenant/company | notifications | compatibility page using `AuthContext` | `/notification/*` compatibility | canonical session tuple | notifications.manage | auth consolidated; resource contract incomplete | notification endpoint/DTO still legacy | type or retire resource in later boundary milestone | H |
+| `/console/notifications` | authenticated account | notifications | account notification center | typed `/notifications*` family | authenticated identity; accessible scope filtering | own assigned notifications | canonical and implemented in mock | durable event source, recipient policy, retention and delivery absent | retain typed client boundary; define backend inbox separately from delivery | backend H |
 | `/[company]/overview` | company | company administration | company overview | session/workspaces | matching active tenant/company | company.view | canonical and implemented | backend resource missing | retain centralized shell guard | M |
 | `/[company]/workspaces`, `/new`, `/[workspace]` | company/workspace admin | workspace config | workspace components | nested typed workspace endpoints | tenant/company | explicit member or tenant workspace-admin permission | canonical and implemented in mock | member removal/deactivation and durable persistence absent | retain typed boundary; add backend lifecycle later | backend H |
 | `/[company]/setup`, `/setup/[step]` | company | company setup | `CompanySetup` | `/companies/[id]/setup/*` | company | company.view/manage | canonical but incomplete | docs say 15 steps; route set has 13 | decide step model | H |
-| `/[company]/masters/[resource]`, `/import`, `/masters/{nobs,lobs}` | company | shared masters | Phase 3 | `/companies/[id]/masters/*` | company | company.view/manage | canonical but incomplete | imports use demo scenario, not production file contract | define import contract | H |
+| `/[company]/masters/[resource]`, `/import`, `/masters/{nobs,lobs}` | company | shared masters | Phase 3; NOB/LOB compatibility redirects | `/companies/[id]/masters/*` | company | company.view/manage | resource/import canonical; NOB/LOB redirect to Settings business structure | imports use demo scenario, not production file contract | retain selected-section redirects; define import contract | H |
 | `/[company]/accounting/{chart-of-accounts,gl-mappings,costing,readiness}` | company | accounting | Phase 3 | `/companies/[id]/accounting/*` | company | finance/company | canonical but incomplete | Arun finance paths differ; readiness is mock policy | replacement/adaptation required | H |
 | `/[company]/members` | company | company membership | `CompanyMembersPage` | `/companies/[id]/{members,invitations}` | active tenant/company; no workspace | users.view/manage plus exact role/workspace mutation capability | canonical and implemented in mock | durable backend resources missing | retain typed client boundary | backend H |
 | `/[company]/roles` | company | company RBAC catalogue | `CompanyRolesPage` | `/companies/[id]/roles` | active tenant/company; no workspace | roles.view; assignment through Members | canonical and implemented in mock | custom roles intentionally planned only | define backend standard/custom catalogue | backend H |
@@ -46,3 +46,9 @@ families now share theme-aware presentation, explicit scope identity, specific
 access states, and responsive overflow coverage. Public trace remains a
 separate public-safe demo route, and compatibility operational routes remain
 redirect-only.
+
+Phase 5 makes `/console/notifications` a typed account inbox, keeps incomplete
+signup/recovery routes out of primary login navigation, and consolidates legacy
+NOB/LOB URLs into selected sections of the canonical business-structure page.
+Navigation active state is presentation metadata and does not alter route
+authorization.

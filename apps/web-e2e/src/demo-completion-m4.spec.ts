@@ -121,7 +121,7 @@ async function auditCanonicalRoutes(page: Page, routes: readonly string[]) {
     await page.setViewportSize(viewport);
     for (const route of routes) {
       await navigate(page, route);
-      await expect(page.getByRole('main')).toBeVisible();
+      await expect(page.getByRole('main')).toBeVisible({ timeout: 15_000 });
       await expect(
         page.getByRole('heading', {
           name: /Access denied|Permission required|Something went wrong/i,

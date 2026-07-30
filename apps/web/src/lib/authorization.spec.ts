@@ -1,6 +1,7 @@
 import type { AuthSession, CompanyRole } from '../contracts/api';
 import {
-  can, destinationForSession, filterNavigation, ROLE_PERMISSIONS,
+  authorizedReturnTo, can, destinationForSession, filterNavigation,
+  ROLE_PERMISSIONS,
 } from './authorization';
 
 function session(options: {
@@ -119,5 +120,46 @@ describe('authorization and context routing', () => {
       { href: '/operations', workspacePermission: 'operations.create' as const, module: 'Batches' },
       { href: '/reports', workspacePermission: 'reports.export' as const, module: 'Analytics' },
     ], value).map((item) => item.href)).toEqual(['/operations']);
+  });
+  it('accepts only canonical list destinations owned by the new session', () => {
+    const value = session();
+    expect(authorizedReturnTo(
+      value,
+      '/company-1/workspaces/workspace-1/batches',
+    )).toBe('/company-1/workspaces/workspace-1/batches');
+    expect(authorizedReturnTo(value, '/company-1/overview')).toBe(
+      '/company-1/overview',
+    );
+  });
+  it('rejects unauthorized and stale company or workspace destinations', () => {
+    const value = session();
+    expect(authorizedReturnTo(value, '/company-2/overview')).toBeNull();
+    expect(authorizedReturnTo(
+      value,
+      '/company-1/workspaces/archive/batches',
+    )).toBeNull();
+    expect(authorizedReturnTo(
+      value,
+      '//example.com/company-1/overview',
+    )).toBeNull();
+  });
+  it('never reuses a record-detail return destination across sessions', () => {
+    const value = session();
+    expect(authorizedReturnTo(
+      value,
+      '/company-1/workspaces/workspace-1/batches/batch-99',
+    )).toBeNull();
+    value.companies[0].role = 'ACCOUNTANT';
+    value.companies[0].permissions = ROLE_PERMISSIONS.ACCOUNTANT;
+    value.workspaces = [];
+    value.activeWorkspaceId = null;
+    expect(authorizedReturnTo(
+      value,
+      '/company-1/accounting/chart-of-accounts/account-99',
+    )).toBeNull();
+    expect(authorizedReturnTo(
+      value,
+      '/company-1/accounting/readiness',
+    )).toBe('/company-1/accounting/readiness');
   });
 });

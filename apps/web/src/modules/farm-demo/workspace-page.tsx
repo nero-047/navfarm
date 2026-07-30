@@ -1968,10 +1968,7 @@ function ProfileSettings({ company }: { company: Company }) {
             </p>
           </div>
           <button
-            onClick={() => {
-              logout();
-              window.location.assign('/login');
-            }}
+            onClick={() => void logout()}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-xs font-semibold text-[#c24332]"
           >
             <LogOut size={14} /> Sign out

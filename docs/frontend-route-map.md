@@ -4,9 +4,10 @@
 
 | Route | Purpose |
 | --- | --- |
-| `/login`, `/signup` | Authentication and tenant signup |
-| `/forgot-password`, `/reset-password` | Password recovery |
-| `/accept-invitation`, `/verify-email` | Account activation |
+| `/login` | Primary presentation authentication and demo-account reset |
+| `/signup` | Compatibility-only tenant signup; not linked from the primary login experience |
+| `/forgot-password`, `/reset-password` | Compatibility-only password recovery; not linked from the primary login experience |
+| `/accept-invitation`, `/verify-email` | Compatibility-only account activation |
 | `/mfa/setup`, `/mfa/verify`, `/mfa/recovery` | MFA lifecycle |
 | `/trace/{company}/{pack}` | Public farm-to-fork trace page |
 
@@ -68,6 +69,11 @@ navigation models. Company mode never renders operational navigation. Workspace
 mode is derived only from a canonical workspace URL plus the matching active
 workspace membership. Session restoration completes before these guards run;
 company administration does not require an active workspace.
+Each canonical pathname has one explicit primary navigation owner. Detail
+routes activate that owner, including Accounting for all company accounting
+children and Batches for workspace batch details. Tenant navigation has one
+`Tenant profile` entry for `/console/profile`; there is no duplicate Settings
+entry.
 
 The company layout owns only `ApplicationShell`; operational
 `DemoStoreProvider` state is mounted by the canonical
@@ -80,8 +86,9 @@ canonical pages, not settings/accounting aliases. Settings supports the
 documented `localization`, `fiscal`, `modules`, and `notifications` sections;
 `settings/business-structure` remains the canonical NOB/LOB configuration page.
 
-The static `masters/nobs` and `masters/lobs` routes open the company
-business-structure workspace. Unknown master resources return 404.
+The legacy `masters/nobs` and `masters/lobs` routes redirect to
+`settings/business-structure?section=nobs` and `?section=lobs` respectively.
+The selected section survives refresh. Unknown master resources return 404.
 
 ## Milestone 3 workspace route status
 
@@ -117,3 +124,16 @@ switcher remains Company/Workspace only. Canonical route families are audited
 for document overflow at 1440×900, 1280×800, 1024×768, 768×1024, and 390×844.
 `/trace/{company}/{pack}` uses a separate public-safe surface with no protected
 navigation.
+
+## Phase 5 stabilisation state
+
+The authenticated header includes an account-scoped notification bell and the
+canonical `/console/notifications` list. The bell supports unread count, mark
+one/all read, loading/error/empty states, Escape, focus restoration, and a
+mobile dialog layout. Notification delivery integrations are not enabled.
+
+Post-login `returnTo` reuse is restricted to list/configuration routes owned by
+the newly authenticated session; protected record details and stale scope
+routes fall back to that account's deterministic landing. Explicit sign-out
+and Reset demo data both open clean `/login`, while only reset restores all
+demo fixtures and invalidates every session.

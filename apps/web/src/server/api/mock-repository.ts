@@ -10,6 +10,7 @@ import {
   workspaceSchema,
   type AuthSession,
   type CompanyRole,
+  type NotificationItem,
   type Permission,
   type Workspace,
   type WorkspaceMember,
@@ -391,6 +392,89 @@ const nobs = [
   ['nob-insect', 'INSECT', 'Insect Farming'], ['nob-processing', 'PROCESSING', 'Feed & Processing'],
 ].map(([nob_id, nob_code, nob_name]) => ({ nob_id, nob_code, nob_name, is_active: true }));
 
+type SeedNotification = Omit<NotificationItem, 'read'> & {
+  recipientUserIds: string[];
+};
+const seedNotifications: SeedNotification[] = [
+  {
+    notificationId: 'notification-quality-review',
+    title: 'Batch GV-B-2026-004 is ready for quality review',
+    description: 'The latest production record is ready for the next quality review step.',
+    occurredAt: '2026-07-30T08:30:00.000Z',
+    context: {
+      scope: 'WORKSPACE',
+      label: 'Poultry Operations',
+      href: '/green-valley-poultry/workspaces/poultry-operations/quality',
+    },
+    recipientUserIds: ['user-manager', 'user-viewer', 'user-multi'],
+  },
+  {
+    notificationId: 'notification-workspace-readiness',
+    title: 'Workspace readiness requires attention',
+    description: 'Feed Mill has an outstanding resource-rate setup item.',
+    occurredAt: '2026-07-30T07:45:00.000Z',
+    context: {
+      scope: 'COMPANY',
+      label: 'Green Valley Poultry',
+      href: '/green-valley-poultry/readiness',
+    },
+    recipientUserIds: ['user-tenant', 'user-company-admin', 'user-multi'],
+  },
+  {
+    notificationId: 'notification-invitation-accepted',
+    title: 'A company invitation was accepted',
+    description: 'The company member list now includes the accepted invitation.',
+    occurredAt: '2026-07-29T15:20:00.000Z',
+    context: {
+      scope: 'COMPANY',
+      label: 'Green Valley Poultry',
+      href: '/green-valley-poultry/members',
+    },
+    recipientUserIds: ['user-tenant', 'user-company-admin'],
+  },
+  {
+    notificationId: 'notification-gl-review',
+    title: 'A GL mapping requires review',
+    description: 'One company mapping is incomplete and needs an accounting review.',
+    occurredAt: '2026-07-29T12:10:00.000Z',
+    context: {
+      scope: 'COMPANY',
+      label: 'Green Valley Poultry accounting',
+      href: '/green-valley-poultry/accounting/gl-mappings',
+    },
+    recipientUserIds: [
+      'user-tenant',
+      'user-company-admin',
+      'user-accountant',
+      'user-auditor',
+    ],
+  },
+  {
+    notificationId: 'notification-resource-threshold',
+    title: 'A resource threshold was exceeded',
+    description: 'Water usage is above the sample threshold for Poultry Operations.',
+    occurredAt: '2026-07-29T09:00:00.000Z',
+    context: {
+      scope: 'WORKSPACE',
+      label: 'Poultry Operations',
+      href: '/green-valley-poultry/workspaces/poultry-operations/resources',
+    },
+    recipientUserIds: ['user-manager'],
+  },
+  {
+    notificationId: 'notification-tenant-capacity',
+    title: 'Tenant user capacity is nearing its limit',
+    description: 'Green Valley Holdings is using 42 of 50 sample user seats.',
+    occurredAt: '2026-07-28T11:15:00.000Z',
+    context: {
+      scope: 'PLATFORM',
+      label: 'Green Valley Holdings',
+      href: '/admin/tenants',
+    },
+    recipientUserIds: ['user-system'],
+  },
+];
+
 type MockState = {
   companies: JsonRecord[];
   demoStates: Map<string, unknown>;
@@ -399,6 +483,7 @@ type MockState = {
   workspaces: Workspace[];
   workspaceMembers: WorkspaceMember[];
   companyInvitations: typeof seedCompanyInvitations;
+  notificationReads: Map<string, string[]>;
 };
 declare global { var __navfarmMockState: MockState | undefined; }
 const state: MockState = globalThis.__navfarmMockState ?? {
@@ -409,9 +494,11 @@ const state: MockState = globalThis.__navfarmMockState ?? {
   workspaces: structuredClone(seedWorkspaces),
   workspaceMembers: structuredClone(seedWorkspaceMembers),
   companyInvitations: structuredClone(seedCompanyInvitations),
+  notificationReads: new Map(),
 };
 state.workspaceMembers ??= structuredClone(seedWorkspaceMembers);
 state.companyInvitations ??= structuredClone(seedCompanyInvitations);
+state.notificationReads ??= new Map();
 globalThis.__navfarmMockState = state;
 
 function json(value: unknown, status = 200) {
@@ -791,8 +878,16 @@ export async function handleMockRequest(request: Request, path: string, requestI
     if (process.env.NODE_ENV === 'production' || process.env.NAVFARM_ENABLE_MOCK_RESET !== 'true') {
       return apiErrorResponse(404, 'Not found.', requestId);
     }
+    const invalidatedSessions = state.sessions.size;
     resetMockRepositoryState();
-    return json({ success: true });
+    const response = json({ success: true, invalidatedSessions });
+    response.cookies.set(SESSION_COOKIE, '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    });
+    return response;
   }
 
   const found = requireSession(request, requestId);
@@ -806,6 +901,57 @@ export async function handleMockRequest(request: Request, path: string, requestI
       undefined,
       'ACCOUNT_SUSPENDED',
     );
+  }
+  const visibleNotifications = seedNotifications
+    .filter((notification) =>
+      notification.recipientUserIds.includes(session.user.userId),
+    )
+    .map(({ recipientUserIds: _recipientUserIds, ...notification }) => ({
+      ...notification,
+      read: (state.notificationReads.get(session.user.userId) ?? []).includes(
+        notification.notificationId,
+      ),
+    }));
+  if (method === 'GET' && path === '/notifications') {
+    return json({
+      items: visibleNotifications,
+      unreadCount: visibleNotifications.filter((notification) => !notification.read).length,
+    });
+  }
+  if (method === 'GET' && path === '/notifications/unread-count') {
+    return json({
+      unreadCount: visibleNotifications.filter((notification) => !notification.read).length,
+    });
+  }
+  const notificationReadMatch = path.match(/^\/notifications\/([^/]+)\/read$/);
+  if (method === 'PATCH' && notificationReadMatch) {
+    const notification = visibleNotifications.find(
+      (item) => item.notificationId === notificationReadMatch[1],
+    );
+    if (!notification) {
+      return apiErrorResponse(404, 'Notification not found.', requestId);
+    }
+    const current = state.notificationReads.get(session.user.userId) ?? [];
+    if (!current.includes(notification.notificationId)) {
+      state.notificationReads.set(session.user.userId, [
+        ...current,
+        notification.notificationId,
+      ]);
+    }
+    return json({ ...notification, read: true });
+  }
+  if (method === 'POST' && path === '/notifications/read-all') {
+    state.notificationReads.set(
+      session.user.userId,
+      visibleNotifications.map((notification) => notification.notificationId),
+    );
+    return json({
+      items: visibleNotifications.map((notification) => ({
+        ...notification,
+        read: true,
+      })),
+      unreadCount: 0,
+    });
   }
   const activeCompany = session.companies.find((company) => company.companyId === session.activeCompanyId);
   const tenantAdmin = session.tenants.some(
@@ -1106,6 +1252,7 @@ export function resetMockRepositoryState() {
   state.workspaces = structuredClone(seedWorkspaces);
   state.workspaceMembers = structuredClone(seedWorkspaceMembers);
   state.companyInvitations = structuredClone(seedCompanyInvitations);
+  state.notificationReads.clear();
   state.demoStates.clear();
   state.sessions.clear();
   resetPhase2Repository();

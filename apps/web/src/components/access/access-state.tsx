@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ShieldX } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { accessReasonContent, type AccessReason } from '../../lib/access-reasons';
@@ -16,7 +15,6 @@ export function AccessState({
   noWorkspaceAssigned?: boolean;
 }) {
   const { user, logout } = useAuth();
-  const router = useRouter();
   const content = accessReasonContent[reason];
   const heading = noWorkspaceAssigned && reason === 'workspace_not_assigned'
     ? 'No workspace assigned'
@@ -56,10 +54,10 @@ export function AccessState({
           <Link href={`/${companySlug}/setup/review`} className="inline-flex min-h-11 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white">Continue company setup</Link>
         ) : null}
         {actions.includes('go_back') ? (
-          <button onClick={() => router.back()} className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border)] px-4 text-xs font-semibold">Go back</button>
+          <button onClick={() => window.history.back()} className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border)] px-4 text-xs font-semibold">Go back</button>
         ) : null}
         {actions.includes('sign_out') ? (
-          <button onClick={() => void logout().then(() => router.replace('/login'))} className="inline-flex min-h-11 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white">Sign out</button>
+          <button onClick={() => void logout()} className="inline-flex min-h-11 items-center rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white">Sign out</button>
         ) : null}
       </div>
     </div>

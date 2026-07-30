@@ -57,10 +57,7 @@ export function AdminShell({
             ))}
           </nav>
           <button
-            onClick={() => {
-              logout();
-              router.push('/login');
-            }}
+            onClick={() => void logout()}
             className="flex items-center gap-2 text-xs text-white/60"
           >
             <LogOut size={14} /> Sign out

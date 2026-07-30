@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { destinationForSession, useAuth } from '@/contexts/AuthContext';
+import {
+  authorizedReturnTo,
+  destinationForSession,
+  useAuth,
+} from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle } from 'lucide-react';
@@ -28,8 +31,10 @@ export function LoginForm({ showDemoAccounts = false }: { showDemoAccounts?: boo
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { login, refreshSession } = useAuth();
+  const [resetting, setResetting] = useState(false);
+  const { login, refreshSession, resetDemo } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -49,11 +54,10 @@ export function LoginForm({ showDemoAccounts = false }: { showDemoAccounts?: boo
       }
       const returnTo = searchParams.get('returnTo');
       const session = result.session ?? await refreshSession();
-      router.push(
-        result.status !== 'suspended' && returnTo?.startsWith('/')
-          ? returnTo
-          : session ? destinationForSession(session) : '/login',
-      );
+      const destination = session
+        ? authorizedReturnTo(session, returnTo) ?? destinationForSession(session)
+        : '/login';
+      router.replace(destination);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to sign in');
     } finally {
@@ -111,15 +115,6 @@ export function LoginForm({ showDemoAccounts = false }: { showDemoAccounts?: boo
             />
           </div>
 
-          <div className="flex justify-end">
-            <Link
-              href="/forgot-password"
-              className="text-[13px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-            >
-              Forgot password?
-            </Link>
-          </div>
-
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? 'Signing in…' : 'Sign In'}
           </Button>
@@ -130,7 +125,7 @@ export function LoginForm({ showDemoAccounts = false }: { showDemoAccounts?: boo
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <h2 id="demo-accounts-title" className="text-sm font-semibold text-[var(--text-primary)]">Demo accounts</h2>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">Mock mode only · common password: <span className="font-semibold text-[var(--text-primary)]">Demo123!</span></p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">Sample accounts · common password: <span className="font-semibold text-[var(--text-primary)]">Demo123!</span></p>
             </div>
             <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#1c4aa9]">Demo data</span>
           </div>
@@ -149,21 +144,38 @@ export function LoginForm({ showDemoAccounts = false }: { showDemoAccounts?: boo
               </button>
             ))}
           </div>
+          <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-xs font-semibold text-[var(--text-primary)]">Reset demo data</h3>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                  Restore the original sample accounts, permissions and records.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={resetting}
+                onClick={() => {
+                  setResetting(true);
+                  setError('');
+                  setResetMessage('');
+                  void resetDemo()
+                    .then(() => setResetMessage('Demo data restored. Choose an account to continue.'))
+                    .catch((cause) => setError(cause instanceof Error ? cause.message : 'Unable to reset demo data.'))
+                    .finally(() => setResetting(false));
+                }}
+              >
+                {resetting ? 'Resetting…' : 'Reset demo data'}
+              </Button>
+            </div>
+            {resetMessage ? <p role="status" className="mt-3 text-xs font-medium text-[var(--success)]">{resetMessage}</p> : null}
+          </div>
         </section>
       )}
 
       <p className="mt-5 text-xs leading-5 text-[var(--text-muted)]">
-        Demo credentials and local mock sessions are presentation fixtures, not production authentication or email delivery.
-      </p>
-
-      <p className="mt-6 max-w-md text-center text-[14px] text-[var(--text-secondary)]">
-        Don&apos;t have an account?{' '}
-        <Link
-          href="/signup"
-          className="font-medium text-[var(--text-primary)] transition-colors hover:text-[var(--color-primary)]"
-        >
-          Create one
-        </Link>
+        Sample credentials are for this local demo only. Email delivery is not enabled.
       </p>
     </div>
   );

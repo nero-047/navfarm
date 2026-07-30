@@ -82,6 +82,10 @@ Operational mutation checks are resource-specific:
 
 A missing permission returns `403 CAPABILITY_REQUIRED`; a mismatched
 tenant/company/workspace or missing membership returns its specific scope code.
+The same scope checks protect post-login `returnTo` reuse. A route accepted for
+one account is not proof that a later account can enter it; the new session
+must independently own the complete scope and route capability. Record-detail
+destinations are always discarded during account changes.
 
 Workspace navigation uses these read requirements:
 
@@ -125,3 +129,15 @@ navigation, dialogs, badges, and access-state copy do not grant capabilities.
 Manager and Viewer controls remain derived from the same permission model, and
 the Company/Workspace switcher still filters by explicit active memberships.
 Static Platform/Tenant scope labels are not switch controls.
+
+## Phase 5 notification and reset boundaries
+
+Notification list/read operations require an authenticated session and return
+only seeded events assigned to that identity and its accessible scope. Read
+state is keyed by user, so marking an item for Manager does not change Viewer,
+Accountant, or Tenant Admin state. Delivery integrations are outside this demo.
+
+Normal sign-out revokes only the current session and preserves mock business
+state. Reset invalidates every session and restores the canonical identity,
+membership, company role, workspace role, invitation, settings, readiness,
+notification, and operational state before another account signs in.

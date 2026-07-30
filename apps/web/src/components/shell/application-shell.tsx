@@ -5,12 +5,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Building2, Check, ChevronDown, ChevronRight, LogOut, Menu, PanelLeftClose,
-  PanelLeftOpen, Plus, Search, Settings2, UserRound, X,
+  PanelLeftOpen, Plus, RefreshCcw, Search, Settings2, UserRound, X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { capabilities, filterNavigation, type AppScope } from '../../lib/authorization';
 import { scopeAccessReason } from '../../lib/access-reasons';
-import { navigationForScope } from './navigation';
+import { activeNavigationItem, navigationForScope } from './navigation';
 import { NavfarmBrand } from '../brand/navfarm-brand';
 import ThemeToggle from '../source-ui/theme-toggle';
 import {
@@ -19,6 +19,7 @@ import {
   workspaceSwitchDestination,
 } from './context-switcher';
 import { SCOPE_PRESENTATION, scopeLabel } from './scope-presentation';
+import { NotificationPopover } from '../../modules/notifications/notification-popover';
 
 export function ApplicationShell({
   scope,
@@ -30,7 +31,8 @@ export function ApplicationShell({
   children: ReactNode;
 }) {
   const {
-    session, user, status, loading, mfaChallengeId, logout, selectContext,
+    session, user, status, loading, mfaChallengeId, logout, resetDemo,
+    selectContext,
   } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -42,6 +44,7 @@ export function ApplicationShell({
   const [transitioning, setTransitioning] = useState(false);
   const [contextChanging, setContextChanging] = useState(false);
   const [contextError, setContextError] = useState('');
+  const [accountError, setAccountError] = useState('');
   const contextButtonRef = useRef<HTMLButtonElement>(null);
   const contextDialogRef = useRef<HTMLDivElement>(null);
   const contextOpenRef = useRef(contextOpen);
@@ -209,7 +212,8 @@ export function ApplicationShell({
   const crumbs = pathname.split('/').filter(Boolean).map((value) =>
     value.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
   );
-  const pageTitle = nav.find((item) => pathname.startsWith(item.href))?.label ?? crumbs.at(-1) ?? scopeLabel(effectiveScope);
+  const activeNav = activeNavigationItem(pathname, nav);
+  const pageTitle = activeNav?.label ?? crumbs.at(-1) ?? scopeLabel(effectiveScope);
   const visibleCompanies = session
     ? buildContextSwitcherGroups(session, contextQuery)
     : [];
@@ -281,6 +285,27 @@ export function ApplicationShell({
   const closeContextSwitcher = () => {
     setContextOpen(false);
     contextButtonRef.current?.focus();
+  };
+  const closeTransientShell = () => {
+    setProfileOpen(false);
+    setContextOpen(false);
+    setContextQuery('');
+    setContextError('');
+    setMobileOpen(false);
+  };
+  const signOut = () => {
+    closeTransientShell();
+    void logout();
+  };
+  const resetAndSwitchAccount = () => {
+    closeTransientShell();
+    setAccountError('');
+    void resetDemo().catch((cause) => {
+      setAccountError(
+        cause instanceof Error ? cause.message : 'Demo data could not be reset.',
+      );
+      setProfileOpen(true);
+    });
   };
   const sidebar = (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,#0a1244,#101a52_60%,#071039)] text-white">
@@ -449,7 +474,7 @@ export function ApplicationShell({
       <nav aria-label={`${scopeLabel(effectiveScope)} navigation`} className="flex-1 space-y-1 overflow-y-auto p-3">
         {!collapsed && <p className="px-3 pb-2 pt-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/35">Navigation</p>}
         {nav.map((item) => {
-          const active = pathname.startsWith(item.href);
+          const active = activeNav?.href === item.href;
           return (
             <Link key={`${item.label}:${item.href}`} href={item.href} aria-current={active ? 'page' : undefined} title={collapsed ? item.label : undefined} className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium ${active ? 'bg-white text-[#101849] shadow-lg' : 'text-white/65 hover:bg-white/[0.07] hover:text-white'}`}>
               <item.icon size={17} className="shrink-0" />
@@ -511,6 +536,7 @@ export function ApplicationShell({
               </div>
               <p className="truncate text-sm font-semibold text-[var(--text-primary)] sm:mt-1">{pageTitle}</p>
             </div>
+            <NotificationPopover />
             <ThemeToggle />
             <div className="relative">
               <button ref={profileButtonRef} onClick={() => setProfileOpen(!profileOpen)} aria-label={`${user?.fullName ?? 'Account'} account menu`} aria-controls="account-popover" aria-expanded={profileOpen} className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border)] px-2">
@@ -521,8 +547,10 @@ export function ApplicationShell({
               {profileOpen && (
                 <div id="account-popover" ref={profileMenuRef} className="absolute right-0 top-12 w-64 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-[var(--shadow-md)]">
                   <div className="border-b border-[var(--border-subtle)] px-3 py-3"><p className="text-sm font-semibold text-[var(--text-primary)]">{user?.fullName}</p><p className="mt-1 truncate text-[10px] text-[var(--text-muted)]">{user?.email}</p></div>
+                  {accountError ? <p role="alert" className="m-2 rounded-lg bg-[var(--danger-soft)] p-2 text-[10px] leading-4 text-[var(--danger)]">{accountError}</p> : null}
                   <Link href="/profile" onClick={() => setProfileOpen(false)} className="mt-1 flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-raised)]"><UserRound size={15} aria-hidden /> My profile</Link>
-                  <button onClick={() => void logout().then(() => router.replace('/login'))} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-xs text-[var(--danger)] hover:bg-[var(--danger-soft)]"><LogOut size={15} aria-hidden /> Sign out</button>
+                  <button onClick={resetAndSwitchAccount} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--surface-raised)]"><RefreshCcw size={15} aria-hidden /><span><span className="block font-semibold">Reset demo data</span><span className="mt-0.5 block text-[10px] leading-4 text-[var(--text-muted)]">Restore the original sample accounts, permissions and records.</span></span></button>
+                  <button onClick={signOut} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-xs text-[var(--danger)] hover:bg-[var(--danger-soft)]"><LogOut size={15} aria-hidden /> Sign out</button>
                 </div>
               )}
             </div>

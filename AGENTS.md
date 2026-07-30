@@ -57,6 +57,13 @@
   mirrored to `localStorage`, `sessionStorage`, or a module-global snapshot.
   Mock sessions are process-memory fixtures, not durable or production
   authentication.
+- Post-login `returnTo` values must pass the shared session-aware route
+  validator. It rejects record details and any inactive, stale, unassigned, or
+  inaccessible tenant/company/workspace route. Explicit sign-out always clears
+  context before guards run and opens clean `/login`.
+- `Reset demo data` is distinct from sign-out. It uses the single
+  `/api/v1/__mock/reset` boundary, restores every mutable demo repository,
+  invalidates all mock sessions, and returns to clean `/login`.
 - The authenticated session establishes the tenant. Visible context selection
   is limited to Company administration and explicitly assigned Workspaces;
   never add tenant/organisation switching to the company/workspace selector.
@@ -86,6 +93,15 @@
 - Preserve the existing visual language unless the user asks for a redesign: navy navigation, white/light-gray content surfaces, restrained red/blue accents, compact typography, and card-based layouts.
 - The frontend demo information architecture should cover: dashboard/overview, batches, daily operations, QC, QR traceability, resources and KPI schedules, financial/variance reports, and settings/onboarding/master data.
 - Settings should reflect the documented setup domains: company profile and addresses/contacts, language and currency, timezone and fiscal rules, enabled modules/NOB/LOB configuration, users/roles, notifications, GL/item mappings, and master data. The current mock settings resource supports profile links, localization, fiscal configuration, modules, notifications, business-structure links, and setup status; do not invent additional persisted preferences.
+- `/{company}/settings/business-structure` is the canonical NOB/LOB screen.
+  Legacy `masters/nobs` and `masters/lobs` routes only redirect to its selected
+  NOB or LOB section.
+- Sidebar active state uses explicit canonical route ownership and must resolve
+  exactly one primary item. Tenant navigation exposes only `Tenant profile`
+  for `/console/profile`.
+- Header notifications use the typed `modules/notifications/client.ts`
+  boundary. Read state is account-scoped process memory, resettable, and must
+  never claim external email, SMS, webhook, or production delivery.
 - Treat incomplete pages as demo placeholders to be progressively backed by realistic local fixtures from the RAK docs, with visible `Demo data` labelling where users could otherwise mistake values for live records.
 
 ### Company and workspace context
