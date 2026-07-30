@@ -104,6 +104,15 @@ describe('Enterprise Quality & Traceability Engine Unit Tests', () => {
     expect(mockDb.insert).toHaveBeenCalled();
   });
 
+  it('should validate QC pass gate correctly for batch release', async () => {
+    mockDb.select.mockReturnValueOnce(
+      createQueryChain([{ inspection_id: 'i-1', overall_result: 'PASSED' }])
+    );
+
+    const isPassed = await inspectionService.validateQCPassed('batch-1', 'tenant-1');
+    expect(isPassed).toBe(true);
+  });
+
   it('should generate secure cryptographic QR / GS1 barcode hash', async () => {
     const dto = {
       company_id: 'comp-1',
@@ -116,6 +125,20 @@ describe('Enterprise Quality & Traceability Engine Unit Tests', () => {
     const result = await qrService.generateQrBarcode(dto, 'tenant-1');
     expect(mockDb.insert).toHaveBeenCalled();
     expect(result.qr_code_hash).toContain('NAV-QR_CODE-');
+  });
+
+  it('should resolve public consumer traceability payload omitting sensitive internal IDs', async () => {
+    mockDb.select
+      .mockReturnValueOnce(createQueryChain([{ qr_id: 'qr-1', qr_code_hash: 'NAV-QR-123', entity_id: 'b-1', scanned_count: 0 }]))
+      .mockReturnValueOnce(createQueryChain([{ batch_id: 'b-1', batch_no: 'B-2026-001', stage: 'HARVESTED' }]))
+      .mockReturnValueOnce(createQueryChain([{ inspection_id: 'i-1', overall_result: 'PASSED' }]));
+
+    const publicPayload = await qrService.getPublicTraceability('NAV-QR-123');
+    expect(publicPayload.qr_code).toBe('NAV-QR-123');
+    expect(publicPayload.batch_number).toBe('B-2026-001');
+    expect(publicPayload.quality_verification).toBe('PASSED_AND_VERIFIED');
+    expect((publicPayload as any).tenant_id).toBeUndefined();
+    expect((publicPayload as any).company_id).toBeUndefined();
   });
 
   it('should log supply chain traceability movement event', async () => {

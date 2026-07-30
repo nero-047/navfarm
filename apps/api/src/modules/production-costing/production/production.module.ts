@@ -16,6 +16,7 @@ import { AuditLogModule } from '../../platform-identity/audit-log/audit-log.modu
     InventoryModule,
     FinanceModule,
     AuditLogModule,
+    // DatabaseModule is @Global() so MASTER_CONNECTION is already available
   ],
   controllers: [
     ProductionOrderController,

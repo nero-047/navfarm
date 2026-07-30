@@ -21,6 +21,13 @@
           }
         }
       },
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "tsc --noEmit -p tsconfig.app.json"
+        }
+      },
       "prune-lockfile": {
         "dependsOn": [
           "build"
@@ -107,6 +114,13 @@
           "cwd": "apps/api",
           "command": "drizzle-kit generate --config drizzle.config.ts"
         }
+      },
+      "validate-schema": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --import tsx src/scripts/validate-schema.ts"
+        }
       }
     }
   },
@@ -137,10 +151,12 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0",
+    "@types/dotenv": "^8.2.3",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.2.0",
     "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.1",
+    "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.1"
   }

@@ -1,5 +1,5 @@
 // NAVFarm ERP Consolidated Drizzle Schema Definitions
-// Target Database: PostgreSQL
+// Target Database: MySQL (dialect: mysql, drizzle-orm/mysql-core)
 
 import { 
   mysqlTable, 
@@ -1227,7 +1227,14 @@ export const glMappingMaster = mysqlTable('gl_mapping_master', {
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull(),
   item_category_id: varchar('item_category_id', { length: 36 }),
-  transaction_type: varchar('transaction_type', { length: 50 }).notNull(), // PURCHASE, CONSUMPTION, OUTPUT, SALE, ADJUSTMENT, MORTALITY, etc.
+  // Phase 4: NOB/LOB/stage/event context for richer posting rule resolution
+  nob_id: varchar('nob_id', { length: 36 }),            // Null = matches any NOB
+  lob_id: varchar('lob_id', { length: 36 }),            // Null = matches any LOB
+  stage: varchar('stage', { length: 30 }),              // Optional batch stage context (e.g. REARING, SLAUGHTER)
+  event_type: varchar('event_type', { length: 50 }),    // Optional event sub-type for granular routing
+  item_posting_group: varchar('item_posting_group', { length: 50 }), // Optional item / posting group
+  valuation_method: varchar('valuation_method', { length: 20 }),     // STANDARD, FIFO, BIO_ASSET
+  transaction_type: varchar('transaction_type', { length: 50 }).notNull(), // PURCHASE, CONSUMPTION, OUTPUT, SALE, ADJUSTMENT, MORTALITY, VARIANCE, WIP_TRANSFER, BATCH_CLOSE
   debit_gl_account_id: varchar('debit_gl_account_id', { length: 36 }),
   credit_gl_account_id: varchar('credit_gl_account_id', { length: 36 }),
   is_active: boolean('is_active').default(true).notNull(),
@@ -2437,6 +2444,11 @@ export const productionBatch = mysqlTable('production_batch', {
   batch_no: varchar('batch_no', { length: 50 }).notNull(),
   parent_batch_id: varchar('parent_batch_id', { length: 36 }),
   formula_id: varchar('formula_id', { length: 36 }),
+  // NOB/LOB/costing dimensions (Phase 4 — Task 1)
+  nob_id: varchar('nob_id', { length: 36 }),          // Nature of Business — validated against nob_master
+  lob_id: varchar('lob_id', { length: 36 }),          // Line of Business — drives QC/QR/costing rules
+  stage: varchar('stage', { length: 50 }),           // Batch stage (e.g. REARING, LAYING, SLAUGHTER)
+  costing_method: varchar('costing_method', { length: 20 }).default('STANDARD'), // Snapshot at batch creation; STANDARD | FIFO | BIO_ASSET
   farm_id: varchar('farm_id', { length: 36 }),
   shed_id: varchar('shed_id', { length: 36 }),
   warehouse_id: varchar('warehouse_id', { length: 36 }).notNull(),
@@ -2445,6 +2457,10 @@ export const productionBatch = mysqlTable('production_batch', {
   actual_qty: decimal('actual_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
   scrap_qty: decimal('scrap_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
   status: varchar('status', { length: 30 }).default('DRAFT').notNull(), // DRAFT, PLANNED, RELEASED, MATERIAL_ISSUED, IN_PROGRESS, QUALITY_CHECK, FINISHED, CLOSED
+  // Traceability audit IDs (Phase 4 — Task 5)
+  traceability_batch_id: varchar('traceability_batch_id', { length: 36 }), // FK to batch_traceability.trace_id — linked on creation
+  qc_inspection_id: varchar('qc_inspection_id', { length: 36 }),           // FK to quality_inspection.inspection_id — linked after QC
+  qr_id: varchar('qr_id', { length: 36 }),                  // FK to qr_barcode_master.qr_id — linked when QR generated
   start_time: timestamp('start_time', { mode: 'string' }),
   end_time: timestamp('end_time', { mode: 'string' }),
   notes: text('notes'),
@@ -3222,7 +3238,7 @@ export const eggGradingBatch = mysqlTable('egg_grading_batch', {
   grading_id: varchar('grading_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
-  source_batch_id: varchar('source_batch_id', { length: 36 }).references(() => poultryBatch.batch_id, { onDelete: 'restrict' }),
+  source_batch_id: varchar('source_batch_id', { length: 36 }).references(() => poultryBatch.poultry_batch_id, { onDelete: 'restrict' }),
   source_egg_production_id: varchar('source_egg_production_id', { length: 36 }),
   grading_date: date('grading_date', { mode: 'string' }).notNull(),
   total_eggs_input: decimal('total_eggs_input', { precision: 12, scale: 0 }).notNull(),
@@ -4587,4 +4603,3 @@ export const feedIngredientInventory = mysqlTable('feed_ingredient_inventory', {
   last_price_per_mt: decimal('last_price_per_mt', { precision: 14, scale: 4 }),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
 });
-

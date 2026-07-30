@@ -6,6 +6,9 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+import { OnboardingAccessGuard } from '../../../common/guards/onboarding-access.guard';
 
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 
@@ -15,6 +18,8 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register-admin')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Register the initial Company Admin (Step 9 of setup)' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Administrative account created successfully.' })
   @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Email address already exists.' })
@@ -22,12 +27,12 @@ export class AuthController {
     @Body() dto: RegisterAdminDto,
     @Request() req,
   ) {
-    const authHeader = req?.headers?.authorization;
-    return this.authService.registerAdmin(dto, authHeader);
+    return this.authService.registerAdmin(dto, req.onboarding);
   }
 
   @Get('users')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @RequirePermission('RBAC', 'USER', 'view')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all users in the active tenant workspace' })
   async listUsers(@Request() req) {

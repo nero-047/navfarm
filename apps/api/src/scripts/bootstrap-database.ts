@@ -164,58 +164,56 @@ async function bootstrap() {
         .onDuplicateKeyUpdate({ set: { ...currency } });
     }
 
+    // Decision record: Steps 1–9 are mandatory per the PDF narrative and per code.
+    // The Final_Docs workbook marks steps 11 (CHART_OF_ACCOUNTS) and 12 (NOB_LOB_CONFIG)
+    // as also mandatory, but these require GL and LOB configuration that may not be
+    // available at initial launch. We preserve 1–9 as the hard gate. Steps 11–12 are
+    // seeded as optional (is_mandatory=false) and enforced by company policy.
     const setupSteps = [
-      ['COMPANY_PROFILE', 'Company profile', 'GENERAL'],
-      ['ADDRESS', 'Address & farm location', 'GENERAL'],
-      ['KEY_CONTACTS', 'Primary contacts', 'GENERAL'],
-      ['DEFAULT_LANGUAGE', 'Language', 'LOCALIZATION'],
-      ['BASE_CURRENCY', 'Base currency', 'LOCALIZATION'],
-      ['TIMEZONE', 'Timezone & region', 'LOCALIZATION'],
-      ['FISCAL_YEAR', 'Fiscal & accounting', 'FINANCE'],
-      ['ENABLE_MODULES', 'Enable modules', 'CONFIGURATION'],
-      ['ADMIN_USER', 'Administrator account', 'SECURITY'],
-      ['TEAM_MEMBERS', 'Users & roles', 'SECURITY'],
-      ['CHART_OF_ACCOUNTS', 'GL mapping', 'FINANCE'],
-      ['NOB_LOB_CONFIG', 'NOB & LOB configuration', 'CONFIGURATION'],
-      ['MASTER_DATA_LOAD', 'Master data', 'CONFIGURATION'],
-      ['NOTIFICATION_SETTINGS', 'Notifications', 'CONFIGURATION'],
-      ['SETUP_COMPLETE', 'Setup complete', 'CONFIGURATION'],
+      ['COMPANY_PROFILE',    'Company profile',           'GENERAL',        5],
+      ['ADDRESS',            'Address & farm location',   'GENERAL',        3],
+      ['KEY_CONTACTS',       'Primary contacts',          'GENERAL',        3],
+      ['DEFAULT_LANGUAGE',   'Language',                  'LOCALIZATION',   2],
+      ['BASE_CURRENCY',      'Base currency',             'LOCALIZATION',   2],
+      ['TIMEZONE',           'Timezone & region',         'LOCALIZATION',   2],
+      ['FISCAL_YEAR',        'Fiscal & accounting',       'FINANCE',        5],
+      ['ENABLE_MODULES',     'Enable modules',            'CONFIGURATION',  5],
+      ['ADMIN_USER',         'Administrator account',     'SECURITY',       3],
+      ['TEAM_MEMBERS',       'Users & roles',             'SECURITY',       5],
+      ['CHART_OF_ACCOUNTS',  'Chart of accounts',         'FINANCE',       10],
+      ['NOB_LOB_CONFIG',     'NOB & LOB configuration',   'CONFIGURATION', 10],
+      ['MASTER_DATA_LOAD',   'Master data',               'CONFIGURATION', 15],
+      ['NOTIFICATION_SETTINGS', 'Notifications',          'CONFIGURATION',  3],
+      ['SETUP_COMPLETE',     'Setup complete',            'CONFIGURATION',  1],
     ] as const;
-    for (const [index, [code, name, category]] of setupSteps.entries()) {
+    for (const [index, [code, name, category, minutes]] of setupSteps.entries()) {
       const order = index + 1;
       const step = {
         step_id: `30000000-3000-3000-3000-${String(order).padStart(12, '0')}`,
         step_code: code,
         step_name: name,
         step_order: order,
+        is_mandatory: order <= 9,   // Steps 1–9 are the mandatory foundation
+        step_category: category,
+        estimated_minutes: minutes,
+        is_active: true,
+      };
+      const updateSet = {
+        step_name: name,
+        step_order: order,
         is_mandatory: order <= 9,
         step_category: category,
+        estimated_minutes: minutes,
         is_active: true,
       };
       await masterDb
         .insert(master.setupStepMaster)
         .values(step)
-        .onDuplicateKeyUpdate({
-          set: {
-            step_name: name,
-            step_order: order,
-            is_mandatory: order <= 9,
-            step_category: category,
-            is_active: true,
-          },
-        });
+        .onDuplicateKeyUpdate({ set: updateSet });
       await tenantDb
         .insert(tenant.setupStepMaster)
         .values(step)
-        .onDuplicateKeyUpdate({
-          set: {
-            step_name: name,
-            step_order: order,
-            is_mandatory: order <= 9,
-            step_category: category,
-            is_active: true,
-          },
-        });
+        .onDuplicateKeyUpdate({ set: updateSet });
     }
 
     const nobs = [
@@ -270,24 +268,54 @@ async function bootstrap() {
     }
 
     const lobs = [
-      ['POULTRY', 'PLT_REARING', 'Rearing & Breeding', 'STANDARD,FIFO', 'NO', 'NO'],
-      ['POULTRY', 'PLT_LAYING', 'Laying', 'STANDARD,FIFO', 'YES', 'YES'],
-      ['POULTRY', 'PLT_HATCHING', 'Hatching', 'STANDARD,FIFO', 'YES', 'YES'],
-      ['POULTRY', 'PLT_CB', 'Commercial Broiler Farming', 'STANDARD', 'YES', 'YES'],
-      ['POULTRY', 'PLT_SLAUGHTER', 'Poultry Slaughter', 'STANDARD', 'YES', 'YES'],
-      ['LIVESTOCK', 'LVS_MILKING', 'Dairy', 'BIO_ASSET,FIFO', 'YES', 'YES'],
-      ['LIVESTOCK', 'LVS_PIGGERY', 'Piggery', 'BIO_ASSET,STANDARD', 'YES', 'YES'],
-      ['LIVESTOCK', 'LVS_GOAT_SHEEP', 'Goat & Sheep', 'BIO_ASSET', 'YES', 'YES'],
-      ['AGRI', 'AGRI_FRUIT', 'Fruit Farming', 'BIO_ASSET,FIFO', 'YES', 'YES'],
-      ['AGRI', 'AGRI_CROP', 'Crop Farming', 'STANDARD,FIFO', 'YES', 'YES'],
-      ['AGRI', 'AGRI_SEEDS', 'Seed Processing', 'STANDARD', 'YES', 'YES'],
-      ['AQUA', 'AQA_FISH', 'Fish Farming', 'BIO_ASSET,FIFO', 'YES', 'YES'],
-      ['AQUA', 'AQA_SLAUGHTER', 'Aquaculture Slaughter', 'STANDARD', 'YES', 'YES'],
-      ['INSECT', 'INS_BEE', 'Bee Keeping', 'STANDARD', 'YES', 'YES'],
-      ['INSECT', 'BSF', 'Black Soldier Fly', 'STANDARD', 'YES', 'YES'],
-      ['PRODUCTION', 'FEED_PROD', 'Feed Production', 'STANDARD', 'YES', 'YES'],
+      // ── POULTRY ─────────────────────────────────────────────────────────────
+      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
+      // Growing/rearing stages: QC=NO, QR=NO — no finished-goods inspection until slaughter
+      // Slaughter: QC=YES, QR=YES — output is a traceable finished product
+      ['POULTRY', 'PLT_REARING',    'Rearing & Breeding',       'STANDARD',            'NO',  'NO',  'YES', 'YES', 'YES'],
+      ['POULTRY', 'PLT_LAYING',     'Laying',                   'STANDARD',            'NO',  'NO',  'YES', 'YES', 'YES'],
+      ['POULTRY', 'PLT_HATCHING',   'Hatching',                 'STANDARD',            'NO',  'NO',  'YES', 'YES', 'YES'],
+      ['POULTRY', 'PLT_CB',         'Commercial Broiler',       'STANDARD',            'NO',  'NO',  'YES', 'YES', 'YES'],
+      ['POULTRY', 'PLT_SLAUGHTER',  'Poultry Slaughter',        'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+
+      // ── LIVESTOCK ────────────────────────────────────────────────────────────
+      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
+      // Living asset LOBs: QR=NO (no barcode on live animals); QC=YES for health checks
+      // Slaughter: QC=YES, QR=YES — output is a traceable finished product
+      // Note: LVS_GOAT_SHEEP is not in the workbook explicitly; retained for completeness
+      // and flagged for review when the workbook is next updated.
+      ['LIVESTOCK', 'LVS_BREEDING',   'Livestock Breeding',       'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
+      ['LIVESTOCK', 'LVS_MILKING',    'Dairy / Milking',          'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
+      ['LIVESTOCK', 'LVS_PIGGERY',    'Piggery',                  'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
+      ['LIVESTOCK', 'LVS_GOAT_SHEEP', 'Goat & Sheep',             'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
+      ['LIVESTOCK', 'LVS_SLAUGHTER',  'Livestock Slaughter',      'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+
+      // ── AGRICULTURE ──────────────────────────────────────────────────────────
+      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
+      // All agri LOBs: QC=YES, QR=YES (harvest lots are traceable)
+      ['AGRI', 'AGRI_FRUIT',   'Fruit Farming',            'BIO_ASSET',           'YES', 'YES', 'YES', 'YES', 'YES'],
+      ['AGRI', 'AGRI_CROP',    'Crop Farming',             'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+      ['AGRI', 'AGRI_FLOWER',  'Flower Farming',           'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+      ['AGRI', 'AGRI_SEEDS',   'Seed Processing',          'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+
+      // ── AQUACULTURE ──────────────────────────────────────────────────────────
+      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
+      // Fish farming: QR=NO (live biomass); Slaughter: QR=YES (finished fish product)
+      ['AQUA', 'AQA_FISH',       'Fish Farming',            'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
+      ['AQUA', 'AQA_SLAUGHTER',  'Aquaculture Slaughter',   'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+
+      // ── INSECT FARMING ───────────────────────────────────────────────────────
+      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
+      // Bee keeping: traceability=NO per workbook (hive-managed, not lot-traceable)
+      // BSF: not explicitly listed in workbook but belongs to INSECT NOB
+      ['INSECT', 'INS_BEE',  'Bee Keeping',              'STANDARD',            'YES', 'NO',  'NO',  'YES', 'YES'],
+      ['INSECT', 'INS_BSF',  'Black Soldier Fly',        'STANDARD',            'YES', 'NO',  'YES', 'YES', 'YES'],
+
+      // ── FEED & PROCESSING ────────────────────────────────────────────────────
+      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
+      ['PRODUCTION', 'FEED_PROD', 'Feed Production',         'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
     ] as const;
-    for (const [index, [nobCode, code, name, costing, qc, qr]] of lobs.entries()) {
+    for (const [index, [nobCode, code, name, costing, qc, qr, traceability, batchCopy, schedulerCopy]] of lobs.entries()) {
       const lob = {
         lob_id: `60000000-6000-6000-6000-${String(index + 1).padStart(12, '0')}`,
         nob_id: nobIds.get(nobCode)!,
@@ -296,7 +324,22 @@ async function bootstrap() {
         costing_method_allowed: costing,
         qc_required: qc,
         qr_required: qr,
-        traceability_required: 'YES',
+        traceability_required: traceability,
+        batch_copy_allowed: batchCopy,
+        scheduler_copy_allowed: schedulerCopy,
+        sort_order: index + 1,
+        is_system: true,
+        is_active: true,
+      };
+      const updateSet = {
+        nob_id: lob.nob_id,
+        lob_name: name,
+        costing_method_allowed: costing,
+        qc_required: qc,
+        qr_required: qr,
+        traceability_required: traceability,
+        batch_copy_allowed: batchCopy,
+        scheduler_copy_allowed: schedulerCopy,
         sort_order: index + 1,
         is_system: true,
         is_active: true,
@@ -304,35 +347,11 @@ async function bootstrap() {
       await masterDb
         .insert(master.lobMaster)
         .values(lob)
-        .onDuplicateKeyUpdate({
-          set: {
-            nob_id: lob.nob_id,
-            lob_name: name,
-            costing_method_allowed: costing,
-            qc_required: qc,
-            qr_required: qr,
-            traceability_required: 'YES',
-            sort_order: index + 1,
-            is_system: true,
-            is_active: true,
-          },
-        });
+        .onDuplicateKeyUpdate({ set: updateSet });
       await tenantDb
         .insert(tenant.lobMaster)
         .values(lob)
-        .onDuplicateKeyUpdate({
-          set: {
-            nob_id: lob.nob_id,
-            lob_name: name,
-            costing_method_allowed: costing,
-            qc_required: qc,
-            qr_required: qr,
-            traceability_required: 'YES',
-            sort_order: index + 1,
-            is_system: true,
-            is_active: true,
-          },
-        });
+        .onDuplicateKeyUpdate({ set: updateSet });
     }
 
     const today = new Date().toISOString().slice(0, 10);

@@ -34,7 +34,7 @@ export class AgriV2ReportService {
       summary: {
         total_crop_plans: plans.length,
         harvested_plans: plans.filter(p => p.plan_status === 'HARVESTED').length,
-        active_plans: plans.filter(p => ['SOWING', 'GROWING'].includes(p.plan_status)).length,
+        active_plans: plans.filter(p => ['SOWING', 'GROWING'].includes(p.plan_status ?? '')).length,
         total_actual_yield_kg: parseFloat(totalActualYield.toFixed(2)),
         total_revenue: parseFloat(totalRevenue.toFixed(2)),
         total_cost: parseFloat(totalCost.toFixed(2)),
@@ -54,7 +54,7 @@ export class AgriV2ReportService {
       fields_in_crop: fields.filter(f => f.field_status === 'IN_CROP').length,
       fields_available: fields.filter(f => f.field_status === 'AVAILABLE').length,
       fields_fallow: fields.filter(f => f.field_status === 'FALLOW').length,
-      active_crop_plans: plans.filter(p => ['SOWING', 'GROWING'].includes(p.plan_status)).length,
+      active_crop_plans: plans.filter(p => ['SOWING', 'GROWING'].includes(p.plan_status ?? '')).length,
     };
   }
 }

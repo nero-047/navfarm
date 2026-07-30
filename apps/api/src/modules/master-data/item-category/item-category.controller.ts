@@ -86,8 +86,8 @@ export class ItemCategoryController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.itemCategoryService.remove(id, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 

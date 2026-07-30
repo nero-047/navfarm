@@ -63,7 +63,7 @@ export class ItemAttributeService {
     if (existing) {
       await this.db
         .update(schema.itemAttributeValues)
-        .set({ value: dto.value })
+        .set({ attribute_value: dto.value })
         .where(
           and(
             eq(schema.itemAttributeValues.item_id, itemId),

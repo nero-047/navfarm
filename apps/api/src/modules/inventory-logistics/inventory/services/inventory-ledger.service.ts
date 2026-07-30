@@ -459,7 +459,7 @@ export class InventoryLedgerService {
         ref_doc_type: schema.inventoryLedger.ref_doc_type,
         ref_doc_id: schema.inventoryLedger.ref_doc_id,
         qty: schema.inventoryLedger.qty,
-        cost_per_unit: schema.inventoryLedger.cost_per_unit,
+        cost_per_unit: schema.inventoryLedger.unit_cost,
         created_at: schema.inventoryLedger.created_at,
       })
       .from(schema.inventoryLedger)

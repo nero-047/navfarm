@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
@@ -9,6 +9,13 @@ import { CreateUserDto, UpdateUserDto, QueryUserDto } from './dto/user.dto';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
+};
+
+type UserActor = {
+  userId?: string;
+  tenantId?: string;
+  companyId?: string | null;
+  userType?: string;
 };
 
 @Injectable()
@@ -23,7 +30,46 @@ export class UserService {
     return tenantDb;
   }
 
-  async create(dto: CreateUserDto) {
+  private get activeTenantId(): string {
+    const tenantId = this.cls.get<string>('tenantId');
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant context is required for user management.');
+    }
+    return tenantId;
+  }
+
+  private async assertCompanyInActiveTenant(companyId: string) {
+    const [company] = await this.db
+      .select({ companyId: schema.companyMaster.company_id })
+      .from(schema.companyMaster)
+      .where(and(
+        eq(schema.companyMaster.company_id, companyId),
+        eq(schema.companyMaster.tenant_id, this.activeTenantId),
+      ))
+      .limit(1);
+
+    if (!company) {
+      throw new NotFoundException(`Company with ID '${companyId}' not found in the active tenant.`);
+    }
+  }
+
+  private assertCompanyAdminScope(actor: UserActor | undefined, companyId: string | null) {
+    if (actor?.userType !== 'COMPANY_ADMIN') {
+      return;
+    }
+    if (!actor.companyId || actor.companyId !== companyId) {
+      throw new ForbiddenException('Company Administrators can manage users only in their assigned company.');
+    }
+  }
+
+  async create(dto: CreateUserDto, actor: UserActor) {
+    const tenantId = this.activeTenantId;
+    if (dto.tenant_id !== tenantId || (actor.tenantId && actor.tenantId !== tenantId)) {
+      throw new ForbiddenException('Users can only be created in the active tenant workspace.');
+    }
+    await this.assertCompanyInActiveTenant(dto.company_id);
+    this.assertCompanyAdminScope(actor, dto.company_id);
+
     const existing = await this.db
       .select()
       .from(schema.userMaster)
@@ -42,7 +88,7 @@ export class UserService {
       await tx.insert(schema.userMaster).values({
         user_id: userId,
         company_id: dto.company_id,
-        tenant_id: dto.tenant_id,
+        tenant_id: tenantId,
         full_name: dto.full_name,
         email: dto.email.toLowerCase(),
         phone: dto.phone || null,
@@ -57,23 +103,27 @@ export class UserService {
         user_id: userId,
         company_id: dto.company_id,
         is_primary: true,
-        assigned_by: userId,
+        assigned_by: actor.userId || userId,
       });
     });
 
-    return this.findById(userId);
+    return this.findById(userId, actor);
   }
 
-  async findById(id: string) {
+  async findById(id: string, actor?: UserActor) {
     const [user] = await this.db
       .select()
       .from(schema.userMaster)
-      .where(eq(schema.userMaster.user_id, id))
+      .where(and(
+        eq(schema.userMaster.user_id, id),
+        eq(schema.userMaster.tenant_id, this.activeTenantId),
+      ))
       .limit(1);
 
     if (!user) {
       throw new NotFoundException(`User with ID '${id}' not found.`);
     }
+    this.assertCompanyAdminScope(actor, user.company_id);
 
     const roles = await this.db
       .select({
@@ -100,17 +150,24 @@ export class UserService {
     const [user] = await this.db
       .select()
       .from(schema.userMaster)
-      .where(eq(schema.userMaster.email, email.toLowerCase()))
+      .where(and(
+        eq(schema.userMaster.email, email.toLowerCase()),
+        eq(schema.userMaster.tenant_id, this.activeTenantId),
+      ))
       .limit(1);
 
     return user || null;
   }
 
-  async findAll(query: QueryUserDto) {
-    const conditions: any[] = [];
+  async findAll(query: QueryUserDto, actor?: UserActor) {
+    const conditions: any[] = [eq(schema.userMaster.tenant_id, this.activeTenantId)];
 
     if (query.companyId) {
+      this.assertCompanyAdminScope(actor, query.companyId);
       conditions.push(eq(schema.userMaster.company_id, query.companyId));
+    } else if (actor?.userType === 'COMPANY_ADMIN') {
+      this.assertCompanyAdminScope(actor, actor.companyId || null);
+      conditions.push(eq(schema.userMaster.company_id, actor.companyId!));
     }
     if (query.userType) {
       conditions.push(eq(schema.userMaster.user_type, query.userType));
@@ -178,12 +235,14 @@ export class UserService {
     return enriched;
   }
 
-  async findByCompany(companyId: string) {
-    return this.findAll({ companyId });
+  async findByCompany(companyId: string, actor?: UserActor) {
+    await this.assertCompanyInActiveTenant(companyId);
+    this.assertCompanyAdminScope(actor, companyId);
+    return this.findAll({ companyId }, actor);
   }
 
-  async update(id: string, dto: UpdateUserDto) {
-    const user = await this.findById(id);
+  async update(id: string, dto: UpdateUserDto, actor?: UserActor) {
+    await this.findById(id, actor);
 
     const updates: any = {};
     if (dto.full_name !== undefined) updates.full_name = dto.full_name;
@@ -202,11 +261,11 @@ export class UserService {
         .where(eq(schema.userMaster.user_id, id));
     }
 
-    return this.findById(id);
+    return this.findById(id, actor);
   }
 
-  async deactivate(id: string) {
-    const user = await this.findById(id);
+  async deactivate(id: string, actor?: UserActor) {
+    await this.findById(id, actor);
 
     await this.db
       .update(schema.userMaster)
@@ -215,11 +274,11 @@ export class UserService {
       })
       .where(eq(schema.userMaster.user_id, id));
 
-    return this.findById(id);
+    return this.findById(id, actor);
   }
 
-  async remove(id: string) {
-    const user = await this.findById(id);
+  async remove(id: string, actor?: UserActor) {
+    await this.findById(id, actor);
 
     await this.db
       .update(schema.userMaster)

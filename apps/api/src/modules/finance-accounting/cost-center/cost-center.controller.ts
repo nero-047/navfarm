@@ -86,8 +86,8 @@ export class CostCenterController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.costCenterService.remove(id, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 

@@ -38,7 +38,7 @@ export class CoaController {
   }
 
   @Put(':id')
-  @RequirePermission('FINANCE', 'COA', 'update')
+  @RequirePermission('FINANCE', 'COA', 'edit')
   @ApiOperation({ summary: 'Update validation constraints or labels of a GL Account' })
   @ApiParam({ name: 'id', description: 'GL Account UUID' })
   async update(@Param('id') id: string, @Body() dto: UpdateGlAccountDto, @Req() req: any) {

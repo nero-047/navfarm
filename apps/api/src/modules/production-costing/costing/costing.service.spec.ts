@@ -107,18 +107,29 @@ describe('Enterprise Costing Engine Unit Tests', () => {
 
     const result = await bioCostingService.calculateBiologicalAssetValuation('pb-1', 'tenant-1');
     expect(result.current_bird_count).toBe(950);
-    expect(result.acquisition_cost).toBe(1500); // 1000 * 1.5
+    expect(result.acquisition_cost).toBe(5000);
     expect(result.cost_per_bird).toBeGreaterThan(0);
   });
 
-  it('should calculate 7-dimension variance analysis for production batch', async () => {
+  it('should calculate variance analysis for standard-cost production batch', async () => {
     mockDb.select
-      .mockReturnValueOnce(createQueryChain([{ batch_id: 'b-1', company_id: 'comp-1', batch_no: 'B01', planned_qty: '100.0000', actual_qty: '110.0000' }]))
-      .mockReturnValueOnce(createQueryChain([{ planned_qty: '10.0000', actual_qty: '12.0000', unit_cost: '5.0000' }]));
+      .mockReturnValueOnce(createQueryChain([{ batch_id: 'b-1', company_id: 'comp-1', batch_no: 'B01', planned_qty: '100.0000', actual_qty: '110.0000', costing_method: 'STANDARD' }]))
+      .mockReturnValueOnce(createQueryChain([{ planned_qty: '10.0000', actual_qty: '12.0000', unit_cost: '5.0000', item_id: 'item-1' }])) // inputs
+      .mockReturnValueOnce(createQueryChain([{ standard_cost: '4.0000' }])) // item standard cost
+      .mockReturnValueOnce(createQueryChain([{ unit_cost: '10.0000' }])); // output cost
 
     const result = await varianceService.calculateVarianceAnalysis('b-1', 'tenant-1', 'user-1');
     expect(mockPostingEngineService.postAutomaticEntry).toHaveBeenCalled();
     expect(result.batch_id).toBe('b-1');
     expect(parseFloat(result.total_variance)).toBeGreaterThan(0);
+  });
+
+  it('should skip standard variance entries for FIFO and BIO_ASSET batches', async () => {
+    mockDb.select
+      .mockReturnValueOnce(createQueryChain([{ batch_id: 'b-fifo', company_id: 'comp-1', batch_no: 'B-FIFO', planned_qty: '100.0000', actual_qty: '100.0000', costing_method: 'FIFO' }]));
+
+    const result = await varianceService.calculateVarianceAnalysis('b-fifo', 'tenant-1', 'user-1');
+    expect(mockPostingEngineService.postAutomaticEntry).not.toHaveBeenCalled();
+    expect(result.total_variance).toBe('0.0000');
   });
 });

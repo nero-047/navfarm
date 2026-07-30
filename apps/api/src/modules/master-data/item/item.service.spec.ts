@@ -14,12 +14,12 @@ describe('ItemService', () => {
   const mockDbUpdate = jest.fn();
   const mockDbDelete = jest.fn();
 
-  const mockDb = {
+  const mockDb: any = {
     select: mockDbSelect,
     insert: mockDbInsert,
     update: mockDbUpdate,
     delete: mockDbDelete,
-    transaction: jest.fn(async (cb) => cb(mockDb)),
+    transaction: jest.fn(async (cb: (db: any) => any) => cb(mockDb)),
   };
 
   beforeEach(async () => {

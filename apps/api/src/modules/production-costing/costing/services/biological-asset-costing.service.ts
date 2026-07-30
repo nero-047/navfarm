@@ -56,8 +56,10 @@ export class BiologicalAssetCostingService {
       else overheadCost += cost;
     }
 
-    const acquisitionCost = pBatch.initial_bird_count * 1.5; // Initial DOC placement cost baseline
-    const grossAssetValue = acquisitionCost + feedCost + laborCost + overheadCost;
+    // Acquisition cost = sum of production_batch_input costs on the production_batch
+    // linked to this poultry batch (actual FIFO/standard GI costs, not a hard-coded rate).
+    const acquisitionCost = feedCost; // Material inputs include DOC/chick purchase costs
+    const grossAssetValue = acquisitionCost + laborCost + overheadCost;
 
     // Calculate Mortality Loss Impact
     const mortalityCount = pBatch.total_mortality;

@@ -19,8 +19,9 @@ import { InventoryModule } from '../inventory-logistics/inventory/inventory.modu
 import { ProductionModule } from '../production-costing/production/production.module';
 import { AuditLogModule } from '../platform-identity/audit-log/audit-log.module';
 
-@Module({
+import { QrPublicController } from './controllers/qr-public.controller';
 
+@Module({
   imports: [
     InventoryModule,
     ProductionModule,
@@ -30,6 +31,7 @@ import { AuditLogModule } from '../platform-identity/audit-log/audit-log.module'
     QualityPlanController,
     QualityInspectionController,
     QrBarcodeController,
+    QrPublicController,
     BatchTraceabilityController,
     FarmToForkController,
     RecallManagementController,

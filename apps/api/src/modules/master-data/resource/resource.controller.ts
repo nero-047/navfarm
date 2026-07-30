@@ -94,8 +94,8 @@ export class ResourceController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.resourceService.remove(id, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 
@@ -186,8 +186,8 @@ export class ResourceController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.resourceService.removeMaintenanceLog(logId, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 }

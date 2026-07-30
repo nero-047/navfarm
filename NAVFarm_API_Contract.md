@@ -128,10 +128,13 @@ POST /auth/mfa/verify → { token, refresh_token }  (each login)
 
 ```http
 Authorization: Bearer <JWT_ACCESS_TOKEN>    # Required on all protected routes
+x-tenant-id: <TENANT_UUID>                  # Optional explicit tenant override header
+x-onboarding-token: <ONBOARDING_TOKEN>      # Required during multi-step setup wizard
 Content-Type: application/json              # Required on POST/PUT/PATCH
 ```
 
-> **Note**: Tenant context is resolved automatically from the JWT `tenantId` claim. No `X-Tenant-Id` header is required on most endpoints. The `tenantId` is embedded in the JWT payload.
+> **Note**: Tenant context is automatically resolved from the JWT `tenantId` claim or `x-tenant-id` header.
+> Unauthenticated public endpoints (e.g. `GET /quality/qr/public/:qrHash` and `POST /auth/login`) do not require the `Authorization` header.
 
 ---
 

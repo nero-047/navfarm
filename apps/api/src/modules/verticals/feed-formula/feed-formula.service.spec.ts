@@ -13,9 +13,9 @@ describe('FeedFormulaService', () => {
   const mockDbInsert = jest.fn();
   const mockDbUpdate = jest.fn();
 
-  const mockTransaction = jest.fn((callback) => callback(mockDb));
+  const mockTransaction = jest.fn((callback: (db: any) => any) => callback(mockDb));
 
-  const mockDb = {
+  const mockDb: any = {
     select: mockDbSelect,
     insert: mockDbInsert,
     update: mockDbUpdate,

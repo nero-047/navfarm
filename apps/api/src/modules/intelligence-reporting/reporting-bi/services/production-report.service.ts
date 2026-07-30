@@ -39,7 +39,7 @@ export class ProductionReportService {
       production_efficiency_pct: efficiencyRate,
       batch_summary: batches.map(b => ({
         batch_id: b.batch_id,
-        batch_number: b.batch_number,
+        batch_number: b.batch_no,   // actual column: batch_no
         status: b.status,
         planned_qty: b.planned_qty,
         actual_qty: b.actual_qty,

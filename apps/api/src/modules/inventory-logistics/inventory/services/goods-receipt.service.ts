@@ -192,14 +192,14 @@ export class GoodsReceiptService {
             receipt.company_id,
             line.item_id,
             line.lot_no,
+            tenantId,
             line.mfg_date || undefined,
             line.expiry_date || undefined,
-            tenantId,
             userId,
             trx
           );
           lotId = lot.lot_id;
-          await this.lotService.updateStock(lotId, line.qty, tenantId, trx);
+          await this.lotService.updateStock(lotId!, line.qty, tenantId, trx);
         }
 
         // 2. Process Serial Master if serial tracked
@@ -214,7 +214,7 @@ export class GoodsReceiptService {
             trx
           );
           serialId = serial.serial_id;
-          await this.serialService.updateStatus(serialId, 'IN_STOCK', tenantId, trx);
+          await this.serialService.updateStatus(serialId!, 'IN_STOCK', tenantId, trx);
         }
 
         // 3. Post to Stock Ledger (which will also update the balance cache)
@@ -264,29 +264,23 @@ export class GoodsReceiptService {
           );
         }
 
-        try {
-          await this.postingEngine.postAutomaticEntry(
-            {
-              company_id: receipt.company_id,
-              item_category_id: item.category_id,
-              transaction_type: 'PURCHASE',
-              amount: parseFloat(line.qty.toString()) * parseFloat(line.unit_cost.toString()),
-              posting_date: receipt.posting_date,
-              ref_doc_type: 'GoodsReceipt',
-              ref_doc_id: receiptId,
-              ref_doc_line_id: line.line_id,
-            },
-            tenantId,
-            userId,
-            trx
-          );
-        } catch (err) {
-          if (err.message && (err.message.includes('GL Mapping') || err.message.includes('No active Accounting Period'))) {
-            console.warn(`[Finance Integration Warning]: ${err.message}`);
-          } else {
-            throw err;
-          }
-        }
+        const transactionType = receipt.receipt_type === 'PRODUCTION' ? 'OUTPUT' : 'PURCHASE';
+        await this.postingEngine.postAutomaticEntry(
+          {
+            company_id: receipt.company_id,
+            item_category_id: item.category_id,
+            valuation_method: item.valuation_method || undefined,
+            transaction_type: transactionType,
+            amount: parseFloat(line.qty.toString()) * parseFloat(line.unit_cost.toString()),
+            posting_date: receipt.posting_date,
+            ref_doc_type: 'GoodsReceipt',
+            ref_doc_id: receiptId,
+            ref_doc_line_id: line.line_id,
+          },
+          tenantId,
+          userId,
+          trx
+        );
       }
 
       // Update document status to POSTED

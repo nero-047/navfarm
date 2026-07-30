@@ -4,6 +4,7 @@ import { LayerService } from './services/layer.service';
 import { HatcheryService } from './services/hatchery.service';
 import { BroilerService } from './services/broiler.service';
 import { SlaughterService } from './services/slaughter.service';
+import { SlaughterCostSplitService } from './services/slaughter-cost-split.service';
 import { PoultryKpiService } from './services/poultry-kpi.service';
 import { ProductionBatchService } from '../../production-costing/production/services/production-batch.service';
 import { BatchMaterialService } from '../../production-costing/production/services/batch-material.service';
@@ -25,8 +26,11 @@ describe('Poultry Industry Vertical Unit Tests', () => {
     limit: jest.fn().mockResolvedValue([]),
     insert: jest.fn().mockReturnThis(),
     values: jest.fn().mockResolvedValue({}),
-    update: jest.fn().mockReturnThis(),
-    set: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue({}),
+      }),
+    }),
   };
 
   const mockClsService = {
@@ -47,6 +51,14 @@ describe('Poultry Industry Vertical Unit Tests', () => {
     log: jest.fn().mockResolvedValue(true),
   };
 
+  const mockSlaughterCostSplitService = {
+    getCostSplitConfigs: jest.fn().mockResolvedValue([
+      { item_id: 'item-breast', cost_split_pct: '50.00' },
+      { item_id: 'item-wings', cost_split_pct: '30.00' },
+      { item_id: 'item-offal', cost_split_pct: '20.00' },
+    ]),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -56,6 +68,7 @@ describe('Poultry Industry Vertical Unit Tests', () => {
         BroilerService,
         SlaughterService,
         PoultryKpiService,
+        { provide: SlaughterCostSplitService, useValue: mockSlaughterCostSplitService },
         { provide: ClsService, useValue: mockClsService },
         { provide: ProductionBatchService, useValue: mockProductionBatchService },
         { provide: BatchMaterialService, useValue: mockBatchMaterialService },
@@ -144,5 +157,29 @@ describe('Poultry Industry Vertical Unit Tests', () => {
     const result = await slaughterService.recordSlaughterYield(dto, 'tenant-1', 'user-1');
     expect(mockBatchMaterialService.receiveBatchOutput).toHaveBeenCalled();
     expect(result.yield_pct).toBe('75.00');
+  });
+
+  it('should record multi-output slaughter joint-cost allocation for carcass, wings, and offal', async () => {
+    mockDb.limit.mockResolvedValue([{ poultry_batch_id: 'pb-1', production_batch_id: 'prod-b-123' }]);
+
+    const dto = {
+      company_id: 'comp-1',
+      poultry_batch_id: 'pb-1',
+      warehouse_id: 'wh-plant',
+      location_id: 'loc-fg',
+      slaughter_date: '2026-08-25',
+      live_birds_received: 5000,
+      total_live_weight_kg: 10000,
+      outputs: [
+        { item_id: 'item-breast', uom_id: 'uom-kg', output_type: 'FINISHED_GOOD' as const, qty_kg: 4000 },
+        { item_id: 'item-wings', uom_id: 'uom-kg', output_type: 'FINISHED_GOOD' as const, qty_kg: 2000 },
+        { item_id: 'item-offal', uom_id: 'uom-kg', output_type: 'OFFAL' as const, qty_kg: 1500 },
+      ],
+    };
+
+    const result = await slaughterService.recordMultiOutputSlaughterYield(dto, 'tenant-1', 'user-1');
+    expect(mockBatchMaterialService.receiveBatchOutput).toHaveBeenCalledTimes(3);
+    expect(result.outputs.length).toBe(3);
+    expect(result.slaughter.yield_pct).toBe('75.00');
   });
 });

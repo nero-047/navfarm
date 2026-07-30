@@ -275,29 +275,22 @@ export class GoodsIssueService {
           })
           .where(eq(schema.inventoryLedger.ledger_id, ledgerId));
 
-        try {
-          await this.postingEngine.postAutomaticEntry(
-            {
-              company_id: issue.company_id,
-              item_category_id: item.category_id,
-              transaction_type: 'CONSUMPTION',
-              amount: totalValue,
-              posting_date: issue.posting_date,
-              ref_doc_type: 'GoodsIssue',
-              ref_doc_id: issueId,
-              ref_doc_line_id: line.line_id,
-            },
-            tenantId,
-            userId,
-            trx
-          );
-        } catch (err) {
-          if (err.message && (err.message.includes('GL Mapping') || err.message.includes('No active Accounting Period'))) {
-            console.warn(`[Finance Integration Warning]: ${err.message}`);
-          } else {
-            throw err;
-          }
-        }
+        await this.postingEngine.postAutomaticEntry(
+          {
+            company_id: issue.company_id,
+            item_category_id: item.category_id,
+            valuation_method: item.valuation_method || undefined,
+            transaction_type: 'CONSUMPTION',
+            amount: totalValue,
+            posting_date: issue.posting_date,
+            ref_doc_type: 'GoodsIssue',
+            ref_doc_id: issueId,
+            ref_doc_line_id: line.line_id,
+          },
+          tenantId,
+          userId,
+          trx
+        );
       }
 
       // Update document status to POSTED

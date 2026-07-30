@@ -12,6 +12,7 @@ import { Step8ModulesDto } from './dto/step8-modules.dto';
 import { CreateNobDto, UpdateNobDto, CreateLobDto, UpdateLobDto } from './dto/nob-lob.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { SystemAdminGuard } from '../../../common/guards/system-admin.guard';
+import { OnboardingAccessGuard } from '../../../common/guards/onboarding-access.guard';
 
 @ApiTags('Onboarding Setup Wizard')
 @Controller('setup/wizard')
@@ -19,6 +20,7 @@ export class SetupWizardController {
   constructor(private readonly wizardService: SetupWizardService) {}
 
   @Post('upload-logo')
+  @UseGuards(OnboardingAccessGuard)
   @ApiOperation({ summary: 'Upload Company Logo image file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -58,14 +60,23 @@ export class SetupWizardController {
   }
 
   @Post('step-1')
-  @ApiOperation({ summary: 'Step 1: Save Company legal Profile info' })
+  @ApiOperation({ summary: 'Step 1: Create a Company profile and issue a short-lived onboarding access token' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Step completed.' })
   async saveStep1(@Body() dto: Step1ProfileDto) {
-    return this.wizardService.saveStep1Profile(dto);
+    return this.wizardService.startOnboarding(dto);
   }
 
+  @Put('step-1')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Step 1: Update the Company profile bound to the onboarding access token' })
+  async updateStep1(@Body() dto: Step1ProfileDto) {
+    return this.wizardService.updateStep1Profile(dto);
+  }
 
   @Post('step-2')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Step 2: Save Company registered Address' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Step completed.' })
   async saveStep2(@Body() dto: Step2AddressDto) {
@@ -73,6 +84,8 @@ export class SetupWizardController {
   }
 
   @Post('step-3')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Step 3: Save Company key Contacts' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Step completed.' })
   async saveStep3(@Body() dto: Step3ContactDto) {
@@ -80,6 +93,8 @@ export class SetupWizardController {
   }
 
   @Post('step-4/:companyId/:langId')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Step 4: Save default Language selection' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'langId', description: 'Language Master UUID' })
@@ -89,6 +104,8 @@ export class SetupWizardController {
   }
 
   @Post('step-5/:companyId/:currencyId')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Step 5: Save default Base Accounting Currency selection' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'currencyId', description: 'Currency Master UUID' })
@@ -98,6 +115,8 @@ export class SetupWizardController {
   }
 
   @Post('step-6/:companyId/:timezoneId/:countryId')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Step 6: Save default Timezone and Region references' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'timezoneId', description: 'Timezone identifier (e.g., Asia/Kolkata)' })
@@ -112,6 +131,8 @@ export class SetupWizardController {
   }
 
   @Post('step-7')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Step 7: Save Fiscal calendars & Inventory costing standard models' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Step completed.' })
   async saveStep7(@Body() dto: Step7FiscalDto) {
@@ -119,6 +140,8 @@ export class SetupWizardController {
   }
 
   @Post('step-8/:companyId')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Step 8: Save list of enabled module codes' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   async saveStep8(@Param('companyId') companyId: string, @Body() dto: Step8ModulesDto) {
@@ -126,6 +149,8 @@ export class SetupWizardController {
   }
 
   @Get('status/:companyId')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Fetch checklist status logs of Steps 1 to 15' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   async getStatus(@Param('companyId') companyId: string) {
@@ -133,6 +158,8 @@ export class SetupWizardController {
   }
 
   @Post('complete/:companyId')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Validate steps 1-9 and complete setup wizard, unlocking dashboard' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   async completeWizard(@Param('companyId') companyId: string) {
@@ -140,6 +167,8 @@ export class SetupWizardController {
   }
 
   @Get('company-details/:companyId')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Retrieve all configuration details of all 8 steps for a company' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   async getCompanySetupDetails(@Param('companyId') companyId: string) {

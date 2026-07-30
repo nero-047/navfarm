@@ -31,7 +31,10 @@ describe('CompanyService', () => {
         {
           provide: ClsService,
           useValue: {
-            get: jest.fn().mockReturnValue(mockDb),
+            get: jest.fn().mockImplementation((key: string) => {
+              if (key === 'tenantId') return 'tenant-123';
+              return mockDb;
+            }),
           },
         },
         {

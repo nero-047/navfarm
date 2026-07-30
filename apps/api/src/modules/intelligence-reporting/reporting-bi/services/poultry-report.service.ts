@@ -57,9 +57,9 @@ export class PoultryReportService {
       flocks_summary: poultryBatches.map(pb => ({
         poultry_batch_id: pb.poultry_batch_id,
         production_batch_id: pb.production_batch_id,
-        flock_type: pb.flock_type,
+        flock_type: pb.batch_type,           // actual column: batch_type
         current_bird_count: pb.current_bird_count,
-        fcr_ratio: pb.fcr_ratio,
+        fcr_ratio: null,                     // not stored on poultry_batch; computed from daily entries
       })),
     };
   }

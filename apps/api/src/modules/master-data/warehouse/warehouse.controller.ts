@@ -86,8 +86,8 @@ export class WarehouseController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.warehouseService.remove(id, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 

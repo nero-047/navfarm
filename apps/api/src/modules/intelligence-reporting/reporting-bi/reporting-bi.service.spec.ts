@@ -97,12 +97,15 @@ describe('Enterprise Reporting & Business Intelligence Engine Unit Tests', () =>
   });
 
   it('should generate financial P&L statement report', async () => {
-    mockDb.select.mockReturnValueOnce(
-      createQueryChain([
-        { account_id: 'a-1', account_type: 'REVENUE', balance_debit: '0.00', balance_credit: '10000.00' },
-        { account_id: 'a-2', account_type: 'EXPENSE', balance_debit: '6000.00', balance_credit: '0.00' },
-      ])
-    );
+    mockDb.select
+      .mockReturnValueOnce(
+        createQueryChain([
+          { gl_account_id: 'a-1', account_type: 'REVENUE' },
+          { gl_account_id: 'a-2', account_type: 'EXPENSE' },
+        ])
+      )
+      .mockReturnValueOnce(createQueryChain([{ totalDebits: '0.00', totalCredits: '10000.00' }]))
+      .mockReturnValueOnce(createQueryChain([{ totalDebits: '6000.00', totalCredits: '0.00' }]));
 
     const report = await finReportService.getProfitAndLossReport('comp-1', 'tenant-1');
     expect(report.total_revenue).toBe(10000.0);

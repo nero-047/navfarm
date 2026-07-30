@@ -4,17 +4,26 @@ import { eq, and, isNull, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../../core/database/schema';
+import * as masterSchema from '../../../../core/database/master-schema';
+import { MASTER_CONNECTION } from '../../../../core/database/database.module';
+import { Inject } from '@nestjs/common';
 import { AuditLogService } from '../../../platform-identity/audit-log/audit-log.service';
-import { CreateProductionBatchDto, BatchStatusEnum } from '../dto/production-batch.dto';
+import { CreateProductionBatchDto, UpdateProductionBatchDto, BatchStatusEnum } from '../dto/production-batch.dto';
 import { RecordDailyProductionDto } from '../dto/daily-entry.dto';
 import { AddResourceUsageDto } from '../dto/resource-usage.dto';
 import { QueryProductionDto } from '../dto/query-production.dto';
+
+/** Costing methods allowed per LOB costing_method_allowed field */
+const VALID_COSTING_METHODS = ['STANDARD', 'FIFO', 'BIO_ASSET'] as const;
+type CostingMethod = typeof VALID_COSTING_METHODS[number];
 
 @Injectable()
 export class ProductionBatchService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    @Inject(MASTER_CONNECTION)
+    private readonly masterDb: MySql2Database<typeof masterSchema>,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -25,8 +34,72 @@ export class ProductionBatchService {
     return tenantDb;
   }
 
+  /**
+   * Validate that (a) the NOB exists, (b) the LOB belongs to that NOB, and
+   * (c) the chosen costing method is listed in LOB.costing_method_allowed.
+   */
+  private async validateNobLobCosting(
+    nobId: string,
+    lobId: string,
+    costingMethod: string,
+  ): Promise<void> {
+    // NOB must exist in master
+    const [nob] = await this.masterDb
+      .select({ nob_id: masterSchema.nobMaster.nob_id })
+      .from(masterSchema.nobMaster)
+      .where(and(eq(masterSchema.nobMaster.nob_id, nobId), eq(masterSchema.nobMaster.is_active, true)))
+      .limit(1);
+
+    if (!nob) {
+      throw new BadRequestException(`NOB with ID '${nobId}' not found or inactive.`);
+    }
+
+    // LOB must belong to that NOB
+    const [lob] = await this.masterDb
+      .select({
+        lob_id: masterSchema.lobMaster.lob_id,
+        costing_method_allowed: masterSchema.lobMaster.costing_method_allowed,
+      })
+      .from(masterSchema.lobMaster)
+      .where(
+        and(
+          eq(masterSchema.lobMaster.lob_id, lobId),
+          eq(masterSchema.lobMaster.nob_id, nobId),
+          eq(masterSchema.lobMaster.is_active, true),
+        ),
+      )
+      .limit(1);
+
+    if (!lob) {
+      throw new BadRequestException(`LOB with ID '${lobId}' not found, inactive, or does not belong to NOB '${nobId}'.`);
+    }
+
+    // Costing method must be a recognised value
+    if (!VALID_COSTING_METHODS.includes(costingMethod as CostingMethod)) {
+      throw new BadRequestException(
+        `Invalid costing method '${costingMethod}'. Must be one of: ${VALID_COSTING_METHODS.join(', ')}.`,
+      );
+    }
+
+    // Costing method must be in the LOB's allowed list
+    // costing_method_allowed is stored as a single value or comma-separated string
+    const allowed = lob.costing_method_allowed.split(',').map(s => s.trim().toUpperCase());
+    if (!allowed.includes(costingMethod.toUpperCase())) {
+      throw new BadRequestException(
+        `Costing method '${costingMethod}' is not allowed for LOB '${lobId}'. Allowed: ${lob.costing_method_allowed}.`,
+      );
+    }
+  }
+
   async createBatch(dto: CreateProductionBatchDto, tenantId: string, userId?: string) {
-    // 1. Validate uniqueness of batch_no
+    // 1. Validate NOB/LOB/costing method (Task 1 — Phase 4)
+    if (dto.nob_id && dto.lob_id && dto.costing_method) {
+      await this.validateNobLobCosting(dto.nob_id, dto.lob_id, dto.costing_method);
+    } else if (dto.nob_id || dto.lob_id) {
+      throw new BadRequestException('Both nob_id and lob_id are required when either is provided.');
+    }
+
+    // 2. Validate uniqueness of batch_no
     const [existing] = await this.db
       .select()
       .from(schema.productionBatch)
@@ -53,6 +126,11 @@ export class ProductionBatchService {
       batch_no: dto.batch_no,
       parent_batch_id: dto.parent_batch_id || null,
       formula_id: dto.formula_id || null,
+      // NOB/LOB/costing dimensions — snapshotted at creation, immutable after postings begin
+      nob_id: dto.nob_id || null,
+      lob_id: dto.lob_id || null,
+      stage: dto.stage || null,
+      costing_method: (dto.costing_method || 'STANDARD').toUpperCase(),
       farm_id: dto.farm_id || null,
       shed_id: dto.shed_id || null,
       warehouse_id: dto.warehouse_id,
@@ -140,6 +218,55 @@ export class ProductionBatchService {
       .orderBy(desc(schema.productionBatch.created_at))
       .limit(limit)
       .offset(offset);
+  }
+
+  async updateBatch(batchId: string, dto: UpdateProductionBatchDto, tenantId: string, userId?: string) {
+    const batch = await this.findBatchById(batchId, tenantId);
+
+    if (dto.costing_method && dto.costing_method.toUpperCase() !== batch.costing_method) {
+      // Check if operational postings have begun (inputs, resource usage, or status beyond DRAFT/PLANNED)
+      const inputs = await this.db
+        .select()
+        .from(schema.productionBatchInput)
+        .where(eq(schema.productionBatchInput.batch_id, batchId))
+        .limit(1);
+
+      const isPostingsBegan = inputs.length > 0 || !['DRAFT', 'PLANNED'].includes(batch.status);
+      if (isPostingsBegan) {
+        throw new BadRequestException('Costing method cannot be changed after operational postings begin.');
+      }
+
+      if (batch.nob_id && batch.lob_id) {
+        await this.validateNobLobCosting(batch.nob_id, batch.lob_id, dto.costing_method);
+      }
+    }
+
+    const updates: Partial<typeof schema.productionBatch.$inferInsert> = {
+      updated_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    };
+
+    if (dto.costing_method) updates.costing_method = dto.costing_method.toUpperCase();
+    if (dto.stage) updates.stage = dto.stage;
+    if (dto.planned_qty !== undefined) updates.planned_qty = dto.planned_qty.toFixed(4);
+    if (dto.notes !== undefined) updates.notes = dto.notes;
+
+    await this.db
+      .update(schema.productionBatch)
+      .set(updates)
+      .where(eq(schema.productionBatch.batch_id, batchId));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: batch.company_id,
+      userId,
+      action: 'UPDATE',
+      entityName: 'production_batch',
+      entityId: batchId,
+      oldValues: batch,
+      newValues: updates,
+    });
+
+    return this.findBatchById(batchId, tenantId);
   }
 
   // --- LIFE-CYCLE STATE MACHINE TRANSITIONS ---

@@ -71,7 +71,7 @@ export class CreateFeedFormulaDto {
 
   @ApiProperty({ type: [CreateFormulaIngredientDto], description: 'List of ingredients in this formula' })
   @IsArray()
-  @ValidateNested({ generosity: true })
+  @ValidateNested({ each: true })
   @Type(() => CreateFormulaIngredientDto)
   ingredients: CreateFormulaIngredientDto[];
 

@@ -86,8 +86,8 @@ export class SupplierController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.supplierService.remove(id, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 

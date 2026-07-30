@@ -36,7 +36,7 @@ export class FiscalController {
   }
 
   @Post('year/:id/close')
-  @RequirePermission('FINANCE', 'FISCAL', 'update')
+  @RequirePermission('FINANCE', 'FISCAL', 'edit')
   @ApiOperation({ summary: 'Close a Fiscal Year and lock all monthly periods' })
   @ApiParam({ name: 'id', description: 'Fiscal Year UUID' })
   async closeFiscalYear(@Param('id') id: string, @Req() req: any) {
@@ -50,7 +50,7 @@ export class FiscalController {
   }
 
   @Post('period/:id/close')
-  @RequirePermission('FINANCE', 'FISCAL', 'update')
+  @RequirePermission('FINANCE', 'FISCAL', 'edit')
   @ApiOperation({ summary: 'Lock a specific Accounting Period to prevent postings' })
   @ApiParam({ name: 'id', description: 'Accounting Period UUID' })
   async closePeriod(@Param('id') id: string, @Req() req: any) {
@@ -64,7 +64,7 @@ export class FiscalController {
   }
 
   @Post('period/:id/reopen')
-  @RequirePermission('FINANCE', 'FISCAL', 'update')
+  @RequirePermission('FINANCE', 'FISCAL', 'edit')
   @ApiOperation({ summary: 'Unlock a specific locked Accounting Period' })
   @ApiParam({ name: 'id', description: 'Accounting Period UUID' })
   async reopenPeriod(@Param('id') id: string, @Req() req: any) {

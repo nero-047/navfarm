@@ -41,7 +41,7 @@ export class InventoryReportService {
         item_code: i.item_code,
         item_name: i.item_name,
         standard_cost: i.standard_cost,
-        average_cost: i.average_cost,
+        average_cost: i.standard_cost,
       })),
     };
   }
@@ -57,20 +57,20 @@ export class InventoryReportService {
         )
       );
 
-    const lots = await this.db
+    const layers = await this.db
       .select()
-      .from(schema.lotMaster)
-      .where(eq(schema.lotMaster.tenant_id, tenantId));
+      .from(schema.fifoLayer)
+      .where(eq(schema.fifoLayer.tenant_id, tenantId));
 
     let totalValuation = 0;
-    const valuationLayers = lots.map(l => {
-      const qty = parseFloat(l.remaining_qty);
-      const unitCost = parseFloat(l.unit_cost);
+    const valuationLayers = layers.map(l => {
+      const qty = parseFloat((l as any).qty_remaining || (l as any).remaining_qty || '0');
+      const unitCost = parseFloat(l.unit_cost || '0');
       const totalCost = qty * unitCost;
       totalValuation += totalCost;
 
       return {
-        lot_number: l.lot_number,
+        layer_id: l.layer_id,
         item_id: l.item_id,
         remaining_qty: qty,
         unit_cost: unitCost,

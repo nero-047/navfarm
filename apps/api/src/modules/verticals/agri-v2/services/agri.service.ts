@@ -453,7 +453,7 @@ export class AgriV2Service {
     return {
       kpis: {
         total_crop_plans: plans.length,
-        active_plans: plans.filter(p => ['SOWING', 'GROWING'].includes(p.plan_status)).length,
+        active_plans: plans.filter(p => ['SOWING', 'GROWING'].includes(p.plan_status ?? '')).length,
         harvested_plans: harvestedPlans.length,
         total_yield_kg: totalYieldKg,
         avg_yield_per_acre_kg: parseFloat(avgYieldPerAcre.toFixed(2)),

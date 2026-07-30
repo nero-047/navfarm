@@ -35,6 +35,8 @@ export class CurrencyController {
   }
 
   @Post('rate')
+  @UseGuards(JwtAuthGuard, SystemAdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Register conversion exchange rate' })
   async updateExchangeRate(@Body() body: UpdateExchangeRateDto) {
     return this.currencyService.updateExchangeRate(
@@ -46,6 +48,8 @@ export class CurrencyController {
   }
 
   @Put('rate/:id')
+  @UseGuards(JwtAuthGuard, SystemAdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an existing exchange rate by ID' })
   @ApiParam({ name: 'id', description: 'Exchange Rate UUID' })
   async updateExchangeRateById(
@@ -56,6 +60,8 @@ export class CurrencyController {
   }
 
   @Delete('rate/:id')
+  @UseGuards(JwtAuthGuard, SystemAdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete an exchange rate entry by ID' })
   @ApiParam({ name: 'id', description: 'Exchange Rate UUID' })
   async deleteExchangeRateById(@Param('id') id: string) {

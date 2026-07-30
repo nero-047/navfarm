@@ -86,8 +86,8 @@ export class FeedFormulaController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.feedFormulaService.remove(id, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 
@@ -122,7 +122,7 @@ export class FeedFormulaController {
   async removeIngredient(@Param('ingredientId') ingredientId: string, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.feedFormulaService.removeIngredientLine(ingredientId, tenantId, req.user);
-    return { success: true, ...result };
+    return { ...result, success: true };
   }
 
   @Post(':id/version')

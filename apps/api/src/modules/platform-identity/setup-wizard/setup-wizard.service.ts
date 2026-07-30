@@ -1,6 +1,7 @@
-import { Injectable, OnModuleInit, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, OnModuleInit, Inject, BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -19,6 +20,7 @@ export class SetupWizardService implements OnModuleInit {
     private readonly masterDb: MySql2Database<typeof masterSchema>,
     private readonly cls: ClsService,
     private readonly auditLogService: AuditLogService,
+    private readonly jwtService: JwtService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -27,6 +29,30 @@ export class SetupWizardService implements OnModuleInit {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  private get activeTenantId(): string {
+    const tenantId = this.cls.get<string>('tenantId');
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant context is required for onboarding.');
+    }
+    return tenantId;
+  }
+
+  private async assertCompanyInActiveTenant(companyId: string) {
+    const [company] = await this.db
+      .select()
+      .from(schema.companyMaster)
+      .where(and(
+        eq(schema.companyMaster.company_id, companyId),
+        eq(schema.companyMaster.tenant_id, this.activeTenantId),
+      ))
+      .limit(1);
+
+    if (!company) {
+      throw new NotFoundException(`Company profile with ID '${companyId}' was not found in the active tenant.`);
+    }
+    return company;
   }
 
   async onModuleInit() {
@@ -42,23 +68,55 @@ export class SetupWizardService implements OnModuleInit {
     }
   }
 
-  async saveStep1Profile(dto: Step1ProfileDto) {
+  async startOnboarding(dto: Step1ProfileDto) {
+    if (dto.company_id) {
+      throw new BadRequestException('Use PUT /setup/wizard/step-1 with the onboarding access token to update a company profile.');
+    }
+
+    const company = await this.saveStep1Profile(dto);
+    const onboardingAccessToken = await this.jwtService.signAsync({
+      purpose: 'ONBOARDING_SETUP',
+      tenantId: company.tenant_id,
+      companyId: company.company_id,
+    }, { expiresIn: '4h' });
+
+    return { ...company, onboarding_access_token: onboardingAccessToken };
+  }
+
+  async updateStep1Profile(dto: Step1ProfileDto) {
+    if (!dto.company_id) {
+      throw new BadRequestException('company_id is required when updating the company profile.');
+    }
+    await this.assertCompanyInActiveTenant(dto.company_id);
+    return this.saveStep1Profile(dto);
+  }
+
+  private async saveStep1Profile(dto: Step1ProfileDto) {
+    if (dto.tenant_id !== this.activeTenantId) {
+      throw new ForbiddenException('Company setup must use the active tenant context.');
+    }
+
     const existing = dto.company_id
       ? await this.db
           .select()
           .from(schema.companyMaster)
-          .where(eq(schema.companyMaster.company_id, dto.company_id))
+          .where(and(
+            eq(schema.companyMaster.company_id, dto.company_id),
+            eq(schema.companyMaster.tenant_id, this.activeTenantId),
+          ))
           .limit(1)
       : await this.db
           .select()
           .from(schema.companyMaster)
-          .where(
-            or(
-              and(eq(schema.companyMaster.tenant_id, dto.tenant_id), eq(schema.companyMaster.company_code, dto.company_code.toUpperCase())),
-              eq(schema.companyMaster.company_id, '00000000-0000-0000-0000-000000000000')
-            )
-          )
+          .where(and(
+            eq(schema.companyMaster.tenant_id, dto.tenant_id),
+            eq(schema.companyMaster.company_code, dto.company_code.toUpperCase()),
+          ))
           .limit(1);
+
+    if (!dto.company_id && existing.length > 0) {
+      throw new ConflictException(`Company with code '${dto.company_code.toUpperCase()}' already exists in this tenant.`);
+    }
 
     return this.db.transaction(async (tx) => {
       let company;
@@ -172,6 +230,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async saveStep2Address(dto: Step2AddressDto) {
+    await this.assertCompanyInActiveTenant(dto.company_id);
     await this.db.transaction(async (tx) => {
       const existing = await tx
         .select()
@@ -218,6 +277,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async saveStep3Contact(dto: Step3ContactDto) {
+    await this.assertCompanyInActiveTenant(dto.company_id);
     await this.db.transaction(async (tx) => {
       const existing = await tx
         .select()
@@ -260,6 +320,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async saveStep4Language(companyId: string, langId: string) {
+    await this.assertCompanyInActiveTenant(companyId);
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.companyMaster)
@@ -272,6 +333,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async saveStep5Currency(companyId: string, currencyId: string) {
+    await this.assertCompanyInActiveTenant(companyId);
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.companyMaster)
@@ -284,6 +346,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async saveStep6Timezone(companyId: string, timezoneId: string, countryId: string) {
+    await this.assertCompanyInActiveTenant(companyId);
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.companyMaster)
@@ -296,6 +359,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async saveStep7Fiscal(dto: Step7FiscalDto) {
+    await this.assertCompanyInActiveTenant(dto.company_id);
     await this.db.transaction(async (tx) => {
       const existing = await tx
         .select()
@@ -345,6 +409,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async saveStep8Modules(companyId: string, modules: string[]) {
+    await this.assertCompanyInActiveTenant(companyId);
     const modulesList = modules || [];
     await this.db.transaction(async (tx) => {
       // Clear old module configs
@@ -368,6 +433,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async getWizardStatus(companyId: string) {
+    await this.assertCompanyInActiveTenant(companyId);
     const steps = await this.db
       .select()
       .from(schema.setupStepMaster)
@@ -392,11 +458,18 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async completeWizard(companyId: string) {
+    await this.assertCompanyInActiveTenant(companyId);
     const stepsStatus = await this.getWizardStatus(companyId);
-    
-    // Check steps 1 to 8 (mandatory setup configuration)
+
+    // Decision record: The PDF narrative and the code treat steps 1–9 as the mandatory
+    // foundation. The Final_Docs workbook marks steps 11 (CHART_OF_ACCOUNTS) and 12
+    // (NOB_LOB_CONFIG) as also mandatory. We preserve 1–9 as the hard gate for dashboard
+    // unlock because steps 11–12 require GL and LOB data that may not be available at
+    // first launch. Steps 11–12 are seeded as optional (is_mandatory=false) and can be
+    // enforced by company policy. If this decision is revisited, change the filter below
+    // to include is_mandatory=true regardless of step_order.
     const pendingMandatory = stepsStatus.filter(
-      (s) => s.isMandatory && s.stepOrder < 9 && s.status !== 'COMPLETED',
+      (s) => s.isMandatory && s.stepOrder <= 9 && s.status !== 'COMPLETED',
     );
 
     if (pendingMandatory.length > 0) {
@@ -490,6 +563,7 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async getCompanySetupDetails(companyId: string) {
+    await this.assertCompanyInActiveTenant(companyId);
     const [company] = await this.db
       .select()
       .from(schema.companyMaster)

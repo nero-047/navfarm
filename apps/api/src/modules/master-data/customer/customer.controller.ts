@@ -86,8 +86,8 @@ export class CustomerController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.customerService.remove(id, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 

@@ -5,6 +5,26 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../../core/database/schema';
 import { LedgerService } from './ledger.service';
 
+export interface PostAutomaticEntryParams {
+  company_id: string;
+  nob_id?: string | null;
+  lob_id?: string | null;
+  stage?: string | null;
+  event_type?: string | null;
+  item_category_id?: string | null;
+  item_posting_group?: string | null;
+  valuation_method?: string | null;
+  transaction_type: string; // PURCHASE, CONSUMPTION, OUTPUT, SALE, ADJUSTMENT, MORTALITY, VARIANCE, WIP_TRANSFER, BATCH_CLOSE
+  amount: number;
+  posting_date: string;
+  ref_doc_type: string;
+  ref_doc_id: string;
+  ref_doc_line_id?: string | null;
+  cost_center_id?: string | null;
+  dimension_values?: Record<string, string> | null;
+  notes?: string | null;
+}
+
 @Injectable()
 export class PostingEngineService {
   constructor(
@@ -21,19 +41,7 @@ export class PostingEngineService {
   }
 
   async postAutomaticEntry(
-    params: {
-      company_id: string;
-      item_category_id?: string | null;
-      transaction_type: string; // PURCHASE, CONSUMPTION, OUTPUT, SALE, ADJUSTMENT, etc.
-      amount: number;
-      posting_date: string;
-      ref_doc_type: string;
-      ref_doc_id: string;
-      ref_doc_line_id?: string | null;
-      cost_center_id?: string | null;
-      dimension_values?: Record<string, string> | null;
-      notes?: string | null;
-    },
+    params: PostAutomaticEntryParams,
     tenantId: string,
     userId?: string,
     tx?: any
@@ -45,7 +53,7 @@ export class PostingEngineService {
       return { success: true, message: 'Zero-amount operational transaction skipped for financial posting.' };
     }
 
-    // FIX-032 (GAP-043): Validate posting_date falls within an OPEN accounting period
+    // Validate posting_date falls within an OPEN accounting period
     const allPeriods = await trx
       .select()
       .from(schema.accountingPeriod)
@@ -68,50 +76,53 @@ export class PostingEngineService {
       }
     }
 
-    // 1. Resolve GL Mapping rules
-    let mapping: typeof schema.glMappingMaster.$inferSelect | undefined;
-
-    // A. Attempt to find specific category mapping first
-    if (params.item_category_id) {
-      [mapping] = await trx
-        .select()
-        .from(schema.glMappingMaster)
-        .where(
-          and(
-            eq(schema.glMappingMaster.tenant_id, tenantId),
-            eq(schema.glMappingMaster.company_id, params.company_id),
-            eq(schema.glMappingMaster.item_category_id, params.item_category_id),
-            eq(schema.glMappingMaster.transaction_type, params.transaction_type),
-            eq(schema.glMappingMaster.is_active, true),
-            isNull(schema.glMappingMaster.deleted_at)
-          )
+    // 1. Resolve GL Mapping rules using multi-level context specificity matching
+    const allCandidateRules = await trx
+      .select()
+      .from(schema.glMappingMaster)
+      .where(
+        and(
+          eq(schema.glMappingMaster.tenant_id, tenantId),
+          eq(schema.glMappingMaster.company_id, params.company_id),
+          eq(schema.glMappingMaster.transaction_type, params.transaction_type.toUpperCase()),
+          eq(schema.glMappingMaster.is_active, true),
+          isNull(schema.glMappingMaster.deleted_at)
         )
-        .limit(1);
-    }
+      );
 
-    // B. Fallback to general/company-wide mapping if no category mapping found
-    if (!mapping) {
-      [mapping] = await trx
-        .select()
-        .from(schema.glMappingMaster)
-        .where(
-          and(
-            eq(schema.glMappingMaster.tenant_id, tenantId),
-            eq(schema.glMappingMaster.company_id, params.company_id),
-            isNull(schema.glMappingMaster.item_category_id),
-            eq(schema.glMappingMaster.transaction_type, params.transaction_type),
-            eq(schema.glMappingMaster.is_active, true),
-            isNull(schema.glMappingMaster.deleted_at)
-          )
-        )
-        .limit(1);
-    }
+    // Filter rules matching the specified context (or rule has null for wildcard)
+    const matchingRules = allCandidateRules.filter(rule => {
+      if (rule.nob_id && params.nob_id && rule.nob_id !== params.nob_id) return false;
+      if (rule.lob_id && params.lob_id && rule.lob_id !== params.lob_id) return false;
+      if (rule.stage && params.stage && rule.stage.toUpperCase() !== params.stage.toUpperCase()) return false;
+      if (rule.event_type && params.event_type && rule.event_type.toUpperCase() !== params.event_type.toUpperCase()) return false;
+      if (rule.item_category_id && params.item_category_id && rule.item_category_id !== params.item_category_id) return false;
+      if (rule.item_posting_group && params.item_posting_group && rule.item_posting_group.toUpperCase() !== params.item_posting_group.toUpperCase()) return false;
+      if (rule.valuation_method && params.valuation_method && rule.valuation_method.toUpperCase() !== params.valuation_method.toUpperCase()) return false;
+      return true;
+    });
 
-    if (!mapping) {
+    if (matchingRules.length === 0) {
       throw new BadRequestException(
         `GL Mapping rule not configured for Transaction Type '${params.transaction_type}' in this company.`
       );
     }
+
+    // Rank matching rules by specificity score (higher matches = more specific rule wins)
+    const scoredRules = matchingRules.map(rule => {
+      let score = 0;
+      if (rule.nob_id && rule.nob_id === params.nob_id) score += 10;
+      if (rule.lob_id && rule.lob_id === params.lob_id) score += 10;
+      if (rule.stage && params.stage && rule.stage.toUpperCase() === params.stage.toUpperCase()) score += 5;
+      if (rule.event_type && params.event_type && rule.event_type.toUpperCase() === params.event_type.toUpperCase()) score += 5;
+      if (rule.item_category_id && rule.item_category_id === params.item_category_id) score += 5;
+      if (rule.item_posting_group && params.item_posting_group && rule.item_posting_group.toUpperCase() === params.item_posting_group.toUpperCase()) score += 5;
+      if (rule.valuation_method && params.valuation_method && rule.valuation_method.toUpperCase() === params.valuation_method.toUpperCase()) score += 5;
+      return { rule, score };
+    });
+
+    scoredRules.sort((a, b) => b.score - a.score);
+    const mapping = scoredRules[0].rule;
 
     const debitAccount = mapping.debit_gl_account_id;
     const creditAccount = mapping.credit_gl_account_id;

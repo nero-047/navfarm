@@ -29,6 +29,8 @@ export class LanguageController {
   }
 
   @Post('translation')
+  @UseGuards(JwtAuthGuard, SystemAdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Register/Update translation record' })
   async addTranslation(@Body() body: AddTranslationDto) {
     return this.languageService.addTranslation(body.langId, body.moduleCode, body.key, body.value);

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq } from 'drizzle-orm';
+import { eq, SQL } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -22,7 +22,7 @@ export class CurrencyService {
   }
 
   async listExchangeRates(fromCurrencyId?: string, toCurrencyId?: string) {
-    const conditions = [];
+    const conditions: SQL<unknown>[] = [];
     if (fromCurrencyId) {
       conditions.push(eq(schema.exchangeRate.from_currency_id, fromCurrencyId));
     }

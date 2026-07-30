@@ -17,7 +17,11 @@ export class TenantMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
-    const tenantId = req.headers['x-tenant-id'] as string;
+    const tenantHeader = req.headers['x-tenant-id'];
+    if (Array.isArray(tenantHeader)) {
+      throw new BadRequestException('x-tenant-id must be supplied only once.');
+    }
+    const tenantId = typeof tenantHeader === 'string' ? tenantHeader.trim() : undefined;
     const path = req.originalUrl.split('?')[0];
     const apiPrefix = `/${(process.env.API_PREFIX || 'api/v1').replace(/^\/+|\/+$/g, '')}`;
 
@@ -26,9 +30,10 @@ export class TenantMiddleware implements NestMiddleware {
       return next();
     }
 
-    // 2. Decode JWT if present to check for SYSTEM_ADMIN permissions or extract tenantId
-    let isSystemAdmin = false;
-    let tokenTenantId = null;
+    // 2. Decode a token only to establish the connection routing context. The
+    // JwtStrategy verifies the signature and checks this context before a user
+    // is authenticated, so decoded claims are never used for authorization.
+    let tokenTenantId: string | undefined;
     const authHeader = req.headers['authorization'];
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
@@ -37,10 +42,7 @@ export class TenantMiddleware implements NestMiddleware {
         if (parts.length === 3) {
           const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
           if (payload) {
-            if (payload.userType === 'SYSTEM_ADMIN') {
-              isSystemAdmin = true;
-            }
-            if (payload.tenantId) {
+            if (typeof payload.tenantId === 'string' && payload.tenantId) {
               tokenTenantId = payload.tenantId;
             }
           }
@@ -58,9 +60,13 @@ export class TenantMiddleware implements NestMiddleware {
       path.includes('/plan') ||
       path.includes('/setup/wizard');
 
-    const effectiveTenantId = tenantId || tokenTenantId;
+    if (tenantId && tokenTenantId && tenantId !== tokenTenantId) {
+      throw new ForbiddenException('x-tenant-id does not match the tenant bound to this access token.');
+    }
 
-    if (!effectiveTenantId && !isPublic && !isSystemAdmin) {
+    const effectiveTenantId = tokenTenantId || tenantId;
+
+    if (!effectiveTenantId && !isPublic) {
       throw new BadRequestException('x-tenant-id header is missing');
     }
     

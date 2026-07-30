@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sum } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../../core/database/schema';
 
@@ -29,14 +29,28 @@ export class FinanceReportService {
 
     let totalDebit = 0;
     let totalCredit = 0;
+    const accountBalances: any[] = [];
 
-    const accountBalances = accounts.map(acc => {
-      const debit = 0;   // balance fields computed from gl_journal_lines
-      const credit = 0;  // not stored on gl_account_master directly
+    for (const acc of accounts) {
+      const [sumRes] = await this.db
+        .select({
+          totalDebits: sum(schema.generalLedgerEntry.debit),
+          totalCredits: sum(schema.generalLedgerEntry.credit),
+        })
+        .from(schema.generalLedgerEntry)
+        .where(
+          and(
+            eq(schema.generalLedgerEntry.gl_account_id, acc.gl_account_id),
+            eq(schema.generalLedgerEntry.tenant_id, tenantId)
+          )
+        );
+
+      const debit = sumRes?.totalDebits ? parseFloat(sumRes.totalDebits) : 0;
+      const credit = sumRes?.totalCredits ? parseFloat(sumRes.totalCredits) : 0;
       totalDebit += debit;
       totalCredit += credit;
 
-      return {
+      accountBalances.push({
         account_id: acc.gl_account_id,
         account_code: acc.account_code,
         account_name: acc.account_name,
@@ -44,8 +58,8 @@ export class FinanceReportService {
         debit,
         credit,
         net_balance: debit - credit,
-      };
-    });
+      });
+    }
 
     return {
       company_id: companyId,
@@ -70,17 +84,33 @@ export class FinanceReportService {
     let totalRevenue = 0;
     let totalExpenses = 0;
 
-    accounts.forEach(acc => {
-      const debit = 0;   // balance fields computed from gl_journal_lines
-      const credit = 0;
+    for (const acc of accounts) {
+      if (!['REVENUE', 'INCOME', 'EXPENSE'].includes(acc.account_type)) {
+        continue;
+      }
 
-      if (acc.account_type === 'REVENUE') {
+      const [sumRes] = await this.db
+        .select({
+          totalDebits: sum(schema.generalLedgerEntry.debit),
+          totalCredits: sum(schema.generalLedgerEntry.credit),
+        })
+        .from(schema.generalLedgerEntry)
+        .where(
+          and(
+            eq(schema.generalLedgerEntry.gl_account_id, acc.gl_account_id),
+            eq(schema.generalLedgerEntry.tenant_id, tenantId)
+          )
+        );
+
+      const debit = sumRes?.totalDebits ? parseFloat(sumRes.totalDebits) : 0;
+      const credit = sumRes?.totalCredits ? parseFloat(sumRes.totalCredits) : 0;
+
+      if (acc.account_type === 'REVENUE' || acc.account_type === 'INCOME') {
         totalRevenue += (credit - debit);
       } else if (acc.account_type === 'EXPENSE') {
         totalExpenses += (debit - credit);
-
       }
-    });
+    }
 
     return {
       company_id: companyId,

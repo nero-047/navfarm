@@ -39,15 +39,13 @@ export class AuthService {
     return tenantDb;
   }
 
-  async registerAdmin(dto: RegisterAdminDto, authHeader?: string) {
-    let requestingUser: any = null;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      try {
-        requestingUser = this.jwtService.decode(token);
-      } catch (e) {
-        // Ignored
-      }
+  async registerAdmin(dto: RegisterAdminDto, onboarding?: { tenantId: string; companyId: string }) {
+    const activeTenantId = this.cls.get<string>('tenantId');
+    if (!onboarding || !activeTenantId ||
+      dto.tenant_id !== activeTenantId ||
+      dto.tenant_id !== onboarding.tenantId ||
+      dto.company_id !== onboarding.companyId) {
+      throw new ForbiddenException('The initial administrator must be created for the company bound to the onboarding access token.');
     }
 
     // 1. Check if user already exists
@@ -83,53 +81,24 @@ export class AuthService {
       );
     }
 
-    // Enforce role boundary logic:
+    // This route is only for the first administrator. All later user creation
+    // is handled by the guarded user-management API.
     if (activeUsers.length > 0) {
-      if (!requestingUser) {
-        throw new UnauthorizedException('Authentication required to register additional users.');
-      }
-
-      const requesterType = requestingUser.userType;
-      if (requesterType === 'TENANT_ADMIN') {
-        if (dto.user_type !== 'COMPANY_ADMIN') {
-          throw new BadRequestException('Tenant Administrators can only register Company Administrator accounts.');
-        }
-      } else if (requesterType === 'COMPANY_ADMIN') {
-        if (dto.user_type !== 'STANDARD_USER') {
-          throw new BadRequestException('Company Administrators can only register Standard Operator accounts.');
-        }
-      } else {
-        throw new ForbiddenException('Insufficient privileges to register user accounts.');
-      }
-    } else {
-      dto.user_type = 'TENANT_ADMIN';
+      throw new ConflictException('An administrator already exists for this tenant. Use the guarded user-management API to add users.');
     }
+    dto.user_type = 'TENANT_ADMIN';
 
-    // Ensure placeholder company exists in tenant database to satisfy foreign keys
-    const [companyPlaceholder] = await this.db
+    const [company] = await this.db
       .select()
       .from(schema.companyMaster)
-      .where(eq(schema.companyMaster.company_id, dto.company_id))
+      .where(and(
+        eq(schema.companyMaster.company_id, dto.company_id),
+        eq(schema.companyMaster.tenant_id, activeTenantId),
+      ))
       .limit(1);
 
-    if (!companyPlaceholder && dto.company_id === '00000000-0000-0000-0000-000000000000') {
-      const [lang] = await this.db.select().from(schema.languageMaster).limit(1);
-      const [curr] = await this.db.select().from(schema.currencyMaster).limit(1);
-
-      await this.db.insert(schema.companyMaster).values({
-        company_id: '00000000-0000-0000-0000-000000000000',
-        tenant_id: dto.tenant_id,
-        company_code: 'PLACEHOLDER',
-        company_name: 'Placeholder Company',
-        company_type: 'Pvt Ltd',
-        industry_type: 'Poultry Farming',
-        base_currency_id: curr?.currency_id || '20000000-2000-2000-2000-200000000001',
-        default_language_id: lang?.lang_id || '10000000-1000-1000-1000-100000000001',
-        default_timezone_id: 'Asia/Kolkata',
-        country_id: 'IND',
-        onboarding_status: 'PENDING',
-        is_active: true,
-      });
+    if (!company) {
+      throw new NotFoundException('The onboarding company was not found in the active tenant workspace.');
     }
 
     // 2. Hash administrative password
@@ -232,7 +201,56 @@ export class AuthService {
       roleName
     ).catch(err => console.error('Failed to dispatch background user invitation email:', err));
 
+    // Mark step 9 (ADMIN_USER) as completed in the onboarding wizard log.
+    // This is done outside the transaction so a logging failure cannot roll back
+    // the user record that was already committed.
+    await this.logAdminUserStep(dto.company_id).catch(err =>
+      console.error('Failed to mark ADMIN_USER onboarding step as complete:', err),
+    );
+
     return result;
+  }
+
+  /**
+   * Log the ADMIN_USER setup wizard step as COMPLETED.
+   * Called after a successful initial administrator registration.
+   */
+  private async logAdminUserStep(companyId: string): Promise<void> {
+    const [step] = await this.db
+      .select()
+      .from(schema.setupStepMaster)
+      .where(eq(schema.setupStepMaster.step_code, 'ADMIN_USER'))
+      .limit(1);
+
+    if (!step) return;
+
+    const [existingLog] = await this.db
+      .select()
+      .from(schema.setupWizardLog)
+      .where(
+        and(
+          eq(schema.setupWizardLog.company_id, companyId),
+          eq(schema.setupWizardLog.step_id, step.step_id),
+        ),
+      )
+      .limit(1);
+
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    if (existingLog) {
+      await this.db
+        .update(schema.setupWizardLog)
+        .set({ status: 'COMPLETED', completed_at: now })
+        .where(eq(schema.setupWizardLog.log_id, existingLog.log_id));
+    } else {
+      await this.db.insert(schema.setupWizardLog).values({
+        log_id: crypto.randomUUID(),
+        company_id: companyId,
+        step_id: step.step_id,
+        status: 'COMPLETED',
+        completed_at: now,
+      });
+    }
   }
 
   async login(dto: LoginDto) {

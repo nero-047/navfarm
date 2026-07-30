@@ -8,12 +8,42 @@ export class CreateGlMappingDto {
   @IsNotEmpty()
   company_id: string;
 
+  @ApiProperty({ description: 'Optional Nature of Business UUID', required: false })
+  @IsUUID()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Optional Line of Business UUID', required: false })
+  @IsUUID()
+  @IsOptional()
+  lob_id?: string;
+
+  @ApiProperty({ description: 'Optional batch stage context (e.g. REARING, LAYING, SLAUGHTER)', required: false })
+  @IsString()
+  @IsOptional()
+  stage?: string;
+
+  @ApiProperty({ description: 'Optional event sub-type context', required: false })
+  @IsString()
+  @IsOptional()
+  event_type?: string;
+
   @ApiProperty({ description: 'Optional Item Category UUID link for scoped category mapping rules', required: false })
   @IsUUID()
   @IsOptional()
   item_category_id?: string;
 
-  @ApiProperty({ description: 'The inventory ledger transaction type', example: 'PURCHASE', enum: ['PURCHASE', 'CONSUMPTION', 'OUTPUT', 'SALE', 'ADJUSTMENT', 'MORTALITY', 'VARIANCE'] })
+  @ApiProperty({ description: 'Optional Item / Posting Group', required: false })
+  @IsString()
+  @IsOptional()
+  item_posting_group?: string;
+
+  @ApiProperty({ description: 'Optional valuation method (STANDARD | FIFO | BIO_ASSET)', required: false })
+  @IsString()
+  @IsOptional()
+  valuation_method?: string;
+
+  @ApiProperty({ description: 'The transaction type', example: 'PURCHASE', enum: ['PURCHASE', 'CONSUMPTION', 'OUTPUT', 'SALE', 'ADJUSTMENT', 'MORTALITY', 'VARIANCE', 'WIP_TRANSFER', 'BATCH_CLOSE'] })
   @IsString()
   @IsNotEmpty()
   transaction_type: string;
@@ -37,7 +67,37 @@ export class UpdateGlMappingDto {
   @ApiProperty({ required: false })
   @IsUUID()
   @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  lob_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  stage?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  event_type?: string;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
   item_category_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  item_posting_group?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  valuation_method?: string;
 
   @ApiProperty({ required: false })
   @IsString()
@@ -74,6 +134,16 @@ export class QueryGlMappingDto {
   @IsOptional()
   @IsUUID()
   companyId?: string;
+
+  @ApiProperty({ description: 'Filter by NOB UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  nobId?: string;
+
+  @ApiProperty({ description: 'Filter by LOB UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  lobId?: string;
 
   @ApiProperty({ description: 'Filter by item category UUID', required: false })
   @IsOptional()

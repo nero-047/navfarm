@@ -24,9 +24,9 @@ export class CostingReportService {
         item_code: schema.itemMaster.item_code,
         item_name: schema.itemMaster.item_name,
         warehouse_id: schema.inventoryBalance.warehouse_id,
-        warehouse_name: schema.warehouseMaster.name,
+        warehouse_name: schema.warehouseMaster.warehouse_name,
         location_id: schema.inventoryBalance.location_id,
-        location_name: schema.locationMaster.name,
+        location_name: schema.locationMaster.location_name,
         qty_on_hand: schema.inventoryBalance.qty_on_hand,
         standard_cost: schema.itemMaster.standard_cost,
       })

@@ -35,7 +35,16 @@ export class ReportService {
         )
       );
 
-    const reportLines = [];
+    const reportLines: Array<{
+      account_id: string;
+      account_code: string;
+      account_name: string;
+      account_type: string;
+      opening_balance: number;
+      debit: number;
+      credit: number;
+      closing_balance: number;
+    }> = [];
 
     for (const acc of accounts) {
       // 2. Query Opening balance (prior to startDate)
@@ -114,9 +123,9 @@ export class ReportService {
         )
       );
 
-    const assetLines = [];
-    const liabilityLines = [];
-    const equityLines = [];
+    const assetLines: Array<{ account_id: string; account_code: string; account_name: string; balance: number }> = [];
+    const liabilityLines: Array<{ account_id: string; account_code: string; account_name: string; balance: number }> = [];
+    const equityLines: Array<{ account_id: string; account_code: string; account_name: string; balance: number }> = [];
 
     let totalAssets = 0;
     let totalLiabilities = 0;
@@ -197,8 +206,8 @@ export class ReportService {
         )
       );
 
-    const revenueLines = [];
-    const expenseLines = [];
+    const revenueLines: Array<{ account_id: string; account_code: string; account_name: string; balance: number }> = [];
+    const expenseLines: Array<{ account_id: string; account_code: string; account_name: string; balance: number }> = [];
 
     let totalRevenue = 0;
     let totalExpenses = 0;

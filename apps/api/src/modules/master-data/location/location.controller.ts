@@ -86,8 +86,8 @@ export class LocationController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.locationService.remove(id, tenantId, req.user);
     return {
+      ...result,
       success: true,
-      ...result
     };
   }
 

@@ -59,7 +59,7 @@ export class InventoryValuationService {
     const totalStockQty = balances.reduce((acc, b) => acc + parseFloat(b.qty_on_hand), 0);
     const revaluationAmount = Math.abs(totalStockQty * costDiff);
 
-    let journalResult = null;
+    let journalResult: { success: boolean; message: string } | null = null;
 
     // 2. Post GL revaluation entry via Phase 4 PostingEngine if stock exists & cost changed
     if (revaluationAmount > 0) {
@@ -96,7 +96,7 @@ export class InventoryValuationService {
       old_cost: oldCost.toFixed(4),
       new_cost: newCost.toFixed(4),
       change_reason: dto.change_reason,
-      revaluation_journal_id: journalResult ? journalResult.entry_id : null,
+      revaluation_journal_id: journalResult ? journalResult.message : null,
     };
 
     await this.db.insert(schema.itemCostHistory).values(newHistory);

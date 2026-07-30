@@ -20,7 +20,7 @@ export class QualityInspectionService {
 
   async executeInspection(dto: ExecuteQualityInspectionDto, tenantId: string, userId?: string) {
     let overallStatus = 'PASSED';
-    const parameterResults = [];
+    const parameterResults: Array<{ parameter_id: string; measured_value: number; pass_fail_status: string }> = [];
 
     // Evaluate each parameter result
     for (const r of dto.results) {
@@ -124,6 +124,58 @@ export class QualityInspectionService {
     return {
       ...inspection,
       results,
+    };
+  }
+
+  async validateQCPassed(batchId: string, tenantId: string): Promise<boolean> {
+    const inspections = await this.db
+      .select()
+      .from(schema.qualityInspection)
+      .where(
+        and(
+          eq(schema.qualityInspection.batch_id, batchId),
+          eq(schema.qualityInspection.tenant_id, tenantId)
+        )
+      );
+
+    if (inspections.length === 0) {
+      return false;
+    }
+
+    const hasPassed = inspections.some(i => i.overall_result === 'PASSED');
+    const hasQuarantine = inspections.some(i => i.overall_result === 'QUARANTINE' || i.overall_result === 'FAILED');
+
+    return hasPassed && !hasQuarantine;
+  }
+
+  async releaseQuarantineHold(holdId: string, disposition: 'RELEASED' | 'REJECTED' | 'SCRAPPED', tenantId: string, notes?: string) {
+    const [hold] = await this.db
+      .select()
+      .from(schema.quarantineHold)
+      .where(
+        and(
+          eq(schema.quarantineHold.hold_id, holdId),
+          eq(schema.quarantineHold.tenant_id, tenantId)
+        )
+      )
+      .limit(1);
+
+    if (!hold) {
+      throw new NotFoundException(`Quarantine Hold '${holdId}' not found.`);
+    }
+
+    await this.db
+      .update(schema.quarantineHold)
+      .set({
+        status: disposition,
+        released_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      })
+      .where(eq(schema.quarantineHold.hold_id, holdId));
+
+    return {
+      ...hold,
+      status: disposition,
+      released_at: new Date().toISOString(),
     };
   }
 

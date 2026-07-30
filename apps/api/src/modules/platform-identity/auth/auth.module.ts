@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { OnboardingAccessGuard } from '../../../common/guards/onboarding-access.guard';
 
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { resolveJwtSecret } from '../../../config/jwt.config';
@@ -23,7 +24,7 @@ import { resolveJwtSecret } from '../../../config/jwt.config';
     AuditLogModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, OnboardingAccessGuard],
   exports: [AuthService, JwtStrategy, PassportModule, JwtModule],
 })
 export class AuthModule {}

@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException, Inject } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { and, eq, ne, isNull, like, or } from 'drizzle-orm';
+import { and, eq, ne, isNull, like, or, SQL } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import * as masterSchema from '../../../core/database/master-schema';
@@ -29,7 +29,18 @@ export class CompanyService {
     return tenantDb;
   }
 
+  private get activeTenantId(): string {
+    const tenantId = this.cls.get<string>('tenantId');
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant context is required for company management.');
+    }
+    return tenantId;
+  }
+
   async findByTenant(tenantId: string, query?: QueryCompanyDto) {
+    if (tenantId !== this.activeTenantId) {
+      throw new ForbiddenException('Companies can only be read from the active tenant workspace.');
+    }
     const conditions: any[] = [
       eq(schema.companyMaster.tenant_id, tenantId),
       ne(schema.companyMaster.company_code, 'PLACEHOLDER'),
@@ -70,6 +81,7 @@ export class CompanyService {
       .from(schema.companyMaster)
       .where(and(
         eq(schema.companyMaster.company_id, companyId),
+        eq(schema.companyMaster.tenant_id, this.activeTenantId),
         isNull(schema.companyMaster.deleted_at)
       ))
       .limit(1);
@@ -82,6 +94,9 @@ export class CompanyService {
   }
 
   async create(dto: CreateCompanyDto, tenantId: string, userPayload?: any) {
+    if (tenantId !== this.activeTenantId) {
+      throw new ForbiddenException('Companies can only be created in the active tenant workspace.');
+    }
     // Check plan limits in masterDb
     const [tenantMeta] = await this.masterDb
       .select()
@@ -395,7 +410,7 @@ export class CompanyService {
 
     // Validate unique code / name if modified
     if (tenantId && (dto.company_code || dto.company_name)) {
-      const codeOrName = [];
+      const codeOrName: SQL<unknown>[] = [];
       if (dto.company_code) codeOrName.push(eq(schema.companyMaster.company_code, dto.company_code.toUpperCase()));
       if (dto.company_name) codeOrName.push(eq(schema.companyMaster.company_name, dto.company_name));
 

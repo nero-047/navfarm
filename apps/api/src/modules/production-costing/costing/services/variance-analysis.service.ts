@@ -37,41 +37,89 @@ export class VarianceAnalysisService {
       throw new NotFoundException(`Production Batch '${batchId}' not found.`);
     }
 
-    // 1. Calculate Usage Variance (Planned Inputs vs Actual Consumed Inputs)
+    const costingMethod = (batch.costing_method || 'STANDARD').toUpperCase();
+
+    // FIFO and BIO_ASSET batches do not create standard-cost variance entries
+    if (costingMethod !== 'STANDARD') {
+      const zeroAnalysis = {
+        analysis_id: randomUUID(),
+        tenant_id: tenantId,
+        company_id: batch.company_id,
+        batch_id: batchId,
+        usage_variance: '0.0000',
+        price_variance: '0.0000',
+        yield_variance: '0.0000',
+        labor_variance: '0.0000',
+        overhead_variance: '0.0000',
+        total_variance: '0.0000',
+        posted_journal_id: null,
+      };
+
+      await this.db.insert(schema.varianceAnalysis).values(zeroAnalysis);
+      return zeroAnalysis;
+    }
+
+    // 1. Calculate Usage & Price Variance (Planned Inputs vs Actual Consumed Inputs)
     const inputs = await this.db
       .select()
       .from(schema.productionBatchInput)
       .where(eq(schema.productionBatchInput.batch_id, batchId));
 
     let usageVariance = 0;
+    let priceVariance = 0;
+
     for (const input of inputs) {
       const planned = parseFloat(input.planned_qty);
       const actual = parseFloat(input.actual_qty);
-      const unitCost = parseFloat(input.unit_cost || '10.00');
-      usageVariance += (actual - planned) * unitCost;
+      const actualUnitCost = parseFloat(input.unit_cost || '0.0000');
+
+      // Resolve standard cost from item master
+      const [item] = await this.db
+        .select({ standard_cost: schema.itemMaster.standard_cost })
+        .from(schema.itemMaster)
+        .where(eq(schema.itemMaster.item_id, input.item_id))
+        .limit(1);
+
+      const standardUnitCost = item ? parseFloat(item.standard_cost || '0') : actualUnitCost;
+
+      usageVariance += (actual - planned) * standardUnitCost;
+      priceVariance += (actualUnitCost - standardUnitCost) * actual;
     }
 
     // 2. Calculate Yield Variance (Planned Output vs Actual Yield)
     const plannedQty = parseFloat(batch.planned_qty);
     const actualQty = parseFloat(batch.actual_qty);
-    const yieldVariance = (actualQty - plannedQty) * 15.0; // Base unit cost multiplier
+
+    const outputs = await this.db
+      .select()
+      .from(schema.productionBatchOutput)
+      .where(eq(schema.productionBatchOutput.batch_id, batchId));
+
+    const avgOutputUnitCost = outputs.length > 0
+      ? outputs.reduce((sum, o) => sum + parseFloat(o.unit_cost), 0) / outputs.length
+      : 0;
+
+    const yieldVariance = (actualQty - plannedQty) * avgOutputUnitCost;
 
     // 3. Labor & Overhead Variance
     const laborVariance = 0;
     const overheadVariance = 0;
-    const priceVariance = 0;
 
-    const totalVariance = Math.abs(usageVariance + yieldVariance + laborVariance + overheadVariance);
+    const totalVariance = usageVariance + priceVariance + yieldVariance + laborVariance + overheadVariance;
 
-    let journalResult = null;
+    let journalResult: { success: boolean; message: string } | null = null;
 
     // 4. Post Financial Journal for Variance if variance exists
-    if (totalVariance > 0) {
+    if (Math.abs(totalVariance) > 0.001) {
       journalResult = await this.postingEngine.postAutomaticEntry(
         {
           company_id: batch.company_id,
-          transaction_type: 'ADJUSTMENT',
-          amount: totalVariance,
+          nob_id: batch.nob_id || undefined,
+          lob_id: batch.lob_id || undefined,
+          stage: batch.stage || undefined,
+          valuation_method: 'STANDARD',
+          transaction_type: 'VARIANCE',
+          amount: Math.abs(totalVariance),
           posting_date: new Date().toISOString().split('T')[0],
           ref_doc_type: 'VARIANCE_ANALYSIS',
           ref_doc_id: batchId,
@@ -95,7 +143,7 @@ export class VarianceAnalysisService {
       labor_variance: laborVariance.toFixed(4),
       overhead_variance: overheadVariance.toFixed(4),
       total_variance: totalVariance.toFixed(4),
-      posted_journal_id: journalResult ? journalResult.entry_id : null,
+      posted_journal_id: journalResult ? journalResult.message : null,
     };
 
     await this.db.insert(schema.varianceAnalysis).values(newAnalysis);
