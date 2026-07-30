@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -59,5 +59,68 @@ export class NobLobConfigService {
       .where(eq(schema.nobLobExtensionConfig.config_id, configId));
 
     return { config_id: configId, config_value: dto.config_value };
+  }
+
+  async getEffectiveLobConfig(lobId: string) {
+    const [lob] = await this.db
+      .select()
+      .from(schema.lobMaster)
+      .where(eq(schema.lobMaster.lob_id, lobId))
+      .limit(1);
+
+    if (!lob) {
+      throw new NotFoundException(`Line of Business with ID '${lobId}' not found.`);
+    }
+
+    const [nob] = await this.db
+      .select()
+      .from(schema.nobMaster)
+      .where(eq(schema.nobMaster.nob_id, lob.nob_id))
+      .limit(1);
+
+    const overrides = await this.getConfigByLob(lobId);
+
+    const baseConfig = (lob.extension_config as Record<string, any>) || {
+      costing_methods: [lob.costing_method_allowed || 'STANDARD'],
+      qc_required: lob.qc_required === 'YES',
+      qr_required: lob.qr_required === 'YES',
+      traceability_level: lob.traceability_required === 'YES' ? 'BATCH' : 'NONE',
+      scheduler_required: lob.scheduler_copy_allowed === 'YES',
+      resource_required: true,
+      stages: [],
+      enabled_modules: [],
+    };
+
+    const effectiveConfig = { ...baseConfig };
+    for (const ov of overrides) {
+      if (ov.config_key && ov.config_value !== null) {
+        try {
+          effectiveConfig[ov.config_key] = JSON.parse(ov.config_value);
+        } catch {
+          effectiveConfig[ov.config_key] = ov.config_value;
+        }
+      }
+    }
+
+    return {
+      lob_id: lob.lob_id,
+      lob_code: lob.lob_code,
+      lob_name: lob.lob_name,
+      nob_id: nob?.nob_id || lob.nob_id,
+      nob_code: nob?.nob_code || null,
+      nob_name: nob?.nob_name || null,
+      effective_config: effectiveConfig,
+    };
+  }
+
+  async validateCostingMethod(lobId: string, costingMethod: string): Promise<boolean> {
+    const { effective_config } = await this.getEffectiveLobConfig(lobId);
+    const allowedMethods: string[] = effective_config.costing_methods || ['STANDARD'];
+    if (!allowedMethods.includes(costingMethod.toUpperCase())) {
+      throw new BadRequestException(
+        `Costing method '${costingMethod}' is not permitted for LOB '${lobId}'. Allowed methods: ${allowedMethods.join(', ')}`
+      );
+    }
+    return true;
   }
 }

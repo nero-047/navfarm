@@ -116,6 +116,8 @@ async function bootstrap() {
         is_system_default: true,
         translation_coverage_pct: '100.00',
         flag_emoji: '🇬🇧',
+        is_rtl: false,
+        is_active: true,
       },
       {
         lang_id: '10000000-1000-1000-1000-100000000002',
@@ -123,8 +125,120 @@ async function bootstrap() {
         lang_name_english: 'Hindi',
         lang_name_native: 'हिन्दी',
         script: 'Devanagari',
-        translation_coverage_pct: '0.00',
+        translation_coverage_pct: '100.00',
         flag_emoji: '🇮🇳',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000003',
+        lang_code: 'mr',
+        lang_name_english: 'Marathi',
+        lang_name_native: 'मराठी',
+        script: 'Devanagari',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇮🇳',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000004',
+        lang_code: 'ta',
+        lang_name_english: 'Tamil',
+        lang_name_native: 'தமிழ்',
+        script: 'Tamil',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇮🇳',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000005',
+        lang_code: 'te',
+        lang_name_english: 'Telugu',
+        lang_name_native: 'తెలుగు',
+        script: 'Telugu',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇮🇳',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000006',
+        lang_code: 'pa',
+        lang_name_english: 'Punjabi',
+        lang_name_native: 'ਪੰਜਾਬੀ',
+        script: 'Gurmukhi',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇮🇳',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000007',
+        lang_code: 'gu',
+        lang_name_english: 'Gujarati',
+        lang_name_native: 'ગુજરાતી',
+        script: 'Gujarati',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇮🇳',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000008',
+        lang_code: 'bn',
+        lang_name_english: 'Bengali',
+        lang_name_native: 'বাংলা',
+        script: 'Bengali',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇮🇳',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000009',
+        lang_code: 'ar',
+        lang_name_english: 'Arabic',
+        lang_name_native: 'العربية',
+        script: 'Arabic',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇦🇪',
+        is_rtl: true,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000010',
+        lang_code: 'fr',
+        lang_name_english: 'French',
+        lang_name_native: 'Français',
+        script: 'Latin',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇫🇷',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000011',
+        lang_code: 'es',
+        lang_name_english: 'Spanish',
+        lang_name_native: 'Español',
+        script: 'Latin',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇪🇸',
+        is_rtl: false,
+        is_active: true,
+      },
+      {
+        lang_id: '10000000-1000-1000-1000-100000000012',
+        lang_code: 'zh',
+        lang_name_english: 'Chinese Simplified',
+        lang_name_native: '简体中文',
+        script: 'Chinese',
+        translation_coverage_pct: '100.00',
+        flag_emoji: '🇨🇳',
+        is_rtl: false,
+        is_active: true,
       },
     ];
     for (const language of languages) {
@@ -269,53 +383,133 @@ async function bootstrap() {
 
     const lobs = [
       // ── POULTRY ─────────────────────────────────────────────────────────────
-      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
-      // Growing/rearing stages: QC=NO, QR=NO — no finished-goods inspection until slaughter
-      // Slaughter: QC=YES, QR=YES — output is a traceable finished product
-      ['POULTRY', 'PLT_REARING',    'Rearing & Breeding',       'STANDARD',            'NO',  'NO',  'YES', 'YES', 'YES'],
-      ['POULTRY', 'PLT_LAYING',     'Laying',                   'STANDARD',            'NO',  'NO',  'YES', 'YES', 'YES'],
-      ['POULTRY', 'PLT_HATCHING',   'Hatching',                 'STANDARD',            'NO',  'NO',  'YES', 'YES', 'YES'],
-      ['POULTRY', 'PLT_CB',         'Commercial Broiler',       'STANDARD',            'NO',  'NO',  'YES', 'YES', 'YES'],
-      ['POULTRY', 'PLT_SLAUGHTER',  'Poultry Slaughter',        'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+      ['POULTRY', 'PLT_REARING', 'Poultry Rearing & Breeding', 'STANDARD', 'NO', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'FIFO', 'ACTUAL'],
+        batch_support: true, qc_required: false, qr_required: false, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['BROODING', 'GROWING', 'REARING'], enabled_modules: ['POULTRY', 'INVENTORY', 'COSTING']
+      }],
+      ['POULTRY', 'PLT_LAYING', 'Poultry Laying', 'STANDARD', 'NO', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'FIFO', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['BROODING', 'GROWING', 'LAYING'], enabled_modules: ['POULTRY', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
+      ['POULTRY', 'PLT_HATCHING', 'Poultry Hatchery', 'STANDARD', 'NO', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'FIFO', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['EGG_SETTING', 'INCUBATION', 'HATCHING'], enabled_modules: ['POULTRY', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
+      ['POULTRY', 'PLT_CB', 'Commercial Broiler', 'STANDARD', 'NO', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'FIFO', 'ACTUAL'],
+        batch_support: true, qc_required: false, qr_required: false, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['BROODING', 'GROWING', 'FINISHING'], enabled_modules: ['POULTRY', 'INVENTORY', 'COSTING']
+      }],
+      ['POULTRY', 'PLT_SLAUGHTER', 'Poultry Slaughter', 'STANDARD', 'YES', 'YES', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'FIFO', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'ITEM',
+        scheduler_required: true, resource_required: true,
+        stages: ['RECEIVING', 'SLAUGHTER', 'CUTTING', 'PACKAGING'], enabled_modules: ['POULTRY', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
 
       // ── LIVESTOCK ────────────────────────────────────────────────────────────
-      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
-      // Living asset LOBs: QR=NO (no barcode on live animals); QC=YES for health checks
-      // Slaughter: QC=YES, QR=YES — output is a traceable finished product
-      // Note: LVS_GOAT_SHEEP is not in the workbook explicitly; retained for completeness
-      // and flagged for review when the workbook is next updated.
-      ['LIVESTOCK', 'LVS_BREEDING',   'Livestock Breeding',       'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
-      ['LIVESTOCK', 'LVS_MILKING',    'Dairy / Milking',          'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
-      ['LIVESTOCK', 'LVS_PIGGERY',    'Piggery',                  'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
-      ['LIVESTOCK', 'LVS_GOAT_SHEEP', 'Goat & Sheep',             'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
-      ['LIVESTOCK', 'LVS_SLAUGHTER',  'Livestock Slaughter',      'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+      ['LIVESTOCK', 'LVS_BREEDING', 'Livestock Breeding', 'BIO_ASSET', 'YES', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['BIO_ASSET', 'STANDARD', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: false, traceability_level: 'SERIAL',
+        scheduler_required: true, resource_required: true,
+        stages: ['CALF', 'HEIFER', 'BREEDING'], enabled_modules: ['LIVESTOCK', 'INVENTORY', 'COSTING']
+      }],
+      ['LIVESTOCK', 'LVS_MILKING', 'Dairy / Milking', 'BIO_ASSET', 'YES', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['BIO_ASSET', 'STANDARD', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: false, traceability_level: 'SERIAL',
+        scheduler_required: true, resource_required: true,
+        stages: ['CALF', 'HEIFER', 'LACTATING', 'DRY'], enabled_modules: ['LIVESTOCK', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
+      ['LIVESTOCK', 'LVS_PIGGERY', 'Piggery', 'BIO_ASSET', 'YES', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['BIO_ASSET', 'STANDARD', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: false, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['FARROWING', 'NURSERY', 'GROW_FINISH'], enabled_modules: ['LIVESTOCK', 'INVENTORY', 'COSTING']
+      }],
+      ['LIVESTOCK', 'LVS_GOAT_SHEEP', 'Goat & Sheep', 'BIO_ASSET', 'YES', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['BIO_ASSET', 'STANDARD', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: false, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['KIDDING', 'WEANING', 'FATTENING'], enabled_modules: ['LIVESTOCK', 'INVENTORY', 'COSTING']
+      }],
+      ['LIVESTOCK', 'LVS_SLAUGHTER', 'Livestock Slaughter', 'STANDARD', 'YES', 'YES', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'FIFO', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'ITEM',
+        scheduler_required: true, resource_required: true,
+        stages: ['LAIRAGE', 'SLAUGHTER', 'CARCASS_SPLIT', 'PACKAGING'], enabled_modules: ['LIVESTOCK', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
 
       // ── AGRICULTURE ──────────────────────────────────────────────────────────
-      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
-      // All agri LOBs: QC=YES, QR=YES (harvest lots are traceable)
-      ['AGRI', 'AGRI_FRUIT',   'Fruit Farming',            'BIO_ASSET',           'YES', 'YES', 'YES', 'YES', 'YES'],
-      ['AGRI', 'AGRI_CROP',    'Crop Farming',             'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
-      ['AGRI', 'AGRI_FLOWER',  'Flower Farming',           'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
-      ['AGRI', 'AGRI_SEEDS',   'Seed Processing',          'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+      ['AGRI', 'AGRI_FRUIT', 'Fruit Farming', 'BIO_ASSET', 'YES', 'YES', 'YES', 'YES', 'YES', {
+        costing_methods: ['BIO_ASSET', 'STANDARD', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['PLANTING', 'FLOWERING', 'FRUIT_SET', 'HARVEST'], enabled_modules: ['AGRI', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
+      ['AGRI', 'AGRI_CROP', 'Crop Farming', 'STANDARD', 'YES', 'YES', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'ACTUAL', 'FIFO'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['LAND_PREP', 'SOWING', 'IRRIGATION', 'HARVEST'], enabled_modules: ['AGRI', 'INVENTORY', 'COSTING']
+      }],
+      ['AGRI', 'AGRI_FLOWER', 'Flower Farming', 'STANDARD', 'YES', 'YES', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'ACTUAL', 'FIFO'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['PLANTING', 'VEGETATIVE', 'BLOOMING', 'HARVEST'], enabled_modules: ['AGRI', 'INVENTORY', 'COSTING']
+      }],
+      ['AGRI', 'AGRI_SEEDS', 'Seed Processing', 'STANDARD', 'YES', 'YES', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'ACTUAL', 'FIFO'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['CLEANING', 'DRYING', 'TREATING', 'PACKAGING'], enabled_modules: ['AGRI', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
 
       // ── AQUACULTURE ──────────────────────────────────────────────────────────
-      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
-      // Fish farming: QR=NO (live biomass); Slaughter: QR=YES (finished fish product)
-      ['AQUA', 'AQA_FISH',       'Fish Farming',            'BIO_ASSET',           'YES', 'NO',  'YES', 'YES', 'YES'],
-      ['AQUA', 'AQA_SLAUGHTER',  'Aquaculture Slaughter',   'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+      ['AQUA', 'AQA_FISH', 'Fish Farming', 'BIO_ASSET', 'YES', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['BIO_ASSET', 'STANDARD', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: false, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['HATCHERY', 'NURSERY', 'GROW_OUT'], enabled_modules: ['AQUA', 'INVENTORY', 'COSTING']
+      }],
+      ['AQUA', 'AQA_SLAUGHTER', 'Aquaculture Slaughter', 'STANDARD', 'YES', 'YES', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'FIFO', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'ITEM',
+        scheduler_required: true, resource_required: true,
+        stages: ['HARVEST', 'GUTTING', 'FILLETING', 'FREEZING'], enabled_modules: ['AQUA', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
 
       // ── INSECT FARMING ───────────────────────────────────────────────────────
-      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
-      // Bee keeping: traceability=NO per workbook (hive-managed, not lot-traceable)
-      // BSF: not explicitly listed in workbook but belongs to INSECT NOB
-      ['INSECT', 'INS_BEE',  'Bee Keeping',              'STANDARD',            'YES', 'NO',  'NO',  'YES', 'YES'],
-      ['INSECT', 'INS_BSF',  'Black Soldier Fly',        'STANDARD',            'YES', 'NO',  'YES', 'YES', 'YES'],
+      ['INSECT', 'INS_BEE', 'Bee Keeping', 'STANDARD', 'YES', 'NO', 'NO', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: false, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['HIVE_SETUP', 'COLONY_BUILD', 'HONEY_HARVEST'], enabled_modules: ['INSECT', 'INVENTORY', 'COSTING']
+      }],
+      ['INSECT', 'INS_BSF', 'Black Soldier Fly', 'STANDARD', 'YES', 'NO', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: false, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['EGG', 'LARVAE', 'PUPAE', 'HARVEST'], enabled_modules: ['INSECT', 'INVENTORY', 'COSTING']
+      }],
 
       // ── FEED & PROCESSING ────────────────────────────────────────────────────
-      // Source: Final_Docs/1. NOB_LOB Master File.xlsx
-      ['PRODUCTION', 'FEED_PROD', 'Feed Production',         'STANDARD',            'YES', 'YES', 'YES', 'YES', 'YES'],
+      ['PRODUCTION', 'FEED_PROD', 'Feed Production', 'STANDARD', 'YES', 'YES', 'YES', 'YES', 'YES', {
+        costing_methods: ['STANDARD', 'FIFO', 'ACTUAL'],
+        batch_support: true, qc_required: true, qr_required: true, traceability_level: 'BATCH',
+        scheduler_required: true, resource_required: true,
+        stages: ['RAW_RECEIPT', 'GRINDING', 'MIXING', 'PELLETING', 'PACKAGING'], enabled_modules: ['FEED', 'INVENTORY', 'COSTING', 'QUALITY']
+      }],
     ] as const;
-    for (const [index, [nobCode, code, name, costing, qc, qr, traceability, batchCopy, schedulerCopy]] of lobs.entries()) {
+
+    for (const [index, [nobCode, code, name, costing, qc, qr, traceability, batchCopy, schedulerCopy, config]] of lobs.entries()) {
       const lob = {
         lob_id: `60000000-6000-6000-6000-${String(index + 1).padStart(12, '0')}`,
         nob_id: nobIds.get(nobCode)!,
@@ -330,6 +524,7 @@ async function bootstrap() {
         sort_order: index + 1,
         is_system: true,
         is_active: true,
+        extension_config: config,
       };
       const updateSet = {
         nob_id: lob.nob_id,
@@ -343,6 +538,7 @@ async function bootstrap() {
         sort_order: index + 1,
         is_system: true,
         is_active: true,
+        extension_config: config,
       };
       await masterDb
         .insert(master.lobMaster)

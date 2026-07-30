@@ -17,14 +17,26 @@
  *      poultry_batch.poultry_batch_id (not any other table).
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as schema from '../core/database/schema';
 
 // ─── Paths ────────────────────────────────────────────────────────────────────
 const ROOT = resolve(__dirname, '../..');
-const SNAPSHOT_PATH = resolve(ROOT, 'src/drizzle/tenant/meta/0012_snapshot.json');
-const MIGRATION_SQL_PATH = resolve(ROOT, 'src/drizzle/tenant/0012_spicy_trish_tilby.sql');
+const META_DIR = resolve(ROOT, 'src/drizzle/tenant/meta');
+const TENANT_DIR = resolve(ROOT, 'src/drizzle/tenant');
+
+// Dynamically discover all snapshot files and select the latest one
+const snapshotFiles = readdirSync(META_DIR)
+  .filter(f => f.endsWith('_snapshot.json'))
+  .sort();
+
+if (snapshotFiles.length === 0) {
+  throw new Error('No Drizzle snapshot JSON files found in ' + META_DIR);
+}
+
+const LATEST_SNAPSHOT_NAME = snapshotFiles[snapshotFiles.length - 1];
+const SNAPSHOT_PATH = resolve(META_DIR, LATEST_SNAPSHOT_NAME);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 let passed = 0;
@@ -45,6 +57,8 @@ function section(title: string) {
 }
 
 // ─── Load snapshot ────────────────────────────────────────────────────────────
+console.log(`[Schema Validator] Validating against latest snapshot: ${LATEST_SNAPSHOT_NAME}`);
+
 const snapshot: {
   tables: Record<
     string,
@@ -92,14 +106,14 @@ for (const [exportKey, value] of Object.entries(schemaExports)) {
 }
 
 // ─── CHECK 1: Every schema table has a migration ───────────────────────────────
-section('CHECK 1 — Every schema.ts table has a valid migration snapshot entry');
+section(`CHECK 1 — Every schema.ts table has a valid migration entry in ${LATEST_SNAPSHOT_NAME}`);
 
 const tablesOnlyInSchema = [...schemaTableNames].filter(t => !snapshotTables.has(t));
 if (tablesOnlyInSchema.length === 0) {
-  pass(`All ${schemaTableNames.size} schema tables are present in the 0012 snapshot.`);
+  pass(`All ${schemaTableNames.size} schema tables are present in ${LATEST_SNAPSHOT_NAME}.`);
 } else {
   for (const t of tablesOnlyInSchema) {
-    fail(`Table '${t}' exists in schema.ts but NOT in 0012 snapshot — needs a new migration.`);
+    fail(`Table '${t}' exists in schema.ts but NOT in ${LATEST_SNAPSHOT_NAME} — needs a new migration.`);
   }
 }
 
@@ -134,13 +148,13 @@ for (const [tableName, tableDef] of Object.entries(snapshot.tables)) {
   }
 }
 if (fkBroken === 0) {
-  pass(`All ${fkCount} foreign keys point to tables that exist in the snapshot.`);
+  pass(`All ${fkCount} foreign keys point to tables that exist in ${LATEST_SNAPSHOT_NAME}.`);
 }
 
-// ─── CHECK 4: Migration 0012 is purely additive ────────────────────────────────
-section('CHECK 4 — Migration 0012 contains no destructive DDL');
+// ─── CHECK 4: Migration SQL files are purely additive ──────────────────────────
+section('CHECK 4 — All migration SQL files contain no destructive DDL');
 
-const migrationSql = readFileSync(MIGRATION_SQL_PATH, 'utf8').toUpperCase();
+const sqlFiles = readdirSync(TENANT_DIR).filter(f => f.endsWith('.sql'));
 const destructivePatterns: Array<[RegExp, string]> = [
   [/\bDROP\s+TABLE\b/, 'DROP TABLE'],
   [/\bDROP\s+COLUMN\b/, 'DROP COLUMN'],
@@ -150,18 +164,24 @@ const destructivePatterns: Array<[RegExp, string]> = [
 ];
 
 let destructiveFound = false;
-for (const [pattern, label] of destructivePatterns) {
-  if (pattern.test(migrationSql)) {
-    fail(`Migration 0012 contains destructive DDL: ${label}`);
-    destructiveFound = true;
+let totalCreateCount = 0;
+let totalAlterCount = 0;
+
+for (const sqlFile of sqlFiles) {
+  const sqlContent = readFileSync(resolve(TENANT_DIR, sqlFile), 'utf8').toUpperCase();
+  for (const [pattern, label] of destructivePatterns) {
+    if (pattern.test(sqlContent)) {
+      fail(`Migration '${sqlFile}' contains destructive DDL: ${label}`);
+      destructiveFound = true;
+    }
   }
+  totalCreateCount += (sqlContent.match(/\bCREATE TABLE\b/g) ?? []).length;
+  totalAlterCount += (sqlContent.match(/\bALTER TABLE\b/g) ?? []).length;
 }
+
 if (!destructiveFound) {
-  // Count additive statements
-  const createCount = (migrationSql.match(/\bCREATE TABLE\b/g) ?? []).length;
-  const alterCount = (migrationSql.match(/\bALTER TABLE\b/g) ?? []).length;
   pass(
-    `Migration 0012 is fully additive: ${createCount} CREATE TABLE, ${alterCount} ALTER TABLE ADD CONSTRAINT.`
+    `All ${sqlFiles.length} migration SQL files are fully additive: ${totalCreateCount} CREATE TABLE, ${totalAlterCount} ALTER TABLE ADD CONSTRAINT.`
   );
 }
 

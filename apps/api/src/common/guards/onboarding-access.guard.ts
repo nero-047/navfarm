@@ -22,15 +22,23 @@ export class OnboardingAccessGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    const onboardingHeader = request.headers?.['x-onboarding-token'];
     const authorization = request.headers?.authorization;
 
-    if (typeof authorization !== 'string' || !authorization.startsWith('Bearer ')) {
-      throw new UnauthorizedException('A valid onboarding access token is required.');
+    let rawToken: string | undefined;
+    if (typeof onboardingHeader === 'string' && onboardingHeader.trim()) {
+      rawToken = onboardingHeader.trim().replace(/^Bearer\s+/i, '');
+    } else if (typeof authorization === 'string' && authorization.startsWith('Bearer ')) {
+      rawToken = authorization.slice(7);
+    }
+
+    if (!rawToken) {
+      throw new UnauthorizedException('A valid onboarding access token is required (via x-onboarding-token or Bearer token).');
     }
 
     let payload: OnboardingTokenPayload;
     try {
-      payload = await this.jwtService.verifyAsync<OnboardingTokenPayload>(authorization.slice(7));
+      payload = await this.jwtService.verifyAsync<OnboardingTokenPayload>(rawToken);
     } catch {
       throw new UnauthorizedException('The onboarding access token is invalid or expired.');
     }

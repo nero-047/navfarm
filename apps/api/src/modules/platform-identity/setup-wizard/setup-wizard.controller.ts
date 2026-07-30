@@ -9,6 +9,7 @@ import { Step2AddressDto } from './dto/step2-address.dto';
 import { Step3ContactDto } from './dto/step3-contact.dto';
 import { Step7FiscalDto } from './dto/step7-fiscal.dto';
 import { Step8ModulesDto } from './dto/step8-modules.dto';
+import { Step9AdminUserDto } from './dto/step9-admin.dto';
 import { CreateNobDto, UpdateNobDto, CreateLobDto, UpdateLobDto } from './dto/nob-lob.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { SystemAdminGuard } from '../../../common/guards/system-admin.guard';
@@ -146,6 +147,15 @@ export class SetupWizardController {
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   async saveStep8(@Param('companyId') companyId: string, @Body() dto: Step8ModulesDto) {
     return this.wizardService.saveStep8Modules(companyId, dto.modules);
+  }
+
+  @Post('step-9')
+  @UseGuards(OnboardingAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Step 9: Save primary Administrator Account' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Step completed.' })
+  async saveStep9(@Body() dto: Step9AdminUserDto) {
+    return this.wizardService.saveStep9AdminUser(dto);
   }
 
   @Get('status/:companyId')

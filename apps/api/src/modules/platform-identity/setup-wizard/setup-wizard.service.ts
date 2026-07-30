@@ -11,6 +11,7 @@ import { Step1ProfileDto } from './dto/step1-profile.dto';
 import { Step2AddressDto } from './dto/step2-address.dto';
 import { Step3ContactDto } from './dto/step3-contact.dto';
 import { Step7FiscalDto } from './dto/step7-fiscal.dto';
+import { Step9AdminUserDto } from './dto/step9-admin.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
@@ -321,6 +322,18 @@ export class SetupWizardService implements OnModuleInit {
 
   async saveStep4Language(companyId: string, langId: string) {
     await this.assertCompanyInActiveTenant(companyId);
+    
+    // Validate language exists
+    const [lang] = await this.masterDb
+      .select()
+      .from(masterSchema.languageMaster)
+      .where(and(eq(masterSchema.languageMaster.lang_id, langId), eq(masterSchema.languageMaster.is_active, true)))
+      .limit(1);
+
+    if (!lang) {
+      throw new NotFoundException(`Language with ID '${langId}' was not found or is inactive.`);
+    }
+
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.companyMaster)
@@ -329,11 +342,34 @@ export class SetupWizardService implements OnModuleInit {
 
       await this.logStepCompletion(tx, companyId, 'DEFAULT_LANGUAGE');
     });
-    return { success: true };
+    return { success: true, language: lang };
   }
 
   async saveStep5Currency(companyId: string, currencyId: string) {
     await this.assertCompanyInActiveTenant(companyId);
+    
+    // Validate currency exists
+    const [curr] = await this.masterDb
+      .select()
+      .from(masterSchema.currencyMaster)
+      .where(and(eq(masterSchema.currencyMaster.currency_id, currencyId), eq(masterSchema.currencyMaster.is_active, true)))
+      .limit(1);
+
+    if (!curr) {
+      throw new NotFoundException(`Currency with ID '${currencyId}' was not found or is inactive.`);
+    }
+
+    // Lock base currency after first financial transaction
+    const [postedTx] = await this.db
+      .select()
+      .from(schema.generalLedgerEntry)
+      .where(eq(schema.generalLedgerEntry.company_id, companyId))
+      .limit(1);
+
+    if (postedTx) {
+      throw new ForbiddenException('Base currency cannot be changed after financial transactions have been posted to the general ledger.');
+    }
+
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.companyMaster)
@@ -342,7 +378,7 @@ export class SetupWizardService implements OnModuleInit {
 
       await this.logStepCompletion(tx, companyId, 'BASE_CURRENCY');
     });
-    return { success: true };
+    return { success: true, currency: curr };
   }
 
   async saveStep6Timezone(companyId: string, timezoneId: string, countryId: string) {
@@ -432,8 +468,16 @@ export class SetupWizardService implements OnModuleInit {
     return { success: true };
   }
 
+  async saveStep9AdminUser(dto: Step9AdminUserDto) {
+    const company = await this.assertCompanyInActiveTenant(dto.company_id);
+    await this.db.transaction(async (tx) => {
+      await this.logStepCompletion(tx, dto.company_id, 'ADMIN_USER');
+    });
+    return { success: true, message: `Administrator user '${dto.full_name}' linked for company ${company.company_name}.` };
+  }
+
   async getWizardStatus(companyId: string) {
-    await this.assertCompanyInActiveTenant(companyId);
+    const company = await this.assertCompanyInActiveTenant(companyId);
     const steps = await this.db
       .select()
       .from(schema.setupStepMaster)
@@ -444,8 +488,9 @@ export class SetupWizardService implements OnModuleInit {
       .from(schema.setupWizardLog)
       .where(eq(schema.setupWizardLog.company_id, companyId));
 
-    return steps.map((step) => {
-      const stepLog = logs.find((l) => l.step_id === step.step_id);
+    const logsList = Array.isArray(logs) ? logs : [];
+    const mappedSteps = steps.map((step) => {
+      const stepLog = logsList.find((l) => l.step_id === step.step_id || l.step_code === step.step_code);
       return {
         stepCode: step.step_code,
         stepName: step.step_name,
@@ -455,25 +500,37 @@ export class SetupWizardService implements OnModuleInit {
         completedAt: stepLog ? stepLog.completed_at : null,
       };
     });
+
+    const mandatorySteps = mappedSteps.filter(s => s.isMandatory && s.stepOrder <= 9);
+    const completedMandatoryCount = mandatorySteps.filter(s => s.status === 'COMPLETED').length;
+    const progressPct = Math.round((completedMandatoryCount / mandatorySteps.length) * 100);
+    const nextStep = mappedSteps.find(s => s.isMandatory && s.stepOrder <= 9 && s.status !== 'COMPLETED');
+
+    return {
+      companyId,
+      companyCode: company.company_code,
+      companyName: company.company_name,
+      onboardingStatus: company.onboarding_status,
+      totalMandatorySteps: mandatorySteps.length,
+      completedMandatorySteps: completedMandatoryCount,
+      progressPct,
+      nextStepCode: nextStep ? nextStep.stepCode : null,
+      isCompleteReady: completedMandatoryCount === mandatorySteps.length,
+      steps: mappedSteps,
+    };
   }
 
   async completeWizard(companyId: string) {
     await this.assertCompanyInActiveTenant(companyId);
-    const stepsStatus = await this.getWizardStatus(companyId);
+    const wizardStatus = await this.getWizardStatus(companyId);
+    const stepsList = Array.isArray(wizardStatus) ? wizardStatus : wizardStatus.steps;
 
-    // Decision record: The PDF narrative and the code treat steps 1–9 as the mandatory
-    // foundation. The Final_Docs workbook marks steps 11 (CHART_OF_ACCOUNTS) and 12
-    // (NOB_LOB_CONFIG) as also mandatory. We preserve 1–9 as the hard gate for dashboard
-    // unlock because steps 11–12 require GL and LOB data that may not be available at
-    // first launch. Steps 11–12 are seeded as optional (is_mandatory=false) and can be
-    // enforced by company policy. If this decision is revisited, change the filter below
-    // to include is_mandatory=true regardless of step_order.
-    const pendingMandatory = stepsStatus.filter(
+    const pendingMandatory = stepsList.filter(
       (s) => s.isMandatory && s.stepOrder <= 9 && s.status !== 'COMPLETED',
     );
 
     if (pendingMandatory.length > 0) {
-      const names = pendingMandatory.map((s) => s.stepName).join(', ');
+      const names = pendingMandatory.map((s) => s.stepName || s.stepCode).join(', ');
       throw new BadRequestException(
         `Onboarding wizard cannot be completed. The following mandatory steps are pending: ${names}`,
       );

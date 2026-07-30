@@ -275,16 +275,21 @@ export class ProductionBatchService {
     const batch = await this.findBatchById(batchId, tenantId);
     const current = batch.status as BatchStatusEnum;
 
-    // State machine validation rules
+    // State machine validation rules for all documented batch states:
+    // DRAFT, APPROVED, ACTIVE, PLANNED, RELEASED, MATERIAL_ISSUED, IN_PROGRESS, QUALITY_CHECK, COMPLETED, FINISHED, CLOSED, CANCELLED
     const allowedTransitions: Record<string, string[]> = {
-      DRAFT: ['PLANNED', 'RELEASED'],
-      PLANNED: ['RELEASED', 'DRAFT'],
-      RELEASED: ['MATERIAL_ISSUED', 'IN_PROGRESS'],
-      MATERIAL_ISSUED: ['IN_PROGRESS'],
-      IN_PROGRESS: ['QUALITY_CHECK', 'FINISHED'],
-      QUALITY_CHECK: ['FINISHED', 'IN_PROGRESS'],
+      DRAFT: ['APPROVED', 'PLANNED', 'RELEASED', 'CANCELLED'],
+      APPROVED: ['ACTIVE', 'RELEASED', 'IN_PROGRESS', 'CANCELLED'],
+      ACTIVE: ['COMPLETED', 'FINISHED', 'IN_PROGRESS', 'CANCELLED'],
+      PLANNED: ['RELEASED', 'DRAFT', 'APPROVED', 'CANCELLED'],
+      RELEASED: ['MATERIAL_ISSUED', 'IN_PROGRESS', 'ACTIVE', 'CANCELLED'],
+      MATERIAL_ISSUED: ['IN_PROGRESS', 'ACTIVE', 'CANCELLED'],
+      IN_PROGRESS: ['QUALITY_CHECK', 'COMPLETED', 'FINISHED', 'CANCELLED'],
+      QUALITY_CHECK: ['FINISHED', 'COMPLETED', 'IN_PROGRESS', 'CANCELLED'],
+      COMPLETED: ['FINISHED', 'CLOSED'],
       FINISHED: ['CLOSED'],
-      CLOSED: [], // Controlled reopen
+      CLOSED: [],
+      CANCELLED: [],
     };
 
     if (!allowedTransitions[current]?.includes(targetStatus)) {

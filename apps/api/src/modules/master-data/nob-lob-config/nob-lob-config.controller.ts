@@ -39,6 +39,15 @@ export class NobLobConfigController {
     return { success: true, message: 'NOB configs retrieved.', data: result };
   }
 
+  @Get('effective/:lobId')
+  @RequirePermission('SETUP', 'NOB_LOB_CONFIG', 'view')
+  @ApiOperation({ summary: 'Get merged effective configuration settings for a LOB (base LOB config + tenant overrides)' })
+  @ApiParam({ name: 'lobId', description: 'LOB UUID' })
+  async getEffectiveLobConfig(@Param('lobId') lobId: string) {
+    const result = await this.svc.getEffectiveLobConfig(lobId);
+    return { success: true, message: 'Effective LOB config retrieved successfully.', data: result };
+  }
+
   @Put(':id')
   @RequirePermission('SETUP', 'NOB_LOB_CONFIG', 'edit')
   @ApiOperation({ summary: 'Update an extension config value' })

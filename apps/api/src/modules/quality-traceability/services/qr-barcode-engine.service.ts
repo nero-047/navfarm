@@ -87,6 +87,7 @@ export class QrBarcodeEngineService {
 
     // Resolve public consumer-safe information based on entity type
     let batch: any = null;
+    let farm: any = null;
     let inspections: any[] = [];
 
     if (qrRecord.entity_id) {
@@ -96,6 +97,15 @@ export class QrBarcodeEngineService {
         .where(eq(schema.productionBatch.batch_id, qrRecord.entity_id))
         .limit(1);
       batch = b || null;
+
+      if (batch?.farm_id) {
+        const [f] = await this.db
+          .select()
+          .from(schema.farmMaster)
+          .where(eq(schema.farmMaster.farm_id, batch.farm_id))
+          .limit(1);
+        farm = f || null;
+      }
 
       try {
         inspections = await this.db
@@ -107,20 +117,32 @@ export class QrBarcodeEngineService {
       }
     }
 
-    const qcPassed = inspections.some(i => i.overall_result === 'PASSED');
+    const inspectionsList = Array.isArray(inspections) ? inspections : [];
+    const hasPassed = inspectionsList.some(i => i.overall_result === 'PASSED');
+    const hasQuarantine = inspectionsList.some(i => i.overall_result === 'QUARANTINE' || i.overall_result === 'FAILED');
+
+    let qualityVerification = 'INSPECTION_PENDING';
+    if (hasPassed && !hasQuarantine) {
+      qualityVerification = 'PASSED_AND_VERIFIED';
+    } else if (hasQuarantine) {
+      qualityVerification = 'QUARANTINE_HOLD';
+    }
+
+    const payloadMeta = (qrRecord.payload_json as Record<string, any>) || {};
 
     // Return sanitized public consumer payload (No internal GL IDs, costs, or tenant secrets)
     return {
       qr_code: qrRecord.qr_code_hash,
-      product_name: (qrRecord.payload_json as any)?.item_name || 'Navfarm Certified Dressed Product',
-      batch_number: batch?.batch_no || 'BATCH-NAV-2026',
-      production_stage: batch?.stage || 'PACKAGED',
-      farm_origin: 'Navfarm Certified Partner Unit',
-      produced_at: batch?.created_at || new Date().toISOString(),
-      quality_verification: qcPassed ? 'PASSED_AND_VERIFIED' : 'CERTIFIED_SAFE',
+      barcode_type: qrRecord.barcode_type,
+      product_name: payloadMeta.item_name || payloadMeta.product_name || null,
+      batch_number: batch?.batch_no || payloadMeta.batch_no || null,
+      production_stage: batch?.stage || payloadMeta.stage || null,
+      farm_origin: farm?.farm_name || payloadMeta.farm_name || null,
+      produced_at: batch?.created_at || qrRecord.created_at || null,
+      quality_verification: qualityVerification,
       total_quality_inspections: inspections.length,
-      certification_seal: 'NAV-GS1-FOOD-SAFETY-2026',
-      consumer_message: 'This product has complete digital farm-to-fork origin verification.',
+      scanned_count: qrRecord.scanned_count + 1,
+      consumer_message: 'Verified farm-to-fork origin record.',
     };
   }
 }

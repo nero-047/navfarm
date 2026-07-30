@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -201,6 +201,38 @@ export class ResourceService {
     });
 
     return this.findOne(id);
+  }
+
+  async validateResourceAvailability(resourceId: string, tenantId: string): Promise<boolean> {
+    const resource = await this.findOne(resourceId);
+
+    if (resource.status === 'INACTIVE' || !resource.is_active) {
+      throw new BadRequestException(`Resource '${resource.resource_name}' is INACTIVE and cannot be assigned.`);
+    }
+
+    const activeMaintenance = await this.db
+      .select()
+      .from(schema.resourceMaintenanceLog)
+      .where(
+        and(
+          eq(schema.resourceMaintenanceLog.tenant_id, tenantId),
+          eq(schema.resourceMaintenanceLog.resource_id, resourceId),
+          or(
+            eq(schema.resourceMaintenanceLog.status, 'IN_PROGRESS'),
+            eq(schema.resourceMaintenanceLog.status, 'UNDER_MAINTENANCE')
+          ),
+          isNull(schema.resourceMaintenanceLog.deleted_at)
+        )
+      )
+      .limit(1);
+
+    if (activeMaintenance.length > 0) {
+      throw new BadRequestException(
+        `Resource '${resource.resource_name}' is currently UNDER_MAINTENANCE and cannot be assigned to operational tasks.`
+      );
+    }
+
+    return true;
   }
 
   async remove(id: string, tenantId: string, userPayload?: any) {

@@ -58,4 +58,52 @@ export class SlaughterCostSplitService {
         )
       );
   }
+
+  async calculateDynamicCostSplits(
+    companyId: string,
+    outputs: Array<{ item_id: string; qty_kg: number; unit_price?: number; cost_split_pct?: number }>,
+    allocationMethod: 'PERCENTAGE' | 'WEIGHT' | 'MARKET_VALUE',
+    tenantId: string
+  ): Promise<Array<{ item_id: string; calculated_split_pct: number }>> {
+    if (outputs.length === 0) return [];
+
+    if (allocationMethod === 'WEIGHT') {
+      const totalWeight = outputs.reduce((sum, o) => sum + (o.qty_kg || 0), 0);
+      if (totalWeight <= 0) {
+        const equalSplit = 100 / outputs.length;
+        return outputs.map((o) => ({ item_id: o.item_id, calculated_split_pct: equalSplit }));
+      }
+      return outputs.map((o) => ({
+        item_id: o.item_id,
+        calculated_split_pct: parseFloat(((o.qty_kg / totalWeight) * 100).toFixed(4)),
+      }));
+    }
+
+    if (allocationMethod === 'MARKET_VALUE') {
+      const totalMarketValue = outputs.reduce((sum, o) => sum + (o.qty_kg || 0) * (o.unit_price || 1), 0);
+      if (totalMarketValue <= 0) {
+        const equalSplit = 100 / outputs.length;
+        return outputs.map((o) => ({ item_id: o.item_id, calculated_split_pct: equalSplit }));
+      }
+      return outputs.map((o) => ({
+        item_id: o.item_id,
+        calculated_split_pct: parseFloat((((o.qty_kg * (o.unit_price || 1)) / totalMarketValue) * 100).toFixed(4)),
+      }));
+    }
+
+    // Default: PERCENTAGE allocation
+    const configuredConfigs = await this.getCostSplitConfigs(companyId, tenantId);
+    return outputs.map((o) => {
+      let splitPct = o.cost_split_pct;
+      if (splitPct === undefined || splitPct === null) {
+        const conf = configuredConfigs.find((c) => c.item_id === o.item_id);
+        if (conf) {
+          splitPct = parseFloat(conf.cost_split_pct);
+        } else {
+          splitPct = 100 / outputs.length;
+        }
+      }
+      return { item_id: o.item_id, calculated_split_pct: splitPct };
+    });
+  }
 }

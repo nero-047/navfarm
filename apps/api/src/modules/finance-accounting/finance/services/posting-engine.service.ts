@@ -90,21 +90,22 @@ export class PostingEngineService {
         )
       );
 
-    // Filter rules matching the specified context (or rule has null for wildcard)
+    // Filter rules matching the specified context.
+    // A dimension-specific rule (non-null in rule) MUST NOT match when required context is absent or mismatched.
     const matchingRules = allCandidateRules.filter(rule => {
-      if (rule.nob_id && params.nob_id && rule.nob_id !== params.nob_id) return false;
-      if (rule.lob_id && params.lob_id && rule.lob_id !== params.lob_id) return false;
-      if (rule.stage && params.stage && rule.stage.toUpperCase() !== params.stage.toUpperCase()) return false;
-      if (rule.event_type && params.event_type && rule.event_type.toUpperCase() !== params.event_type.toUpperCase()) return false;
-      if (rule.item_category_id && params.item_category_id && rule.item_category_id !== params.item_category_id) return false;
-      if (rule.item_posting_group && params.item_posting_group && rule.item_posting_group.toUpperCase() !== params.item_posting_group.toUpperCase()) return false;
-      if (rule.valuation_method && params.valuation_method && rule.valuation_method.toUpperCase() !== params.valuation_method.toUpperCase()) return false;
+      if (rule.nob_id && rule.nob_id !== params.nob_id) return false;
+      if (rule.lob_id && rule.lob_id !== params.lob_id) return false;
+      if (rule.stage && (!params.stage || rule.stage.toUpperCase() !== params.stage.toUpperCase())) return false;
+      if (rule.event_type && (!params.event_type || rule.event_type.toUpperCase() !== params.event_type.toUpperCase())) return false;
+      if (rule.item_category_id && rule.item_category_id !== params.item_category_id) return false;
+      if (rule.item_posting_group && (!params.item_posting_group || rule.item_posting_group.toUpperCase() !== params.item_posting_group.toUpperCase())) return false;
+      if (rule.valuation_method && (!params.valuation_method || rule.valuation_method.toUpperCase() !== params.valuation_method.toUpperCase())) return false;
       return true;
     });
 
     if (matchingRules.length === 0) {
       throw new BadRequestException(
-        `GL Mapping rule not configured for Transaction Type '${params.transaction_type}' in this company.`
+        `GL Mapping rule not configured for Transaction Type '${params.transaction_type}' in this company with specified context.`
       );
     }
 
@@ -133,45 +134,56 @@ export class PostingEngineService {
       );
     }
 
-    // 2. Write Debit general ledger line
-    await this.ledgerService.postEntry(
-      {
-        company_id: params.company_id,
-        gl_account_id: debitAccount,
-        debit: params.amount,
-        credit: 0,
-        posting_date: params.posting_date,
-        cost_center_id: params.cost_center_id || null,
-        dimension_values: params.dimension_values || null,
-        ref_doc_type: params.ref_doc_type,
-        ref_doc_id: params.ref_doc_id,
-        ref_doc_line_id: params.ref_doc_line_id || null,
-        notes: params.notes || `Auto Posting: ${params.transaction_type}`,
-      },
-      tenantId,
-      userId,
-      trx
-    );
+    // 2. Perform atomic double-entry posting inside a database transaction
+    const executePosting = async (dbTx: any) => {
+      // Write Debit general ledger line
+      await this.ledgerService.postEntry(
+        {
+          company_id: params.company_id,
+          gl_account_id: debitAccount,
+          debit: params.amount,
+          credit: 0,
+          posting_date: params.posting_date,
+          cost_center_id: params.cost_center_id || null,
+          dimension_values: params.dimension_values || null,
+          ref_doc_type: params.ref_doc_type,
+          ref_doc_id: params.ref_doc_id,
+          ref_doc_line_id: params.ref_doc_line_id || null,
+          notes: params.notes || `Auto Posting: ${params.transaction_type}`,
+        },
+        tenantId,
+        userId,
+        dbTx
+      );
 
-    // 3. Write Credit general ledger line
-    await this.ledgerService.postEntry(
-      {
-        company_id: params.company_id,
-        gl_account_id: creditAccount,
-        debit: 0,
-        credit: params.amount,
-        posting_date: params.posting_date,
-        cost_center_id: params.cost_center_id || null,
-        dimension_values: params.dimension_values || null,
-        ref_doc_type: params.ref_doc_type,
-        ref_doc_id: params.ref_doc_id,
-        ref_doc_line_id: params.ref_doc_line_id || null,
-        notes: params.notes || `Auto Posting: ${params.transaction_type}`,
-      },
-      tenantId,
-      userId,
-      trx
-    );
+      // Write Credit general ledger line
+      await this.ledgerService.postEntry(
+        {
+          company_id: params.company_id,
+          gl_account_id: creditAccount,
+          debit: 0,
+          credit: params.amount,
+          posting_date: params.posting_date,
+          cost_center_id: params.cost_center_id || null,
+          dimension_values: params.dimension_values || null,
+          ref_doc_type: params.ref_doc_type,
+          ref_doc_id: params.ref_doc_id,
+          ref_doc_line_id: params.ref_doc_line_id || null,
+          notes: params.notes || `Auto Posting: ${params.transaction_type}`,
+        },
+        tenantId,
+        userId,
+        dbTx
+      );
+    };
+
+    if (tx) {
+      await executePosting(tx);
+    } else {
+      await this.db.transaction(async (dbTx) => {
+        await executePosting(dbTx);
+      });
+    }
 
     return { success: true, message: 'Automated double-entry general ledger records written successfully.' };
   }

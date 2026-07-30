@@ -137,6 +137,37 @@ export class AlertEngineService {
     };
   }
 
+  async resolveAlert(alertId: string, tenantId: string, notes?: string, userId?: string) {
+    const [alert] = await this.db
+      .select()
+      .from(schema.alertEvent)
+      .where(
+        and(
+          eq(schema.alertEvent.alert_id, alertId),
+          eq(schema.alertEvent.tenant_id, tenantId)
+        )
+      )
+      .limit(1);
+
+    if (!alert) {
+      throw new NotFoundException(`Alert '${alertId}' not found.`);
+    }
+
+    await this.db
+      .update(schema.alertEvent)
+      .set({
+        status: 'RESOLVED',
+      })
+      .where(eq(schema.alertEvent.alert_id, alertId));
+
+    return {
+      ...alert,
+      status: 'RESOLVED',
+      resolution_notes: notes || 'Alert resolved.',
+      resolved_by: userId || null,
+    };
+  }
+
   /**
    * Fire a direct alert without a pre-existing alert rule.
    * Used by verticals (Aqua water quality, Feed QC, Agri PHI) to persist

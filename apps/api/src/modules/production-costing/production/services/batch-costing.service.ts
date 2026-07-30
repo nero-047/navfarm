@@ -66,7 +66,8 @@ export class BatchCostingService {
     let totalMachineCost = 0;
     let totalOverheadCost = 0;
 
-    for (const r of resourceUsages) {
+    const resourceUsagesList = Array.isArray(resourceUsages) ? resourceUsages : [];
+    for (const r of resourceUsagesList) {
       const cost = parseFloat(r.total_cost);
       if (r.usage_type === 'LABOR') totalLaborCost += cost;
       else if (r.usage_type === 'MACHINE') totalMachineCost += cost;
@@ -168,9 +169,9 @@ export class BatchCostingService {
     if (batch.status === 'CLOSED') {
       throw new BadRequestException(`Batch '${batch.batch_no}' is already CLOSED.`);
     }
-    if (batch.status !== 'FINISHED') {
+    if (batch.status !== 'FINISHED' && batch.status !== 'COMPLETED') {
       throw new BadRequestException(
-        `Batch '${batch.batch_no}' must be in FINISHED status before closing. Current status: '${batch.status}'.`,
+        `Batch '${batch.batch_no}' must be in FINISHED or COMPLETED status before closing. Current status: '${batch.status}'.`,
       );
     }
 

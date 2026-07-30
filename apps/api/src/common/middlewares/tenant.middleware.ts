@@ -52,13 +52,17 @@ export class TenantMiddleware implements NestMiddleware {
       }
     }
 
-    // 3. Bypass public authentication and onboarding wizard steps
+    // 3. Bypass public authentication, onboarding wizard steps, and public QR scans
     const isPublic = 
       path.includes('/auth/login') || 
       path.includes('/auth/register-admin') || 
-      path.includes('/tenant') ||
+      path.includes('/auth/forgot-password') || 
+      path.includes('/auth/reset-password') || 
+      path.includes('/tenant/signup') ||
+      path.includes('/tenant/code/') ||
       path.includes('/plan') ||
-      path.includes('/setup/wizard');
+      path.includes('/setup/wizard') ||
+      path.includes('/quality/qr/public');
 
     if (tenantId && tokenTenantId && tenantId !== tokenTenantId) {
       throw new ForbiddenException('x-tenant-id does not match the tenant bound to this access token.');
@@ -70,7 +74,7 @@ export class TenantMiddleware implements NestMiddleware {
       throw new BadRequestException('x-tenant-id header is missing');
     }
     
-    // Default to the system tenant ID if no custom tenant header is supplied
+    // Use effectiveTenantId if supplied, otherwise fallback to system tenant ID for public routes
     const activeTenantId = effectiveTenantId || '00000000-0000-0000-0000-000000000000';
 
     if (activeTenantId) {
@@ -86,21 +90,21 @@ export class TenantMiddleware implements NestMiddleware {
         )
         .limit(1);
 
-      if (!tenant) {
+      if (tenant) {
+        if (!tenant.is_active) {
+          throw new ForbiddenException('Tenant account is suspended or inactive. Please contact system support.');
+        }
+
+        const tenantDb = await this.connectionManager.getTenantConnection(tenant);
+
+        // Store in AsyncLocalStorage
+        const resolvedTenantId = tenant.tenant_id;
+        this.cls.set('tenantId', resolvedTenantId);
+        this.cls.set('tenantDb', tenantDb);
+        req['tenantId'] = resolvedTenantId;
+      } else if (!isPublic) {
         throw new BadRequestException(`Tenant connection context for '${activeTenantId}' not found.`);
       }
-
-      if (!tenant.is_active) {
-        throw new ForbiddenException('Tenant account is suspended or inactive. Please contact system support.');
-      }
-
-      const tenantDb = await this.connectionManager.getTenantConnection(tenant);
-
-      // Store in AsyncLocalStorage
-      const resolvedTenantId = tenant.tenant_id;
-      this.cls.set('tenantId', resolvedTenantId);
-      this.cls.set('tenantDb', tenantDb);
-      req['tenantId'] = resolvedTenantId;
     }
     
     next();

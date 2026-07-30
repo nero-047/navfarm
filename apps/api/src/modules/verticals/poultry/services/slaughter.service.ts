@@ -109,21 +109,37 @@ export class SlaughterService {
     const totalDressedWeight = dto.outputs.reduce((sum, o) => sum + o.qty_kg, 0);
     const yieldPct = dto.total_live_weight_kg > 0 ? (totalDressedWeight / dto.total_live_weight_kg) * 100 : 0;
 
-    // Fetch configured cost split percentages for company
-    const configuredSplits = await this.costSplitService.getCostSplitConfigs(dto.company_id, tenantId);
+    // Resolve dynamic cost splits (PERCENTAGE, WEIGHT, or MARKET_VALUE)
+    const allocationMethod = (dto as any).allocation_method || 'PERCENTAGE';
+    const dynamicSplits = typeof this.costSplitService.calculateDynamicCostSplits === 'function'
+      ? await this.costSplitService.calculateDynamicCostSplits(
+          dto.company_id,
+          dto.outputs,
+          allocationMethod,
+          tenantId
+        )
+      : null;
+
+    // Fetch configured cost split percentages for company if dynamicSplits not present
+    const configuredSplits = dynamicSplits ? [] : await this.costSplitService.getCostSplitConfigs(dto.company_id, tenantId);
 
     const postedOutputs: any[] = [];
     let primaryReceiptId: string | null = null;
+    const slaughterId = randomUUID();
 
     for (const output of dto.outputs) {
-      // Resolve cost split percentage
       let splitPct = output.cost_split_pct;
       if (splitPct === undefined || splitPct === null) {
-        const conf = configuredSplits.find(c => c.item_id === output.item_id);
-        if (conf) {
-          splitPct = parseFloat(conf.cost_split_pct);
+        if (dynamicSplits) {
+          const splitInfo = dynamicSplits.find((s) => s.item_id === output.item_id);
+          splitPct = splitInfo ? splitInfo.calculated_split_pct : (100 / dto.outputs.length);
         } else {
-          splitPct = totalDressedWeight > 0 ? (output.qty_kg / totalDressedWeight) * 100 : (100 / dto.outputs.length);
+          const conf = configuredSplits.find(c => c.item_id === output.item_id);
+          if (conf) {
+            splitPct = parseFloat(conf.cost_split_pct);
+          } else {
+            splitPct = totalDressedWeight > 0 ? (output.qty_kg / totalDressedWeight) * 100 : (100 / dto.outputs.length);
+          }
         }
       }
 
@@ -146,10 +162,24 @@ export class SlaughterService {
       if (!primaryReceiptId) {
         primaryReceiptId = res.output.goods_receipt_id;
       }
+
+      // Persist cost split execution history
+      await this.db.insert(schema.slaughterCostSplitExecution).values({
+        execution_id: randomUUID(),
+        tenant_id: tenantId,
+        company_id: dto.company_id,
+        slaughter_id: slaughterId,
+        item_id: output.item_id,
+        output_type: output.output_type,
+        qty_kg: output.qty_kg.toFixed(4),
+        calculated_split_pct: splitPct.toFixed(4),
+        allocated_cost: parseFloat(res.output.unit_cost) * output.qty_kg,
+        goods_receipt_id: res.output.goods_receipt_id,
+      });
+
       postedOutputs.push({ ...output, cost_split_pct: splitPct, goods_receipt_id: res.output.goods_receipt_id });
     }
 
-    const slaughterId = randomUUID();
     const newSlaughter = {
       slaughter_id: slaughterId,
       tenant_id: tenantId,

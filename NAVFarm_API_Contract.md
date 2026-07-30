@@ -936,8 +936,9 @@ export const useLogin = () => useMutation((payload) => api.post('/auth/login', p
 
 # MODULE 08 — Setup Wizard (`/setup/wizard`)
 
-**Business Purpose**: Guided 9-step onboarding for new tenant workspaces.  
-**DB Tables**: `company_master` (onboarding_status), `user_master`
+**Business Purpose**: Guided onboarding for new tenant workspaces (8 steps implemented: Steps 1-7 core profile + Step 8 NOB/LOB selection).  
+**DB Tables**: `company_master` (onboarding_step, is_onboarded), `user_master`
+**Audit Note**: Standardized to 8 wizard steps per RAK requirements matrix audit.
 
 ### GET `/setup/wizard/status`
 

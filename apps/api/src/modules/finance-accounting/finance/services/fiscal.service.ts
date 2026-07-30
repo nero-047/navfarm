@@ -170,6 +170,16 @@ export class FiscalService {
         throw new NotFoundException(`Accounting Period with ID '${periodId}' not found.`);
       }
 
+      const [year] = await trx
+        .select()
+        .from(schema.fiscalYear)
+        .where(eq(schema.fiscalYear.fiscal_year_id, period.fiscal_year_id))
+        .limit(1);
+
+      if (year && year.status === 'CLOSED') {
+        throw new BadRequestException(`Cannot reopen accounting period '${period.period_name}'. Parent Fiscal Year '${year.year_code}' is closed.`);
+      }
+
       await trx
         .update(schema.accountingPeriod)
         .set({
@@ -235,6 +245,39 @@ export class FiscalService {
       });
 
       return { success: true, message: `Fiscal Year '${year.year_code}' closed and all accounting periods locked.` };
+    });
+  }
+
+  async reopenFiscalYear(fiscalYearId: string, tenantId: string, userId?: string) {
+    return this.db.transaction(async (trx) => {
+      const year = await this.findOneFiscalYear(fiscalYearId, tenantId, trx);
+      if (year.status === 'OPEN') {
+        throw new BadRequestException('Fiscal Year is already open.');
+      }
+
+      const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+      await trx
+        .update(schema.fiscalYear)
+        .set({
+          status: 'OPEN',
+          updated_by: userId || null,
+          updated_at: nowStr,
+        })
+        .where(eq(schema.fiscalYear.fiscal_year_id, fiscalYearId));
+
+      await this.auditService.log({
+        tenantId,
+        companyId: year.company_id,
+        userId,
+        action: 'REOPEN_YEAR',
+        entityName: 'fiscal_year',
+        entityId: fiscalYearId,
+        oldValues: year,
+        newValues: { ...year, status: 'OPEN' },
+      });
+
+      return { success: true, message: `Fiscal Year '${year.year_code}' reopened successfully.` };
     });
   }
 
@@ -307,7 +350,7 @@ export class FiscalService {
 
     return {
       ...year,
-      periods: periods.sort((a, b) => a.period_no - b.period_no),
+      periods: Array.isArray(periods) ? periods.sort((a, b) => a.period_no - b.period_no) : [],
     };
   }
 

@@ -49,6 +49,20 @@ export class FiscalController {
     };
   }
 
+  @Post('year/:id/reopen')
+  @RequirePermission('FINANCE', 'FISCAL', 'edit')
+  @ApiOperation({ summary: 'Controlled Reopening of a closed Fiscal Year' })
+  @ApiParam({ name: 'id', description: 'Fiscal Year UUID' })
+  async reopenFiscalYear(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.fiscalService.reopenFiscalYear(id, tenantId, req.user?.userId);
+    return {
+      success: true,
+      message: result.message,
+      data: null
+    };
+  }
+
   @Post('period/:id/close')
   @RequirePermission('FINANCE', 'FISCAL', 'edit')
   @ApiOperation({ summary: 'Lock a specific Accounting Period to prevent postings' })
