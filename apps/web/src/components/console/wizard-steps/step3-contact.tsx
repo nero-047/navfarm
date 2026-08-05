@@ -43,11 +43,11 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Contact className="w-5 h-5 text-teal-400" />
+        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
+          <Contact className="w-5 h-5 text-(--accent)" />
           Step 3: Primary Contact Details
         </h2>
-        <p className="text-xs text-gray-500">Provide the contact profile for administrative alerts and reporting.</p>
+        <p className="text-xs text-(--text-secondary)">Provide the contact profile for administrative alerts and reporting.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -90,9 +90,9 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
             id="receives_reports"
             checked={formData.receives_reports}
             onChange={(e) => setFormData({ ...formData, receives_reports: e.target.checked })}
-            className="w-4 h-4 rounded border-gray-800 bg-[#121824] text-teal-500 focus:ring-teal-500"
+            className="w-4 h-4 rounded border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent)"
           />
-          <label htmlFor="receives_reports" className="text-xs text-gray-300 font-medium cursor-pointer">
+          <label htmlFor="receives_reports" className="text-xs text-(--text-secondary) font-medium cursor-pointer">
             Receive periodic executive report emails (weekly P&L, batch metrics)
           </label>
         </div>

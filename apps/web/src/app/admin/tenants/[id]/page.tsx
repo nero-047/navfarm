@@ -54,7 +54,7 @@ function Badge({ children, color = "default" }: { children: React.ReactNode; col
     amber:   "bg-amber-50 text-amber-700 border-amber-200",
     blue:    "bg-blue-50 text-blue-700 border-blue-200",
     purple:  "bg-purple-50 text-purple-700 border-purple-200",
-    default: "bg-gray-50 text-gray-600 border-gray-200",
+    default: "bg-(--surface-raised) text-(--text-secondary) border-(--border)",
   };
   return (
     <span className={`inline-flex items-center gap-1 text-[11px] font-semibold border px-2.5 py-0.5 rounded-full ${cls[color]}`}>
@@ -378,7 +378,7 @@ export default function TenantDetailPage() {
             <p className="text-xs" style={S.muted}>This is the current plan.</p>
           )}
           <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
-            <button type="button" disabled={upgrading} onClick={() => setShowPlanDialog(false)} className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+            <button type="button" disabled={upgrading} onClick={() => setShowPlanDialog(false)} className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">Cancel</button>
             <button type="submit" disabled={!selectedPlan || upgrading || selectedPlan === tenant?.plan_id}
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
               {upgrading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
@@ -591,7 +591,7 @@ export default function TenantDetailPage() {
                                         : (nobs.find(n => n.nob_code === m)?.nob_name || m);
                                       return (
                                         <span key={m}
-                                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${isLob ? "border-teal-200 bg-teal-50 text-teal-700" : "border-purple-200 bg-purple-50 text-purple-700"}`}>
+                                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${isLob ? "border-blue-200 bg-blue-50 text-blue-700" : "border-purple-200 bg-purple-50 text-purple-700"}`}>
                                           {displayName}
                                         </span>
                                       );
@@ -786,7 +786,7 @@ export default function TenantDetailPage() {
                           type="checkbox"
                           checked={isNobChecked}
                           onChange={toggleNob}
-                          className="w-4 h-4 rounded accent-teal-500 cursor-pointer"
+                          className="w-4 h-4 rounded accent-(--accent) cursor-pointer"
                         />
                         <span>{nob.nob_name}</span>
                         <span className="text-[10px] font-mono font-normal opacity-60">({nob.nob_code})</span>
@@ -818,7 +818,7 @@ export default function TenantDetailPage() {
                                   type="checkbox"
                                   checked={isLobChecked}
                                   onChange={toggleLob}
-                                  className="w-3 h-3 rounded accent-teal-500 cursor-pointer"
+                                  className="w-3 h-3 rounded accent-(--accent) cursor-pointer"
                                 />
                                 <span>{lob.lob_name}</span>
                               </label>

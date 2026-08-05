@@ -31,8 +31,13 @@ function stored(key: string): string | null {
 
 function errorMessage(payload: unknown, fallback: string): string {
   if (!payload || typeof payload !== 'object') return fallback;
-  const candidate = (payload as { message?: unknown; error?: unknown }).message ??
-    (payload as { error?: unknown }).error;
+  const obj = payload as { message?: unknown; error?: unknown };
+  let candidate: unknown = obj.message ?? obj.error;
+  // The API's HttpExceptionFilter nests the real message as `error.message`
+  // (e.g. { error: { message: "...", error: "Bad Request", statusCode } }).
+  if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+    candidate = (candidate as { message?: unknown }).message ?? candidate;
+  }
   if (Array.isArray(candidate)) return candidate.join(', ');
   return typeof candidate === 'string' ? candidate : fallback;
 }

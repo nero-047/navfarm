@@ -49,11 +49,11 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-teal-400" />
+        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-(--accent)" />
           Step 2: Operating Addresses
         </h2>
-        <p className="text-xs text-gray-500">Provide operating physical addresses for billing and tax allocations.</p>
+        <p className="text-xs text-(--text-secondary)">Provide operating physical addresses for billing and tax allocations.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -99,11 +99,11 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
           required
         />
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">Location Type</label>
+          <label className="text-xs text-(--text-secondary) font-medium">Location Type</label>
           <select
             value={formData.address_type}
             onChange={(e) => setFormData({ ...formData, address_type: e.target.value })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="HEAD_OFFICE">Head Office</option>
             <option value="FARM">Farm Location</option>

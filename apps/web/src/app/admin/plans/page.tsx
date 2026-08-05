@@ -199,7 +199,7 @@ export default function AdminPlansPage() {
                 {saving ? "Saving…" : editingPlan ? "Save Changes" : "Create Plan"}
               </button>
               <button type="button" onClick={() => setShowForm(false)}
-                className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm font-medium text-[#515463] hover:bg-[#f7f8fa]">
+                className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">
                 Cancel
               </button>
             </div>

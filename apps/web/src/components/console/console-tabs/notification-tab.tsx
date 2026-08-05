@@ -184,14 +184,14 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
 
       {/* Toast Alert Feedbacks */}
       {actionError && (
-        <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/30 text-red-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
-          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+        <div className="fixed top-4 right-4 bg-(--surface) border border-red-500/30 text-(--danger) px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
+          <AlertCircle className="w-5 h-5 text-(--danger) flex-shrink-0" />
           <span className="text-sm">{actionError}</span>
         </div>
       )}
       {actionSuccess && (
-        <div className="fixed top-4 right-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
-          <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+        <div className="fixed top-4 right-4 bg-(--surface) border border-emerald-500/30 text-emerald-600 px-4 py-3 rounded-xl z-50 flex items-center gap-2 max-w-md shadow-lg backdrop-blur">
+          <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
           <span className="text-sm">{actionSuccess}</span>
         </div>
       )}
@@ -200,13 +200,13 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
       <div className="md:col-span-8 flex flex-col gap-6">
 
         {/* Toggle Channel selector */}
-        <div className="flex gap-4 p-1.5 bg-[#0b0f19] border border-[#1a1f2e] rounded-2xl">
+        <div className="flex gap-4 p-1.5 bg-(--surface) border border-(--border) rounded-2xl">
           <button
             onClick={() => setActiveChannel("EMAIL")}
             className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeChannel === "EMAIL"
-                ? "bg-teal-500/10 border border-teal-500/20 text-white shadow-sm"
-                : "text-gray-400 hover:text-white"
+                ? "bg-(--accent-muted) border border-(--accent)/20 text-(--text-primary) shadow-sm"
+                : "text-(--text-secondary) hover:text-(--text-primary)"
             }`}
           >
             <Mail className="w-4 h-4" /> SMTP Email Server
@@ -215,8 +215,8 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
             onClick={() => setActiveChannel("WEBHOOK")}
             className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeChannel === "WEBHOOK"
-                ? "bg-teal-500/10 border border-teal-500/20 text-white shadow-sm"
-                : "text-gray-400 hover:text-white"
+                ? "bg-(--accent-muted) border border-(--accent)/20 text-(--text-primary) shadow-sm"
+                : "text-(--text-secondary) hover:text-(--text-primary)"
             }`}
           >
             <Globe className="w-4 h-4" /> Outgoing Webhooks
@@ -224,10 +224,10 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
         </div>
 
         {activeChannel === "EMAIL" && (
-          <Card className="p-6 border-[#1a1f2e] bg-[#0b0f19]">
+          <Card className="p-6 border-(--border) bg-(--surface)">
             <form onSubmit={handleSaveEmail} className="flex flex-col gap-4">
-              <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-3 mb-2">
-                <h3 className="font-bold text-white text-sm">SMTP Gateway Integration</h3>
+              <div className="flex justify-between items-center border-b border-(--border) pb-3 mb-2">
+                <h3 className="font-bold text-(--text-primary) text-sm">SMTP Gateway Integration</h3>
                 {configs.find(c => c.channel === "EMAIL") && (
                   <button
                     type="button"
@@ -235,12 +235,12 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
                       const email = configs.find(c => c.channel === "EMAIL");
                       toggleChannelEnabled(email.notif_id, email.is_enabled);
                     }}
-                    className="text-gray-400 hover:text-white flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+                    className="text-(--text-secondary) hover:text-(--text-primary) flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
                   >
                     {configs.find(c => c.channel === "EMAIL")?.is_enabled ? (
-                      <>Active <ToggleRight className="w-6 h-6 text-teal-400" /></>
+                      <>Active <ToggleRight className="w-6 h-6 text-(--accent)" /></>
                     ) : (
-                      <>Inactive <ToggleLeft className="w-6 h-6 text-gray-650" /></>
+                      <>Inactive <ToggleLeft className="w-6 h-6 text-(--text-muted)" /></>
                     )}
                   </button>
                 )}
@@ -302,10 +302,10 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
         )}
 
         {activeChannel === "WEBHOOK" && (
-          <Card className="p-6 border-[#1a1f2e] bg-[#0b0f19]">
+          <Card className="p-6 border-(--border) bg-(--surface)">
             <form onSubmit={handleSaveWebhook} className="flex flex-col gap-4">
-              <div className="flex justify-between items-center border-b border-[#1a1f2e] pb-3 mb-2">
-                <h3 className="font-bold text-white text-sm">HTTP Webhook Triggers</h3>
+              <div className="flex justify-between items-center border-b border-(--border) pb-3 mb-2">
+                <h3 className="font-bold text-(--text-primary) text-sm">HTTP Webhook Triggers</h3>
                 {configs.find(c => c.channel === "WEBHOOK") && (
                   <button
                     type="button"
@@ -313,12 +313,12 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
                       const webhook = configs.find(c => c.channel === "WEBHOOK");
                       toggleChannelEnabled(webhook.notif_id, webhook.is_enabled);
                     }}
-                    className="text-gray-400 hover:text-white flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+                    className="text-(--text-secondary) hover:text-(--text-primary) flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
                   >
                     {configs.find(c => c.channel === "WEBHOOK")?.is_enabled ? (
-                      <>Active <ToggleRight className="w-6 h-6 text-teal-400" /></>
+                      <>Active <ToggleRight className="w-6 h-6 text-(--accent)" /></>
                     ) : (
-                      <>Inactive <ToggleLeft className="w-6 h-6 text-gray-650" /></>
+                      <>Inactive <ToggleLeft className="w-6 h-6 text-(--text-muted)" /></>
                     )}
                   </button>
                 )}
@@ -351,8 +351,8 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
 
       {/* Right Side Test Dispatch Panel */}
       <div className="md:col-span-4 flex flex-col gap-6">
-        <Card className="p-6 border-[#1a1f2e] bg-[#0b0f19]">
-          <h4 className="font-bold text-white text-sm border-b border-[#1a1f2e] pb-3 mb-4">Send Test Notification</h4>
+        <Card className="p-6 border-(--border) bg-(--surface)">
+          <h4 className="font-bold text-(--text-primary) text-sm border-b border-(--border) pb-3 mb-4">Send Test Notification</h4>
           <form onSubmit={handleSendTest} className="flex flex-col gap-4">
             <Input
               label={activeChannel === "EMAIL" ? "Test Recipient Email" : "Test Endpoint URL override"}
@@ -362,11 +362,11 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
               required
             />
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Notification Body Message</label>
+              <label className="text-[10px] text-(--text-secondary) font-bold uppercase tracking-wider">Notification Body Message</label>
               <textarea
                 value={testMessage}
                 onChange={(e) => setTestMessage(e.target.value)}
-                className="w-full bg-[#121824] border border-[#1a1f2e] rounded-xl p-3 text-xs text-white h-24 focus:outline-none focus:border-teal-500 outline-none"
+                className="w-full bg-(--input-bg) border border-(--input-border) rounded-xl p-3 text-xs text-(--input-text) h-24 focus:outline-none focus:border-(--input-border-focus) outline-none"
                 required
               />
             </div>

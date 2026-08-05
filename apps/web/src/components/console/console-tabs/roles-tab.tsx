@@ -236,7 +236,7 @@ export default function RolesTab({
                   className={`p-4 transition-all border rounded-xl relative overflow-hidden flex flex-col gap-3 cursor-pointer ${
                     isCurrent
                       ? "shadow-sm"
-                      : "hover:border-gray-500"
+                      : "hover:border-(--accent)"
                   }`}
                   style={{
                     backgroundColor: isCurrent ? "var(--surface-raised)" : "var(--surface)",
@@ -335,7 +335,7 @@ export default function RolesTab({
                               type="checkbox"
                               checked={p[key]}
                               onChange={() => handleToggleCheckbox(idx, key)}
-                              className="w-4 h-4 rounded border text-teal-650 cursor-pointer focus:ring-0 focus:ring-offset-0"
+                              className="w-4 h-4 rounded border text-(--accent) cursor-pointer focus:ring-0 focus:ring-offset-0"
                               style={{
                                 backgroundColor: "var(--input-bg)",
                                 borderColor: "var(--input-border)",

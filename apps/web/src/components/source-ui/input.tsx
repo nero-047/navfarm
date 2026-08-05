@@ -21,7 +21,7 @@ export const Input: React.FC<InputProps> = ({
           </div>
         )}
         <input 
-          className={`w-full rounded-lg h-11 pr-4 text-sm focus:border-teal-500/40 focus:ring-1 focus:ring-teal-500/20 outline-none ${
+          className={`w-full rounded-lg h-11 pr-4 text-sm focus:border-(--accent)/40 focus:ring-1 focus:ring-(--accent)/20 outline-none ${
             icon ? 'pl-10' : 'pl-3.5'
           } ${className}`}
           style={{

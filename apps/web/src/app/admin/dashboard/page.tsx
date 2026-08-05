@@ -145,7 +145,7 @@ export default function AdminDashboardPage() {
           <div className="mt-2 text-xs flex items-center gap-2" style={S.sub}>
             <span className="text-green-500 font-semibold">{activeTenants} {t("active")}</span>
             <span className="opacity-40">·</span>
-            <span className="text-gray-400 font-semibold">{inactiveTenants} {t("inactive")}</span>
+            <span className="font-semibold" style={S.muted}>{inactiveTenants} {t("inactive")}</span>
           </div>
         </div>
 
@@ -236,7 +236,7 @@ export default function AdminDashboardPage() {
               <div className="px-6 py-10 text-center text-sm" style={S.muted}>{t("noTenantsRegistered")}</div>
             ) : (
               tenants.slice(-4).reverse().map((tItem) => (
-                <div key={tItem.tenant_id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                <div key={tItem.tenant_id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap hover:bg-(--surface-raised) transition-colors">
                   <div>
                     <div className="text-sm font-bold" style={S.primary}>{tItem.tenant_name}</div>
                     <div className="text-xs font-mono" style={S.muted}>{tItem.tenant_code} · {tItem.billing_email}</div>
@@ -246,7 +246,7 @@ export default function AdminDashboardPage() {
                       style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
                       {tItem.plan_id?.replace("PLAN_", "") || "—"}
                     </span>
-                    <span className={`text-[11px] font-bold ${tItem.is_active !== false ? "text-green-600" : "text-gray-400"}`}>
+                    <span className={`text-[11px] font-bold ${tItem.is_active !== false ? "text-green-600" : ""}`} style={tItem.is_active !== false ? undefined : S.muted}>
                       {tItem.is_active !== false ? t("active") : t("inactive")}
                     </span>
                   </div>
@@ -302,7 +302,7 @@ export default function AdminDashboardPage() {
               <div className="px-6 py-10 text-center text-sm" style={S.muted}>{t("noEventsRecorded")}</div>
             ) : (
               auditLogs.map((log, index) => (
-                <div key={log.audit_id || index} className="px-6 py-3.5 flex items-center justify-between gap-4 flex-wrap hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                <div key={log.audit_id || index} className="px-6 py-3.5 flex items-center justify-between gap-4 flex-wrap hover:bg-(--surface-raised) transition-colors">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       {actionBadge(log.action)}

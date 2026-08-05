@@ -37,24 +37,24 @@ export function LoginForm() {
   return (
     <div>
       <div className="mb-10">
-        <h1 className="text-3xl font-semibold text-[#2e313f] tracking-tight mb-2">
+        <h1 className="text-3xl font-semibold text-(--text-primary) tracking-tight mb-2">
           Welcome back
         </h1>
-        <p className="text-[#707070] text-[15px]">
+        <p className="text-(--text-secondary) text-[15px]">
           Sign in to your NAVFarm account
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <div className="flex items-center gap-2 text-sm text-[#c24332] py-1">
+          <div className="flex items-center gap-2 text-sm text-(--danger) py-1">
             <AlertCircle size={16} />
             <span>{error}</span>
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label htmlFor="email" className="block text-[13px] font-medium text-[#2e313f]">
+          <label htmlFor="email" className="block text-[13px] font-medium text-(--text-primary)">
             Email
           </label>
           <Input
@@ -67,7 +67,7 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="password" className="block text-[13px] font-medium text-[#2e313f]">
+          <label htmlFor="password" className="block text-[13px] font-medium text-(--text-primary)">
             Password
           </label>
           <Input
@@ -82,7 +82,7 @@ export function LoginForm() {
         <div className="flex justify-end">
           <Link
             href="/reset-password"
-            className="text-[13px] text-[#707070] hover:text-[#2e313f] transition-colors"
+            className="text-[13px] text-(--text-secondary) hover:text-(--text-primary) transition-colors"
           >
             Forgot password?
           </Link>
@@ -93,11 +93,11 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <p className="mt-8 text-center text-[14px] text-[#707070]">
+      <p className="mt-8 text-center text-[14px] text-(--text-secondary)">
         Don&apos;t have an account?{' '}
         <Link
           href="/signup"
-          className="font-medium text-[#2e313f] hover:text-[#c24332] transition-colors"
+          className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
         >
           Create one
         </Link>

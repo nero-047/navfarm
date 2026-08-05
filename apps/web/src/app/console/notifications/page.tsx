@@ -279,7 +279,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* Test Send */}
-      <div className="flex flex-col gap-4 rounded-xl border bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+      <div className="flex flex-col gap-4 rounded-xl border bg-(--surface) p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
         style={{ borderColor: "var(--border)" }}>
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
@@ -316,7 +316,7 @@ export default function NotificationsPage() {
           </Field>
           <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={{ borderColor: "var(--border)" }}>
             <button type="button" disabled={testing} onClick={() => setShowTestDialog(false)}
-              className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+              className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">
               Cancel
             </button>
             <button type="submit" disabled={testing || !testRecipient}

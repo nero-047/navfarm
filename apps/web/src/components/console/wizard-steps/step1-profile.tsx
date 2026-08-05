@@ -93,16 +93,16 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-teal-400" />
+        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
+          <Building2 className="w-5 h-5 text-(--accent)" />
           Step 1: Register Company Profile
         </h2>
-        <p className="text-xs text-gray-500">Provide registration names, company logo, and brand details. Limits set by pricing plan are applied.</p>
+        <p className="text-xs text-(--text-secondary)">Provide registration names, company logo, and brand details. Limits set by pricing plan are applied.</p>
       </div>
 
       {/* ── Company Logo Upload Section ── */}
-      <div className="p-4 rounded-xl border border-gray-800 bg-[#0f1420] flex flex-col sm:flex-row items-center gap-4">
-        <div className="w-20 h-20 rounded-xl border border-dashed border-gray-700 bg-[#121824] flex items-center justify-center overflow-hidden relative group shrink-0">
+      <div className="p-4 rounded-xl border border-(--border) bg-(--surface-raised) flex flex-col sm:flex-row items-center gap-4">
+        <div className="w-20 h-20 rounded-xl border border-dashed border-(--border) bg-(--input-bg) flex items-center justify-center overflow-hidden relative group shrink-0">
           {logoUrl ? (
             <img
               src={logoUrl.startsWith('/') ? `${backendUrl}${logoUrl}` : logoUrl}
@@ -110,16 +110,16 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
               className="w-full h-full object-contain p-1"
             />
           ) : (
-            <ImageIcon className="w-8 h-8 text-gray-600" />
+            <ImageIcon className="w-8 h-8 text-(--text-muted)" />
           )}
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 w-full">
-          <label className="text-xs font-semibold text-gray-300">Company Brand Logo</label>
-          <p className="text-[11px] text-gray-500">Supported formats: PNG, JPG, SVG, WebP (Max 5MB). Saved to server /uploads folder.</p>
+          <label className="text-xs font-semibold text-(--text-secondary)">Company Brand Logo</label>
+          <p className="text-[11px] text-(--text-secondary)">Supported formats: PNG, JPG, SVG, WebP (Max 5MB). Saved to server /uploads folder.</p>
 
           <div className="flex items-center gap-3 mt-1">
-            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/30 text-xs font-semibold hover:bg-teal-500/20 transition-all">
+            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-(--accent-muted) text-(--accent) border border-(--accent) text-xs font-semibold hover:bg-(--accent-muted) transition-all">
               <Upload className="w-3.5 h-3.5" />
               {uploadingLogo ? "Uploading..." : logoUrl ? "Change Logo" : "Upload Logo"}
               <input
@@ -135,7 +135,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
               <button
                 type="button"
                 onClick={handleClearLogo}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 text-xs font-semibold hover:bg-red-500/20 transition-all"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/30 text-xs font-semibold hover:bg-red-500/20 transition-all"
               >
                 <X className="w-3.5 h-3.5" />
                 Remove
@@ -143,7 +143,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             )}
           </div>
 
-          {logoError && <p className="text-xs text-red-400 mt-1">{logoError}</p>}
+          {logoError && <p className="text-xs text-(--danger) mt-1">{logoError}</p>}
         </div>
       </div>
 
@@ -169,11 +169,11 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           onChange={(e) => setFormData({ ...formData, company_display_name: e.target.value })}
         />
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">Business Class</label>
+          <label className="text-xs text-(--text-secondary) font-medium">Business Class</label>
           <select
             value={formData.company_type}
             onChange={(e) => setFormData({ ...formData, company_type: e.target.value })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="Sole Proprietor">Sole Proprietor</option>
             <option value="Partnership">Partnership</option>
@@ -182,11 +182,11 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">Industry Classification</label>
+          <label className="text-xs text-(--text-secondary) font-medium">Industry Classification</label>
           <select
             value={formData.industry_type}
             onChange={(e) => setFormData({ ...formData, industry_type: e.target.value })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="Poultry Farming">Poultry Farming</option>
             <option value="Livestock">Livestock Farming</option>
@@ -209,11 +209,11 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
         />
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">Tax Regime</label>
+          <label className="text-xs text-(--text-secondary) font-medium">Tax Regime</label>
           <select
             value={formData.tax_regime}
             onChange={(e) => setFormData({ ...formData, tax_regime: e.target.value })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="STANDARD">Standard Scheme</option>
             <option value="COMPOSITION">Composition Scheme</option>

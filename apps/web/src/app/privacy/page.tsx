@@ -6,9 +6,9 @@ import { ArrowLeft, Shield, Lock, Eye, FileText } from "lucide-react";
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen bg-[#090d16] text-gray-100 font-sans relative overflow-x-hidden selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen bg-[#090d16] text-gray-100 font-sans relative overflow-x-hidden selection:bg-[#c24332] selection:text-white">
       {/* Background decoration */}
-      <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-teal-500/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-[#c24332]/5 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-[300px] h-[300px] bg-blue-600/5 rounded-full blur-[80px] pointer-events-none" />
 
       {/* Header */}
@@ -19,7 +19,7 @@ export default function PrivacyPolicyPage() {
             Back to Home
           </Link>
           <span className="text-sm font-bold tracking-tight text-white">
-            NAV<span className="text-teal-400">Farm</span>
+            NAV<span className="text-[#c24332]">Farm</span>
           </span>
         </div>
       </header>
@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
       {/* Content Container */}
       <main className="max-w-4xl mx-auto px-6 py-16">
         <div className="flex flex-col gap-4 mb-12 border-b border-gray-900 pb-8">
-          <div className="w-12 h-12 rounded-xl bg-teal-500/10 flex items-center justify-center border border-teal-500/20 text-teal-400">
+          <div className="w-12 h-12 rounded-xl bg-[#c24332]/10 flex items-center justify-center border border-[#c24332]/20 text-[#c24332]">
             <Shield className="w-6 h-6" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
@@ -49,7 +49,7 @@ export default function PrivacyPolicyPage() {
               { id: "security", label: "Technical Security" },
               { id: "compliance", label: "GDPR & Compliance" },
             ].map(sec => (
-              <a key={sec.id} href={`#${sec.id}`} className="block text-xs font-semibold text-gray-400 hover:text-teal-400 transition-colors py-1.5 border-l-2 border-transparent pl-3 hover:border-teal-500/30">
+              <a key={sec.id} href={`#${sec.id}`} className="block text-xs font-semibold text-gray-400 hover:text-[#c24332] transition-colors py-1.5 border-l-2 border-transparent pl-3 hover:border-[#c24332]/30">
                 {sec.label}
               </a>
             ))}
@@ -60,7 +60,7 @@ export default function PrivacyPolicyPage() {
             
             <section id="isolation" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Lock className="w-4 h-4 text-teal-400" />
+                <Lock className="w-4 h-4 text-[#c24332]" />
                 <h2>1. Multi-Tenant Database Isolation</h2>
               </div>
               <p>
@@ -73,7 +73,7 @@ export default function PrivacyPolicyPage() {
 
             <section id="collection" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <FileText className="w-4 h-4 text-teal-400" />
+                <FileText className="w-4 h-4 text-[#c24332]" />
                 <h2>2. Information We Collect</h2>
               </div>
               <p>
@@ -88,7 +88,7 @@ export default function PrivacyPolicyPage() {
 
             <section id="usage" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Eye className="w-4 h-4 text-teal-400" />
+                <Eye className="w-4 h-4 text-[#c24332]" />
                 <h2>3. How We Use Your Data</h2>
               </div>
               <p>
@@ -106,7 +106,7 @@ export default function PrivacyPolicyPage() {
 
             <section id="security" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Shield className="w-4 h-4 text-teal-400" />
+                <Shield className="w-4 h-4 text-[#c24332]" />
                 <h2>4. Technical Security Measures</h2>
               </div>
               <p>
@@ -121,7 +121,7 @@ export default function PrivacyPolicyPage() {
 
             <section id="compliance" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Shield className="w-4 h-4 text-teal-400" />
+                <Shield className="w-4 h-4 text-[#c24332]" />
                 <h2>5. GDPR & Compliance Rights</h2>
               </div>
               <p>

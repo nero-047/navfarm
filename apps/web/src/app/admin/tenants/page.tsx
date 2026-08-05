@@ -212,7 +212,7 @@ export default function AdminTenantsPage() {
             </select>
             <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
               <button type="button" disabled={upgrading} onClick={() => { setUpgradingTenant(null); setSelectedPlanId(""); }}
-                className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">Cancel</button>
               <button type="submit" disabled={!selectedPlanId || upgrading}
                 className="min-h-10 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
                 {upgrading ? "Updating…" : "Apply plan change"}
@@ -255,7 +255,7 @@ export default function AdminTenantsPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`text-[11px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${active ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                      <span className={`text-[11px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${active ? "bg-green-50 text-green-700 border-green-200" : "bg-(--surface-raised) text-(--text-secondary) border-(--border)"}`}>
                         {active ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                         {active ? "Active" : "Inactive"}
                       </span>
@@ -273,7 +273,7 @@ export default function AdminTenantsPage() {
                           <Eye className="w-3.5 h-3.5" /> Details
                         </Link>
                         {tenant.tenant_id === "00000000-0000-0000-0000-000000000000" || tenant.tenant_code === "system" ? (
-                          <span className="text-xs font-medium flex items-center gap-1 text-gray-400 cursor-not-allowed opacity-50" title="System plan cannot be changed">
+                          <span className="text-xs font-medium flex items-center gap-1 text-(--text-muted) cursor-not-allowed opacity-50" title="System plan cannot be changed">
                             <ArrowUpRight className="w-3.5 h-3.5" /> Upgrade
                           </span>
                         ) : (
@@ -344,7 +344,7 @@ export default function AdminTenantsPage() {
               )}
 
               <div className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-teal-500">1. Tenant & Invoicing Info</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-(--accent)">1. Tenant & Invoicing Info</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Legal Tenant Name *</label>
@@ -378,7 +378,7 @@ export default function AdminTenantsPage() {
               </div>
 
               <div className="space-y-4 pt-4 border-t" style={S.border}>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-teal-500">2. Initial Tenant Admin Account</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-(--accent)">2. Initial Tenant Admin Account</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Administrator Name *</label>
@@ -405,7 +405,7 @@ export default function AdminTenantsPage() {
               <div className="space-y-4 pt-4 border-t" style={S.border}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-teal-500">3. Permitted Business Sectors (NOB & LOB)</h3>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-(--accent)">3. Permitted Business Sectors (NOB & LOB)</h3>
                     <p className="text-xs mt-0.5" style={S.muted}>Select which Nature of Business (NOB) & Line of Business (LOB) options this tenant is licensed to use.</p>
                   </div>
                   <button
@@ -464,7 +464,7 @@ export default function AdminTenantsPage() {
                               type="checkbox"
                               checked={isNobChecked}
                               onChange={toggleNob}
-                              className="w-4 h-4 rounded accent-teal-500 cursor-pointer"
+                              className="w-4 h-4 rounded accent-(--accent) cursor-pointer"
                             />
                             <span>{nob.nob_name}</span>
                             <span className="text-[10px] font-mono font-normal opacity-60">({nob.nob_code})</span>
@@ -497,7 +497,7 @@ export default function AdminTenantsPage() {
                                       type="checkbox"
                                       checked={isLobChecked}
                                       onChange={toggleLob}
-                                      className="w-3 h-3 rounded accent-teal-500 cursor-pointer"
+                                      className="w-3 h-3 rounded accent-(--accent) cursor-pointer"
                                     />
                                     <span>{lob.lob_name}</span>
                                   </label>
@@ -514,7 +514,7 @@ export default function AdminTenantsPage() {
 
               <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
                 <button type="button" disabled={creating} onClick={() => setShowAddModal(false)}
-                  className="min-h-10 rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                  className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-5 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">
                   Cancel
                 </button>
                 <button type="submit" disabled={creating}

@@ -91,23 +91,23 @@ export default function CompanySelectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
-      <header className="border-b border-[#e7e7e7] bg-white">
+    <div className="min-h-screen bg-(--bg)">
+      <header className="border-b border-(--border) bg-(--surface)">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-          <div className="text-xl font-bold tracking-tight text-[#0b1248]">
+          <div className="text-xl font-bold tracking-tight text-(--text-primary)">
             NAV<span className="text-[#c24332]">Farm</span>
           </div>
           <div className="flex items-center gap-3">
             {user.userType === 'SYSTEM_ADMIN' ? (
-              <Link href="/admin" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><ShieldCheck size={14} /> System Admin</Link>
+              <Link href="/admin" className="hidden items-center gap-1.5 rounded-lg border border-(--border) px-3 py-2 text-xs font-semibold text-(--text-secondary) md:flex"><ShieldCheck size={14} /> System Admin</Link>
             ) : (
-              <Link href="/organization" className="hidden items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#515463] md:flex"><Building2 size={14} /> Tenant admin</Link>
+              <Link href="/organization" className="hidden items-center gap-1.5 rounded-lg border border-(--border) px-3 py-2 text-xs font-semibold text-(--text-secondary) md:flex"><Building2 size={14} /> Tenant admin</Link>
             )}
             <div className="hidden text-right sm:block">
-              <p className="text-xs font-semibold text-[#2e313f]">
+              <p className="text-xs font-semibold text-(--text-primary)">
                 {user.name}
               </p>
-              <p className="text-[10px] text-[#8a8a8a]">
+              <p className="text-[10px] text-(--text-muted)">
                 Organization workspace
               </p>
             </div>
@@ -116,7 +116,7 @@ export default function CompanySelectionPage() {
                 logout();
                 router.push('/login');
               }}
-              className="rounded-lg border border-[#e5e5e5] p-2 text-[#707070] hover:text-[#c24332]"
+              className="rounded-lg border border-(--border) p-2 text-(--text-secondary) hover:text-[#c24332]"
             >
               <LogOut size={16} />
             </button>
@@ -126,39 +126,39 @@ export default function CompanySelectionPage() {
       <main className="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
         <div className="mb-9 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1c4aa9]">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-(--accent)">
               Organization
             </p>
-            <h1 className="mt-2 text-[30px] font-semibold tracking-tight text-[#2e313f]">
+            <h1 className="mt-2 text-[30px] font-semibold tracking-tight text-(--text-primary)">
               Choose a company
             </h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-[#707070]">
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-(--text-secondary)">
               Choose the legal or operating company you want to work in. Each
               company has its own operations, finance, users and settings.
             </p>
           </div>
-          <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700">
+          <span className="w-fit rounded-full border border-(--accent) bg-(--accent-muted) px-3 py-1 text-[11px] font-semibold text-(--accent)">
             Companies
           </span>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {syncing && Object.keys(companies).length === 0 && (
-            <p className="text-sm text-[#707070]">Loading companies from NAVFarm API…</p>
+            <p className="text-sm text-(--text-secondary)">Loading companies from NAVFarm API…</p>
           )}
           {Object.values(companies).map((company) => (
             <CompanyCard key={company.slug} company={company} />
           ))}
           <button
             onClick={() => setModalOpen(true)}
-            className="group flex min-h-[230px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[#d4d4d4] bg-white p-7 transition-all hover:-translate-y-1 hover:border-[#1c4aa9] hover:shadow-lg"
+            className="group flex min-h-[230px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-(--border) bg-(--surface) p-7 transition-all hover:-translate-y-1 hover:border-(--accent) hover:shadow-lg"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-[#707070] group-hover:bg-blue-50 group-hover:text-[#1c4aa9]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-(--surface-raised) text-(--text-secondary) group-hover:bg-(--accent-muted) group-hover:text-(--accent)">
               <Plus size={21} />
             </div>
-            <span className="text-sm font-semibold text-[#606372]">
+            <span className="text-sm font-semibold text-(--text-secondary)">
               Create company
             </span>
-            <span className="text-xs text-[#8a8a8a]">
+            <span className="text-xs text-(--text-muted)">
               Assign a NOB and configure LOBs
             </span>
           </button>
@@ -173,29 +173,29 @@ export default function CompanySelectionPage() {
             role="dialog"
             aria-modal="true"
             aria-label="Create company"
-            className="w-full rounded-2xl bg-white p-7 shadow-2xl animate-slide-up"
+            className="w-full rounded-2xl bg-(--surface) p-7 shadow-2xl animate-slide-up"
           >
             <button
               onClick={() => setModalOpen(false)}
-              className="absolute right-5 top-5 text-[#707070]"
+              className="absolute right-5 top-5 text-(--text-secondary)"
             >
               <X size={19} />
             </button>
-            <h2 className="text-xl font-semibold text-[#2e313f]">
+            <h2 className="text-xl font-semibold text-(--text-primary)">
               Create company
             </h2>
-            <p className="mt-1 text-sm text-[#707070]">
+            <p className="mt-1 text-sm text-(--text-secondary)">
               Company details can be completed in the 15-step setup checklist.
             </p>
             {error && (
-              <div className="mt-5 flex items-center gap-2 text-xs text-[#c24332]">
+              <div className="mt-5 flex items-center gap-2 text-xs text-(--danger)">
                 <AlertCircle size={15} />
                 {error}
               </div>
             )}
             <div className="mt-6 space-y-5">
               <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-[#2e313f]">
+                <span className="mb-1.5 block text-xs font-medium text-(--text-primary)">
                   Company name
                 </span>
                 <Input
@@ -205,7 +205,7 @@ export default function CompanySelectionPage() {
                 />
               </label>
               <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-[#2e313f]">
+                <span className="mb-1.5 block text-xs font-medium text-(--text-primary)">
                   Nature of Business
                 </span>
                 <select
@@ -213,7 +213,7 @@ export default function CompanySelectionPage() {
                   onChange={(event) =>
                     setNobCode(event.target.value as NobCode)
                   }
-                  className="h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm text-[#2e313f] outline-none focus:border-[#2f66d0]"
+                  className="h-12 w-full rounded-xl border border-(--input-border) bg-(--input-bg) px-4 text-sm text-(--input-text) outline-none focus:border-(--input-border-focus)"
                 >
                   <option value="">Select NOB</option>
                   {nobOptions.map((nob) => (

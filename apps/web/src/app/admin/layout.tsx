@@ -157,24 +157,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const breadcrumbLabel = activeNavItem ? t(activeNavItem.key) : "Admin";
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full" style={{ backgroundColor: "var(--sidebar-bg)" }}>
-
-      {/* ── Logo ── */}
-      <div className="h-14 flex items-center px-5 shrink-0 border-b gap-2" style={{ borderColor: "var(--sidebar-border)" }}>
-        <span className="text-lg font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-          NAV<span style={{ color: "var(--accent)" }}>Farm</span>
-        </span>
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-white bg-red-600 px-2 py-0.5 rounded">
-          {t("systemAdmin")}
-        </span>
+    <div className="flex h-full flex-col">
+      {/* ── Logo + access-level card (mirrors the tenant console chrome) ── */}
+      <div className="border-b border-white/[0.08] px-5 pb-4 pt-5">
+        <Link href="/admin/dashboard" className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#f16d50,#c24332)] text-sm font-black text-white shadow-lg">NF</span>
+          <span>
+            <span className="block text-xl font-bold tracking-tight text-white">NAV<span className="text-[#f16d50]">Farm</span></span>
+            <span className="block text-[8px] font-semibold uppercase tracking-[0.22em] text-white/35">Platform administration</span>
+          </span>
+        </Link>
+        <div className="mt-5 rounded-xl border border-red-400/25 bg-red-500/[0.08] p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-red-300/80">Access level</span>
+            <ShieldCheck className="h-3.5 w-3.5 text-red-300" />
+          </div>
+          <p className="mt-1 text-sm font-bold text-white">{t("systemAdmin")}</p>
+        </div>
       </div>
 
       {/* ── Nav ── */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest px-2 mb-3" style={{ color: "var(--text-muted)" }}>
-          {t("admin")}
-        </p>
-        <ul className="space-y-0.5">
+      <nav className="flex-1 overflow-y-auto p-3">
+        <p className="px-3 pb-2 pt-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/30">{t("admin")}</p>
+        <ul className="space-y-1">
           {adminNavItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
@@ -182,13 +187,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Link
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border-l-4"
-                  style={isActive
-                    ? { backgroundColor: "var(--sidebar-active-bg)", color: "var(--sidebar-active-text)", borderLeftColor: "var(--accent)" }
-                    : { color: "var(--sidebar-text)", borderColor: "transparent" }
-                  }
+                  className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-medium transition-all ${isActive ? "bg-white text-[#111a4f] shadow-[0_8px_22px_rgba(0,0,0,0.16)]" : "text-white/62 hover:bg-white/[0.07] hover:text-white"}`}
                 >
-                  <item.icon className="w-4 h-4 shrink-0" style={{ color: isActive ? "var(--accent)" : "var(--text-muted)" }} />
+                  {isActive && <span className="absolute -left-3 h-5 w-1 rounded-r-full bg-[#ed6a4f]" />}
+                  <item.icon size={17} strokeWidth={isActive ? 2 : 1.6} />
                   {t(item.key)}
                 </Link>
               </li>
@@ -198,64 +200,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </nav>
 
       {/* ── Footer ── */}
-      <div className="border-t shrink-0" style={{ borderColor: "var(--sidebar-border)" }}>
-
-        {/* User card */}
-        <div className="px-4 pt-3 pb-2 flex items-center gap-3">
-          <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-              {initials}
-            </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 rounded-full"
-              style={{ borderColor: "var(--sidebar-bg)" }} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold truncate" style={{ color: "var(--sidebar-text)" }}>{user.fullName}</div>
-            <div className="flex items-center gap-1 mt-0.5">
-              <ShieldCheck className="w-3 h-3 text-red-400 shrink-0" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-red-400">{t("systemAdmin")}</span>
-            </div>
-          </div>
+      <div className="border-t border-white/[0.08] p-4">
+        <div className="flex items-center gap-3 px-1 pb-3">
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white">
+            {initials}
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0b1248] bg-emerald-400" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-xs font-semibold text-white">{user.fullName}</span>
+            <span className="mt-0.5 block truncate text-[9px] text-white/38">{user.email}</span>
+          </span>
         </div>
-
-        {/* Theme + Language + Sign out — buttons container */}
-        <div className="px-3 pb-3 flex flex-col gap-2">
-          <button
-            onClick={handleLogout}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              padding: "7px 12px",
-              borderRadius: "8px",
-              border: "1px solid var(--sidebar-border)",
-              backgroundColor: "transparent",
-              color: "var(--text-muted)",
-              fontSize: "12px",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "background-color 150ms, color 150ms, border-color 150ms",
-            }}
-            onMouseEnter={(e) => {
-              const b = e.currentTarget;
-              b.style.backgroundColor = "rgba(239,68,68,0.1)";
-              b.style.color = "#EF4444";
-              b.style.borderColor = "rgba(239,68,68,0.35)";
-            }}
-            onMouseLeave={(e) => {
-              const b = e.currentTarget;
-              b.style.backgroundColor = "transparent";
-              b.style.color = "var(--text-muted)";
-              b.style.borderColor = "var(--sidebar-border)";
-            }}
-          >
-            <LogOut style={{ width: 14, height: 14 }} />
-            {t("signOut")}
-          </button>
-        </div>
-
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-medium text-white/50 transition hover:border-red-400/25 hover:bg-red-400/10 hover:text-red-300"
+        >
+          <LogOut size={14} /> {t("signOut")}
+        </button>
       </div>
     </div>
   );
@@ -263,16 +224,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "var(--bg)" }}>
       {/* Desktop Sidebar */}
-      <aside className="w-60 flex flex-col fixed inset-y-0 left-0 z-30 hidden md:flex border-r" style={{ backgroundColor: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] text-white md:flex">
         <SidebarContent />
       </aside>
 
       {/* Mobile Sidebar */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 flex md:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
-          <aside className="relative w-60 flex flex-col shadow-xl" style={{ backgroundColor: "var(--sidebar-bg)" }}>
-            <button className="absolute top-4 right-4" style={{ color: "var(--text-muted)" }} onClick={() => setSidebarOpen(false)}>
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <aside className="relative h-full w-[min(300px,86vw)] flex flex-col bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] shadow-2xl">
+            <button className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white" onClick={() => setSidebarOpen(false)}>
               <X className="w-5 h-5" />
             </button>
             <SidebarContent />
@@ -281,7 +242,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-h-screen md:pl-60">
+      <div className="flex-1 flex flex-col min-h-screen md:pl-[264px]">
         <header className="h-14 flex items-center px-6 shrink-0 sticky top-0 z-20 border-b" style={{ backgroundColor: "var(--header-bg)", borderColor: "var(--border)" }}>
           <button className="mr-3 md:hidden" style={{ color: "var(--text-secondary)" }} onClick={() => setSidebarOpen(true)}>
             <Menu className="w-5 h-5" />

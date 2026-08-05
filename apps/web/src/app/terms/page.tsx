@@ -6,9 +6,9 @@ import { ArrowLeft, Scale, CreditCard, Activity, Cpu } from "lucide-react";
 
 export default function TermsOfServicePage() {
   return (
-    <div className="min-h-screen bg-[#090d16] text-gray-100 font-sans relative overflow-x-hidden selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen bg-[#090d16] text-gray-100 font-sans relative overflow-x-hidden selection:bg-[#c24332] selection:text-white">
       {/* Background decoration */}
-      <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-teal-500/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-[#c24332]/5 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-[300px] h-[300px] bg-blue-600/5 rounded-full blur-[80px] pointer-events-none" />
 
       {/* Header */}
@@ -19,7 +19,7 @@ export default function TermsOfServicePage() {
             Back to Home
           </Link>
           <span className="text-sm font-bold tracking-tight text-white">
-            NAV<span className="text-teal-400">Farm</span>
+            NAV<span className="text-[#c24332]">Farm</span>
           </span>
         </div>
       </header>
@@ -27,7 +27,7 @@ export default function TermsOfServicePage() {
       {/* Content Container */}
       <main className="max-w-4xl mx-auto px-6 py-16">
         <div className="flex flex-col gap-4 mb-12 border-b border-gray-900 pb-8">
-          <div className="w-12 h-12 rounded-xl bg-teal-500/10 flex items-center justify-center border border-teal-500/20 text-teal-400">
+          <div className="w-12 h-12 rounded-xl bg-[#c24332]/10 flex items-center justify-center border border-[#c24332]/20 text-[#c24332]">
             <Scale className="w-6 h-6" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
@@ -49,7 +49,7 @@ export default function TermsOfServicePage() {
               { id: "api", label: "API Rate Limits" },
               { id: "termination", label: "Suspension & Exit" },
             ].map(sec => (
-              <a key={sec.id} href={`#${sec.id}`} className="block text-xs font-semibold text-gray-400 hover:text-teal-400 transition-colors py-1.5 border-l-2 border-transparent pl-3 hover:border-teal-500/30">
+              <a key={sec.id} href={`#${sec.id}`} className="block text-xs font-semibold text-gray-400 hover:text-[#c24332] transition-colors py-1.5 border-l-2 border-transparent pl-3 hover:border-[#c24332]/30">
                 {sec.label}
               </a>
             ))}
@@ -60,7 +60,7 @@ export default function TermsOfServicePage() {
             
             <section id="accounts" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Scale className="w-4 h-4 text-teal-400" />
+                <Scale className="w-4 h-4 text-[#c24332]" />
                 <h2>1. Tenant Accounts & Workspace Usage</h2>
               </div>
               <p>
@@ -73,7 +73,7 @@ export default function TermsOfServicePage() {
 
             <section id="billing" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <CreditCard className="w-4 h-4 text-teal-400" />
+                <CreditCard className="w-4 h-4 text-[#c24332]" />
                 <h2>2. Billing, Pricing & Renewals</h2>
               </div>
               <p>
@@ -91,7 +91,7 @@ export default function TermsOfServicePage() {
 
             <section id="sla" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Activity className="w-4 h-4 text-teal-400" />
+                <Activity className="w-4 h-4 text-[#c24332]" />
                 <h2>3. Service Level Agreement (SLA) & Uptime</h2>
               </div>
               <p>
@@ -108,7 +108,7 @@ export default function TermsOfServicePage() {
 
             <section id="api" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Cpu className="w-4 h-4 text-teal-400" />
+                <Cpu className="w-4 h-4 text-[#c24332]" />
                 <h2>4. API Integration & Rate Limits</h2>
               </div>
               <p>
@@ -121,7 +121,7 @@ export default function TermsOfServicePage() {
 
             <section id="termination" className="scroll-mt-24 space-y-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Scale className="w-4 h-4 text-teal-400" />
+                <Scale className="w-4 h-4 text-[#c24332]" />
                 <h2>5. Suspension & Account Exit</h2>
               </div>
               <p>

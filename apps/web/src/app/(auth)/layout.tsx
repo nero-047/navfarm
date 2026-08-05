@@ -35,12 +35,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* Right form panel */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-(--bg)">
         {/* Mobile logo */}
         <div className="md:hidden px-6 pt-8 pb-4">
           <Link href="/" className="inline-flex items-center gap-1">
-            <span className="text-xl font-bold text-[#0b1248] tracking-tight">
-              NAV<span className="text-[#c24332]">Farm</span>
+            <span className="text-xl font-bold text-(--text-primary) tracking-tight">
+              NAV<span className="text-(--accent)">Farm</span>
             </span>
           </Link>
         </div>

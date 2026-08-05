@@ -21,11 +21,11 @@ export default function AuditTab({ auditLogs }: AuditTabProps) {
   };
 
   return (
-    <Card className="p-0 overflow-hidden border-[#1a1f2e] bg-[#0b0f19] animate-fade-in">
+    <Card className="p-0 overflow-hidden border-(--border) bg-(--surface) animate-fade-in">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-[#1a1f2e] text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-[#0b0f19]">
+            <tr className="border-b border-(--border) text-[10px] font-bold text-(--text-secondary) uppercase tracking-wider bg-(--surface)">
               <th className="p-4 w-12 text-center">#</th>
               <th className="p-4">Timestamp</th>
               <th className="p-4">Action Event</th>
@@ -36,23 +36,23 @@ export default function AuditTab({ auditLogs }: AuditTabProps) {
           <tbody>
             {auditLogs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-gray-500 text-xs">No operational audit entries registered.</td>
+                <td colSpan={5} className="p-8 text-center text-(--text-secondary) text-xs">No operational audit entries registered.</td>
               </tr>
             ) : (
               auditLogs.map((log, idx) => (
-                <tr key={log.audit_id} className="border-b border-[#1a1f2e] text-xs hover:bg-white/[0.01] transition-colors">
-                  <td className="p-4 text-center font-mono text-gray-650">{idx + 1}</td>
-                  <td className="p-4 font-mono text-gray-400">{log.created_at}</td>
-                  <td className="p-4 font-semibold text-white">
+                <tr key={log.audit_id} className="border-b border-(--border) text-xs hover:bg-(--surface-raised) transition-colors">
+                  <td className="p-4 text-center font-mono text-(--text-muted)">{idx + 1}</td>
+                  <td className="p-4 font-mono text-(--text-secondary)">{log.created_at}</td>
+                  <td className="p-4 font-semibold text-(--text-primary)">
                     <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-bold border uppercase font-mono ${getActionBadgeColor(log.action)}`}>
                       {log.action}
                     </span>
                   </td>
-                  <td className="p-4 text-gray-450 font-medium">
+                  <td className="p-4 text-(--text-secondary) font-medium">
                     {log.entity_name}{' '}
-                    <span className="text-[10px] text-gray-600 font-mono">({log.entity_id?.substring(0, 8)}...)</span>
+                    <span className="text-[10px] text-(--text-muted) font-mono">({log.entity_id?.substring(0, 8)}...)</span>
                   </td>
-                  <td className="p-4 text-gray-400 font-medium">{log.user_name || "System Background Job"}</td>
+                  <td className="p-4 text-(--text-secondary) font-medium">{log.user_name || "System Background Job"}</td>
                 </tr>
               ))
             )}

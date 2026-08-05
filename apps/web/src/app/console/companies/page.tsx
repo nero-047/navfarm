@@ -131,7 +131,7 @@ export default function CompaniesPage() {
       return (
         <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 lg:p-7">
           {/* Compact navigation and company identity toolbar */}
-          <div className="flex items-center gap-3 rounded-2xl border border-[#e3e7ee] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+          <div className="flex items-center gap-3 rounded-2xl border border-(--border) bg-(--surface) p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
             <button
               type="button"
               onClick={() => setManagingCompany(null)}
@@ -275,7 +275,7 @@ export default function CompaniesPage() {
                     {creating ? "Creating…" : "Create Company"}
                   </button>
                   <button type="button" onClick={() => setShowAddModal(false)}
-                    className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm font-medium text-[#515463] hover:bg-[#f7f8fa]">
+                    className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">
                     Cancel
                   </button>
                 </div>
@@ -377,7 +377,7 @@ export default function CompaniesPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 xl:p-8">
       {/* Company identity header */}
-      <div className="flex items-center gap-4 rounded-2xl border border-[#e3e7ee] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+      <div className="flex items-center gap-4 rounded-2xl border border-(--border) bg-(--surface) p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-sm font-black text-white">
           {myCompany.company_code?.substring(0, 2) || myCompany.company_name?.substring(0, 2) || "CO"}
         </div>

@@ -33,7 +33,7 @@ export function AdminShell({
     },
   ];
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <div className="min-h-screen bg-(--bg)">
       <header className="border-b border-white/10 bg-[#0b1248] text-white">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div>
@@ -68,7 +68,7 @@ export function AdminShell({
         </div>
       </header>
       <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-[#2e313f]">
+        <h1 className="text-3xl font-semibold tracking-tight text-(--text-primary)">
           {title}
         </h1>
         {children}

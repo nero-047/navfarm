@@ -14,7 +14,7 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div 
       className={`rounded-[var(--radius-lg)] p-6 relative overflow-hidden shadow-[var(--shadow-sm)] ${
-        glow ? 'shadow-lg border-teal-500/20' : ''
+        glow ? 'shadow-lg border-(--accent)/20' : ''
       } ${className}`}
       style={{
         backgroundColor: 'var(--card-bg)',

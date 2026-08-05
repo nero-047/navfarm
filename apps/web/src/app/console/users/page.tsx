@@ -615,7 +615,7 @@ export default function UsersPage() {
           { label: "Administrators", value: displayedUsers.filter((member) => member.user_type?.includes("ADMIN")).length, detail: "Tenant and company admins", tone: "bg-red-50 text-[#c24332]" },
           { label: "Roles assigned", value: displayedUsers.filter((member) => member.roles?.length).length, detail: `${displayedUsers.filter((member) => !member.roles?.length).length} awaiting assignment`, tone: "bg-emerald-50 text-emerald-700" },
         ].map((item) => (
-          <div key={item.label} className="rounded-2xl border border-[#e3e7ee] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+          <div key={item.label} className="rounded-2xl border border-(--border) bg-(--surface) p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-xs font-medium text-[#707070]">{item.label}</p><p className="mt-1 text-2xl font-semibold tracking-tight text-[#2e313f]">{item.value}</p></div>
               <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.tone}`}><Users size={17} /></span>
@@ -683,7 +683,7 @@ export default function UsersPage() {
                 {submitting ? "Registering…" : "Register User"}
               </button>
               <button type="button" onClick={() => setShowAddForm(false)}
-                className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm font-medium text-[#515463] hover:bg-[#f7f8fa]">
+                className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">
                 Cancel
               </button>
             </div>
@@ -691,13 +691,13 @@ export default function UsersPage() {
       </Dialog>
 
       {/* ── Users Table ── */}
-      <div className="overflow-hidden rounded-2xl border border-[#e3e7ee] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+      <div className="overflow-hidden rounded-2xl border border-(--border) bg-(--surface) shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
         <div className="flex flex-col gap-3 border-b border-[#ededed] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-[15px] font-semibold text-[#2e313f]">Workspace directory</h2>
             <p className="mt-0.5 text-xs text-[#8a8a8a]">{displayedUsers.length} member{displayedUsers.length !== 1 ? "s" : ""}</p>
           </div>
-          <label className="flex h-10 w-full items-center gap-2 rounded-xl border border-[#e3e7ee] bg-[#f7f8fa] px-3 text-[#8a90a0] transition focus-within:border-[#2f66d0] focus-within:bg-white focus-within:ring-[3px] focus-within:ring-blue-100/80 sm:w-72">
+          <label className="flex h-10 w-full items-center gap-2 rounded-xl border border-(--border) bg-(--surface-raised) px-3 text-(--text-muted) transition focus-within:border-(--input-border-focus) focus-within:bg-(--surface) focus-within:ring-[3px] focus-within:ring-blue-100/80 sm:w-72">
             <Search size={14} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search members" className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-[#30364b] outline-none" />
           </label>
@@ -709,7 +709,7 @@ export default function UsersPage() {
               {["#", "Name", "Email", isTenantAdmin ? "Company" : "", "Type", "Assigned Roles", "Actions"]
                 .filter(Boolean)
                 .map((h) => (
-                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8a90a0]">{h}</th>
+                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-(--text-muted)">{h}</th>
                 ))}
             </tr>
           </thead>
@@ -739,7 +739,7 @@ export default function UsersPage() {
                         )}
                       </div>
                       {(u.designation || u.department) && (
-                        <p className="mt-0.5 text-[10px] text-[#8a90a0]">
+                        <p className="mt-0.5 text-[10px] text-(--text-muted)">
                           {[u.designation, u.department].filter(Boolean).join(" · ")}
                         </p>
                       )}

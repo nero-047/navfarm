@@ -44,20 +44,20 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-teal-400" />
+        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-(--accent)" />
           Step 7: Fiscal Year & Ledger Configuration
         </h2>
-        <p className="text-xs text-gray-500">Define accounting start months, depreciation models, tax audit settings, and decimal precision.</p>
+        <p className="text-xs text-(--text-secondary)">Define accounting start months, depreciation models, tax audit settings, and decimal precision.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">Fiscal Year Start Month</label>
+          <label className="text-xs text-(--text-secondary) font-medium">Fiscal Year Start Month</label>
           <select
             value={formData.fiscal_start_month}
             onChange={(e) => setFormData({ ...formData, fiscal_start_month: parseInt(e.target.value) })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value={1}>January</option>
             <option value={4}>April</option>
@@ -67,11 +67,11 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">Inventory Valuation Model</label>
+          <label className="text-xs text-(--text-secondary) font-medium">Inventory Valuation Model</label>
           <select
             value={formData.valuation_method}
             onChange={(e) => setFormData({ ...formData, valuation_method: e.target.value })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="FIFO">First-In, First-Out (FIFO)</option>
             <option value="STANDARD">Standard Costing</option>
@@ -80,11 +80,11 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">Asset Depreciation Model</label>
+          <label className="text-xs text-(--text-secondary) font-medium">Asset Depreciation Model</label>
           <select
             value={formData.depreciation_method}
             onChange={(e) => setFormData({ ...formData, depreciation_method: e.target.value })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="SLM">Straight Line Method (SLM)</option>
             <option value="WDV">Written Down Value (WDV)</option>
@@ -93,11 +93,11 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">GST / Tax Filing Frequency</label>
+          <label className="text-xs text-(--text-secondary) font-medium">GST / Tax Filing Frequency</label>
           <select
             value={formData.gst_filing_frequency}
             onChange={(e) => setFormData({ ...formData, gst_filing_frequency: e.target.value })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="MONTHLY">Monthly Filing</option>
             <option value="QUARTERLY">Quarterly Filing</option>
@@ -105,11 +105,11 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-gray-400 font-medium">Decimal Precision (Amounts & Qty)</label>
+          <label className="text-xs text-(--text-secondary) font-medium">Decimal Precision (Amounts & Qty)</label>
           <select
             value={formData.decimal_places}
             onChange={(e) => setFormData({ ...formData, decimal_places: parseInt(e.target.value) })}
-            className="bg-[#121824] border border-gray-800 rounded-xl px-4 h-12 text-sm text-white focus:outline-none focus:border-teal-500"
+            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value={2}>2 Decimal Places (e.g. 100.50)</option>
             <option value={3}>3 Decimal Places (e.g. 100.500 for KG/Liters)</option>
@@ -123,9 +123,9 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
             id="tax_audit_applicable"
             checked={formData.tax_audit_applicable}
             onChange={(e) => setFormData({ ...formData, tax_audit_applicable: e.target.checked })}
-            className="w-4 h-4 rounded border-gray-800 bg-[#121824] text-teal-500 focus:ring-teal-500"
+            className="w-4 h-4 rounded border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent)"
           />
-          <label htmlFor="tax_audit_applicable" className="text-xs text-gray-300 font-medium cursor-pointer">
+          <label htmlFor="tax_audit_applicable" className="text-xs text-(--text-secondary) font-medium cursor-pointer">
             Mandatory Statutory Tax Audit Applicable
           </label>
         </div>

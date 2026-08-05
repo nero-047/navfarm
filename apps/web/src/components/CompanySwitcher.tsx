@@ -132,29 +132,29 @@ export function CompanySwitcher() {
         {open && (
           <div
             ref={dropdownRef}
-            className="absolute left-0 top-full z-50 mt-2 w-[340px] overflow-hidden rounded-2xl border border-[#dfe3ea] bg-white shadow-2xl"
+            className="absolute left-0 top-full z-50 mt-2 w-[340px] overflow-hidden rounded-2xl border border-(--border) bg-(--surface) shadow-2xl"
           >
-            <div className="border-b border-[#edf0f4] px-4 py-3">
+            <div className="border-b border-(--border) px-4 py-3">
               <div className="flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0b1248] text-white">
                   <Building2 size={17} />
                 </span>
                 <div>
-                  <p className="text-xs font-semibold text-[#252b3d]">
+                  <p className="text-xs font-semibold text-(--text-primary)">
                     Green Valley Holdings
                   </p>
-                  <p className="mt-0.5 text-[9px] uppercase tracking-wide text-[#9298a8]">
+                  <p className="mt-0.5 text-[9px] uppercase tracking-wide text-(--text-muted)">
                     Organization · {Object.keys(companies).length} companies
                   </p>
                 </div>
               </div>
-              <label className="mt-3 flex h-9 items-center gap-2 rounded-xl border border-[#e3e7ee] bg-[#f7f8fa] px-3 transition focus-within:border-[#2f66d0] focus-within:bg-white focus-within:ring-[3px] focus-within:ring-blue-100/80">
-                <Search size={13} className="text-[#8a90a0]" />
+              <label className="mt-3 flex h-9 items-center gap-2 rounded-xl border border-(--border) bg-(--surface-raised) px-3 transition focus-within:border-(--input-border-focus) focus-within:bg-(--surface) focus-within:ring-[3px] focus-within:ring-blue-100/80">
+                <Search size={13} className="text-(--text-muted)" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Find a company"
-                  className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-[#30364b] outline-none"
+                  className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-(--text-primary) outline-none"
                 />
               </label>
             </div>
@@ -172,16 +172,16 @@ export function CompanySwitcher() {
                       setOpen(false);
                       router.push(`/${company.slug}/dashboard`);
                     }}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${company.slug === currentSlug ? 'bg-blue-50' : 'hover:bg-[#f8f8f8]'}`}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${company.slug === currentSlug ? 'bg-(--accent-muted)' : 'hover:bg-(--surface-raised)'}`}
                   >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-base shadow-sm">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--surface) text-base shadow-sm">
                       {company.icon}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-medium text-[#2e313f]">
+                      <span className="block truncate text-xs font-medium text-(--text-primary)">
                         {company.name}
                       </span>
-                      <span className="block text-[9px] uppercase tracking-wide text-[#8a8a8a]">
+                      <span className="block text-[9px] uppercase tracking-wide text-(--text-muted)">
                         {company.nobName}
                       </span>
                     </span>
@@ -191,13 +191,13 @@ export function CompanySwitcher() {
                   </button>
                 ))}
             </div>
-            <div className="grid grid-cols-2 gap-1 border-t border-[#e5e5e5] p-2">
+            <div className="grid grid-cols-2 gap-1 border-t border-(--border) p-2">
               <button
                 onClick={() => {
                   setOpen(false);
                   router.push('/organization');
                 }}
-                className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-[#51586a] hover:bg-[#f5f7fa]"
+                className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-(--text-secondary) hover:bg-(--surface-raised)"
               >
                 <Settings2 size={13} /> Organization
               </button>
@@ -206,7 +206,7 @@ export function CompanySwitcher() {
                   setOpen(false);
                   setModalOpen(true);
                 }}
-                className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-[#1c4aa9] hover:bg-blue-50"
+                className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-(--accent) hover:bg-(--accent-muted)"
               >
                 <Plus size={13} />
                 New company
@@ -225,21 +225,21 @@ export function CompanySwitcher() {
             role="dialog"
             aria-modal="true"
             aria-label="Create company"
-            className="w-full rounded-2xl bg-white p-7 text-[#2e313f] shadow-2xl animate-slide-up"
+            className="w-full rounded-2xl bg-(--surface) p-7 text-(--text-primary) shadow-2xl animate-slide-up"
           >
             <button
               onClick={() => setModalOpen(false)}
-              className="absolute right-5 top-5 text-[#707070]"
+              className="absolute right-5 top-5 text-(--text-secondary)"
             >
               <X size={19} />
             </button>
             <h2 className="text-xl font-semibold">Create company</h2>
-            <p className="mt-1 text-sm text-[#707070]">
+            <p className="mt-1 text-sm text-(--text-secondary)">
               A company is assigned one primary NOB. Its LOBs are configured
               inside the workspace.
             </p>
             {error && (
-              <div className="mt-5 flex items-center gap-2 text-xs text-[#c24332]">
+              <div className="mt-5 flex items-center gap-2 text-xs text-(--danger)">
                 <AlertCircle size={15} />
                 {error}
               </div>
@@ -264,7 +264,7 @@ export function CompanySwitcher() {
                   onChange={(event) =>
                     setNobCode(event.target.value as NobCode)
                   }
-                  className="flex h-12 w-full rounded-xl border border-[#e5e5e5] bg-white px-4 text-sm outline-none focus:border-[#2f66d0]"
+                  className="flex h-12 w-full rounded-xl border border-(--input-border) bg-(--input-bg) px-4 text-sm outline-none focus:border-(--input-border-focus)"
                 >
                   <option value="">Select NOB</option>
                   {nobOptions.map((nob) => (

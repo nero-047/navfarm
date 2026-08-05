@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   History,
   Bell,
+  Database,
   LogOut,
   Menu,
   X,
@@ -221,6 +222,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const navItems: ConsoleSidebarItem[] = [
     { label: "Dashboard",       href: "/console/dashboard",      icon: LayoutDashboard, show: user.userType === "TENANT_ADMIN" || user.userType === "COMPANY_ADMIN" },
     { label: "Companies",       href: "/console/companies",      icon: Building2,       show: hasPermission(user, "COMPANY", "SETTINGS", "can_view") },
+    { label: "Master Data",     href: "/console/master-data",    icon: Database,        show: hasPermission(user, "MASTER_DATA", "UOM", "can_view") },
     { label: "Team Management", href: "/console/users",          icon: Users,           show: hasPermission(user, "RBAC", "USER", "can_view") },
     { label: "Role Permissions",href: "/console/roles",          icon: ShieldAlert,     show: hasPermission(user, "RBAC", "ROLE", "can_view") },
     { label: "Audit Ledger",    href: "/console/audit",          icon: History,         show: hasPermission(user, "AUDIT", "LOGS", "can_view") },

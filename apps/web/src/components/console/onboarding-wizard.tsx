@@ -262,26 +262,26 @@ export default function OnboardingWizard({
   return (
     <div className="nf-onboarding flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 md:p-12 flex flex-col md:flex-row gap-4 md:gap-8 overflow-y-auto">
 
-      <div className="rounded-2xl border border-[#23304b] bg-[#0b0f19] p-4 text-white shadow-lg md:hidden">
+      <div className="rounded-2xl border border-(--border) bg-(--surface) p-4 text-(--text-primary) shadow-lg md:hidden">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-400">Company setup</p>
-            <p className="mt-1 text-sm font-semibold text-white">Step {activeWizardStep} of 9</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-(--accent)">Company setup</p>
+            <p className="mt-1 text-sm font-semibold text-(--text-primary)">Step {activeWizardStep} of 9</p>
           </div>
-          <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold text-white/70">
+          <span className="rounded-full border border-(--border) bg-(--surface-raised) px-3 py-1 text-[10px] font-semibold text-(--text-secondary)">
             {Math.round((activeWizardStep / 9) * 100)}%
           </span>
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-teal-400 transition-all" style={{ width: `${(activeWizardStep / 9) * 100}%` }} />
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-(--surface-raised)">
+          <div className="h-full rounded-full bg-(--accent) transition-all" style={{ width: `${(activeWizardStep / 9) * 100}%` }} />
         </div>
       </div>
 
       {/* Progress Menu (Left Sidebar) */}
       <aside className="hidden md:flex md:w-72 shrink-0 flex-col gap-3">
-        <div className="p-4 bg-[#0b0f19] border border-gray-800 rounded-2xl flex flex-col gap-1 mb-2">
-          <h3 className="font-bold text-white text-sm">ERP Setup Wizard</h3>
-          <p className="text-xs text-gray-400">Configure your company settings to activate agricultural management.</p>
+        <div className="p-4 bg-(--surface) border border-(--border) rounded-2xl flex flex-col gap-1 mb-2">
+          <h3 className="font-bold text-(--text-primary) text-sm">ERP Setup Wizard</h3>
+          <p className="text-xs text-(--text-secondary)">Configure your company settings to activate agricultural management.</p>
         </div>
 
         {[
@@ -306,30 +306,30 @@ export default function OnboardingWizard({
               onClick={() => setActiveWizardStep(step.order)}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all text-left outline-none ${
                 isActive
-                  ? "bg-teal-500/10 border-teal-500/30 text-white shadow-sm shadow-teal-500/5"
+                  ? "bg-(--accent-muted) border-(--accent) text-(--text-primary) shadow-sm"
                   : isCompleted
-                  ? "border-gray-800 bg-[#0b0f19]/30 text-gray-400 hover:bg-white/[0.02] cursor-pointer"
+                  ? "border-(--border) bg-(--surface-raised) text-(--text-secondary) hover:bg-(--surface) cursor-pointer"
                   : isClickable
-                  ? "border-transparent text-gray-500 hover:text-gray-300 cursor-pointer"
-                  : "border-transparent text-gray-700 cursor-not-allowed opacity-50"
+                  ? "border-transparent text-(--text-secondary) hover:text-(--text-primary) cursor-pointer"
+                  : "border-transparent text-(--text-muted) cursor-not-allowed opacity-50"
               }`}
             >
               <div className="flex items-center gap-2">
                 {step.icon}
                 <span>{step.label}</span>
               </div>
-              {isCompleted && <Check className="w-4 h-4 text-teal-400" />}
+              {isCompleted && <Check className="w-4 h-4 text-(--accent)" />}
             </button>
           );
         })}
       </aside>
 
       {/* Wizard Form Panel (Right Side) */}
-      <main className="flex-1 bg-[#0b0f19] border border-gray-800 rounded-3xl p-5 sm:p-8 shadow-xl flex flex-col gap-6 justify-between animate-fade-in">
+      <main className="flex-1 bg-(--surface) border border-(--border) rounded-3xl p-5 sm:p-8 shadow-xl flex flex-col gap-6 justify-between animate-fade-in">
         <div className="flex-1">
           {loadingDetails ? (
             <div className="flex items-center justify-center h-48">
-              <RefreshCw className="animate-spin w-6 h-6 text-teal-400" />
+              <RefreshCw className="animate-spin w-6 h-6 text-(--accent)" />
             </div>
           ) : (
             <>

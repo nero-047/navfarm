@@ -88,16 +88,16 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Layers className="w-5 h-5 text-teal-400" />
+        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
+          <Layers className="w-5 h-5 text-(--accent)" />
           Step 8: Nature of Farming Business
         </h2>
-        <p className="text-xs text-gray-500">Enable lines of businesses to activate standard templates and workflows.</p>
+        <p className="text-xs text-(--text-secondary)">Enable lines of businesses to activate standard templates and workflows.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         {nobs.length === 0 ? (
-          <div className="p-4 bg-gray-900/50 rounded-xl text-gray-500 text-sm">Loading business modules catalog...</div>
+          <div className="p-4 bg-(--surface-raised) rounded-xl text-(--text-secondary) text-sm">Loading business modules catalog...</div>
         ) : (
           nobs.map((n: any) => {
             const isChecked = selectedNobs.includes(n.nob_code);
@@ -107,28 +107,28 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
                 onClick={() => handleNobToggle(n.nob_code, n.nob_id)}
                 className={`p-4 border rounded-2xl flex flex-col gap-2 cursor-pointer transition-all ${
                   isChecked
-                    ? "border-teal-500/40 bg-teal-500/5"
-                    : "border-gray-800 bg-[#121824]/50 hover:border-gray-700"
+                    ? "border-(--accent) bg-(--accent-muted)"
+                    : "border-(--border) bg-(--surface-raised) hover:border-(--accent)"
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-white">{n.nob_name}</span>
+                  <span className="font-bold text-sm text-(--text-primary)">{n.nob_name}</span>
                   <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                    isChecked ? "bg-teal-500 border-teal-500 text-white" : "border-gray-700"
+                    isChecked ? "bg-(--accent) border-(--accent) text-white" : "border-(--border)"
                   }`}>
                     {isChecked && <Check className="w-3.5 h-3.5" />}
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">{n.description || "Link this sector to enable daily feed logs and batches."}</p>
+                <p className="text-xs text-(--text-secondary)">{n.description || "Link this sector to enable daily feed logs and batches."}</p>
 
                 {/* Sub-LOBs options rendered inside the parent NOB card */}
                 {isChecked && (
-                  <div className="mt-3 pt-3 border-t border-gray-800/80 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[10px] font-bold text-teal-400 uppercase tracking-wider">Select Active Operations (LOBs):</span>
+                  <div className="mt-3 pt-3 border-t border-(--border) flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[10px] font-bold text-(--accent) uppercase tracking-wider">Select Active Operations (LOBs):</span>
                     {loadingLobs[n.nob_id] ? (
-                      <div className="text-[11px] text-gray-500 animate-pulse py-1">Loading active sub-sectors...</div>
+                      <div className="text-[11px] text-(--text-secondary) animate-pulse py-1">Loading active sub-sectors...</div>
                     ) : !lobMap[n.nob_id] || lobMap[n.nob_id].length === 0 ? (
-                      <div className="text-[11px] text-gray-500 py-1">No sub-sectors available.</div>
+                      <div className="text-[11px] text-(--text-secondary) py-1">No sub-sectors available.</div>
                     ) : (
                       <div className="flex flex-col gap-1.5 mt-1">
                         {lobMap[n.nob_id].map((lob: any) => {
@@ -136,17 +136,17 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
                           return (
                             <label
                               key={lob.lob_id}
-                              className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2 rounded-lg hover:bg-white/[0.02] text-xs transition-colors"
+                              className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2 rounded-lg hover:bg-(--surface-raised) text-xs transition-colors"
                             >
                               <input
                                 type="checkbox"
                                 checked={isLobChecked}
                                 onChange={() => handleLobToggle(lob.lob_code)}
-                                className="w-4 h-4 rounded border-gray-800 bg-gray-900 text-teal-500 focus:ring-teal-500 focus:ring-offset-0 focus:ring-0 cursor-pointer"
+                                className="w-4 h-4 rounded border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent) focus:ring-offset-0 focus:ring-0 cursor-pointer"
                               />
                               <div className="flex flex-col">
-                                <span className="font-semibold text-gray-200">{lob.lob_name}</span>
-                                {lob.description && <span className="text-[10px] text-gray-500">{lob.description}</span>}
+                                <span className="font-semibold text-(--text-primary)">{lob.lob_name}</span>
+                                {lob.description && <span className="text-[10px] text-(--text-secondary)">{lob.description}</span>}
                               </div>
                             </label>
                           );

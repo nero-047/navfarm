@@ -236,7 +236,7 @@ export default function AdminMastersPage() {
                       {savingNob ? "Saving…" : "Save NOB"}
                     </button>
                     <button type="button" onClick={() => setShowNobForm(false)}
-                      className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm text-[#515463] hover:bg-[#f7f8fa]">
+                      className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
                       Cancel
                     </button>
                   </div>
@@ -296,7 +296,7 @@ export default function AdminMastersPage() {
                                   {savingLob ? "Saving…" : "Save LOB"}
                                 </button>
                                 <button type="button" onClick={() => setShowLobForm(null)}
-                                  className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm text-[#515463] hover:bg-[#f7f8fa]">
+                                  className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
                                   Cancel
                                 </button>
                               </div>
@@ -368,7 +368,7 @@ export default function AdminMastersPage() {
                       {savingCurr ? "Saving…" : "Add Currency"}
                     </button>
                     <button type="button" onClick={() => setShowCurrForm(false)}
-                      className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm text-[#515463] hover:bg-[#f7f8fa]">Cancel</button>
+                      className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
                   </div>
                 </form>
               </Dialog>
@@ -432,7 +432,7 @@ export default function AdminMastersPage() {
                       {savingLang ? "Saving…" : "Add Language"}
                     </button>
                     <button type="button" onClick={() => setShowLangForm(false)}
-                      className="h-11 rounded-xl border border-[#e3e7ee] bg-white px-5 text-sm text-[#515463] hover:bg-[#f7f8fa]">Cancel</button>
+                      className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
                   </div>
                 </form>
               </Dialog>

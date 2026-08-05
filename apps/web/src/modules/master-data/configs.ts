@@ -1,0 +1,518 @@
+import type { MasterDataConfig } from "./types";
+
+const STATUS_OPTIONS = [
+  { value: "ACTIVE", label: "Active" },
+  { value: "INACTIVE", label: "Inactive" },
+  { value: "ARCHIVE", label: "Archive" },
+];
+
+// ── Farm Operations ─────────────────────────────────────────────────────────
+
+const farm: MasterDataConfig = {
+  key: "farm",
+  label: "Farms",
+  description: "Physical farm sites owned by the company.",
+  apiBase: "/farm",
+  idKey: "farm_id",
+  group: "Farm Operations",
+  columns: [
+    { key: "farm_code", label: "Code" },
+    { key: "farm_name", label: "Name" },
+    { key: "farm_type", label: "Type" },
+    { key: "city", label: "City" },
+    { key: "capacity", label: "Capacity" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "farm_code", label: "Farm Code", type: "text", required: true, placeholder: "e.g. FARM01" },
+    { key: "farm_name", label: "Farm Name", type: "text", required: true, placeholder: "Green Valley Breeding Farm" },
+    {
+      key: "farm_type", label: "Farm Type", type: "select", required: true,
+      options: ["BREEDER", "COMMERCIAL_LAYERS", "COMMERCIAL_BROILERS", "HATCHERY", "REARING", "DAIRY"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+    { key: "capacity", label: "Capacity", type: "number" },
+    { key: "address_line1", label: "Address Line 1", type: "text" },
+    { key: "city", label: "City", type: "text" },
+    { key: "state", label: "State", type: "text" },
+    { key: "country", label: "Country", type: "text" },
+    { key: "pincode", label: "Pincode", type: "text" },
+  ],
+};
+
+const warehouse: MasterDataConfig = {
+  key: "warehouse",
+  label: "Warehouses",
+  description: "Storage facilities and silos, optionally linked to a farm.",
+  apiBase: "/warehouse",
+  idKey: "warehouse_id",
+  group: "Farm Operations",
+  columns: [
+    { key: "warehouse_code", label: "Code" },
+    { key: "warehouse_name", label: "Name" },
+    { key: "warehouse_type", label: "Type" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "farm_id", label: "Farm", type: "select-entity", entityEndpoint: "/farm", entityValueKey: "farm_id", entityLabelKeys: ["farm_code", "farm_name"] },
+    { key: "warehouse_code", label: "Warehouse Code", type: "text", required: true, placeholder: "WH01" },
+    { key: "warehouse_name", label: "Warehouse Name", type: "text", required: true, placeholder: "Raw Material Feed Silo 1" },
+    {
+      key: "warehouse_type", label: "Warehouse Type", type: "select", required: true,
+      options: ["COLD_STORAGE", "SILO", "GENERAL", "INGREDIENTS", "MEDICINE"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+  ],
+};
+
+const location: MasterDataConfig = {
+  key: "location",
+  label: "Locations",
+  description: "Hierarchical storage/operational locations within a warehouse.",
+  apiBase: "/location",
+  idKey: "location_id",
+  group: "Farm Operations",
+  columns: [
+    { key: "location_code", label: "Code" },
+    { key: "location_name", label: "Name" },
+    { key: "location_type", label: "Type" },
+    { key: "location_level", label: "Level" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "warehouse_id", label: "Warehouse", type: "select-entity", entityEndpoint: "/warehouse", entityValueKey: "warehouse_id", entityLabelKeys: ["warehouse_code", "warehouse_name"] },
+    { key: "parent_location_id", label: "Parent Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"] },
+    { key: "location_code", label: "Location Code", type: "text", required: true, placeholder: "LOC-A" },
+    { key: "location_name", label: "Location Name", type: "text", required: true, placeholder: "Storage Area A" },
+    { key: "location_level", label: "Hierarchy Level", type: "number", required: true },
+    {
+      key: "location_type", label: "Location Type", type: "select", required: true,
+      options: ["FARM", "SHED", "AREA", "SECTION", "ROOM", "AISLE", "SHELF"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "area_size", label: "Area Size", type: "number", step: "0.01" },
+    { key: "area_unit", label: "Area Unit", type: "text", placeholder: "SQFT" },
+    { key: "max_capacity", label: "Max Capacity", type: "number", step: "0.01" },
+    { key: "capacity_uom", label: "Capacity UOM", type: "text" },
+    { key: "current_count", label: "Current Count", type: "number", step: "0.01" },
+    { key: "gps_latitude", label: "GPS Latitude", type: "number", step: "0.000001" },
+    { key: "gps_longitude", label: "GPS Longitude", type: "number", step: "0.000001" },
+    { key: "storage_type", label: "Storage Conditions", type: "text" },
+    { key: "is_quarantine_zone", label: "Quarantine Zone", type: "boolean" },
+  ],
+};
+
+const shed: MasterDataConfig = {
+  key: "shed",
+  label: "Sheds",
+  description: "Rearing sheds belonging to a farm.",
+  apiBase: "/shed",
+  idKey: "shed_id",
+  group: "Farm Operations",
+  columns: [
+    { key: "shed_code", label: "Code" },
+    { key: "shed_name", label: "Name" },
+    { key: "shed_type", label: "Type" },
+    { key: "capacity", label: "Capacity" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "farm_id", label: "Farm", type: "select-entity", required: true, entityEndpoint: "/farm", entityValueKey: "farm_id", entityLabelKeys: ["farm_code", "farm_name"] },
+    { key: "shed_code", label: "Shed Code", type: "text", required: true, placeholder: "SHED01" },
+    { key: "shed_name", label: "Shed Name", type: "text", required: true, placeholder: "Broiler Grow-out Shed 1" },
+    {
+      key: "shed_type", label: "Shed Type", type: "select", required: true,
+      options: ["OPEN_SIDED", "ENVIRONMENTALLY_CONTROLLED", "SEMI_EC"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+    { key: "capacity", label: "Capacity", type: "number" },
+  ],
+};
+
+// ── Inventory ────────────────────────────────────────────────────────────────
+
+const itemCategory: MasterDataConfig = {
+  key: "item-category",
+  label: "Item Categories",
+  description: "Hierarchical classification for inventory items.",
+  apiBase: "/item-category",
+  idKey: "category_id",
+  group: "Inventory",
+  columns: [
+    { key: "category_code", label: "Code" },
+    { key: "category_name", label: "Name" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "category_code", label: "Category Code", type: "text", required: true, placeholder: "FEED" },
+    { key: "category_name", label: "Category Name", type: "text", required: true, placeholder: "Animal Feed Products" },
+    { key: "parent_category_id", label: "Parent Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
+  ],
+};
+
+const uom: MasterDataConfig = {
+  key: "uom",
+  label: "Units of Measure",
+  description: "Measurement units used across items and transactions.",
+  apiBase: "/uom",
+  idKey: "uom_id",
+  group: "Inventory",
+  columns: [
+    { key: "uom_code", label: "Code" },
+    { key: "uom_name", label: "Name" },
+    { key: "uom_type", label: "Type" },
+    { key: "is_base_uom", label: "Base Unit" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
+    { key: "uom_code", label: "UOM Code", type: "text", required: true, placeholder: "KG" },
+    { key: "uom_name", label: "UOM Name", type: "text", required: true, placeholder: "Kilogram" },
+    {
+      key: "uom_type", label: "UOM Type", type: "select", required: true,
+      options: ["WEIGHT", "VOLUME", "COUNT", "AREA", "TIME", "OTHER"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "decimal_places", label: "Decimal Places", type: "number" },
+    { key: "is_base_uom", label: "Is Base Unit", type: "boolean" },
+  ],
+};
+
+const item: MasterDataConfig = {
+  key: "item",
+  label: "Items",
+  description: "Inventory item master — raw materials, finished goods, assets.",
+  apiBase: "/item",
+  idKey: "item_id",
+  group: "Inventory",
+  columns: [
+    { key: "item_code", label: "Code" },
+    { key: "item_name", label: "Name" },
+    { key: "item_type", label: "Type" },
+    { key: "uom_primary", label: "UOM" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "item_code", label: "Item Code", type: "text", required: true, placeholder: "ITEM-001" },
+    { key: "item_name", label: "Item Name", type: "text", required: true, placeholder: "Cobb Broiler Chicks" },
+    { key: "item_type", label: "Item Type", type: "text", required: true, placeholder: "RAW_MATERIAL" },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"] },
+    { key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
+    { key: "uom_primary", label: "Primary UOM Code", type: "text", required: true, placeholder: "PCS" },
+    { key: "uom_secondary", label: "Secondary UOM Code", type: "text" },
+    { key: "valuation_method", label: "Valuation Method", type: "select", options: ["FIFO", "LIFO", "WEIGHTED_AVG", "STANDARD"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })) },
+    { key: "standard_cost", label: "Standard Cost", type: "number", step: "0.01" },
+    { key: "is_lot_tracked", label: "Lot Tracked", type: "boolean" },
+    { key: "is_serial_tracked", label: "Serial Tracked", type: "boolean" },
+    { key: "is_biological_asset", label: "Biological Asset", type: "boolean" },
+    { key: "is_inventoriable", label: "Inventoriable", type: "boolean" },
+    { key: "min_stock_level", label: "Min Stock Level", type: "number", step: "0.01" },
+    { key: "max_stock_level", label: "Max Stock Level", type: "number", step: "0.01" },
+    { key: "reorder_level", label: "Reorder Level", type: "number", step: "0.01" },
+    { key: "shelf_life_days", label: "Shelf Life (days)", type: "number" },
+    { key: "is_qr_enabled", label: "QR Tracking Enabled", type: "boolean" },
+  ],
+};
+
+// ── Livestock & Health ────────────────────────────────────────────────────────
+
+const species: MasterDataConfig = {
+  key: "species",
+  label: "Species",
+  description: "Base species catalog used by breeds (e.g. Chicken, Cattle).",
+  apiBase: "/species",
+  idKey: "species_id",
+  group: "Livestock & Health",
+  columns: [
+    { key: "species_code", label: "Code" },
+    { key: "species_name", label: "Name" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
+    { key: "species_code", label: "Species Code", type: "text", required: true, placeholder: "CHICKEN" },
+    { key: "species_name", label: "Species Name", type: "text", required: true, placeholder: "Chicken" },
+  ],
+};
+
+const breed: MasterDataConfig = {
+  key: "breed",
+  label: "Breeds",
+  description: "Breed benchmarks — growth, FCR, mortality, laying rates.",
+  apiBase: "/breed",
+  idKey: "breed_id",
+  group: "Livestock & Health",
+  columns: [
+    { key: "breed_code", label: "Code" },
+    { key: "breed_name", label: "Name" },
+    { key: "breed_type", label: "Type" },
+    { key: "avg_fcr", label: "Avg FCR" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"] },
+    { key: "breed_code", label: "Breed Code", type: "text", required: true, placeholder: "COBB500" },
+    { key: "breed_name", label: "Breed Name", type: "text", required: true, placeholder: "Cobb 500 Broiler" },
+    { key: "species_id", label: "Species", type: "select-entity", required: true, entityEndpoint: "/species", entityValueKey: "species_id", entityLabelKeys: ["species_code", "species_name"] },
+    {
+      key: "breed_type", label: "Breed Type", type: "select", required: true,
+      options: ["BROILER", "LAYER", "BREEDER", "DUAL_PURPOSE", "DAIRY", "BEEF", "TREE", "FISH"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+    { key: "avg_growth_rate_g_day", label: "Avg Growth Rate (g/day)", type: "number", step: "0.01" },
+    { key: "avg_fcr", label: "Avg FCR", type: "number", step: "0.01" },
+    { key: "avg_mortality_pct", label: "Avg Mortality %", type: "number", step: "0.01" },
+    { key: "avg_lay_rate_pct", label: "Avg Lay Rate %", type: "number", step: "0.01" },
+    { key: "incubation_days", label: "Incubation Days", type: "number" },
+    { key: "gestation_days", label: "Gestation Days", type: "number" },
+    { key: "avg_litter_size", label: "Avg Litter Size", type: "number", step: "0.01" },
+    { key: "mature_age_months", label: "Mature Age (months)", type: "number" },
+    { key: "productive_life_months", label: "Productive Life (months)", type: "number" },
+    { key: "avg_yield_per_unit", label: "Avg Yield per Unit", type: "number", step: "0.01" },
+    { key: "description", label: "Description", type: "textarea" },
+  ],
+};
+
+const disease: MasterDataConfig = {
+  key: "disease",
+  label: "Diseases",
+  description: "Disease reference catalog with symptoms and treatment guidelines.",
+  apiBase: "/disease",
+  idKey: "disease_id",
+  group: "Livestock & Health",
+  columns: [
+    { key: "disease_code", label: "Code" },
+    { key: "disease_name", label: "Name" },
+    { key: "scientific_name", label: "Scientific Name" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "disease_code", label: "Disease Code", type: "text", required: true, placeholder: "DIS-ND" },
+    { key: "disease_name", label: "Disease Name", type: "text", required: true, placeholder: "Newcastle Disease" },
+    { key: "scientific_name", label: "Scientific Name", type: "text", placeholder: "Avian paramyxovirus 1" },
+    { key: "symptoms", label: "Symptoms", type: "textarea" },
+    { key: "treatment_guideline", label: "Treatment Guideline", type: "textarea" },
+  ],
+};
+
+const medicine: MasterDataConfig = {
+  key: "medicine",
+  label: "Medicines",
+  description: "Medicine/vaccine profiles linked to an inventory item.",
+  apiBase: "/medicine",
+  idKey: "medicine_id",
+  group: "Livestock & Health",
+  columns: [
+    { key: "composition", label: "Composition" },
+    { key: "route_of_administration", label: "Route" },
+    { key: "withdrawal_period_days", label: "Withdrawal (days)" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "item_id", label: "Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+    { key: "composition", label: "Composition", type: "text", placeholder: "Amoxicillin 10% w/w" },
+    { key: "dosage_guideline", label: "Dosage Guideline", type: "textarea" },
+    { key: "withdrawal_period_days", label: "Withdrawal Period (days)", type: "number" },
+    {
+      key: "route_of_administration", label: "Route of Administration", type: "select",
+      options: ["ORAL", "INJECTION", "WATER", "TOPICAL"].map((v) => ({ value: v, label: v })),
+    },
+  ],
+};
+
+const feedFormula: MasterDataConfig = {
+  key: "feed-formula",
+  label: "Feed Formulas",
+  description: "Feed recipes (BOM). Ingredients are edited as a JSON array — one entry per raw material.",
+  apiBase: "/feed-formula",
+  idKey: "formula_id",
+  group: "Livestock & Health",
+  columns: [
+    { key: "formula_code", label: "Code" },
+    { key: "formula_name", label: "Name" },
+    { key: "batch_size", label: "Batch Size" },
+    { key: "batch_unit", label: "Unit" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "formula_code", label: "Formula Code", type: "text", required: true, placeholder: "FORM-BR-STARTER" },
+    { key: "formula_name", label: "Formula Name", type: "text", required: true, placeholder: "Broiler Starter Feed Formula" },
+    { key: "target_item_id", label: "Produced Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+    { key: "batch_size", label: "Batch Size", type: "number", required: true, step: "0.01" },
+    { key: "batch_unit", label: "Batch Unit", type: "text", required: true, placeholder: "KG" },
+    { key: "description", label: "Description", type: "textarea" },
+    {
+      key: "ingredients", label: "Ingredients (JSON array)", type: "json", required: true,
+      helpText: 'Array of { item_id, quantity, unit, inclusion_pct?, loss_pct? }. Example: [{"item_id":"...","quantity":650,"unit":"KG"}]',
+    },
+  ],
+};
+
+// ── Business Partners ─────────────────────────────────────────────────────────
+
+const supplier: MasterDataConfig = {
+  key: "supplier",
+  label: "Suppliers",
+  description: "Vendors and raw material suppliers.",
+  apiBase: "/supplier",
+  idKey: "supplier_id",
+  group: "Business Partners",
+  columns: [
+    { key: "supplier_code", label: "Code" },
+    { key: "supplier_name", label: "Name" },
+    { key: "email", label: "Email" },
+    { key: "phone", label: "Phone" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "supplier_code", label: "Supplier Code", type: "text", required: true, placeholder: "SUP-001" },
+    { key: "supplier_name", label: "Supplier Name", type: "text", required: true, placeholder: "Feed Ingredients Corp Ltd" },
+    { key: "email", label: "Email", type: "email", placeholder: "orders@feedingredients.com" },
+    { key: "phone", label: "Phone", type: "text" },
+    { key: "tax_number", label: "Tax Registration No.", type: "text", placeholder: "GSTIN123456789A" },
+    { key: "payment_terms", label: "Payment Terms", type: "text", placeholder: "NET30" },
+    { key: "address_line1", label: "Address Line 1", type: "text" },
+    { key: "city", label: "City", type: "text" },
+    { key: "state", label: "State", type: "text" },
+    { key: "country", label: "Country", type: "text" },
+    { key: "pincode", label: "Pincode", type: "text" },
+  ],
+};
+
+const customer: MasterDataConfig = {
+  key: "customer",
+  label: "Customers",
+  description: "Buyers and wholesale/retail customer accounts.",
+  apiBase: "/customer",
+  idKey: "customer_id",
+  group: "Business Partners",
+  columns: [
+    { key: "customer_code", label: "Code" },
+    { key: "customer_name", label: "Name" },
+    { key: "mobile", label: "Mobile" },
+    { key: "credit_limit", label: "Credit Limit" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "customer_code", label: "Customer Code", type: "text", required: true, placeholder: "CUST-001" },
+    { key: "customer_name", label: "Customer Name", type: "text", required: true, placeholder: "John Doe Wholesalers" },
+    { key: "email", label: "Email", type: "email", placeholder: "billing@johndoe.com" },
+    { key: "mobile", label: "Mobile", type: "text", required: true, placeholder: "+919876543210" },
+    { key: "tax_number", label: "Tax Registration No.", type: "text" },
+    { key: "credit_limit", label: "Credit Limit", type: "number", step: "0.01" },
+    { key: "address_line1", label: "Address Line 1", type: "text" },
+    { key: "city", label: "City", type: "text" },
+    { key: "state", label: "State", type: "text" },
+    { key: "country", label: "Country", type: "text" },
+    { key: "pincode", label: "Pincode", type: "text" },
+  ],
+};
+
+const resource: MasterDataConfig = {
+  key: "resource",
+  label: "Resources",
+  description: "Labor, equipment and vehicles used in operations.",
+  apiBase: "/resource",
+  idKey: "resource_id",
+  group: "Business Partners",
+  columns: [
+    { key: "resource_code", label: "Code" },
+    { key: "resource_name", label: "Name" },
+    { key: "resource_type", label: "Type" },
+    { key: "cost_rate", label: "Cost Rate" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "resource_code", label: "Resource Code", type: "text", required: true, placeholder: "LBR-01" },
+    { key: "resource_name", label: "Resource Name", type: "text", required: true, placeholder: "Senior Laborer" },
+    {
+      key: "resource_type", label: "Resource Type", type: "select", required: true,
+      options: ["LABOR", "EQUIPMENT", "VEHICLE"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "capacity", label: "Capacity", type: "number", step: "0.01" },
+    { key: "unit", label: "Unit", type: "text", placeholder: "HOURS" },
+    { key: "cost_rate", label: "Cost Rate", type: "number", step: "0.01" },
+  ],
+};
+
+// ── Finance ──────────────────────────────────────────────────────────────────
+
+const glAccount: MasterDataConfig = {
+  key: "gl-account",
+  label: "GL Accounts",
+  description: "Chart of Accounts.",
+  apiBase: "/gl-account",
+  idKey: "account_id",
+  group: "Finance",
+  columns: [
+    { key: "account_code", label: "Code" },
+    { key: "account_name", label: "Name" },
+    { key: "account_type", label: "Type" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "account_code", label: "Account Code", type: "text", required: true, placeholder: "101000" },
+    { key: "account_name", label: "Account Name", type: "text", required: true, placeholder: "Cash at Bank" },
+    {
+      key: "account_type", label: "Account Type", type: "select", required: true,
+      options: ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "parent_account_id", label: "Parent Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"] },
+    { key: "is_sub_account", label: "Sub-Account", type: "boolean" },
+    { key: "is_reconciliation", label: "Reconciliation Account", type: "boolean" },
+  ],
+};
+
+const glMapping: MasterDataConfig = {
+  key: "gl-mapping",
+  label: "GL Mappings",
+  description: "Maps inventory transaction types to debit/credit GL accounts.",
+  apiBase: "/gl-mapping",
+  idKey: "mapping_id",
+  group: "Finance",
+  columns: [
+    { key: "transaction_type", label: "Transaction Type" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "item_category_id", label: "Item Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
+    {
+      key: "transaction_type", label: "Transaction Type", type: "select", required: true,
+      options: ["PURCHASE", "CONSUMPTION", "OUTPUT", "SALE", "ADJUSTMENT", "MORTALITY", "VARIANCE"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "debit_gl_account_id", label: "Debit GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"] },
+    { key: "credit_gl_account_id", label: "Credit GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"] },
+  ],
+};
+
+const costCenter: MasterDataConfig = {
+  key: "cost-center",
+  label: "Cost Centers",
+  description: "Dimensions for cost allocation and reporting.",
+  apiBase: "/cost-center",
+  idKey: "cost_center_id",
+  group: "Finance",
+  columns: [
+    { key: "cost_center_code", label: "Code" },
+    { key: "cost_center_name", label: "Name" },
+    { key: "cost_center_type", label: "Type" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "cost_center_code", label: "Cost Center Code", type: "text", required: true, placeholder: "DEPT-ADMIN" },
+    { key: "cost_center_name", label: "Cost Center Name", type: "text", required: true, placeholder: "Administrative Department" },
+    {
+      key: "cost_center_type", label: "Cost Center Type", type: "select", required: true,
+      options: ["DEPARTMENT", "FARM", "WAREHOUSE", "PROJECT", "OTHER"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "parent_cost_center_id", label: "Parent Cost Center", type: "select-entity", entityEndpoint: "/cost-center", entityValueKey: "cost_center_id", entityLabelKeys: ["cost_center_code", "cost_center_name"] },
+  ],
+};
+
+export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
+  farm, warehouse, location, shed,
+  itemCategory, uom, item,
+  species, breed, disease, medicine, feedFormula,
+  supplier, customer, resource,
+  glAccount, glMapping, costCenter,
+];
+
+export const MASTER_DATA_GROUPS = ["Farm Operations", "Inventory", "Livestock & Health", "Business Partners", "Finance"] as const;
+
+export function getConfig(key: string): MasterDataConfig | undefined {
+  return MASTER_DATA_CONFIGS.find((c) => c.key === key);
+}
+
+export { STATUS_OPTIONS };
