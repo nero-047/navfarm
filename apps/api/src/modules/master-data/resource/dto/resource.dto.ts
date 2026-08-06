@@ -8,6 +8,16 @@ export class CreateResourceDto {
   @IsNotEmpty()
   company_id: string;
 
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
+
   @ApiProperty({ description: 'Unique code representing the resource', example: 'LBR-01' })
   @IsString()
   @IsNotEmpty()
@@ -23,10 +33,30 @@ export class CreateResourceDto {
   @IsNotEmpty()
   resource_type: string;
 
+  @ApiProperty({ description: 'Sub-classification: PERMANENT/CONTRACT/DAILY for labor, OWNED/LEASED/RENTED for equipment', required: false })
+  @IsString()
+  @IsOptional()
+  resource_sub_type?: string;
+
+  @ApiProperty({ description: 'HR employee ID (labor/manpower resources only)', required: false })
+  @IsString()
+  @IsOptional()
+  employee_id?: string;
+
+  @ApiProperty({ description: 'Job title/designation (labor/manpower resources only)', required: false })
+  @IsString()
+  @IsOptional()
+  designation?: string;
+
   @ApiProperty({ description: 'Operating capacity count/limit', required: false })
   @IsNumber()
   @IsOptional()
   capacity?: number;
+
+  @ApiProperty({ description: 'UOM for the capacity value (e.g. KG_PER_HOUR)', required: false })
+  @IsString()
+  @IsOptional()
+  capacity_uom?: string;
 
   @ApiProperty({ description: 'Operational units', required: false, example: 'HOURS' })
   @IsString()
@@ -38,12 +68,68 @@ export class CreateResourceDto {
   @IsOptional()
   cost_rate?: number;
 
+  @ApiProperty({ description: 'Fixed asset register code (equipment/vehicle only)', required: false })
+  @IsString()
+  @IsOptional()
+  asset_code?: string;
+
+  @ApiProperty({ description: 'Make/brand of the equipment', required: false })
+  @IsString()
+  @IsOptional()
+  asset_make?: string;
+
+  @ApiProperty({ description: 'Model number of the equipment', required: false })
+  @IsString()
+  @IsOptional()
+  asset_model?: string;
+
+  @ApiProperty({ description: 'Serial number of the equipment', required: false })
+  @IsString()
+  @IsOptional()
+  asset_serial_no?: string;
+
+  @ApiProperty({ description: 'Equipment purchase date', required: false })
+  @IsDateString()
+  @IsOptional()
+  purchase_date?: string;
+
+  @ApiProperty({ description: 'Warranty expiry date', required: false })
+  @IsDateString()
+  @IsOptional()
+  warranty_expiry_date?: string;
+
+  @ApiProperty({ description: 'Days between scheduled maintenance services (equipment/vehicle)', required: false })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  maintenance_frequency_days?: number;
+
+  @ApiProperty({ description: 'Expected cost per maintenance service', required: false })
+  @IsNumber()
+  @IsOptional()
+  maintenance_cost_per_service?: number;
+
+  @ApiProperty({ description: 'Preferred maintenance vendor/engineer', required: false })
+  @IsString()
+  @IsOptional()
+  maintenance_vendor?: string;
+
   @ApiProperty({ description: 'Flexible custom config configurations in JSON format', required: false })
   @IsOptional()
   extension_config?: any;
 }
 
 export class UpdateResourceDto {
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
+
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
@@ -60,9 +146,29 @@ export class UpdateResourceDto {
   resource_type?: string;
 
   @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  resource_sub_type?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  employee_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  designation?: string;
+
+  @ApiProperty({ required: false })
   @IsNumber()
   @IsOptional()
   capacity?: number;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  capacity_uom?: string;
 
   @ApiProperty({ required: false })
   @IsString()
@@ -73,6 +179,52 @@ export class UpdateResourceDto {
   @IsNumber()
   @IsOptional()
   cost_rate?: number;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  asset_code?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  asset_make?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  asset_model?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  asset_serial_no?: string;
+
+  @ApiProperty({ required: false })
+  @IsDateString()
+  @IsOptional()
+  purchase_date?: string;
+
+  @ApiProperty({ required: false })
+  @IsDateString()
+  @IsOptional()
+  warranty_expiry_date?: string;
+
+  @ApiProperty({ required: false })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  maintenance_frequency_days?: number;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  maintenance_cost_per_service?: number;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  maintenance_vendor?: string;
 
   @ApiProperty({ required: false })
   @IsBoolean()
@@ -99,6 +251,22 @@ export class QueryResourceDto {
   @IsOptional()
   @IsString()
   resourceType?: string;
+
+  @ApiProperty({ description: 'Filter by NOB UUID', required: false })
+  @IsOptional()
+  @IsString()
+  nobId?: string;
+
+  @ApiProperty({ description: 'Filter by LOB UUID', required: false })
+  @IsOptional()
+  @IsString()
+  lobId?: string;
+
+  @ApiProperty({ description: 'Filter resources whose next maintenance is due within N days', required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  maintenanceDueWithinDays?: number;
 
   @ApiProperty({ description: 'Filter by active status', required: false })
   @IsOptional()

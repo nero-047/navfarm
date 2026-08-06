@@ -77,12 +77,12 @@ export class QuerySpeciesDto {
 
 export class CreateBreedDto {
   @ApiProperty({ description: 'Nature of Business UUID scope', example: '50000000-5000-5000-5000-000000000001' })
-  @IsUUID()
+  @IsString()
   @IsNotEmpty()
   nob_id: string;
 
   @ApiProperty({ description: 'Line of Business UUID scope (optional)', required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   lob_id?: string;
 
@@ -187,12 +187,12 @@ export class CreateBreedDto {
 
 export class UpdateBreedDto {
   @ApiProperty({ required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   nob_id?: string;
 
   @ApiProperty({ required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   lob_id?: string;
 

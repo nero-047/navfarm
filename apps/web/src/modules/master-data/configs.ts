@@ -88,9 +88,9 @@ const location: MasterDataConfig = {
       options: ["FARM", "SHED", "AREA", "SECTION", "ROOM", "AISLE", "SHELF"].map((v) => ({ value: v, label: v })),
     },
     { key: "area_size", label: "Area Size", type: "number", step: "0.01" },
-    { key: "area_unit", label: "Area Unit", type: "text", placeholder: "SQFT" },
+    { key: "area_unit", label: "Area Unit", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "max_capacity", label: "Max Capacity", type: "number", step: "0.01" },
-    { key: "capacity_uom", label: "Capacity UOM", type: "text" },
+    { key: "capacity_uom", label: "Capacity UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "current_count", label: "Current Count", type: "number", step: "0.01" },
     { key: "gps_latitude", label: "GPS Latitude", type: "number", step: "0.000001" },
     { key: "gps_longitude", label: "GPS Longitude", type: "number", step: "0.000001" },
@@ -172,6 +172,37 @@ const uom: MasterDataConfig = {
   ],
 };
 
+const itemAttribute: MasterDataConfig = {
+  key: "item-attribute",
+  label: "Item Attributes",
+  description: "Custom item attributes (e.g. Protein %, Colour) available to select when editing an item.",
+  apiBase: "/item-attribute",
+  idKey: "attribute_id",
+  group: "Inventory",
+  columns: [
+    { key: "attribute_code", label: "Code" },
+    { key: "attribute_name", label: "Name" },
+    { key: "data_type", label: "Type" },
+    { key: "is_mandatory", label: "Mandatory" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank to make this attribute available across all NOBs." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank to make this attribute available across all LOBs under the selected NOB." },
+    { key: "attribute_code", label: "Attribute Code", type: "text", required: true, placeholder: "PROTEIN_PCT" },
+    { key: "attribute_name", label: "Attribute Name", type: "text", required: true, placeholder: "Protein %" },
+    {
+      key: "data_type", label: "Value Type", type: "select", required: true,
+      options: ["STRING", "NUMBER", "BOOLEAN", "LIST"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "list_values", label: "List Options (JSON array)", type: "json", helpText: 'Only used when Value Type = LIST. Example: ["Grade A","Grade B"]' },
+    { key: "unit", label: "Unit Label", type: "text", placeholder: "PCT" },
+    { key: "is_mandatory", label: "Mandatory on every item in scope", type: "boolean" },
+    { key: "affects_costing", label: "Affects Costing", type: "boolean" },
+    { key: "is_variant", label: "Distinguishes Item Variants", type: "boolean" },
+  ],
+};
+
 const item: MasterDataConfig = {
   key: "item",
   label: "Items",
@@ -190,10 +221,11 @@ const item: MasterDataConfig = {
     { key: "item_code", label: "Item Code", type: "text", required: true, placeholder: "ITEM-001" },
     { key: "item_name", label: "Item Name", type: "text", required: true, placeholder: "Cobb Broiler Chicks" },
     { key: "item_type", label: "Item Type", type: "text", required: true, placeholder: "RAW_MATERIAL" },
-    { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"] },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this item is used across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this item is used across all LOBs under the selected NOB." },
     { key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
-    { key: "uom_primary", label: "Primary UOM Code", type: "text", required: true, placeholder: "PCS" },
-    { key: "uom_secondary", label: "Secondary UOM Code", type: "text" },
+    { key: "uom_primary", label: "Primary UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
+    { key: "uom_secondary", label: "Secondary UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "valuation_method", label: "Valuation Method", type: "select", options: ["FIFO", "LIFO", "WEIGHTED_AVG", "STANDARD"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })) },
     { key: "standard_cost", label: "Standard Cost", type: "number", step: "0.01" },
     { key: "is_lot_tracked", label: "Lot Tracked", type: "boolean" },
@@ -205,6 +237,11 @@ const item: MasterDataConfig = {
     { key: "reorder_level", label: "Reorder Level", type: "number", step: "0.01" },
     { key: "shelf_life_days", label: "Shelf Life (days)", type: "number" },
     { key: "is_qr_enabled", label: "QR Tracking Enabled", type: "boolean" },
+    {
+      key: "attributes", label: "Attribute Values (JSON array)", type: "json",
+      jsonListKeys: ["attribute_id", "attribute_value"],
+      helpText: 'Array of { attribute_id, attribute_value }. Define available attributes first under Item Attributes. Example: [{"attribute_id":"...","attribute_value":"8.5"}]',
+    },
   ],
 };
 
@@ -244,6 +281,7 @@ const breed: MasterDataConfig = {
   fields: [
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"] },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this breed applies to all LOBs under the selected NOB." },
     { key: "breed_code", label: "Breed Code", type: "text", required: true, placeholder: "COBB500" },
     { key: "breed_name", label: "Breed Name", type: "text", required: true, placeholder: "Cobb 500 Broiler" },
     { key: "species_id", label: "Species", type: "select-entity", required: true, entityEndpoint: "/species", entityValueKey: "species_id", entityLabelKeys: ["species_code", "species_name"] },
@@ -331,11 +369,11 @@ const feedFormula: MasterDataConfig = {
     { key: "formula_name", label: "Formula Name", type: "text", required: true, placeholder: "Broiler Starter Feed Formula" },
     { key: "target_item_id", label: "Produced Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
     { key: "batch_size", label: "Batch Size", type: "number", required: true, step: "0.01" },
-    { key: "batch_unit", label: "Batch Unit", type: "text", required: true, placeholder: "KG" },
+    { key: "batch_unit", label: "Batch Unit", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "description", label: "Description", type: "textarea" },
     {
-      key: "ingredients", label: "Ingredients (JSON array)", type: "json", required: true,
-      helpText: 'Array of { item_id, quantity, unit, inclusion_pct?, loss_pct? }. Example: [{"item_id":"...","quantity":650,"unit":"KG"}]',
+      key: "ingredients", label: "Ingredients (JSON array)", type: "json", required: true, createOnly: true,
+      helpText: 'Array of { item_id, quantity, unit, inclusion_pct?, loss_pct? }. Example: [{"item_id":"...","quantity":650,"unit":"KG"}]. Set at creation only — the API does not yet support editing ingredients after a formula is created.',
     },
   ],
 };
@@ -412,18 +450,40 @@ const resource: MasterDataConfig = {
     { key: "resource_name", label: "Name" },
     { key: "resource_type", label: "Type" },
     { key: "cost_rate", label: "Cost Rate" },
+    { key: "next_maintenance_date", label: "Next Maintenance" },
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this resource is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this resource is shared across all LOBs under the selected NOB." },
     { key: "resource_code", label: "Resource Code", type: "text", required: true, placeholder: "LBR-01" },
     { key: "resource_name", label: "Resource Name", type: "text", required: true, placeholder: "Senior Laborer" },
     {
       key: "resource_type", label: "Resource Type", type: "select", required: true,
       options: ["LABOR", "EQUIPMENT", "VEHICLE"].map((v) => ({ value: v, label: v })),
     },
+    {
+      key: "resource_sub_type", label: "Sub-Type", type: "select",
+      options: ["PERMANENT", "CONTRACT", "DAILY", "OWNED", "LEASED", "RENTED"].map((v) => ({ value: v, label: v })),
+      helpText: "PERMANENT/CONTRACT/DAILY for labor; OWNED/LEASED/RENTED for equipment or vehicles.",
+    },
+    { key: "employee_id", label: "Employee ID", type: "text", placeholder: "EMP-001", helpText: "Labor/manpower only." },
+    { key: "designation", label: "Designation", type: "text", placeholder: "Senior Farm Worker", helpText: "Labor/manpower only." },
     { key: "capacity", label: "Capacity", type: "number", step: "0.01" },
-    { key: "unit", label: "Unit", type: "text", placeholder: "HOURS" },
+    { key: "capacity_uom", label: "Capacity UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
+    { key: "unit", label: "Cost UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "cost_rate", label: "Cost Rate", type: "number", step: "0.01" },
+    { key: "asset_code", label: "Asset Code", type: "text", placeholder: "ASSET-PELLETISER-01", helpText: "Equipment/vehicle only." },
+    { key: "asset_make", label: "Asset Make", type: "text" },
+    { key: "asset_model", label: "Asset Model", type: "text" },
+    { key: "asset_serial_no", label: "Asset Serial No.", type: "text" },
+    { key: "purchase_date", label: "Purchase Date", type: "date" },
+    { key: "warranty_expiry_date", label: "Warranty Expiry", type: "date" },
+    { key: "maintenance_frequency_days", label: "Maintenance Frequency (days)", type: "number", helpText: "Days between scheduled services. Logging a completed service auto-calculates the next due date." },
+    { key: "maintenance_cost_per_service", label: "Est. Cost per Service", type: "number", step: "0.01" },
+    { key: "maintenance_vendor", label: "Preferred Maintenance Vendor", type: "text" },
+    { key: "last_maintenance_date", label: "Last Maintenance (system-tracked)", type: "date", hideInForm: true },
+    { key: "next_maintenance_date", label: "Next Maintenance (system-tracked)", type: "date", hideInForm: true },
   ],
 };
 
@@ -503,7 +563,7 @@ const costCenter: MasterDataConfig = {
 
 export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   farm, warehouse, location, shed,
-  itemCategory, uom, item,
+  itemCategory, uom, item, itemAttribute,
   species, breed, disease, medicine, feedFormula,
   supplier, customer, resource,
   glAccount, glMapping, costCenter,

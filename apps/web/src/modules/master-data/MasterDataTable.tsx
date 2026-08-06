@@ -31,6 +31,17 @@ function entityLabel(row: Row, field: MasterDataField): string {
   return text || row[field.entityValueKey || "id"];
 }
 
+/** Resolves a select-entity field's actual endpoint, substituting "{value}" with the parent field's current value. Returns null while a dependent field's parent is unset. */
+function resolveEndpoint(f: MasterDataField, form: Row): string | null {
+  if (!f.entityEndpoint) return null;
+  if (f.dependsOn) {
+    const parentVal = form[f.dependsOn];
+    if (!parentVal) return null;
+    return f.entityEndpoint.replace("{value}", parentVal);
+  }
+  return f.entityEndpoint;
+}
+
 function displayValue(row: Row, key: string): string {
   const v = row[key];
   if (v === null || v === undefined || v === "") return "—";
@@ -57,6 +68,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const companyId = getActiveCompanyId();
   const formFields = config.fields.filter((f) => !f.hideInForm);
+  const visibleFields = editing ? formFields.filter((f) => !f.createOnly) : formFields;
   const columns = config.columns || config.fields.filter((f) => !f.hideInTable).slice(0, 5);
 
   const load = async () => {
@@ -84,7 +96,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   useEffect(() => {
     const endpoints = Array.from(
-      new Set(config.fields.filter((f) => f.type === "select-entity" && f.entityEndpoint).map((f) => f.entityEndpoint!))
+      new Set(config.fields.filter((f) => f.type === "select-entity" && f.entityEndpoint && !f.dependsOn).map((f) => f.entityEndpoint!))
     );
     endpoints.forEach(async (ep) => {
       try {
@@ -101,6 +113,23 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.key]);
 
+  useEffect(() => {
+    if (!modalOpen) return;
+    const dependentFields = config.fields.filter((f) => f.type === "select-entity" && f.dependsOn);
+    dependentFields.forEach(async (f) => {
+      const ep = resolveEndpoint(f, form);
+      if (!ep || entityOptions[ep]) return;
+      try {
+        const res = await api.get(ep);
+        const list = unwrap<Row[]>(res);
+        setEntityOptions((prev) => ({ ...prev, [ep]: Array.isArray(list) ? list : [] }));
+      } catch {
+        setEntityOptions((prev) => ({ ...prev, [ep]: [] }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, form, config.key]);
+
   const openCreate = () => {
     setEditing(null);
     const initial: Row = {};
@@ -113,9 +142,18 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const openEdit = (row: Row) => {
     setEditing(row);
     const initial: Row = {};
-    formFields.forEach((f) => {
+    formFields.filter((f) => !f.createOnly).forEach((f) => {
       let v = row[f.key];
-      if (f.type === "json" && v && typeof v !== "string") v = JSON.stringify(v, null, 2);
+      if (f.type === "json" && v && typeof v !== "string") {
+        if (f.jsonListKeys && Array.isArray(v)) {
+          v = v.map((entry: Row) => {
+            const picked: Row = {};
+            f.jsonListKeys!.forEach((k) => { if (entry[k] !== undefined) picked[k] = entry[k]; });
+            return picked;
+          });
+        }
+        v = JSON.stringify(v, null, 2);
+      }
       initial[f.key] = v ?? (f.type === "boolean" ? false : "");
     });
     setForm(initial);
@@ -123,14 +161,20 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     setModalOpen(true);
   };
 
-  const setField = (key: string, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
+  const setField = (key: string, value: any) => setForm((prev) => {
+    const next = { ...prev, [key]: value };
+    config.fields.forEach((f) => {
+      if (f.dependsOn === key && next[f.key]) next[f.key] = "";
+    });
+    return next;
+  });
 
   const handleSave = async () => {
     setSaving(true);
     setFormError("");
     try {
       const payload: Row = {};
-      for (const f of formFields) {
+      for (const f of visibleFields) {
         let v = form[f.key];
         if (v === "" || v === undefined) continue;
         if (f.type === "number") v = Number(v);
@@ -212,10 +256,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       );
     }
     if (f.type === "select-entity") {
-      const options = entityOptions[f.entityEndpoint || ""] || [];
+      const resolvedEp = resolveEndpoint(f, form);
+      const options = resolvedEp ? entityOptions[resolvedEp] || [] : [];
+      const disabled = !!f.dependsOn && !resolvedEp;
+      const parentLabel = f.dependsOn ? config.fields.find((pf) => pf.key === f.dependsOn)?.label || f.dependsOn : "";
       return (
-        <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={inputCls} style={S.input}>
-          <option value="">Select…</option>
+        <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={inputCls} style={S.input} disabled={disabled}>
+          <option value="">{disabled ? `Select ${parentLabel} first…` : "Select…"}</option>
           {options.map((o) => (
             <option key={o[f.entityValueKey || "id"]} value={o[f.entityValueKey || "id"]}>
               {entityLabel(o, f)}
@@ -361,7 +408,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             </div>
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {formFields.map((f) => (
+            {visibleFields.map((f) => (
               <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>
                   {f.label}{f.required && <span className="text-red-500"> *</span>}

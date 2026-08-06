@@ -101,6 +101,20 @@
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-system-master-data.ts"
         }
       },
+      "db-migrate-all-tenants": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/migrate-all-tenants.ts"
+        }
+      },
+      "db-sync-nob-lob": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/sync-nob-lob.ts"
+        }
+      },
       "db-migrate-master": {
         "executor": "nx:run-commands",
         "options": {

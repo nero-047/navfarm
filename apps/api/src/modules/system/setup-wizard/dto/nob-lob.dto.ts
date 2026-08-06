@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsInt, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsInt } from 'class-validator';
 
 export class CreateNobDto {
   @ApiProperty({ description: 'Short unique Nature of Business code name', example: 'POULTRY' })
@@ -72,7 +72,7 @@ export class UpdateNobDto {
 
 export class CreateLobDto {
   @ApiProperty({ description: 'Parent Nature of Business UUID mapping code', example: '00000000-0000-0000-0000-000000000000' })
-  @IsUUID()
+  @IsString()
   @IsNotEmpty()
   nob_id: string;
 
@@ -134,7 +134,7 @@ export class CreateLobDto {
 
 export class UpdateLobDto {
   @ApiProperty({ description: 'Parent Nature of Business UUID mapping code', required: false, example: '00000000-0000-0000-0000-000000000000' })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   nob_id?: string;
 

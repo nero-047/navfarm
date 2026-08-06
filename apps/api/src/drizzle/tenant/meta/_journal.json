@@ -71,6 +71,34 @@
       "when": 1785137871360,
       "tag": "0009_graceful_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1785930321290,
+      "tag": "0010_silly_madame_masque",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1785934237774,
+      "tag": "0011_talented_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1785995385572,
+      "tag": "0012_pale_crystal",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1786002687651,
+      "tag": "0013_last_shaman",
+      "breakpoints": true
     }
   ]
 }

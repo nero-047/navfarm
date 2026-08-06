@@ -958,9 +958,26 @@ export const resourceMaster = mysqlTable('resource_master', {
   resource_code: varchar('resource_code', { length: 50 }).notNull(),
   resource_name: varchar('resource_name', { length: 150 }).notNull(),
   resource_type: varchar('resource_type', { length: 30 }).notNull(), // LABOR, EQUIPMENT, VEHICLE
+  nob_id: varchar('nob_id', { length: 36 }), // NOB scope (null = available across all NOBs)
+  lob_id: varchar('lob_id', { length: 36 }), // LOB scope (null = not LOB-restricted)
+  resource_sub_type: varchar('resource_sub_type', { length: 50 }), // PERMANENT/CONTRACT/DAILY (labor); OWNED/LEASED/RENTED (equipment)
+  employee_id: varchar('employee_id', { length: 50 }), // HR employee ID (manpower resources only)
+  designation: varchar('designation', { length: 100 }), // Job title (manpower resources only)
   capacity: decimal('capacity', { precision: 18, scale: 4 }),
+  capacity_uom: varchar('capacity_uom', { length: 20 }),
   unit: varchar('unit', { length: 20 }),
   cost_rate: decimal('cost_rate', { precision: 18, scale: 4 }),
+  asset_code: varchar('asset_code', { length: 50 }),
+  asset_make: varchar('asset_make', { length: 100 }),
+  asset_model: varchar('asset_model', { length: 100 }),
+  asset_serial_no: varchar('asset_serial_no', { length: 100 }),
+  purchase_date: date('purchase_date', { mode: 'string' }),
+  warranty_expiry_date: date('warranty_expiry_date', { mode: 'string' }),
+  maintenance_frequency_days: int('maintenance_frequency_days'),
+  last_maintenance_date: date('last_maintenance_date', { mode: 'string' }),
+  next_maintenance_date: date('next_maintenance_date', { mode: 'string' }),
+  maintenance_cost_per_service: decimal('maintenance_cost_per_service', { precision: 18, scale: 4 }),
+  maintenance_vendor: varchar('maintenance_vendor', { length: 200 }),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -974,7 +991,17 @@ export const resourceMaster = mysqlTable('resource_master', {
     columns: [table.company_id],
     foreignColumns: [companyMaster.company_id],
     name: 'res_master_company_id_fk'
-  }).onDelete('restrict')
+  }).onDelete('restrict'),
+  nobFk: foreignKey({
+    columns: [table.nob_id],
+    foreignColumns: [nobMaster.nob_id],
+    name: 'res_master_nob_id_fk'
+  }).onDelete('restrict'),
+  lobFk: foreignKey({
+    columns: [table.lob_id],
+    foreignColumns: [lobMaster.lob_id],
+    name: 'res_master_lob_id_fk'
+  }).onDelete('restrict'),
 }));
 
 export const resourceMaintenanceLog = mysqlTable('resource_maintenance_log', {
@@ -1364,4 +1391,313 @@ export const notificationLogRelations = relations(notificationLog, ({ one }) => 
     fields: [notificationLog.company_id],
     references: [companyMaster.company_id]
   })
+}));
+
+// ==========================================
+// 9. INVENTORY ENGINE (Phase 3)
+// ==========================================
+
+// Append-only movement log. Rows are never updated or soft-deleted — corrections
+// are made via new offsetting entries, matching standard ERP ledger practice.
+export const inventoryLedger = mysqlTable('inventory_ledger', {
+  ledger_id: varchar('ledger_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  item_code: varchar('item_code', { length: 50 }).notNull(), // denormalized snapshot at posting time
+  item_description: varchar('item_description', { length: 200 }).notNull(),
+  document_type: varchar('document_type', { length: 30 }).notNull(), // GOODS_RECEIPT, GOODS_ISSUE, TRANSFER, ADJUSTMENT
+  document_no: varchar('document_no', { length: 50 }).notNull(),
+  document_line_id: varchar('document_line_id', { length: 36 }),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  external_reference_no: varchar('external_reference_no', { length: 50 }),
+  entry_type: varchar('entry_type', { length: 20 }).notNull(), // POSITIVE, NEGATIVE, TRANSFER, OVERHEAD, DESCRIPTIVE
+  transaction_type: varchar('transaction_type', { length: 30 }).notNull(), // PURCHASE, CONSUMPTION, OUTPUT, TRANSFER_SHIPMENT, TRANSFER_RECEIPT, SALES, VARIANCE_POSITIVE, VARIANCE_NEGATIVE
+  quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(), // signed
+  remaining_quantity: decimal('remaining_quantity', { precision: 18, scale: 4 }), // meaningful on POSITIVE entries only
+  uom: varchar('uom', { length: 20 }).notNull(),
+  uom_conversion_factor: decimal('uom_conversion_factor', { precision: 18, scale: 6 }),
+  alternate_quantity: decimal('alternate_quantity', { precision: 18, scale: 4 }),
+  rate: decimal('rate', { precision: 18, scale: 6 }),
+  amount: decimal('amount', { precision: 18, scale: 4 }),
+  lot_no: varchar('lot_no', { length: 50 }),
+  serial_no: varchar('serial_no', { length: 100 }),
+  expiry_date: date('expiry_date', { mode: 'string' }),
+  batch_no: varchar('batch_no', { length: 50 }), // plain string until batch_master exists (Phase 5)
+  location_id: varchar('location_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  category_id: varchar('category_id', { length: 36 }).references(() => itemCategoryMaster.category_id, { onDelete: 'restrict' }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+// FIFO matching: which inbound (receipt) ledger rows an outbound (consumption)
+// ledger row drew its quantity/cost from.
+export const inventoryApplication = mysqlTable('inventory_application', {
+  application_id: varchar('application_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  inbound_ledger_id: varchar('inbound_ledger_id', { length: 36 }).notNull(),
+  outbound_ledger_id: varchar('outbound_ledger_id', { length: 36 }).notNull(),
+  applied_qty: decimal('applied_qty', { precision: 18, scale: 4 }).notNull(),
+  applied_cost_amount: decimal('applied_cost_amount', { precision: 18, scale: 4 }).notNull(),
+  application_date: date('application_date', { mode: 'string' }).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  inboundLedgerFk: foreignKey({
+    columns: [table.inbound_ledger_id],
+    foreignColumns: [inventoryLedger.ledger_id],
+    name: 'inv_app_inbound_ledger_fk'
+  }).onDelete('restrict'),
+  outboundLedgerFk: foreignKey({
+    columns: [table.outbound_ledger_id],
+    foreignColumns: [inventoryLedger.ledger_id],
+    name: 'inv_app_outbound_ledger_fk'
+  }).onDelete('restrict'),
+}));
+
+// Living/biological asset value-change log (mortality, growth, fair-value
+// adjustments, transformation). Schema only for now — nothing auto-writes to
+// this yet since it's driven by batch lifecycle events (Phase 5, not built).
+// A basic manual-entry API exists so Phase 5 can hook into it without a
+// schema change later.
+export const bioAssetLedger = mysqlTable('bio_asset_ledger', {
+  entry_id: varchar('entry_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  bio_asset_item_id: varchar('bio_asset_item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  entry_type: varchar('entry_type', { length: 30 }).notNull(), // ACQUISITION, CONSUMPTION, WRITEOFF, OVERHEAD, OVERHEAD_COST, GROWTH_ADJMT, MORTALITY, DEAD_PLANT, AMORTIZATION, FAIR_VALUE_ADJMT, TRANSFORMATION
+  document_no: varchar('document_no', { length: 50 }),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  asset_tracking_type: varchar('asset_tracking_type', { length: 10 }), // SERIAL, LOT
+  lot_no: varchar('lot_no', { length: 50 }),
+  asset_rfid_no: varchar('asset_rfid_no', { length: 100 }),
+  batch_no: varchar('batch_no', { length: 50 }),
+  stage: varchar('stage', { length: 50 }),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }),
+  cost_amount: decimal('cost_amount', { precision: 18, scale: 4 }),
+  cost_amount_each_unit: decimal('cost_amount_each_unit', { precision: 18, scale: 4 }),
+  costing_method: varchar('costing_method', { length: 30 }), // COST_ACCUMULATION, AMORTIZED_COST, FAIR_VALUE
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const goodsReceipt = mysqlTable('goods_receipt', {
+  receipt_id: varchar('receipt_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  receipt_no: varchar('receipt_no', { length: 50 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  supplier_id: varchar('supplier_id', { length: 36 }).references(() => supplierMaster.supplier_id, { onDelete: 'restrict' }),
+  external_reference_no: varchar('external_reference_no', { length: 50 }),
+  remarks: text('remarks'),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
+  posted_at: timestamp('posted_at', { mode: 'string' }),
+  posted_by: varchar('posted_by', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+});
+
+export const goodsReceiptLine = mysqlTable('goods_receipt_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  receipt_id: varchar('receipt_id', { length: 36 }).notNull().references(() => goodsReceipt.receipt_id, { onDelete: 'cascade' }),
+  line_no: int('line_no').notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(),
+  uom: varchar('uom', { length: 20 }).notNull(),
+  rate: decimal('rate', { precision: 18, scale: 6 }),
+  amount: decimal('amount', { precision: 18, scale: 4 }),
+  lot_no: varchar('lot_no', { length: 50 }),
+  serial_no: varchar('serial_no', { length: 100 }),
+  expiry_date: date('expiry_date', { mode: 'string' }),
+  remarks: varchar('remarks', { length: 500 }),
+});
+
+export const inventoryLedgerRelations = relations(inventoryLedger, ({ one, many }) => ({
+  item: one(itemMaster, { fields: [inventoryLedger.item_id], references: [itemMaster.item_id] }),
+  location: one(locationMaster, { fields: [inventoryLedger.location_id], references: [locationMaster.location_id] }),
+  warehouse: one(warehouseMaster, { fields: [inventoryLedger.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  inboundApplications: many(inventoryApplication, { relationName: 'inbound_ledger' }),
+  outboundApplications: many(inventoryApplication, { relationName: 'outbound_ledger' }),
+}));
+
+export const inventoryApplicationRelations = relations(inventoryApplication, ({ one }) => ({
+  item: one(itemMaster, { fields: [inventoryApplication.item_id], references: [itemMaster.item_id] }),
+  inboundLedger: one(inventoryLedger, {
+    fields: [inventoryApplication.inbound_ledger_id],
+    references: [inventoryLedger.ledger_id],
+    relationName: 'inbound_ledger',
+  }),
+  outboundLedger: one(inventoryLedger, {
+    fields: [inventoryApplication.outbound_ledger_id],
+    references: [inventoryLedger.ledger_id],
+    relationName: 'outbound_ledger',
+  }),
+}));
+
+export const bioAssetLedgerRelations = relations(bioAssetLedger, ({ one }) => ({
+  item: one(itemMaster, { fields: [bioAssetLedger.bio_asset_item_id], references: [itemMaster.item_id] }),
+}));
+
+export const goodsReceiptRelations = relations(goodsReceipt, ({ one, many }) => ({
+  company: one(companyMaster, { fields: [goodsReceipt.company_id], references: [companyMaster.company_id] }),
+  warehouse: one(warehouseMaster, { fields: [goodsReceipt.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  supplier: one(supplierMaster, { fields: [goodsReceipt.supplier_id], references: [supplierMaster.supplier_id] }),
+  lines: many(goodsReceiptLine),
+}));
+
+export const goodsReceiptLineRelations = relations(goodsReceiptLine, ({ one }) => ({
+  receipt: one(goodsReceipt, { fields: [goodsReceiptLine.receipt_id], references: [goodsReceipt.receipt_id] }),
+  item: one(itemMaster, { fields: [goodsReceiptLine.item_id], references: [itemMaster.item_id] }),
+}));
+
+export const goodsIssue = mysqlTable('goods_issue', {
+  issue_id: varchar('issue_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  issue_no: varchar('issue_no', { length: 50 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  cost_center_id: varchar('cost_center_id', { length: 36 }).references(() => costCenterMaster.cost_center_id, { onDelete: 'restrict' }),
+  remarks: text('remarks'),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(),
+  posted_at: timestamp('posted_at', { mode: 'string' }),
+  posted_by: varchar('posted_by', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+});
+
+export const goodsIssueLine = mysqlTable('goods_issue_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  issue_id: varchar('issue_id', { length: 36 }).notNull().references(() => goodsIssue.issue_id, { onDelete: 'cascade' }),
+  line_no: int('line_no').notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(),
+  uom: varchar('uom', { length: 20 }).notNull(),
+  remarks: varchar('remarks', { length: 500 }),
+});
+
+export const stockTransfer = mysqlTable('stock_transfer', {
+  transfer_id: varchar('transfer_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  transfer_no: varchar('transfer_no', { length: 50 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  from_warehouse_id: varchar('from_warehouse_id', { length: 36 }).notNull(),
+  to_warehouse_id: varchar('to_warehouse_id', { length: 36 }).notNull(),
+  remarks: text('remarks'),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(),
+  posted_at: timestamp('posted_at', { mode: 'string' }),
+  posted_by: varchar('posted_by', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => ({
+  fromWarehouseFk: foreignKey({
+    columns: [table.from_warehouse_id],
+    foreignColumns: [warehouseMaster.warehouse_id],
+    name: 'stock_transfer_from_warehouse_fk'
+  }).onDelete('restrict'),
+  toWarehouseFk: foreignKey({
+    columns: [table.to_warehouse_id],
+    foreignColumns: [warehouseMaster.warehouse_id],
+    name: 'stock_transfer_to_warehouse_fk'
+  }).onDelete('restrict'),
+}));
+
+export const stockTransferLine = mysqlTable('stock_transfer_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  transfer_id: varchar('transfer_id', { length: 36 }).notNull().references(() => stockTransfer.transfer_id, { onDelete: 'cascade' }),
+  line_no: int('line_no').notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(),
+  uom: varchar('uom', { length: 20 }).notNull(),
+  remarks: varchar('remarks', { length: 500 }),
+});
+
+export const stockAdjustment = mysqlTable('stock_adjustment', {
+  adjustment_id: varchar('adjustment_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  adjustment_no: varchar('adjustment_no', { length: 50 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  reason: varchar('reason', { length: 200 }),
+  remarks: text('remarks'),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(),
+  posted_at: timestamp('posted_at', { mode: 'string' }),
+  posted_by: varchar('posted_by', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+});
+
+export const stockAdjustmentLine = mysqlTable('stock_adjustment_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  adjustment_id: varchar('adjustment_id', { length: 36 }).notNull(),
+  line_no: int('line_no').notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(), // signed: positive = found stock, negative = missing/damaged
+  uom: varchar('uom', { length: 20 }).notNull(),
+  rate: decimal('rate', { precision: 18, scale: 6 }), // required only when quantity is positive (validated at DTO level)
+  remarks: varchar('remarks', { length: 500 }),
+}, (table) => ({
+  adjustmentFk: foreignKey({
+    columns: [table.adjustment_id],
+    foreignColumns: [stockAdjustment.adjustment_id],
+    name: 'stock_adj_line_adjustment_id_fk'
+  }).onDelete('cascade'),
+}));
+
+export const goodsIssueRelations = relations(goodsIssue, ({ one, many }) => ({
+  company: one(companyMaster, { fields: [goodsIssue.company_id], references: [companyMaster.company_id] }),
+  warehouse: one(warehouseMaster, { fields: [goodsIssue.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  costCenter: one(costCenterMaster, { fields: [goodsIssue.cost_center_id], references: [costCenterMaster.cost_center_id] }),
+  lines: many(goodsIssueLine),
+}));
+
+export const goodsIssueLineRelations = relations(goodsIssueLine, ({ one }) => ({
+  issue: one(goodsIssue, { fields: [goodsIssueLine.issue_id], references: [goodsIssue.issue_id] }),
+  item: one(itemMaster, { fields: [goodsIssueLine.item_id], references: [itemMaster.item_id] }),
+}));
+
+export const stockTransferRelations = relations(stockTransfer, ({ one, many }) => ({
+  company: one(companyMaster, { fields: [stockTransfer.company_id], references: [companyMaster.company_id] }),
+  fromWarehouse: one(warehouseMaster, { fields: [stockTransfer.from_warehouse_id], references: [warehouseMaster.warehouse_id], relationName: 'transfer_from_warehouse' }),
+  toWarehouse: one(warehouseMaster, { fields: [stockTransfer.to_warehouse_id], references: [warehouseMaster.warehouse_id], relationName: 'transfer_to_warehouse' }),
+  lines: many(stockTransferLine),
+}));
+
+export const stockTransferLineRelations = relations(stockTransferLine, ({ one }) => ({
+  transfer: one(stockTransfer, { fields: [stockTransferLine.transfer_id], references: [stockTransfer.transfer_id] }),
+  item: one(itemMaster, { fields: [stockTransferLine.item_id], references: [itemMaster.item_id] }),
+}));
+
+export const stockAdjustmentRelations = relations(stockAdjustment, ({ one, many }) => ({
+  company: one(companyMaster, { fields: [stockAdjustment.company_id], references: [companyMaster.company_id] }),
+  warehouse: one(warehouseMaster, { fields: [stockAdjustment.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  lines: many(stockAdjustmentLine),
+}));
+
+export const stockAdjustmentLineRelations = relations(stockAdjustmentLine, ({ one }) => ({
+  adjustment: one(stockAdjustment, { fields: [stockAdjustmentLine.adjustment_id], references: [stockAdjustment.adjustment_id] }),
+  item: one(itemMaster, { fields: [stockAdjustmentLine.item_id], references: [itemMaster.item_id] }),
 }));

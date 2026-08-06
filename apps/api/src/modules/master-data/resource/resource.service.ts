@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
+import { eq, and, like, or, isNull, isNotNull, ne, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -69,12 +69,27 @@ export class ResourceService {
       resource_id: resourceId,
       tenant_id: tenantId,
       company_id: dto.company_id,
+      nob_id: dto.nob_id || null,
+      lob_id: dto.lob_id || null,
       resource_code: dto.resource_code.toUpperCase(),
       resource_name: dto.resource_name,
       resource_type: dto.resource_type,
+      resource_sub_type: dto.resource_sub_type || null,
+      employee_id: dto.employee_id || null,
+      designation: dto.designation || null,
       capacity: dto.capacity?.toString() || null,
+      capacity_uom: dto.capacity_uom || null,
       unit: dto.unit || null,
       cost_rate: dto.cost_rate?.toString() || null,
+      asset_code: dto.asset_code || null,
+      asset_make: dto.asset_make || null,
+      asset_model: dto.asset_model || null,
+      asset_serial_no: dto.asset_serial_no || null,
+      purchase_date: dto.purchase_date || null,
+      warranty_expiry_date: dto.warranty_expiry_date || null,
+      maintenance_frequency_days: dto.maintenance_frequency_days ?? null,
+      maintenance_cost_per_service: dto.maintenance_cost_per_service?.toString() || null,
+      maintenance_vendor: dto.maintenance_vendor || null,
       is_active: true,
       status: 'ACTIVE',
       extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
@@ -122,6 +137,22 @@ export class ResourceService {
     }
     if (query.resourceType) {
       conditions.push(eq(schema.resourceMaster.resource_type, query.resourceType));
+    }
+    if (query.nobId) {
+      conditions.push(eq(schema.resourceMaster.nob_id, query.nobId));
+    }
+    if (query.lobId) {
+      conditions.push(eq(schema.resourceMaster.lob_id, query.lobId));
+    }
+    if (query.maintenanceDueWithinDays !== undefined) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + query.maintenanceDueWithinDays);
+      conditions.push(
+        and(
+          isNotNull(schema.resourceMaster.next_maintenance_date),
+          lte(schema.resourceMaster.next_maintenance_date, cutoff.toISOString().slice(0, 10))
+        )
+      );
     }
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.resourceMaster.is_active, query.isActive));
@@ -174,12 +205,27 @@ export class ResourceService {
       updated_at: toMysqlTimestamp(),
     };
 
+    if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
+    if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
     if (dto.resource_code !== undefined) updates.resource_code = dto.resource_code.toUpperCase();
     if (dto.resource_name !== undefined) updates.resource_name = dto.resource_name;
     if (dto.resource_type !== undefined) updates.resource_type = dto.resource_type;
+    if (dto.resource_sub_type !== undefined) updates.resource_sub_type = dto.resource_sub_type;
+    if (dto.employee_id !== undefined) updates.employee_id = dto.employee_id;
+    if (dto.designation !== undefined) updates.designation = dto.designation;
     if (dto.capacity !== undefined) updates.capacity = dto.capacity?.toString() || null;
+    if (dto.capacity_uom !== undefined) updates.capacity_uom = dto.capacity_uom;
     if (dto.unit !== undefined) updates.unit = dto.unit;
     if (dto.cost_rate !== undefined) updates.cost_rate = dto.cost_rate?.toString() || null;
+    if (dto.asset_code !== undefined) updates.asset_code = dto.asset_code;
+    if (dto.asset_make !== undefined) updates.asset_make = dto.asset_make;
+    if (dto.asset_model !== undefined) updates.asset_model = dto.asset_model;
+    if (dto.asset_serial_no !== undefined) updates.asset_serial_no = dto.asset_serial_no;
+    if (dto.purchase_date !== undefined) updates.purchase_date = dto.purchase_date;
+    if (dto.warranty_expiry_date !== undefined) updates.warranty_expiry_date = dto.warranty_expiry_date;
+    if (dto.maintenance_frequency_days !== undefined) updates.maintenance_frequency_days = dto.maintenance_frequency_days;
+    if (dto.maintenance_cost_per_service !== undefined) updates.maintenance_cost_per_service = dto.maintenance_cost_per_service?.toString() || null;
+    if (dto.maintenance_vendor !== undefined) updates.maintenance_vendor = dto.maintenance_vendor;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;
     if (dto.extension_config !== undefined) updates.extension_config = JSON.stringify(dto.extension_config);
@@ -293,6 +339,26 @@ export class ResourceService {
     };
 
     await this.db.insert(schema.resourceMaintenanceLog).values(newLog);
+
+    // Roll the resource's maintenance-due tracking forward from this service.
+    // Mirrors the doc's intent: completing a service updates last/next dates
+    // on the resource itself, so overdue equipment can be queried directly.
+    if (newLog.status === 'COMPLETED') {
+      const resourceUpdates: any = {
+        last_maintenance_date: dto.maintenance_date,
+        updated_by: userPayload?.userId || null,
+        updated_at: toMysqlTimestamp(),
+      };
+      if (resource.maintenance_frequency_days) {
+        const next = new Date(dto.maintenance_date);
+        next.setDate(next.getDate() + resource.maintenance_frequency_days);
+        resourceUpdates.next_maintenance_date = next.toISOString().slice(0, 10);
+      }
+      await this.db
+        .update(schema.resourceMaster)
+        .set(resourceUpdates)
+        .where(eq(schema.resourceMaster.resource_id, resourceId));
+    }
 
     await this.auditService.log({
       tenantId,

@@ -22,6 +22,7 @@ import { LocationModule } from './modules/master-data/location/location.module';
 import { ShedModule } from './modules/master-data/shed/shed.module';
 import { ItemCategoryModule } from './modules/master-data/item-category/item-category.module';
 import { ItemModule } from './modules/master-data/item/item.module';
+import { ItemAttributeModule } from './modules/master-data/item-attribute/item-attribute.module';
 import { SupplierModule } from './modules/master-data/supplier/supplier.module';
 import { CustomerModule } from './modules/master-data/customer/customer.module';
 import { ResourceModule } from './modules/master-data/resource/resource.module';
@@ -31,6 +32,12 @@ import { FeedFormulaModule } from './modules/master-data/feed-formula/feed-formu
 import { GlAccountModule } from './modules/finance/gl-account/gl-account.module';
 import { GlMappingModule } from './modules/finance/gl-mapping/gl-mapping.module';
 import { CostCenterModule } from './modules/finance/cost-center/cost-center.module';
+import { InventoryLedgerModule } from './modules/inventory/inventory-ledger/inventory-ledger.module';
+import { GoodsReceiptModule } from './modules/inventory/goods-receipt/goods-receipt.module';
+import { BioAssetLedgerModule } from './modules/inventory/bio-asset-ledger/bio-asset-ledger.module';
+import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.module';
+import { StockTransferModule } from './modules/inventory/stock-transfer/stock-transfer.module';
+import { StockAdjustmentModule } from './modules/inventory/stock-adjustment/stock-adjustment.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -74,6 +81,7 @@ import { SystemController } from './system/system.controller';
     ShedModule,
     ItemCategoryModule,
     ItemModule,
+    ItemAttributeModule,
     SupplierModule,
     CustomerModule,
     ResourceModule,
@@ -83,6 +91,12 @@ import { SystemController } from './system/system.controller';
     GlAccountModule,
     GlMappingModule,
     CostCenterModule,
+    InventoryLedgerModule,
+    GoodsReceiptModule,
+    BioAssetLedgerModule,
+    GoodsIssueModule,
+    StockTransferModule,
+    StockAdjustmentModule,
   ],
   controllers: [SystemController],
   providers: [],

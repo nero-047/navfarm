@@ -35,13 +35,13 @@ export class CreateItemDto {
   @IsNotEmpty()
   item_type: string;
 
-  @ApiProperty({ description: 'Nature of Business UUID scope', example: 'nob-uuid-here' })
-  @IsUUID()
-  @IsNotEmpty()
-  nob_id: string;
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = usable across all NOBs)', required: false, example: 'nob-uuid-here' })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
 
   @ApiProperty({ description: 'Line of Business UUID scope', required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   lob_id?: string;
 
@@ -180,12 +180,12 @@ export class UpdateItemDto {
   item_type?: string;
 
   @ApiProperty({ required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   nob_id?: string;
 
   @ApiProperty({ required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   lob_id?: string;
 
@@ -335,12 +335,12 @@ export class QueryItemDto {
 
   @ApiProperty({ description: 'Filter by NOB UUID', required: false })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   nobId?: string;
 
   @ApiProperty({ description: 'Filter by LOB UUID', required: false })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   lobId?: string;
 
   @ApiProperty({ description: 'Filter by active status', required: false })
