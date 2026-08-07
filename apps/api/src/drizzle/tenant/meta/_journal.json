@@ -99,6 +99,41 @@
       "when": 1786002687651,
       "tag": "0013_last_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1786011878384,
+      "tag": "0014_loving_talisman",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1786016330075,
+      "tag": "0015_windy_kree",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1786080688106,
+      "tag": "0016_busy_zemo",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1786096880146,
+      "tag": "0017_sleepy_mesmero",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1786098299120,
+      "tag": "0018_awesome_sunspot",
+      "breakpoints": true
     }
   ]
 }

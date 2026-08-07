@@ -22,6 +22,7 @@ interface WritePositiveEntryParams {
   lotNo?: string;
   serialNo?: string;
   expiryDate?: string;
+  batchNo?: string;
   warehouseId?: string;
   locationId?: string;
   userId?: string;
@@ -39,6 +40,7 @@ interface WriteNegativeEntryParams {
   transactionType: string;
   quantity: number; // positive number — the amount being consumed/shipped/written off
   uom: string;
+  batchNo?: string;
   warehouseId?: string;
   locationId?: string;
   userId?: string;
@@ -99,6 +101,7 @@ export class InventoryLedgerService {
       lot_no: params.lotNo || null,
       serial_no: params.serialNo || null,
       expiry_date: params.expiryDate || null,
+      batch_no: params.batchNo || null,
       location_id: params.locationId || null,
       warehouse_id: params.warehouseId || null,
       nob_id: item.nob_id,
@@ -219,6 +222,7 @@ export class InventoryLedgerService {
       quantity: (-Math.abs(params.quantity)).toString(),
       uom: params.uom,
       uom_conversion_factor: item.uom_conversion_factor,
+      batch_no: params.batchNo || null,
       location_id: params.locationId || null,
       warehouse_id: params.warehouseId || null,
       nob_id: item.nob_id,

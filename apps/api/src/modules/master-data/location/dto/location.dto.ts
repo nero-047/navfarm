@@ -9,16 +9,26 @@ export class CreateLocationDto {
   company_id?: string;
 
   @ApiProperty({ description: 'Nature of Business UUID scope', required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   nob_id?: string;
 
   @ApiProperty({ description: 'Line of Business UUID scope', required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   lob_id?: string;
 
-  @ApiProperty({ description: 'Linked Warehouse UUID', required: false })
+  @ApiProperty({ description: 'Parent Farm UUID — set exactly one of farm_id/shed_id/warehouse_id', required: false })
+  @IsUUID()
+  @IsOptional()
+  farm_id?: string;
+
+  @ApiProperty({ description: 'Parent Shed UUID — set exactly one of farm_id/shed_id/warehouse_id', required: false })
+  @IsUUID()
+  @IsOptional()
+  shed_id?: string;
+
+  @ApiProperty({ description: 'Parent Warehouse UUID — set exactly one of farm_id/shed_id/warehouse_id', required: false })
   @IsUUID()
   @IsOptional()
   warehouse_id?: string;
@@ -105,16 +115,26 @@ export class UpdateLocationDto {
   company_id?: string;
 
   @ApiProperty({ required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   nob_id?: string;
 
   @ApiProperty({ required: false })
-  @IsUUID()
+  @IsString()
   @IsOptional()
   lob_id?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'Parent Farm UUID — set exactly one of farm_id/shed_id/warehouse_id', required: false })
+  @IsUUID()
+  @IsOptional()
+  farm_id?: string;
+
+  @ApiProperty({ description: 'Parent Shed UUID — set exactly one of farm_id/shed_id/warehouse_id', required: false })
+  @IsUUID()
+  @IsOptional()
+  shed_id?: string;
+
+  @ApiProperty({ description: 'Parent Warehouse UUID — set exactly one of farm_id/shed_id/warehouse_id', required: false })
   @IsUUID()
   @IsOptional()
   warehouse_id?: string;
@@ -210,6 +230,16 @@ export class QueryLocationDto {
   @IsOptional()
   @IsUUID()
   companyId?: string;
+
+  @ApiProperty({ description: 'Filter by parent farm UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  farmId?: string;
+
+  @ApiProperty({ description: 'Filter by parent shed UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  shedId?: string;
 
   @ApiProperty({ description: 'Filter by linked warehouse UUID', required: false })
   @IsOptional()

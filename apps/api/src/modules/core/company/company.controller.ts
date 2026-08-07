@@ -3,13 +3,18 @@ import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth } from '@nestjs/swagger'
 import { CompanyService } from './company.service';
 import { CreateCompanyDto, UpdateCompanyDto, QueryCompanyDto } from './dto/company.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 
 @ApiTags('Company Profile Management')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('company')
 export class CompanyController {
   constructor(private readonly companyService: CompanyService) {}
 
   @Get('tenant/:tenantId')
+  @RequirePermission('COMPANY', 'SETTINGS', 'view')
   @ApiOperation({ summary: 'List all company profiles registered under a Tenant group (Multi-company setup)' })
   @ApiParam({ name: 'tenantId', description: 'Tenant UUID identifier' })
   async findByTenant(@Param('tenantId') tenantId: string, @Query() query: QueryCompanyDto) {
@@ -17,6 +22,7 @@ export class CompanyController {
   }
 
   @Get(':id')
+  @RequirePermission('COMPANY', 'SETTINGS', 'view')
   @ApiOperation({ summary: 'Fetch company details by UUID' })
   @ApiParam({ name: 'id', description: 'Company UUID identifier' })
   async findOne(@Param('id') id: string) {
@@ -24,8 +30,7 @@ export class CompanyController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermission('COMPANY', 'SETTINGS', 'create')
   @ApiOperation({ summary: 'Register a new company under the active tenant' })
   async create(@Body() dto: CreateCompanyDto, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
@@ -33,8 +38,7 @@ export class CompanyController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermission('COMPANY', 'SETTINGS', 'edit')
   @ApiOperation({ summary: 'Update company profile details' })
   @ApiParam({ name: 'id', description: 'Company UUID identifier' })
   async update(@Param('id') id: string, @Body() dto: UpdateCompanyDto, @Req() req: any) {
@@ -43,8 +47,7 @@ export class CompanyController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermission('COMPANY', 'SETTINGS', 'delete')
   @ApiOperation({ summary: 'Deactivate (soft-delete) a company profile' })
   @ApiParam({ name: 'id', description: 'Company UUID identifier' })
   async remove(@Param('id') id: string, @Req() req: any) {
@@ -53,8 +56,7 @@ export class CompanyController {
   }
 
   @Patch(':id/restore')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermission('COMPANY', 'SETTINGS', 'edit')
   @ApiOperation({ summary: 'Restore a soft-deleted company profile' })
   @ApiParam({ name: 'id', description: 'Company UUID identifier' })
   async restore(@Param('id') id: string, @Req() req: any) {

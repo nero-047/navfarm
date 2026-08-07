@@ -16,15 +16,52 @@ interface RolesTabProps {
   setActionSuccess: (msg: string) => void;
 }
 
+// Kept in sync with every @RequirePermission(moduleCode, resource, action) call
+// across apps/api/src/modules — this list is what a role can actually be
+// granted. A resource with no backend enforcement has no business appearing
+// here: checking its box would look like it does something and wouldn't.
 const DEFAULT_RESOURCES = [
-  { module_code: "POULTRY", resource: "BATCH_CONTROL", name: "Batches Production Control" },
-  { module_code: "POULTRY", resource: "FEED_LOGS", name: "Farming Feed Allocation Logs" },
-  { module_code: "ACCOUNTING", resource: "LEDGER", name: "General Ledger Journal Entries" },
-  { module_code: "FINANCE", resource: "VALUATION", name: "Costing Valuation Registers" },
-  { module_code: "RBAC", resource: "ROLE", name: "User Roles & Team Management" },
-  { module_code: "COMPANY", resource: "SETTINGS", name: "Company Setup & Profiles" },
+  // AUDIT
+  { module_code: "AUDIT", resource: "LOGS", name: "Audit Logs & Trails" },
+  // COMPANY
+  { module_code: "COMPANY", resource: "SETTINGS", name: "Company Profiles" },
+  // FINANCE (Phase 4)
+  { module_code: "FINANCE", resource: "JOURNAL", name: "Journal Entries" },
+  { module_code: "FINANCE", resource: "REPORTS", name: "Financial Reports" },
+  // INVENTORY (Phase 3)
+  { module_code: "INVENTORY", resource: "GOODS_RECEIPT", name: "Goods Receipt" },
+  { module_code: "INVENTORY", resource: "GOODS_ISSUE", name: "Goods Issue" },
+  { module_code: "INVENTORY", resource: "STOCK_TRANSFER", name: "Stock Transfer" },
+  { module_code: "INVENTORY", resource: "STOCK_ADJUSTMENT", name: "Stock Adjustment" },
+  { module_code: "INVENTORY", resource: "LEDGER", name: "Inventory Ledger" },
+  { module_code: "INVENTORY", resource: "BIO_ASSET_LEDGER", name: "Bio-Asset Ledger" },
+  // MASTER_DATA (Phase 2)
+  { module_code: "MASTER_DATA", resource: "UOM", name: "Units of Measure" },
+  { module_code: "MASTER_DATA", resource: "SPECIES", name: "Species" },
+  { module_code: "MASTER_DATA", resource: "BREED", name: "Breeds" },
+  { module_code: "MASTER_DATA", resource: "FARM", name: "Farms" },
+  { module_code: "MASTER_DATA", resource: "WAREHOUSE", name: "Warehouses" },
+  { module_code: "MASTER_DATA", resource: "SHED", name: "Sheds" },
+  { module_code: "MASTER_DATA", resource: "LOCATION", name: "Locations" },
+  { module_code: "MASTER_DATA", resource: "ITEM_CATEGORY", name: "Item Categories" },
+  { module_code: "MASTER_DATA", resource: "ITEM", name: "Items" },
+  { module_code: "MASTER_DATA", resource: "ITEM_ATTRIBUTE", name: "Item Attributes" },
+  { module_code: "MASTER_DATA", resource: "SUPPLIER", name: "Suppliers" },
+  { module_code: "MASTER_DATA", resource: "CUSTOMER", name: "Customers" },
+  { module_code: "MASTER_DATA", resource: "RESOURCE", name: "Resources (Labor/Equipment)" },
+  { module_code: "MASTER_DATA", resource: "DISEASE", name: "Diseases" },
+  { module_code: "MASTER_DATA", resource: "MEDICINE", name: "Medicines" },
+  { module_code: "MASTER_DATA", resource: "FEED_FORMULA", name: "Feed Formulas" },
+  { module_code: "MASTER_DATA", resource: "GL_ACCOUNT", name: "GL Accounts" },
+  { module_code: "MASTER_DATA", resource: "GL_MAPPING", name: "GL Mappings" },
+  { module_code: "MASTER_DATA", resource: "COST_CENTER", name: "Cost Centers" },
+  // NOTIFICATION
   { module_code: "NOTIFICATION", resource: "SETTINGS", name: "Notification Gateway Settings" },
-  { module_code: "AUDIT", resource: "LOGS", name: "Audit Logs & Trails" }
+  // PRODUCTION (Phase 5)
+  { module_code: "PRODUCTION", resource: "BATCH", name: "Production Batches" },
+  // RBAC
+  { module_code: "RBAC", resource: "ROLE", name: "User Roles & Team Management" },
+  { module_code: "RBAC", resource: "USER", name: "User Accounts" },
 ];
 
 const S = {

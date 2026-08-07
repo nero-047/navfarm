@@ -64,6 +64,8 @@ export class FarmService {
       farm_code: dto.farm_code.toUpperCase(),
       farm_name: dto.farm_name,
       farm_type: dto.farm_type,
+      nob_id: dto.nob_id || null,
+      lob_id: dto.lob_id || null,
       capacity: dto.capacity || 0,
       address_line1: dto.address_line1 || null,
       city: dto.city || null,
@@ -172,6 +174,8 @@ export class FarmService {
     if (dto.farm_code !== undefined) updates.farm_code = dto.farm_code.toUpperCase();
     if (dto.farm_name !== undefined) updates.farm_name = dto.farm_name;
     if (dto.farm_type !== undefined) updates.farm_type = dto.farm_type;
+    if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
+    if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
     if (dto.capacity !== undefined) updates.capacity = dto.capacity;
     if (dto.address_line1 !== undefined) updates.address_line1 = dto.address_line1;
     if (dto.city !== undefined) updates.city = dto.city;

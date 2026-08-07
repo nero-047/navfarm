@@ -1,0 +1,368 @@
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsUUID,
+  IsInt,
+  Min,
+  Max,
+  IsNumber,
+  IsDateString,
+  IsArray,
+  ValidateNested,
+  ArrayMinSize,
+  IsIn,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+const COSTING_METHODS = ['STANDARD', 'FIFO', 'BIO_ASSET'] as const;
+const DISPOSAL_TYPES = ['HARVEST', 'SOLD'] as const;
+const TRANSACTION_TYPES = ['CONSUMPTION', 'MORTALITY', 'OUTPUT', 'OVERHEAD', 'OBSERVATION'] as const;
+const OUTPUT_TYPES = ['MAIN', 'BY_PRODUCT'] as const;
+
+export class BatchInputLineInput {
+  @ApiProperty({ description: 'Item UUID being placed into the batch' })
+  @IsUUID()
+  @IsNotEmpty()
+  item_id: string;
+
+  @ApiProperty({ description: 'Source batch UUID, when this input is another batch\'s output (traceability)', required: false })
+  @IsUUID()
+  @IsOptional()
+  source_batch_id?: string;
+
+  @ApiProperty({ description: 'Quantity placed', example: 5000 })
+  @IsNumber()
+  @IsNotEmpty()
+  quantity: number;
+
+  @ApiProperty({ description: 'Unit of measure code' })
+  @IsString()
+  @IsNotEmpty()
+  uom: string;
+
+  @ApiProperty({ description: 'Rate per unit', required: false })
+  @IsNumber()
+  @IsOptional()
+  rate?: number;
+}
+
+export class BatchStandardConsumptionLineInput {
+  @ApiProperty({ description: 'Item UUID this consumption standard applies to' })
+  @IsUUID()
+  @IsNotEmpty()
+  item_id: string;
+
+  @ApiProperty({ description: 'Standard expected quantity per opening unit per day', example: 0.12 })
+  @IsNumber()
+  @IsNotEmpty()
+  std_qty_per_unit_per_day: number;
+
+  @ApiProperty({ description: 'Standard rate per UOM (defaults to the item\'s master standard cost if omitted)', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_rate?: number;
+}
+
+export class BatchStandardInput {
+  @ApiProperty({ description: 'Standard expected output quantity (defaults to opening_quantity adjusted by the breed\'s avg_mortality_pct, if a breed is set)', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_output_quantity?: number;
+
+  @ApiProperty({ description: 'Standard cost per output unit, used for Output Variance', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_output_cost_per_unit?: number;
+
+  @ApiProperty({ description: 'Standard overhead rate per output unit, used for Overhead Variance', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_overhead_rate_per_unit?: number;
+
+  @ApiProperty({ description: 'Per-item consumption standards, used for Price/Usage Variance', type: [BatchStandardConsumptionLineInput], required: false })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BatchStandardConsumptionLineInput)
+  @IsOptional()
+  consumption_lines?: BatchStandardConsumptionLineInput[];
+}
+
+export class CreateBatchDto {
+  @ApiProperty({ description: 'Company UUID scope' })
+  @IsUUID()
+  @IsNotEmpty()
+  company_id: string;
+
+  @ApiProperty({ description: 'Line of Business UUID — determines allowed costing methods' })
+  @IsString()
+  @IsNotEmpty()
+  lob_id: string;
+
+  @ApiProperty({ description: 'Costing method for this batch', enum: COSTING_METHODS })
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(COSTING_METHODS)
+  costing_method: string;
+
+  @ApiProperty({ description: 'Breed UUID (optional)', required: false })
+  @IsUUID()
+  @IsOptional()
+  breed_id?: string;
+
+  @ApiProperty({ description: 'Shed UUID (optional — set exactly one of shed_id/location_id, or neither)', required: false })
+  @IsUUID()
+  @IsOptional()
+  shed_id?: string;
+
+  @ApiProperty({ description: 'Location UUID (optional)', required: false })
+  @IsUUID()
+  @IsOptional()
+  location_id?: string;
+
+  @ApiProperty({ description: 'Batch start date', example: '2026-08-07' })
+  @IsDateString()
+  @IsNotEmpty()
+  start_date: string;
+
+  @ApiProperty({ description: 'Expected end date', required: false })
+  @IsDateString()
+  @IsOptional()
+  expected_end_date?: string;
+
+  @ApiProperty({ description: 'Opening quantity', example: 5000 })
+  @IsNumber()
+  @IsNotEmpty()
+  opening_quantity: number;
+
+  @ApiProperty({ description: 'Unit of measure for the opening quantity' })
+  @IsString()
+  @IsNotEmpty()
+  uom: string;
+
+  @ApiProperty({ description: 'Remarks', required: false })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+
+  @ApiProperty({ description: 'Input lines — what the batch opens with', type: [BatchInputLineInput] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => BatchInputLineInput)
+  input_lines: BatchInputLineInput[];
+
+  @ApiProperty({ description: 'Standard-cost assumptions for variance calculation — only meaningful when costing_method = STANDARD', type: BatchStandardInput, required: false })
+  @ValidateNested()
+  @Type(() => BatchStandardInput)
+  @IsOptional()
+  standard?: BatchStandardInput;
+}
+
+export class AddBatchTransactionDto {
+  @ApiProperty({ description: 'Transaction date', example: '2026-08-07' })
+  @IsDateString()
+  @IsNotEmpty()
+  transaction_date: string;
+
+  @ApiProperty({ description: 'Transaction type', enum: TRANSACTION_TYPES })
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(TRANSACTION_TYPES)
+  transaction_type: string;
+
+  @ApiProperty({ description: 'Item UUID (required for CONSUMPTION/MORTALITY/OUTPUT, omit for pure OVERHEAD/OBSERVATION)', required: false })
+  @IsUUID()
+  @IsOptional()
+  item_id?: string;
+
+  @ApiProperty({ description: 'Resource UUID (labor/equipment consumed, for OVERHEAD)', required: false })
+  @IsUUID()
+  @IsOptional()
+  resource_id?: string;
+
+  @ApiProperty({ description: 'Quantity (unsigned — sign is derived from transaction_type)', required: false })
+  @IsNumber()
+  @IsOptional()
+  quantity?: number;
+
+  @ApiProperty({ description: 'Unit of measure', required: false })
+  @IsString()
+  @IsOptional()
+  uom?: string;
+
+  @ApiProperty({ description: 'Rate per unit', required: false })
+  @IsNumber()
+  @IsOptional()
+  rate?: number;
+
+  @ApiProperty({ description: 'Remarks', required: false })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+}
+
+export class BatchOutputLineInput {
+  @ApiProperty({ description: 'Output item UUID' })
+  @IsUUID()
+  @IsNotEmpty()
+  item_id: string;
+
+  @ApiProperty({ description: 'Output classification', enum: OUTPUT_TYPES, default: 'MAIN' })
+  @IsString()
+  @IsOptional()
+  @IsIn(OUTPUT_TYPES)
+  output_type?: string;
+
+  @ApiProperty({ description: 'Share of total batch cost allocated to this output line (all lines must sum to 100)', example: 100 })
+  @IsNumber()
+  @Min(0.01)
+  @Max(100)
+  @IsNotEmpty()
+  cost_split_pct: number;
+
+  @ApiProperty({ description: 'Output quantity' })
+  @IsNumber()
+  @IsNotEmpty()
+  quantity: number;
+
+  @ApiProperty({ description: 'Unit of measure' })
+  @IsString()
+  @IsNotEmpty()
+  uom: string;
+
+  @ApiProperty({ description: 'Destination warehouse UUID' })
+  @IsUUID()
+  @IsNotEmpty()
+  warehouse_id: string;
+}
+
+export class CloseBatchDto {
+  @ApiProperty({ description: 'Actual end date', required: false, example: '2026-09-18' })
+  @IsDateString()
+  @IsOptional()
+  actual_end_date?: string;
+
+  @ApiProperty({ description: 'Surviving/closing quantity', required: false })
+  @IsNumber()
+  @IsOptional()
+  closing_quantity?: number;
+
+  @ApiProperty({ description: 'Output lines — cost_split_pct must sum to 100 across all lines', type: [BatchOutputLineInput] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => BatchOutputLineInput)
+  output_lines: BatchOutputLineInput[];
+}
+
+export class QueryBatchDto {
+  @ApiProperty({ description: 'Filter by company UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
+  @ApiProperty({ description: 'Filter by status', required: false, enum: ['DRAFT', 'ACTIVE', 'CLOSED', 'CANCELLED'] })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiProperty({ description: 'Filter by LOB UUID', required: false })
+  @IsOptional()
+  @IsString()
+  lobId?: string;
+
+  @ApiProperty({ description: 'Search batch no.', required: false })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({ description: 'Results per page', default: 50, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @ApiProperty({ description: 'Pagination offset', default: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
+
+export class MatureBioAssetDto {
+  @ApiProperty({ description: 'Residual (salvage) value per unit, used in the amortization formula', example: 5000 })
+  @IsNumber()
+  @IsNotEmpty()
+  residual_value_per_unit: number;
+
+  @ApiProperty({ description: 'Productive life in months (defaults to the batch breed\'s productive_life_months if omitted)', required: false })
+  @IsInt()
+  @IsOptional()
+  productive_life_months?: number;
+}
+
+export class AmortizeBioAssetDto {
+  @ApiProperty({ description: 'Posting date for this amortization run — one run per calendar month is allowed', example: '2026-09-30' })
+  @IsDateString()
+  @IsNotEmpty()
+  posting_date: string;
+}
+
+export class RecordFairValueDto {
+  @ApiProperty({ description: 'Posting date', example: '2026-09-30' })
+  @IsDateString()
+  @IsNotEmpty()
+  posting_date: string;
+
+  @ApiProperty({ description: 'New fair value per unit', example: 28000 })
+  @IsNumber()
+  @IsNotEmpty()
+  fair_value_per_unit: number;
+}
+
+export class DisposeBioAssetDto {
+  @ApiProperty({ description: 'Disposal type', enum: DISPOSAL_TYPES })
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(DISPOSAL_TYPES)
+  disposal_type: string;
+
+  @ApiProperty({ description: 'Number of animals disposed', example: 1 })
+  @IsNumber()
+  @IsNotEmpty()
+  quantity: number;
+
+  @ApiProperty({ description: 'Posting date', example: '2026-10-15' })
+  @IsDateString()
+  @IsNotEmpty()
+  posting_date: string;
+
+  @ApiProperty({ description: 'Output item UUID the disposed animals convert into (required for HARVEST)', required: false })
+  @IsUUID()
+  @IsOptional()
+  output_item_id?: string;
+
+  @ApiProperty({ description: 'UOM for the harvested output quantity (required for HARVEST)', required: false })
+  @IsString()
+  @IsOptional()
+  output_uom?: string;
+
+  @ApiProperty({ description: 'Harvested output quantity (required for HARVEST — may differ from animal count, e.g. carcass weight)', required: false })
+  @IsNumber()
+  @IsOptional()
+  output_quantity?: number;
+
+  @ApiProperty({ description: 'Destination warehouse UUID (required for HARVEST)', required: false })
+  @IsUUID()
+  @IsOptional()
+  warehouse_id?: string;
+
+  @ApiProperty({ description: 'Sale proceeds (required for SOLD)', required: false })
+  @IsNumber()
+  @IsOptional()
+  sale_proceeds?: number;
+}

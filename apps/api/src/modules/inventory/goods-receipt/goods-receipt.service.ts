@@ -7,6 +7,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateGoodsReceiptDto, UpdateGoodsReceiptDto, QueryGoodsReceiptDto } from './dto/goods-receipt.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { InventoryLedgerService } from '../inventory-ledger/inventory-ledger.service';
+import { GlPostingService } from '../../finance/journal/gl-posting.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -18,6 +19,7 @@ export class GoodsReceiptService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly ledgerService: InventoryLedgerService,
+    private readonly glPostingService: GlPostingService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -215,7 +217,7 @@ export class GoodsReceiptService {
     }
 
     for (const line of receipt.lines) {
-      await this.ledgerService.writePositiveEntry({
+      const ledgerEntry = await this.ledgerService.writePositiveEntry({
         tenantId,
         companyId: receipt.company_id,
         itemId: line.item_id,
@@ -234,6 +236,8 @@ export class GoodsReceiptService {
         warehouseId: receipt.warehouse_id,
         userId: userPayload?.userId,
       });
+
+      await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
     }
 
     await this.db

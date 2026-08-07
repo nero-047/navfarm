@@ -38,6 +38,9 @@ import { BioAssetLedgerModule } from './modules/inventory/bio-asset-ledger/bio-a
 import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.module';
 import { StockTransferModule } from './modules/inventory/stock-transfer/stock-transfer.module';
 import { StockAdjustmentModule } from './modules/inventory/stock-adjustment/stock-adjustment.module';
+import { JournalModule } from './modules/finance/journal/journal.module';
+import { FinancialReportsModule } from './modules/finance/financial-reports/financial-reports.module';
+import { BatchModule } from './modules/production/batch/batch.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -97,6 +100,9 @@ import { SystemController } from './system/system.controller';
     GoodsIssueModule,
     StockTransferModule,
     StockAdjustmentModule,
+    JournalModule,
+    FinancialReportsModule,
+    BatchModule,
   ],
   controllers: [SystemController],
   providers: [],

@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { StockTransferService } from './stock-transfer.service';
 import { StockTransferController } from './stock-transfer.controller';
 import { InventoryLedgerModule } from '../inventory-ledger/inventory-ledger.module';
+import { JournalModule } from '../../finance/journal/journal.module';
 
 @Module({
-  imports: [InventoryLedgerModule],
+  imports: [InventoryLedgerModule, JournalModule],
   controllers: [StockTransferController],
   providers: [StockTransferService],
   exports: [StockTransferService],

@@ -76,6 +76,8 @@ export class ShedService {
       shed_code: dto.shed_code.toUpperCase(),
       shed_name: dto.shed_name,
       shed_type: dto.shed_type,
+      nob_id: dto.nob_id || null,
+      lob_id: dto.lob_id || null,
       capacity: dto.capacity || 0,
       is_active: true,
       status: 'ACTIVE',
@@ -197,6 +199,8 @@ export class ShedService {
     if (dto.shed_code !== undefined) updates.shed_code = dto.shed_code.toUpperCase();
     if (dto.shed_name !== undefined) updates.shed_name = dto.shed_name;
     if (dto.shed_type !== undefined) updates.shed_type = dto.shed_type;
+    if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
+    if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
     if (dto.capacity !== undefined) updates.capacity = dto.capacity;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;

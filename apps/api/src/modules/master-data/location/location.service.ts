@@ -26,6 +26,16 @@ export class LocationService {
     return tenantDb;
   }
 
+  /** A location anchors to exactly one direct parent: a Farm, a Shed, or a Warehouse. */
+  private assertExactlyOneParent(farmId?: string | null, shedId?: string | null, warehouseId?: string | null) {
+    const setCount = [farmId, shedId, warehouseId].filter(Boolean).length;
+    if (setCount !== 1) {
+      throw new ConflictException(
+        'A location must have exactly one parent: set exactly one of farm_id, shed_id, or warehouse_id.'
+      );
+    }
+  }
+
   async create(dto: CreateLocationDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists (if provided)
     if (dto.company_id) {
@@ -48,7 +58,31 @@ export class LocationService {
       }
     }
 
-    // 3. Verify warehouse exists (if provided)
+    // 3. Exactly one of farm/shed/warehouse must be this location's parent
+    this.assertExactlyOneParent(dto.farm_id, dto.shed_id, dto.warehouse_id);
+
+    if (dto.farm_id) {
+      const [farm] = await this.db
+        .select()
+        .from(schema.farmMaster)
+        .where(and(eq(schema.farmMaster.farm_id, dto.farm_id), isNull(schema.farmMaster.deleted_at)))
+        .limit(1);
+      if (!farm) {
+        throw new NotFoundException(`Farm with ID '${dto.farm_id}' not found.`);
+      }
+    }
+
+    if (dto.shed_id) {
+      const [shed] = await this.db
+        .select()
+        .from(schema.shedMaster)
+        .where(and(eq(schema.shedMaster.shed_id, dto.shed_id), isNull(schema.shedMaster.deleted_at)))
+        .limit(1);
+      if (!shed) {
+        throw new NotFoundException(`Shed with ID '${dto.shed_id}' not found.`);
+      }
+    }
+
     if (dto.warehouse_id) {
       const [warehouse] = await this.db
         .select()
@@ -90,6 +124,8 @@ export class LocationService {
       company_id: dto.company_id || null,
       nob_id: dto.nob_id || null,
       lob_id: dto.lob_id || null,
+      farm_id: dto.farm_id || null,
+      shed_id: dto.shed_id || null,
       warehouse_id: dto.warehouse_id || null,
       location_code: dto.location_code.toUpperCase(),
       location_name: dto.location_name,
@@ -155,6 +191,12 @@ export class LocationService {
         )
       );
     }
+    if (query.farmId) {
+      conditions.push(eq(schema.locationMaster.farm_id, query.farmId));
+    }
+    if (query.shedId) {
+      conditions.push(eq(schema.locationMaster.shed_id, query.shedId));
+    }
     if (query.warehouseId) {
       conditions.push(eq(schema.locationMaster.warehouse_id, query.warehouseId));
     }
@@ -206,6 +248,35 @@ export class LocationService {
       await this.findOne(dto.parent_location_id);
     }
 
+    // Exactly one of farm/shed/warehouse must be the parent — validate against the
+    // effective values (dto's if this update touches it, otherwise the existing row's).
+    const effectiveFarmId = dto.farm_id !== undefined ? dto.farm_id : location.farm_id;
+    const effectiveShedId = dto.shed_id !== undefined ? dto.shed_id : location.shed_id;
+    const effectiveWarehouseId = dto.warehouse_id !== undefined ? dto.warehouse_id : location.warehouse_id;
+    this.assertExactlyOneParent(effectiveFarmId, effectiveShedId, effectiveWarehouseId);
+
+    if (dto.farm_id) {
+      const [farm] = await this.db
+        .select()
+        .from(schema.farmMaster)
+        .where(and(eq(schema.farmMaster.farm_id, dto.farm_id), isNull(schema.farmMaster.deleted_at)))
+        .limit(1);
+      if (!farm) {
+        throw new NotFoundException(`Farm with ID '${dto.farm_id}' not found.`);
+      }
+    }
+
+    if (dto.shed_id) {
+      const [shed] = await this.db
+        .select()
+        .from(schema.shedMaster)
+        .where(and(eq(schema.shedMaster.shed_id, dto.shed_id), isNull(schema.shedMaster.deleted_at)))
+        .limit(1);
+      if (!shed) {
+        throw new NotFoundException(`Shed with ID '${dto.shed_id}' not found.`);
+      }
+    }
+
     if (dto.warehouse_id) {
       const [warehouse] = await this.db
         .select()
@@ -251,6 +322,8 @@ export class LocationService {
     if (dto.company_id !== undefined) updates.company_id = dto.company_id;
     if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
     if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
+    if (dto.farm_id !== undefined) updates.farm_id = dto.farm_id;
+    if (dto.shed_id !== undefined) updates.shed_id = dto.shed_id;
     if (dto.warehouse_id !== undefined) updates.warehouse_id = dto.warehouse_id;
     if (dto.location_code !== undefined) updates.location_code = dto.location_code.toUpperCase();
     if (dto.location_name !== undefined) updates.location_name = dto.location_name;

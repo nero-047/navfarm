@@ -1,0 +1,130 @@
+import { Controller, Get, Post, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { BatchService } from './batch.service';
+import {
+  CreateBatchDto,
+  AddBatchTransactionDto,
+  CloseBatchDto,
+  QueryBatchDto,
+  MatureBioAssetDto,
+  AmortizeBioAssetDto,
+  RecordFairValueDto,
+  DisposeBioAssetDto,
+} from './dto/batch.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+
+@ApiTags('Production Batches')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('batch')
+export class BatchController {
+  constructor(private readonly batchService: BatchService) {}
+
+  @Post()
+  @RequirePermission('PRODUCTION', 'BATCH', 'create')
+  @ApiOperation({ summary: 'Create a draft Batch with input lines' })
+  async create(@Body() dto: CreateBatchDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.create(dto, tenantId, req.user);
+    return { success: true, message: 'Batch draft created successfully.', data: result };
+  }
+
+  @Get()
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'List Batches matching filters' })
+  async findAll(@Query() query: QueryBatchDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.findAll(query, tenantId);
+    return { success: true, message: 'Batches retrieved successfully.', data: result };
+  }
+
+  @Get(':id')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'Fetch a single Batch with input lines, transactions and output lines' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async findOne(@Param('id') id: string) {
+    const result = await this.batchService.findOne(id);
+    return { success: true, message: 'Batch details retrieved.', data: result };
+  }
+
+  @Delete(':id')
+  @RequirePermission('PRODUCTION', 'BATCH', 'delete')
+  @ApiOperation({ summary: 'Cancel a DRAFT Batch' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async remove(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    return this.batchService.remove(id, tenantId, req.user);
+  }
+
+  @Post(':id/activate')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Activate a DRAFT Batch — consumes input lines from inventory via FIFO and mirrors to GL' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async activate(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.activate(id, tenantId, req.user);
+    return { success: true, message: 'Batch activated successfully.', data: result };
+  }
+
+  @Post(':id/transaction')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Record a daily transaction against an ACTIVE Batch (consumption, mortality, output, overhead, observation)' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async addTransaction(@Param('id') id: string, @Body() dto: AddBatchTransactionDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.addTransaction(id, dto, tenantId, req.user);
+    return { success: true, message: 'Batch transaction recorded successfully.', data: result };
+  }
+
+  @Post(':id/close')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Close an ACTIVE Batch — allocates total cost across output lines and posts them to inventory' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async close(@Param('id') id: string, @Body() dto: CloseBatchDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.close(id, dto, tenantId, req.user);
+    return { success: true, message: 'Batch closed successfully.', data: result };
+  }
+
+  @Post(':id/mature')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'BIO_ASSET only — transitions PREMATURE → MATURE and sets up the amortization schedule' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async mature(@Param('id') id: string, @Body() dto: MatureBioAssetDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.matureBioAsset(id, dto, tenantId, req.user);
+    return { success: true, message: 'Batch matured successfully.', data: result };
+  }
+
+  @Post(':id/amortize')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'BIO_ASSET only, MATURE stage — runs one month of amortization (one run per calendar month)' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async amortize(@Param('id') id: string, @Body() dto: AmortizeBioAssetDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.amortizeBioAsset(id, dto, tenantId, req.user);
+    return { success: true, message: 'Amortization posted successfully.', data: result };
+  }
+
+  @Post(':id/fair-value')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'BIO_ASSET only — revalues the herd to a new fair value per unit, posting the gain or loss' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async fairValue(@Param('id') id: string, @Body() dto: RecordFairValueDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.recordFairValue(id, dto, tenantId, req.user);
+    return { success: true, message: 'Fair value adjustment posted successfully.', data: result };
+  }
+
+  @Post(':id/dispose')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'BIO_ASSET only — exits animals via HARVEST (to inventory) or SOLD (gain/loss); auto-closes once the herd is fully disposed' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async dispose(@Param('id') id: string, @Body() dto: DisposeBioAssetDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.disposeBioAsset(id, dto, tenantId, req.user);
+    return { success: true, message: 'Disposal recorded successfully.', data: result };
+  }
+}

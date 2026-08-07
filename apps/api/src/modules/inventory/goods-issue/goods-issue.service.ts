@@ -7,6 +7,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateGoodsIssueDto, UpdateGoodsIssueDto, QueryGoodsIssueDto } from './dto/goods-issue.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { InventoryLedgerService } from '../inventory-ledger/inventory-ledger.service';
+import { GlPostingService } from '../../finance/journal/gl-posting.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -18,6 +19,7 @@ export class GoodsIssueService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly ledgerService: InventoryLedgerService,
+    private readonly glPostingService: GlPostingService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -195,7 +197,7 @@ export class GoodsIssueService {
     }
 
     for (const line of issue.lines) {
-      await this.ledgerService.writeNegativeEntry({
+      const ledgerEntry = await this.ledgerService.writeNegativeEntry({
         tenantId,
         companyId: issue.company_id,
         itemId: line.item_id,
@@ -209,6 +211,8 @@ export class GoodsIssueService {
         warehouseId: issue.warehouse_id,
         userId: userPayload?.userId,
       });
+
+      await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
     }
 
     await this.db

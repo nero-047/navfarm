@@ -28,6 +28,16 @@ export class CreateShedDto {
   @IsNotEmpty()
   shed_type: string;
 
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = shared across all business verticals)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
+
   @ApiProperty({ description: 'Maximum holding capacity (birds/animals)', default: 0, required: false })
   @IsInt()
   @Min(0)
@@ -59,6 +69,16 @@ export class UpdateShedDto {
   @IsString()
   @IsOptional()
   shed_type?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 
   @ApiProperty({ required: false })
   @IsInt()

@@ -591,6 +591,8 @@ export const farmMaster = mysqlTable('farm_master', {
   farm_code: varchar('farm_code', { length: 50 }).notNull(),
   farm_name: varchar('farm_name', { length: 100 }).notNull(),
   farm_type: varchar('farm_type', { length: 50 }).notNull(), // BREEDER, COMMERCIAL_LAYERS, COMMERCIAL_BROILERS, HATCHERY, REARING, DAIRY, etc.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   capacity: int('capacity').default(0).notNull(),
   address_line1: varchar('address_line1', { length: 255 }),
   city: varchar('city', { length: 100 }),
@@ -633,6 +635,8 @@ export const shedMaster = mysqlTable('shed_master', {
   shed_code: varchar('shed_code', { length: 50 }).notNull(),
   shed_name: varchar('shed_name', { length: 100 }).notNull(),
   shed_type: varchar('shed_type', { length: 50 }).notNull(), // OPEN_SIDED, ENVIRONMENTALLY_CONTROLLED, SEMI_EC
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   capacity: int('capacity').default(0).notNull(),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
@@ -650,6 +654,11 @@ export const locationMaster = mysqlTable('location_master', {
   company_id: varchar('company_id', { length: 36 }),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  // Exactly one of farm_id / shed_id / warehouse_id should be set — this location's
+  // direct parent. Enforced at the service layer, not the DB (MySQL has no clean way
+  // to express "exactly one of three nullable columns" as a constraint).
+  farm_id: varchar('farm_id', { length: 36 }),
+  shed_id: varchar('shed_id', { length: 36 }),
   warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
   location_code: varchar('location_code', { length: 50 }).notNull(),
   location_name: varchar('location_name', { length: 200 }).notNull(),
@@ -678,7 +687,17 @@ export const locationMaster = mysqlTable('location_master', {
     columns: [table.parent_location_id],
     foreignColumns: [table.location_id],
     name: 'loc_master_parent_loc_id_fk'
-  }).onDelete('restrict')
+  }).onDelete('restrict'),
+  farmFk: foreignKey({
+    columns: [table.farm_id],
+    foreignColumns: [farmMaster.farm_id],
+    name: 'loc_master_farm_id_fk'
+  }).onDelete('restrict'),
+  shedFk: foreignKey({
+    columns: [table.shed_id],
+    foreignColumns: [shedMaster.shed_id],
+    name: 'loc_master_shed_id_fk'
+  }).onDelete('restrict'),
 }));
 
 // ==========================================
@@ -1349,6 +1368,261 @@ export const costCenterMasterRelations = relations(costCenterMaster, ({ one, man
   })
 }));
 
+// ==========================================
+// 10. FINANCE ENGINE (Phase 4)
+// ==========================================
+
+export const journalHeader = mysqlTable('journal_header', {
+  journal_id: varchar('journal_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  journal_no: varchar('journal_no', { length: 50 }).notNull(),
+  posting_date: date('posting_date', { mode: 'string' }).notNull(),
+  source: varchar('source', { length: 10 }).notNull(), // MANUAL, SYSTEM
+  source_document_type: varchar('source_document_type', { length: 30 }),
+  source_document_no: varchar('source_document_no', { length: 50 }),
+  source_ledger_id: varchar('source_ledger_id', { length: 36 }).references(() => inventoryLedger.ledger_id, { onDelete: 'restrict' }),
+  description: text('description'),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
+  total_debit: decimal('total_debit', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  total_credit: decimal('total_credit', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  posted_at: timestamp('posted_at', { mode: 'string' }),
+  posted_by: varchar('posted_by', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+});
+
+export const journalLine = mysqlTable('journal_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  journal_id: varchar('journal_id', { length: 36 }).notNull().references(() => journalHeader.journal_id, { onDelete: 'cascade' }),
+  line_no: int('line_no').notNull(),
+  gl_account_id: varchar('gl_account_id', { length: 36 }).notNull().references(() => glAccountMaster.gl_account_id, { onDelete: 'restrict' }),
+  cost_center_id: varchar('cost_center_id', { length: 36 }).references(() => costCenterMaster.cost_center_id, { onDelete: 'restrict' }),
+  debit_amount: decimal('debit_amount', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  credit_amount: decimal('credit_amount', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  description: varchar('description', { length: 500 }),
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+});
+
+export const journalHeaderRelations = relations(journalHeader, ({ one, many }) => ({
+  company: one(companyMaster, { fields: [journalHeader.company_id], references: [companyMaster.company_id] }),
+  sourceLedger: one(inventoryLedger, { fields: [journalHeader.source_ledger_id], references: [inventoryLedger.ledger_id] }),
+  lines: many(journalLine),
+}));
+
+export const journalLineRelations = relations(journalLine, ({ one }) => ({
+  journal: one(journalHeader, { fields: [journalLine.journal_id], references: [journalHeader.journal_id] }),
+  glAccount: one(glAccountMaster, { fields: [journalLine.gl_account_id], references: [glAccountMaster.gl_account_id] }),
+  costCenter: one(costCenterMaster, { fields: [journalLine.cost_center_id], references: [costCenterMaster.cost_center_id] }),
+}));
+
+// ==========================================
+// 11. PRODUCTION ENGINE (Phase 5) — STANDARD/FIFO batches only.
+// Bio-asset (IAS41) batch accounting is a separate, deferred model.
+// ==========================================
+
+export const batchHeader = mysqlTable('batch_header', {
+  batch_id: varchar('batch_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  batch_no: varchar('batch_no', { length: 50 }).notNull(),
+  lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  costing_method: varchar('costing_method', { length: 20 }).notNull(), // STANDARD, FIFO
+  breed_id: varchar('breed_id', { length: 36 }).references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
+  shed_id: varchar('shed_id', { length: 36 }),
+  location_id: varchar('location_id', { length: 36 }),
+  start_date: date('start_date', { mode: 'string' }).notNull(),
+  expected_end_date: date('expected_end_date', { mode: 'string' }),
+  actual_end_date: date('actual_end_date', { mode: 'string' }),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, ACTIVE, CLOSED, CANCELLED
+  opening_quantity: decimal('opening_quantity', { precision: 18, scale: 4 }).notNull(),
+  uom: varchar('uom', { length: 20 }).notNull(),
+  closing_quantity: decimal('closing_quantity', { precision: 18, scale: 4 }),
+  total_cost: decimal('total_cost', { precision: 18, scale: 4 }),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 6 }),
+  remarks: text('remarks'),
+  closed_at: timestamp('closed_at', { mode: 'string' }),
+  closed_by: varchar('closed_by', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => ({
+  shedFk: foreignKey({
+    columns: [table.shed_id],
+    foreignColumns: [shedMaster.shed_id],
+    name: 'batch_header_shed_id_fk'
+  }).onDelete('restrict'),
+  locationFk: foreignKey({
+    columns: [table.location_id],
+    foreignColumns: [locationMaster.location_id],
+    name: 'batch_header_location_id_fk'
+  }).onDelete('restrict'),
+}));
+
+export const batchInputLine = mysqlTable('batch_input_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  line_no: int('line_no').notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  // Traceability: set when this input is another batch's output (e.g. Hatching
+  // sourced from Laying + Breeding batches), rather than a plain inventory item.
+  source_batch_id: varchar('source_batch_id', { length: 36 }),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(),
+  uom: varchar('uom', { length: 20 }).notNull(),
+  rate: decimal('rate', { precision: 18, scale: 6 }),
+  amount: decimal('amount', { precision: 18, scale: 4 }),
+}, (table) => ({
+  batchFk: foreignKey({
+    columns: [table.batch_id],
+    foreignColumns: [batchHeader.batch_id],
+    name: 'batch_input_line_batch_id_fk'
+  }).onDelete('cascade'),
+  sourceBatchFk: foreignKey({
+    columns: [table.source_batch_id],
+    foreignColumns: [batchHeader.batch_id],
+    name: 'batch_input_line_source_fk'
+  }).onDelete('restrict'),
+}));
+
+export const batchTransaction = mysqlTable('batch_transaction', {
+  transaction_id: varchar('transaction_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  transaction_date: date('transaction_date', { mode: 'string' }).notNull(),
+  transaction_type: varchar('transaction_type', { length: 20 }).notNull(), // CONSUMPTION, MORTALITY, OUTPUT, OVERHEAD, OBSERVATION
+  item_id: varchar('item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  resource_id: varchar('resource_id', { length: 36 }).references(() => resourceMaster.resource_id, { onDelete: 'restrict' }),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }),
+  uom: varchar('uom', { length: 20 }),
+  rate: decimal('rate', { precision: 18, scale: 6 }),
+  amount: decimal('amount', { precision: 18, scale: 4 }),
+  remarks: varchar('remarks', { length: 500 }),
+  ledger_id: varchar('ledger_id', { length: 36 }).references(() => inventoryLedger.ledger_id, { onDelete: 'restrict' }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const batchOutputLine = mysqlTable('batch_output_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  output_type: varchar('output_type', { length: 20 }).default('MAIN').notNull(), // MAIN, BY_PRODUCT
+  cost_split_pct: decimal('cost_split_pct', { precision: 6, scale: 2 }).notNull(),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(),
+  uom: varchar('uom', { length: 20 }).notNull(),
+  computed_cost: decimal('computed_cost', { precision: 18, scale: 4 }),
+  unit_cost: decimal('unit_cost', { precision: 18, scale: 6 }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+});
+
+export const batchHeaderRelations = relations(batchHeader, ({ one, many }) => ({
+  company: one(companyMaster, { fields: [batchHeader.company_id], references: [companyMaster.company_id] }),
+  lob: one(lobMaster, { fields: [batchHeader.lob_id], references: [lobMaster.lob_id] }),
+  breed: one(breedMaster, { fields: [batchHeader.breed_id], references: [breedMaster.breed_id] }),
+  inputLines: many(batchInputLine),
+  transactions: many(batchTransaction),
+  outputLines: many(batchOutputLine),
+}));
+
+export const batchInputLineRelations = relations(batchInputLine, ({ one }) => ({
+  batch: one(batchHeader, { fields: [batchInputLine.batch_id], references: [batchHeader.batch_id], relationName: 'batch_inputs' }),
+  item: one(itemMaster, { fields: [batchInputLine.item_id], references: [itemMaster.item_id] }),
+  sourceBatch: one(batchHeader, { fields: [batchInputLine.source_batch_id], references: [batchHeader.batch_id], relationName: 'batch_as_source' }),
+}));
+
+export const batchTransactionRelations = relations(batchTransaction, ({ one }) => ({
+  batch: one(batchHeader, { fields: [batchTransaction.batch_id], references: [batchHeader.batch_id] }),
+  item: one(itemMaster, { fields: [batchTransaction.item_id], references: [itemMaster.item_id] }),
+  resource: one(resourceMaster, { fields: [batchTransaction.resource_id], references: [resourceMaster.resource_id] }),
+  ledgerEntry: one(inventoryLedger, { fields: [batchTransaction.ledger_id], references: [inventoryLedger.ledger_id] }),
+}));
+
+export const batchOutputLineRelations = relations(batchOutputLine, ({ one }) => ({
+  batch: one(batchHeader, { fields: [batchOutputLine.batch_id], references: [batchHeader.batch_id] }),
+  item: one(itemMaster, { fields: [batchOutputLine.item_id], references: [itemMaster.item_id] }),
+  warehouse: one(warehouseMaster, { fields: [batchOutputLine.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+}));
+
+// 11a. COSTING / VARIANCE ENGINE (Phase 7) — STANDARD batches only.
+// Lightweight per-batch standards (no separate Parameter/Scheduler system).
+
+export const batchStandard = mysqlTable('batch_standard', {
+  standard_id: varchar('standard_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().unique().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  std_output_quantity: decimal('std_output_quantity', { precision: 18, scale: 4 }),
+  std_output_cost_per_unit: decimal('std_output_cost_per_unit', { precision: 18, scale: 6 }),
+  std_overhead_rate_per_unit: decimal('std_overhead_rate_per_unit', { precision: 18, scale: 6 }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const batchStandardConsumptionLine = mysqlTable('batch_standard_consumption_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  item_id: varchar('item_id', { length: 36 }).notNull(),
+  std_qty_per_unit_per_day: decimal('std_qty_per_unit_per_day', { precision: 18, scale: 8 }).notNull(),
+  std_rate: decimal('std_rate', { precision: 18, scale: 6 }),
+}, (table) => ({
+  batchFk: foreignKey({
+    columns: [table.batch_id],
+    foreignColumns: [batchHeader.batch_id],
+    name: 'bscl_batch_id_fk'
+  }).onDelete('cascade'),
+  itemFk: foreignKey({
+    columns: [table.item_id],
+    foreignColumns: [itemMaster.item_id],
+    name: 'bscl_item_id_fk'
+  }).onDelete('restrict'),
+}));
+
+export const batchCostVariance = mysqlTable('batch_cost_variance', {
+  variance_id: varchar('variance_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  variance_type: varchar('variance_type', { length: 20 }).notNull(), // PRICE, USAGE, OUTPUT, OVERHEAD
+  item_id: varchar('item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  std_value: decimal('std_value', { precision: 18, scale: 6 }).notNull(),
+  actual_value: decimal('actual_value', { precision: 18, scale: 6 }).notNull(),
+  variance_amount: decimal('variance_amount', { precision: 18, scale: 4 }).notNull(), // positive = unfavorable
+  is_favorable: boolean('is_favorable').notNull(),
+  dr_gl_account_id: varchar('dr_gl_account_id', { length: 36 }),
+  cr_gl_account_id: varchar('cr_gl_account_id', { length: 36 }),
+  journal_id: varchar('journal_id', { length: 36 }).references(() => journalHeader.journal_id, { onDelete: 'restrict' }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  drGlFk: foreignKey({
+    columns: [table.dr_gl_account_id],
+    foreignColumns: [glAccountMaster.gl_account_id],
+    name: 'bcv_dr_gl_fk'
+  }).onDelete('restrict'),
+  crGlFk: foreignKey({
+    columns: [table.cr_gl_account_id],
+    foreignColumns: [glAccountMaster.gl_account_id],
+    name: 'bcv_cr_gl_fk'
+  }).onDelete('restrict'),
+}));
+
+export const batchStandardRelations = relations(batchStandard, ({ one, many }) => ({
+  batch: one(batchHeader, { fields: [batchStandard.batch_id], references: [batchHeader.batch_id] }),
+  consumptionLines: many(batchStandardConsumptionLine),
+}));
+
+export const batchStandardConsumptionLineRelations = relations(batchStandardConsumptionLine, ({ one }) => ({
+  batch: one(batchHeader, { fields: [batchStandardConsumptionLine.batch_id], references: [batchHeader.batch_id] }),
+  item: one(itemMaster, { fields: [batchStandardConsumptionLine.item_id], references: [itemMaster.item_id] }),
+}));
+
+export const batchCostVarianceRelations = relations(batchCostVariance, ({ one }) => ({
+  batch: one(batchHeader, { fields: [batchCostVariance.batch_id], references: [batchHeader.batch_id] }),
+  item: one(itemMaster, { fields: [batchCostVariance.item_id], references: [itemMaster.item_id] }),
+  journal: one(journalHeader, { fields: [batchCostVariance.journal_id], references: [journalHeader.journal_id] }),
+}));
+
 export const auditLog = mysqlTable('audit_log', {
   audit_id: varchar('audit_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
@@ -1423,7 +1697,7 @@ export const inventoryLedger = mysqlTable('inventory_ledger', {
   lot_no: varchar('lot_no', { length: 50 }),
   serial_no: varchar('serial_no', { length: 100 }),
   expiry_date: date('expiry_date', { mode: 'string' }),
-  batch_no: varchar('batch_no', { length: 50 }), // plain string until batch_master exists (Phase 5)
+  batch_no: varchar('batch_no', { length: 50 }), // denormalized from batch_header.batch_no (Phase 5) for query convenience
   location_id: varchar('location_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
@@ -1461,10 +1735,9 @@ export const inventoryApplication = mysqlTable('inventory_application', {
 }));
 
 // Living/biological asset value-change log (mortality, growth, fair-value
-// adjustments, transformation). Schema only for now — nothing auto-writes to
-// this yet since it's driven by batch lifecycle events (Phase 5, not built).
-// A basic manual-entry API exists so Phase 5 can hook into it without a
-// schema change later.
+// adjustments, transformation). Auto-written by BIO_ASSET batch lifecycle
+// events (activate/consume/mature/amortize/fair-value/dispose — Bio-Asset
+// IAS41 batch accounting); batch_id links each row back to its batch_header.
 export const bioAssetLedger = mysqlTable('bio_asset_ledger', {
   entry_id: varchar('entry_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
@@ -1477,6 +1750,7 @@ export const bioAssetLedger = mysqlTable('bio_asset_ledger', {
   lot_no: varchar('lot_no', { length: 50 }),
   asset_rfid_no: varchar('asset_rfid_no', { length: 100 }),
   batch_no: varchar('batch_no', { length: 50 }),
+  batch_id: varchar('batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
   stage: varchar('stage', { length: 50 }),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   quantity: decimal('quantity', { precision: 18, scale: 4 }),
@@ -1488,6 +1762,23 @@ export const bioAssetLedger = mysqlTable('bio_asset_ledger', {
   created_by: varchar('created_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
 });
+
+export const batchBioAssetState = mysqlTable('batch_bio_asset_state', {
+  state_id: varchar('state_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().unique().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  stage: varchar('stage', { length: 20 }).default('PREMATURE').notNull(), // PREMATURE, MATURE
+  current_quantity: decimal('current_quantity', { precision: 18, scale: 4 }).notNull(),
+  nca_book_value: decimal('nca_book_value', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  residual_value_per_unit: decimal('residual_value_per_unit', { precision: 18, scale: 6 }),
+  productive_life_months: int('productive_life_months'),
+  monthly_amortization_rate: decimal('monthly_amortization_rate', { precision: 18, scale: 6 }),
+  matured_at: date('matured_at', { mode: 'string' }),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const batchBioAssetStateRelations = relations(batchBioAssetState, ({ one }) => ({
+  batch: one(batchHeader, { fields: [batchBioAssetState.batch_id], references: [batchHeader.batch_id] }),
+}));
 
 export const goodsReceipt = mysqlTable('goods_receipt', {
   receipt_id: varchar('receipt_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -1548,6 +1839,7 @@ export const inventoryApplicationRelations = relations(inventoryApplication, ({ 
 
 export const bioAssetLedgerRelations = relations(bioAssetLedger, ({ one }) => ({
   item: one(itemMaster, { fields: [bioAssetLedger.bio_asset_item_id], references: [itemMaster.item_id] }),
+  batch: one(batchHeader, { fields: [bioAssetLedger.batch_id], references: [batchHeader.batch_id] }),
 }));
 
 export const goodsReceiptRelations = relations(goodsReceipt, ({ one, many }) => ({

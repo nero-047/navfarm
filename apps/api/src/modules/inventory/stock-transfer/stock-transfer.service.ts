@@ -7,6 +7,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateStockTransferDto, UpdateStockTransferDto, QueryStockTransferDto } from './dto/stock-transfer.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { InventoryLedgerService } from '../inventory-ledger/inventory-ledger.service';
+import { GlPostingService } from '../../finance/journal/gl-posting.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -18,6 +19,7 @@ export class StockTransferService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly ledgerService: InventoryLedgerService,
+    private readonly glPostingService: GlPostingService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -204,7 +206,7 @@ export class StockTransferService {
     }
 
     for (const line of transfer.lines) {
-      await this.ledgerService.writeTransferEntries({
+      const { shipment, receipt } = await this.ledgerService.writeTransferEntries({
         tenantId,
         companyId: transfer.company_id,
         itemId: line.item_id,
@@ -217,6 +219,13 @@ export class StockTransferService {
         toWarehouseId: transfer.to_warehouse_id,
         userId: userPayload?.userId,
       });
+
+      // Both legs post to GL independently (each carries its own
+      // transaction_type — TRANSFER_SHIPMENT / TRANSFER_RECEIPT — so
+      // gl_mapping_master resolves them separately, typically via an
+      // inventory-in-transit clearing account).
+      await this.glPostingService.postInventoryLedgerEntry(shipment, userPayload?.userId);
+      await this.glPostingService.postInventoryLedgerEntry(receipt, userPayload?.userId);
     }
 
     await this.db
