@@ -1434,6 +1434,7 @@ export const batchHeader = mysqlTable('batch_header', {
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   costing_method: varchar('costing_method', { length: 20 }).notNull(), // STANDARD, FIFO
   breed_id: varchar('breed_id', { length: 36 }).references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
+  scheduler_id: varchar('scheduler_id', { length: 36 }).references(() => schedulerMaster.scheduler_id, { onDelete: 'restrict' }),
   shed_id: varchar('shed_id', { length: 36 }),
   location_id: varchar('location_id', { length: 36 }),
   start_date: date('start_date', { mode: 'string' }).notNull(),
@@ -1621,6 +1622,147 @@ export const batchCostVarianceRelations = relations(batchCostVariance, ({ one })
   batch: one(batchHeader, { fields: [batchCostVariance.batch_id], references: [batchHeader.batch_id] }),
   item: one(itemMaster, { fields: [batchCostVariance.item_id], references: [itemMaster.item_id] }),
   journal: one(journalHeader, { fields: [batchCostVariance.journal_id], references: [journalHeader.journal_id] }),
+}));
+
+// ==========================================
+// 11b. PARAMETER / SCHEDULER / KPI ENGINE (Phase 6)
+// Additive KPI-monitoring layer — hooks into batch_transaction inserts.
+// Does not touch Phase 7's variance engine (batch_standard stays separate).
+// ==========================================
+
+export const parameterMaster = mysqlTable('parameter_master', {
+  parameter_id: varchar('parameter_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }), // null = tenant-wide template
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  parameter_code: varchar('parameter_code', { length: 50 }).notNull(),
+  parameter_name: varchar('parameter_name', { length: 200 }).notNull(),
+  parameter_type: varchar('parameter_type', { length: 20 }).notNull(), // CONSUMPTION, MORTALITY, OUTPUT, OVERHEAD, OBSERVATION
+  item_id: varchar('item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  resource_id: varchar('resource_id', { length: 36 }).references(() => resourceMaster.resource_id, { onDelete: 'restrict' }),
+  default_uom: varchar('default_uom', { length: 20 }),
+  qty_method: varchar('qty_method', { length: 20 }).notNull(), // PER_UNIT, PER_BATCH, MANUAL_AT_ENTRY
+  default_qty_per_unit: decimal('default_qty_per_unit', { precision: 18, scale: 8 }),
+  default_qty_per_batch: decimal('default_qty_per_batch', { precision: 18, scale: 4 }),
+  description: text('description'),
+  is_mandatory: boolean('is_mandatory').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const schedulerMaster = mysqlTable('scheduler_master', {
+  scheduler_id: varchar('scheduler_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
+  nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  scheduler_code: varchar('scheduler_code', { length: 50 }).notNull(),
+  scheduler_name: varchar('scheduler_name', { length: 200 }).notNull(),
+  duration_value: int('duration_value').notNull(),
+  duration_unit: varchar('duration_unit', { length: 10 }).notNull(), // DAY, WEEK, MONTH
+  breed_id: varchar('breed_id', { length: 36 }).references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
+  is_locked: boolean('is_locked').default(false).notNull(),
+  description: text('description'),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const schedulerParameterLine = mysqlTable('scheduler_parameter_line', {
+  spl_id: varchar('spl_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  scheduler_id: varchar('scheduler_id', { length: 36 }).notNull(),
+  parameter_id: varchar('parameter_id', { length: 36 }).notNull(),
+  period_no: int('period_no').notNull(),
+  period_from: int('period_from').notNull(),
+  period_to: int('period_to').notNull(),
+  period_label: varchar('period_label', { length: 50 }),
+  expected_qty_override: decimal('expected_qty_override', { precision: 18, scale: 8 }),
+  uom_override: varchar('uom_override', { length: 20 }),
+  kpi_enabled: boolean('kpi_enabled').default(true).notNull(),
+  kpi_mode: varchar('kpi_mode', { length: 10 }), // PCT, VALUE
+  kpi_min_pct: decimal('kpi_min_pct', { precision: 6, scale: 2 }),
+  kpi_max_pct: decimal('kpi_max_pct', { precision: 6, scale: 2 }),
+  kpi_min_value: decimal('kpi_min_value', { precision: 18, scale: 4 }),
+  kpi_max_value: decimal('kpi_max_value', { precision: 18, scale: 4 }),
+  kpi_target_value: decimal('kpi_target_value', { precision: 18, scale: 4 }),
+  critical_threshold_pct: decimal('critical_threshold_pct', { precision: 6, scale: 2 }),
+  notify_in_app: boolean('notify_in_app').default(true).notNull(),
+  notify_push: boolean('notify_push').default(false).notNull(),
+  notify_email: boolean('notify_email').default(false).notNull(),
+  sort_order: int('sort_order'),
+  notes: text('notes'),
+}, (table) => ({
+  schedulerFk: foreignKey({
+    columns: [table.scheduler_id],
+    foreignColumns: [schedulerMaster.scheduler_id],
+    name: 'spl_scheduler_id_fk'
+  }).onDelete('cascade'),
+  parameterFk: foreignKey({
+    columns: [table.parameter_id],
+    foreignColumns: [parameterMaster.parameter_id],
+    name: 'spl_parameter_id_fk'
+  }).onDelete('restrict'),
+}));
+
+export const notificationAlertLog = mysqlTable('notification_alert_log', {
+  alert_id: varchar('alert_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  batch_id: varchar('batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  spl_id: varchar('spl_id', { length: 36 }),
+  transaction_id: varchar('transaction_id', { length: 36 }),
+  alert_type: varchar('alert_type', { length: 40 }).default('KPI_DEVIATION').notNull(),
+  severity: varchar('severity', { length: 10 }).notNull(), // WARNING, CRITICAL
+  title: varchar('title', { length: 200 }).notNull(),
+  message: text('message').notNull(),
+  parameter_name: varchar('parameter_name', { length: 200 }),
+  kpi_mode: varchar('kpi_mode', { length: 10 }),
+  expected_value: decimal('expected_value', { precision: 18, scale: 4 }),
+  actual_value: decimal('actual_value', { precision: 18, scale: 4 }),
+  deviation_amount: decimal('deviation_amount', { precision: 18, scale: 4 }),
+  deviation_pct: decimal('deviation_pct', { precision: 8, scale: 2 }),
+  kpi_min: decimal('kpi_min', { precision: 18, scale: 4 }),
+  kpi_max: decimal('kpi_max', { precision: 18, scale: 4 }),
+  is_read: boolean('is_read').default(false).notNull(),
+  read_by: varchar('read_by', { length: 36 }),
+  read_at: timestamp('read_at', { mode: 'string' }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  splFk: foreignKey({
+    columns: [table.spl_id],
+    foreignColumns: [schedulerParameterLine.spl_id],
+    name: 'nal_spl_id_fk'
+  }).onDelete('restrict'),
+  transactionFk: foreignKey({
+    columns: [table.transaction_id],
+    foreignColumns: [batchTransaction.transaction_id],
+    name: 'nal_transaction_id_fk'
+  }).onDelete('restrict'),
+}));
+
+export const parameterMasterRelations = relations(parameterMaster, ({ one }) => ({
+  item: one(itemMaster, { fields: [parameterMaster.item_id], references: [itemMaster.item_id] }),
+  resource: one(resourceMaster, { fields: [parameterMaster.resource_id], references: [resourceMaster.resource_id] }),
+}));
+
+export const schedulerMasterRelations = relations(schedulerMaster, ({ one, many }) => ({
+  breed: one(breedMaster, { fields: [schedulerMaster.breed_id], references: [breedMaster.breed_id] }),
+  parameterLines: many(schedulerParameterLine),
+}));
+
+export const schedulerParameterLineRelations = relations(schedulerParameterLine, ({ one }) => ({
+  scheduler: one(schedulerMaster, { fields: [schedulerParameterLine.scheduler_id], references: [schedulerMaster.scheduler_id] }),
+  parameter: one(parameterMaster, { fields: [schedulerParameterLine.parameter_id], references: [parameterMaster.parameter_id] }),
+}));
+
+export const notificationAlertLogRelations = relations(notificationAlertLog, ({ one }) => ({
+  batch: one(batchHeader, { fields: [notificationAlertLog.batch_id], references: [batchHeader.batch_id] }),
+  schedulerParameterLine: one(schedulerParameterLine, { fields: [notificationAlertLog.spl_id], references: [schedulerParameterLine.spl_id] }),
+  transaction: one(batchTransaction, { fields: [notificationAlertLog.transaction_id], references: [batchTransaction.transaction_id] }),
 }));
 
 export const auditLog = mysqlTable('audit_log', {

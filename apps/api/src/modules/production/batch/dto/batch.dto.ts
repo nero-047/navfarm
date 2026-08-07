@@ -111,6 +111,11 @@ export class CreateBatchDto {
   @IsOptional()
   breed_id?: string;
 
+  @ApiProperty({ description: 'Scheduler UUID (optional) — attaches a period-based KPI monitoring plan to this batch', required: false })
+  @IsUUID()
+  @IsOptional()
+  scheduler_id?: string;
+
   @ApiProperty({ description: 'Shed UUID (optional — set exactly one of shed_id/location_id, or neither)', required: false })
   @IsUUID()
   @IsOptional()

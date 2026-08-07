@@ -76,6 +76,7 @@ export class BatchService {
       nob_id: lob.nob_id,
       costing_method: dto.costing_method.toUpperCase(),
       breed_id: dto.breed_id || null,
+      scheduler_id: dto.scheduler_id || null,
       shed_id: dto.shed_id || null,
       location_id: dto.location_id || null,
       start_date: dto.start_date,
@@ -191,6 +192,11 @@ export class BatchService {
       ? await this.db.select().from(schema.bioAssetLedger).where(eq(schema.bioAssetLedger.batch_id, id))
       : [];
 
+    const [scheduler] = batch.scheduler_id
+      ? await this.db.select().from(schema.schedulerMaster).where(eq(schema.schedulerMaster.scheduler_id, batch.scheduler_id)).limit(1)
+      : [];
+    const alerts = await this.db.select().from(schema.notificationAlertLog).where(eq(schema.notificationAlertLog.batch_id, id));
+
     return {
       ...batch,
       input_lines: inputLines,
@@ -200,6 +206,8 @@ export class BatchService {
       variances,
       bio_asset_state: bioAssetState || null,
       bio_asset_entries: bioAssetEntries,
+      scheduler: scheduler || null,
+      alerts,
     };
   }
 
@@ -312,6 +320,13 @@ export class BatchService {
       .update(schema.batchHeader)
       .set({ status: 'ACTIVE', updated_by: userPayload?.userId || null, updated_at: toMysqlTimestamp() })
       .where(eq(schema.batchHeader.batch_id, id));
+
+    if (batch.scheduler_id) {
+      await this.db
+        .update(schema.schedulerMaster)
+        .set({ is_locked: true, updated_at: toMysqlTimestamp() })
+        .where(eq(schema.schedulerMaster.scheduler_id, batch.scheduler_id));
+    }
 
     await this.auditService.log({
       tenantId,
@@ -579,6 +594,17 @@ export class BatchService {
       created_by: userPayload?.userId || null,
     });
 
+    if (batch.scheduler_id && dto.quantity !== undefined && dto.quantity !== null) {
+      await this.evaluateKpi(batch, {
+        transaction_id: transactionId,
+        transaction_date: dto.transaction_date,
+        transaction_type: dto.transaction_type,
+        item_id: dto.item_id || null,
+        resource_id: dto.resource_id || null,
+        quantity: dto.quantity,
+      });
+    }
+
     await this.auditService.log({
       tenantId,
       companyId: batch.company_id,
@@ -590,6 +616,114 @@ export class BatchService {
     });
 
     return this.findOne(id);
+  }
+
+  /**
+   * Additive KPI-monitoring layer (Phase 6) — no-ops entirely if the batch
+   * has no scheduler attached. Finds the scheduler_parameter_line covering
+   * today's day-of-batch for a parameter matching this transaction, compares
+   * actual vs. expected, and writes a notification_alert_log row on breach.
+   * Does not touch cost/GL — purely observational.
+   */
+  private async evaluateKpi(
+    batch: Awaited<ReturnType<BatchService['findOne']>>,
+    transaction: {
+      transaction_id: string;
+      transaction_date: string;
+      transaction_type: string;
+      item_id: string | null;
+      resource_id: string | null;
+      quantity: number;
+    }
+  ) {
+    if (!batch.scheduler_id) return;
+
+    const startDate = new Date(batch.start_date);
+    const txDate = new Date(transaction.transaction_date);
+    const dayOfBatch = Math.floor((txDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (dayOfBatch < 1) return;
+
+    const lines = await this.db
+      .select({
+        spl: schema.schedulerParameterLine,
+        parameter: schema.parameterMaster,
+      })
+      .from(schema.schedulerParameterLine)
+      .innerJoin(schema.parameterMaster, eq(schema.schedulerParameterLine.parameter_id, schema.parameterMaster.parameter_id))
+      .where(eq(schema.schedulerParameterLine.scheduler_id, batch.scheduler_id));
+
+    const match = lines.find(({ spl, parameter }) => {
+      if (dayOfBatch < spl.period_from || dayOfBatch > spl.period_to) return false;
+      if (parameter.parameter_type !== transaction.transaction_type) return false;
+      if (parameter.item_id && parameter.item_id !== transaction.item_id) return false;
+      if (parameter.resource_id && parameter.resource_id !== transaction.resource_id) return false;
+      return true;
+    });
+
+    if (!match || !match.spl.kpi_enabled || !match.spl.kpi_mode) return;
+    const { spl, parameter } = match;
+
+    const openingQty = Number(batch.opening_quantity);
+    const expectedQty = spl.expected_qty_override
+      ? Number(spl.expected_qty_override)
+      : parameter.qty_method === 'PER_UNIT' && parameter.default_qty_per_unit
+      ? Number(parameter.default_qty_per_unit) * openingQty
+      : parameter.qty_method === 'PER_BATCH' && parameter.default_qty_per_batch
+      ? Number(parameter.default_qty_per_batch)
+      : openingQty; // MANUAL_AT_ENTRY fallback — e.g. mortality as a % of headcount
+
+    const actual = transaction.quantity;
+    let breached = false;
+    let breachDirection: 'below' | 'above' | null = null;
+    let deviationPct: number | null = null;
+    let severity: 'WARNING' | 'CRITICAL' = 'WARNING';
+
+    if (spl.kpi_mode === 'PCT') {
+      if (expectedQty <= 0) return;
+      const minQty = spl.kpi_min_pct ? expectedQty * (Number(spl.kpi_min_pct) / 100) : -Infinity;
+      const maxQty = spl.kpi_max_pct ? expectedQty * (Number(spl.kpi_max_pct) / 100) : Infinity;
+      breached = actual < minQty || actual > maxQty;
+      breachDirection = actual < minQty ? 'below' : actual > maxQty ? 'above' : null;
+      deviationPct = (actual / expectedQty - 1) * 100;
+      if (breached && spl.critical_threshold_pct && Math.abs(deviationPct) > Number(spl.critical_threshold_pct)) {
+        severity = 'CRITICAL';
+      }
+    } else if (spl.kpi_mode === 'VALUE') {
+      const minVal = spl.kpi_min_value !== null ? Number(spl.kpi_min_value) : -Infinity;
+      const maxVal = spl.kpi_max_value !== null ? Number(spl.kpi_max_value) : Infinity;
+      breached = actual < minVal || actual > maxVal;
+      breachDirection = actual < minVal ? 'below' : actual > maxVal ? 'above' : null;
+    }
+
+    if (!breached) return;
+
+    const deviationAmount = actual - expectedQty;
+    const title = `${parameter.parameter_name} ${breachDirection === 'below' ? 'Below' : 'Above'} KPI — Batch ${batch.batch_no}${spl.period_label ? `, ${spl.period_label}` : ''}`;
+    const message = spl.kpi_mode === 'PCT'
+      ? `${parameter.parameter_name}: actual ${actual}, expected ${expectedQty.toFixed(4)} (${deviationPct!.toFixed(2)}% deviation). Batch ${batch.batch_no}, Day ${dayOfBatch}.`
+      : `${parameter.parameter_name}: actual ${actual} outside range [${spl.kpi_min_value ?? '-∞'}, ${spl.kpi_max_value ?? '∞'}]. Batch ${batch.batch_no}, Day ${dayOfBatch}.`;
+
+    await this.db.insert(schema.notificationAlertLog).values({
+      alert_id: randomUUID(),
+      tenant_id: batch.tenant_id,
+      company_id: batch.company_id,
+      lob_id: batch.lob_id,
+      batch_id: batch.batch_id,
+      spl_id: spl.spl_id,
+      transaction_id: transaction.transaction_id,
+      alert_type: 'KPI_DEVIATION',
+      severity,
+      title,
+      message,
+      parameter_name: parameter.parameter_name,
+      kpi_mode: spl.kpi_mode,
+      expected_value: expectedQty.toString(),
+      actual_value: actual.toString(),
+      deviation_amount: deviationAmount.toString(),
+      deviation_pct: deviationPct !== null ? deviationPct.toString() : null,
+      kpi_min: spl.kpi_mode === 'PCT' ? spl.kpi_min_pct : spl.kpi_min_value,
+      kpi_max: spl.kpi_mode === 'PCT' ? spl.kpi_max_pct : spl.kpi_max_value,
+    });
   }
 
   async close(id: string, dto: CloseBatchDto, tenantId: string, userPayload?: any) {

@@ -41,6 +41,9 @@ import { StockAdjustmentModule } from './modules/inventory/stock-adjustment/stoc
 import { JournalModule } from './modules/finance/journal/journal.module';
 import { FinancialReportsModule } from './modules/finance/financial-reports/financial-reports.module';
 import { BatchModule } from './modules/production/batch/batch.module';
+import { ParameterModule } from './modules/production/parameter/parameter.module';
+import { SchedulerModule } from './modules/production/scheduler/scheduler.module';
+import { AlertModule } from './modules/production/alert/alert.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -103,6 +106,9 @@ import { SystemController } from './system/system.controller';
     JournalModule,
     FinancialReportsModule,
     BatchModule,
+    ParameterModule,
+    SchedulerModule,
+    AlertModule,
   ],
   controllers: [SystemController],
   providers: [],

@@ -52,12 +52,13 @@ export default function BatchPanel() {
   const [warehouses, setWarehouses] = useState<Row[]>([]);
   const [resources, setResources] = useState<Row[]>([]);
   const [batches, setBatches] = useState<Row[]>([]);
+  const [schedulers, setSchedulers] = useState<Row[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [nobId, setNobId] = useState("");
-  const [header, setHeader] = useState<Row>({ lob_id: "", costing_method: "STANDARD", breed_id: "", shed_id: "", start_date: "", expected_end_date: "", opening_quantity: "", uom: "", remarks: "" });
+  const [header, setHeader] = useState<Row>({ lob_id: "", costing_method: "STANDARD", breed_id: "", scheduler_id: "", shed_id: "", start_date: "", expected_end_date: "", opening_quantity: "", uom: "", remarks: "" });
   const [inputLines, setInputLines] = useState<Row[]>([emptyInputLine()]);
   const [stdForm, setStdForm] = useState<Row>({ std_output_quantity: "", std_output_cost_per_unit: "", std_overhead_rate_per_unit: "" });
   const [stdConsumptionLines, setStdConsumptionLines] = useState<Row[]>([emptyStdConsumptionLine()]);
@@ -123,9 +124,19 @@ export default function BatchPanel() {
     api.get(`/setup/wizard/lobs/${nobId}`).then((r) => setLobs(unwrap<Row[]>(r) || [])).catch(() => setLobs([]));
   }, [nobId]);
 
+  useEffect(() => {
+    if (!header.lob_id) { setSchedulers([]); return; }
+    const params = new URLSearchParams();
+    if (companyId) params.set("companyId", companyId);
+    params.set("lobId", header.lob_id);
+    params.set("limit", "200");
+    api.get(`/scheduler?${params.toString()}`).then((r) => setSchedulers(unwrap<Row[]>(r) || [])).catch(() => setSchedulers([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [header.lob_id]);
+
   const openCreate = () => {
     setNobId("");
-    setHeader({ lob_id: "", costing_method: "STANDARD", breed_id: "", shed_id: "", start_date: new Date().toISOString().slice(0, 10), expected_end_date: "", opening_quantity: "", uom: "", remarks: "" });
+    setHeader({ lob_id: "", costing_method: "STANDARD", breed_id: "", scheduler_id: "", shed_id: "", start_date: new Date().toISOString().slice(0, 10), expected_end_date: "", opening_quantity: "", uom: "", remarks: "" });
     setInputLines([emptyInputLine()]);
     setStdForm({ std_output_quantity: "", std_output_cost_per_unit: "", std_overhead_rate_per_unit: "" });
     setStdConsumptionLines([emptyStdConsumptionLine()]);
@@ -188,6 +199,7 @@ export default function BatchPanel() {
         lob_id: header.lob_id,
         costing_method: header.costing_method,
         breed_id: header.breed_id || undefined,
+        scheduler_id: header.scheduler_id || undefined,
         shed_id: header.shed_id || undefined,
         start_date: header.start_date,
         expected_end_date: header.expected_end_date || undefined,
@@ -521,6 +533,13 @@ export default function BatchPanel() {
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Scheduler (KPI monitoring)</label>
+              <select value={header.scheduler_id} onChange={(e) => setHeader((h) => ({ ...h, scheduler_id: e.target.value }))} className={inputCls} style={S.input} disabled={!header.lob_id}>
+                <option value="">{header.lob_id ? "None" : "Select Line of Business first…"}</option>
+                {schedulers.map((s) => <option key={s.scheduler_id} value={s.scheduler_id}>{s.scheduler_code} — {s.scheduler_name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Shed</label>
               <select value={header.shed_id} onChange={(e) => setHeader((h) => ({ ...h, shed_id: e.target.value }))} className={inputCls} style={S.input}>
                 <option value="">Select…</option>
@@ -698,6 +717,12 @@ export default function BatchPanel() {
               <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Method</p><p style={S.primary}>{viewing.costing_method}</p></div>
               <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Opening Qty</p><p style={S.primary}>{viewing.opening_quantity} {viewing.uom}</p></div>
               {viewing.total_cost && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Total Cost / Unit</p><p style={S.primary}>{viewing.total_cost} / {viewing.unit_cost}</p></div>}
+              {viewing.scheduler && (
+                <div>
+                  <p className="font-semibold uppercase tracking-wider" style={S.muted}>Scheduler</p>
+                  <p style={S.primary}>{viewing.scheduler.scheduler_code}{(viewing.alerts || []).length > 0 ? ` — ${viewing.alerts.length} alert(s)` : ""}</p>
+                </div>
+              )}
             </div>
 
             {viewing.status === "DRAFT" && (

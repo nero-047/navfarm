@@ -59,6 +59,9 @@ const DEFAULT_RESOURCES = [
   { module_code: "NOTIFICATION", resource: "SETTINGS", name: "Notification Gateway Settings" },
   // PRODUCTION (Phase 5)
   { module_code: "PRODUCTION", resource: "BATCH", name: "Production Batches" },
+  // PRODUCTION (Phase 6)
+  { module_code: "PRODUCTION", resource: "PARAMETER", name: "Production Parameters" },
+  { module_code: "PRODUCTION", resource: "SCHEDULER", name: "Production Schedulers" },
   // RBAC
   { module_code: "RBAC", resource: "ROLE", name: "User Roles & Team Management" },
   { module_code: "RBAC", resource: "USER", name: "User Accounts" },

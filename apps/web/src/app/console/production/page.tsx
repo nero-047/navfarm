@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, hasPermission, NavUser } from "@/hooks/useAuth";
 import BatchPanel from "@/components/console/production/batch-panel";
+import ParameterPanel from "@/components/console/production/parameter-panel";
+import SchedulerPanel from "@/components/console/production/scheduler-panel";
+import AlertPanel from "@/components/console/production/alert-panel";
 import { ShieldAlert } from "lucide-react";
 
 const S = {
@@ -15,6 +18,9 @@ const S = {
 
 const SECTIONS = [
   { key: "batches", label: "Batches" },
+  { key: "schedulers", label: "Schedulers" },
+  { key: "parameters", label: "Parameters" },
+  { key: "alerts", label: "Alerts" },
 ];
 
 export default function ProductionPage() {
@@ -82,6 +88,9 @@ export default function ProductionPage() {
 
         <main className="min-w-0 flex-1">
           {activeKey === "batches" && <BatchPanel />}
+          {activeKey === "schedulers" && <SchedulerPanel />}
+          {activeKey === "parameters" && <ParameterPanel />}
+          {activeKey === "alerts" && <AlertPanel />}
         </main>
       </div>
     </div>
