@@ -30,31 +30,38 @@ export class GoodsIssueService {
     return tenantDb;
   }
 
-  private async generateIssueNo(tenantId: string, companyId: string): Promise<string> {
-    const [row] = await this.db
+  // `executor` must be the active transaction when called from inside one (see
+  // `create()`) — `.for('update')` locks the counted rows so a second concurrent
+  // call blocks until the first commits its insert, instead of both reading the
+  // same count and generating the same issue number.
+  private async generateIssueNo(tenantId: string, companyId: string, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
+    const [row] = await executor
       .select({ total: count() })
       .from(schema.goodsIssue)
-      .where(and(eq(schema.goodsIssue.tenant_id, tenantId), eq(schema.goodsIssue.company_id, companyId)));
+      .where(and(eq(schema.goodsIssue.tenant_id, tenantId), eq(schema.goodsIssue.company_id, companyId)))
+      .for('update');
     const seq = Number(row?.total || 0) + 1;
     return `GI-${String(seq).padStart(6, '0')}`;
   }
 
   async create(dto: CreateGoodsIssueDto, tenantId: string, userPayload?: any) {
     const issueId = randomUUID();
-    const issueNo = await this.generateIssueNo(tenantId, dto.company_id);
-
-    await this.db.insert(schema.goodsIssue).values({
-      issue_id: issueId,
-      tenant_id: tenantId,
-      company_id: dto.company_id,
-      issue_no: issueNo,
-      posting_date: dto.posting_date,
-      warehouse_id: dto.warehouse_id,
-      cost_center_id: dto.cost_center_id || null,
-      remarks: dto.remarks || null,
-      status: 'DRAFT',
-      created_by: userPayload?.userId || null,
-      updated_by: userPayload?.userId || null,
+    const issueNo = await this.db.transaction(async (tx) => {
+      const no = await this.generateIssueNo(tenantId, dto.company_id, tx);
+      await tx.insert(schema.goodsIssue).values({
+        issue_id: issueId,
+        tenant_id: tenantId,
+        company_id: dto.company_id,
+        issue_no: no,
+        posting_date: dto.posting_date,
+        warehouse_id: dto.warehouse_id,
+        cost_center_id: dto.cost_center_id || null,
+        remarks: dto.remarks || null,
+        status: 'DRAFT',
+        created_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      });
+      return no;
     });
 
     await this.insertLines(issueId, dto.lines);

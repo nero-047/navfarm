@@ -31,15 +31,37 @@ function entityLabel(row: Row, field: MasterDataField): string {
   return text || row[field.entityValueKey || "id"];
 }
 
-/** Resolves a select-entity field's actual endpoint, substituting "{value}" with the parent field's current value. Returns null while a dependent field's parent is unset. */
+function parentKeys(f: MasterDataField): string[] {
+  if (!f.dependsOn) return [];
+  return Array.isArray(f.dependsOn) ? f.dependsOn : [f.dependsOn];
+}
+
+/**
+ * Resolves a select-entity field's actual endpoint.
+ * - "path" mode (default, single parent): substitutes "{value}" with the parent's current
+ *   value; returns null (blocking the field) while that parent is unset.
+ * - "query" mode (one or more parents): appends each set parent as a query param via
+ *   queryParams; unset parents are simply omitted rather than blocking the fetch.
+ */
 function resolveEndpoint(f: MasterDataField, form: Row): string | null {
   if (!f.entityEndpoint) return null;
-  if (f.dependsOn) {
-    const parentVal = form[f.dependsOn];
-    if (!parentVal) return null;
-    return f.entityEndpoint.replace("{value}", parentVal);
+  const parents = parentKeys(f);
+  if (parents.length === 0) return f.entityEndpoint;
+
+  if (f.dependsOnMode === "query") {
+    const params = new URLSearchParams();
+    for (const key of parents) {
+      const val = form[key];
+      const paramName = f.queryParams?.[key];
+      if (val && paramName) params.set(paramName, val);
+    }
+    const qs = params.toString();
+    return qs ? `${f.entityEndpoint}?${qs}` : f.entityEndpoint;
   }
-  return f.entityEndpoint;
+
+  const parentVal = form[parents[0]];
+  if (!parentVal) return null;
+  return f.entityEndpoint.replace("{value}", parentVal);
 }
 
 function displayValue(row: Row, key: string): string {
@@ -56,6 +78,11 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [entityOptions, setEntityOptions] = useState<Record<string, Row[]>>({});
+
+  const [nobFilterOptions, setNobFilterOptions] = useState<Row[]>([]);
+  const [lobFilterOptions, setLobFilterOptions] = useState<Row[]>([]);
+  const [nobFilter, setNobFilter] = useState("");
+  const [lobFilter, setLobFilter] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
@@ -78,6 +105,8 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       const params = new URLSearchParams();
       if (companyId) params.set("companyId", companyId);
       if (search) params.set("search", search);
+      if (config.supportsNobLobFilter && nobFilter) params.set("nobId", nobFilter);
+      if (config.supportsNobLobFilter && lobFilter) params.set("lobId", lobFilter);
       params.set("limit", "200");
       const res = await api.get(`${config.apiBase}?${params.toString()}`);
       const list = unwrap<Row[]>(res);
@@ -92,7 +121,23 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.key, search]);
+  }, [config.key, search, nobFilter, lobFilter]);
+
+  useEffect(() => {
+    if (!config.supportsNobLobFilter) return;
+    setNobFilter("");
+    setLobFilter("");
+    const params = new URLSearchParams();
+    if (companyId) params.set("companyId", companyId);
+    params.set("limit", "500");
+    api.get(`/setup/wizard/nobs?${params.toString()}`).then((r) => setNobFilterOptions(unwrap<Row[]>(r) || [])).catch(() => setNobFilterOptions([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.key]);
+
+  useEffect(() => {
+    if (!config.supportsNobLobFilter || !nobFilter) { setLobFilterOptions([]); return; }
+    api.get(`/setup/wizard/lobs/${nobFilter}`).then((r) => setLobFilterOptions(unwrap<Row[]>(r) || [])).catch(() => setLobFilterOptions([]));
+  }, [config.supportsNobLobFilter, nobFilter]);
 
   useEffect(() => {
     const endpoints = Array.from(
@@ -164,7 +209,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const setField = (key: string, value: any) => setForm((prev) => {
     const next = { ...prev, [key]: value };
     config.fields.forEach((f) => {
-      if (f.dependsOn === key && next[f.key]) next[f.key] = "";
+      if (parentKeys(f).includes(key) && next[f.key]) next[f.key] = "";
     });
     return next;
   });
@@ -175,6 +220,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     try {
       const payload: Row = {};
       for (const f of visibleFields) {
+        if (f.filterOnly) continue;
         let v = form[f.key];
         if (v === "" || v === undefined) continue;
         if (f.type === "number") v = Number(v);
@@ -258,8 +304,11 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     if (f.type === "select-entity") {
       const resolvedEp = resolveEndpoint(f, form);
       const options = resolvedEp ? entityOptions[resolvedEp] || [] : [];
-      const disabled = !!f.dependsOn && !resolvedEp;
-      const parentLabel = f.dependsOn ? config.fields.find((pf) => pf.key === f.dependsOn)?.label || f.dependsOn : "";
+      const parents = parentKeys(f);
+      // "query" mode never blocks — an unset parent just narrows the results less, it
+      // doesn't prevent fetching (mirrors the backend treating an absent filter as "show all").
+      const disabled = f.dependsOnMode !== "query" && parents.length > 0 && !resolvedEp;
+      const parentLabel = parents.map((k) => config.fields.find((pf) => pf.key === k)?.label || k).join(" & ");
       return (
         <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={inputCls} style={S.input} disabled={disabled}>
           <option value="">{disabled ? `Select ${parentLabel} first…` : "Select…"}</option>
@@ -292,6 +341,33 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           {config.description && <p className="mt-0.5 text-xs" style={S.sub}>{config.description}</p>}
         </div>
         <div className="flex items-center gap-2">
+          {config.supportsNobLobFilter && (
+            <>
+              <select
+                value={nobFilter}
+                onChange={(e) => setNobFilter(e.target.value)}
+                className="rounded-lg border py-1.5 px-2 text-xs outline-none"
+                style={S.input}
+              >
+                <option value="">All Nature of Business</option>
+                {nobFilterOptions.map((n) => (
+                  <option key={n.nob_id} value={n.nob_id}>{n.nob_code}</option>
+                ))}
+              </select>
+              <select
+                value={lobFilter}
+                onChange={(e) => setLobFilter(e.target.value)}
+                className="rounded-lg border py-1.5 px-2 text-xs outline-none"
+                style={S.input}
+                disabled={!nobFilter}
+              >
+                <option value="">{nobFilter ? "All Lines of Business" : "Select NOB first…"}</option>
+                {lobFilterOptions.map((l) => (
+                  <option key={l.lob_id} value={l.lob_id}>{l.lob_code}</option>
+                ))}
+              </select>
+            </>
+          )}
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
             <input

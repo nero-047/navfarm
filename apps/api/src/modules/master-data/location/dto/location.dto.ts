@@ -231,6 +231,16 @@ export class QueryLocationDto {
   @IsUUID()
   companyId?: string;
 
+  @ApiProperty({ description: 'Filter by Nature of Business UUID', required: false })
+  @IsOptional()
+  @IsString()
+  nobId?: string;
+
+  @ApiProperty({ description: 'Filter by Line of Business UUID', required: false })
+  @IsOptional()
+  @IsString()
+  lobId?: string;
+
   @ApiProperty({ description: 'Filter by parent farm UUID', required: false })
   @IsOptional()
   @IsUUID()

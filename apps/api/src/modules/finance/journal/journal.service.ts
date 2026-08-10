@@ -36,11 +36,18 @@ export class JournalService {
     return tenantDb;
   }
 
-  private async generateJournalNo(tenantId: string, companyId: string): Promise<string> {
-    const [row] = await this.db
+  // `executor` must be the active transaction when called from inside one (both
+  // callers below do this) — `.for('update')` locks the counted rows so a second
+  // concurrent call blocks until the first commits its insert, instead of both
+  // reading the same count and generating the same journal number. This is the
+  // hottest of the document-number generators — every domain's GL auto-posting
+  // routes through `createAndPostSystemJournal`.
+  private async generateJournalNo(tenantId: string, companyId: string, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
+    const [row] = await executor
       .select({ total: count() })
       .from(schema.journalHeader)
-      .where(and(eq(schema.journalHeader.tenant_id, tenantId), eq(schema.journalHeader.company_id, companyId)));
+      .where(and(eq(schema.journalHeader.tenant_id, tenantId), eq(schema.journalHeader.company_id, companyId)))
+      .for('update');
     const seq = Number(row?.total || 0) + 1;
     return `JE-${String(seq).padStart(6, '0')}`;
   }
@@ -55,22 +62,25 @@ export class JournalService {
 
   async create(dto: CreateJournalDto, tenantId: string, userPayload?: any) {
     const journalId = randomUUID();
-    const journalNo = await this.generateJournalNo(tenantId, dto.company_id);
     const { totalDebit, totalCredit } = this.sumLines(dto.lines);
 
-    await this.db.insert(schema.journalHeader).values({
-      journal_id: journalId,
-      tenant_id: tenantId,
-      company_id: dto.company_id,
-      journal_no: journalNo,
-      posting_date: dto.posting_date,
-      source: 'MANUAL',
-      description: dto.description || null,
-      status: 'DRAFT',
-      total_debit: totalDebit.toString(),
-      total_credit: totalCredit.toString(),
-      created_by: userPayload?.userId || null,
-      updated_by: userPayload?.userId || null,
+    const journalNo = await this.db.transaction(async (tx) => {
+      const no = await this.generateJournalNo(tenantId, dto.company_id, tx);
+      await tx.insert(schema.journalHeader).values({
+        journal_id: journalId,
+        tenant_id: tenantId,
+        company_id: dto.company_id,
+        journal_no: no,
+        posting_date: dto.posting_date,
+        source: 'MANUAL',
+        description: dto.description || null,
+        status: 'DRAFT',
+        total_debit: totalDebit.toString(),
+        total_credit: totalCredit.toString(),
+        created_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      });
+      return no;
     });
 
     await this.insertLines(journalId, dto.lines);
@@ -277,27 +287,30 @@ export class JournalService {
     }
 
     const journalId = randomUUID();
-    const journalNo = await this.generateJournalNo(params.tenantId, params.companyId);
     const postedTime = toMysqlTimestamp();
 
-    await this.db.insert(schema.journalHeader).values({
-      journal_id: journalId,
-      tenant_id: params.tenantId,
-      company_id: params.companyId,
-      journal_no: journalNo,
-      posting_date: params.postingDate,
-      source: 'SYSTEM',
-      source_document_type: params.sourceDocumentType,
-      source_document_no: params.sourceDocumentNo,
-      source_ledger_id: params.sourceLedgerId || null,
-      description: params.description || null,
-      status: 'POSTED',
-      total_debit: totalDebit.toString(),
-      total_credit: totalCredit.toString(),
-      posted_at: postedTime as any,
-      posted_by: params.userId || null,
-      created_by: params.userId || null,
-      updated_by: params.userId || null,
+    const journalNo = await this.db.transaction(async (tx) => {
+      const no = await this.generateJournalNo(params.tenantId, params.companyId, tx);
+      await tx.insert(schema.journalHeader).values({
+        journal_id: journalId,
+        tenant_id: params.tenantId,
+        company_id: params.companyId,
+        journal_no: no,
+        posting_date: params.postingDate,
+        source: 'SYSTEM',
+        source_document_type: params.sourceDocumentType,
+        source_document_no: params.sourceDocumentNo,
+        source_ledger_id: params.sourceLedgerId || null,
+        description: params.description || null,
+        status: 'POSTED',
+        total_debit: totalDebit.toString(),
+        total_credit: totalCredit.toString(),
+        posted_at: postedTime as any,
+        posted_by: params.userId || null,
+        created_by: params.userId || null,
+        updated_by: params.userId || null,
+      });
+      return no;
     });
 
     await this.db.insert(schema.journalLine).values(

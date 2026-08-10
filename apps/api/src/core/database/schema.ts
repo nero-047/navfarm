@@ -1393,7 +1393,12 @@ export const journalHeader = mysqlTable('journal_header', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
-});
+}, (table) => [
+  // Defense in depth alongside the row-locked generator in journal.service.ts —
+  // a duplicate journal_no under concurrent inserts fails loudly instead of
+  // silently corrupting the document sequence.
+  uniqueIndex('uq_journal_header_tenant_company_no').on(table.tenant_id, table.company_id, table.journal_no),
+]);
 
 export const journalLine = mysqlTable('journal_line', {
   line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -1465,6 +1470,10 @@ export const batchHeader = mysqlTable('batch_header', {
     foreignColumns: [locationMaster.location_id],
     name: 'batch_header_location_id_fk'
   }).onDelete('restrict'),
+  // Defense in depth alongside the row-locked generator in batch.service.ts —
+  // a duplicate batch_no under concurrent inserts fails loudly instead of
+  // silently corrupting the document sequence.
+  uqBatchNo: uniqueIndex('uq_batch_header_tenant_company_no').on(table.tenant_id, table.company_id, table.batch_no),
 }));
 
 export const batchInputLine = mysqlTable('batch_input_line', {
@@ -2121,7 +2130,12 @@ export const goodsIssue = mysqlTable('goods_issue', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
-});
+}, (table) => [
+  // Defense in depth alongside the row-locked generator in goods-issue.service.ts —
+  // a duplicate issue_no under concurrent inserts fails loudly instead of
+  // silently corrupting the document sequence.
+  uniqueIndex('uq_goods_issue_tenant_company_no').on(table.tenant_id, table.company_id, table.issue_no),
+]);
 
 export const goodsIssueLine = mysqlTable('goods_issue_line', {
   line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -2161,6 +2175,10 @@ export const stockTransfer = mysqlTable('stock_transfer', {
     foreignColumns: [warehouseMaster.warehouse_id],
     name: 'stock_transfer_to_warehouse_fk'
   }).onDelete('restrict'),
+  // Defense in depth alongside the row-locked generator in stock-transfer.service.ts —
+  // a duplicate transfer_no under concurrent inserts fails loudly instead of
+  // silently corrupting the document sequence.
+  uqTransferNo: uniqueIndex('uq_stock_transfer_tenant_company_no').on(table.tenant_id, table.company_id, table.transfer_no),
 }));
 
 export const stockTransferLine = mysqlTable('stock_transfer_line', {
@@ -2190,7 +2208,12 @@ export const stockAdjustment = mysqlTable('stock_adjustment', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
-});
+}, (table) => [
+  // Defense in depth alongside the row-locked generator in stock-adjustment.service.ts —
+  // a duplicate adjustment_no under concurrent inserts fails loudly instead of
+  // silently corrupting the document sequence.
+  uniqueIndex('uq_stock_adjustment_tenant_company_no').on(table.tenant_id, table.company_id, table.adjustment_no),
+]);
 
 export const stockAdjustmentLine = mysqlTable('stock_adjustment_line', {
   line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),

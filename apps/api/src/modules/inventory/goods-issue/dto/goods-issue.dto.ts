@@ -7,6 +7,7 @@ import {
   IsInt,
   Min,
   IsNumber,
+  IsPositive,
   IsDateString,
   IsArray,
   ValidateNested,
@@ -22,6 +23,7 @@ export class GoodsIssueLineInput {
 
   @ApiProperty({ description: 'Quantity to issue', example: 20 })
   @IsNumber()
+  @IsPositive()
   @IsNotEmpty()
   quantity: number;
 

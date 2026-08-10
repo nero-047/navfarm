@@ -39,11 +39,16 @@ export class BatchService {
     return tenantDb;
   }
 
-  private async generateBatchNo(tenantId: string, companyId: string): Promise<string> {
-    const [row] = await this.db
+  // `executor` defaults to `this.db` but must be passed the active transaction
+  // when called from inside one (see `create()`) — `.for('update')` locks the
+  // counted rows so a second concurrent call blocks until the first commits its
+  // insert, instead of both reading the same count and generating the same number.
+  private async generateBatchNo(tenantId: string, companyId: string, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
+    const [row] = await executor
       .select({ total: count() })
       .from(schema.batchHeader)
-      .where(and(eq(schema.batchHeader.tenant_id, tenantId), eq(schema.batchHeader.company_id, companyId)));
+      .where(and(eq(schema.batchHeader.tenant_id, tenantId), eq(schema.batchHeader.company_id, companyId)))
+      .for('update');
     const seq = Number(row?.total || 0) + 1;
     return `BATCH-${String(seq).padStart(6, '0')}`;
   }
@@ -65,28 +70,30 @@ export class BatchService {
     }
 
     const batchId = randomUUID();
-    const batchNo = await this.generateBatchNo(tenantId, dto.company_id);
-
-    await this.db.insert(schema.batchHeader).values({
-      batch_id: batchId,
-      tenant_id: tenantId,
-      company_id: dto.company_id,
-      batch_no: batchNo,
-      lob_id: dto.lob_id,
-      nob_id: lob.nob_id,
-      costing_method: dto.costing_method.toUpperCase(),
-      breed_id: dto.breed_id || null,
-      scheduler_id: dto.scheduler_id || null,
-      shed_id: dto.shed_id || null,
-      location_id: dto.location_id || null,
-      start_date: dto.start_date,
-      expected_end_date: dto.expected_end_date || null,
-      status: 'DRAFT',
-      opening_quantity: dto.opening_quantity.toString(),
-      uom: dto.uom,
-      remarks: dto.remarks || null,
-      created_by: userPayload?.userId || null,
-      updated_by: userPayload?.userId || null,
+    const batchNo = await this.db.transaction(async (tx) => {
+      const no = await this.generateBatchNo(tenantId, dto.company_id, tx);
+      await tx.insert(schema.batchHeader).values({
+        batch_id: batchId,
+        tenant_id: tenantId,
+        company_id: dto.company_id,
+        batch_no: no,
+        lob_id: dto.lob_id,
+        nob_id: lob.nob_id,
+        costing_method: dto.costing_method.toUpperCase(),
+        breed_id: dto.breed_id || null,
+        scheduler_id: dto.scheduler_id || null,
+        shed_id: dto.shed_id || null,
+        location_id: dto.location_id || null,
+        start_date: dto.start_date,
+        expected_end_date: dto.expected_end_date || null,
+        status: 'DRAFT',
+        opening_quantity: dto.opening_quantity.toString(),
+        uom: dto.uom,
+        remarks: dto.remarks || null,
+        created_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      });
+      return no;
     });
 
     await this.db.insert(schema.batchInputLine).values(
@@ -741,8 +748,12 @@ export class BatchService {
     }
 
     const inputTotal = (batch.input_lines || []).reduce((sum, l) => sum + Number(l.amount || 0), 0);
+    // MORTALITY is deliberately excluded here — it's already expensed and relieved
+    // from WIP the moment it's recorded (see addTransaction()'s postBatchCostEntry
+    // for 'MORTALITY'). Including it again here would double-count the write-off
+    // into the surviving output's valuation.
     const costTransactions = (batch.transactions || []).filter(
-      (t) => t.transaction_type === 'CONSUMPTION' || t.transaction_type === 'OVERHEAD' || t.transaction_type === 'MORTALITY'
+      (t) => t.transaction_type === 'CONSUMPTION' || t.transaction_type === 'OVERHEAD'
     );
     const transactionTotal = costTransactions.reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
     const totalCost = inputTotal + transactionTotal;
@@ -971,7 +982,11 @@ export class BatchService {
     const currentQty = Number(bioState.current_quantity);
     const ncaValue = Number(bioState.nca_book_value);
     const residualTotal = dto.residual_value_per_unit * currentQty;
-    const monthlyRate = (ncaValue - residualTotal) / productiveLifeMonths;
+    // Stored per-unit (amortizeBioAsset multiplies by the *current* headcount at
+    // each run, which correctly shrinks the monthly charge as mortality reduces
+    // the surviving herd — storing a herd-total here instead double-counts
+    // headcount and wipes the NCA out on the very first amortization run).
+    const monthlyRate = currentQty > 0 ? (ncaValue - residualTotal) / productiveLifeMonths / currentQty : 0;
     if (monthlyRate < 0) {
       throw new BadRequestException('Residual value exceeds the current NCA book value — cannot compute a positive amortization rate.');
     }

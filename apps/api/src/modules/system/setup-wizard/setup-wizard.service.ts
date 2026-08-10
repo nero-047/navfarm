@@ -11,6 +11,7 @@ import { Step2AddressDto } from './dto/step2-address.dto';
 import { Step3ContactDto } from './dto/step3-contact.dto';
 import { Step7FiscalDto } from './dto/step7-fiscal.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { MasterDataSeedService } from './seed/master-data-seed.service';
 
 @Injectable()
 export class SetupWizardService implements OnModuleInit {
@@ -19,6 +20,7 @@ export class SetupWizardService implements OnModuleInit {
     private readonly masterDb: MySql2Database<typeof masterSchema>,
     private readonly cls: ClsService,
     private readonly auditLogService: AuditLogService,
+    private readonly masterDataSeedService: MasterDataSeedService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -414,6 +416,20 @@ export class SetupWizardService implements OnModuleInit {
 
     // Mark the final completion step as completed in log
     await this.logStepCompletion(this.db, companyId, 'SETUP_COMPLETE');
+
+    // Provision a starter chart of accounts, GL mappings, and a default
+    // warehouse — without this a brand-new company has no way to post a
+    // batch or goods receipt until someone hand-builds a chart of accounts.
+    const [company] = await this.db
+      .select({ tenant_id: schema.companyMaster.tenant_id })
+      .from(schema.companyMaster)
+      .where(eq(schema.companyMaster.company_id, companyId))
+      .limit(1);
+    if (company) {
+      await this.masterDataSeedService.seedStarterMasterData(company.tenant_id, companyId);
+      await this.logStepCompletion(this.db, companyId, 'CHART_OF_ACCOUNTS');
+      await this.logStepCompletion(this.db, companyId, 'MASTER_DATA_LOAD');
+    }
 
     return {
       success: true,

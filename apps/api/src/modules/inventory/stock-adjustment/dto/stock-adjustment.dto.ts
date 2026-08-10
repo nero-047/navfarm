@@ -7,6 +7,7 @@ import {
   IsInt,
   Min,
   IsNumber,
+  NotEquals,
   IsDateString,
   IsArray,
   ValidateNested,
@@ -23,6 +24,7 @@ export class StockAdjustmentLineInput {
 
   @ApiProperty({ description: 'Signed quantity — positive for found/excess stock, negative for missing/damaged stock', example: -5 })
   @IsNumber()
+  @NotEquals(0, { message: 'quantity cannot be zero — a zero-quantity adjustment line has no effect and silently bypasses FIFO validation' })
   @IsNotEmpty()
   quantity: number;
 

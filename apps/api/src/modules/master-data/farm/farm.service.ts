@@ -117,6 +117,12 @@ export class FarmService {
     if (query.companyId) {
       conditions.push(eq(schema.farmMaster.company_id, query.companyId));
     }
+    if (query.nobId) {
+      conditions.push(eq(schema.farmMaster.nob_id, query.nobId));
+    }
+    if (query.lobId) {
+      conditions.push(eq(schema.farmMaster.lob_id, query.lobId));
+    }
     if (query.farmType) {
       conditions.push(eq(schema.farmMaster.farm_type, query.farmType));
     }

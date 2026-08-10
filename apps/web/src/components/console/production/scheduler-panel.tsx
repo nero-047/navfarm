@@ -79,8 +79,6 @@ export default function SchedulerPanel() {
     params.set("limit", "500");
     const qs = params.toString();
     api.get(`/setup/wizard/nobs?${qs}`).then((r) => setNobs(unwrap<Row[]>(r) || [])).catch(() => {});
-    api.get(`/breed?${qs}`).then((r) => setBreeds(unwrap<Row[]>(r) || [])).catch(() => {});
-    api.get(`/parameter?${qs}`).then((r) => setParameters(unwrap<Row[]>(r) || [])).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -88,6 +86,25 @@ export default function SchedulerPanel() {
     if (!nobId) { setLobs([]); return; }
     api.get(`/setup/wizard/lobs/${nobId}`).then((r) => setLobs(unwrap<Row[]>(r) || [])).catch(() => setLobs([]));
   }, [nobId]);
+
+  // Breed/Parameter are scoped by Nature of Business and Line of Business —
+  // re-fetched whenever either selection changes. The "active" scope prefers
+  // whichever scheduler is currently open for viewing (so its own parameter
+  // lines resolve to the right names) and falls back to the create form's
+  // current selection otherwise.
+  const activeNobId = viewing?.nob_id || nobId;
+  const activeLobId = viewing?.lob_id || header.lob_id;
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (companyId) params.set("companyId", companyId);
+    if (activeNobId) params.set("nobId", activeNobId);
+    if (activeLobId) params.set("lobId", activeLobId);
+    params.set("limit", "500");
+    const qs = params.toString();
+    api.get(`/breed?${qs}`).then((r) => setBreeds(unwrap<Row[]>(r) || [])).catch(() => setBreeds([]));
+    api.get(`/parameter?${qs}`).then((r) => setParameters(unwrap<Row[]>(r) || [])).catch(() => setParameters([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNobId, activeLobId]);
 
   const openCreate = () => {
     setNobId("");

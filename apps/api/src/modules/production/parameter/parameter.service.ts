@@ -93,6 +93,8 @@ export class ParameterService {
     if (query.companyId) {
       conditions.push(or(eq(schema.parameterMaster.company_id, query.companyId), isNull(schema.parameterMaster.company_id))!);
     }
+    if (query.nobId) conditions.push(eq(schema.parameterMaster.nob_id, query.nobId));
+    if (query.lobId) conditions.push(eq(schema.parameterMaster.lob_id, query.lobId));
     if (query.parameterType) conditions.push(eq(schema.parameterMaster.parameter_type, query.parameterType));
     if (query.search) {
       conditions.push(

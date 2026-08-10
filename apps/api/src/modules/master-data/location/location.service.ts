@@ -191,6 +191,12 @@ export class LocationService {
         )
       );
     }
+    if (query.nobId) {
+      conditions.push(eq(schema.locationMaster.nob_id, query.nobId));
+    }
+    if (query.lobId) {
+      conditions.push(eq(schema.locationMaster.lob_id, query.lobId));
+    }
     if (query.farmId) {
       conditions.push(eq(schema.locationMaster.farm_id, query.farmId));
     }

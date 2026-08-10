@@ -15,6 +15,7 @@ const farm: MasterDataConfig = {
   apiBase: "/farm",
   idKey: "farm_id",
   group: "Farm Operations",
+  supportsNobLobFilter: true,
   columns: [
     { key: "farm_code", label: "Code" },
     { key: "farm_name", label: "Name" },
@@ -110,6 +111,7 @@ const shed: MasterDataConfig = {
   apiBase: "/shed",
   idKey: "shed_id",
   group: "Farm Operations",
+  supportsNobLobFilter: true,
   columns: [
     { key: "shed_code", label: "Code" },
     { key: "shed_name", label: "Name" },
@@ -185,6 +187,7 @@ const itemAttribute: MasterDataConfig = {
   apiBase: "/item-attribute",
   idKey: "attribute_id",
   group: "Inventory",
+  supportsNobLobFilter: true,
   columns: [
     { key: "attribute_code", label: "Code" },
     { key: "attribute_name", label: "Name" },
@@ -278,6 +281,7 @@ const breed: MasterDataConfig = {
   apiBase: "/breed",
   idKey: "breed_id",
   group: "Livestock & Health",
+  supportsNobLobFilter: true,
   columns: [
     { key: "breed_code", label: "Code" },
     { key: "breed_name", label: "Name" },
@@ -345,7 +349,12 @@ const medicine: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "item_id", label: "Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], filterOnly: true, helpText: "Scopes the Item picker below — medicines aren't NOB/LOB-scoped themselves." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", filterOnly: true },
+    {
+      key: "item_id", label: "Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"],
+      dependsOn: ["nob_id", "lob_id"], dependsOnMode: "query", queryParams: { nob_id: "nobId", lob_id: "lobId" },
+    },
     { key: "composition", label: "Composition", type: "text", placeholder: "Amoxicillin 10% w/w" },
     { key: "dosage_guideline", label: "Dosage Guideline", type: "textarea" },
     { key: "withdrawal_period_days", label: "Withdrawal Period (days)", type: "number" },
@@ -373,7 +382,12 @@ const feedFormula: MasterDataConfig = {
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "formula_code", label: "Formula Code", type: "text", required: true, placeholder: "FORM-BR-STARTER" },
     { key: "formula_name", label: "Formula Name", type: "text", required: true, placeholder: "Broiler Starter Feed Formula" },
-    { key: "target_item_id", label: "Produced Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], filterOnly: true, helpText: "Scopes the Produced Item picker below — feed formulas aren't NOB/LOB-scoped themselves." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", filterOnly: true },
+    {
+      key: "target_item_id", label: "Produced Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"],
+      dependsOn: ["nob_id", "lob_id"], dependsOnMode: "query", queryParams: { nob_id: "nobId", lob_id: "lobId" },
+    },
     { key: "batch_size", label: "Batch Size", type: "number", required: true, step: "0.01" },
     { key: "batch_unit", label: "Batch Unit", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "description", label: "Description", type: "textarea" },
@@ -451,6 +465,7 @@ const resource: MasterDataConfig = {
   apiBase: "/resource",
   idKey: "resource_id",
   group: "Business Partners",
+  supportsNobLobFilter: true,
   columns: [
     { key: "resource_code", label: "Code" },
     { key: "resource_name", label: "Name" },

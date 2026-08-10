@@ -136,6 +136,14 @@ export class InventoryLedgerService {
     },
     executor: MySql2Database<typeof schema> = this.db
   ): Promise<{ totalCost: number; averageRate: number }> {
+    // A zero/negative quantity would make the loop below no-op immediately
+    // (remainingToConsume <= 0 on the first check) and the insufficient-stock
+    // guard after it never fires either (0/negative is never > 0) — silently
+    // skipping FIFO consumption instead of rejecting the request.
+    if (params.quantity <= 0) {
+      throw new BadRequestException(`FIFO consumption quantity must be positive (got ${params.quantity}).`);
+    }
+
     let remainingToConsume = params.quantity;
     let totalCost = 0;
 
@@ -204,6 +212,10 @@ export class InventoryLedgerService {
    * consumed layer behind.
    */
   async writeNegativeEntry(params: WriteNegativeEntryParams) {
+    if (params.quantity <= 0) {
+      throw new BadRequestException(`Outbound quantity must be positive (got ${params.quantity}).`);
+    }
+
     const [item] = await this.db
       .select()
       .from(schema.itemMaster)

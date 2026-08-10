@@ -4,7 +4,7 @@ import { eq, sql, and, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import * as masterSchema from '../../../core/database/master-schema';
 import * as schema from '../../../core/database/schema';
-import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED } from '../../../core/database/system-master-data-seed';
+import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED } from '../../../core/database/system-master-data-seed';
 import { MASTER_CONNECTION } from '../../../core/database/database.module';
 import { ConnectionManagerService } from '../../../core/database/connection-manager.service';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
@@ -110,6 +110,50 @@ export class TenantService {
       await tenantDb.insert(schema.speciesMaster).values(
         SYSTEM_SPECIES_SEED.map((s) => ({ ...s, tenant_id: tenantId }))
       );
+
+      // Default breeds/items per NOB/LOB, visible tenant-wide (company_id
+      // null — same wildcard convention breed.service.ts/item.service.ts
+      // already match on) so every company under this tenant starts with a
+      // real catalog instead of empty dropdowns.
+      const nobIdByCode = new Map(masterNobs.map((n) => [n.nob_code, n.nob_id]));
+      const lobIdByCode = new Map(masterLobs.map((l) => [l.lob_code, l.lob_id]));
+      const speciesRows = await tenantDb.select().from(schema.speciesMaster);
+      const speciesIdByCode = new Map(speciesRows.map((s) => [s.species_code, s.species_id]));
+
+      for (const breed of SYSTEM_BREED_SEED) {
+        const nobId = nobIdByCode.get(breed.nob_code);
+        const lobId = lobIdByCode.get(breed.lob_code);
+        const speciesId = speciesIdByCode.get(breed.species_code);
+        if (!nobId || !lobId) continue;
+        await tenantDb.insert(schema.breedMaster).values({
+          breed_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: nobId,
+          lob_id: lobId,
+          breed_code: breed.breed_code,
+          breed_name: breed.breed_name,
+          species_id: speciesId || null,
+          breed_type: breed.breed_type,
+        });
+      }
+
+      for (const item of SYSTEM_ITEM_SEED) {
+        const nobId = nobIdByCode.get(item.nob_code);
+        const lobId = lobIdByCode.get(item.lob_code);
+        if (!nobId || !lobId) continue;
+        await tenantDb.insert(schema.itemMaster).values({
+          item_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: nobId,
+          lob_id: lobId,
+          item_code: item.item_code,
+          item_name: item.item_name,
+          item_type: item.item_type,
+          uom_primary: item.uom_primary,
+        });
+      }
 
       // Seed placeholder company to prevent foreign key errors for initial user registration
       const defaultLangId = masterLangs.find(l => l.is_system_default)?.lang_id || masterLangs[0]?.lang_id || '10000000-1000-1000-1000-100000000001';

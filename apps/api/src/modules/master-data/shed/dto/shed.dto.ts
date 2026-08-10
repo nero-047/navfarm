@@ -112,6 +112,16 @@ export class QueryShedDto {
   @IsUUID()
   farmId?: string;
 
+  @ApiProperty({ description: 'Filter by Nature of Business UUID', required: false })
+  @IsOptional()
+  @IsString()
+  nobId?: string;
+
+  @ApiProperty({ description: 'Filter by Line of Business UUID', required: false })
+  @IsOptional()
+  @IsString()
+  lobId?: string;
+
   @ApiProperty({ description: 'Filter by shed type', required: false })
   @IsOptional()
   @IsString()

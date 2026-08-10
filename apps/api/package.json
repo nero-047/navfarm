@@ -128,6 +128,24 @@
           "cwd": "apps/api",
           "command": "drizzle-kit generate --config drizzle.config.ts"
         }
+      },
+      "db-seed-dev-tenant": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-dev-tenant.ts"
+        }
+      },
+      "db-setup-dev": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "commands": [
+            "pnpm nx run api:db-bootstrap",
+            "pnpm nx run api:db-seed-dev-tenant"
+          ],
+          "parallel": false
+        }
       }
     }
   },

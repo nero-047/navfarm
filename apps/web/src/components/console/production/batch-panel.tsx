@@ -127,12 +127,8 @@ export default function BatchPanel() {
     params.set("limit", "500");
     const qs = params.toString();
     api.get(`/setup/wizard/nobs?${qs}`).then((r) => setNobs(unwrap<Row[]>(r) || [])).catch(() => {});
-    api.get(`/breed?${qs}`).then((r) => setBreeds(unwrap<Row[]>(r) || [])).catch(() => {});
-    api.get(`/shed?${qs}`).then((r) => setSheds(unwrap<Row[]>(r) || [])).catch(() => {});
-    api.get(`/item?${qs}`).then((r) => setItems(unwrap<Row[]>(r) || [])).catch(() => {});
     api.get(`/uom?${qs}`).then((r) => setUoms(unwrap<Row[]>(r) || [])).catch(() => {});
     api.get(`/warehouse?${qs}`).then((r) => setWarehouses(unwrap<Row[]>(r) || [])).catch(() => {});
-    api.get(`/resource?${qs}`).then((r) => setResources(unwrap<Row[]>(r) || [])).catch(() => {});
     api.get(`/batch?${qs}`).then((r) => setBatches(unwrap<Row[]>(r) || [])).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,6 +137,28 @@ export default function BatchPanel() {
     if (!nobId) { setLobs([]); return; }
     api.get(`/setup/wizard/lobs/${nobId}`).then((r) => setLobs(unwrap<Row[]>(r) || [])).catch(() => setLobs([]));
   }, [nobId]);
+
+  // Breed/Item/Shed/Resource are all scoped by Nature of Business and Line of
+  // Business — re-fetched whenever either selection changes, instead of once
+  // on mount, so e.g. a Poultry LOB never shows Livestock breeds. The "active"
+  // scope prefers whichever batch is currently open for viewing (so labels in
+  // the detail modal resolve correctly for that batch's own LOB) and falls
+  // back to the create form's current selection otherwise.
+  const activeNobId = viewing?.nob_id || nobId;
+  const activeLobId = viewing?.lob_id || header.lob_id;
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (companyId) params.set("companyId", companyId);
+    if (activeNobId) params.set("nobId", activeNobId);
+    if (activeLobId) params.set("lobId", activeLobId);
+    params.set("limit", "500");
+    const qs = params.toString();
+    api.get(`/breed?${qs}`).then((r) => setBreeds(unwrap<Row[]>(r) || [])).catch(() => setBreeds([]));
+    api.get(`/shed?${qs}`).then((r) => setSheds(unwrap<Row[]>(r) || [])).catch(() => setSheds([]));
+    api.get(`/item?${qs}`).then((r) => setItems(unwrap<Row[]>(r) || [])).catch(() => setItems([]));
+    api.get(`/resource?${qs}`).then((r) => setResources(unwrap<Row[]>(r) || [])).catch(() => setResources([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNobId, activeLobId]);
 
   useEffect(() => {
     if (!header.lob_id) { setSchedulers([]); return; }
@@ -908,7 +926,7 @@ export default function BatchPanel() {
                     </div>
                     <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Current Qty</p><p style={S.primary}>{viewing.bio_asset_state.current_quantity}</p></div>
                     <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>NCA Book Value</p><p style={S.primary}>{viewing.bio_asset_state.nca_book_value}</p></div>
-                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Monthly Amort. Rate</p><p style={S.primary}>{viewing.bio_asset_state.monthly_amortization_rate ?? "—"}</p></div>
+                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Monthly Amort. Rate / Unit</p><p style={S.primary}>{viewing.bio_asset_state.monthly_amortization_rate ?? "—"}</p></div>
                   </div>
                   {viewing.status === "ACTIVE" && (
                     <div className="mt-3 flex flex-wrap gap-2">

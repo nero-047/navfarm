@@ -127,6 +127,12 @@ export class ShedService {
     if (query.farmId) {
       conditions.push(eq(schema.shedMaster.farm_id, query.farmId));
     }
+    if (query.nobId) {
+      conditions.push(eq(schema.shedMaster.nob_id, query.nobId));
+    }
+    if (query.lobId) {
+      conditions.push(eq(schema.shedMaster.lob_id, query.lobId));
+    }
     if (query.shedType) {
       conditions.push(eq(schema.shedMaster.shed_type, query.shedType));
     }

@@ -375,7 +375,10 @@ export class BreedService {
       conditions.push(eq(schema.breedMaster.nob_id, query.nobId));
     }
     if (query.lobId) {
-      conditions.push(eq(schema.breedMaster.lob_id, query.lobId));
+      // A breed with lob_id IS NULL applies to every LOB under its NOB — eq() never
+      // matches NULL, so without the wildcard these breeds would be wrongly excluded
+      // whenever a specific LOB is requested.
+      conditions.push(or(eq(schema.breedMaster.lob_id, query.lobId), isNull(schema.breedMaster.lob_id))!);
     }
     if (query.breedType) {
       conditions.push(eq(schema.breedMaster.breed_type, query.breedType));

@@ -30,11 +30,16 @@ export class StockTransferService {
     return tenantDb;
   }
 
-  private async generateTransferNo(tenantId: string, companyId: string): Promise<string> {
-    const [row] = await this.db
+  // `executor` must be the active transaction when called from inside one (see
+  // `create()`) — `.for('update')` locks the counted rows so a second concurrent
+  // call blocks until the first commits its insert, instead of both reading the
+  // same count and generating the same transfer number.
+  private async generateTransferNo(tenantId: string, companyId: string, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
+    const [row] = await executor
       .select({ total: count() })
       .from(schema.stockTransfer)
-      .where(and(eq(schema.stockTransfer.tenant_id, tenantId), eq(schema.stockTransfer.company_id, companyId)));
+      .where(and(eq(schema.stockTransfer.tenant_id, tenantId), eq(schema.stockTransfer.company_id, companyId)))
+      .for('update');
     const seq = Number(row?.total || 0) + 1;
     return `TR-${String(seq).padStart(6, '0')}`;
   }
@@ -45,20 +50,22 @@ export class StockTransferService {
     }
 
     const transferId = randomUUID();
-    const transferNo = await this.generateTransferNo(tenantId, dto.company_id);
-
-    await this.db.insert(schema.stockTransfer).values({
-      transfer_id: transferId,
-      tenant_id: tenantId,
-      company_id: dto.company_id,
-      transfer_no: transferNo,
-      posting_date: dto.posting_date,
-      from_warehouse_id: dto.from_warehouse_id,
-      to_warehouse_id: dto.to_warehouse_id,
-      remarks: dto.remarks || null,
-      status: 'DRAFT',
-      created_by: userPayload?.userId || null,
-      updated_by: userPayload?.userId || null,
+    const transferNo = await this.db.transaction(async (tx) => {
+      const no = await this.generateTransferNo(tenantId, dto.company_id, tx);
+      await tx.insert(schema.stockTransfer).values({
+        transfer_id: transferId,
+        tenant_id: tenantId,
+        company_id: dto.company_id,
+        transfer_no: no,
+        posting_date: dto.posting_date,
+        from_warehouse_id: dto.from_warehouse_id,
+        to_warehouse_id: dto.to_warehouse_id,
+        remarks: dto.remarks || null,
+        status: 'DRAFT',
+        created_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      });
+      return no;
     });
 
     await this.insertLines(transferId, dto.lines);

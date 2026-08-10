@@ -210,6 +210,11 @@ export class QuerySchedulerDto {
   @IsUUID()
   companyId?: string;
 
+  @ApiProperty({ description: 'Filter by Nature of Business UUID', required: false })
+  @IsOptional()
+  @IsString()
+  nobId?: string;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

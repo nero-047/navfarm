@@ -7,6 +7,7 @@ import {
   IsInt,
   Min,
   IsNumber,
+  IsPositive,
   IsDateString,
   IsArray,
   ValidateNested,
@@ -22,6 +23,7 @@ export class StockTransferLineInput {
 
   @ApiProperty({ description: 'Quantity to transfer', example: 20 })
   @IsNumber()
+  @IsPositive()
   @IsNotEmpty()
   quantity: number;
 

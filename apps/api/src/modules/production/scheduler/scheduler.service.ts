@@ -124,6 +124,7 @@ export class SchedulerService {
     const conditions: any[] = [eq(schema.schedulerMaster.tenant_id, tenantId)];
 
     if (query.companyId) conditions.push(eq(schema.schedulerMaster.company_id, query.companyId));
+    if (query.nobId) conditions.push(eq(schema.schedulerMaster.nob_id, query.nobId));
     if (query.lobId) conditions.push(eq(schema.schedulerMaster.lob_id, query.lobId));
     if (query.search) {
       conditions.push(

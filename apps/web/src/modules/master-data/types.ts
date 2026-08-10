@@ -23,14 +23,37 @@ export interface MasterDataField {
   helpText?: string;
   /** Static dropdown options, for type: "select" */
   options?: SelectOption[];
-  /** API path to fetch related records from, for type: "select-entity". If dependsOn is set, include "{value}" as a placeholder for the parent field's current value. */
+  /** API path to fetch related records from, for type: "select-entity". In "path" mode (default), include "{value}" as a placeholder for the (single) parent field's current value. */
   entityEndpoint?: string;
   /** Field on the related record to use as the option value (defaults to its idKey) */
   entityValueKey?: string;
   /** Fields on the related record to join (" — ") for the option label */
   entityLabelKeys?: string[];
-  /** For type "select-entity": key of another field in this form whose value this dropdown depends on (e.g. lob_id depending on nob_id). Disabled until the parent has a value; resets when the parent changes. */
-  dependsOn?: string;
+  /**
+   * For type "select-entity": key(s) of other field(s) in this form whose value this dropdown
+   * depends on (e.g. lob_id depending on nob_id). Disabled until every parent has a value;
+   * resets when any parent changes.
+   */
+  dependsOn?: string | string[];
+  /**
+   * How dependsOn resolves into the fetch endpoint:
+   * - "path" (default): a single dependsOn key substituted for "{value}" in entityEndpoint
+   *   (e.g. entityEndpoint "/setup/wizard/lobs/{value}").
+   * - "query": each dependsOn key is appended to entityEndpoint as a query param, named via
+   *   queryParams (e.g. entityEndpoint "/item", queryParams { nob_id: "nobId", lob_id: "lobId" }
+   *   produces "/item?nobId=...&lobId=..."). Unlike "path", a parent left unset simply omits
+   *   that param rather than blocking the fetch — matches the backend treating an absent
+   *   filter as "show all".
+   */
+  dependsOnMode?: "path" | "query";
+  /** Required when dependsOnMode is "query": maps each dependsOn field key to its query-param name. */
+  queryParams?: Record<string, string>;
+  /**
+   * Field exists purely to scope a sibling select-entity field's options (e.g. a helper
+   * nob_id/lob_id pair on a form whose own table has no such column) — collected in the form
+   * but excluded from the save payload.
+   */
+  filterOnly?: boolean;
   /** Excluded from the create/edit form (e.g. company_id, auto-injected) */
   hideInForm?: boolean;
   /** Excluded from the list table */
@@ -58,4 +81,6 @@ export interface MasterDataConfig {
   /** Table columns; defaults to all non-hidden fields plus status if omitted */
   columns?: { key: string; label: string }[];
   group: string;
+  /** Show a Nature of Business / Line of Business filter pair in the list toolbar (for entities whose table carries nob_id/lob_id). */
+  supportsNobLobFilter?: boolean;
 }

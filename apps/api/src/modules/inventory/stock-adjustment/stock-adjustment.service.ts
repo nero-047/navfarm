@@ -30,31 +30,38 @@ export class StockAdjustmentService {
     return tenantDb;
   }
 
-  private async generateAdjustmentNo(tenantId: string, companyId: string): Promise<string> {
-    const [row] = await this.db
+  // `executor` must be the active transaction when called from inside one (see
+  // `create()`) — `.for('update')` locks the counted rows so a second concurrent
+  // call blocks until the first commits its insert, instead of both reading the
+  // same count and generating the same adjustment number.
+  private async generateAdjustmentNo(tenantId: string, companyId: string, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
+    const [row] = await executor
       .select({ total: count() })
       .from(schema.stockAdjustment)
-      .where(and(eq(schema.stockAdjustment.tenant_id, tenantId), eq(schema.stockAdjustment.company_id, companyId)));
+      .where(and(eq(schema.stockAdjustment.tenant_id, tenantId), eq(schema.stockAdjustment.company_id, companyId)))
+      .for('update');
     const seq = Number(row?.total || 0) + 1;
     return `ADJ-${String(seq).padStart(6, '0')}`;
   }
 
   async create(dto: CreateStockAdjustmentDto, tenantId: string, userPayload?: any) {
     const adjustmentId = randomUUID();
-    const adjustmentNo = await this.generateAdjustmentNo(tenantId, dto.company_id);
-
-    await this.db.insert(schema.stockAdjustment).values({
-      adjustment_id: adjustmentId,
-      tenant_id: tenantId,
-      company_id: dto.company_id,
-      adjustment_no: adjustmentNo,
-      posting_date: dto.posting_date,
-      warehouse_id: dto.warehouse_id,
-      reason: dto.reason || null,
-      remarks: dto.remarks || null,
-      status: 'DRAFT',
-      created_by: userPayload?.userId || null,
-      updated_by: userPayload?.userId || null,
+    const adjustmentNo = await this.db.transaction(async (tx) => {
+      const no = await this.generateAdjustmentNo(tenantId, dto.company_id, tx);
+      await tx.insert(schema.stockAdjustment).values({
+        adjustment_id: adjustmentId,
+        tenant_id: tenantId,
+        company_id: dto.company_id,
+        adjustment_no: no,
+        posting_date: dto.posting_date,
+        warehouse_id: dto.warehouse_id,
+        reason: dto.reason || null,
+        remarks: dto.remarks || null,
+        status: 'DRAFT',
+        created_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      });
+      return no;
     });
 
     await this.insertLines(adjustmentId, dto.lines);
