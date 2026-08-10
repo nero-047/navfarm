@@ -13,7 +13,18 @@ export class CreateGlMappingDto {
   @IsOptional()
   item_category_id?: string;
 
-  @ApiProperty({ description: 'The inventory ledger transaction type', example: 'PURCHASE', enum: ['PURCHASE', 'CONSUMPTION', 'OUTPUT', 'SALE', 'ADJUSTMENT', 'MORTALITY', 'VARIANCE'] })
+  @ApiProperty({
+    description: 'The inventory_ledger transaction type this mapping resolves GL accounts for — must match a value GlPostingService actually posts (see inventory-ledger.service.ts / batch.service.ts / *.service.ts callers of postInventoryLedgerEntry / postBatchCostEntry)',
+    example: 'PURCHASE',
+    enum: [
+      'PURCHASE', 'CONSUMPTION', 'TRANSFER_SHIPMENT', 'TRANSFER_RECEIPT', 'VARIANCE_POSITIVE', 'VARIANCE_NEGATIVE',
+      'BATCH_INPUT', 'BATCH_CONSUMPTION', 'BATCH_OUTPUT', 'MORTALITY', 'OVERHEAD',
+      'PRICE_VARIANCE', 'USAGE_VARIANCE', 'OUTPUT_VARIANCE', 'OVERHEAD_VARIANCE',
+      'BIO_ACQUISITION', 'BIO_CONSUMPTION_PREMATURE', 'BIO_CONSUMPTION_MATURE', 'BIO_OUTPUT',
+      'BIO_MORTALITY_PREMATURE', 'BIO_MORTALITY_MATURE', 'BIO_OVERHEAD_PREMATURE', 'BIO_OVERHEAD_MATURE',
+      'BIO_TRANSFORMATION', 'BIO_AMORTIZATION', 'BIO_FAIR_VALUE', 'BIO_HARVEST', 'BIO_DISPOSAL_SOLD',
+    ],
+  })
   @IsString()
   @IsNotEmpty()
   transaction_type: string;

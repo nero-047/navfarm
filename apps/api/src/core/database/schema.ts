@@ -1765,6 +1765,114 @@ export const notificationAlertLogRelations = relations(notificationAlertLog, ({ 
   transaction: one(batchTransaction, { fields: [notificationAlertLog.transaction_id], references: [batchTransaction.transaction_id] }),
 }));
 
+// ==========================================
+// 11c. QC / QR TRACEABILITY ENGINE
+// Additive — reads batch_header/batch_input_line/batch_output_line for
+// traceability, never writes to them. QC and QR generation are independent
+// (a QR can exist with or without a linked QC record).
+// ==========================================
+
+export const qcParameterMaster = mysqlTable('qc_parameter_master', {
+  param_id: varchar('param_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }), // null = tenant-wide template
+  lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  param_code: varchar('param_code', { length: 50 }).notNull(),
+  param_name: varchar('param_name', { length: 100 }).notNull(),
+  param_type: varchar('param_type', { length: 20 }).notNull(), // NUMERIC, BOOLEAN, GRADE
+  uom: varchar('uom', { length: 20 }),
+  min_value: decimal('min_value', { precision: 18, scale: 4 }),
+  max_value: decimal('max_value', { precision: 18, scale: 4 }),
+  pass_criteria: text('pass_criteria'),
+  fail_criteria: text('fail_criteria'),
+  grade_scale: json('grade_scale'), // GRADE type: { "A": "2.0-2.5kg", "B": "1.8-2.0kg" }
+  is_mandatory: boolean('is_mandatory').default(true).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const qcBatchDetail = mysqlTable('qc_batch_detail', {
+  qc_id: varchar('qc_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  source_batch_id: varchar('source_batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  output_line_id: varchar('output_line_id', { length: 36 }).references(() => batchOutputLine.line_id, { onDelete: 'restrict' }),
+  qc_date: date('qc_date', { mode: 'string' }).notNull(),
+  inspector_id: varchar('inspector_id', { length: 36 }).references(() => userMaster.user_id, { onDelete: 'restrict' }),
+  total_qty_received: decimal('total_qty_received', { precision: 18, scale: 4 }).notNull(),
+  pass_qty: decimal('pass_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  fail_qty: decimal('fail_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  hold_qty: decimal('hold_qty', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  grade_a_qty: decimal('grade_a_qty', { precision: 18, scale: 4 }),
+  grade_b_qty: decimal('grade_b_qty', { precision: 18, scale: 4 }),
+  grade_c_qty: decimal('grade_c_qty', { precision: 18, scale: 4 }),
+  overall_result: varchar('overall_result', { length: 20 }).notNull(), // PASS, FAIL, CONDITIONAL
+  disposition: varchar('disposition', { length: 30 }).notNull(), // ACCEPT, REJECT, REWORK, QUARANTINE, CONDITIONAL_ACCEPT
+  qc_notes: text('qc_notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const qcParamResult = mysqlTable('qc_param_result', {
+  result_id: varchar('result_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  qc_id: varchar('qc_id', { length: 36 }).notNull().references(() => qcBatchDetail.qc_id, { onDelete: 'cascade' }),
+  param_id: varchar('param_id', { length: 36 }).notNull().references(() => qcParameterMaster.param_id, { onDelete: 'restrict' }),
+  actual_value: varchar('actual_value', { length: 200 }).notNull(),
+  result_status: varchar('result_status', { length: 10 }).notNull(), // PASS, FAIL
+  grade_assigned: varchar('grade_assigned', { length: 10 }),
+  notes: text('notes'),
+});
+
+export const qrCodeMaster = mysqlTable('qr_code_master', {
+  qr_id: varchar('qr_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  output_line_id: varchar('output_line_id', { length: 36 }).references(() => batchOutputLine.line_id, { onDelete: 'restrict' }),
+  qc_id: varchar('qc_id', { length: 36 }).references(() => qcBatchDetail.qc_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  lot_no: varchar('lot_no', { length: 100 }),
+  pack_no: varchar('pack_no', { length: 50 }).notNull(),
+  production_date: date('production_date', { mode: 'string' }).notNull(),
+  expiry_date: date('expiry_date', { mode: 'string' }),
+  net_weight: decimal('net_weight', { precision: 10, scale: 4 }).notNull(),
+  gross_weight: decimal('gross_weight', { precision: 10, scale: 4 }),
+  pack_uom: varchar('pack_uom', { length: 20 }).notNull(),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  grade: varchar('grade', { length: 10 }),
+  origin_batch_chain: json('origin_batch_chain'),
+  breed: varchar('breed', { length: 100 }),
+  qr_data: json('qr_data').notNull(),
+  generated_at: timestamp('generated_at', { mode: 'string' }).defaultNow().notNull(),
+  generated_by: varchar('generated_by', { length: 36 }),
+  is_voided: boolean('is_voided').default(false).notNull(),
+});
+
+export const qcParameterMasterRelations = relations(qcParameterMaster, ({ one }) => ({
+  lob: one(lobMaster, { fields: [qcParameterMaster.lob_id], references: [lobMaster.lob_id] }),
+}));
+
+export const qcBatchDetailRelations = relations(qcBatchDetail, ({ one, many }) => ({
+  sourceBatch: one(batchHeader, { fields: [qcBatchDetail.source_batch_id], references: [batchHeader.batch_id] }),
+  outputLine: one(batchOutputLine, { fields: [qcBatchDetail.output_line_id], references: [batchOutputLine.line_id] }),
+  inspector: one(userMaster, { fields: [qcBatchDetail.inspector_id], references: [userMaster.user_id] }),
+  paramResults: many(qcParamResult),
+}));
+
+export const qcParamResultRelations = relations(qcParamResult, ({ one }) => ({
+  qcBatch: one(qcBatchDetail, { fields: [qcParamResult.qc_id], references: [qcBatchDetail.qc_id] }),
+  parameter: one(qcParameterMaster, { fields: [qcParamResult.param_id], references: [qcParameterMaster.param_id] }),
+}));
+
+export const qrCodeMasterRelations = relations(qrCodeMaster, ({ one }) => ({
+  batch: one(batchHeader, { fields: [qrCodeMaster.batch_id], references: [batchHeader.batch_id] }),
+  outputLine: one(batchOutputLine, { fields: [qrCodeMaster.output_line_id], references: [batchOutputLine.line_id] }),
+  qcBatch: one(qcBatchDetail, { fields: [qrCodeMaster.qc_id], references: [qcBatchDetail.qc_id] }),
+  item: one(itemMaster, { fields: [qrCodeMaster.item_id], references: [itemMaster.item_id] }),
+  warehouse: one(warehouseMaster, { fields: [qrCodeMaster.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+}));
+
 export const auditLog = mysqlTable('audit_log', {
   audit_id: varchar('audit_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),

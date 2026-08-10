@@ -44,6 +44,9 @@ import { BatchModule } from './modules/production/batch/batch.module';
 import { ParameterModule } from './modules/production/parameter/parameter.module';
 import { SchedulerModule } from './modules/production/scheduler/scheduler.module';
 import { AlertModule } from './modules/production/alert/alert.module';
+import { QcParameterModule } from './modules/production/qc-parameter/qc-parameter.module';
+import { QcModule } from './modules/production/qc/qc.module';
+import { QrCodeModule } from './modules/production/qr-code/qr-code.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -109,6 +112,9 @@ import { SystemController } from './system/system.controller';
     ParameterModule,
     SchedulerModule,
     AlertModule,
+    QcParameterModule,
+    QcModule,
+    QrCodeModule,
   ],
   controllers: [SystemController],
   providers: [],

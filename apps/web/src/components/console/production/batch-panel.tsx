@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Search, AlertCircle, Loader2, Inbox, Eye, PlayCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Search, AlertCircle, Loader2, Inbox, Eye, PlayCircle, CheckCircle2, ClipboardCheck, QrCode as QrCodeIcon } from "lucide-react";
+import QRCode from "react-qr-code";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
 import { getActiveCompanyId } from "@/hooks/useAuth";
@@ -77,6 +78,23 @@ export default function BatchPanel() {
   const [bioActing, setBioActing] = useState(false);
   const [bioError, setBioError] = useState("");
   const [bioForm, setBioForm] = useState<Row>({});
+
+  const [qcModalOpen, setQcModalOpen] = useState(false);
+  const [qcLine, setQcLine] = useState<Row | null>(null);
+  const [qcParameters, setQcParameters] = useState<Row[]>([]);
+  const [qcForm, setQcForm] = useState<Row>({});
+  const [qcResultValues, setQcResultValues] = useState<Record<string, Row>>({});
+  const [qcSaving, setQcSaving] = useState(false);
+  const [qcError, setQcError] = useState("");
+  const [qcSubmitted, setQcSubmitted] = useState<Row | null>(null);
+
+  const [packModalOpen, setPackModalOpen] = useState(false);
+  const [packLine, setPackLine] = useState<Row | null>(null);
+  const [packForm, setPackForm] = useState<Row>({});
+  const [packQcRecords, setPackQcRecords] = useState<Row[]>([]);
+  const [packSaving, setPackSaving] = useState(false);
+  const [packError, setPackError] = useState("");
+  const [generatedPack, setGeneratedPack] = useState<Row | null>(null);
 
   const companyId = getActiveCompanyId();
 
@@ -404,6 +422,128 @@ export default function BatchPanel() {
   const batchLabel = (id: string) => {
     const b = batches.find((x) => x.batch_id === id);
     return b ? b.batch_no : "—";
+  };
+
+  const openRecordQc = (line: Row) => {
+    if (!viewing) return;
+    setQcLine(line);
+    setQcForm({
+      qc_date: new Date().toISOString().slice(0, 10),
+      total_qty_received: String(line.quantity ?? ""),
+      pass_qty: "",
+      fail_qty: "",
+      hold_qty: "",
+      grade_a_qty: "",
+      grade_b_qty: "",
+      grade_c_qty: "",
+      disposition: "ACCEPT",
+      qc_notes: "",
+    });
+    setQcResultValues({});
+    setQcError("");
+    setQcSubmitted(null);
+    setQcModalOpen(true);
+    const params = new URLSearchParams();
+    if (companyId) params.set("companyId", companyId);
+    params.set("lobId", viewing.lob_id);
+    params.set("limit", "200");
+    api.get(`/qc-parameter?${params.toString()}`).then((r) => setQcParameters(unwrap<Row[]>(r) || [])).catch(() => setQcParameters([]));
+  };
+
+  const setQcResultField = (paramId: string, key: string, value: any) => {
+    setQcResultValues((prev) => ({ ...prev, [paramId]: { ...prev[paramId], [key]: value } }));
+  };
+
+  const handleSaveQc = async () => {
+    if (!viewing || !qcLine) return;
+    setQcSaving(true);
+    setQcError("");
+    try {
+      if (!qcForm.total_qty_received) throw new Error("Total quantity received is required.");
+      const results = qcParameters
+        .filter((p) => qcResultValues[p.param_id]?.actual_value !== undefined && qcResultValues[p.param_id]?.actual_value !== "")
+        .map((p) => ({
+          param_id: p.param_id,
+          actual_value: String(qcResultValues[p.param_id].actual_value),
+          grade_assigned: qcResultValues[p.param_id].grade_assigned || undefined,
+          notes: qcResultValues[p.param_id].notes || undefined,
+        }));
+      if (results.length === 0) throw new Error("Record at least one parameter result.");
+      const result = await api.post("/qc", {
+        company_id: companyId,
+        source_batch_id: viewing.batch_id,
+        output_line_id: qcLine.line_id,
+        qc_date: qcForm.qc_date,
+        total_qty_received: Number(qcForm.total_qty_received),
+        pass_qty: qcForm.pass_qty ? Number(qcForm.pass_qty) : undefined,
+        fail_qty: qcForm.fail_qty ? Number(qcForm.fail_qty) : undefined,
+        hold_qty: qcForm.hold_qty ? Number(qcForm.hold_qty) : undefined,
+        grade_a_qty: qcForm.grade_a_qty ? Number(qcForm.grade_a_qty) : undefined,
+        grade_b_qty: qcForm.grade_b_qty ? Number(qcForm.grade_b_qty) : undefined,
+        grade_c_qty: qcForm.grade_c_qty ? Number(qcForm.grade_c_qty) : undefined,
+        disposition: qcForm.disposition,
+        qc_notes: qcForm.qc_notes || undefined,
+        results,
+      });
+      setQcSubmitted(unwrap<Row>(result));
+    } catch (err: any) {
+      setQcError(err?.message || "Failed to record QC inspection.");
+    } finally {
+      setQcSaving(false);
+    }
+  };
+
+  const openGeneratePack = (line: Row) => {
+    if (!viewing) return;
+    setPackLine(line);
+    setPackForm({
+      net_weight: String(line.quantity ?? ""),
+      gross_weight: "",
+      pack_uom: line.uom || "",
+      warehouse_id: line.warehouse_id || "",
+      lot_no: "",
+      qc_id: "",
+    });
+    setGeneratedPack(null);
+    setPackError("");
+    setPackModalOpen(true);
+    const params = new URLSearchParams();
+    params.set("sourceBatchId", viewing.batch_id);
+    params.set("outputLineId", line.line_id);
+    params.set("limit", "50");
+    api.get(`/qc?${params.toString()}`).then((r) => setPackQcRecords(unwrap<Row[]>(r) || [])).catch(() => setPackQcRecords([]));
+  };
+
+  const handleGeneratePack = async () => {
+    if (!viewing || !packLine) return;
+    setPackSaving(true);
+    setPackError("");
+    try {
+      if (!packForm.net_weight || !packForm.pack_uom) throw new Error("Net weight and UOM are required.");
+      const result = await api.post("/qr-code", {
+        company_id: companyId,
+        batch_id: viewing.batch_id,
+        output_line_id: packLine.line_id,
+        qc_id: packForm.qc_id || undefined,
+        item_id: packLine.item_id,
+        lot_no: packForm.lot_no || undefined,
+        production_date: viewing.actual_end_date || new Date().toISOString().slice(0, 10),
+        net_weight: Number(packForm.net_weight),
+        gross_weight: packForm.gross_weight ? Number(packForm.gross_weight) : undefined,
+        pack_uom: packForm.pack_uom,
+        warehouse_id: packForm.warehouse_id || undefined,
+      });
+      setGeneratedPack(unwrap<Row>(result));
+    } catch (err: any) {
+      setPackError(err?.message || "Failed to generate pack.");
+    } finally {
+      setPackSaving(false);
+    }
+  };
+
+  const generateAnotherPack = () => {
+    setGeneratedPack(null);
+    setPackForm((f: Row) => ({ ...f, lot_no: "" }));
   };
 
   return (
@@ -905,6 +1045,7 @@ export default function BatchPanel() {
                       <th className="px-3 py-2 font-semibold" style={S.sub}>Split %</th>
                       <th className="px-3 py-2 font-semibold" style={S.sub}>Qty</th>
                       <th className="px-3 py-2 font-semibold" style={S.sub}>Cost / Unit Cost</th>
+                      <th className="px-3 py-2 font-semibold text-right" style={S.sub}>QC / Pack</th>
                     </tr></thead>
                     <tbody>
                       {(viewing.output_lines || []).map((l: Row) => (
@@ -914,6 +1055,16 @@ export default function BatchPanel() {
                           <td className="px-3 py-2" style={S.primary}>{l.cost_split_pct}%</td>
                           <td className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</td>
                           <td className="px-3 py-2" style={S.primary}>{l.computed_cost} / {l.unit_cost}</td>
+                          <td className="px-3 py-2 text-right">
+                            <div className="flex justify-end gap-1">
+                              <button onClick={() => openRecordQc(l)} title="Record QC" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                                <ClipboardCheck className="h-3.5 w-3.5" />
+                              </button>
+                              <button onClick={() => openGeneratePack(l)} title="Generate Pack" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                                <QrCodeIcon className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1173,6 +1324,222 @@ export default function BatchPanel() {
                   <p className="text-[11px]" style={S.muted}>Gain/loss vs. the disposed animals' book value posts automatically. Cash/receivable isn't recorded here.</p>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      </Dialog>
+
+      {/* Record QC modal */}
+      <Dialog
+        open={qcModalOpen}
+        onClose={() => !qcSaving && setQcModalOpen(false)}
+        title={qcLine ? `Record QC — ${itemLabel(qcLine.item_id)}` : "Record QC"}
+        maxWidth="lg"
+        footer={
+          qcSubmitted ? (
+            <button onClick={() => { setQcModalOpen(false); refreshViewing(); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: "var(--accent)" }}>Done</button>
+          ) : (
+            <>
+              <button onClick={() => setQcModalOpen(false)} disabled={qcSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
+              <button onClick={handleSaveQc} disabled={qcSaving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+                {qcSaving ? "Saving…" : "Submit Inspection"}
+              </button>
+            </>
+          )
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {qcError && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {qcError}
+            </div>
+          )}
+
+          {qcSubmitted ? (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <span
+                className="rounded-full border px-4 py-1.5 text-sm font-bold"
+                style={qcSubmitted.overall_result === "PASS"
+                  ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--accent-muted)" }
+                  : { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" }}
+              >
+                Overall Result: {qcSubmitted.overall_result}
+              </span>
+              <p className="text-xs" style={S.sub}>Disposition: {qcSubmitted.disposition}</p>
+              <div className="w-full overflow-x-auto rounded-xl border" style={S.surface}>
+                <table className="w-full text-left text-xs">
+                  <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                    <th className="px-3 py-2 font-semibold" style={S.sub}>Parameter</th>
+                    <th className="px-3 py-2 font-semibold" style={S.sub}>Value</th>
+                    <th className="px-3 py-2 font-semibold" style={S.sub}>Result</th>
+                  </tr></thead>
+                  <tbody>
+                    {(qcSubmitted.results || []).map((r: Row) => {
+                      const param = qcParameters.find((p) => p.param_id === r.param_id);
+                      return (
+                        <tr key={r.result_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                          <td className="px-3 py-2" style={S.primary}>{param?.param_name || r.param_id}</td>
+                          <td className="px-3 py-2" style={S.sub}>{r.actual_value}{r.grade_assigned ? ` (${r.grade_assigned})` : ""}</td>
+                          <td className="px-3 py-2 font-semibold" style={r.result_status === "PASS" ? { color: "var(--success)" } : { color: "var(--danger)" }}>{r.result_status}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>QC Date</label>
+                  <input type="date" value={qcForm.qc_date} onChange={(e) => setQcForm((f: Row) => ({ ...f, qc_date: e.target.value }))} className={inputCls} style={S.input} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Total Qty Received</label>
+                  <input type="number" value={qcForm.total_qty_received} onChange={(e) => setQcForm((f: Row) => ({ ...f, total_qty_received: e.target.value }))} className={inputCls} style={S.input} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Disposition</label>
+                  <select value={qcForm.disposition} onChange={(e) => setQcForm((f: Row) => ({ ...f, disposition: e.target.value }))} className={inputCls} style={S.input}>
+                    {["ACCEPT", "REJECT", "REWORK", "QUARANTINE", "CONDITIONAL_ACCEPT"].map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Pass Qty</label>
+                  <input type="number" value={qcForm.pass_qty} onChange={(e) => setQcForm((f: Row) => ({ ...f, pass_qty: e.target.value }))} className={inputCls} style={S.input} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Fail Qty</label>
+                  <input type="number" value={qcForm.fail_qty} onChange={(e) => setQcForm((f: Row) => ({ ...f, fail_qty: e.target.value }))} className={inputCls} style={S.input} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Hold Qty</label>
+                  <input type="number" value={qcForm.hold_qty} onChange={(e) => setQcForm((f: Row) => ({ ...f, hold_qty: e.target.value }))} className={inputCls} style={S.input} />
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Parameter Results</p>
+                {qcParameters.length === 0 ? (
+                  <p className="rounded-xl border p-3 text-xs" style={{ ...S.surface, ...S.sub }}>No QC parameters defined for this Line of Business yet.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {qcParameters.map((p) => (
+                      <div key={p.param_id} className="grid grid-cols-3 items-center gap-2 rounded-xl border p-2.5" style={S.surface}>
+                        <div>
+                          <p className="text-xs font-semibold" style={S.primary}>{p.param_name}{p.is_mandatory && <span className="text-red-500"> *</span>}</p>
+                          <p className="text-[10px]" style={S.muted}>{p.param_type === "NUMERIC" ? `${p.min_value ?? "—"}–${p.max_value ?? "—"} ${p.uom || ""}` : p.param_type}</p>
+                        </div>
+                        <div className="col-span-2">
+                          {p.param_type === "NUMERIC" && (
+                            <input type="number" placeholder="Actual value" value={qcResultValues[p.param_id]?.actual_value ?? ""} onChange={(e) => setQcResultField(p.param_id, "actual_value", e.target.value)} className={inputCls} style={S.input} />
+                          )}
+                          {p.param_type === "BOOLEAN" && (
+                            <select value={qcResultValues[p.param_id]?.actual_value ?? ""} onChange={(e) => setQcResultField(p.param_id, "actual_value", e.target.value)} className={inputCls} style={S.input}>
+                              <option value="">Select…</option>
+                              <option value="true">Pass (true)</option>
+                              <option value="false">Fail (false)</option>
+                            </select>
+                          )}
+                          {p.param_type === "GRADE" && (
+                            <select
+                              value={qcResultValues[p.param_id]?.actual_value ?? ""}
+                              onChange={(e) => { setQcResultField(p.param_id, "actual_value", e.target.value); setQcResultField(p.param_id, "grade_assigned", e.target.value); }}
+                              className={inputCls}
+                              style={S.input}
+                            >
+                              <option value="">Select grade…</option>
+                              {Object.keys(p.grade_scale || {}).map((g) => <option key={g} value={g}>{g} — {p.grade_scale[g]}</option>)}
+                            </select>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Notes</label>
+                <input value={qcForm.qc_notes} onChange={(e) => setQcForm((f: Row) => ({ ...f, qc_notes: e.target.value }))} className={inputCls} style={S.input} />
+              </div>
+            </>
+          )}
+        </div>
+      </Dialog>
+
+      {/* Generate Pack modal */}
+      <Dialog
+        open={packModalOpen}
+        onClose={() => !packSaving && setPackModalOpen(false)}
+        title={packLine ? `Generate Pack — ${itemLabel(packLine.item_id)}` : "Generate Pack"}
+        footer={
+          generatedPack ? (
+            <>
+              <button onClick={generateAnotherPack} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Generate Another Pack</button>
+              <button onClick={() => setPackModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: "var(--accent)" }}>Done</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setPackModalOpen(false)} disabled={packSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
+              <button onClick={handleGeneratePack} disabled={packSaving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+                {packSaving ? "Generating…" : "Generate Pack"}
+              </button>
+            </>
+          )
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {packError && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {packError}
+            </div>
+          )}
+
+          {generatedPack ? (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <p className="text-sm font-bold" style={S.primary}>{generatedPack.pack_no}</p>
+              <div className="rounded-xl bg-white p-4">
+                <QRCode value={JSON.stringify(generatedPack.qr_data)} size={200} />
+              </div>
+              <p className="text-xs" style={S.sub}>{generatedPack.net_weight} {generatedPack.pack_uom} — {generatedPack.production_date}{generatedPack.expiry_date ? ` → ${generatedPack.expiry_date}` : ""}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Net Weight <span className="text-red-500">*</span></label>
+                <input type="number" value={packForm.net_weight} onChange={(e) => setPackForm((f: Row) => ({ ...f, net_weight: e.target.value }))} className={inputCls} style={S.input} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Gross Weight</label>
+                <input type="number" value={packForm.gross_weight} onChange={(e) => setPackForm((f: Row) => ({ ...f, gross_weight: e.target.value }))} className={inputCls} style={S.input} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Pack UOM <span className="text-red-500">*</span></label>
+                <select value={packForm.pack_uom} onChange={(e) => setPackForm((f: Row) => ({ ...f, pack_uom: e.target.value }))} className={inputCls} style={S.input}>
+                  <option value="">Select…</option>
+                  {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Lot No.</label>
+                <input value={packForm.lot_no} onChange={(e) => setPackForm((f: Row) => ({ ...f, lot_no: e.target.value }))} className={inputCls} style={S.input} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Warehouse / Facility</label>
+                <select value={packForm.warehouse_id} onChange={(e) => setPackForm((f: Row) => ({ ...f, warehouse_id: e.target.value }))} className={inputCls} style={S.input}>
+                  <option value="">Select…</option>
+                  {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Link QC Record (optional)</label>
+                <select value={packForm.qc_id} onChange={(e) => setPackForm((f: Row) => ({ ...f, qc_id: e.target.value }))} className={inputCls} style={S.input}>
+                  <option value="">None</option>
+                  {packQcRecords.map((q) => <option key={q.qc_id} value={q.qc_id}>{q.qc_date} — {q.overall_result}</option>)}
+                </select>
+              </div>
             </div>
           )}
         </div>

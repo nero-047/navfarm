@@ -117,23 +117,29 @@ export class InventoryLedgerService {
    * FIFO consumption: walks the oldest unconsumed POSITIVE ledger rows for an
    * item and applies the requested quantity against them, writing an
    * inventory_application row per source layer and decrementing its
-   * remaining_quantity. Called by writeNegativeEntry before it inserts the
-   * outbound row, so the row can carry the correct weighted-average cost.
-   * Returns the weighted-average cost of the consumed quantity.
+   * remaining_quantity. Called by writeNegativeEntry, inside the same
+   * transaction as the outbound row's insert, so the row can carry the
+   * correct weighted-average cost. Returns the weighted-average cost of the
+   * consumed quantity. Accepts an optional transaction executor so the
+   * insufficient-stock case below rolls back every write this method made,
+   * instead of leaving partial layer applications behind.
    */
-  async applyFifo(params: {
-    tenantId: string;
-    companyId: string;
-    itemId: string;
-    outboundLedgerId: string;
-    quantity: number;
-    applicationDate: string;
-    userId?: string;
-  }): Promise<{ totalCost: number; averageRate: number }> {
+  async applyFifo(
+    params: {
+      tenantId: string;
+      companyId: string;
+      itemId: string;
+      outboundLedgerId: string;
+      quantity: number;
+      applicationDate: string;
+      userId?: string;
+    },
+    executor: MySql2Database<typeof schema> = this.db
+  ): Promise<{ totalCost: number; averageRate: number }> {
     let remainingToConsume = params.quantity;
     let totalCost = 0;
 
-    const availableLayers = await this.db
+    const availableLayers = await executor
       .select()
       .from(schema.inventoryLedger)
       .where(
@@ -154,7 +160,7 @@ export class InventoryLedgerService {
       const layerRate = Number(layer.rate || 0);
       const drawCost = drawQty * layerRate;
 
-      await this.db.insert(schema.inventoryApplication).values({
+      await executor.insert(schema.inventoryApplication).values({
         application_id: randomUUID(),
         tenant_id: params.tenantId,
         company_id: params.companyId,
@@ -167,7 +173,7 @@ export class InventoryLedgerService {
         created_by: params.userId || null,
       });
 
-      await this.db
+      await executor
         .update(schema.inventoryLedger)
         .set({ remaining_quantity: (layerRemaining - drawQty).toString() })
         .where(eq(schema.inventoryLedger.ledger_id, layer.ledger_id));
@@ -190,6 +196,12 @@ export class InventoryLedgerService {
    * shipment leg of a Stock Transfer, and negative Stock Adjustment lines.
    * Cost is never user-supplied here; it's always derived from applyFifo
    * against existing inventory layers.
+   *
+   * The outbound row's insert, the FIFO layer consumption, and the final
+   * rate/amount update all run inside one transaction — if applyFifo throws
+   * (e.g. insufficient stock) partway through, everything it already wrote
+   * rolls back instead of leaving an orphaned ledger row or a partially
+   * consumed layer behind.
    */
   async writeNegativeEntry(params: WriteNegativeEntryParams) {
     const [item] = await this.db
@@ -204,47 +216,52 @@ export class InventoryLedgerService {
 
     const ledgerId = randomUUID();
 
-    // Insert first so applyFifo has an outbound_ledger_id to attach applications to.
-    await this.db.insert(schema.inventoryLedger).values({
-      ledger_id: ledgerId,
-      tenant_id: params.tenantId,
-      company_id: params.companyId,
-      item_id: params.itemId,
-      item_code: item.item_code,
-      item_description: item.item_name,
-      document_type: params.documentType,
-      document_no: params.documentNo,
-      document_line_id: params.documentLineId || null,
-      posting_date: params.postingDate,
-      external_reference_no: params.externalReferenceNo || null,
-      entry_type: 'NEGATIVE',
-      transaction_type: params.transactionType,
-      quantity: (-Math.abs(params.quantity)).toString(),
-      uom: params.uom,
-      uom_conversion_factor: item.uom_conversion_factor,
-      batch_no: params.batchNo || null,
-      location_id: params.locationId || null,
-      warehouse_id: params.warehouseId || null,
-      nob_id: item.nob_id,
-      lob_id: item.lob_id,
-      category_id: item.category_id,
-      created_by: params.userId || null,
-    });
+    await this.db.transaction(async (tx) => {
+      // Insert first so applyFifo has an outbound_ledger_id to attach applications to.
+      await tx.insert(schema.inventoryLedger).values({
+        ledger_id: ledgerId,
+        tenant_id: params.tenantId,
+        company_id: params.companyId,
+        item_id: params.itemId,
+        item_code: item.item_code,
+        item_description: item.item_name,
+        document_type: params.documentType,
+        document_no: params.documentNo,
+        document_line_id: params.documentLineId || null,
+        posting_date: params.postingDate,
+        external_reference_no: params.externalReferenceNo || null,
+        entry_type: 'NEGATIVE',
+        transaction_type: params.transactionType,
+        quantity: (-Math.abs(params.quantity)).toString(),
+        uom: params.uom,
+        uom_conversion_factor: item.uom_conversion_factor,
+        batch_no: params.batchNo || null,
+        location_id: params.locationId || null,
+        warehouse_id: params.warehouseId || null,
+        nob_id: item.nob_id,
+        lob_id: item.lob_id,
+        category_id: item.category_id,
+        created_by: params.userId || null,
+      });
 
-    const { totalCost, averageRate } = await this.applyFifo({
-      tenantId: params.tenantId,
-      companyId: params.companyId,
-      itemId: params.itemId,
-      outboundLedgerId: ledgerId,
-      quantity: params.quantity,
-      applicationDate: params.postingDate,
-      userId: params.userId,
-    });
+      const { totalCost, averageRate } = await this.applyFifo(
+        {
+          tenantId: params.tenantId,
+          companyId: params.companyId,
+          itemId: params.itemId,
+          outboundLedgerId: ledgerId,
+          quantity: params.quantity,
+          applicationDate: params.postingDate,
+          userId: params.userId,
+        },
+        tx
+      );
 
-    await this.db
-      .update(schema.inventoryLedger)
-      .set({ rate: averageRate.toString(), amount: (-totalCost).toString() })
-      .where(eq(schema.inventoryLedger.ledger_id, ledgerId));
+      await tx
+        .update(schema.inventoryLedger)
+        .set({ rate: averageRate.toString(), amount: (-totalCost).toString() })
+        .where(eq(schema.inventoryLedger.ledger_id, ledgerId));
+    });
 
     return this.findOne(ledgerId);
   }

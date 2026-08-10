@@ -7,6 +7,8 @@ import BatchPanel from "@/components/console/production/batch-panel";
 import ParameterPanel from "@/components/console/production/parameter-panel";
 import SchedulerPanel from "@/components/console/production/scheduler-panel";
 import AlertPanel from "@/components/console/production/alert-panel";
+import QcParameterPanel from "@/components/console/production/qc-parameter-panel";
+import PacksPanel from "@/components/console/production/packs-panel";
 import { ShieldAlert } from "lucide-react";
 
 const S = {
@@ -21,6 +23,8 @@ const SECTIONS = [
   { key: "schedulers", label: "Schedulers" },
   { key: "parameters", label: "Parameters" },
   { key: "alerts", label: "Alerts" },
+  { key: "qc-parameters", label: "QC Parameters" },
+  { key: "packs", label: "Packs" },
 ];
 
 export default function ProductionPage() {
@@ -91,6 +95,8 @@ export default function ProductionPage() {
           {activeKey === "schedulers" && <SchedulerPanel />}
           {activeKey === "parameters" && <ParameterPanel />}
           {activeKey === "alerts" && <AlertPanel />}
+          {activeKey === "qc-parameters" && <QcParameterPanel />}
+          {activeKey === "packs" && <PacksPanel />}
         </main>
       </div>
     </div>

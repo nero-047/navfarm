@@ -536,7 +536,42 @@ const glMapping: MasterDataConfig = {
     { key: "item_category_id", label: "Item Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
     {
       key: "transaction_type", label: "Transaction Type", type: "select", required: true,
-      options: ["PURCHASE", "CONSUMPTION", "OUTPUT", "SALE", "ADJUSTMENT", "MORTALITY", "VARIANCE"].map((v) => ({ value: v, label: v })),
+      // Kept in sync with every transactionType string the GL posting engine actually
+      // writes (GlPostingService.resolveMapping looks up by this exact value) — not a
+      // curated subset. Grouped by originating document/flow for scannability.
+      options: [
+        // Inventory documents
+        { value: "PURCHASE", label: "Purchase — Goods Receipt" },
+        { value: "CONSUMPTION", label: "Consumption — Goods Issue" },
+        { value: "TRANSFER_SHIPMENT", label: "Transfer Out — Stock Transfer (Shipment)" },
+        { value: "TRANSFER_RECEIPT", label: "Transfer In — Stock Transfer (Receipt)" },
+        { value: "VARIANCE_POSITIVE", label: "Stock Adjustment — Positive Variance" },
+        { value: "VARIANCE_NEGATIVE", label: "Stock Adjustment — Negative Variance" },
+        // Batch — STANDARD/FIFO costing
+        { value: "BATCH_INPUT", label: "Batch — Input Draw (on Activation)" },
+        { value: "BATCH_CONSUMPTION", label: "Batch — Daily Consumption" },
+        { value: "BATCH_OUTPUT", label: "Batch — Output (on Close)" },
+        { value: "MORTALITY", label: "Batch — Mortality Write-off" },
+        { value: "OVERHEAD", label: "Batch — Overhead" },
+        { value: "PRICE_VARIANCE", label: "Batch — Price Variance (Standard Costing)" },
+        { value: "USAGE_VARIANCE", label: "Batch — Usage Variance (Standard Costing)" },
+        { value: "OUTPUT_VARIANCE", label: "Batch — Output Variance (Standard Costing)" },
+        { value: "OVERHEAD_VARIANCE", label: "Batch — Overhead Variance (Standard Costing)" },
+        // Batch — Bio-Asset (IAS 41) costing lifecycle
+        { value: "BIO_ACQUISITION", label: "Bio-Asset — Acquisition" },
+        { value: "BIO_CONSUMPTION_PREMATURE", label: "Bio-Asset — Consumption (Pre-mature, Capitalized)" },
+        { value: "BIO_CONSUMPTION_MATURE", label: "Bio-Asset — Consumption (Mature, Expensed)" },
+        { value: "BIO_OUTPUT", label: "Bio-Asset — Output" },
+        { value: "BIO_MORTALITY_PREMATURE", label: "Bio-Asset — Mortality (Pre-mature)" },
+        { value: "BIO_MORTALITY_MATURE", label: "Bio-Asset — Mortality (Mature)" },
+        { value: "BIO_OVERHEAD_PREMATURE", label: "Bio-Asset — Overhead (Pre-mature)" },
+        { value: "BIO_OVERHEAD_MATURE", label: "Bio-Asset — Overhead (Mature)" },
+        { value: "BIO_TRANSFORMATION", label: "Bio-Asset — Transformation (Pre-mature → Mature)" },
+        { value: "BIO_AMORTIZATION", label: "Bio-Asset — Amortization" },
+        { value: "BIO_FAIR_VALUE", label: "Bio-Asset — Fair Value Adjustment" },
+        { value: "BIO_HARVEST", label: "Bio-Asset — Disposal (Harvest)" },
+        { value: "BIO_DISPOSAL_SOLD", label: "Bio-Asset — Disposal (Sold)" },
+      ],
     },
     { key: "debit_gl_account_id", label: "Debit GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"] },
     { key: "credit_gl_account_id", label: "Credit GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"] },

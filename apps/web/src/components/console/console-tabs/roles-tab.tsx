@@ -62,6 +62,10 @@ const DEFAULT_RESOURCES = [
   // PRODUCTION (Phase 6)
   { module_code: "PRODUCTION", resource: "PARAMETER", name: "Production Parameters" },
   { module_code: "PRODUCTION", resource: "SCHEDULER", name: "Production Schedulers" },
+  // PRODUCTION (QC/QR)
+  { module_code: "PRODUCTION", resource: "QC_PARAMETER", name: "QC Parameters" },
+  { module_code: "PRODUCTION", resource: "QC", name: "QC Inspections" },
+  { module_code: "PRODUCTION", resource: "QR_CODE", name: "Traceability Packs (QR)" },
   // RBAC
   { module_code: "RBAC", resource: "ROLE", name: "User Roles & Team Management" },
   { module_code: "RBAC", resource: "USER", name: "User Accounts" },
