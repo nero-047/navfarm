@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, hasPermission, NavUser } from "@/hooks/useAuth";
+import StockBalancePanel from "@/components/console/inventory/stock-balance-panel";
 import GoodsReceiptPanel from "@/components/console/inventory/goods-receipt-panel";
 import GoodsIssuePanel from "@/components/console/inventory/goods-issue-panel";
 import StockTransferPanel from "@/components/console/inventory/stock-transfer-panel";
@@ -18,6 +19,7 @@ const S = {
 };
 
 const SECTIONS = [
+  { key: "balance", label: "Stock Balance" },
   { key: "goods-receipt", label: "Goods Receipt" },
   { key: "goods-issue", label: "Goods Issue" },
   { key: "stock-transfer", label: "Stock Transfer" },
@@ -89,6 +91,7 @@ export default function InventoryPage() {
         </aside>
 
         <main className="min-w-0 flex-1">
+          {activeKey === "balance" && <StockBalancePanel />}
           {activeKey === "goods-receipt" && <GoodsReceiptPanel />}
           {activeKey === "goods-issue" && <GoodsIssuePanel />}
           {activeKey === "stock-transfer" && <StockTransferPanel />}

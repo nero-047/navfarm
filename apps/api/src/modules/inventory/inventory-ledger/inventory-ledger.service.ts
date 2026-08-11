@@ -1,10 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, gte, lte, asc, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, asc, desc, sql, isNotNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
-import { QueryInventoryLedgerDto } from './dto/inventory-ledger.dto';
+import { QueryInventoryLedgerDto, QueryStockBalanceDto } from './dto/inventory-ledger.dto';
 
 interface WritePositiveEntryParams {
   tenantId: string;
@@ -362,5 +362,75 @@ export class InventoryLedgerService {
       .orderBy(desc(schema.inventoryLedger.posting_date), desc(schema.inventoryLedger.created_at))
       .limit(limit)
       .offset(offset);
+  }
+
+  /**
+   * Current on-hand quantity per item/warehouse — the FIFO-layer view: each
+   * POSITIVE ledger entry (receipt/output/transfer-in) is a layer, and
+   * remaining_quantity already tracks what hasn't been consumed off it yet
+   * (see writeNegativeEntry's applyFifo). Summing remaining_quantity across
+   * an item's layers is exactly its current stock; no separate running
+   * balance is maintained anywhere else, so this is computed on read.
+   */
+  async getStockBalance(query: QueryStockBalanceDto, tenantId: string) {
+    const conditions: any[] = [
+      eq(schema.inventoryLedger.tenant_id, tenantId),
+      eq(schema.inventoryLedger.company_id, query.companyId),
+      eq(schema.inventoryLedger.entry_type, 'POSITIVE'),
+      isNotNull(schema.inventoryLedger.remaining_quantity),
+    ];
+    if (query.warehouseId) conditions.push(eq(schema.inventoryLedger.warehouse_id, query.warehouseId));
+    if (query.itemId) conditions.push(eq(schema.inventoryLedger.item_id, query.itemId));
+    if (query.nobId) conditions.push(eq(schema.itemMaster.nob_id, query.nobId));
+    if (query.lobId) conditions.push(eq(schema.itemMaster.lob_id, query.lobId));
+
+    const rows = await this.db
+      .select({
+        item_id: schema.inventoryLedger.item_id,
+        item_code: schema.inventoryLedger.item_code,
+        item_description: schema.inventoryLedger.item_description,
+        uom: schema.inventoryLedger.uom,
+        warehouse_id: schema.inventoryLedger.warehouse_id,
+        warehouse_code: schema.warehouseMaster.warehouse_code,
+        warehouse_name: schema.warehouseMaster.warehouse_name,
+        reorder_level: schema.itemMaster.reorder_level,
+        min_stock_level: schema.itemMaster.min_stock_level,
+        max_stock_level: schema.itemMaster.max_stock_level,
+        on_hand_qty: sql<string>`COALESCE(SUM(${schema.inventoryLedger.remaining_quantity}), 0)`,
+        on_hand_value: sql<string>`COALESCE(SUM(${schema.inventoryLedger.remaining_quantity} * ${schema.inventoryLedger.rate}), 0)`,
+      })
+      .from(schema.inventoryLedger)
+      .leftJoin(schema.warehouseMaster, eq(schema.inventoryLedger.warehouse_id, schema.warehouseMaster.warehouse_id))
+      .innerJoin(schema.itemMaster, eq(schema.inventoryLedger.item_id, schema.itemMaster.item_id))
+      .where(and(...conditions))
+      .groupBy(
+        schema.inventoryLedger.item_id,
+        schema.inventoryLedger.item_code,
+        schema.inventoryLedger.item_description,
+        schema.inventoryLedger.uom,
+        schema.inventoryLedger.warehouse_id,
+        schema.warehouseMaster.warehouse_code,
+        schema.warehouseMaster.warehouse_name,
+        schema.itemMaster.reorder_level,
+        schema.itemMaster.min_stock_level,
+        schema.itemMaster.max_stock_level,
+      );
+
+    const balances = rows
+      .map((r) => ({
+        ...r,
+        on_hand_qty: Number(r.on_hand_qty),
+        on_hand_value: Number(r.on_hand_value),
+        reorder_level: r.reorder_level != null ? Number(r.reorder_level) : null,
+        min_stock_level: r.min_stock_level != null ? Number(r.min_stock_level) : null,
+        max_stock_level: r.max_stock_level != null ? Number(r.max_stock_level) : null,
+      }))
+      .filter((r) => r.on_hand_qty > 0.0001)
+      .sort((a, b) => a.item_code.localeCompare(b.item_code));
+
+    if (query.belowReorderOnly) {
+      return balances.filter((r) => r.reorder_level != null && r.on_hand_qty <= r.reorder_level);
+    }
+    return balances;
   }
 }

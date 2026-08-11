@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsUUID, IsInt, Min, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsInt, Min, IsDateString, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class QueryInventoryLedgerDto {
@@ -56,4 +56,36 @@ export class QueryInventoryLedgerDto {
   @IsInt()
   @Min(0)
   offset?: number;
+}
+
+export class QueryStockBalanceDto {
+  @ApiProperty({ description: 'Filter by company UUID (required)' })
+  @IsUUID()
+  companyId: string;
+
+  @ApiProperty({ description: 'Filter by warehouse UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  warehouseId?: string;
+
+  @ApiProperty({ description: 'Filter by item UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  itemId?: string;
+
+  @ApiProperty({ description: 'Filter by Nature of Business UUID', required: false })
+  @IsOptional()
+  @IsString()
+  nobId?: string;
+
+  @ApiProperty({ description: 'Filter by Line of Business UUID', required: false })
+  @IsOptional()
+  @IsString()
+  lobId?: string;
+
+  @ApiProperty({ description: 'Only show items at or below their reorder level', required: false })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  belowReorderOnly?: boolean;
 }

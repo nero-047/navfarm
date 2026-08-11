@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/mysql2/migrator';
 import * as mysql from 'mysql2/promise';
 import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
-import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED } from '../core/database/system-master-data-seed';
+import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED } from '../core/database/system-master-data-seed';
 import { STARTER_GL_ACCOUNTS, STARTER_GL_MAPPINGS, STARTER_WAREHOUSE } from '../modules/system/setup-wizard/seed/starter-master-data.seed-data';
 
 /**
@@ -117,56 +117,82 @@ async function seedDevTenant() {
         await tenantDb.insert(tenant.speciesMaster).values(SYSTEM_SPECIES_SEED.map((s) => ({ ...s, tenant_id: tenantId })));
       }
 
-      // Default breeds/items per NOB/LOB, visible tenant-wide (company_id
-      // null, matching the wildcard convention breed/item services already
-      // match on) so every company under this tenant starts with a real
-      // catalog instead of empty dropdowns.
-      const [existingBreed] = await tenantDb.select().from(tenant.breedMaster).limit(1);
-      const [existingItem] = await tenantDb.select().from(tenant.itemMaster).limit(1);
-      if (!existingBreed || !existingItem) {
-        const nobIdByCode = new Map(masterNobs.map((n) => [n.nob_code, n.nob_id]));
-        const lobIdByCode = new Map(masterLobs.map((l) => [l.lob_code, l.lob_id]));
-        const speciesRows = await tenantDb.select().from(tenant.speciesMaster);
-        const speciesIdByCode = new Map(speciesRows.map((s) => [s.species_code, s.species_id]));
+      // Default breeds/items/parameters per NOB/LOB, visible tenant-wide
+      // (company_id null, matching the wildcard convention those services
+      // already match on) so every company under this tenant starts with a
+      // real catalog instead of empty dropdowns. Idempotent per-code (not a
+      // single any-row-exists gate) so extending these lists later backfills
+      // cleanly into tenants that were seeded before the addition.
+      const nobIdByCode = new Map(masterNobs.map((n) => [n.nob_code, n.nob_id]));
+      const lobIdByCode = new Map(masterLobs.map((l) => [l.lob_code, l.lob_id]));
+      const speciesRows = await tenantDb.select().from(tenant.speciesMaster);
+      const speciesIdByCode = new Map(speciesRows.map((s) => [s.species_code, s.species_id]));
 
-        if (!existingBreed) {
-          for (const breed of SYSTEM_BREED_SEED) {
-            const nobId = nobIdByCode.get(breed.nob_code);
-            const lobId = lobIdByCode.get(breed.lob_code);
-            const speciesId = speciesIdByCode.get(breed.species_code);
-            if (!nobId || !lobId) continue;
-            await tenantDb.insert(tenant.breedMaster).values({
-              breed_id: randomUUID(),
-              tenant_id: tenantId,
-              company_id: null,
-              nob_id: nobId,
-              lob_id: lobId,
-              breed_code: breed.breed_code,
-              breed_name: breed.breed_name,
-              species_id: speciesId || null,
-              breed_type: breed.breed_type,
-            });
-          }
-        }
+      const existingBreedCodes = new Set((await tenantDb.select({ c: tenant.breedMaster.breed_code }).from(tenant.breedMaster)).map((r) => r.c));
+      for (const breed of SYSTEM_BREED_SEED) {
+        if (existingBreedCodes.has(breed.breed_code)) continue;
+        const nobId = nobIdByCode.get(breed.nob_code);
+        const lobId = lobIdByCode.get(breed.lob_code);
+        const speciesId = speciesIdByCode.get(breed.species_code);
+        if (!nobId || !lobId) continue;
+        await tenantDb.insert(tenant.breedMaster).values({
+          breed_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: nobId,
+          lob_id: lobId,
+          breed_code: breed.breed_code,
+          breed_name: breed.breed_name,
+          species_id: speciesId || null,
+          breed_type: breed.breed_type,
+        });
+      }
 
-        if (!existingItem) {
-          for (const item of SYSTEM_ITEM_SEED) {
-            const nobId = nobIdByCode.get(item.nob_code);
-            const lobId = lobIdByCode.get(item.lob_code);
-            if (!nobId || !lobId) continue;
-            await tenantDb.insert(tenant.itemMaster).values({
-              item_id: randomUUID(),
-              tenant_id: tenantId,
-              company_id: null,
-              nob_id: nobId,
-              lob_id: lobId,
-              item_code: item.item_code,
-              item_name: item.item_name,
-              item_type: item.item_type,
-              uom_primary: item.uom_primary,
-            });
-          }
-        }
+      const itemIdByCode = new Map<string, string>();
+      for (const row of await tenantDb.select().from(tenant.itemMaster)) itemIdByCode.set(row.item_code, row.item_id);
+      for (const item of SYSTEM_ITEM_SEED) {
+        if (itemIdByCode.has(item.item_code)) continue;
+        const nobId = nobIdByCode.get(item.nob_code);
+        const lobId = lobIdByCode.get(item.lob_code);
+        if (!nobId || !lobId) continue;
+        const itemId = randomUUID();
+        itemIdByCode.set(item.item_code, itemId);
+        await tenantDb.insert(tenant.itemMaster).values({
+          item_id: itemId,
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: nobId,
+          lob_id: lobId,
+          item_code: item.item_code,
+          item_name: item.item_name,
+          item_type: item.item_type,
+          uom_primary: item.uom_primary,
+        });
+      }
+
+      const existingParameterCodes = new Set((await tenantDb.select({ c: tenant.parameterMaster.parameter_code }).from(tenant.parameterMaster)).map((r) => r.c));
+      for (const param of SYSTEM_PARAMETER_SEED) {
+        if (existingParameterCodes.has(param.parameter_code)) continue;
+        const nobId = nobIdByCode.get(param.nob_code);
+        const lobId = lobIdByCode.get(param.lob_code);
+        if (!nobId || !lobId) continue;
+        const itemId = param.item_code ? itemIdByCode.get(param.item_code) : undefined;
+        await tenantDb.insert(tenant.parameterMaster).values({
+          parameter_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: nobId,
+          lob_id: lobId,
+          parameter_code: param.parameter_code,
+          parameter_name: param.parameter_name,
+          parameter_type: param.parameter_type,
+          item_id: itemId || null,
+          default_uom: param.default_uom,
+          qty_method: param.qty_method,
+          default_qty_per_unit: param.default_qty_per_unit != null ? param.default_qty_per_unit.toString() : null,
+          default_qty_per_batch: param.default_qty_per_batch != null ? param.default_qty_per_batch.toString() : null,
+          is_mandatory: param.is_mandatory ?? false,
+        });
       }
 
       const defaultLangId = masterLangs.find((l) => l.is_system_default)?.lang_id || masterLangs[0]?.lang_id;

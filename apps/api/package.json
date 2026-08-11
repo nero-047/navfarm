@@ -136,6 +136,27 @@
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-dev-tenant.ts"
         }
       },
+      "db-seed-demo-data": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-dev-demo-data.ts"
+        }
+      },
+      "db-seed-demo-tenant": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-demo-tenant.ts"
+        }
+      },
+      "db-seed-demo-full-flow": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-demo-full-flow.ts"
+        }
+      },
       "db-setup-dev": {
         "executor": "nx:run-commands",
         "options": {

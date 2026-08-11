@@ -4,7 +4,7 @@ import { eq, sql, and, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import * as masterSchema from '../../../core/database/master-schema';
 import * as schema from '../../../core/database/schema';
-import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED } from '../../../core/database/system-master-data-seed';
+import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED } from '../../../core/database/system-master-data-seed';
 import { MASTER_CONNECTION } from '../../../core/database/database.module';
 import { ConnectionManagerService } from '../../../core/database/connection-manager.service';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
@@ -138,12 +138,15 @@ export class TenantService {
         });
       }
 
+      const itemIdByCode = new Map<string, string>();
       for (const item of SYSTEM_ITEM_SEED) {
         const nobId = nobIdByCode.get(item.nob_code);
         const lobId = lobIdByCode.get(item.lob_code);
         if (!nobId || !lobId) continue;
+        const itemId = randomUUID();
+        itemIdByCode.set(item.item_code, itemId);
         await tenantDb.insert(schema.itemMaster).values({
-          item_id: randomUUID(),
+          item_id: itemId,
           tenant_id: tenantId,
           company_id: null,
           nob_id: nobId,
@@ -152,6 +155,31 @@ export class TenantService {
           item_name: item.item_name,
           item_type: item.item_type,
           uom_primary: item.uom_primary,
+        });
+      }
+
+      // Default batch KPI parameters (CONSUMPTION/MORTALITY/OUTPUT) per
+      // NOB/LOB — same tenant-wide wildcard convention as breed/item above.
+      for (const param of SYSTEM_PARAMETER_SEED) {
+        const nobId = nobIdByCode.get(param.nob_code);
+        const lobId = lobIdByCode.get(param.lob_code);
+        if (!nobId || !lobId) continue;
+        const itemId = param.item_code ? itemIdByCode.get(param.item_code) : undefined;
+        await tenantDb.insert(schema.parameterMaster).values({
+          parameter_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: nobId,
+          lob_id: lobId,
+          parameter_code: param.parameter_code,
+          parameter_name: param.parameter_name,
+          parameter_type: param.parameter_type,
+          item_id: itemId || null,
+          default_uom: param.default_uom,
+          qty_method: param.qty_method,
+          default_qty_per_unit: param.default_qty_per_unit != null ? param.default_qty_per_unit.toString() : null,
+          default_qty_per_batch: param.default_qty_per_batch != null ? param.default_qty_per_batch.toString() : null,
+          is_mandatory: param.is_mandatory ?? false,
         });
       }
 
