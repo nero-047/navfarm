@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { TraceabilityPage as TraceabilityWorkspace } from '@/modules/traceability/traceability-page';
 
 export default function TraceabilityPage() {
-  return <WorkspacePage kind="traceability" />;
+  return <TraceabilityWorkspace />;
 }

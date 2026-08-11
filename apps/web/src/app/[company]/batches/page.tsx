@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { BatchesPage as BatchesWorkspace } from '@/modules/batches/batches-page';
 
 export default function BatchesPage() {
-  return <WorkspacePage kind="batches" />;
+  return <BatchesWorkspace />;
 }

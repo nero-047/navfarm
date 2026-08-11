@@ -26,7 +26,9 @@ export function LoginForm() {
     setSubmitting(true);
     try {
       const signedInUser = await login(email, password);
-      router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
+      router.push(
+        signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console',
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to sign in');
     } finally {
@@ -54,7 +56,10 @@ export function LoginForm() {
         )}
 
         <div className="space-y-1.5">
-          <label htmlFor="email" className="block text-[13px] font-medium text-(--text-primary)">
+          <label
+            htmlFor="email"
+            className="block text-[13px] font-medium text-(--text-primary)"
+          >
             Email
           </label>
           <Input
@@ -67,7 +72,10 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="password" className="block text-[13px] font-medium text-(--text-primary)">
+          <label
+            htmlFor="password"
+            className="block text-[13px] font-medium text-(--text-primary)"
+          >
             Password
           </label>
           <Input
@@ -97,7 +105,7 @@ export function LoginForm() {
         Don&apos;t have an account?{' '}
         <Link
           href="/signup"
-          className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
+          className="font-medium text-(--text-primary) hover:text-(--accent) transition-colors"
         >
           Create one
         </Link>

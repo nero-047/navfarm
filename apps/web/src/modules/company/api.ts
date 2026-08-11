@@ -1,5 +1,10 @@
 import { api } from '@/lib/api-client';
-import { getNobOption, normalizeCompany, type CompanyMeta, type NobCode } from './types';
+import {
+  getNobOption,
+  normalizeCompany,
+  type CompanyMeta,
+  type NobCode,
+} from './types';
 
 export interface BackendCompany {
   company_id: string;
@@ -13,18 +18,33 @@ export interface BackendCompany {
 }
 
 export function slugifyCompany(name: string, id?: string): string {
-  const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const base = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
   return id ? `${base}-${id.slice(0, 8)}` : base;
 }
 
 function inferNobCode(industry: string): NobCode {
   const value = industry.toUpperCase();
-  if (value.includes('LIVESTOCK') || value.includes('DAIRY') || value.includes('PIGGERY')) return 'LIVESTOCK';
-  if (value.includes('AGRI') || value.includes('CROP') || value.includes('SEED')) return 'AGRICULTURE';
+  if (
+    value.includes('LIVESTOCK') ||
+    value.includes('DAIRY') ||
+    value.includes('PIGGERY')
+  )
+    return 'LIVESTOCK';
+  if (
+    value.includes('AGRI') ||
+    value.includes('CROP') ||
+    value.includes('SEED')
+  )
+    return 'AGRICULTURE';
   if (value.includes('AQUA') || value.includes('FISH')) return 'AQUACULTURE';
   if (value.includes('INSECT') || value.includes('BEE')) return 'INSECT';
   if (value.includes('FEED') || value.includes('PROCESS')) return 'PROCESSING';
-  return 'POULTRY';
+  if (value.includes('POULTRY') || value.includes('CHICKEN')) return 'POULTRY';
+  return 'UNCONFIGURED';
 }
 
 export function toCompanyMeta(company: BackendCompany): CompanyMeta {
@@ -33,8 +53,10 @@ export function toCompanyMeta(company: BackendCompany): CompanyMeta {
   return normalizeCompany({
     id: company.company_id,
     tenantId: company.tenant_id,
-    source: 'api',
-    slug: slugifyCompany(company.company_display_name || company.company_name, company.company_id),
+    slug: slugifyCompany(
+      company.company_display_name || company.company_name,
+      company.company_id,
+    ),
     name: company.company_display_name || company.company_name,
     nobCode: nob.code,
     nobName: nob.name,
@@ -46,11 +68,21 @@ export function toCompanyMeta(company: BackendCompany): CompanyMeta {
   });
 }
 
-export async function fetchTenantCompanies(tenantId: string): Promise<CompanyMeta[]> {
-  const companies = await api.get<BackendCompany[]>(`/company/tenant/${tenantId}`);
+export async function fetchTenantCompanies(
+  tenantId: string,
+): Promise<CompanyMeta[]> {
+  const companies = await api.get<BackendCompany[]>(
+    `/company/tenant/${tenantId}`,
+  );
   return companies
-    .filter((company) => company.is_active && company.company_code !== 'PLACEHOLDER')
+    .filter(
+      (company) => company.is_active && company.company_code !== 'PLACEHOLDER',
+    )
     .map(toCompanyMeta);
+}
+
+export async function fetchCompany(companyId: string): Promise<CompanyMeta> {
+  return toCompanyMeta(await api.get<BackendCompany>(`/company/${companyId}`));
 }
 
 export async function createBackendCompany(input: {
@@ -58,7 +90,10 @@ export async function createBackendCompany(input: {
   nobCode: NobCode;
 }): Promise<CompanyMeta> {
   const company = await api.post<BackendCompany>('/company', {
-    company_code: slugifyCompany(input.name).replace(/-/g, '_').toUpperCase().slice(0, 20),
+    company_code: slugifyCompany(input.name)
+      .replace(/-/g, '_')
+      .toUpperCase()
+      .slice(0, 20),
     company_name: input.name,
     company_display_name: input.name,
     company_type: 'Pvt Ltd',

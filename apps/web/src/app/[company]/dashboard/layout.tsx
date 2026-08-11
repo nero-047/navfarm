@@ -1,4 +1,3 @@
-import { COMPANIES, isValidCompany } from '@/modules/company';
 import type { Metadata } from 'next';
 
 interface Props {
@@ -7,8 +6,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { company } = await params;
-  const meta = isValidCompany(company) ? COMPANIES[company] : null;
-  return { title: `${meta?.name ?? 'Company'} Dashboard - NAVFarm` };
+  return { title: `${company.replaceAll('-', ' ')} Dashboard - NAVFarm` };
 }
 
 export default async function CompanyDashboardLayout({

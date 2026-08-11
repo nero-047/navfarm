@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { QualityPage as QualityWorkspace } from '@/modules/quality/quality-page';
 
 export default function QualityPage() {
-  return <WorkspacePage kind="quality" />;
+  return <QualityWorkspace />;
 }

@@ -32,7 +32,9 @@ export function SignupForm() {
       !/[0-9]/.test(password) ||
       !/[^A-Za-z0-9]/.test(password)
     ) {
-      setError('Use 8+ characters with an uppercase letter, number and special character');
+      setError(
+        'Use 8+ characters with an uppercase letter, number and special character',
+      );
       return;
     }
     setSubmitting(true);
@@ -40,7 +42,9 @@ export function SignupForm() {
       await signup({ tenantName, tenantCode, name, email, password });
       router.push('/company-selection');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to create workspace');
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to create workspace',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -66,7 +70,10 @@ export function SignupForm() {
         )}
 
         <div className="space-y-1.5">
-          <label htmlFor="tenant-name" className="block text-[13px] font-medium text-(--text-primary)">
+          <label
+            htmlFor="tenant-name"
+            className="block text-[13px] font-medium text-(--text-primary)"
+          >
             Organization name
           </label>
           <Input
@@ -79,7 +86,10 @@ export function SignupForm() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="tenant-code" className="block text-[13px] font-medium text-(--text-primary)">
+          <label
+            htmlFor="tenant-code"
+            className="block text-[13px] font-medium text-(--text-primary)"
+          >
             Workspace code
           </label>
           <Input
@@ -87,12 +97,19 @@ export function SignupForm() {
             type="text"
             placeholder="greenvalley"
             value={tenantCode}
-            onChange={(e) => setTenantCode(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+            onChange={(e) =>
+              setTenantCode(
+                e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''),
+              )
+            }
           />
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="name" className="block text-[13px] font-medium text-(--text-primary)">
+          <label
+            htmlFor="name"
+            className="block text-[13px] font-medium text-(--text-primary)"
+          >
             Full Name
           </label>
           <Input
@@ -105,7 +122,10 @@ export function SignupForm() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="email" className="block text-[13px] font-medium text-(--text-primary)">
+          <label
+            htmlFor="email"
+            className="block text-[13px] font-medium text-(--text-primary)"
+          >
             Email
           </label>
           <Input
@@ -118,7 +138,10 @@ export function SignupForm() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="password" className="block text-[13px] font-medium text-(--text-primary)">
+          <label
+            htmlFor="password"
+            className="block text-[13px] font-medium text-(--text-primary)"
+          >
             Password
           </label>
           <Input
@@ -139,7 +162,7 @@ export function SignupForm() {
         Already have an account?{' '}
         <Link
           href="/login"
-          className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
+          className="font-medium text-(--text-primary) hover:text-(--accent) transition-colors"
         >
           Sign in
         </Link>

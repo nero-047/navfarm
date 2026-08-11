@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
-import { Building2, Upload, X, Image as ImageIcon } from "lucide-react";
-import { api } from "../../../services/api-client";
+import React, { useEffect, useState } from 'react';
+import Input from '../../ui/input';
+import Button from '../../ui/button';
+import { Building2, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { api } from '../../../services/api-client';
 
 interface Step1ProfileProps {
   onSubmit: (data: any) => Promise<void>;
@@ -10,77 +10,80 @@ interface Step1ProfileProps {
   initialData?: any;
 }
 
-export default function Step1Profile({ onSubmit, isSubmitting, initialData }: Step1ProfileProps) {
-  const [logoUrl, setLogoUrl] = useState(initialData?.company_logo_url || "");
+export default function Step1Profile({
+  onSubmit,
+  isSubmitting,
+  initialData,
+}: Step1ProfileProps) {
+  const [logoUrl, setLogoUrl] = useState(initialData?.company_logo_url || '');
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [logoError, setLogoError] = useState("");
+  const [logoError, setLogoError] = useState('');
 
   const [formData, setFormData] = useState({
-    company_code: initialData?.company_code || "",
-    company_name: initialData?.company_name || "",
-    company_display_name: initialData?.company_display_name || "",
-    company_type: initialData?.company_type || "Pvt Ltd",
-    industry_type: initialData?.industry_type || "Poultry Farming",
-    registration_no: initialData?.registration_no || "",
-    tax_id: initialData?.tax_id || "",
-    tax_regime: initialData?.tax_regime || "STANDARD",
-    incorporation_date: initialData?.incorporation_date || "",
-    website: initialData?.website || "",
-    email_domain: initialData?.email_domain || "",
-    support_email: initialData?.support_email || "",
-    phone_primary: initialData?.phone_primary || "",
-    primary_color_hex: initialData?.primary_color_hex || "#1F4E79",
-    company_logo_url: initialData?.company_logo_url || ""
+    company_code: initialData?.company_code || '',
+    company_name: initialData?.company_name || '',
+    company_display_name: initialData?.company_display_name || '',
+    company_type: initialData?.company_type || 'Pvt Ltd',
+    industry_type: initialData?.industry_type || 'Poultry Farming',
+    registration_no: initialData?.registration_no || '',
+    tax_id: initialData?.tax_id || '',
+    tax_regime: initialData?.tax_regime || 'STANDARD',
+    incorporation_date: initialData?.incorporation_date || '',
+    website: initialData?.website || '',
+    email_domain: initialData?.email_domain || '',
+    support_email: initialData?.support_email || '',
+    phone_primary: initialData?.phone_primary || '',
+    primary_color_hex: initialData?.primary_color_hex || '#C24332',
+    company_logo_url: initialData?.company_logo_url || '',
   });
 
   useEffect(() => {
     if (initialData) {
-      setLogoUrl(initialData.company_logo_url || "");
+      setLogoUrl(initialData.company_logo_url || '');
       setFormData({
-        company_code: initialData.company_code || "",
-        company_name: initialData.company_name || "",
-        company_display_name: initialData.company_display_name || "",
-        company_type: initialData.company_type || "Pvt Ltd",
-        industry_type: initialData.industry_type || "Poultry Farming",
-        registration_no: initialData.registration_no || "",
-        tax_id: initialData.tax_id || "",
-        tax_regime: initialData.tax_regime || "STANDARD",
-        incorporation_date: initialData.incorporation_date || "",
-        website: initialData.website || "",
-        email_domain: initialData.email_domain || "",
-        support_email: initialData.support_email || "",
-        phone_primary: initialData.phone_primary || "",
-        primary_color_hex: initialData.primary_color_hex || "#1F4E79",
-        company_logo_url: initialData.company_logo_url || ""
+        company_code: initialData.company_code || '',
+        company_name: initialData.company_name || '',
+        company_display_name: initialData.company_display_name || '',
+        company_type: initialData.company_type || 'Pvt Ltd',
+        industry_type: initialData.industry_type || 'Poultry Farming',
+        registration_no: initialData.registration_no || '',
+        tax_id: initialData.tax_id || '',
+        tax_regime: initialData.tax_regime || 'STANDARD',
+        incorporation_date: initialData.incorporation_date || '',
+        website: initialData.website || '',
+        email_domain: initialData.email_domain || '',
+        support_email: initialData.support_email || '',
+        phone_primary: initialData.phone_primary || '',
+        primary_color_hex: initialData.primary_color_hex || '#C24332',
+        company_logo_url: initialData.company_logo_url || '',
       });
     }
   }, [initialData]);
-
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingLogo(true);
-    setLogoError("");
+    setLogoError('');
 
     try {
       const data = new FormData();
-      data.append("file", file);
+      data.append('file', file);
 
-      const res = await api.upload("/setup/wizard/upload-logo", data);
+      const res = await api.upload('/setup/wizard/upload-logo', data);
       setLogoUrl(res.logoUrl);
-      setFormData(prev => ({ ...prev, company_logo_url: res.logoUrl }));
+      setFormData((prev) => ({ ...prev, company_logo_url: res.logoUrl }));
     } catch (err: any) {
-      setLogoError(err?.message || "Failed to upload logo.");
+      setLogoError(err?.message || 'Failed to upload logo.');
     } finally {
       setUploadingLogo(false);
     }
   };
 
   const handleClearLogo = () => {
-    setLogoUrl("");
-    setFormData(prev => ({ ...prev, company_logo_url: "" }));
+    setLogoUrl('');
+    setFormData((prev) => ({ ...prev, company_logo_url: '' }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -88,7 +91,9 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
     onSubmit(formData);
   };
 
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:2877';
+  const backendUrl =
+    process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ||
+    'http://localhost:2877';
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -97,15 +102,20 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           <Building2 className="w-5 h-5 text-(--accent)" />
           Step 1: Register Company Profile
         </h2>
-        <p className="text-xs text-(--text-secondary)">Provide registration names, company logo, and brand details. Limits set by pricing plan are applied.</p>
+        <p className="text-xs text-(--text-secondary)">
+          Provide registration names, company logo, and brand details. Limits
+          set by pricing plan are applied.
+        </p>
       </div>
 
       {/* ── Company Logo Upload Section ── */}
-      <div className="p-4 rounded-xl border border-(--border) bg-(--surface-raised) flex flex-col sm:flex-row items-center gap-4">
-        <div className="w-20 h-20 rounded-xl border border-dashed border-(--border) bg-(--input-bg) flex items-center justify-center overflow-hidden relative group shrink-0">
+      <div className="p-4 rounded-[var(--radius-md)] border border-(--border) bg-(--surface-raised) flex flex-col sm:flex-row items-center gap-4">
+        <div className="w-20 h-20 rounded-[var(--radius-md)] border border-dashed border-(--border) bg-(--input-bg) flex items-center justify-center overflow-hidden relative group shrink-0">
           {logoUrl ? (
             <img
-              src={logoUrl.startsWith('/') ? `${backendUrl}${logoUrl}` : logoUrl}
+              src={
+                logoUrl.startsWith('/') ? `${backendUrl}${logoUrl}` : logoUrl
+              }
               alt="Company Logo"
               className="w-full h-full object-contain p-1"
             />
@@ -115,13 +125,22 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 w-full">
-          <label className="text-xs font-semibold text-(--text-secondary)">Company Brand Logo</label>
-          <p className="text-[11px] text-(--text-secondary)">Supported formats: PNG, JPG, SVG, WebP (Max 5MB). Saved to server /uploads folder.</p>
+          <label className="text-xs font-semibold text-(--text-secondary)">
+            Company Brand Logo
+          </label>
+          <p className="text-xs text-(--text-secondary)">
+            Supported formats: PNG, JPG, SVG, WebP (Max 5MB). Saved to server
+            /uploads folder.
+          </p>
 
           <div className="flex items-center gap-3 mt-1">
-            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-(--accent-muted) text-(--accent) border border-(--accent) text-xs font-semibold hover:bg-(--accent-muted) transition-all">
+            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-sm)] bg-(--accent-muted) text-(--accent) border border-(--accent) text-xs font-semibold hover:bg-(--accent-muted) transition-all">
               <Upload className="w-3.5 h-3.5" />
-              {uploadingLogo ? "Uploading..." : logoUrl ? "Change Logo" : "Upload Logo"}
+              {uploadingLogo
+                ? 'Uploading...'
+                : logoUrl
+                  ? 'Change Logo'
+                  : 'Upload Logo'}
               <input
                 type="file"
                 accept="image/png, image/jpeg, image/svg+xml, image/webp"
@@ -135,7 +154,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
               <button
                 type="button"
                 onClick={handleClearLogo}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/30 text-xs font-semibold hover:bg-red-500/20 transition-all"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-sm)] bg-red-500/10 text-red-500 border border-red-500/30 text-xs font-semibold hover:bg-red-500/20 transition-all"
               >
                 <X className="w-3.5 h-3.5" />
                 Remove
@@ -143,7 +162,9 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             )}
           </div>
 
-          {logoError && <p className="text-xs text-(--danger) mt-1">{logoError}</p>}
+          {logoError && (
+            <p className="text-xs text-(--danger) mt-1">{logoError}</p>
+          )}
         </div>
       </div>
 
@@ -152,28 +173,41 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           label="Company Code (Short ID)"
           placeholder="e.g. GVF"
           value={formData.company_code}
-          onChange={(e) => setFormData({ ...formData, company_code: e.target.value.toUpperCase() })}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              company_code: e.target.value.toUpperCase(),
+            })
+          }
           required
         />
         <Input
           label="Legal Entity Name"
           placeholder="Green Valley Farms Pvt Ltd"
           value={formData.company_name}
-          onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, company_name: e.target.value })
+          }
           required
         />
         <Input
           label="Display Name"
           placeholder="Green Valley Farms"
           value={formData.company_display_name}
-          onChange={(e) => setFormData({ ...formData, company_display_name: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, company_display_name: e.target.value })
+          }
         />
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Business Class</label>
+          <label className="text-xs text-(--text-secondary) font-medium">
+            Business Class
+          </label>
           <select
             value={formData.company_type}
-            onChange={(e) => setFormData({ ...formData, company_type: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            onChange={(e) =>
+              setFormData({ ...formData, company_type: e.target.value })
+            }
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="Sole Proprietor">Sole Proprietor</option>
             <option value="Partnership">Partnership</option>
@@ -182,25 +216,33 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Industry Classification</label>
+          <label className="text-xs text-(--text-secondary) font-medium">
+            Industry Classification
+          </label>
           <select
             value={formData.industry_type}
-            onChange={(e) => setFormData({ ...formData, industry_type: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            onChange={(e) =>
+              setFormData({ ...formData, industry_type: e.target.value })
+            }
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="Poultry Farming">Poultry Farming</option>
             <option value="Livestock">Livestock Farming</option>
             <option value="Agriculture">Agriculture & Crop Farming</option>
             <option value="Aquaculture">Aquaculture & Fisheries</option>
             <option value="Insect Farming">Insect Farming & Apiaries</option>
-            <option value="Feed & Processing">Feed Mill & Food Processing</option>
+            <option value="Feed & Processing">
+              Feed Mill & Food Processing
+            </option>
           </select>
         </div>
         <Input
           label="Registration Certificate No"
           placeholder="e.g. U01403DL2023PTC123456"
           value={formData.registration_no}
-          onChange={(e) => setFormData({ ...formData, registration_no: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, registration_no: e.target.value })
+          }
         />
         <Input
           label="Taxpayer ID / GSTIN"
@@ -209,11 +251,15 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
         />
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Tax Regime</label>
+          <label className="text-xs text-(--text-secondary) font-medium">
+            Tax Regime
+          </label>
           <select
             value={formData.tax_regime}
-            onChange={(e) => setFormData({ ...formData, tax_regime: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            onChange={(e) =>
+              setFormData({ ...formData, tax_regime: e.target.value })
+            }
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="STANDARD">Standard Scheme</option>
             <option value="COMPOSITION">Composition Scheme</option>
@@ -224,36 +270,50 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           label="Incorporation Date"
           type="date"
           value={formData.incorporation_date}
-          onChange={(e) => setFormData({ ...formData, incorporation_date: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, incorporation_date: e.target.value })
+          }
         />
         <Input
           label="Website URL"
           placeholder="https://greenvalleyfarms.in"
           value={formData.website}
-          onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, website: e.target.value })
+          }
         />
         <Input
           label="Email Domain (for Auto-verify)"
           placeholder="greenvalleyfarms.in"
           value={formData.email_domain}
-          onChange={(e) => setFormData({ ...formData, email_domain: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, email_domain: e.target.value })
+          }
         />
         <Input
           label="Support Email"
           placeholder="support@greenvalleyfarms.in"
           type="email"
           value={formData.support_email}
-          onChange={(e) => setFormData({ ...formData, support_email: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, support_email: e.target.value })
+          }
         />
         <Input
           label="Primary Phone / Landline"
           placeholder="+91 11 2345 6789"
           value={formData.phone_primary}
-          onChange={(e) => setFormData({ ...formData, phone_primary: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, phone_primary: e.target.value })
+          }
         />
       </div>
-      <Button type="submit" disabled={isSubmitting || uploadingLogo} className="mt-4 self-end">
-        {isSubmitting ? "Registering..." : "Save & Continue"}
+      <Button
+        type="submit"
+        disabled={isSubmitting || uploadingLogo}
+        className="mt-4 self-end"
+      >
+        {isSubmitting ? 'Registering...' : 'Save & Continue'}
       </Button>
     </form>
   );

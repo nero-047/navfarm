@@ -41,13 +41,17 @@ export function ResetPasswordForm() {
         <p className="text-[13px] text-(--text-secondary) mb-8 leading-relaxed">
           Didn&apos;t receive the email? Check your spam folder or try again.
         </p>
-        <Button variant="outline" onClick={() => setSubmitted(false)} className="mx-auto">
+        <Button
+          variant="outline"
+          onClick={() => setSubmitted(false)}
+          className="mx-auto"
+        >
           Try again
         </Button>
         <p className="mt-8 text-[14px]">
           <Link
             href="/login"
-            className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
+            className="font-medium text-(--text-primary) hover:text-(--accent) transition-colors"
           >
             Back to sign in
           </Link>
@@ -76,7 +80,10 @@ export function ResetPasswordForm() {
         )}
 
         <div className="space-y-1.5">
-          <label htmlFor="email" className="block text-[13px] font-medium text-(--text-primary)">
+          <label
+            htmlFor="email"
+            className="block text-[13px] font-medium text-(--text-primary)"
+          >
             Email
           </label>
           <Input
@@ -96,7 +103,7 @@ export function ResetPasswordForm() {
       <p className="mt-8 text-center text-[14px] text-(--text-secondary)">
         <Link
           href="/login"
-          className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
+          className="font-medium text-(--text-primary) hover:text-(--accent) transition-colors"
         >
           Back to sign in
         </Link>

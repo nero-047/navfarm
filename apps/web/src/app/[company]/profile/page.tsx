@@ -1,5 +1,5 @@
-import { ProfileWorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { ProfilePage as ProfileWorkspace } from '@/modules/profile/profile-page';
 
 export default function ProfilePage() {
-  return <ProfileWorkspacePage />;
+  return <ProfileWorkspace />;
 }

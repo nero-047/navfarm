@@ -22,7 +22,10 @@ describe('Page', () => {
   it('sends an authenticated user to company selection', () => {
     const replace = jest.fn();
     (useRouter as jest.Mock).mockReturnValue({ replace });
-    localStorage.setItem('navfarm_auth_user', JSON.stringify({ email: 'demo@navfarm.com' }));
+    localStorage.setItem(
+      'navfarm_auth_user',
+      JSON.stringify({ email: 'user@navfarm.test' }),
+    );
 
     render(<Page />);
 

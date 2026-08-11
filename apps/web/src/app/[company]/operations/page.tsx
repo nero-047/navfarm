@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { OperationsPage as OperationsWorkspace } from '@/modules/operations/operations-page';
 
 export default function OperationsPage() {
-  return <WorkspacePage kind="operations" />;
+  return <OperationsWorkspace />;
 }

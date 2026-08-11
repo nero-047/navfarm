@@ -25,12 +25,21 @@ export function FullPageOverlay({
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') closeRef.current();
       if (event.key !== 'Tab' || !panelRef.current) return;
-      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      const focusable = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
     document.addEventListener('keydown', closeOnEscape);
@@ -51,7 +60,13 @@ export function FullPageOverlay({
         className="fixed inset-0 bg-black/45 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div ref={panelRef} tabIndex={-1} className={`relative my-auto w-full outline-none ${className}`}>{children}</div>
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className={`relative my-auto w-full outline-none ${className}`}
+      >
+        {children}
+      </div>
     </div>,
     document.body,
   );
@@ -69,5 +84,9 @@ export function FullPageDialogBoundary({
   className?: string;
 }) {
   if (!open) return <>{children}</>;
-  return <FullPageOverlay onClose={onClose} className={className}>{children}</FullPageOverlay>;
+  return (
+    <FullPageOverlay onClose={onClose} className={className}>
+      {children}
+    </FullPageOverlay>
+  );
 }

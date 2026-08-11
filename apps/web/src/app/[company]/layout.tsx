@@ -5,461 +5,293 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   BarChart3,
-  Bell,
   Boxes,
   Building2,
   ChevronDown,
   ClipboardCheck,
-  Command,
   Gauge,
-  HelpCircle,
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   QrCode,
   Search,
   Settings,
-  ShieldCheck,
-  Sparkles,
+  Sun,
   UserRound,
   Wrench,
   X,
 } from 'lucide-react';
 import { CompanySwitcher } from '@/components/CompanySwitcher';
+import { Button } from '@/components/ui/button';
+import { ErrorState, LoadingState } from '@/components/ui/primitives';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCurrentCompany } from '@/modules/company/use-current-company';
-import { DemoStoreProvider } from '@/modules/farm-demo/demo-store';
+import { useTheme } from '@/hooks/useTheme';
+import { CompanyProvider, useCompanyContext } from '@/modules/company';
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: 'dashboard', modules: [] },
-  { icon: Boxes, label: 'Batches', href: 'batches', modules: ['Batches'] },
-  {
-    icon: Gauge,
-    label: 'Operations',
-    href: 'operations',
-    modules: ['Batches', 'Inventory'],
-  },
-  {
-    icon: ClipboardCheck,
-    label: 'Quality Control',
-    href: 'quality',
-    modules: ['QC'],
-  },
-  {
-    icon: QrCode,
-    label: 'Traceability',
-    href: 'traceability',
-    modules: ['QR'],
-  },
-  {
-    icon: Wrench,
-    label: 'Resources & KPIs',
-    href: 'resources',
-    modules: ['Batches', 'Analytics'],
-  },
-  {
-    icon: BarChart3,
-    label: 'Reports',
-    href: 'reports',
-    modules: ['Finance', 'Analytics'],
-  },
-  { icon: Settings, label: 'Settings', href: 'settings', modules: [] },
-];
+  { icon: LayoutDashboard, label: 'Dashboard', href: 'dashboard' },
+  { icon: Boxes, label: 'Batches', href: 'batches' },
+  { icon: Gauge, label: 'Data entry', href: 'operations' },
+  { icon: ClipboardCheck, label: 'Quality control', href: 'quality' },
+  { icon: QrCode, label: 'Traceability', href: 'traceability' },
+  { icon: Wrench, label: 'Resources & KPIs', href: 'resources' },
+  { icon: BarChart3, label: 'Reports', href: 'reports' },
+  { icon: Settings, label: 'Settings', href: 'settings' },
+] as const;
 
-function getInitial(name: string) {
-  return name?.charAt(0)?.toUpperCase() ?? '?';
-}
-function getCurrentSlug(pathname: string) {
-  return pathname.split('/').filter(Boolean)[0] ?? null;
-}
-
-function NavLink({
-  item,
-  slug,
-  activePage,
-  compact = false,
-}: {
-  item: (typeof NAV_ITEMS)[number];
-  slug: string | null;
-  activePage: string;
-  compact?: boolean;
-}) {
-  const active = activePage === item.href;
-  return (
-    <Link
-      href={slug ? `/${slug}/${item.href}` : '#'}
-      className={`group relative flex shrink-0 items-center gap-3 rounded-xl text-[12px] font-medium transition-all ${compact ? 'px-3 py-2' : 'px-3 py-2.5'} ${active ? 'bg-white text-[#111a4f] shadow-[0_8px_22px_rgba(0,0,0,0.16)]' : 'text-white/62 hover:bg-white/[0.07] hover:text-white'}`}
-    >
-      {!compact && active && (
-        <span className="absolute -left-3 h-5 w-1 rounded-r-full bg-[#ed6a4f]" />
-      )}
-      <item.icon size={17} strokeWidth={active ? 2 : 1.6} />
-      {item.label}
-    </Link>
-  );
-}
-
-export default function CompanyLayout({ children }: { children: ReactNode }) {
-  const { user, loading, logout } = useAuth();
+function WorkspaceLayout({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading, logout } = useAuth();
+  const { company, loading, error, reload } = useCompanyContext();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
-  const slug = getCurrentSlug(pathname);
-  const company = useCurrentCompany();
+  const slug = pathname.split('/').filter(Boolean)[0] ?? '';
   const activePage = pathname.split('/').filter(Boolean)[1] ?? 'dashboard';
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [enabledModules, setEnabledModules] = useState<string[]>([
-    'Batches',
-    'Inventory',
-    'QC',
-    'QR',
-    'Finance',
-    'Analytics',
-  ]);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
-    if (!company) return;
-    const key = `navfarm_demo_state_v6_${company.slug}`;
-    const syncModules = () => {
-      try {
-        const saved = localStorage.getItem(key);
-        const parsed = saved ? JSON.parse(saved) : null;
-        if (Array.isArray(parsed?.setup?.modules)) {
-          setEnabledModules(parsed.setup.modules);
-        }
-      } catch {
-        // Keep documented demo defaults when local state is unavailable.
-      }
-    };
-    const handleDemoState = (event: Event) => {
-      const detail = (event as CustomEvent).detail;
-      if (detail?.company === company.slug && Array.isArray(detail.modules)) {
-        setEnabledModules(detail.modules);
-      }
-    };
-    syncModules();
-    window.addEventListener('storage', syncModules);
-    window.addEventListener('navfarm-demo-state', handleDemoState);
-    return () => {
-      window.removeEventListener('storage', syncModules);
-      window.removeEventListener('navfarm-demo-state', handleDemoState);
-    };
-  }, [company]);
+    if (!authLoading && !user) router.replace('/login');
+  }, [authLoading, router, user]);
 
   useEffect(() => {
-    if (!loading && !user) router.push('/login');
-  }, [loading, router, user]);
-  useEffect(() => {
-    function shortcut(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        document.getElementById('workspace-search')?.focus();
-      }
-      if (event.key === 'Escape') {
-        setProfileOpen(false);
-        setNotificationsOpen(false);
-        setSearchQuery('');
-      }
-    }
-    window.addEventListener('keydown', shortcut);
-    return () => window.removeEventListener('keydown', shortcut);
-  }, []);
+    setMobileOpen(false);
+    setAccountOpen(false);
+  }, [pathname]);
 
-  if (loading)
+  if (authLoading || loading) return <LoadingState label="Loading workspace" />;
+  if (!user) return null;
+  if (error)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-sm text-[#707070]">
-        Loading workspace…
+      <div className="min-h-screen bg-(--bg) p-6">
+        <ErrorState message={error} onRetry={reload} />
       </div>
     );
-  if (!user) return null;
-  const visibleNavItems = NAV_ITEMS.filter(
-    (item) =>
-      item.modules.length === 0 ||
-      item.modules.some((module) => enabledModules.includes(module)),
-  );
-  const searchResults = visibleNavItems.filter((item) =>
-    item.label.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  if (!company)
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-(--bg) p-6">
+        <div className="max-w-md text-center">
+          <Building2 size={28} className="mx-auto text-(--text-muted)" />
+          <h1 className="mt-4 text-xl font-semibold text-(--text-primary)">
+            Company not found
+          </h1>
+          <p className="mt-2 text-sm text-(--text-secondary)">
+            This company is unavailable or your account no longer has access.
+          </p>
+          <Button
+            className="mt-5"
+            onClick={() => router.push('/company-selection')}
+          >
+            Choose a company
+          </Button>
+        </div>
+      </div>
+    );
+
+  const searchResults = query
+    ? NAV_ITEMS.filter((item) =>
+        item.label.toLowerCase().includes(query.toLowerCase()),
+      )
+    : [];
   const signOut = () => {
     logout();
     router.push('/login');
   };
 
-  return (
-    <div className="min-h-screen bg-[#f3f5f8] lg:flex">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] text-white lg:flex">
-        <div className="pointer-events-none absolute -left-24 top-28 h-60 w-60 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="relative border-b border-white/[0.08] p-5 pb-4">
-          <Link
-            href="/company-selection"
-            className="mb-5 flex items-center gap-3"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#f16d50,#c24332)] text-sm font-black shadow-lg">
-              NF
-            </span>
-            <span>
-              <span className="block text-xl font-bold tracking-tight">
-                NAV<span className="text-[#f16d50]">Farm</span>
-              </span>
-              <span className="block text-[8px] font-semibold uppercase tracking-[0.24em] text-white/35">
-                Farm intelligence ERP
-              </span>
-            </span>
-          </Link>
-          <div className="rounded-xl border border-white/10 bg-white/[0.06] p-1">
-            <CompanySwitcher />
-          </div>
+  const Navigation = () => (
+    <>
+      <div className="border-b border-white/10 px-4 pb-4 pt-5">
+        <Link
+          href="/company-selection"
+          className="flex items-center gap-3 px-2"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] border border-white/15 text-[13px] font-bold text-white">
+            NF
+          </span>
+          <span className="text-lg font-semibold tracking-[-0.02em] text-white">
+            NAV<span className="text-[#ef806f]">Farm</span>
+          </span>
+        </Link>
+        <div className="mt-4 rounded-[var(--radius-sm)] border border-white/10 bg-white/[0.04] p-1">
+          <CompanySwitcher />
         </div>
-        <nav className="relative flex-1 space-y-1 overflow-y-auto p-3">
-          <p className="px-3 pb-1 pt-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/30">
-            Company workspace
-          </p>
-          {visibleNavItems.map((item) => (
-            <NavLink
+      </div>
+      <nav
+        aria-label="Company workspace"
+        className="flex-1 space-y-1 overflow-y-auto p-3"
+      >
+        {NAV_ITEMS.map((item) => {
+          const active = activePage === item.href;
+          return (
+            <Link
               key={item.href}
-              item={item}
-              slug={slug}
-              activePage={activePage}
-            />
-          ))}
-        </nav>
-        <div className="relative border-t border-white/[0.08] p-4">
-          <Link
-            href="/organization"
-            className="group block rounded-xl border border-white/10 bg-white/[0.05] p-3 transition-colors hover:bg-white/[0.09]"
-          >
-            <span className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
-                <Building2 size={16} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-white/35">
-                  Organization
-                </span>
-                <span className="mt-0.5 block truncate text-xs font-semibold text-white">
-                  Green Valley Holdings
-                </span>
-              </span>
-              <ChevronDown
-                size={13}
-                className="-rotate-90 text-white/35 transition-transform group-hover:translate-x-0.5"
-              />
-            </span>
-            <span className="mt-3 flex items-center justify-between border-t border-white/[0.08] pt-2.5 text-[9px] text-white/40">
-              <span>6 companies</span>
-              <span>Enterprise plan</span>
-            </span>
-          </Link>
-        </div>
-      </aside>
-
-      <div className="min-w-0 flex-1 lg:ml-[264px]">
-        <header className="sticky top-0 z-20 border-b border-[#e4e8ef] bg-white/95 backdrop-blur-xl">
-          <div className="grid h-16 grid-cols-[auto_1fr_auto] items-center gap-3 px-4 sm:px-6 lg:grid-cols-[200px_minmax(260px,1fr)_auto] lg:gap-5 xl:px-8">
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle navigation"
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e4e8ef] text-[#30364b] lg:hidden"
+              href={`/${slug}/${item.href}`}
+              className={`flex min-h-11 items-center gap-3 rounded-[var(--radius-sm)] px-3 text-[14px] transition-colors ${active ? 'bg-white/10 font-semibold text-white' : 'text-white/70 hover:bg-white/[0.06] hover:text-white'}`}
             >
-              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+              <item.icon size={18} className={active ? 'text-[#ef806f]' : ''} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="border-t border-white/10 p-3">
+        <Link
+          href="/organization"
+          className="flex min-h-11 items-center gap-3 rounded-[var(--radius-sm)] px-3 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white"
+        >
+          <Building2 size={18} />
+          Organization
+        </Link>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-(--bg) lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-white/10 bg-(--sidebar-bg) lg:flex">
+        <Navigation />
+      </aside>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            aria-label="Close navigation"
+            className="absolute inset-0 bg-black/45"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="relative flex h-full w-[min(320px,88vw)] flex-col bg-(--sidebar-bg)">
+            <button
+              aria-label="Close navigation"
+              className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] text-white/70"
+              onClick={() => setMobileOpen(false)}
+            >
+              <X size={20} />
             </button>
-            <div className="hidden min-w-0 border-r border-[#edf0f4] pr-5 lg:block">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#9298a8]">
-                Green Valley Holdings
+            <Navigation />
+          </aside>
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1 lg:ml-64">
+        <header className="sticky top-0 z-20 h-14 border-b border-(--border-subtle) bg-[var(--surface-overlay)] backdrop-blur-[20px] backdrop-saturate-[180%]">
+          <div className="flex h-full items-center gap-3 px-4 sm:px-6 xl:px-8">
+            <button
+              aria-label="Open navigation"
+              onClick={() => setMobileOpen(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] text-(--text-secondary) lg:hidden"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="hidden min-w-0 sm:block">
+              <p className="truncate text-[13px] font-semibold text-(--text-primary)">
+                {company.name}
               </p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-[#252b3d]">
-                {company?.name ?? 'Select company'}
+              <p className="truncate text-xs text-(--text-muted)">
+                {company.nobName}
               </p>
             </div>
-            <Link
-              href="/company-selection"
-              className="mr-auto text-lg font-bold text-[#0b1248] lg:hidden"
-            >
-              NAV<span className="text-[#c24332]">Farm</span>
-            </Link>
-            <div className="relative hidden h-10 min-w-0 w-full items-center gap-2 rounded-xl border border-[#e4e8ef] bg-[#f7f8fa] px-3 text-[#8a90a0] transition md:flex focus-within:border-[#2f66d0] focus-within:bg-white focus-within:ring-[3px] focus-within:ring-blue-100/80">
-              <Search size={15} />
-              <input
-                id="workspace-search"
-                aria-label="Search workspace"
-                placeholder="Search workspace pages"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-[#30364b] outline-none"
-              />
-              <span className="flex items-center gap-1 rounded-md border border-[#dfe3ea] bg-white px-1.5 py-1 text-[9px]">
-                <Command size={9} /> K
-              </span>
-              {searchQuery && (
-                <div className="absolute inset-x-0 top-12 z-50 overflow-hidden rounded-2xl border border-[#e4e8ef] bg-white p-2 shadow-2xl">
-                  {searchResults.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={slug ? `/${slug}/${item.href}` : '#'}
-                      onClick={() => setSearchQuery('')}
-                      className="flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-semibold text-[#4e5567] hover:bg-[#f5f7fa]"
-                    >
-                      <item.icon size={15} className="text-[#1c4aa9]" />
-                      {item.label}
-                    </Link>
-                  ))}
-                  {!searchResults.length && (
-                    <p className="px-3 py-4 text-center text-xs text-[#8a90a0]">
+            <div className="relative ml-auto hidden w-full max-w-md md:block">
+              <label className="flex h-10 items-center gap-2 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) px-3">
+                <Search size={15} className="text-(--text-muted)" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label="Search workspace"
+                  placeholder="Search workspace"
+                  className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-sm text-(--text-primary) outline-none"
+                />
+              </label>
+              {query && (
+                <div className="absolute inset-x-0 top-12 rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-2 shadow-[var(--shadow-md)]">
+                  {searchResults.length ? (
+                    searchResults.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={`/${slug}/${item.href}`}
+                        onClick={() => setQuery('')}
+                        className="flex min-h-10 items-center gap-3 rounded-[var(--radius-sm)] px-3 text-sm text-(--text-secondary) hover:bg-(--surface-raised)"
+                      >
+                        <item.icon size={16} />
+                        {item.label}
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="px-3 py-4 text-center text-sm text-(--text-muted)">
                       No matching page
                     </p>
                   )}
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-end gap-2">
-              <Link
-                href={slug ? `/${slug}/operations` : '#'}
-                className="hidden h-10 items-center gap-2 rounded-xl bg-[#0b1248] px-4 text-xs font-semibold text-white shadow-sm hover:bg-[#151d5e] xl:flex"
-              >
-                <Sparkles size={14} /> Quick entry
-              </Link>
+            <Link
+              href={`/${slug}/operations`}
+              className="hidden min-h-10 items-center rounded-[var(--radius-sm)] bg-(--accent) px-4 text-[13px] font-semibold text-white hover:bg-(--accent-hover) sm:flex"
+            >
+              New entry
+            </Link>
+            <button
+              aria-label={
+                theme === 'dark'
+                  ? 'Use light appearance'
+                  : 'Use dark appearance'
+              }
+              onClick={toggleTheme}
+              className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] text-(--text-secondary) hover:bg-(--surface-raised)"
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <div className="relative">
               <button
-                aria-label="Help"
-                className="hidden h-10 w-10 items-center justify-center rounded-xl border border-[#e4e8ef] text-[#646b7c] hover:bg-[#f7f8fa] sm:flex"
+                onClick={() => setAccountOpen(!accountOpen)}
+                className="flex h-11 items-center gap-2 rounded-[var(--radius-sm)] px-2 text-(--text-secondary) hover:bg-(--surface-raised)"
               >
-                <HelpCircle size={17} />
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-(--accent-muted) text-xs font-bold text-(--accent)">
+                  {(user.name || user.email).charAt(0).toUpperCase()}
+                </span>
+                <ChevronDown size={14} />
               </button>
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setNotificationsOpen(!notificationsOpen);
-                    setProfileOpen(false);
-                  }}
-                  aria-label="Notifications"
-                  className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#e4e8ef] text-[#646b7c] hover:bg-[#f7f8fa]"
-                >
-                  <Bell size={17} />
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-[#e55b43]" />
-                </button>
-                {notificationsOpen && (
-                  <div className="absolute right-0 top-12 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#e4e8ef] bg-white shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-[#edf0f4] px-4 py-3">
-                      <p className="text-sm font-semibold text-[#252b3d]">
-                        Notifications
-                      </p>
-                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-                        3 new
-                      </span>
-                    </div>
-                    {[
-                      'QC hold requires disposition',
-                      'Feed usage crossed warning limit',
-                      'Batch is ready to close',
-                    ].map((item, index) => (
-                      <Link
-                        key={item}
-                        href={
-                          slug
-                            ? `/${slug}/${index === 0 ? 'quality' : index === 1 ? 'operations' : 'batches'}`
-                            : '#'
-                        }
-                        onClick={() => setNotificationsOpen(false)}
-                        className="flex gap-3 border-b border-[#f0f1f4] px-4 py-3 hover:bg-[#f8f9fb]"
-                      >
-                        <span
-                          className={`mt-1 h-2 w-2 shrink-0 rounded-full ${index === 0 ? 'bg-red-500' : index === 1 ? 'bg-amber-500' : 'bg-blue-500'}`}
-                        />
-                        <span>
-                          <span className="block text-xs font-semibold text-[#30364b]">
-                            {item}
-                          </span>
-                          <span className="mt-1 block text-[10px] text-[#8a90a0]">
-                            {index + 2}h ago
-                          </span>
-                        </span>
-                      </Link>
-                    ))}
+              {accountOpen && (
+                <div className="absolute right-0 top-12 w-64 rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-2 shadow-[var(--shadow-md)]">
+                  <div className="border-b border-(--border-subtle) px-3 py-3">
+                    <p className="text-sm font-semibold text-(--text-primary)">
+                      {user.name || user.email}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-(--text-muted)">
+                      {user.email}
+                    </p>
                   </div>
-                )}
-              </div>
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setProfileOpen(!profileOpen);
-                    setNotificationsOpen(false);
-                  }}
-                  className="flex h-10 items-center gap-2 rounded-xl border border-[#e4e8ef] bg-white px-2 hover:bg-[#f7f8fa]"
-                >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-[10px] font-bold text-white">
-                    {getInitial(user.name || user.email)}
-                  </span>
-                  <span className="hidden max-w-28 truncate text-xs font-semibold text-[#30364b] 2xl:block">
-                    {user.name || 'User'}
-                  </span>
-                  <ChevronDown size={13} className="text-[#8a90a0]" />
-                </button>
-                {profileOpen && (
-                  <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-2xl border border-[#e4e8ef] bg-white p-2 shadow-2xl">
-                    <div className="border-b border-[#edf0f4] px-3 py-3">
-                      <p className="text-sm font-semibold text-[#252b3d]">
-                        {user.name || 'User'}
-                      </p>
-                      <p className="mt-1 truncate text-[10px] text-[#8a90a0]">
-                        {user.email}
-                      </p>
-                    </div>
-                    <Link
-                      href={slug ? `/${slug}/profile` : '#'}
-                      onClick={() => setProfileOpen(false)}
-                      className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-[#4e5567] hover:bg-[#f5f7fa]"
-                    >
-                      <UserRound size={15} /> Profile & preferences
-                    </Link>
-                    <Link
-                      href="/organization"
-                      className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-[#4e5567] hover:bg-[#f5f7fa]"
-                    >
-                      <ShieldCheck size={15} /> Organization
-                    </Link>
-                    <button
-                      onClick={signOut}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-[#c24332] hover:bg-red-50"
-                    >
-                      <LogOut size={15} /> Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
+                  <Link
+                    href={`/${slug}/profile`}
+                    className="mt-1 flex min-h-10 items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm text-(--text-secondary) hover:bg-(--surface-raised)"
+                  >
+                    <UserRound size={16} />
+                    Profile
+                  </Link>
+                  <button
+                    onClick={signOut}
+                    className="flex min-h-10 w-full items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm text-(--danger) hover:bg-red-500/10"
+                  >
+                    <LogOut size={16} />
+                    Sign out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-          {mobileOpen && (
-            <nav className="flex gap-1 overflow-x-auto border-t border-[#edf0f4] bg-[#0b1248] px-3 py-2 lg:hidden">
-              {visibleNavItems.map((item) => (
-                <NavLink
-                  key={item.href}
-                  item={item}
-                  slug={slug}
-                  activePage={activePage}
-                  compact
-                />
-              ))}
-            </nav>
-          )}
         </header>
-        <main className="min-h-[calc(100vh-4rem)] p-4 sm:p-6 xl:p-8">
-          {company && (
-            <div className="mb-5 flex flex-col gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800 sm:flex-row sm:items-center sm:justify-between">
-              <span className="font-semibold">Interactive frontend demo</span>
-              <span className="text-blue-700">
-                Sample values are stored only in this browser; no live ERP,
-                authentication service, or backend is connected.
-              </span>
-            </div>
-          )}
-          {company ? (
-            <DemoStoreProvider company={company}>{children}</DemoStoreProvider>
-          ) : (
-            children
-          )}
+        <main className="mx-auto min-h-[calc(100vh-3.5rem)] max-w-[1600px] p-4 sm:p-6 xl:p-8">
+          {children}
         </main>
       </div>
     </div>
+  );
+}
+
+export default function CompanyLayout({ children }: { children: ReactNode }) {
+  return (
+    <CompanyProvider>
+      <WorkspaceLayout>{children}</WorkspaceLayout>
+    </CompanyProvider>
   );
 }

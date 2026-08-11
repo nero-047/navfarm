@@ -6,7 +6,7 @@ import { useEffect, type ReactNode } from 'react';
 import { Building2, LogOut, Settings2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-export function AdminShell({
+export function ManagementShell({
   title,
   eyebrow,
   children,
@@ -19,7 +19,7 @@ export function AdminShell({
   const pathname = usePathname();
   const router = useRouter();
   useEffect(() => {
-    if (!loading && !user) router.push('/login');
+    if (!loading && !user) router.replace('/login');
   }, [loading, router, user]);
   if (loading || !user) return null;
   const links = [
@@ -34,24 +34,22 @@ export function AdminShell({
   ];
   return (
     <div className="min-h-screen bg-(--bg)">
-      <header className="border-b border-white/10 bg-[#0b1248] text-white">
-        <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div>
-            <Link href="/company-selection" className="text-xl font-bold">
-              NAV<span className="text-[#c24332]">Farm</span>
-            </Link>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/45">
-              {eyebrow}
-            </p>
-          </div>
-          <nav className="flex flex-wrap gap-1">
+      <header className="sticky top-0 z-20 border-b border-(--border) bg-[var(--surface-overlay)] backdrop-blur-[20px] backdrop-saturate-[180%]">
+        <div className="mx-auto flex min-h-14 max-w-[1500px] items-center gap-5 px-5 sm:px-8">
+          <Link
+            href="/company-selection"
+            className="text-lg font-semibold tracking-tight text-(--text-primary)"
+          >
+            NAV<span className="text-(--accent)">Farm</span>
+          </Link>
+          <nav className="ml-auto flex items-center gap-1">
             {links.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${pathname === item.href ? 'bg-white/15 text-white' : 'text-white/60 hover:bg-white/10'}`}
+                className={`flex min-h-10 items-center gap-2 rounded-[var(--radius-sm)] px-3 text-[13px] ${pathname === item.href ? 'bg-(--accent-muted) font-semibold text-(--accent)' : 'text-(--text-secondary) hover:bg-(--surface-raised)'}`}
               >
-                <item.icon size={14} />
+                <item.icon size={15} />
                 {item.label}
               </Link>
             ))}
@@ -61,14 +59,16 @@ export function AdminShell({
               logout();
               router.push('/login');
             }}
-            className="flex items-center gap-2 text-xs text-white/60"
+            aria-label="Sign out"
+            className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] text-(--text-secondary) hover:bg-(--surface-raised)"
           >
-            <LogOut size={14} /> Sign out
+            <LogOut size={17} />
           </button>
         </div>
       </header>
       <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-(--text-primary)">
+        <p className="text-[13px] font-semibold text-(--accent)">{eyebrow}</p>
+        <h1 className="mt-2 text-[clamp(1.75rem,3vw,2.125rem)] font-semibold tracking-tight text-(--text-primary)">
           {title}
         </h1>
         {children}

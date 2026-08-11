@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import {
   AUTH_STORAGE,
   api,
@@ -76,7 +82,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const response = await api.post<AuthResponse>('/auth/login', { email, password });
+    const response = await api.post<AuthResponse>('/auth/login', {
+      email,
+      password,
+    });
     if (!response.access_token || response.mfa_required) {
       throw new Error('MFA verification is required for this account.');
     }
@@ -86,19 +95,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return nextUser;
   }, []);
 
-  const signup = useCallback(async (input: SignupInput) => {
-    await api.post<{ tenant_id: string }>('/tenant/signup', {
-      tenant_code: input.tenantCode,
-      tenant_name: input.tenantName,
-      tenant_type: 'SME',
-      plan_id: 'PLAN_PRO',
-      billing_email: input.email,
-      admin_name: input.name,
-      admin_email: input.email,
-      admin_password: input.password,
-    });
-    return login(input.email, input.password);
-  }, [login]);
+  const signup = useCallback(
+    async (input: SignupInput) => {
+      await api.post<{ tenant_id: string }>('/tenant/signup', {
+        tenant_code: input.tenantCode,
+        tenant_name: input.tenantName,
+        tenant_type: 'SME',
+        plan_id: 'PLAN_PRO',
+        billing_email: input.email,
+        admin_name: input.name,
+        admin_email: input.email,
+        admin_password: input.password,
+      });
+      return login(input.email, input.password);
+    },
+    [login],
+  );
 
   const logout = useCallback(() => {
     setUser(null);

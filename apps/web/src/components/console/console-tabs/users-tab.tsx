@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import Card from "../../source-ui/card";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
-import { UserPlus } from "lucide-react";
-import { Dialog } from "../../ui/dialog";
+import React, { useState } from 'react';
+import Card from '../../ui/card';
+import Input from '../../ui/input';
+import Button from '../../ui/button';
+import { UserPlus } from 'lucide-react';
+import { Dialog } from '../../ui/dialog';
 
 interface UsersTabProps {
   users: any[];
@@ -24,31 +24,31 @@ export default function UsersTab({
   onUnassignRole,
   isSubmitting,
   currentUser,
-  activeCompany
+  activeCompany,
 }: UsersTabProps) {
-  const isTenantAdmin = currentUser?.userType === "TENANT_ADMIN";
+  const isTenantAdmin = currentUser?.userType === 'TENANT_ADMIN';
 
   const [newUser, setNewUser] = useState({
-    email: "",
-    password_hash: "",
-    full_name: "",
-    phone: "",
-    user_type: isTenantAdmin ? "COMPANY_ADMIN" : "STANDARD_USER"
+    email: '',
+    password_hash: '',
+    full_name: '',
+    phone: '',
+    user_type: isTenantAdmin ? 'COMPANY_ADMIN' : 'STANDARD_USER',
   });
 
   const [selectedUserForAssign, setSelectedUserForAssign] = useState<any>(null);
-  const [targetRoleId, setTargetRoleId] = useState("");
+  const [targetRoleId, setTargetRoleId] = useState('');
   const [assigning, setAssigning] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onAddUser(newUser).then(() => {
       setNewUser({
-        email: "",
-        password_hash: "",
-        full_name: "",
-        phone: "",
-        user_type: isTenantAdmin ? "COMPANY_ADMIN" : "STANDARD_USER"
+        email: '',
+        password_hash: '',
+        full_name: '',
+        phone: '',
+        user_type: isTenantAdmin ? 'COMPANY_ADMIN' : 'STANDARD_USER',
       });
     });
   };
@@ -59,16 +59,24 @@ export default function UsersTab({
     try {
       await onAssignRole(selectedUserForAssign.user_id, targetRoleId);
       setSelectedUserForAssign(null);
-      setTargetRoleId("");
+      setTargetRoleId('');
     } finally {
       setAssigning(false);
     }
   };
 
-  const companyId = currentUser?.companyId || currentUser?.company_id || activeCompany?.company_id;
+  const companyId =
+    currentUser?.companyId ||
+    currentUser?.company_id ||
+    activeCompany?.company_id;
   const filteredUsers = isTenantAdmin
-    ? users.filter((u) => u.user_type === "COMPANY_ADMIN" || u.user_type === "TENANT_ADMIN")
-    : users.filter((u) => u.user_type === "STANDARD_USER" && u.company_id === companyId);
+    ? users.filter(
+        (u) =>
+          u.user_type === 'COMPANY_ADMIN' || u.user_type === 'TENANT_ADMIN',
+      )
+    : users.filter(
+        (u) => u.user_type === 'STANDARD_USER' && u.company_id === companyId,
+      );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-fade-in">
@@ -78,7 +86,7 @@ export default function UsersTab({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-(--border) text-[10px] font-bold text-(--text-secondary) uppercase tracking-wider bg-(--surface)">
+                <tr className="border-b border-(--border) text-xs font-bold text-(--text-secondary) uppercase tracking-wider bg-(--surface)">
                   <th className="p-4 w-12 text-center">#</th>
                   <th className="p-4">Full Name</th>
                   <th className="p-4">Email</th>
@@ -90,34 +98,56 @@ export default function UsersTab({
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-(--text-secondary) text-xs">No workspace operators registered.</td>
+                    <td
+                      colSpan={6}
+                      className="p-8 text-center text-(--text-secondary) text-xs"
+                    >
+                      No workspace operators registered.
+                    </td>
                   </tr>
                 ) : (
                   filteredUsers.map((u, idx) => {
-                    const initials = u.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "OP";
+                    const initials =
+                      u.full_name
+                        ?.split(' ')
+                        .map((n: string) => n[0])
+                        .join('')
+                        .substring(0, 2)
+                        .toUpperCase() || 'OP';
                     return (
-                      <tr key={u.user_id} className="border-b border-(--border) text-xs hover:bg-(--surface-raised) transition-colors">
-                        <td className="p-4 text-center font-mono text-(--text-muted)">{idx + 1}</td>
+                      <tr
+                        key={u.user_id}
+                        className="border-b border-(--border) text-xs hover:bg-(--surface-raised) transition-colors"
+                      >
+                        <td className="p-4 text-center font-mono text-(--text-muted)">
+                          {idx + 1}
+                        </td>
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-(--accent)/10 border border-(--accent)/20 text-(--accent) font-bold flex items-center justify-center text-xs tracking-wider">
+                            <div className="w-8 h-8 rounded-[var(--radius-md)] bg-(--accent)/10 border border-(--accent)/20 text-(--accent) font-bold flex items-center justify-center text-xs tracking-wider">
                               {initials}
                             </div>
-                            <span className="font-semibold text-(--text-primary)">{u.full_name}</span>
+                            <span className="font-semibold text-(--text-primary)">
+                              {u.full_name}
+                            </span>
                           </div>
                         </td>
-                        <td className="p-4 text-(--text-secondary) font-mono">{u.email}</td>
+                        <td className="p-4 text-(--text-secondary) font-mono">
+                          {u.email}
+                        </td>
                         <td className="p-4">
                           {u.role_name ? (
                             <div className="flex items-center gap-2">
-                              <span className="bg-(--accent)/10 text-(--accent) border border-(--accent)/20 text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase font-mono">
+                              <span className="bg-(--accent)/10 text-(--accent) border border-(--accent)/20 text-xs font-bold px-2 py-0.5 rounded-[var(--radius-sm)] uppercase font-mono">
                                 {u.role_code}
                               </span>
-                              <span className="text-[11px] text-(--text-secondary)">{u.role_name}</span>
+                              <span className="text-xs text-(--text-secondary)">
+                                {u.role_name}
+                              </span>
                               {onUnassignRole && u.assign_id && (
                                 <button
                                   onClick={() => onUnassignRole(u.assign_id)}
-                                  className="text-[9px] text-(--text-muted) hover:text-red-500 ml-1.5 cursor-pointer bg-(--surface-raised) p-1 rounded-md border border-(--border) transition-colors"
+                                  className="text-xs text-(--text-muted) hover:text-red-500 ml-1.5 cursor-pointer bg-(--surface-raised) p-1 rounded-md border border-(--border) transition-colors"
                                   title="Unassign role"
                                 >
                                   ✕
@@ -125,23 +155,32 @@ export default function UsersTab({
                               )}
                             </div>
                           ) : (
-                            <span className="text-xs text-(--text-secondary) font-medium italic">No Role Assigned</span>
+                            <span className="text-xs text-(--text-secondary) font-medium italic">
+                              No Role Assigned
+                            </span>
                           )}
                         </td>
                         <td className="p-4 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-bold border ${
-                            u.is_active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'
-                          }`}>
-                            {u.is_active ? "Active" : "Inactive"}
+                          <span
+                            className={`px-2.5 py-0.5 rounded-[var(--radius-sm)] text-xs font-bold border ${
+                              u.is_active
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                            }`}
+                          >
+                            {u.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td className="p-4 text-right">
                           <button
                             onClick={() => {
                               setSelectedUserForAssign(u);
-                              setTargetRoleId(u.role_id || (roles.length > 0 ? roles[0].role_id : ""));
+                              setTargetRoleId(
+                                u.role_id ||
+                                  (roles.length > 0 ? roles[0].role_id : ''),
+                              );
                             }}
-                            className="text-[10px] font-bold text-(--accent) hover:text-(--accent-hover) cursor-pointer bg-(--surface-raised) py-1.5 px-3 rounded-lg border border-(--border) transition-colors"
+                            className="text-xs font-bold text-(--accent) hover:text-(--accent-hover) cursor-pointer bg-(--surface-raised) py-1.5 px-3 rounded-[var(--radius-sm)] border border-(--border) transition-colors"
                           >
                             Assign Role
                           </button>
@@ -168,7 +207,9 @@ export default function UsersTab({
             label="Full Name"
             placeholder="Jane Doe"
             value={newUser.full_name}
-            onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+            onChange={(e) =>
+              setNewUser({ ...newUser, full_name: e.target.value })
+            }
             required
           />
           <Input
@@ -183,7 +224,9 @@ export default function UsersTab({
             label="Password"
             placeholder="Minimum 8 characters"
             value={newUser.password_hash}
-            onChange={(e) => setNewUser({ ...newUser, password_hash: e.target.value })}
+            onChange={(e) =>
+              setNewUser({ ...newUser, password_hash: e.target.value })
+            }
             type="password"
             required
           />
@@ -195,11 +238,15 @@ export default function UsersTab({
           />
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] text-(--text-secondary) font-bold uppercase tracking-wider">Account Role Class</label>
+            <label className="text-xs text-(--text-secondary) font-bold uppercase tracking-wider">
+              Account Role Class
+            </label>
             <select
               value={newUser.user_type}
-              onChange={(e) => setNewUser({ ...newUser, user_type: e.target.value })}
-              className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-xs text-(--input-text) focus:outline-none focus:border-(--input-border-focus) cursor-pointer"
+              onChange={(e) =>
+                setNewUser({ ...newUser, user_type: e.target.value })
+              }
+              className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-xs text-(--input-text) focus:outline-none focus:border-(--input-border-focus) cursor-pointer"
             >
               {isTenantAdmin ? (
                 <>
@@ -212,26 +259,42 @@ export default function UsersTab({
             </select>
           </div>
 
-          <Button type="submit" disabled={isSubmitting} className="mt-2 w-full justify-center text-xs">
-            {isSubmitting ? "Inviting..." : "Add User"}
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="mt-2 w-full justify-center text-xs"
+          >
+            {isSubmitting ? 'Inviting...' : 'Add User'}
           </Button>
         </form>
       </Card>
 
-      <Dialog open={Boolean(selectedUserForAssign)} onClose={() => !assigning && setSelectedUserForAssign(null)} title="Assign role" description={selectedUserForAssign ? `Choose an active role for ${selectedUserForAssign.full_name}.` : undefined} maxWidth="sm">
-          {selectedUserForAssign && <div className="flex flex-col gap-5">
-
+      <Dialog
+        open={Boolean(selectedUserForAssign)}
+        onClose={() => !assigning && setSelectedUserForAssign(null)}
+        title="Assign role"
+        description={
+          selectedUserForAssign
+            ? `Choose an active role for ${selectedUserForAssign.full_name}.`
+            : undefined
+        }
+        maxWidth="sm"
+      >
+        {selectedUserForAssign && (
+          <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-1.5 mt-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Available Roles</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+                Available Roles
+              </label>
               {roles.length === 0 ? (
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-center text-xs text-[var(--text-secondary)]">
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-center text-xs text-[var(--text-secondary)]">
                   No roles defined. Please create a role first in the Roles tab.
                 </div>
               ) : (
                 <select
                   value={targetRoleId}
                   onChange={(e) => setTargetRoleId(e.target.value)}
-                  className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none"
                 >
                   {roles.map((role) => (
                     <option key={role.role_id} value={role.role_id}>
@@ -243,7 +306,11 @@ export default function UsersTab({
             </div>
 
             <div className="mt-2 flex flex-col-reverse gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={() => setSelectedUserForAssign(null)} className="py-2 px-4 text-xs">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedUserForAssign(null)}
+                className="py-2 px-4 text-xs"
+              >
                 Close
               </Button>
               <Button
@@ -251,12 +318,12 @@ export default function UsersTab({
                 disabled={assigning || roles.length === 0}
                 className="py-2 px-4 text-xs"
               >
-                {assigning ? "Assigning..." : "Assign Role"}
+                {assigning ? 'Assigning...' : 'Assign Role'}
               </Button>
             </div>
-          </div>}
+          </div>
+        )}
       </Dialog>
-
     </div>
   );
 }

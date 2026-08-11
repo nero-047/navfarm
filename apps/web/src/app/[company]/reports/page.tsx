@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { ReportsPage as ReportsWorkspace } from '@/modules/reports/reports-page';
 
 export default function ReportsPage() {
-  return <WorkspacePage kind="reports" />;
+  return <ReportsWorkspace />;
 }

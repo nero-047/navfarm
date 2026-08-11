@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
-import Button from "../../source-ui/button";
-import { Calendar } from "lucide-react";
+import React, { useEffect, useState } from 'react';
+import Button from '../../ui/button';
+import { Calendar } from 'lucide-react';
 
 interface Step7FiscalProps {
   onSubmit: (data: any) => Promise<void>;
@@ -8,33 +8,36 @@ interface Step7FiscalProps {
   initialData?: any;
 }
 
-export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Step7FiscalProps) {
+export default function Step7Fiscal({
+  onSubmit,
+  isSubmitting,
+  initialData,
+}: Step7FiscalProps) {
   const [formData, setFormData] = useState({
     fiscal_start_month: initialData?.fiscal_start_month || 4, // April
-    valuation_method: initialData?.valuation_method || "FIFO",
-    depreciation_method: initialData?.depreciation_method || "SLM",
-    gst_filing_frequency: initialData?.gst_filing_frequency || "MONTHLY",
+    valuation_method: initialData?.valuation_method || 'FIFO',
+    depreciation_method: initialData?.depreciation_method || 'SLM',
+    gst_filing_frequency: initialData?.gst_filing_frequency || 'MONTHLY',
     tax_audit_applicable: initialData?.tax_audit_applicable ?? false,
     decimal_places: initialData?.decimal_places ?? 2,
     currency_precision: initialData?.currency_precision || 2,
-    checkbook_format: initialData?.checkbook_format || "STANDARD"
+    checkbook_format: initialData?.checkbook_format || 'STANDARD',
   });
 
   useEffect(() => {
     if (initialData) {
       setFormData({
         fiscal_start_month: initialData.fiscal_start_month || 4,
-        valuation_method: initialData.valuation_method || "FIFO",
-        depreciation_method: initialData.depreciation_method || "SLM",
-        gst_filing_frequency: initialData.gst_filing_frequency || "MONTHLY",
+        valuation_method: initialData.valuation_method || 'FIFO',
+        depreciation_method: initialData.depreciation_method || 'SLM',
+        gst_filing_frequency: initialData.gst_filing_frequency || 'MONTHLY',
         tax_audit_applicable: initialData.tax_audit_applicable ?? false,
         decimal_places: initialData.decimal_places ?? 2,
         currency_precision: initialData.currency_precision || 2,
-        checkbook_format: initialData.checkbook_format || "STANDARD"
+        checkbook_format: initialData.checkbook_format || 'STANDARD',
       });
     }
   }, [initialData]);
-
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,16 +51,26 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
           <Calendar className="w-5 h-5 text-(--accent)" />
           Step 7: Fiscal Year & Ledger Configuration
         </h2>
-        <p className="text-xs text-(--text-secondary)">Define accounting start months, depreciation models, tax audit settings, and decimal precision.</p>
+        <p className="text-xs text-(--text-secondary)">
+          Define accounting start months, depreciation models, tax audit
+          settings, and decimal precision.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Fiscal Year Start Month</label>
+          <label className="text-xs text-(--text-secondary) font-medium">
+            Fiscal Year Start Month
+          </label>
           <select
             value={formData.fiscal_start_month}
-            onChange={(e) => setFormData({ ...formData, fiscal_start_month: parseInt(e.target.value) })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                fiscal_start_month: parseInt(e.target.value),
+              })
+            }
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value={1}>January</option>
             <option value={4}>April</option>
@@ -67,11 +80,15 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Inventory Valuation Model</label>
+          <label className="text-xs text-(--text-secondary) font-medium">
+            Inventory Valuation Model
+          </label>
           <select
             value={formData.valuation_method}
-            onChange={(e) => setFormData({ ...formData, valuation_method: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            onChange={(e) =>
+              setFormData({ ...formData, valuation_method: e.target.value })
+            }
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="FIFO">First-In, First-Out (FIFO)</option>
             <option value="STANDARD">Standard Costing</option>
@@ -80,11 +97,15 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Asset Depreciation Model</label>
+          <label className="text-xs text-(--text-secondary) font-medium">
+            Asset Depreciation Model
+          </label>
           <select
             value={formData.depreciation_method}
-            onChange={(e) => setFormData({ ...formData, depreciation_method: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            onChange={(e) =>
+              setFormData({ ...formData, depreciation_method: e.target.value })
+            }
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="SLM">Straight Line Method (SLM)</option>
             <option value="WDV">Written Down Value (WDV)</option>
@@ -93,11 +114,15 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">GST / Tax Filing Frequency</label>
+          <label className="text-xs text-(--text-secondary) font-medium">
+            GST / Tax Filing Frequency
+          </label>
           <select
             value={formData.gst_filing_frequency}
-            onChange={(e) => setFormData({ ...formData, gst_filing_frequency: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            onChange={(e) =>
+              setFormData({ ...formData, gst_filing_frequency: e.target.value })
+            }
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value="MONTHLY">Monthly Filing</option>
             <option value="QUARTERLY">Quarterly Filing</option>
@@ -105,14 +130,23 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Decimal Precision (Amounts & Qty)</label>
+          <label className="text-xs text-(--text-secondary) font-medium">
+            Decimal Precision (Amounts & Qty)
+          </label>
           <select
             value={formData.decimal_places}
-            onChange={(e) => setFormData({ ...formData, decimal_places: parseInt(e.target.value) })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                decimal_places: parseInt(e.target.value),
+              })
+            }
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-md)] px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
           >
             <option value={2}>2 Decimal Places (e.g. 100.50)</option>
-            <option value={3}>3 Decimal Places (e.g. 100.500 for KG/Liters)</option>
+            <option value={3}>
+              3 Decimal Places (e.g. 100.500 for KG/Liters)
+            </option>
             <option value={4}>4 Decimal Places (High Precision)</option>
           </select>
         </div>
@@ -122,17 +156,25 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
             type="checkbox"
             id="tax_audit_applicable"
             checked={formData.tax_audit_applicable}
-            onChange={(e) => setFormData({ ...formData, tax_audit_applicable: e.target.checked })}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                tax_audit_applicable: e.target.checked,
+              })
+            }
             className="w-4 h-4 rounded border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent)"
           />
-          <label htmlFor="tax_audit_applicable" className="text-xs text-(--text-secondary) font-medium cursor-pointer">
+          <label
+            htmlFor="tax_audit_applicable"
+            className="text-xs text-(--text-secondary) font-medium cursor-pointer"
+          >
             Mandatory Statutory Tax Audit Applicable
           </label>
         </div>
       </div>
 
       <Button type="submit" disabled={isSubmitting} className="mt-8 self-end">
-        {isSubmitting ? "Saving..." : "Save & Continue"}
+        {isSubmitting ? 'Saving...' : 'Save & Continue'}
       </Button>
     </form>
   );

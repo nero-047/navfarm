@@ -1,5 +1,5 @@
-import { WorkspacePage } from '@/modules/farm-demo/workspace-page';
+import { DashboardPage } from '@/modules/dashboard/dashboard-page';
 
 export default function CompanyDashboardPage() {
-  return <WorkspacePage kind="dashboard" />;
+  return <DashboardPage />;
 }

@@ -1,5 +1,5 @@
-import { TenantAdminPage } from '@/modules/admin-demo/tenant-admin-page';
+import { OrganizationPage as OrganizationWorkspace } from '@/modules/organization/organization-page';
 
 export default function OrganizationPage() {
-  return <TenantAdminPage />;
+  return <OrganizationWorkspace />;
 }

@@ -73,7 +73,11 @@ async function refreshAccessToken(): Promise<string> {
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.access_token) {
       clearSession();
-      throw new ApiError(errorMessage(payload, 'Your session has expired.'), response.status, payload);
+      throw new ApiError(
+        errorMessage(payload, 'Your session has expired.'),
+        response.status,
+        payload,
+      );
     }
     localStorage.setItem(AUTH_STORAGE.accessToken, payload.access_token);
     if (payload.refresh_token) {
@@ -86,10 +90,20 @@ async function refreshAccessToken(): Promise<string> {
   return refreshPromise;
 }
 
-export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const { body, tenantId = stored(AUTH_STORAGE.tenantId), retry = true, ...init } = options;
+export async function apiRequest<T>(
+  path: string,
+  options: ApiOptions = {},
+): Promise<T> {
+  const {
+    body,
+    tenantId = stored(AUTH_STORAGE.tenantId),
+    retry = true,
+    ...init
+  } = options;
   const headers = new Headers(init.headers);
-  const isFormData = body instanceof FormData || (body && typeof (body as any).append === 'function');
+  const isFormData =
+    body instanceof FormData ||
+    (body && typeof (body as any).append === 'function');
   if (!isFormData) headers.set('Content-Type', 'application/json');
   const token = stored(AUTH_STORAGE.accessToken);
   if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -100,7 +114,11 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
-    body: isFormData ? (body as any) : body === undefined ? undefined : JSON.stringify(body),
+    body: isFormData
+      ? (body as any)
+      : body === undefined
+        ? undefined
+        : JSON.stringify(body),
   });
 
   if (response.status === 401 && token && retry && path !== '/auth/refresh') {
@@ -109,19 +127,29 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
     return apiRequest<T>(path, { ...options, headers, retry: false });
   }
 
-  const payload = response.status === 204 ? null : await response.json().catch(() => null);
+  const payload =
+    response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
-    throw new ApiError(errorMessage(payload, `Request failed (${response.status}).`), response.status, payload);
+    throw new ApiError(
+      errorMessage(payload, `Request failed (${response.status}).`),
+      response.status,
+      payload,
+    );
   }
   return payload as T;
 }
 
 export const api = {
-  get: <T>(path: string, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'GET' }),
-  post: <T>(path: string, body?: unknown, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'POST', body }),
-  put: <T>(path: string, body?: unknown, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'PUT', body }),
-  patch: <T>(path: string, body?: unknown, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'PATCH', body }),
-  delete: <T>(path: string, options?: ApiOptions) => apiRequest<T>(path, { ...options, method: 'DELETE' }),
+  get: <T>(path: string, options?: ApiOptions) =>
+    apiRequest<T>(path, { ...options, method: 'GET' }),
+  post: <T>(path: string, body?: unknown, options?: ApiOptions) =>
+    apiRequest<T>(path, { ...options, method: 'POST', body }),
+  put: <T>(path: string, body?: unknown, options?: ApiOptions) =>
+    apiRequest<T>(path, { ...options, method: 'PUT', body }),
+  patch: <T>(path: string, body?: unknown, options?: ApiOptions) =>
+    apiRequest<T>(path, { ...options, method: 'PATCH', body }),
+  delete: <T>(path: string, options?: ApiOptions) =>
+    apiRequest<T>(path, { ...options, method: 'DELETE' }),
 };
 
 export function persistAuthSession(session: {
@@ -137,7 +165,8 @@ export function persistAuthSession(session: {
   localStorage.setItem('refresh_token', session.refresh_token);
   localStorage.setItem('user', JSON.stringify(session.user));
   const tenantId = (session.user as { tenantId?: string }).tenantId;
-  const companyId = (session.user as { companyId?: string; company_id?: string }).companyId ??
+  const companyId =
+    (session.user as { companyId?: string; company_id?: string }).companyId ??
     (session.user as { company_id?: string }).company_id;
   if (companyId) localStorage.setItem('active_company_id', companyId);
   if (tenantId) {

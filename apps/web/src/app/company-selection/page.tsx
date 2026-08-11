@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { FullPageOverlay } from '@/components/ui/full-page-overlay';
 import {
   NOB_OPTIONS,
-  getNobCatalog,
   CompanyCard,
   createBackendCompany,
   fetchTenantCompanies,
@@ -25,7 +24,6 @@ import {
   type NobCode,
   type NobOption,
 } from '@/modules/company';
-import { saveApiCompanies } from '@/modules/company/use-current-company';
 
 function slugify(text: string) {
   return text
@@ -38,12 +36,11 @@ function slugify(text: string) {
 export default function CompanySelectionPage() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
-  const [companies, setCompanies] =
-    useState<Record<string, CompanyMeta>>({});
+  const [companies, setCompanies] = useState<Record<string, CompanyMeta>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [nobCode, setNobCode] = useState<NobCode | ''>('');
-  const [nobOptions, setNobOptions] = useState<NobOption[]>(NOB_OPTIONS);
+  const [nobOptions] = useState<NobOption[]>(NOB_OPTIONS);
   const [error, setError] = useState('');
   const [syncing, setSyncing] = useState(false);
 
@@ -51,15 +48,19 @@ export default function CompanySelectionPage() {
     if (!loading && !user) router.push('/login');
   }, [user, loading, router]);
   useEffect(() => {
-    setNobOptions(getNobCatalog());
     if (!user?.tenantId) return;
     setSyncing(true);
     fetchTenantCompanies(user.tenantId)
       .then((items) => {
-        saveApiCompanies(items);
-        setCompanies(Object.fromEntries(items.map((company) => [company.slug, company])));
+        setCompanies(
+          Object.fromEntries(items.map((company) => [company.slug, company])),
+        );
       })
-      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not load companies'))
+      .catch((cause) =>
+        setError(
+          cause instanceof Error ? cause.message : 'Could not load companies',
+        ),
+      )
       .finally(() => setSyncing(false));
   }, [user?.tenantId]);
 
@@ -78,13 +79,14 @@ export default function CompanySelectionPage() {
       const created = await createBackendCompany({ name: trimmed, nobCode });
       const next = { ...companies, [created.slug]: created };
       setCompanies(next);
-      saveApiCompanies(Object.values(next));
       setModalOpen(false);
       setName('');
       setNobCode('');
       router.push(`/${created.slug}/settings`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not create company');
+      setError(
+        cause instanceof Error ? cause.message : 'Could not create company',
+      );
     } finally {
       setSyncing(false);
     }
@@ -95,19 +97,29 @@ export default function CompanySelectionPage() {
       <header className="border-b border-(--border) bg-(--surface)">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
           <div className="text-xl font-bold tracking-tight text-(--text-primary)">
-            NAV<span className="text-[#c24332]">Farm</span>
+            NAV<span className="text-(--accent)">Farm</span>
           </div>
           <div className="flex items-center gap-3">
             {user.userType === 'SYSTEM_ADMIN' ? (
-              <Link href="/admin" className="hidden items-center gap-1.5 rounded-lg border border-(--border) px-3 py-2 text-xs font-semibold text-(--text-secondary) md:flex"><ShieldCheck size={14} /> System Admin</Link>
+              <Link
+                href="/admin"
+                className="hidden items-center gap-1.5 rounded-[var(--radius-sm)] border border-(--border) px-3 py-2 text-xs font-semibold text-(--text-secondary) md:flex"
+              >
+                <ShieldCheck size={14} /> System Admin
+              </Link>
             ) : (
-              <Link href="/organization" className="hidden items-center gap-1.5 rounded-lg border border-(--border) px-3 py-2 text-xs font-semibold text-(--text-secondary) md:flex"><Building2 size={14} /> Tenant admin</Link>
+              <Link
+                href="/organization"
+                className="hidden items-center gap-1.5 rounded-[var(--radius-sm)] border border-(--border) px-3 py-2 text-xs font-semibold text-(--text-secondary) md:flex"
+              >
+                <Building2 size={14} /> Tenant admin
+              </Link>
             )}
             <div className="hidden text-right sm:block">
               <p className="text-xs font-semibold text-(--text-primary)">
                 {user.name}
               </p>
-              <p className="text-[10px] text-(--text-muted)">
+              <p className="text-xs text-(--text-muted)">
                 Organization workspace
               </p>
             </div>
@@ -116,7 +128,7 @@ export default function CompanySelectionPage() {
                 logout();
                 router.push('/login');
               }}
-              className="rounded-lg border border-(--border) p-2 text-(--text-secondary) hover:text-[#c24332]"
+              className="rounded-[var(--radius-sm)] border border-(--border) p-2 text-(--text-secondary) hover:text-(--accent)"
             >
               <LogOut size={16} />
             </button>
@@ -137,20 +149,33 @@ export default function CompanySelectionPage() {
               company has its own operations, finance, users and settings.
             </p>
           </div>
-          <span className="w-fit rounded-full border border-(--accent) bg-(--accent-muted) px-3 py-1 text-[11px] font-semibold text-(--accent)">
+          <span className="w-fit rounded-full border border-(--accent) bg-(--accent-muted) px-3 py-1 text-xs font-semibold text-(--accent)">
             Companies
           </span>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {syncing && Object.keys(companies).length === 0 && (
-            <p className="text-sm text-(--text-secondary)">Loading companies from NAVFarm API…</p>
+            <p className="text-sm text-(--text-secondary)">
+              Loading companies from NAVFarm API…
+            </p>
           )}
           {Object.values(companies).map((company) => (
             <CompanyCard key={company.slug} company={company} />
           ))}
+          {!syncing && Object.keys(companies).length === 0 && !error && (
+            <div className="sm:col-span-2 lg:col-span-3 rounded-[var(--radius-md)] border border-(--border) bg-(--surface) px-6 py-12 text-center">
+              <Building2 className="mx-auto text-(--text-muted)" size={24} />
+              <h2 className="mt-3 text-base font-semibold text-(--text-primary)">
+                No company configured
+              </h2>
+              <p className="mt-1 text-sm text-(--text-secondary)">
+                Create the first legal or operating company to begin onboarding.
+              </p>
+            </div>
+          )}
           <button
             onClick={() => setModalOpen(true)}
-            className="group flex min-h-[230px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-(--border) bg-(--surface) p-7 transition-all hover:-translate-y-1 hover:border-(--accent) hover:shadow-lg"
+            className="group flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-[var(--radius-md)] border border-dashed border-(--border) bg-(--surface) p-7 transition-colors hover:border-(--accent)"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-(--surface-raised) text-(--text-secondary) group-hover:bg-(--accent-muted) group-hover:text-(--accent)">
               <Plus size={21} />
@@ -173,7 +198,7 @@ export default function CompanySelectionPage() {
             role="dialog"
             aria-modal="true"
             aria-label="Create company"
-            className="w-full rounded-2xl bg-(--surface) p-7 shadow-2xl animate-slide-up"
+            className="w-full rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-7 shadow-[var(--shadow-md)] animate-slide-up"
           >
             <button
               onClick={() => setModalOpen(false)}
@@ -213,7 +238,7 @@ export default function CompanySelectionPage() {
                   onChange={(event) =>
                     setNobCode(event.target.value as NobCode)
                   }
-                  className="h-12 w-full rounded-xl border border-(--input-border) bg-(--input-bg) px-4 text-sm text-(--input-text) outline-none focus:border-(--input-border-focus)"
+                  className="h-12 w-full rounded-[var(--radius-md)] border border-(--input-border) bg-(--input-bg) px-4 text-sm text-(--input-text) outline-none focus:border-(--input-border-focus)"
                 >
                   <option value="">Select NOB</option>
                   {nobOptions.map((nob) => (

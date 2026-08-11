@@ -1,13 +1,13 @@
 export type FieldType =
-  | "text"
-  | "textarea"
-  | "number"
-  | "boolean"
-  | "email"
-  | "date"
-  | "select"
-  | "select-entity"
-  | "json";
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'boolean'
+  | 'email'
+  | 'date'
+  | 'select'
+  | 'select-entity'
+  | 'json';
 
 export interface SelectOption {
   value: string;
@@ -45,7 +45,7 @@ export interface MasterDataField {
    *   that param rather than blocking the fetch — matches the backend treating an absent
    *   filter as "show all".
    */
-  dependsOnMode?: "path" | "query";
+  dependsOnMode?: 'path' | 'query';
   /** Required when dependsOnMode is "query": maps each dependsOn field key to its query-param name. */
   queryParams?: Record<string, string>;
   /**

@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { translations, TranslationKeys } from "../utils/translations";
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { translations, TranslationKeys } from '../utils/translations';
 
-export type Language = "en" | "hi" | "mr" | "es" | "fr" | "bn" | "te" | "ta";
+export type Language = 'en' | 'hi' | 'mr' | 'es' | 'fr' | 'bn' | 'te' | 'ta';
 
 interface LanguageContextValue {
   language: Language;
@@ -12,25 +12,25 @@ interface LanguageContextValue {
 }
 
 const LanguageContext = createContext<LanguageContextValue>({
-  language: "en",
+  language: 'en',
   setLanguage: () => undefined,
   t: (key: TranslationKeys) => key,
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLangState] = useState<Language>("en");
+  const [language, setLangState] = useState<Language>('en');
 
   useEffect(() => {
-    const saved = localStorage.getItem("navfarm_lang") as Language | null;
+    const saved = localStorage.getItem('navfarm_lang') as Language | null;
     if (
-      saved === "en" ||
-      saved === "hi" ||
-      saved === "mr" ||
-      saved === "es" ||
-      saved === "fr" ||
-      saved === "bn" ||
-      saved === "te" ||
-      saved === "ta"
+      saved === 'en' ||
+      saved === 'hi' ||
+      saved === 'mr' ||
+      saved === 'es' ||
+      saved === 'fr' ||
+      saved === 'bn' ||
+      saved === 'te' ||
+      saved === 'ta'
     ) {
       setLangState(saved);
     }
@@ -38,7 +38,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLanguage = (lang: Language) => {
     setLangState(lang);
-    localStorage.setItem("navfarm_lang", lang);
+    localStorage.setItem('navfarm_lang', lang);
   };
 
   const t = (key: TranslationKeys): string => {

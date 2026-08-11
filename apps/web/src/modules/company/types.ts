@@ -11,7 +11,6 @@ export interface NobOption {
 export interface CompanyMeta {
   id?: string;
   tenantId?: string;
-  source?: 'api' | 'demo';
   slug: string;
   name: string;
   icon: string;
@@ -84,76 +83,16 @@ export const NOB_OPTIONS: NobOption[] = [
   },
 ];
 
-function company(
-  slug: string,
-  name: string,
-  nobCode: NobCode,
-  location: string,
-  setupProgress = 100,
-): CompanyMeta {
-  const nob = getNobOption(nobCode);
-  return {
-    source: 'demo',
-    slug,
-    name,
-    icon: nob.icon,
-    description: nob.description,
-    nobCode,
-    nobName: nob.name,
-    lobs: nob.lobs,
-    location,
-    setupProgress,
-  };
-}
-
-export const COMPANIES: Record<string, CompanyMeta> = {
-  'green-valley-poultry': company(
-    'green-valley-poultry',
-    'Green Valley Poultry',
-    'POULTRY',
-    'Pune, Maharashtra',
-  ),
-  'sunrise-livestock': company(
-    'sunrise-livestock',
-    'Sunrise Livestock',
-    'LIVESTOCK',
-    'Nashik, Maharashtra',
-    93,
-  ),
-  'harvest-ridge-farms': company(
-    'harvest-ridge-farms',
-    'Harvest Ridge Farms',
-    'AGRICULTURE',
-    'Indore, Madhya Pradesh',
-    87,
-  ),
-  'bluewater-aqua': company(
-    'bluewater-aqua',
-    'BlueWater Aqua',
-    'AQUACULTURE',
-    'Nellore, Andhra Pradesh',
-    80,
-  ),
-  'golden-hive-apiary': company(
-    'golden-hive-apiary',
-    'Golden Hive Apiary',
-    'INSECT',
-    'Ludhiana, Punjab',
-    73,
-  ),
-  'nutrifeed-mills': company(
-    'nutrifeed-mills',
-    'NutriFeed Mills',
-    'PROCESSING',
-    'Coimbatore, Tamil Nadu',
-    93,
-  ),
-};
-
-export type CompanySlug = keyof typeof COMPANIES;
-
 export function getNobOption(code: NobCode): NobOption {
-  return NOB_OPTIONS.find((item) => item.code === code) ?? NOB_OPTIONS[0];
+  return (
+    NOB_OPTIONS.find((item) => item.code === code) ?? {
+      code,
+      name: 'Unconfigured',
+      icon: '🏢',
+      description: 'Nature of business has not been configured.',
+      lobs: [],
+    }
+  );
 }
 
 export function createCompanyMeta(
@@ -164,7 +103,6 @@ export function createCompanyMeta(
 ): CompanyMeta {
   const nob = configuredNob ?? getNobOption(nobCode);
   return {
-    source: 'api',
     slug,
     name,
     icon: nob.icon,
@@ -185,11 +123,10 @@ export function normalizeCompany(
       (item) =>
         item.code === value.nobCode ||
         item.name.toLowerCase() === value.nobName?.toLowerCase(),
-    ) ?? NOB_OPTIONS[0];
+    ) ?? getNobOption(value.nobCode ?? 'UNCONFIGURED');
   return {
     id: value.id,
     tenantId: value.tenantId,
-    source: value.source ?? 'demo',
     slug: value.slug,
     name: value.name,
     icon: value.icon ?? inferred.icon,
@@ -200,8 +137,4 @@ export function normalizeCompany(
     location: value.location ?? 'Location not configured',
     setupProgress: value.setupProgress ?? 0,
   };
-}
-
-export function isValidCompany(slug: string): slug is CompanySlug {
-  return slug in COMPANIES;
 }
