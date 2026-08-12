@@ -1,6 +1,10 @@
+'use client';
+
 import Link from 'next/link';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useLanguage();
   return (
     <div className="min-h-screen flex">
       {/* Left branding panel */}
@@ -19,17 +23,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
           <div className="animate-fade-in">
             <h1 className="text-4xl font-semibold text-white leading-tight tracking-tight mb-4">
-              Farm management,
+              {t('authTagline')}
               <br />
-              simplified.
+              {t('authTaglineLine2')}
             </h1>
             <p className="text-white/60 text-lg max-w-md leading-relaxed">
-              Manage your livestock, crops, and operations from one clean dashboard.
+              {t('authSubheading')}
             </p>
           </div>
 
           <p className="text-white/30 text-sm">
-            © {new Date().getFullYear()} NAVFarm. All rights reserved.
+            © {new Date().getFullYear()} NAVFarm. {t('authAllRightsReserved')}
           </p>
         </div>
       </div>

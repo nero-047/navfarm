@@ -78,7 +78,7 @@ function displayValue(row: Row, key: string): string {
 }
 
 export default function MasterDataTable({ config }: { config: MasterDataConfig }) {
-  const { t } = useLanguage();
+  const { t, tLabel } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -292,7 +292,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             onChange={(e) => setField(f.key, e.target.checked)}
             className="h-4 w-4 rounded accent-(--accent)"
           />
-          {f.label}
+          {tLabel(f.label)}
         </label>
       );
     }
@@ -325,7 +325,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       // "query" mode never blocks — an unset parent just narrows the results less, it
       // doesn't prevent fetching (mirrors the backend treating an absent filter as "show all").
       const disabled = f.dependsOnMode !== "query" && parents.length > 0 && !resolvedEp;
-      const parentLabel = parents.map((k) => config.fields.find((pf) => pf.key === k)?.label || k).join(" & ");
+      const parentLabel = parents.map((k) => tLabel(config.fields.find((pf) => pf.key === k)?.label || k)).join(" & ");
       return (
         <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={inputCls} style={S.input} disabled={disabled}>
           <option value="">{disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder")}</option>
@@ -354,8 +354,8 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>{config.label}</h2>
-          {config.description && <p className="mt-0.5 text-xs" style={S.sub}>{config.description}</p>}
+          <h2 className="text-lg font-bold" style={S.primary}>{tLabel(config.label)}</h2>
+          {config.description && <p className="mt-0.5 text-xs" style={S.sub}>{tLabel(config.description)}</p>}
         </div>
         <div className="flex items-center gap-2">
           {config.supportsNobLobFilter && (
@@ -400,7 +400,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
             style={{ backgroundColor: "var(--accent)" }}
           >
-            <Plus className="h-3.5 w-3.5" /> {t("addItem", { name: config.label.replace(/s$/, "") })}
+            <Plus className="h-3.5 w-3.5" /> {t("addItem", { name: tLabel(config.label.replace(/s$/, "")) })}
           </button>
         </div>
       </div>
@@ -413,7 +413,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             <thead>
               <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
                 {columns.map((c) => (
-                  <th key={c.key} className="whitespace-nowrap px-4 py-3">{c.label}</th>
+                  <th key={c.key} className="whitespace-nowrap px-4 py-3">{tLabel(c.label)}</th>
                 ))}
                 <th className="px-4 py-3 text-right">{t("statusColumn")}</th>
                 <th className="px-4 py-3 text-right">{t("actionsColumn")}</th>
@@ -430,7 +430,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 <tr>
                   <td colSpan={columns.length + 2} className="px-4 py-10 text-center text-xs" style={S.sub}>
                     <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
-                    {t("noRecordsYet", { name: config.label.toLowerCase() })}
+                    {t("noRecordsYet", { name: tLabel(config.label).toLowerCase() })}
                     <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>{t("addFirstOne")}</button>
                   </td>
                 </tr>
@@ -479,7 +479,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title={editing ? t("editItem", { name: config.label.replace(/s$/, "") }) : t("addItem", { name: config.label.replace(/s$/, "") })}
+        title={editing ? t("editItem", { name: tLabel(config.label.replace(/s$/, "")) }) : t("addItem", { name: tLabel(config.label.replace(/s$/, "")) })}
         maxWidth="lg"
         footer={
           <>
@@ -503,7 +503,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             {visibleFields.map((f) => (
               <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>
-                  {f.label}{f.required && <span className="text-red-500"> *</span>}
+                  {tLabel(f.label)}{f.required && <span className="text-red-500"> *</span>}
                 </label>
                 {renderField(f)}
                 {f.helpText && <p className="text-[11px]" style={S.muted}>{f.helpText}</p>}
@@ -517,7 +517,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         open={!!confirmDelete}
         onClose={() => !deleting && setConfirmDelete(null)}
         title={t("deactivateRecordTitle")}
-        description={confirmDelete ? t("deactivateRecordDesc", { name: confirmDelete[columns[0]?.key] ?? confirmDelete[config.idKey], label: config.label }) : undefined}
+        description={confirmDelete ? t("deactivateRecordDesc", { name: confirmDelete[columns[0]?.key] ?? confirmDelete[config.idKey], label: tLabel(config.label) }) : undefined}
         maxWidth="sm"
         footer={
           <>

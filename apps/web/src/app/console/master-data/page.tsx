@@ -17,7 +17,7 @@ const S = {
 
 export default function MasterDataPage() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, tLabel } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
   const [ready, setReady] = useState(false);
   const [activeKey, setActiveKey] = useState(MASTER_DATA_CONFIGS[0].key);
@@ -65,7 +65,7 @@ export default function MasterDataPage() {
           <nav className="rounded-2xl border p-2" style={S.surface}>
             {MASTER_DATA_GROUPS.map((group) => (
               <div key={group} className="mb-1 last:mb-0">
-                <p className="px-3 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest" style={S.muted}>{group}</p>
+                <p className="px-3 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest" style={S.muted}>{tLabel(group)}</p>
                 <ul className="flex flex-col gap-0.5">
                   {MASTER_DATA_CONFIGS.filter((c) => c.group === group).map((c) => {
                     const isActive = c.key === activeKey;
@@ -78,7 +78,7 @@ export default function MasterDataPage() {
                             ? { backgroundColor: "var(--accent-muted)", color: "var(--accent)" }
                             : { color: "var(--text-secondary)" }}
                         >
-                          {c.label}
+                          {tLabel(c.label)}
                         </button>
                       </li>
                     );

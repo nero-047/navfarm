@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { translations, TranslationKeys } from "../utils/translations";
+import { masterDataLabelTranslations } from "../utils/master-data-translations";
 
 export type Language = "en" | "hi" | "mr" | "es" | "fr" | "bn" | "te" | "ta";
 
@@ -18,12 +19,18 @@ interface LanguageContextValue {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: TranslationKeys, vars?: TranslationVars) => string;
+  /** Looks up a literal English UI string (not a translation key) — for
+   * data-driven label/description text like Master Data's configs.ts,
+   * where rewriting every string into a keyed dictionary isn't practical.
+   * Falls back to the English text itself when no translation exists. */
+  tLabel: (text: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextValue>({
   language: "en",
   setLanguage: () => undefined,
   t: (key: TranslationKeys) => key,
+  tLabel: (text: string) => text,
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
@@ -56,8 +63,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return interpolate(template, vars);
   };
 
+  const tLabel = (text: string): string => {
+    if (language === "en") return text;
+    return masterDataLabelTranslations[text]?.[language] || text;
+  };
+
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, tLabel }}>
       {children}
     </LanguageContext.Provider>
   );

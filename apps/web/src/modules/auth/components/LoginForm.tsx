@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle } from 'lucide-react';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -15,12 +16,13 @@ export function LoginForm() {
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const { t } = useLanguage();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!email || !password) {
-      setError('Please fill in all fields');
+      setError(t('authFillAllFields'));
       return;
     }
     setSubmitting(true);
@@ -38,10 +40,10 @@ export function LoginForm() {
     <div>
       <div className="mb-10">
         <h1 className="text-3xl font-semibold text-(--text-primary) tracking-tight mb-2">
-          Welcome back
+          {t('authWelcomeBack')}
         </h1>
         <p className="text-(--text-secondary) text-[15px]">
-          Sign in to your NAVFarm account
+          {t('authSignInSubtitle')}
         </p>
       </div>
 
@@ -55,7 +57,7 @@ export function LoginForm() {
 
         <div className="space-y-1.5">
           <label htmlFor="email" className="block text-[13px] font-medium text-(--text-primary)">
-            Email
+            {t('authEmail')}
           </label>
           <Input
             id="email"
@@ -68,7 +70,7 @@ export function LoginForm() {
 
         <div className="space-y-1.5">
           <label htmlFor="password" className="block text-[13px] font-medium text-(--text-primary)">
-            Password
+            {t('authPassword')}
           </label>
           <Input
             id="password"
@@ -84,22 +86,22 @@ export function LoginForm() {
             href="/reset-password"
             className="text-[13px] text-(--text-secondary) hover:text-(--text-primary) transition-colors"
           >
-            Forgot password?
+            {t('authForgotPassword')}
           </Link>
         </div>
 
         <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? 'Signing in...' : 'Sign In'}
+          {submitting ? t('authSigningIn') : t('authSignIn')}
         </Button>
       </form>
 
       <p className="mt-8 text-center text-[14px] text-(--text-secondary)">
-        Don&apos;t have an account?{' '}
+        {t('authNoAccount')}{' '}
         <Link
           href="/signup"
           className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
         >
-          Create one
+          {t('authCreateOne')}
         </Link>
       </p>
     </div>

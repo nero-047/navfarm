@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle } from 'lucide-react';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export function SignupForm() {
   const [name, setName] = useState('');
@@ -18,12 +19,13 @@ export function SignupForm() {
   const [submitting, setSubmitting] = useState(false);
   const { signup } = useAuth();
   const router = useRouter();
+  const { t } = useLanguage();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!tenantName || !tenantCode || !name || !email || !password) {
-      setError('Please fill in all fields');
+      setError(t('authFillAllFields'));
       return;
     }
     if (
@@ -32,7 +34,7 @@ export function SignupForm() {
       !/[0-9]/.test(password) ||
       !/[^A-Za-z0-9]/.test(password)
     ) {
-      setError('Use 8+ characters with an uppercase letter, number and special character');
+      setError(t('authPasswordRules'));
       return;
     }
     setSubmitting(true);
@@ -50,10 +52,10 @@ export function SignupForm() {
     <div>
       <div className="mb-10">
         <h1 className="text-3xl font-semibold text-(--text-primary) tracking-tight mb-2">
-          Create account
+          {t('authCreateAccount')}
         </h1>
         <p className="text-(--text-secondary) text-[15px]">
-          Create your NAVFarm account
+          {t('authCreateAccountSubtitle')}
         </p>
       </div>
 
@@ -67,7 +69,7 @@ export function SignupForm() {
 
         <div className="space-y-1.5">
           <label htmlFor="tenant-name" className="block text-[13px] font-medium text-(--text-primary)">
-            Organization name
+            {t('authOrgName')}
           </label>
           <Input
             id="tenant-name"
@@ -80,7 +82,7 @@ export function SignupForm() {
 
         <div className="space-y-1.5">
           <label htmlFor="tenant-code" className="block text-[13px] font-medium text-(--text-primary)">
-            Workspace code
+            {t('authWorkspaceCode')}
           </label>
           <Input
             id="tenant-code"
@@ -93,7 +95,7 @@ export function SignupForm() {
 
         <div className="space-y-1.5">
           <label htmlFor="name" className="block text-[13px] font-medium text-(--text-primary)">
-            Full Name
+            {t('authFullName')}
           </label>
           <Input
             id="name"
@@ -106,7 +108,7 @@ export function SignupForm() {
 
         <div className="space-y-1.5">
           <label htmlFor="email" className="block text-[13px] font-medium text-(--text-primary)">
-            Email
+            {t('authEmail')}
           </label>
           <Input
             id="email"
@@ -119,7 +121,7 @@ export function SignupForm() {
 
         <div className="space-y-1.5">
           <label htmlFor="password" className="block text-[13px] font-medium text-(--text-primary)">
-            Password
+            {t('authPassword')}
           </label>
           <Input
             id="password"
@@ -131,17 +133,17 @@ export function SignupForm() {
         </div>
 
         <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? 'Creating account...' : 'Create Account'}
+          {submitting ? t('authCreatingAccount') : t('authCreateAccountBtn')}
         </Button>
       </form>
 
       <p className="mt-8 text-center text-[14px] text-(--text-secondary)">
-        Already have an account?{' '}
+        {t('authAlreadyHaveAccount')}{' '}
         <Link
           href="/login"
           className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
         >
-          Sign in
+          {t('authSignInLink')}
         </Link>
       </p>
     </div>
