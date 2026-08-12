@@ -182,8 +182,17 @@ export class UserService {
     return this.findAll({ companyId });
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  async update(id: string, dto: UpdateUserDto, actingUserId?: string) {
     const user = await this.findById(id);
+
+    // A user can edit their own profile fields, but never flip their own
+    // account inactive — that's an easy way to accidentally lock yourself
+    // out with no one else able to log in and reverse it (especially for a
+    // tenant's only admin). Deactivating someone always has to come from a
+    // different, still-active account.
+    if (actingUserId && id === actingUserId && dto.is_active === false) {
+      throw new BadRequestException('You cannot deactivate your own account.');
+    }
 
     const updates: any = {};
     if (dto.full_name !== undefined) updates.full_name = dto.full_name;
@@ -218,7 +227,11 @@ export class UserService {
     return this.findById(id);
   }
 
-  async remove(id: string) {
+  async remove(id: string, actingUserId?: string) {
+    if (actingUserId && id === actingUserId) {
+      throw new BadRequestException('You cannot deactivate your own account.');
+    }
+
     const user = await this.findById(id);
 
     await this.db

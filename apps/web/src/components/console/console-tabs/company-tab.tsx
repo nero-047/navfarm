@@ -26,6 +26,7 @@ import {
 import { api } from "../../../services/api-client";
 import { Dialog } from "../../ui/dialog";
 import { FullPageDialogBoundary } from "../../ui/full-page-overlay";
+import { EditMemberModal, ActiveStatusBadge } from "../edit-member-modal";
 
 interface CompanyTabProps {
   activeCompany: any;
@@ -70,6 +71,12 @@ export default function CompanyTab({
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [showAdminDialog, setShowAdminDialog] = useState(false);
   const [userPendingDeletion, setUserPendingDeletion] = useState<string | null>(null);
+
+  // View/edit a single operator — reuses the same modal as Team Management
+  // (profile, Active toggle, role assignment, company access) instead of
+  // this panel only ever offering a one-way Deactivate.
+  const [editingOperator, setEditingOperator] = useState<any | null>(null);
+  const [operatorRoles, setOperatorRoles] = useState<any[]>([]);
 
   // 8 steps detailed setup configuration context
   const [setupDetails, setSetupDetails] = useState<any>(null);
@@ -207,6 +214,15 @@ export default function CompanyTab({
     }
   };
 
+  const fetchOperatorRoles = async (companyId: string) => {
+    try {
+      const data = await api.get(`/role/company/${companyId}`);
+      setOperatorRoles(Array.isArray(data) ? data : []);
+    } catch {
+      setOperatorRoles([]);
+    }
+  };
+
   const fetchSetupDetails = async (companyId: string) => {
     setLoadingDetails(true);
     setSetupLoadWarning("");
@@ -224,6 +240,7 @@ export default function CompanyTab({
   useEffect(() => {
     if (targetCompany?.company_id) {
       fetchCompanyUsers(targetCompany.company_id);
+      fetchOperatorRoles(targetCompany.company_id);
       fetchSetupDetails(targetCompany.company_id);
       setIsEditing(false);
     }
@@ -1783,21 +1800,55 @@ export default function CompanyTab({
               ) : companyUsers.length === 0 ? (
                 <div className="text-xs text-(--text-secondary) text-center py-6">No users assigned. Register one below.</div>
               ) : (
-                companyUsers.map((u) => (
-                  <div key={u.user_id} className="flex items-center justify-between rounded-xl border border-(--border) bg-(--surface-raised) p-3">
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="font-semibold text-xs text-(--text-primary) truncate">{u.full_name}</span>
-                      <span className="text-[10px] text-(--text-secondary) truncate">{u.email}</span>
+                companyUsers.map((u) => {
+                  const isSelf = !!currentUser?.userId && u.user_id === currentUser.userId;
+                  return (
+                  <button
+                    key={u.user_id}
+                    type="button"
+                    onClick={() => setEditingOperator(u)}
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-(--border) bg-(--surface-raised) p-3 text-left transition hover:border-(--accent)"
+                  >
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className="truncate text-xs font-semibold text-(--text-primary)">
+                        {u.full_name}
+                        {isSelf && <span className="ml-1.5 rounded-full border px-1.5 py-0.5 text-[9px] font-bold" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>YOU</span>}
+                      </span>
+                      <span className="truncate text-[10px] text-(--text-secondary)">{u.email}</span>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <ActiveStatusBadge isActive={u.is_active !== false} />
+                        {u.roles && u.roles.length > 0 ? (
+                          u.roles.map((r: any) => (
+                            <span key={r.role_id} className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ borderColor: "var(--accent)", color: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
+                              {r.role_name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>No role assigned</span>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setUserPendingDeletion(u.user_id)}
-                      className="p-1 text-(--text-secondary) hover:text-red-400 hover:bg-red-500/10 rounded-lg cursor-pointer transition-colors shrink-0"
-                      title="Deactivate account"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span
+                        onClick={(e) => { e.stopPropagation(); setEditingOperator(u); }}
+                        className="p-1.5 text-(--text-secondary) hover:text-(--accent) hover:bg-(--accent-muted) rounded-lg cursor-pointer transition-colors"
+                        title="View / edit"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </span>
+                      {!isSelf && (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); setUserPendingDeletion(u.user_id); }}
+                          className="p-1.5 text-(--text-secondary) hover:text-red-400 hover:bg-red-500/10 rounded-lg cursor-pointer transition-colors"
+                          title="Deactivate account"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  );
+                })
               )}
             </div>
           </Card>
@@ -1851,6 +1902,21 @@ export default function CompanyTab({
               </div>
             </div>
           </Dialog>
+
+          {editingOperator && (
+            <EditMemberModal
+              member={editingOperator}
+              roles={operatorRoles}
+              isTenantAdmin={isTenantAdmin}
+              allCompanies={companies}
+              isSelf={!!currentUser?.userId && editingOperator.user_id === currentUser.userId}
+              onClose={() => setEditingOperator(null)}
+              onSaved={() => {
+                setEditingOperator(null);
+                if (targetCompany?.company_id) fetchCompanyUsers(targetCompany.company_id);
+              }}
+            />
+          )}
 
         </div>
 

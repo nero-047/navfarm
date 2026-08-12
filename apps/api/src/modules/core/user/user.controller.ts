@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request, UseGuards, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -49,15 +49,15 @@ export class UserController {
   @RequirePermission('RBAC', 'USER', 'edit')
   @ApiOperation({ summary: 'Update user profile details' })
   @ApiParam({ name: 'id', description: 'User UUID' })
-  async update(@Param('id') id: string, @Body() body: UpdateUserDto) {
-    return this.userService.update(id, body);
+  async update(@Param('id') id: string, @Body() body: UpdateUserDto, @Request() req: any) {
+    return this.userService.update(id, body, req.user?.userId);
   }
 
   @Delete(':id')
   @RequirePermission('RBAC', 'USER', 'delete')
   @ApiOperation({ summary: 'Soft-delete / deactivate a user account' })
   @ApiParam({ name: 'id', description: 'User UUID' })
-  async remove(@Param('id') id: string) {
-    return this.userService.remove(id);
+  async remove(@Param('id') id: string, @Request() req: any) {
+    return this.userService.remove(id, req.user?.userId);
   }
 }
