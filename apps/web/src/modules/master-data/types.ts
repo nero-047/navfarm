@@ -69,6 +69,13 @@ export interface MasterDataField {
   jsonListKeys?: string[];
   /** Only sent on create — omit from the edit form/payload (e.g. the API's update endpoint doesn't accept this field). */
   createOnly?: boolean;
+  /**
+   * Key(s) of other field(s) in this form that must be left empty when this one is set (e.g.
+   * a location's farm_id/shed_id/warehouse_id, where exactly one may be chosen) — setting this
+   * field to a non-empty value clears each listed field, so the mutual-exclusivity the backend
+   * enforces can't be violated from the form itself.
+   */
+  exclusiveWith?: string[];
 }
 
 export interface MasterDataConfig {

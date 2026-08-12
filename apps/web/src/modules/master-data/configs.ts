@@ -81,9 +81,9 @@ const location: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "farm_id", label: "Parent: Farm", type: "select-entity", entityEndpoint: "/farm", entityValueKey: "farm_id", entityLabelKeys: ["farm_code", "farm_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent." },
-    { key: "shed_id", label: "Parent: Shed", type: "select-entity", entityEndpoint: "/shed", entityValueKey: "shed_id", entityLabelKeys: ["shed_code", "shed_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent." },
-    { key: "warehouse_id", label: "Parent: Warehouse", type: "select-entity", entityEndpoint: "/warehouse", entityValueKey: "warehouse_id", entityLabelKeys: ["warehouse_code", "warehouse_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent." },
+    { key: "farm_id", label: "Parent: Farm", type: "select-entity", entityEndpoint: "/farm", entityValueKey: "farm_id", entityLabelKeys: ["farm_code", "farm_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent.", exclusiveWith: ["shed_id", "warehouse_id"] },
+    { key: "shed_id", label: "Parent: Shed", type: "select-entity", entityEndpoint: "/shed", entityValueKey: "shed_id", entityLabelKeys: ["shed_code", "shed_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent.", exclusiveWith: ["farm_id", "warehouse_id"] },
+    { key: "warehouse_id", label: "Parent: Warehouse", type: "select-entity", entityEndpoint: "/warehouse", entityValueKey: "warehouse_id", entityLabelKeys: ["warehouse_code", "warehouse_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent.", exclusiveWith: ["farm_id", "shed_id"] },
     { key: "parent_location_id", label: "Parent Location (sub-location nesting)", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"] },
     { key: "location_code", label: "Location Code", type: "text", required: true, placeholder: "LOC-A" },
     { key: "location_name", label: "Location Name", type: "text", required: true, placeholder: "Storage Area A" },

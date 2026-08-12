@@ -70,6 +70,15 @@ export class BatchController {
     return { success: true, message: 'Batch activated successfully.', data: result };
   }
 
+  @Get(':id/data-entry')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: "Scheduled parameter lines due on a given date for this batch, with expected quantity and what's already been recorded — drives the guided Data Entry screen" })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async getDataEntry(@Param('id') id: string, @Query('date') date: string) {
+    const result = await this.batchService.getDataEntry(id, date || new Date().toISOString().slice(0, 10));
+    return { success: true, message: 'Scheduled data-entry lines retrieved.', data: result };
+  }
+
   @Post(':id/transaction')
   @RequirePermission('PRODUCTION', 'BATCH', 'edit')
   @ApiOperation({ summary: 'Record a daily transaction against an ACTIVE Batch (consumption, mortality, output, overhead, observation)' })

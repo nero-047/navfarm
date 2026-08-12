@@ -74,6 +74,14 @@ export default function BatchPanel() {
   const [acting, setActing] = useState(false);
   const [txForm, setTxForm] = useState<Row>(emptyTxForm());
 
+  const [detailTab, setDetailTab] = useState<"overview" | "transactions" | "data-entry">("overview");
+  const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [dataEntryLoading, setDataEntryLoading] = useState(false);
+  const [dataEntryError, setDataEntryError] = useState("");
+  const [dataEntryLines, setDataEntryLines] = useState<Row[]>([]);
+  const [dataEntryValues, setDataEntryValues] = useState<Record<string, string>>({});
+  const [dataEntrySavingId, setDataEntrySavingId] = useState<string | null>(null);
+
   const [closeModalOpen, setCloseModalOpen] = useState(false);
   const [closeError, setCloseError] = useState("");
   const [closeDate, setCloseDate] = useState(new Date().toISOString().slice(0, 10));
@@ -285,6 +293,11 @@ export default function BatchPanel() {
       const res = await api.get(`/batch/${row.batch_id}`);
       setViewing(unwrap<Row>(res));
       setTxForm(emptyTxForm());
+      setDetailTab("overview");
+      setDataEntryDate(new Date().toISOString().slice(0, 10));
+      setDataEntryLines([]);
+      setDataEntryValues({});
+      setDataEntryError("");
     } catch (err: any) {
       setError(err?.message || "Failed to load batch details.");
     }
@@ -294,6 +307,55 @@ export default function BatchPanel() {
     if (!viewing) return;
     const res = await api.get(`/batch/${viewing.batch_id}`);
     setViewing(unwrap<Row>(res));
+  };
+
+  const loadDataEntry = async () => {
+    if (!viewing) return;
+    setDataEntryLoading(true);
+    setDataEntryError("");
+    try {
+      const res = await api.get(`/batch/${viewing.batch_id}/data-entry?date=${dataEntryDate}`);
+      const data = unwrap<Row>(res);
+      const dueLines = data.lines || [];
+      setDataEntryLines(dueLines);
+      setDataEntryValues(
+        Object.fromEntries(dueLines.map((l: Row) => [l.spl_id, l.already_entered_qty ? String(l.already_entered_qty) : ""]))
+      );
+    } catch (err: any) {
+      setDataEntryError(err?.message || "Failed to load scheduled data-entry lines.");
+      setDataEntryLines([]);
+    } finally {
+      setDataEntryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewing && detailTab === "data-entry") loadDataEntry();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewing?.batch_id, detailTab, dataEntryDate]);
+
+  const handleDataEntrySave = async (line: Row) => {
+    if (!viewing) return;
+    const rawValue = dataEntryValues[line.spl_id];
+    if (rawValue === undefined || rawValue === "") return;
+    setDataEntrySavingId(line.spl_id);
+    setDataEntryError("");
+    try {
+      await api.post(`/batch/${viewing.batch_id}/transaction`, {
+        transaction_date: dataEntryDate,
+        transaction_type: line.parameter_type,
+        item_id: line.item_id || undefined,
+        resource_id: line.resource_id || undefined,
+        quantity: Number(rawValue),
+        uom: line.uom || undefined,
+      });
+      await loadDataEntry();
+      await refreshViewing();
+    } catch (err: any) {
+      setDataEntryError(err?.message || "Failed to record entry.");
+    } finally {
+      setDataEntrySavingId(null);
+    }
   };
 
   const handleActivate = async () => {
@@ -1029,6 +1091,29 @@ export default function BatchPanel() {
               )}
             </div>
 
+            <div className="flex items-center gap-1.5 border-b" style={{ borderColor: "var(--border)" }}>
+              {([
+                ["overview", "Overview"],
+                ["transactions", "Transactions"],
+                ["data-entry", "Data Entry"],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setDetailTab(key)}
+                  className="rounded-t-lg px-3 py-2 text-xs font-semibold transition"
+                  style={
+                    detailTab === key
+                      ? { color: "var(--accent)", borderBottom: "2px solid var(--accent)" }
+                      : { color: "var(--text-secondary)", borderBottom: "2px solid transparent" }
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {detailTab === "overview" && (
+            <>
             {viewing.status === "DRAFT" && (
               <button onClick={handleActivate} disabled={acting} className="flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 self-start" style={{ backgroundColor: "var(--accent)" }}>
                 <PlayCircle className="h-4 w-4" /> {acting ? "Activating…" : "Activate Batch"}
@@ -1125,7 +1210,79 @@ export default function BatchPanel() {
                 </div>
               </div>
             )}
+            </>
+            )}
 
+            {detailTab === "data-entry" && (
+              <div className="flex flex-col gap-3">
+                {!viewing.scheduler_id ? (
+                  <InlineAlert variant="info">This batch has no scheduler attached — record entries via the Transactions tab instead.</InlineAlert>
+                ) : viewing.status !== "ACTIVE" ? (
+                  <InlineAlert variant="info">Data Entry is only available while the batch is ACTIVE.</InlineAlert>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Date</label>
+                      <input type="date" value={dataEntryDate} onChange={(e) => setDataEntryDate(e.target.value)} className={inputCls + " w-auto"} style={S.input} />
+                      {dataEntryLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" style={S.accent} />}
+                    </div>
+
+                    {dataEntryError && <InlineAlert>{dataEntryError}</InlineAlert>}
+
+                    <div className="overflow-x-auto rounded-xl border" style={S.surface}>
+                      <table className="w-full text-left text-xs">
+                        <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                          <th className="px-3 py-2 font-semibold" style={S.sub}>Parameter Type</th>
+                          <th className="px-3 py-2 font-semibold" style={S.sub}>Data Entry Type</th>
+                          <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
+                          <th className="px-3 py-2 font-semibold" style={S.sub}>UOM</th>
+                          <th className="px-3 py-2 font-semibold" style={S.sub}>Occurrence</th>
+                          <th className="px-3 py-2 font-semibold" style={S.sub}>Expected</th>
+                          <th className="px-3 py-2 font-semibold" style={S.sub}>Actual</th>
+                          <th className="px-3 py-2"></th>
+                        </tr></thead>
+                        <tbody>
+                          {!dataEntryLoading && dataEntryLines.length === 0 ? (
+                            <tr><td colSpan={8} className="px-3 py-6 text-center" style={S.sub}>No parameters scheduled for this date.</td></tr>
+                          ) : dataEntryLines.map((line) => (
+                            <tr key={line.spl_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                              <td className="px-3 py-2" style={S.sub}>{line.parameter_type}</td>
+                              <td className="px-3 py-2" style={S.primary}>{line.parameter_name}</td>
+                              <td className="px-3 py-2" style={S.sub}>{line.item_label || "—"}</td>
+                              <td className="px-3 py-2" style={S.sub}>{line.uom || "—"}</td>
+                              <td className="px-3 py-2" style={S.sub}>{line.occurrence ? line.occurrence.charAt(0) + line.occurrence.slice(1).toLowerCase() : "—"}</td>
+                              <td className="px-3 py-2" style={S.primary}>{Number(line.expected_qty).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                              <td className="px-2 py-1.5 w-28">
+                                <input
+                                  type="number"
+                                  value={dataEntryValues[line.spl_id] ?? ""}
+                                  onChange={(e) => setDataEntryValues((v) => ({ ...v, [line.spl_id]: e.target.value }))}
+                                  className={inputCls}
+                                  style={S.input}
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <button
+                                  onClick={() => handleDataEntrySave(line)}
+                                  disabled={dataEntrySavingId === line.spl_id || !dataEntryValues[line.spl_id]}
+                                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                                  style={{ backgroundColor: "var(--accent)" }}
+                                >
+                                  {dataEntrySavingId === line.spl_id ? "Saving…" : "Save"}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {detailTab === "transactions" && (
+            <>
             {viewing.status === "ACTIVE" && (
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Add Transaction</p>
@@ -1203,7 +1360,11 @@ export default function BatchPanel() {
                 </table>
               </div>
             </div>
+            </>
+            )}
 
+            {detailTab === "overview" && (
+            <>
             {viewing.costing_method === "BIO_ASSET" && (viewing.bio_asset_entries || []).length > 0 && (
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Bio-Asset Ledger</p>
@@ -1317,6 +1478,8 @@ export default function BatchPanel() {
               <button onClick={openRenew} className="flex items-center justify-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold self-start" style={S.surface}>
                 <RefreshCw className="h-4 w-4" /> Renew Batch — Start Next Cycle
               </button>
+            )}
+            </>
             )}
           </div>
         )}

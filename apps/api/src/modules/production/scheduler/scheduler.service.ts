@@ -53,6 +53,7 @@ export class SchedulerService {
       duration_value: dto.duration_value,
       duration_unit: dto.duration_unit,
       breed_id: dto.breed_id || null,
+      batch_start_from: dto.batch_start_from || null,
       description: dto.description || null,
       created_by: userPayload?.userId || null,
     });
@@ -82,6 +83,7 @@ export class SchedulerService {
         period_from: line.period_from,
         period_to: line.period_to,
         period_label: line.period_label || null,
+        occurrence: line.occurrence || null,
         stage_code: line.stage_code || null,
         expected_qty_override: line.expected_qty_override?.toString() || null,
         uom_override: line.uom_override || null,
@@ -161,6 +163,7 @@ export class SchedulerService {
         scheduler_name: dto.scheduler_name ?? scheduler.scheduler_name,
         description: dto.description ?? scheduler.description,
         is_active: dto.is_active ?? scheduler.is_active,
+        batch_start_from: dto.batch_start_from ?? scheduler.batch_start_from,
         updated_at: toMysqlTimestamp(),
       })
       .where(eq(schema.schedulerMaster.scheduler_id, id));

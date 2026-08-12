@@ -18,6 +18,7 @@ import { Type } from 'class-transformer';
 
 const DURATION_UNITS = ['DAY', 'WEEK', 'MONTH'] as const;
 const KPI_MODES = ['PCT', 'VALUE'] as const;
+const OCCURRENCES = ['DAILY', 'WEEKLY', 'MONTHLY'] as const;
 
 export class SchedulerParameterLineInput {
   @ApiProperty({ description: 'Parameter UUID' })
@@ -46,6 +47,12 @@ export class SchedulerParameterLineInput {
   @IsString()
   @IsOptional()
   period_label?: string;
+
+  @ApiProperty({ description: 'How often this entry is expected', enum: OCCURRENCES, required: false })
+  @IsString()
+  @IsOptional()
+  @IsIn(OCCURRENCES)
+  occurrence?: string;
 
   @ApiProperty({ description: 'Only apply this line once the batch has transferred into this stage/sub-location (batch_header.current_stage_code) — omit to apply regardless of stage', required: false, example: 'HATCHER_ROOM' })
   @IsString()
@@ -172,6 +179,11 @@ export class CreateSchedulerDto {
   @IsOptional()
   breed_id?: string;
 
+  @ApiProperty({ description: 'Informational label for what day-zero represents, e.g. "Start Date" — display only', required: false })
+  @IsString()
+  @IsOptional()
+  batch_start_from?: string;
+
   @ApiProperty({ description: 'Description', required: false })
   @IsString()
   @IsOptional()
@@ -200,6 +212,11 @@ export class UpdateSchedulerDto {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+
+  @ApiProperty({ description: 'Informational label for what day-zero represents, e.g. "Start Date" — display only', required: false })
+  @IsString()
+  @IsOptional()
+  batch_start_from?: string;
 
   @ApiProperty({ description: 'Replaces all existing lines when provided (rejected once locked)', required: false, type: [SchedulerParameterLineInput] })
   @IsArray()

@@ -222,6 +222,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     config.fields.forEach((f) => {
       if (parentKeys(f).includes(key) && next[f.key]) next[f.key] = "";
     });
+    if (value) {
+      const changedField = config.fields.find((f) => f.key === key);
+      (changedField?.exclusiveWith || []).forEach((otherKey) => { next[otherKey] = ""; });
+    }
     return next;
   });
 

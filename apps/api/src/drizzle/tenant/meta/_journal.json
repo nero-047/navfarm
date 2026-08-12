@@ -169,6 +169,13 @@
       "when": 1786433480029,
       "tag": "0023_sad_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1786518161430,
+      "tag": "0024_sharp_zeigeist",
+      "breakpoints": true
     }
   ]
 }

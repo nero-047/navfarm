@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, isNull, count } from 'drizzle-orm';
+import { eq, and, like, isNull, count, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -448,12 +448,7 @@ export class BatchService {
       .set({ status: 'ACTIVE', updated_by: userPayload?.userId || null, updated_at: toMysqlTimestamp() })
       .where(eq(schema.batchHeader.batch_id, id));
 
-    if (batch.scheduler_id) {
-      await this.db
-        .update(schema.schedulerMaster)
-        .set({ is_locked: true, updated_at: toMysqlTimestamp() })
-        .where(eq(schema.schedulerMaster.scheduler_id, batch.scheduler_id));
-    }
+    await this.syncSchedulerLock(batch.scheduler_id);
 
     await this.auditService.log({
       tenantId,
@@ -800,6 +795,71 @@ export class BatchService {
    * actual vs. expected, and writes a notification_alert_log row on breach.
    * Does not touch cost/GL — purely observational.
    */
+  /**
+   * Day-range + stage filter shared by evaluateKpi() and getDataEntry() —
+   * all scheduler_parameter_line rows (joined to their Parameter) that are
+   * "live" for a given day of the batch, regardless of what transaction (if
+   * any) is being checked against them.
+   */
+  private async loadActiveScheduleLines(
+    batch: Awaited<ReturnType<BatchService['findOne']>>,
+    dayOfBatch: number
+  ) {
+    if (!batch.scheduler_id) return [];
+
+    const lines = await this.db
+      .select({
+        spl: schema.schedulerParameterLine,
+        parameter: schema.parameterMaster,
+      })
+      .from(schema.schedulerParameterLine)
+      .innerJoin(schema.parameterMaster, eq(schema.schedulerParameterLine.parameter_id, schema.parameterMaster.parameter_id))
+      .where(eq(schema.schedulerParameterLine.scheduler_id, batch.scheduler_id));
+
+    return lines.filter(({ spl }) => {
+      if (dayOfBatch < spl.period_from || dayOfBatch > spl.period_to) return false;
+      // A line scoped to a stage only applies once the batch has transferred
+      // into it (e.g. hatcher-stage temperature thresholds don't fire while
+      // still in the setter stage) — unscoped lines (stage_code null) always
+      // apply, preserving today's behavior for batches that never transfer.
+      if (spl.stage_code && spl.stage_code !== batch.current_stage_code) return false;
+      return true;
+    });
+  }
+
+  private computeExpectedQty(
+    spl: typeof schema.schedulerParameterLine.$inferSelect,
+    parameter: typeof schema.parameterMaster.$inferSelect,
+    openingQty: number
+  ): number {
+    return spl.expected_qty_override
+      ? Number(spl.expected_qty_override)
+      : parameter.qty_method === 'PER_UNIT' && parameter.default_qty_per_unit
+      ? Number(parameter.default_qty_per_unit) * openingQty
+      : parameter.qty_method === 'PER_BATCH' && parameter.default_qty_per_batch
+      ? Number(parameter.default_qty_per_batch)
+      : openingQty; // MANUAL_AT_ENTRY fallback — e.g. mortality as a % of headcount
+  }
+
+  /**
+   * Keeps scheduler_master.is_locked in sync with whether any batch is
+   * currently ACTIVE against it — locked while at least one is, so its plan
+   * can't change out from under a batch being KPI-tracked against it, but
+   * unlocked again once none are, so it becomes editable once its batches
+   * close or get cancelled rather than staying locked forever.
+   */
+  private async syncSchedulerLock(schedulerId: string | null) {
+    if (!schedulerId) return;
+    const [{ activeCount }] = await this.db
+      .select({ activeCount: count() })
+      .from(schema.batchHeader)
+      .where(and(eq(schema.batchHeader.scheduler_id, schedulerId), eq(schema.batchHeader.status, 'ACTIVE')));
+    await this.db
+      .update(schema.schedulerMaster)
+      .set({ is_locked: activeCount > 0, updated_at: toMysqlTimestamp() })
+      .where(eq(schema.schedulerMaster.scheduler_id, schedulerId));
+  }
+
   private async evaluateKpi(
     batch: Awaited<ReturnType<BatchService['findOne']>>,
     transaction: {
@@ -818,25 +878,11 @@ export class BatchService {
     const dayOfBatch = Math.floor((txDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     if (dayOfBatch < 1) return;
 
-    const lines = await this.db
-      .select({
-        spl: schema.schedulerParameterLine,
-        parameter: schema.parameterMaster,
-      })
-      .from(schema.schedulerParameterLine)
-      .innerJoin(schema.parameterMaster, eq(schema.schedulerParameterLine.parameter_id, schema.parameterMaster.parameter_id))
-      .where(eq(schema.schedulerParameterLine.scheduler_id, batch.scheduler_id));
-
-    const match = lines.find(({ spl, parameter }) => {
-      if (dayOfBatch < spl.period_from || dayOfBatch > spl.period_to) return false;
+    const activeLines = await this.loadActiveScheduleLines(batch, dayOfBatch);
+    const match = activeLines.find(({ parameter }) => {
       if (parameter.parameter_type !== transaction.transaction_type) return false;
       if (parameter.item_id && parameter.item_id !== transaction.item_id) return false;
       if (parameter.resource_id && parameter.resource_id !== transaction.resource_id) return false;
-      // A line scoped to a stage only applies once the batch has transferred
-      // into it (e.g. hatcher-stage temperature thresholds don't fire while
-      // still in the setter stage) — unscoped lines (stage_code null) always
-      // apply, preserving today's behavior for batches that never transfer.
-      if (spl.stage_code && spl.stage_code !== batch.current_stage_code) return false;
       return true;
     });
 
@@ -844,13 +890,7 @@ export class BatchService {
     const { spl, parameter } = match;
 
     const openingQty = Number(batch.opening_quantity);
-    const expectedQty = spl.expected_qty_override
-      ? Number(spl.expected_qty_override)
-      : parameter.qty_method === 'PER_UNIT' && parameter.default_qty_per_unit
-      ? Number(parameter.default_qty_per_unit) * openingQty
-      : parameter.qty_method === 'PER_BATCH' && parameter.default_qty_per_batch
-      ? Number(parameter.default_qty_per_batch)
-      : openingQty; // MANUAL_AT_ENTRY fallback — e.g. mortality as a % of headcount
+    const expectedQty = this.computeExpectedQty(spl, parameter, openingQty);
 
     const actual = transaction.quantity;
     let breached = false;
@@ -904,6 +944,66 @@ export class BatchService {
       kpi_min: spl.kpi_mode === 'PCT' ? spl.kpi_min_pct : spl.kpi_min_value,
       kpi_max: spl.kpi_mode === 'PCT' ? spl.kpi_max_pct : spl.kpi_max_value,
     });
+  }
+
+  /**
+   * Drives the batch "Data Entry" screen: every scheduler_parameter_line
+   * that's due on the given date, with its expected quantity and whatever's
+   * already been recorded that day — so the UI can show a guided checklist
+   * instead of a blank generic transaction form.
+   */
+  async getDataEntry(id: string, dateStr: string) {
+    const batch = await this.findOne(id);
+    if (!batch.scheduler_id) {
+      throw new BadRequestException('This batch has no scheduler attached — record entries via the generic Transactions form instead.');
+    }
+
+    const startDate = new Date(batch.start_date);
+    const date = new Date(dateStr);
+    const dayOfBatch = Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    const activeLines = await this.loadActiveScheduleLines(batch, dayOfBatch);
+    const openingQty = Number(batch.opening_quantity);
+
+    const sameDayTx = await this.db
+      .select()
+      .from(schema.batchTransaction)
+      .where(and(eq(schema.batchTransaction.batch_id, id), eq(schema.batchTransaction.transaction_date, dateStr)));
+
+    const itemIds = [...new Set(activeLines.map(({ parameter }) => parameter.item_id).filter((x): x is string => !!x))];
+    const itemRows = itemIds.length
+      ? await this.db.select().from(schema.itemMaster).where(inArray(schema.itemMaster.item_id, itemIds))
+      : [];
+    const itemLabel = (itemId: string | null) => {
+      if (!itemId) return null;
+      const it = itemRows.find((x) => x.item_id === itemId);
+      return it ? `${it.item_code} — ${it.item_name}` : null;
+    };
+
+    const lines = activeLines.map(({ spl, parameter }) => {
+      const alreadyEntered = sameDayTx
+        .filter((t) => t.transaction_type === parameter.parameter_type
+          && (parameter.item_id ? t.item_id === parameter.item_id : true)
+          && (parameter.resource_id ? t.resource_id === parameter.resource_id : true))
+        .reduce((sum, t) => sum + Number(t.quantity || 0), 0);
+
+      return {
+        spl_id: spl.spl_id,
+        parameter_id: parameter.parameter_id,
+        parameter_type: parameter.parameter_type,
+        parameter_name: parameter.parameter_name,
+        item_id: parameter.item_id,
+        item_label: itemLabel(parameter.item_id),
+        resource_id: parameter.resource_id,
+        uom: spl.uom_override || parameter.default_uom || null,
+        occurrence: spl.occurrence,
+        period_label: spl.period_label,
+        expected_qty: this.computeExpectedQty(spl, parameter, openingQty),
+        already_entered_qty: alreadyEntered,
+      };
+    });
+
+    return { date: dateStr, day_of_batch: dayOfBatch, lines };
   }
 
   async close(id: string, dto: CloseBatchDto, tenantId: string, userPayload?: any) {
@@ -1025,6 +1125,8 @@ export class BatchService {
     if (varianceLines.length > 0) {
       await this.postVarianceLines(id, batch, varianceLines, actualEndDate, tenantId, userPayload);
     }
+
+    await this.syncSchedulerLock(batch.scheduler_id);
 
     await this.auditService.log({
       tenantId,
@@ -1497,6 +1599,7 @@ export class BatchService {
           updated_at: toMysqlTimestamp(),
         })
         .where(eq(schema.batchHeader.batch_id, id));
+      await this.syncSchedulerLock(batch.scheduler_id);
     }
 
     await this.auditService.log({

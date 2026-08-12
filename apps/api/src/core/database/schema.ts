@@ -1701,6 +1701,9 @@ export const schedulerMaster = mysqlTable('scheduler_master', {
   duration_unit: varchar('duration_unit', { length: 10 }).notNull(), // DAY, WEEK, MONTH
   breed_id: varchar('breed_id', { length: 36 }).references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
   is_locked: boolean('is_locked').default(false).notNull(),
+  // Informational label only (e.g. "Start Date") — day-of-batch math always
+  // anchors to batch_header.start_date regardless of this value.
+  batch_start_from: varchar('batch_start_from', { length: 50 }),
   description: text('description'),
   is_active: boolean('is_active').default(true).notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -1716,6 +1719,7 @@ export const schedulerParameterLine = mysqlTable('scheduler_parameter_line', {
   period_from: int('period_from').notNull(),
   period_to: int('period_to').notNull(),
   period_label: varchar('period_label', { length: 50 }),
+  occurrence: varchar('occurrence', { length: 10 }), // DAILY, WEEKLY, MONTHLY
   // When set, this KPI line only applies once the batch has transferred into
   // this stage (batch_header.current_stage_code) — lets a scheduler define
   // different thresholds pre- vs. post-transfer (e.g. setter vs. hatcher
