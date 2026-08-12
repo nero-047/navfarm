@@ -50,38 +50,41 @@ export class TenantMiddleware implements NestMiddleware {
       }
     }
 
-    // 3. Bypass public authentication and onboarding wizard steps
-    const isPublic = 
-      path.includes('/auth/login') || 
-      path.includes('/auth/register-admin') || 
+    // 3. Routes that never touch the CLS-scoped tenantDb — tenant provisioning
+    // itself (no tenant exists yet to scope to), cross-tenant login lookup
+    // (searches every tenant DB itself), and the system-wide plan catalog
+    // (reads MASTER_CONNECTION directly). Everything else — including every
+    // setup-wizard step and register-admin — reads/writes via the CLS tenantDb
+    // and must supply x-tenant-id explicitly: silently defaulting to the
+    // system tenant here previously let a missing header route real writes
+    // (e.g. a wizard step, or a new admin user) into the system tenant's
+    // database instead of the intended one.
+    const isPublic =
+      path.includes('/auth/login') ||
       path.includes('/tenant') ||
-      path.includes('/plan') ||
-      path.includes('/setup/wizard');
+      path.includes('/plan');
 
     const effectiveTenantId = tenantId || tokenTenantId;
 
     if (!effectiveTenantId && !isPublic && !isSystemAdmin) {
       throw new BadRequestException('x-tenant-id header is missing');
     }
-    
-    // Default to the system tenant ID if no custom tenant header is supplied
-    const activeTenantId = effectiveTenantId || '00000000-0000-0000-0000-000000000000';
 
-    if (activeTenantId) {
+    if (effectiveTenantId) {
       // Resolve tenant connection credentials from master database by ID or Subdomain Code
       const [tenant] = await this.masterDb
         .select()
         .from(masterSchema.tenantMaster)
         .where(
           or(
-            eq(masterSchema.tenantMaster.tenant_id, activeTenantId),
-            eq(masterSchema.tenantMaster.tenant_code, activeTenantId.toLowerCase())
+            eq(masterSchema.tenantMaster.tenant_id, effectiveTenantId),
+            eq(masterSchema.tenantMaster.tenant_code, effectiveTenantId.toLowerCase())
           )
         )
         .limit(1);
 
       if (!tenant) {
-        throw new BadRequestException(`Tenant connection context for '${activeTenantId}' not found.`);
+        throw new BadRequestException(`Tenant connection context for '${effectiveTenantId}' not found.`);
       }
 
       if (!tenant.is_active) {

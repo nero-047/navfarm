@@ -82,6 +82,7 @@ export class SchedulerService {
         period_from: line.period_from,
         period_to: line.period_to,
         period_label: line.period_label || null,
+        stage_code: line.stage_code || null,
         expected_qty_override: line.expected_qty_override?.toString() || null,
         uom_override: line.uom_override || null,
         kpi_enabled: line.kpi_enabled ?? true,

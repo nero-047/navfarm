@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, isNull, count } from 'drizzle-orm';
+import { eq, and, like, isNull, count, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -58,9 +58,44 @@ export class JournalService {
     return { totalDebit, totalCredit };
   }
 
+  // Manual journal lines carry a client-supplied gl_account_id — the DB FK
+  // only guarantees the row exists somewhere in the tenant DB, not that it
+  // belongs to this journal's company or is still postable. Without this,
+  // a journal for Company A could post against Company B's chart of
+  // accounts (both live in the same physical tenant database), or against
+  // an account that's since been deactivated.
+  private async validateJournalAccounts(companyId: string, lines: { gl_account_id: string }[]) {
+    const accountIds = [...new Set(lines.map((l) => l.gl_account_id))];
+    const accounts = await this.db
+      .select({
+        gl_account_id: schema.glAccountMaster.gl_account_id,
+        account_code: schema.glAccountMaster.account_code,
+        company_id: schema.glAccountMaster.company_id,
+        is_active: schema.glAccountMaster.is_active,
+      })
+      .from(schema.glAccountMaster)
+      .where(inArray(schema.glAccountMaster.gl_account_id, accountIds));
+
+    const byId = new Map(accounts.map((a) => [a.gl_account_id, a]));
+    for (const id of accountIds) {
+      const account = byId.get(id);
+      if (!account) {
+        throw new BadRequestException(`GL account '${id}' not found.`);
+      }
+      if (account.company_id !== companyId) {
+        throw new BadRequestException(`GL account '${account.account_code}' does not belong to this company.`);
+      }
+      if (!account.is_active) {
+        throw new BadRequestException(`GL account '${account.account_code}' is inactive and cannot be posted to.`);
+      }
+    }
+  }
+
   // --- Manual journal entries (draft -> post lifecycle) ---
 
   async create(dto: CreateJournalDto, tenantId: string, userPayload?: any) {
+    await this.validateJournalAccounts(dto.company_id, dto.lines);
+
     const journalId = randomUUID();
     const { totalDebit, totalCredit } = this.sumLines(dto.lines);
 
@@ -169,6 +204,7 @@ export class JournalService {
     if (dto.description !== undefined) updates.description = dto.description;
 
     if (dto.lines) {
+      await this.validateJournalAccounts(journal.company_id, dto.lines);
       const { totalDebit, totalCredit } = this.sumLines(dto.lines);
       updates.total_debit = totalDebit.toString();
       updates.total_credit = totalCredit.toString();

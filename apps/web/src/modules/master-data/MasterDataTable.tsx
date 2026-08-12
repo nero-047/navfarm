@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Search, AlertCircle, Loader2, Inbox } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Inbox } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { InlineAlert } from "@/components/ui/alert";
+import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import type { MasterDataConfig, MasterDataField } from "./types";
+
+const PAGE_SIZE = 25;
 
 type Row = Record<string, any>;
 
@@ -93,6 +97,9 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [confirmDelete, setConfirmDelete] = useState<Row | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+
   const companyId = getActiveCompanyId();
   const formFields = config.fields.filter((f) => !f.hideInForm);
   const visibleFields = editing ? formFields.filter((f) => !f.createOnly) : formFields;
@@ -122,6 +129,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.key, search, nobFilter, lobFilter]);
+
+  useEffect(() => { setPage(1); }, [config.key, search, nobFilter, lobFilter, pageSize]);
+
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
     if (!config.supportsNobLobFilter) return;
@@ -388,11 +399,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         </div>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-        </div>
-      )}
+      {error && <InlineAlert>{error}</InlineAlert>}
 
       <div className="overflow-hidden rounded-2xl border" style={S.surface}>
         <div className="overflow-x-auto">
@@ -416,11 +423,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length + 2} className="px-4 py-10 text-center text-xs" style={S.sub}>
-                    <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No {config.label.toLowerCase()} yet.
+                    <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
+                    No {config.label.toLowerCase()} yet.
+                    <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>+ Add the first one</button>
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                pagedRows.map((row) => {
                   const inactive = row.is_active === false;
                   return (
                     <tr key={row[config.idKey]} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
@@ -432,7 +441,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                           className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
                           style={inactive
                             ? { color: "var(--text-muted)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }
-                            : { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--accent-muted)" }}
+                            : { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" }}
                         >
                           {inactive ? "Inactive" : "Active"}
                         </span>
@@ -442,7 +451,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                           <button onClick={() => openEdit(row)} title="Edit" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button onClick={() => setConfirmDelete(row)} title="Deactivate" className="rounded-lg p-1.5 text-red-500 transition hover:bg-red-50">
+                          <button onClick={() => setConfirmDelete(row)} title="Deactivate" className="rounded-lg p-1.5 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -454,6 +463,11 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             </tbody>
           </table>
         </div>
+        {!loading && rows.length > 0 && (
+          <div className="border-t px-2" style={{ borderColor: "var(--border)" }}>
+            <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizeOptions={[25, 50, 100]} />
+          </div>
+        )}
       </div>
 
       <Dialog
@@ -478,11 +492,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         }
       >
         <div className="flex flex-col gap-4">
-          {formError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formError}
-            </div>
-          )}
+          {formError && <InlineAlert>{formError}</InlineAlert>}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {visibleFields.map((f) => (
               <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
@@ -508,7 +518,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             <button onClick={() => setConfirmDelete(null)} disabled={deleting} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>
               Cancel
             </button>
-            <button onClick={handleDelete} disabled={deleting} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+            <button onClick={handleDelete} disabled={deleting} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}>
               {deleting ? "Deactivating…" : "Deactivate"}
             </button>
           </>

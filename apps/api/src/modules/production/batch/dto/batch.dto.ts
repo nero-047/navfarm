@@ -19,7 +19,7 @@ import { Type } from 'class-transformer';
 const COSTING_METHODS = ['STANDARD', 'FIFO', 'BIO_ASSET'] as const;
 const DISPOSAL_TYPES = ['HARVEST', 'SOLD'] as const;
 const TRANSACTION_TYPES = ['CONSUMPTION', 'MORTALITY', 'OUTPUT', 'OVERHEAD', 'OBSERVATION'] as const;
-const OUTPUT_TYPES = ['MAIN', 'BY_PRODUCT'] as const;
+const OUTPUT_TYPES = ['MAIN', 'BY_PRODUCT', 'WASTE'] as const;
 
 export class BatchInputLineInput {
   @ApiProperty({ description: 'Item UUID being placed into the batch' })
@@ -165,6 +165,57 @@ export class CreateBatchDto {
   standard?: BatchStandardInput;
 }
 
+export class RenewBatchDto {
+  @ApiProperty({ description: 'New cycle start date', example: '2027-06-01' })
+  @IsDateString()
+  @IsNotEmpty()
+  start_date: string;
+
+  @ApiProperty({ description: 'Expected end date for the new cycle', required: false })
+  @IsDateString()
+  @IsOptional()
+  expected_end_date?: string;
+
+  @ApiProperty({ description: 'Opening quantity for the new cycle', example: 100 })
+  @IsNumber()
+  @IsNotEmpty()
+  opening_quantity: number;
+
+  @ApiProperty({ description: 'Unit of measure for the opening quantity' })
+  @IsString()
+  @IsNotEmpty()
+  uom: string;
+
+  @ApiProperty({ description: 'Remarks', required: false })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+
+  @ApiProperty({ description: 'Input lines for the new cycle — everything else (breed, scheduler, shed, costing method, standard assumptions) is carried forward from the source batch', type: [BatchInputLineInput] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => BatchInputLineInput)
+  input_lines: BatchInputLineInput[];
+}
+
+export class TransferStageDto {
+  @ApiProperty({ description: 'The stage/sub-location code the batch is moving into (LOB-defined, free text — e.g. HATCHER_ROOM)', example: 'HATCHER_ROOM' })
+  @IsString()
+  @IsNotEmpty()
+  to_stage_code: string;
+
+  @ApiProperty({ description: 'Destination location UUID (optional)', required: false })
+  @IsUUID()
+  @IsOptional()
+  to_location_id?: string;
+
+  @ApiProperty({ description: 'Remarks', required: false })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+}
+
 export class AddBatchTransactionDto {
   @ApiProperty({ description: 'Transaction date', example: '2026-08-07' })
   @IsDateString()
@@ -206,6 +257,17 @@ export class AddBatchTransactionDto {
   @IsString()
   @IsOptional()
   remarks?: string;
+
+  @ApiProperty({ description: 'Output classification (OUTPUT type only) — set to BY_PRODUCT/WASTE with nrv_rate to remove a by-product mid-batch at Net Realisable Value, distinct from the main product', enum: OUTPUT_TYPES, required: false })
+  @IsString()
+  @IsOptional()
+  @IsIn(OUTPUT_TYPES)
+  output_type?: string;
+
+  @ApiProperty({ description: 'Net Realisable Value per unit (OUTPUT type, output_type=BY_PRODUCT/WASTE only) — the value this quantity actually enters inventory at; the difference vs. its at-cost value posts as an impairment loss', required: false })
+  @IsNumber()
+  @IsOptional()
+  nrv_rate?: number;
 }
 
 export class BatchOutputLineInput {

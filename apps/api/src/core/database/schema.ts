@@ -1442,6 +1442,18 @@ export const batchHeader = mysqlTable('batch_header', {
   scheduler_id: varchar('scheduler_id', { length: 36 }).references(() => schedulerMaster.scheduler_id, { onDelete: 'restrict' }),
   shed_id: varchar('shed_id', { length: 36 }),
   location_id: varchar('location_id', { length: 36 }),
+  // Config lineage for the renew()/copy-forward flow (perpetual/seasonal LOBs
+  // like orchards, apiaries) — distinct from batch_input_line.source_batch_id,
+  // which tracks cost traceability. No FK constraint, same lightweight
+  // pointer pattern as source_batch_id below.
+  renewed_from_batch_id: varchar('renewed_from_batch_id', { length: 36 }),
+  // Current physical stage (e.g. SETTER_ROOM -> HATCHER_ROOM) — free text,
+  // LOB-defined rather than a fixed enum, since stages vary per LOB. Distinct
+  // from shed_id/location_id above (the batch's starting assignment); this is
+  // the CURRENT sub-location, updated by transferStage(). History lives in
+  // batch_stage_log.
+  current_stage_code: varchar('current_stage_code', { length: 50 }),
+  sub_location_id: varchar('sub_location_id', { length: 36 }),
   start_date: date('start_date', { mode: 'string' }).notNull(),
   expected_end_date: date('expected_end_date', { mode: 'string' }),
   actual_end_date: date('actual_end_date', { mode: 'string' }),
@@ -1529,6 +1541,22 @@ export const batchOutputLine = mysqlTable('batch_output_line', {
   computed_cost: decimal('computed_cost', { precision: 18, scale: 4 }),
   unit_cost: decimal('unit_cost', { precision: 18, scale: 6 }),
   warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+});
+
+// Append-only audit trail of batch_header.current_stage_code/sub_location_id
+// transitions (transferStage()) — mirrors bio_asset_ledger's append-only
+// pattern. No cost/GL impact; this is a physical/tracking event, not a cost
+// event (matches spec: "sub-location transfer... No journal, location update").
+export const batchStageLog = mysqlTable('batch_stage_log', {
+  log_id: varchar('log_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  from_stage_code: varchar('from_stage_code', { length: 50 }),
+  to_stage_code: varchar('to_stage_code', { length: 50 }).notNull(),
+  from_location_id: varchar('from_location_id', { length: 36 }),
+  to_location_id: varchar('to_location_id', { length: 36 }),
+  transferred_at: timestamp('transferred_at', { mode: 'string' }).defaultNow().notNull(),
+  transferred_by: varchar('transferred_by', { length: 36 }),
+  remarks: text('remarks'),
 });
 
 export const batchHeaderRelations = relations(batchHeader, ({ one, many }) => ({
@@ -1688,6 +1716,11 @@ export const schedulerParameterLine = mysqlTable('scheduler_parameter_line', {
   period_from: int('period_from').notNull(),
   period_to: int('period_to').notNull(),
   period_label: varchar('period_label', { length: 50 }),
+  // When set, this KPI line only applies once the batch has transferred into
+  // this stage (batch_header.current_stage_code) — lets a scheduler define
+  // different thresholds pre- vs. post-transfer (e.g. setter vs. hatcher
+  // temperature ranges). Null = applies regardless of stage (today's behavior).
+  stage_code: varchar('stage_code', { length: 50 }),
   expected_qty_override: decimal('expected_qty_override', { precision: 18, scale: 8 }),
   uom_override: varchar('uom_override', { length: 20 }),
   kpi_enabled: boolean('kpi_enabled').default(true).notNull(),

@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, AlertCircle, Loader2, Inbox, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Loader2, Inbox, CheckCircle2 } from "lucide-react";
 import { api } from "@/services/api-client";
+import { InlineAlert } from "@/components/ui/alert";
+import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+
+const PAGE_SIZE = 25;
 
 type Row = Record<string, any>;
 
@@ -32,6 +36,8 @@ export default function AlertPanel() {
   const [severityFilter, setSeverityFilter] = useState("");
   const [readFilter, setReadFilter] = useState("");
   const [acting, setActing] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const companyId = getActiveCompanyId();
 
@@ -58,10 +64,13 @@ export default function AlertPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [severityFilter, readFilter]);
 
+  useEffect(() => { setPage(1); }, [severityFilter, readFilter, pageSize]);
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
+
   const markRead = async (id: string) => {
     setActing(id);
     try {
-      await api.post(`/alert/${id}/read`, {});
+      await api.post(`/alert/${id}/read`, { companyId });
       load();
     } catch (err: any) {
       setError(err?.message || "Failed to mark alert as read.");
@@ -92,9 +101,7 @@ export default function AlertPanel() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-        </div>
+        <InlineAlert>{error}</InlineAlert>
       )}
 
       <div className="flex flex-col gap-2">
@@ -103,7 +110,7 @@ export default function AlertPanel() {
         ) : rows.length === 0 ? (
           <div className="rounded-2xl border p-10 text-center text-xs" style={{ ...S.surface, ...S.sub }}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No alerts.</div>
         ) : (
-          rows.map((alert) => (
+          pagedRows.map((alert) => (
             <div key={alert.alert_id} className="flex items-start justify-between gap-3 rounded-2xl border p-4" style={{ ...S.surface, opacity: alert.is_read ? 0.6 : 1 }}>
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: SEVERITY_STYLE[alert.severity]?.color }} />
@@ -129,6 +136,10 @@ export default function AlertPanel() {
           ))
         )}
       </div>
+
+      {!loading && rows.length > 0 && (
+        <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+      )}
     </div>
   );
 }

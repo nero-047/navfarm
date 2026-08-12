@@ -136,50 +136,68 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password_hash, salt);
 
     const result = await this.db.transaction(async (tx) => {
-      // 3. Ensure the SUPER_ADMIN role exists for this company
-      let [superAdminRole] = await tx
-        .select()
-        .from(schema.roleMaster)
-        .where(
-          and(
-            eq(schema.roleMaster.company_id, dto.company_id),
-            eq(schema.roleMaster.role_code, 'SUPER_ADMIN')
-          )
-        )
-        .limit(1);
+      // 3. Ensure the SUPER_ADMIN role exists for this company — but only
+      // bother/use it for TENANT_ADMIN and COMPANY_ADMIN accounts. Both
+      // already bypass every permission check unconditionally on their
+      // userType alone (see RolesGuard.canActivate and the frontend's
+      // hasPermission()), so this role is pure bootstrap scaffolding for
+      // them — never actually consulted. For STANDARD_USER it's the
+      // opposite: RolesGuard and hasPermission() DO look up this user's
+      // assigned role's permissions, so auto-granting SUPER_ADMIN
+      // (module_code/resource 'ALL', every action true) here handed every
+      // newly invited staff account unrestricted access to the entire
+      // company from the moment they were created, until an admin
+      // remembered to go assign them something narrower via Team
+      // Management. A standard user should start with zero permissions,
+      // not full access that quietly gets revoked later.
+      const isStandardUser = dto.user_type === 'STANDARD_USER';
+      let superAdminRole: typeof schema.roleMaster.$inferSelect | undefined;
 
-      if (!superAdminRole) {
-        const roleId = crypto.randomUUID();
-        await tx
-          .insert(schema.roleMaster)
-          .values({
-            role_id: roleId,
-            company_id: dto.company_id,
-            role_code: 'SUPER_ADMIN',
-            role_name: 'Super Administrator',
-            role_description: 'Full administrative control over all company scopes',
-            is_system_role: true,
-          });
-
+      if (!isStandardUser) {
         [superAdminRole] = await tx
           .select()
           .from(schema.roleMaster)
-          .where(eq(schema.roleMaster.role_id, roleId))
+          .where(
+            and(
+              eq(schema.roleMaster.company_id, dto.company_id),
+              eq(schema.roleMaster.role_code, 'SUPER_ADMIN')
+            )
+          )
           .limit(1);
 
-        // Seed all permissions for SUPER_ADMIN
-        await tx.insert(schema.rolePermissions).values({
-          role_id: superAdminRole.role_id,
-          module_code: 'ALL',
-          resource: 'ALL',
-          can_view: true,
-          can_create: true,
-          can_edit: true,
-          can_delete: true,
-          can_approve: true,
-          can_export: true,
-          can_print: true,
-        });
+        if (!superAdminRole) {
+          const roleId = crypto.randomUUID();
+          await tx
+            .insert(schema.roleMaster)
+            .values({
+              role_id: roleId,
+              company_id: dto.company_id,
+              role_code: 'SUPER_ADMIN',
+              role_name: 'Super Administrator',
+              role_description: 'Full administrative control over all company scopes',
+              is_system_role: true,
+            });
+
+          [superAdminRole] = await tx
+            .select()
+            .from(schema.roleMaster)
+            .where(eq(schema.roleMaster.role_id, roleId))
+            .limit(1);
+
+          // Seed all permissions for SUPER_ADMIN
+          await tx.insert(schema.rolePermissions).values({
+            role_id: superAdminRole.role_id,
+            module_code: 'ALL',
+            resource: 'ALL',
+            can_view: true,
+            can_create: true,
+            can_edit: true,
+            can_delete: true,
+            can_approve: true,
+            can_export: true,
+            can_print: true,
+          });
+        }
       }
 
       // 4. Create user record
@@ -204,12 +222,14 @@ export class AuthService {
         .where(eq(schema.userMaster.user_id, userId))
         .limit(1);
 
-      // 5. Assign SUPER_ADMIN role to user
-      await tx.insert(schema.userRoleAssignment).values({
-        user_id: user.user_id,
-        role_id: superAdminRole.role_id,
-        assigned_by: user.user_id, // Self-assigned for initial admin setup
-      });
+      // 5. Assign SUPER_ADMIN role to user (skipped entirely for STANDARD_USER — see above)
+      if (superAdminRole) {
+        await tx.insert(schema.userRoleAssignment).values({
+          user_id: user.user_id,
+          role_id: superAdminRole.role_id,
+          assigned_by: user.user_id, // Self-assigned for initial admin setup
+        });
+      }
 
       return {
         user_id: user.user_id,

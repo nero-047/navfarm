@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { AlertService } from './alert.service';
-import { QueryAlertDto } from './dto/alert.dto';
+import { QueryAlertDto, MarkAlertReadDto } from './dto/alert.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -29,8 +29,8 @@ export class AlertController {
   @RequirePermission('PRODUCTION', 'BATCH', 'view')
   @ApiOperation({ summary: 'Mark an alert as read/acknowledged' })
   @ApiParam({ name: 'id', description: 'Alert UUID' })
-  async markRead(@Param('id') id: string, @Req() req: any) {
-    const result = await this.alertService.markRead(id, req.user);
+  async markRead(@Param('id') id: string, @Body() dto: MarkAlertReadDto, @Req() req: any) {
+    const result = await this.alertService.markRead(id, dto.companyId, req.user);
     return { success: true, message: 'Alert marked as read.', data: result };
   }
 }

@@ -47,6 +47,11 @@ export class SchedulerParameterLineInput {
   @IsOptional()
   period_label?: string;
 
+  @ApiProperty({ description: 'Only apply this line once the batch has transferred into this stage/sub-location (batch_header.current_stage_code) — omit to apply regardless of stage', required: false, example: 'HATCHER_ROOM' })
+  @IsString()
+  @IsOptional()
+  stage_code?: string;
+
   @ApiProperty({ description: "Override the parameter's default expected quantity for this period", required: false })
   @IsNumber()
   @IsOptional()

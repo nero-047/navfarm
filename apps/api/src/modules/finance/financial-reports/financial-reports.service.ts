@@ -116,6 +116,31 @@ export class FinancialReportsService {
     const liabilities = rows.filter((r) => r.account_type === 'LIABILITY').map(toLine).sort((a, b) => a.account_code.localeCompare(b.account_code));
     const equity = rows.filter((r) => r.account_type === 'EQUITY').map(toLine).sort((a, b) => a.account_code.localeCompare(b.account_code));
 
+    // There's no period-close step anywhere in this system (no journal entry
+    // ever zeroes Income/Expense into a retained-earnings GL account), so an
+    // interim balance sheet has nowhere for the period's trading result to
+    // land — Assets would never equal Liabilities + Equity for any company
+    // with real revenue/expense activity. Computed on the fly (all posted
+    // Income/Expense activity from inception through asOfDate, same
+    // convention as the Asset/Liability/Equity pull above) and shown as one
+    // synthetic Equity line, rather than requiring a formal closing entry.
+    const plRows = await this.getAccountBalances(tenantId, companyId, lte(schema.journalHeader.posting_date, asOfDate), [
+      'INCOME',
+      'EXPENSE',
+    ]);
+    const totalIncome = plRows.filter((r) => r.account_type === 'INCOME').reduce((sum, r) => sum + netBalance(r), 0);
+    const totalExpense = plRows.filter((r) => r.account_type === 'EXPENSE').reduce((sum, r) => sum + netBalance(r), 0);
+    const retainedEarnings = totalIncome - totalExpense;
+
+    if (Math.abs(retainedEarnings) > 0.0001) {
+      equity.push({
+        gl_account_id: 'retained-earnings-current-period',
+        account_code: 'RE-CURRENT',
+        account_name: 'Retained Earnings (Current Period)',
+        balance: retainedEarnings,
+      });
+    }
+
     const totalAssets = assets.reduce((sum, a) => sum + a.balance, 0);
     const totalLiabilities = liabilities.reduce((sum, a) => sum + a.balance, 0);
     const totalEquity = equity.reduce((sum, a) => sum + a.balance, 0);

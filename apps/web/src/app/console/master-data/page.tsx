@@ -35,11 +35,14 @@ export default function MasterDataPage() {
   if (user.userType !== "COMPANY_ADMIN" && user.userType !== "SYSTEM_ADMIN") {
     return (
       <div className="mx-auto max-w-2xl p-8">
-        <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-800">
+        <div
+          className="flex items-center gap-3 rounded-2xl border p-5"
+          style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}
+        >
           <ShieldAlert className="h-5 w-5 shrink-0" />
           <div>
             <p className="text-sm font-semibold">Master Data is managed by Company Admins</p>
-            <p className="mt-1 text-xs">Your account ({user.userType.replace(/_/g, " ").toLowerCase()}) doesn&apos;t have access to this section. Contact your company administrator if you need a change made here.</p>
+            <p className="mt-1 text-xs" style={S.sub}>Your account ({user.userType.replace(/_/g, " ").toLowerCase()}) doesn&apos;t have access to this section. Contact your company administrator if you need a change made here.</p>
           </div>
         </div>
       </div>

@@ -65,6 +65,10 @@ export const STARTER_GL_MAPPINGS: StarterGlMapping[] = [
   { transaction_type: 'BATCH_CONSUMPTION', debit_account_code: '1020', credit_account_code: '1010' },
   { transaction_type: 'BATCH_OUTPUT', debit_account_code: '1030', credit_account_code: '1020' },
   { transaction_type: 'MORTALITY', debit_account_code: '5010', credit_account_code: '1020' },
+  // Mid-batch by-product/waste removal at NRV — the gap between what it cost
+  // to produce and what it's actually worth, relieved from WIP the same way
+  // MORTALITY is (see batch.service.ts addTransaction()'s OUTPUT branch).
+  { transaction_type: 'BATCH_IMPAIRMENT', debit_account_code: '5070', credit_account_code: '1020' },
   { transaction_type: 'OVERHEAD', debit_account_code: '1020', credit_account_code: '2010' },
   { transaction_type: 'PRICE_VARIANCE', debit_account_code: '5030', credit_account_code: '1020' },
   { transaction_type: 'USAGE_VARIANCE', debit_account_code: '5040', credit_account_code: '1020' },

@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, AlertCircle, Loader2, Inbox, Ban } from "lucide-react";
+import { Search, Loader2, Inbox, Ban } from "lucide-react";
 import QRCode from "react-qr-code";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { InlineAlert } from "@/components/ui/alert";
+import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+
+const PAGE_SIZE = 25;
 
 type Row = Record<string, any>;
 
@@ -31,6 +35,8 @@ export default function PacksPanel() {
   const [batches, setBatches] = useState<Row[]>([]);
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<Row | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const companyId = getActiveCompanyId();
 
@@ -72,6 +78,9 @@ export default function PacksPanel() {
     ? rows.filter((r) => (r.pack_no || "").toLowerCase().includes(search.toLowerCase()) || (r.lot_no || "").toLowerCase().includes(search.toLowerCase()))
     : rows;
 
+  useEffect(() => { setPage(1); }, [search, pageSize]);
+  const pagedFiltered = filtered.slice((page - 1) * pageSize, page * pageSize);
+
   const handleVoid = async (row: Row) => {
     if (!confirm(`Void pack ${row.pack_no}? This cannot be undone.`)) return;
     setVoidingId(row.qr_id);
@@ -101,9 +110,7 @@ export default function PacksPanel() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-        </div>
+        <InlineAlert>{error}</InlineAlert>
       )}
 
       {loading ? (
@@ -112,7 +119,7 @@ export default function PacksPanel() {
         <div className="rounded-2xl border py-10 text-center text-xs" style={{ ...S.surface, ...S.sub }}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No packs generated yet.</div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((row) => (
+          {pagedFiltered.map((row) => (
             <button
               key={row.qr_id}
               onClick={() => setViewing(row)}
@@ -121,7 +128,7 @@ export default function PacksPanel() {
             >
               <div className="flex w-full items-center justify-between">
                 <span className="text-xs font-bold" style={S.primary}>{row.pack_no}</span>
-                {row.is_voided && <span className="rounded-full border px-2 py-0.5 text-[9px] font-semibold text-red-600 border-red-300 bg-red-50">VOIDED</span>}
+                {row.is_voided && <span className="rounded-full border px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }}>VOIDED</span>}
                 {row.grade && !row.is_voided && <span className="rounded-full border px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>Grade {row.grade}</span>}
               </div>
               <div className="flex w-full justify-center rounded-lg bg-white p-2">
@@ -138,6 +145,10 @@ export default function PacksPanel() {
         </div>
       )}
 
+      {!loading && filtered.length > 0 && (
+        <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+      )}
+
       <Dialog
         open={!!viewing}
         onClose={() => setViewing(null)}
@@ -145,7 +156,7 @@ export default function PacksPanel() {
         footer={
           <div className="flex w-full items-center justify-between">
             {viewing && !viewing.is_voided ? (
-              <button onClick={() => viewing && handleVoid(viewing)} disabled={voidingId === viewing.qr_id} className="flex items-center gap-1.5 rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 disabled:opacity-50">
+              <button onClick={() => viewing && handleVoid(viewing)} disabled={voidingId === viewing.qr_id} className="flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
                 <Ban className="h-4 w-4" /> {voidingId === viewing.qr_id ? "Voiding…" : "Void Pack"}
               </button>
             ) : <span />}

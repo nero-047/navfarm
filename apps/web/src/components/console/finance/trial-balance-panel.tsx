@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2, Inbox } from "lucide-react";
+import { Loader2, Inbox } from "lucide-react";
+import { InlineAlert } from "@/components/ui/alert";
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 
@@ -64,9 +65,7 @@ export default function TrialBalancePanel() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-        </div>
+        <InlineAlert>{error}</InlineAlert>
       )}
 
       <div className="overflow-hidden rounded-2xl border" style={S.surface}>

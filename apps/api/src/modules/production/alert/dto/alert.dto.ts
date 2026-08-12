@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsUUID, IsString, IsInt, Min, IsBoolean } from 'class-validator';
+import { IsOptional, IsUUID, IsString, IsInt, Min, IsBoolean, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class MarkAlertReadDto {
+  @ApiProperty({ description: 'Company UUID the alert belongs to' })
+  @IsUUID()
+  @IsNotEmpty()
+  companyId: string;
+}
 
 export class QueryAlertDto {
   @ApiProperty({ required: false })

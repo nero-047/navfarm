@@ -30,32 +30,40 @@ export class GoodsReceiptService {
     return tenantDb;
   }
 
-  private async generateReceiptNo(tenantId: string, companyId: string): Promise<string> {
-    const [row] = await this.db
+  // `executor` must be the active transaction when called from inside one —
+  // `.for('update')` locks the counted rows so a second concurrent call
+  // blocks until the first commits its insert, instead of both reading the
+  // same count and generating the same receipt number (matches the pattern
+  // already used by the other 3 document types' number generators).
+  private async generateReceiptNo(tenantId: string, companyId: string, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
+    const [row] = await executor
       .select({ total: count() })
       .from(schema.goodsReceipt)
-      .where(and(eq(schema.goodsReceipt.tenant_id, tenantId), eq(schema.goodsReceipt.company_id, companyId)));
+      .where(and(eq(schema.goodsReceipt.tenant_id, tenantId), eq(schema.goodsReceipt.company_id, companyId)))
+      .for('update');
     const seq = Number(row?.total || 0) + 1;
     return `GR-${String(seq).padStart(6, '0')}`;
   }
 
   async create(dto: CreateGoodsReceiptDto, tenantId: string, userPayload?: any) {
     const receiptId = randomUUID();
-    const receiptNo = await this.generateReceiptNo(tenantId, dto.company_id);
-
-    await this.db.insert(schema.goodsReceipt).values({
-      receipt_id: receiptId,
-      tenant_id: tenantId,
-      company_id: dto.company_id,
-      receipt_no: receiptNo,
-      posting_date: dto.posting_date,
-      warehouse_id: dto.warehouse_id,
-      supplier_id: dto.supplier_id || null,
-      external_reference_no: dto.external_reference_no || null,
-      remarks: dto.remarks || null,
-      status: 'DRAFT',
-      created_by: userPayload?.userId || null,
-      updated_by: userPayload?.userId || null,
+    const receiptNo = await this.db.transaction(async (tx) => {
+      const no = await this.generateReceiptNo(tenantId, dto.company_id, tx);
+      await tx.insert(schema.goodsReceipt).values({
+        receipt_id: receiptId,
+        tenant_id: tenantId,
+        company_id: dto.company_id,
+        receipt_no: no,
+        posting_date: dto.posting_date,
+        warehouse_id: dto.warehouse_id,
+        supplier_id: dto.supplier_id || null,
+        external_reference_no: dto.external_reference_no || null,
+        remarks: dto.remarks || null,
+        status: 'DRAFT',
+        created_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      });
+      return no;
     });
 
     await this.insertLines(receiptId, dto.lines);
@@ -216,6 +224,24 @@ export class GoodsReceiptService {
       throw new BadRequestException('Cannot post a Goods Receipt with no lines.');
     }
 
+    // Claim the DRAFT -> POSTED transition atomically before writing any
+    // ledger/GL entries — see goods-issue.service.ts's post() for the full
+    // rationale (closes both the double-post race and the "retry after a
+    // partial failure duplicates the successful lines" hole).
+    const [claim] = await this.db
+      .update(schema.goodsReceipt)
+      .set({
+        status: 'POSTED',
+        posted_at: toMysqlTimestamp() as any,
+        posted_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      })
+      .where(and(eq(schema.goodsReceipt.receipt_id, id), eq(schema.goodsReceipt.status, 'DRAFT')));
+
+    if (claim.affectedRows === 0) {
+      throw new BadRequestException('Goods Receipt cannot be posted — it was already posted by another request.');
+    }
+
     for (const line of receipt.lines) {
       const ledgerEntry = await this.ledgerService.writePositiveEntry({
         tenantId,
@@ -239,16 +265,6 @@ export class GoodsReceiptService {
 
       await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
     }
-
-    await this.db
-      .update(schema.goodsReceipt)
-      .set({
-        status: 'POSTED',
-        posted_at: toMysqlTimestamp() as any,
-        posted_by: userPayload?.userId || null,
-        updated_by: userPayload?.userId || null,
-      })
-      .where(eq(schema.goodsReceipt.receipt_id, id));
 
     await this.auditService.log({
       tenantId,

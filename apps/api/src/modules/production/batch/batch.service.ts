@@ -13,6 +13,8 @@ import {
   AmortizeBioAssetDto,
   RecordFairValueDto,
   DisposeBioAssetDto,
+  RenewBatchDto,
+  TransferStageDto,
 } from './dto/batch.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { InventoryLedgerService } from '../../inventory/inventory-ledger/inventory-ledger.service';
@@ -170,6 +172,75 @@ export class BatchService {
     return this.findOne(batchId);
   }
 
+  /**
+   * Copy-forward for perpetual/seasonal LOBs (orchards, apiaries) — creates a
+   * new DRAFT batch carrying the source's config (breed, scheduler, shed,
+   * costing method, standard-cost assumptions) forward, needing only the new
+   * cycle's own start date / opening quantity / input lines. Gated by
+   * lob_master.batch_copy_allowed — matches the spec's "annual batch copy"
+   * (year-end: COPY batch for next season, scheduler + location auto-copied).
+   */
+  async renew(id: string, dto: RenewBatchDto, tenantId: string, userPayload?: any) {
+    const source = await this.findOne(id);
+    this.assertStatus(source, 'CLOSED');
+
+    const [lob] = await this.db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, source.lob_id)).limit(1);
+    if (lob?.batch_copy_allowed !== 'YES') {
+      throw new BadRequestException(`LOB '${lob?.lob_name || source.lob_id}' does not allow batch renewal.`);
+    }
+
+    const created = await this.create(
+      {
+        company_id: source.company_id,
+        lob_id: source.lob_id,
+        costing_method: source.costing_method,
+        breed_id: source.breed_id || undefined,
+        scheduler_id: source.scheduler_id || undefined,
+        shed_id: source.shed_id || undefined,
+        location_id: source.location_id || undefined,
+        start_date: dto.start_date,
+        expected_end_date: dto.expected_end_date,
+        opening_quantity: dto.opening_quantity,
+        uom: dto.uom,
+        remarks: dto.remarks,
+        input_lines: dto.input_lines,
+        standard: source.standard
+          ? {
+              // std_output_quantity is deliberately NOT carried forward — it's
+              // re-derived from the new opening_quantity × breed mortality%
+              // by create() itself, the same way a fresh batch would.
+              std_output_cost_per_unit: source.standard.std_output_cost_per_unit ? Number(source.standard.std_output_cost_per_unit) : undefined,
+              std_overhead_rate_per_unit: source.standard.std_overhead_rate_per_unit ? Number(source.standard.std_overhead_rate_per_unit) : undefined,
+              consumption_lines: (source.standard.consumption_lines || []).map((l: any) => ({
+                item_id: l.item_id,
+                std_qty_per_unit_per_day: Number(l.std_qty_per_unit_per_day),
+                std_rate: l.std_rate ? Number(l.std_rate) : undefined,
+              })),
+            }
+          : undefined,
+      },
+      tenantId,
+      userPayload
+    );
+
+    await this.db
+      .update(schema.batchHeader)
+      .set({ renewed_from_batch_id: id, updated_by: userPayload?.userId || null, updated_at: toMysqlTimestamp() })
+      .where(eq(schema.batchHeader.batch_id, created.batch_id));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: source.company_id,
+      userId: userPayload?.userId,
+      action: 'RENEW',
+      entityName: 'batch_header',
+      entityId: created.batch_id,
+      newValues: { renewed_from_batch_id: id },
+    });
+
+    return this.findOne(created.batch_id);
+  }
+
   async findOne(id: string) {
     const [batch] = await this.db
       .select()
@@ -203,6 +274,7 @@ export class BatchService {
       ? await this.db.select().from(schema.schedulerMaster).where(eq(schema.schedulerMaster.scheduler_id, batch.scheduler_id)).limit(1)
       : [];
     const alerts = await this.db.select().from(schema.notificationAlertLog).where(eq(schema.notificationAlertLog.batch_id, id));
+    const stageLog = await this.db.select().from(schema.batchStageLog).where(eq(schema.batchStageLog.batch_id, id));
 
     return {
       ...batch,
@@ -215,7 +287,55 @@ export class BatchService {
       bio_asset_entries: bioAssetEntries,
       scheduler: scheduler || null,
       alerts,
+      stage_log: stageLog,
     };
+  }
+
+  /**
+   * Records a physical move to a new stage/sub-location mid-life (e.g. setter
+   * room -> hatcher room) — a tracking event, not a cost event, so there's no
+   * GL impact (matches spec: "sub-location transfer... No journal, location
+   * update"). Feeds evaluateKpi() below, which matches scheduler_parameter_line
+   * rows against the batch's CURRENT stage so thresholds can differ pre- vs.
+   * post-transfer.
+   */
+  async transferStage(id: string, dto: TransferStageDto, tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(id);
+    this.assertStatus(batch, 'ACTIVE');
+
+    await this.db
+      .update(schema.batchHeader)
+      .set({
+        current_stage_code: dto.to_stage_code,
+        sub_location_id: dto.to_location_id || null,
+        updated_by: userPayload?.userId || null,
+        updated_at: toMysqlTimestamp(),
+      })
+      .where(eq(schema.batchHeader.batch_id, id));
+
+    await this.db.insert(schema.batchStageLog).values({
+      log_id: randomUUID(),
+      batch_id: id,
+      from_stage_code: batch.current_stage_code || null,
+      to_stage_code: dto.to_stage_code,
+      from_location_id: batch.sub_location_id || null,
+      to_location_id: dto.to_location_id || null,
+      transferred_by: userPayload?.userId || null,
+      remarks: dto.remarks || null,
+    });
+
+    await this.auditService.log({
+      tenantId,
+      companyId: batch.company_id,
+      userId: userPayload?.userId,
+      action: 'TRANSFER_STAGE',
+      entityName: 'batch_header',
+      entityId: id,
+      oldValues: { current_stage_code: batch.current_stage_code, sub_location_id: batch.sub_location_id },
+      newValues: { current_stage_code: dto.to_stage_code, sub_location_id: dto.to_location_id },
+    });
+
+    return this.findOne(id);
   }
 
   async findAll(query: QueryBatchDto, tenantId: string) {
@@ -437,6 +557,18 @@ export class BatchService {
       if (isBioAsset && bioState!.stage !== 'MATURE') {
         throw new BadRequestException('OUTPUT can only be recorded once the bio-asset batch has matured.');
       }
+
+      // Mid-batch by-product/waste removal at Net Realisable Value — the
+      // spec's "candling loss" pattern: the item leaves WIP at what it
+      // actually cost to produce, enters inventory at what it's actually
+      // worth (NRV), and the difference posts as an impairment loss.
+      // close()'s totalCost pool never sees this quantity — it's relieved
+      // here, the same way MORTALITY is already relieved the moment it's
+      // recorded. Only meaningful for non-bio-asset batches; bio-asset
+      // by-products would need a different NCA-relief treatment, out of scope
+      // here, so this path is simply not offered for them.
+      const isByProductRemoval = !isBioAsset && (dto.output_type === 'BY_PRODUCT' || dto.output_type === 'WASTE') && dto.nrv_rate != null;
+
       const ledgerEntry = await this.ledgerService.writePositiveEntry({
         tenantId,
         companyId: batch.company_id,
@@ -448,7 +580,7 @@ export class BatchService {
         transactionType: isBioAsset ? 'BIO_OUTPUT' : 'BATCH_OUTPUT',
         quantity: dto.quantity,
         uom: dto.uom,
-        rate: dto.rate,
+        rate: isByProductRemoval ? dto.nrv_rate : dto.rate,
         batchNo: batch.batch_no,
         userId: userPayload?.userId,
       });
@@ -463,6 +595,42 @@ export class BatchService {
           .update(schema.batchBioAssetState)
           .set({ nca_book_value: newNca.toString(), updated_at: toMysqlTimestamp() })
           .where(eq(schema.batchBioAssetState.batch_id, id));
+      }
+
+      if (isByProductRemoval) {
+        const nrvRate = dto.nrv_rate!;
+        const atCostRate = await this.computeRunningUnitCost(batch);
+        const atCostValue = atCostRate * dto.quantity;
+        const nrvValue = nrvRate * dto.quantity;
+        const impairment = atCostValue - nrvValue;
+
+        if (impairment > 0.005) {
+          await this.glPostingService.postBatchCostEntry({
+            tenantId,
+            companyId: batch.company_id,
+            transactionType: 'BATCH_IMPAIRMENT',
+            amount: impairment,
+            documentNo: batch.batch_no,
+            documentLineId: transactionId,
+            postingDate: dto.transaction_date,
+            description: `${dto.output_type} removal impairment (at-cost ₹${atCostValue.toFixed(2)} vs NRV ₹${nrvValue.toFixed(2)}) — ${batch.batch_no}`,
+            nobId: batch.nob_id || undefined,
+            lobId: batch.lob_id,
+            userId: userPayload?.userId,
+          });
+        }
+
+        await this.db.insert(schema.batchOutputLine).values({
+          line_id: randomUUID(),
+          batch_id: id,
+          item_id: dto.item_id,
+          output_type: dto.output_type!,
+          cost_split_pct: '0',
+          quantity: dto.quantity.toString(),
+          uom: dto.uom,
+          computed_cost: nrvValue.toString(),
+          unit_cost: nrvRate.toString(),
+        });
       }
     } else if (dto.transaction_type === 'MORTALITY') {
       if (!dto.quantity) {
@@ -664,6 +832,11 @@ export class BatchService {
       if (parameter.parameter_type !== transaction.transaction_type) return false;
       if (parameter.item_id && parameter.item_id !== transaction.item_id) return false;
       if (parameter.resource_id && parameter.resource_id !== transaction.resource_id) return false;
+      // A line scoped to a stage only applies once the batch has transferred
+      // into it (e.g. hatcher-stage temperature thresholds don't fire while
+      // still in the setter stage) — unscoped lines (stage_code null) always
+      // apply, preserving today's behavior for batches that never transfer.
+      if (spl.stage_code && spl.stage_code !== batch.current_stage_code) return false;
       return true;
     });
 
@@ -751,24 +924,63 @@ export class BatchService {
     // MORTALITY is deliberately excluded here — it's already expensed and relieved
     // from WIP the moment it's recorded (see addTransaction()'s postBatchCostEntry
     // for 'MORTALITY'). Including it again here would double-count the write-off
-    // into the surviving output's valuation.
+    // into the surviving output's valuation. Mid-batch BY_PRODUCT/WASTE outputs
+    // are excluded the same way — they're already relieved from WIP when recorded.
     const costTransactions = (batch.transactions || []).filter(
       (t) => t.transaction_type === 'CONSUMPTION' || t.transaction_type === 'OVERHEAD'
     );
     const transactionTotal = costTransactions.reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
     const totalCost = inputTotal + transactionTotal;
 
-    for (const line of dto.output_lines) {
-      const computedCost = (totalCost * line.cost_split_pct) / 100;
-      const unitCost = line.quantity > 0 ? computedCost / line.quantity : 0;
+    const closingQuantity = dto.closing_quantity ?? Number(batch.opening_quantity);
+    const actualEndDate = dto.actual_end_date || toMysqlTimestamp().slice(0, 10);
 
+    let standard: typeof schema.batchStandard.$inferSelect | undefined;
+    if (batch.costing_method === 'STANDARD') {
+      [standard] = await this.db.select().from(schema.batchStandard).where(eq(schema.batchStandard.batch_id, id)).limit(1);
+    }
+    // STANDARD batches with a locked output rate value their output at that
+    // rate, not a proportional split of actual cost — this is what makes the
+    // variance postings below a real reconciliation (actual cost in = std
+    // value out + variances), not a non-binding side report. FIFO batches,
+    // and STANDARD batches that never set up standard assumptions, keep the
+    // original actual-cost-proportional-split — matching the spec's own
+    // "FIFO: no variance, layered cost IS the batch cost" rule.
+    const stdOutputCostPerUnit = standard?.std_output_cost_per_unit ? Number(standard.std_output_cost_per_unit) : null;
+
+    let sumOfOutputValues = 0;
+    const outputValuations = dto.output_lines.map((line) => {
+      const computedCost = stdOutputCostPerUnit !== null
+        ? stdOutputCostPerUnit * line.quantity
+        : (totalCost * line.cost_split_pct) / 100;
+      sumOfOutputValues += computedCost;
+      return { line, computedCost, unitCost: line.quantity > 0 ? computedCost / line.quantity : 0 };
+    });
+
+    // Pre-compute variance lines (pure calculation, no writes) so the
+    // reconciliation check below can run BEFORE anything is posted — a batch
+    // that doesn't reconcile is rejected outright, nothing gets written.
+    const varianceLines = standard ? await this.computeVarianceLines(id, batch, standard, closingQuantity, actualEndDate) : [];
+
+    if (stdOutputCostPerUnit !== null) {
+      const sumOfVariances = varianceLines.reduce((sum, v) => sum + v.variance_amount, 0);
+      const residual = totalCost - sumOfOutputValues - sumOfVariances;
+      if (Math.abs(residual) > 0.01) {
+        throw new BadRequestException(
+          `Batch cannot close — cost does not reconcile (₹${residual.toFixed(2)} unaccounted for). ` +
+          `This usually means a consumption transaction has no matching standard-cost line, or a standard rate is unset for an item that was consumed. Review the batch's transactions before retrying.`
+        );
+      }
+    }
+
+    for (const { line, computedCost, unitCost } of outputValuations) {
       const ledgerEntry = await this.ledgerService.writePositiveEntry({
         tenantId,
         companyId: batch.company_id,
         itemId: line.item_id,
         documentType: 'BATCH',
         documentNo: batch.batch_no,
-        postingDate: dto.actual_end_date || toMysqlTimestamp().slice(0, 10),
+        postingDate: actualEndDate,
         transactionType: 'BATCH_OUTPUT',
         quantity: line.quantity,
         uom: line.uom,
@@ -793,9 +1005,7 @@ export class BatchService {
       });
     }
 
-    const closingQuantity = dto.closing_quantity ?? Number(batch.opening_quantity);
     const unitCost = closingQuantity > 0 ? totalCost / closingQuantity : 0;
-    const actualEndDate = dto.actual_end_date || toMysqlTimestamp().slice(0, 10);
 
     await this.db
       .update(schema.batchHeader)
@@ -812,8 +1022,8 @@ export class BatchService {
       })
       .where(eq(schema.batchHeader.batch_id, id));
 
-    if (batch.costing_method === 'STANDARD') {
-      await this.computeAndPostVariances(id, batch, closingQuantity, actualEndDate, tenantId, userPayload);
+    if (varianceLines.length > 0) {
+      await this.postVarianceLines(id, batch, varianceLines, actualEndDate, tenantId, userPayload);
     }
 
     await this.auditService.log({
@@ -831,21 +1041,18 @@ export class BatchService {
 
   /**
    * Standard-costing only. Compares actuals against batch_standard /
-   * batch_standard_consumption_line and posts a variance journal per
-   * non-zero deviation. Silently no-ops if no standards were set on the
-   * batch — variance is an opt-in comparison, not a forced one.
+   * batch_standard_consumption_line and returns the resulting variance lines
+   * — pure calculation, no journal/DB writes. close() uses this twice: once
+   * to reconcile WIP before committing anything, then (only if that check
+   * passes) to actually post via postVarianceLines().
    */
-  private async computeAndPostVariances(
+  private async computeVarianceLines(
     id: string,
     batch: Awaited<ReturnType<BatchService['findOne']>>,
+    standard: typeof schema.batchStandard.$inferSelect,
     closingQuantity: number,
-    actualEndDate: string,
-    tenantId: string,
-    userPayload?: any
-  ) {
-    const [standard] = await this.db.select().from(schema.batchStandard).where(eq(schema.batchStandard.batch_id, id)).limit(1);
-    if (!standard) return;
-
+    actualEndDate: string
+  ): Promise<Array<{ variance_type: string; item_id: string | null; std_value: number; actual_value: number; variance_amount: number }>> {
     const standardLines = await this.db
       .select()
       .from(schema.batchStandardConsumptionLine)
@@ -914,6 +1121,17 @@ export class BatchService {
       }
     }
 
+    return lines;
+  }
+
+  private async postVarianceLines(
+    id: string,
+    batch: Awaited<ReturnType<BatchService['findOne']>>,
+    lines: Array<{ variance_type: string; item_id: string | null; std_value: number; actual_value: number; variance_amount: number }>,
+    actualEndDate: string,
+    tenantId: string,
+    userPayload?: any
+  ) {
     for (const line of lines) {
       const isFavorable = line.variance_amount < 0;
       const journal: any = await this.glPostingService.postBatchCostEntry({

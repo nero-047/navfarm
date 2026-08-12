@@ -13,10 +13,13 @@
 :root {
   color-scheme: light;
 
-  /* Color distribution: ~80% neutral canvas/surfaces, ~15% NAVFarm navy
-     structure, ~5% semantic accent and status colors. */
-  --color-primary: #c84335;
-  --color-primary-hover: #aa352a;
+  /* NAVFarm brand: navy structure + coral/orange accent (matches the
+     wordmark — "NAV" in navy/white, "Farm" in orange). Light mode keeps a
+     neutral canvas so dense ERP tables stay readable, but every accent,
+     link, and primary action pulls from the same orange used in the
+     sidebar, not a generic blue. */
+  --color-primary: #ff6f4c;
+  --color-primary-hover: #e85a37;
   --color-primary-soft: #fff1ee;
   --color-navy: #0b1248;
   --color-navy-light: #18225f;
@@ -24,22 +27,25 @@
   --color-blue-soft: #eef4ff;
 
   /* Semantic design tokens */
-  --bg: #f5f5f7;
+  --bg: #f4f5f8;
   --surface: #ffffff;
-  --surface-raised: #fafafa;
+  --surface-raised: #fafbfc;
   --surface-overlay: rgba(255, 255, 255, 0.88);
-  --border: rgba(60, 60, 67, 0.18);
-  --border-subtle: rgba(60, 60, 67, 0.1);
-  --text-primary: #1d1d1f;
-  --text-secondary: #6e6e73;
-  --text-muted: #8e8e93;
-  --accent: #0066cc;
-  --accent-hover: #0055b3;
-  --accent-muted: rgba(0, 102, 204, 0.08);
-  --danger: #d70015;
-  --success: #248a3d;
-  --warning: #9a6700;
-  --info: #0066cc;
+  --border: rgba(11, 18, 72, 0.12);
+  --border-subtle: rgba(11, 18, 72, 0.07);
+  --text-primary: #10122a;
+  --text-secondary: #5c6484;
+  --text-muted: #8b93b0;
+  --accent: #ff6f4c;
+  --accent-hover: #e85a37;
+  --accent-muted: rgba(255, 111, 76, 0.1);
+  --danger: #d7263d;
+  --danger-muted: rgba(215, 38, 61, 0.08);
+  --success: #1a9c63;
+  --success-muted: rgba(26, 156, 99, 0.1);
+  --warning: #b3760a;
+  --warning-muted: rgba(179, 118, 10, 0.1);
+  --info: #2457b7;
 
   --sidebar-bg: #0b1248;
   --sidebar-border: rgba(255, 255, 255, 0.1);
@@ -48,14 +54,14 @@
   --sidebar-active-text: #0b1248;
   --header-bg: rgba(255, 255, 255, 0.88);
   --input-bg: #ffffff;
-  --input-text: #1d1d1f;
-  --input-placeholder: #8e8e93;
-  --input-border: rgba(60, 60, 67, 0.24);
-  --input-border-focus: #0066cc;
+  --input-text: #10122a;
+  --input-placeholder: #8b93b0;
+  --input-border: rgba(11, 18, 72, 0.18);
+  --input-border-focus: #ff6f4c;
   --card-bg: #ffffff;
-  --card-border: rgba(60, 60, 67, 0.16);
+  --card-border: rgba(11, 18, 72, 0.1);
   --row-hover: rgba(11, 18, 72, 0.035);
-  --row-border: #e8eaee;
+  --row-border: #e7e9f0;
   --badge-bg: rgba(11, 18, 72, 0.06);
 
   --radius-sm: 8px;
@@ -94,10 +100,10 @@ p { text-wrap: pretty; }
 button, a, select, input, textarea { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled), select { cursor: pointer; }
 
-::selection { background: #dce6ff; color: var(--color-navy); }
+::selection { background: var(--accent-muted); color: var(--color-navy); }
 
 :where(a, button, summary, input, select, textarea, [role='button']):focus-visible {
-  outline: 3px solid rgba(36, 87, 183, 0.3);
+  outline: 3px solid var(--accent-muted);
   outline-offset: 2px;
 }
 
@@ -108,7 +114,7 @@ input, select, textarea {
 :where(input:not(.nf-embedded-input), select, textarea):focus-visible {
   outline: none;
   border-color: var(--input-border-focus) !important;
-  box-shadow: 0 0 0 4px rgba(36, 87, 183, 0.12);
+  box-shadow: 0 0 0 4px var(--accent-muted);
 }
 
 .nf-embedded-input:focus-visible { outline: none; box-shadow: none; }
@@ -141,48 +147,54 @@ input, select, textarea {
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #c7cbd3; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #a9aeb8; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 .animate-fade-in { animation: fade-in 0.45s ease-out both; }
 .animate-slide-up { animation: slide-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 html[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #000000;
-  --surface: #1c1c1e;
-  --surface-raised: #2c2c2e;
-  --surface-overlay: rgba(28, 28, 30, 0.88);
-  --border: rgba(84, 84, 88, 0.65);
-  --border-subtle: rgba(84, 84, 88, 0.4);
-  --text-primary: #f5f5f7;
-  --text-secondary: #aeaeb2;
-  --text-muted: #8e8e93;
-  --accent: #0a84ff;
-  --accent-hover: #409cff;
-  --accent-muted: rgba(10, 132, 255, 0.14);
-  --danger: #ff453a;
-  --success: #30d158;
-  --warning: #ffd60a;
-  --info: #64d2ff;
+  /* Same navy family as the logo/sidebar, not a generic near-black — the
+     whole app should read as one continuous surface with the sidebar,
+     not two different dark themes stitched together. */
+  --bg: #0b0f1f;
+  --surface: #141a33;
+  --surface-raised: #1b2140;
+  --surface-overlay: rgba(20, 26, 51, 0.88);
+  --border: #252c4d;
+  --border-subtle: rgba(37, 44, 77, 0.6);
+  --text-primary: #f5f6fa;
+  --text-secondary: #8b93b0;
+  --text-muted: #5c6486;
+  --accent: #ff6f4c;
+  --accent-hover: #ff8563;
+  --accent-muted: rgba(255, 111, 76, 0.16);
+  --danger: #f2555a;
+  --danger-muted: rgba(242, 85, 90, 0.14);
+  --success: #3dd68c;
+  --success-muted: rgba(61, 214, 140, 0.14);
+  --warning: #f5b94d;
+  --warning-muted: rgba(245, 185, 77, 0.14);
+  --info: #64b5ff;
   --sidebar-bg: #090d31;
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-text: rgba(255, 255, 255, 0.7);
   --sidebar-active-bg: #ffffff;
   --sidebar-active-text: #0b1248;
-  --header-bg: rgba(23, 27, 45, 0.88);
-  --input-bg: #1c1c1e;
+  --header-bg: rgba(11, 15, 31, 0.88);
+  --input-bg: #141a33;
   --input-text: #f5f6fa;
-  --input-placeholder: #8e8e93;
-  --input-border: rgba(84, 84, 88, 0.72);
-  --input-border-focus: #0a84ff;
-  --card-bg: #1c1c1e;
-  --card-border: rgba(84, 84, 88, 0.65);
+  --input-placeholder: #5c6486;
+  --input-border: #2b3358;
+  --input-border-focus: #ff6f4c;
+  --card-bg: #141a33;
+  --card-border: #252c4d;
   --row-hover: rgba(255, 255, 255, 0.035);
-  --row-border: rgba(84, 84, 88, 0.4);
-  --badge-bg: rgba(255, 255, 255, 0.07);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.22), 0 8px 20px rgba(0, 0, 0, 0.14);
-  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.28);
+  --row-border: #252c4d;
+  --badge-bg: rgba(255, 255, 255, 0.06);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-reduced-motion: reduce) {

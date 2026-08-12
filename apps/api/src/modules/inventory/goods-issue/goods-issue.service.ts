@@ -203,6 +203,28 @@ export class GoodsIssueService {
       throw new BadRequestException('Cannot post a Goods Issue with no lines.');
     }
 
+    // Claim the DRAFT -> POSTED transition atomically, before writing any
+    // ledger/GL entries: the WHERE also requires status='DRAFT', so if two
+    // concurrent post() calls race here only one UPDATE matches a row — the
+    // loser's affectedRows is 0 and it aborts before touching the ledger. This
+    // also closes the "retry after a partial failure" hole: since status is
+    // already POSTED once this succeeds, a retry hits assertDraft()'s
+    // rejection instead of silently re-running the loop and duplicating the
+    // lines that already succeeded.
+    const [claim] = await this.db
+      .update(schema.goodsIssue)
+      .set({
+        status: 'POSTED',
+        posted_at: toMysqlTimestamp() as any,
+        posted_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      })
+      .where(and(eq(schema.goodsIssue.issue_id, id), eq(schema.goodsIssue.status, 'DRAFT')));
+
+    if (claim.affectedRows === 0) {
+      throw new BadRequestException('Goods Issue cannot be posted — it was already posted by another request.');
+    }
+
     for (const line of issue.lines) {
       const ledgerEntry = await this.ledgerService.writeNegativeEntry({
         tenantId,
@@ -221,16 +243,6 @@ export class GoodsIssueService {
 
       await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
     }
-
-    await this.db
-      .update(schema.goodsIssue)
-      .set({
-        status: 'POSTED',
-        posted_at: toMysqlTimestamp() as any,
-        posted_by: userPayload?.userId || null,
-        updated_by: userPayload?.userId || null,
-      })
-      .where(eq(schema.goodsIssue.issue_id, id));
 
     await this.auditService.log({
       tenantId,

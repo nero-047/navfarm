@@ -133,6 +133,13 @@ export class InventoryLedgerService {
       quantity: number;
       applicationDate: string;
       userId?: string;
+      // Batch consumption draws from a company-wide pool and never sets this
+      // (see batch.service.ts) — left undefined there preserves that existing
+      // behavior. Every warehouse-based document (Goods Issue, Stock Transfer,
+      // Stock Adjustment) always supplies it, which scopes FIFO consumption to
+      // layers actually received into that warehouse instead of drawing down
+      // whichever warehouse happens to hold the oldest layer tenant-wide.
+      warehouseId?: string;
     },
     executor: MySql2Database<typeof schema> = this.db
   ): Promise<{ totalCost: number; averageRate: number }> {
@@ -147,17 +154,24 @@ export class InventoryLedgerService {
     let remainingToConsume = params.quantity;
     let totalCost = 0;
 
+    const layerConditions = [
+      eq(schema.inventoryLedger.tenant_id, params.tenantId),
+      eq(schema.inventoryLedger.item_id, params.itemId),
+      eq(schema.inventoryLedger.entry_type, 'POSITIVE'),
+    ];
+    if (params.warehouseId) {
+      layerConditions.push(eq(schema.inventoryLedger.warehouse_id, params.warehouseId));
+    }
+
+    // Row-locked so two concurrent consumptions against the same layers can't
+    // both read the same remaining_quantity and each compute an independent
+    // decrement — the second call blocks until the first transaction commits.
     const availableLayers = await executor
       .select()
       .from(schema.inventoryLedger)
-      .where(
-        and(
-          eq(schema.inventoryLedger.tenant_id, params.tenantId),
-          eq(schema.inventoryLedger.item_id, params.itemId),
-          eq(schema.inventoryLedger.entry_type, 'POSITIVE')
-        )
-      )
-      .orderBy(asc(schema.inventoryLedger.posting_date), asc(schema.inventoryLedger.created_at));
+      .where(and(...layerConditions))
+      .orderBy(asc(schema.inventoryLedger.posting_date), asc(schema.inventoryLedger.created_at))
+      .for('update');
 
     for (const layer of availableLayers) {
       if (remainingToConsume <= 0) break;
@@ -265,6 +279,7 @@ export class InventoryLedgerService {
           quantity: params.quantity,
           applicationDate: params.postingDate,
           userId: params.userId,
+          warehouseId: params.warehouseId,
         },
         tx
       );

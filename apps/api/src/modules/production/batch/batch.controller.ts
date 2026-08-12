@@ -10,6 +10,8 @@ import {
   AmortizeBioAssetDto,
   RecordFairValueDto,
   DisposeBioAssetDto,
+  RenewBatchDto,
+  TransferStageDto,
 } from './dto/batch.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
@@ -126,5 +128,25 @@ export class BatchController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.batchService.disposeBioAsset(id, dto, tenantId, req.user);
     return { success: true, message: 'Disposal recorded successfully.', data: result };
+  }
+
+  @Post(':id/renew')
+  @RequirePermission('PRODUCTION', 'BATCH', 'create')
+  @ApiOperation({ summary: "Copy a CLOSED batch's config (breed, scheduler, shed, costing method, standard assumptions) into a new DRAFT batch for the next cycle — only for LOBs with batch_copy_allowed" })
+  @ApiParam({ name: 'id', description: 'Source (CLOSED) Batch UUID' })
+  async renew(@Param('id') id: string, @Body() dto: RenewBatchDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.renew(id, dto, tenantId, req.user);
+    return { success: true, message: 'Batch renewed successfully.', data: result };
+  }
+
+  @Post(':id/transfer-stage')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Record a physical move to a new stage/sub-location mid-life (e.g. setter room -> hatcher room) — tracking only, no GL impact' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async transferStage(@Param('id') id: string, @Body() dto: TransferStageDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.transferStage(id, dto, tenantId, req.user);
+    return { success: true, message: 'Batch stage transferred successfully.', data: result };
   }
 }

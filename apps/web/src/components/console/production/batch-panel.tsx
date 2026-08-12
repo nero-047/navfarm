@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Search, AlertCircle, Loader2, Inbox, Eye, PlayCircle, CheckCircle2, ClipboardCheck, QrCode as QrCodeIcon } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, Inbox, Eye, PlayCircle, CheckCircle2, ClipboardCheck, QrCode as QrCodeIcon, RefreshCw } from "lucide-react";
 import QRCode from "react-qr-code";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { InlineAlert } from "@/components/ui/alert";
+import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+
+const PAGE_SIZE = 25;
 
 type Row = Record<string, any>;
 
@@ -27,13 +31,13 @@ function unwrap<T = any>(res: any): T {
 
 const emptyInputLine = () => ({ item_id: "", source_batch_id: "", quantity: "", uom: "", rate: "" });
 const emptyOutputLine = () => ({ item_id: "", output_type: "MAIN", cost_split_pct: "100", quantity: "", uom: "", warehouse_id: "" });
-const emptyTxForm = () => ({ transaction_date: new Date().toISOString().slice(0, 10), transaction_type: "CONSUMPTION", item_id: "", resource_id: "", quantity: "", uom: "", rate: "", remarks: "" });
+const emptyTxForm = () => ({ transaction_date: new Date().toISOString().slice(0, 10), transaction_type: "CONSUMPTION", item_id: "", resource_id: "", quantity: "", uom: "", rate: "", remarks: "", output_type: "", nrv_rate: "" });
 const emptyStdConsumptionLine = () => ({ item_id: "", std_qty_per_unit_per_day: "", std_rate: "" });
 
 const STATUS_STYLE: Record<string, any> = {
   DRAFT: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" },
   ACTIVE: { color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" },
-  CLOSED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--accent-muted)" },
+  CLOSED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
   CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" },
 };
 
@@ -43,6 +47,8 @@ export default function BatchPanel() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const [nobs, setNobs] = useState<Row[]>([]);
   const [lobs, setLobs] = useState<Row[]>([]);
@@ -96,6 +102,18 @@ export default function BatchPanel() {
   const [packError, setPackError] = useState("");
   const [generatedPack, setGeneratedPack] = useState<Row | null>(null);
 
+  const [renewModalOpen, setRenewModalOpen] = useState(false);
+  const [renewForm, setRenewForm] = useState<Row>({});
+  const [renewSaving, setRenewSaving] = useState(false);
+  const [renewError, setRenewError] = useState("");
+
+  const [stageModalOpen, setStageModalOpen] = useState(false);
+  const [stageForm, setStageForm] = useState<Row>({});
+  const [stageSaving, setStageSaving] = useState(false);
+  const [stageError, setStageError] = useState("");
+  const [stageOptions, setStageOptions] = useState<string[]>([]);
+  const [stageOptionsLoading, setStageOptionsLoading] = useState(false);
+
   const companyId = getActiveCompanyId();
 
   const load = async () => {
@@ -121,6 +139,9 @@ export default function BatchPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter]);
 
+  useEffect(() => { setPage(1); }, [search, statusFilter, pageSize]);
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (companyId) params.set("companyId", companyId);
@@ -133,10 +154,15 @@ export default function BatchPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keyed on activeNobId (declared below) rather than the create-form's own
+  // nobId, so the batch-detail modal's QC-gate check (which needs this
+  // batch's own LOB, not whatever's left selected in the create form) can
+  // find the right LOB entry too.
+  const activeNobIdForLobs = viewing?.nob_id || nobId;
   useEffect(() => {
-    if (!nobId) { setLobs([]); return; }
-    api.get(`/setup/wizard/lobs/${nobId}`).then((r) => setLobs(unwrap<Row[]>(r) || [])).catch(() => setLobs([]));
-  }, [nobId]);
+    if (!activeNobIdForLobs) { setLobs([]); return; }
+    api.get(`/setup/wizard/lobs/${activeNobIdForLobs}`).then((r) => setLobs(unwrap<Row[]>(r) || [])).catch(() => setLobs([]));
+  }, [activeNobIdForLobs]);
 
   // Breed/Item/Shed/Resource are all scoped by Nature of Business and Line of
   // Business — re-fetched whenever either selection changes, instead of once
@@ -301,6 +327,11 @@ export default function BatchPanel() {
         payload.quantity = Number(txForm.quantity);
         payload.uom = txForm.uom;
         if (txForm.rate) payload.rate = Number(txForm.rate);
+        if (txForm.transaction_type === "OUTPUT" && txForm.output_type) {
+          if (!txForm.nrv_rate) throw new Error("Net Realisable Value rate is required when removing a by-product/waste mid-batch.");
+          payload.output_type = txForm.output_type;
+          payload.nrv_rate = Number(txForm.nrv_rate);
+        }
       } else if (txForm.transaction_type === "MORTALITY") {
         if (!txForm.quantity) throw new Error("Quantity is required for mortality.");
         payload.quantity = Number(txForm.quantity);
@@ -442,6 +473,17 @@ export default function BatchPanel() {
     return b ? b.batch_no : "—";
   };
 
+  // This LOB may require a passing QC record before a pack can be generated
+  // (mirrors the server-side gate in qr-code.service.ts) — checked against
+  // whichever QC record is currently selected in the Generate Pack form.
+  const packQcRequired = lobs.find((l) => l.lob_id === viewing?.lob_id)?.qc_required === "YES";
+  const packSelectedQc = packQcRecords.find((q) => q.qc_id === packForm.qc_id);
+  const packQcGateBlocked = packQcRequired && packSelectedQc?.overall_result !== "PASS";
+
+  // Batch renewal (copy config forward for a new cycle) is only offered for
+  // LOBs configured to allow it — matches the server-side gate in renew().
+  const renewAllowed = lobs.find((l) => l.lob_id === viewing?.lob_id)?.batch_copy_allowed === "YES";
+
   const openRecordQc = (line: Row) => {
     if (!viewing) return;
     setQcLine(line);
@@ -564,6 +606,101 @@ export default function BatchPanel() {
     setPackForm((f: Row) => ({ ...f, lot_no: "" }));
   };
 
+  const openRenew = () => {
+    if (!viewing) return;
+    setRenewForm({
+      start_date: new Date().toISOString().slice(0, 10),
+      expected_end_date: "",
+      opening_quantity: viewing.opening_quantity ?? "",
+      uom: viewing.uom || "",
+      remarks: "",
+      item_id: viewing.input_lines?.[0]?.item_id || "",
+      quantity: viewing.opening_quantity ?? "",
+      line_uom: viewing.input_lines?.[0]?.uom || "",
+      rate: "",
+    });
+    setRenewError("");
+    setRenewModalOpen(true);
+  };
+
+  const handleRenew = async () => {
+    if (!viewing) return;
+    setRenewSaving(true);
+    setRenewError("");
+    try {
+      if (!renewForm.start_date || !renewForm.opening_quantity || !renewForm.uom) throw new Error("Start date, opening quantity and UOM are required.");
+      if (!renewForm.item_id || !renewForm.quantity || !renewForm.line_uom) throw new Error("The new cycle's input line (item, quantity, UOM) is required.");
+      const result = await api.post(`/batch/${viewing.batch_id}/renew`, {
+        start_date: renewForm.start_date,
+        expected_end_date: renewForm.expected_end_date || undefined,
+        opening_quantity: Number(renewForm.opening_quantity),
+        uom: renewForm.uom,
+        remarks: renewForm.remarks || undefined,
+        input_lines: [{
+          item_id: renewForm.item_id,
+          quantity: Number(renewForm.quantity),
+          uom: renewForm.line_uom,
+          rate: renewForm.rate ? Number(renewForm.rate) : undefined,
+        }],
+      });
+      setRenewModalOpen(false);
+      await load();
+      setViewing(unwrap<Row>(result));
+    } catch (err: any) {
+      setRenewError(err?.message || "Failed to renew batch.");
+    } finally {
+      setRenewSaving(false);
+    }
+  };
+
+  const openTransferStage = async () => {
+    if (!viewing) return;
+    setStageForm({ to_stage_code: "", remarks: "" });
+    setStageError("");
+    setStageOptions([]);
+    setStageModalOpen(true);
+    // Stages aren't a fixed enum — they're whatever the batch's own scheduler
+    // defines via stage-scoped parameter lines (scheduler_parameter_line.stage_code),
+    // and schedulers are themselves NOB/LOB-scoped. So the valid stage list for
+    // this batch is exactly the distinct stage codes configured on its scheduler.
+    if (!viewing.scheduler_id) return;
+    setStageOptionsLoading(true);
+    try {
+      const scheduler = unwrap<Row>(await api.get(`/scheduler/${viewing.scheduler_id}`));
+      const codes = Array.from(
+        new Set(
+          (scheduler?.parameter_lines || [])
+            .map((l: Row) => l.stage_code)
+            .filter((c: string | null) => !!c && c !== viewing.current_stage_code)
+        )
+      ) as string[];
+      setStageOptions(codes.sort());
+    } catch {
+      setStageOptions([]);
+    } finally {
+      setStageOptionsLoading(false);
+    }
+  };
+
+  const handleTransferStage = async () => {
+    if (!viewing) return;
+    setStageSaving(true);
+    setStageError("");
+    try {
+      if (!stageForm.to_stage_code) throw new Error("The destination stage code is required.");
+      const result = await api.post(`/batch/${viewing.batch_id}/transfer-stage`, {
+        to_stage_code: stageForm.to_stage_code,
+        remarks: stageForm.remarks || undefined,
+      });
+      setStageModalOpen(false);
+      setViewing(unwrap<Row>(result));
+    } catch (err: any) {
+      setStageError(err?.message || "Failed to transfer stage.");
+    } finally {
+      setStageSaving(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -590,9 +727,7 @@ export default function BatchPanel() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-        </div>
+        <InlineAlert>{error}</InlineAlert>
       )}
 
       <div className="overflow-hidden rounded-2xl border" style={S.surface}>
@@ -615,7 +750,7 @@ export default function BatchPanel() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No batches yet.</td></tr>
               ) : (
-                rows.map((row) => (
+                pagedRows.map((row) => (
                   <tr key={row.batch_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
                     <td className="whitespace-nowrap px-4 py-3 font-semibold" style={S.primary}>{row.batch_no}</td>
                     <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.start_date}</td>
@@ -636,6 +771,11 @@ export default function BatchPanel() {
             </tbody>
           </table>
         </div>
+        {!loading && rows.length > 0 && (
+          <div className="border-t px-2" style={{ borderColor: "var(--border)" }}>
+            <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          </div>
+        )}
       </div>
 
       {/* Create modal */}
@@ -655,9 +795,7 @@ export default function BatchPanel() {
       >
         <div className="flex flex-col gap-4">
           {formError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formError}
-            </div>
+            <InlineAlert>{formError}</InlineAlert>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -772,7 +910,7 @@ export default function BatchPanel() {
                     </td>
                     <td className="px-2 py-1.5 w-24"><input type="number" value={line.rate} onChange={(e) => setInputLineField(idx, "rate", e.target.value)} className={inputCls} style={S.input} /></td>
                     <td className="px-2 py-1.5">
-                      <button onClick={() => removeInputLine(idx)} type="button" className="rounded p-1 text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeInputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </td>
                   </tr>
                 ))}
@@ -848,7 +986,7 @@ export default function BatchPanel() {
                           />
                         </td>
                         <td className="px-2 py-1.5">
-                          <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded p-1 text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                         </td>
                       </tr>
                     ))}
@@ -875,6 +1013,14 @@ export default function BatchPanel() {
               <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Method</p><p style={S.primary}>{viewing.costing_method}</p></div>
               <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Opening Qty</p><p style={S.primary}>{viewing.opening_quantity} {viewing.uom}</p></div>
               {viewing.total_cost && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Total Cost / Unit</p><p style={S.primary}>{viewing.total_cost} / {viewing.unit_cost}</p></div>}
+              {viewing.current_stage_code && (
+                <div>
+                  <p className="font-semibold uppercase tracking-wider" style={S.muted}>Stage</p>
+                  <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
+                    {viewing.current_stage_code}
+                  </span>
+                </div>
+              )}
               {viewing.scheduler && (
                 <div>
                   <p className="font-semibold uppercase tracking-wider" style={S.muted}>Scheduler</p>
@@ -887,6 +1033,38 @@ export default function BatchPanel() {
               <button onClick={handleActivate} disabled={acting} className="flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 self-start" style={{ backgroundColor: "var(--accent)" }}>
                 <PlayCircle className="h-4 w-4" /> {acting ? "Activating…" : "Activate Batch"}
               </button>
+            )}
+
+            {viewing.status === "ACTIVE" && (
+              <button onClick={openTransferStage} className="flex items-center justify-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold self-start" style={S.surface}>
+                <RefreshCw className="h-4 w-4" /> Transfer Stage
+              </button>
+            )}
+
+            {(viewing.stage_log || []).length > 0 && (
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Stage History</p>
+                <div className="overflow-x-auto rounded-xl border" style={S.surface}>
+                  <table className="w-full text-left text-xs">
+                    <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                      <th className="px-3 py-2 font-semibold" style={S.sub}>From</th>
+                      <th className="px-3 py-2 font-semibold" style={S.sub}>To</th>
+                      <th className="px-3 py-2 font-semibold" style={S.sub}>Transferred At</th>
+                      <th className="px-3 py-2 font-semibold" style={S.sub}>Remarks</th>
+                    </tr></thead>
+                    <tbody>
+                      {(viewing.stage_log || []).map((s: Row) => (
+                        <tr key={s.log_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                          <td className="px-3 py-2" style={S.sub}>{s.from_stage_code || "—"}</td>
+                          <td className="px-3 py-2 font-semibold" style={S.primary}>{s.to_stage_code}</td>
+                          <td className="px-3 py-2" style={S.sub}>{s.transferred_at}</td>
+                          <td className="px-3 py-2" style={S.sub}>{s.remarks || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
 
             <div>
@@ -920,7 +1098,7 @@ export default function BatchPanel() {
                   <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
                     <div>
                       <p className="font-semibold uppercase tracking-wider" style={S.muted}>Stage</p>
-                      <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={viewing.bio_asset_state.stage === "MATURE" ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--accent-muted)" } : { color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
+                      <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={viewing.bio_asset_state.stage === "MATURE" ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" } : { color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
                         {viewing.bio_asset_state.stage}
                       </span>
                     </div>
@@ -979,6 +1157,16 @@ export default function BatchPanel() {
                   )}
                   {["OUTPUT", "OVERHEAD"].includes(txForm.transaction_type) && (
                     <input type="number" placeholder="Rate" value={txForm.rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, rate: e.target.value }))} className={inputCls} style={S.input} />
+                  )}
+                  {txForm.transaction_type === "OUTPUT" && (
+                    <select value={txForm.output_type} onChange={(e) => setTxForm((f: Row) => ({ ...f, output_type: e.target.value }))} className={inputCls} style={S.input}>
+                      <option value="">Main product (at close)</option>
+                      <option value="BY_PRODUCT">Remove now — By-product (at NRV)</option>
+                      <option value="WASTE">Remove now — Waste (at NRV)</option>
+                    </select>
+                  )}
+                  {txForm.transaction_type === "OUTPUT" && txForm.output_type && (
+                    <input type="number" placeholder="NRV Rate / Unit" value={txForm.nrv_rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, nrv_rate: e.target.value }))} className={inputCls} style={S.input} />
                   )}
                   <input placeholder="Remarks" value={txForm.remarks} onChange={(e) => setTxForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls + " sm:col-span-3"} style={S.input} />
                   <button onClick={handleAddTransaction} disabled={acting} className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 sm:col-span-3" style={{ backgroundColor: "var(--accent)" }}>
@@ -1113,7 +1301,7 @@ export default function BatchPanel() {
                           <td className="px-3 py-2" style={S.primary}>{Number(v.actual_value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
                           <td className="px-3 py-2 font-semibold" style={v.is_favorable ? { color: "var(--success)" } : { color: "var(--danger)" }}>{v.variance_amount}</td>
                           <td className="px-3 py-2">
-                            <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={v.is_favorable ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--accent-muted)" } : { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" }}>
+                            <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={v.is_favorable ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" } : { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" }}>
                               {v.is_favorable ? "FAV" : "UNFAV"}
                             </span>
                           </td>
@@ -1124,8 +1312,121 @@ export default function BatchPanel() {
                 </div>
               </div>
             )}
+
+            {viewing.status === "CLOSED" && renewAllowed && (
+              <button onClick={openRenew} className="flex items-center justify-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold self-start" style={S.surface}>
+                <RefreshCw className="h-4 w-4" /> Renew Batch — Start Next Cycle
+              </button>
+            )}
           </div>
         )}
+      </Dialog>
+
+      {/* Transfer stage modal */}
+      <Dialog
+        open={stageModalOpen}
+        onClose={() => !stageSaving && setStageModalOpen(false)}
+        title="Transfer Stage"
+        footer={
+          <>
+            <button onClick={() => setStageModalOpen(false)} disabled={stageSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
+            <button onClick={handleTransferStage} disabled={stageSaving || stageOptions.length === 0 || !stageForm.to_stage_code} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+              {stageSaving ? "Transferring…" : "Transfer"}
+            </button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {stageError && (
+            <InlineAlert>{stageError}</InlineAlert>
+          )}
+          <p className="text-xs" style={S.sub}>Current stage: <span className="font-semibold" style={S.primary}>{viewing?.current_stage_code || "None"}</span>. This is a tracking event only — no cost or GL impact.</p>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>New Stage *</label>
+            {stageOptionsLoading ? (
+              <div className="flex items-center gap-2 text-xs" style={S.sub}><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading stages for this batch's scheduler…</div>
+            ) : stageOptions.length > 0 ? (
+              <select value={stageForm.to_stage_code || ""} onChange={(e) => setStageForm((f: Row) => ({ ...f, to_stage_code: e.target.value }))} className={inputCls} style={S.input}>
+                <option value="">Select a stage…</option>
+                {stageOptions.map((code) => (<option key={code} value={code}>{code}</option>))}
+              </select>
+            ) : (
+              <p className="text-xs" style={S.muted}>No stages are configured on this batch's scheduler yet — add stage-scoped parameter lines to the scheduler (Production &rarr; Schedulers) before transferring.</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+            <input value={stageForm.remarks || ""} onChange={(e) => setStageForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls} style={S.input} />
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Renew batch modal */}
+      <Dialog
+        open={renewModalOpen}
+        onClose={() => !renewSaving && setRenewModalOpen(false)}
+        title="Renew Batch — Start Next Cycle"
+        footer={
+          <>
+            <button onClick={() => setRenewModalOpen(false)} disabled={renewSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
+            <button onClick={handleRenew} disabled={renewSaving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+              {renewSaving ? "Creating…" : "Create Next Cycle"}
+            </button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {renewError && (
+            <InlineAlert>{renewError}</InlineAlert>
+          )}
+          <div className="rounded-lg border px-3 py-2 text-xs" style={S.surface}>
+            <p className="mb-1 font-semibold uppercase tracking-wider" style={S.muted}>Carried forward from {viewing?.batch_no}</p>
+            <p style={S.sub}>Breed: <span style={S.primary}>{viewing?.breed_id ? breeds.find((b) => b.breed_id === viewing.breed_id)?.breed_name || "—" : "—"}</span></p>
+            <p style={S.sub}>Scheduler: <span style={S.primary}>{viewing?.scheduler_id ? schedulers.find((s) => s.scheduler_id === viewing.scheduler_id)?.scheduler_name || "—" : "—"}</span></p>
+            <p style={S.sub}>Shed: <span style={S.primary}>{viewing?.shed_id ? sheds.find((s) => s.shed_id === viewing.shed_id)?.shed_name || "—" : "—"}</span></p>
+            <p style={S.sub}>Costing method: <span style={S.primary}>{viewing?.costing_method}</span>{viewing?.standard ? " (standard-cost assumptions carried forward too)" : ""}</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Start Date *</label>
+              <input type="date" value={renewForm.start_date || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, start_date: e.target.value }))} className={inputCls} style={S.input} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Expected End Date</label>
+              <input type="date" value={renewForm.expected_end_date || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, expected_end_date: e.target.value }))} className={inputCls} style={S.input} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Opening Quantity *</label>
+              <input type="number" value={renewForm.opening_quantity ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, opening_quantity: e.target.value }))} className={inputCls} style={S.input} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>UOM *</label>
+              <select value={renewForm.uom || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, uom: e.target.value }))} className={inputCls} style={S.input}>
+                <option value="">Select…</option>
+                {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Line</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <select value={renewForm.item_id || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={inputCls + " sm:col-span-2"} style={S.input}>
+                <option value="">Item…</option>
+                {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
+              </select>
+              <input type="number" placeholder="Qty" value={renewForm.quantity ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
+              <select value={renewForm.line_uom || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, line_uom: e.target.value }))} className={inputCls} style={S.input}>
+                <option value="">UOM…</option>
+                {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+              </select>
+              <input type="number" placeholder="Est. Rate" value={renewForm.rate ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, rate: e.target.value }))} className={inputCls + " sm:col-span-4"} style={S.input} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+            <input value={renewForm.remarks || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls} style={S.input} />
+          </div>
+        </div>
       </Dialog>
 
       {/* Close batch modal */}
@@ -1145,9 +1446,7 @@ export default function BatchPanel() {
       >
         <div className="flex flex-col gap-4">
           {closeError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {closeError}
-            </div>
+            <InlineAlert>{closeError}</InlineAlert>
           )}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
@@ -1210,7 +1509,7 @@ export default function BatchPanel() {
                       </select>
                     </td>
                     <td className="px-2 py-1.5">
-                      <button onClick={() => removeOutputLine(idx)} type="button" className="rounded p-1 text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeOutputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </td>
                   </tr>
                 ))}
@@ -1248,9 +1547,7 @@ export default function BatchPanel() {
       >
         <div className="flex flex-col gap-4">
           {bioError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bioError}
-            </div>
+            <InlineAlert>{bioError}</InlineAlert>
           )}
 
           {bioActionOpen === "mature" && (
@@ -1368,9 +1665,7 @@ export default function BatchPanel() {
       >
         <div className="flex flex-col gap-4">
           {qcError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {qcError}
-            </div>
+            <InlineAlert>{qcError}</InlineAlert>
           )}
 
           {qcSubmitted ? (
@@ -1378,7 +1673,7 @@ export default function BatchPanel() {
               <span
                 className="rounded-full border px-4 py-1.5 text-sm font-bold"
                 style={qcSubmitted.overall_result === "PASS"
-                  ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--accent-muted)" }
+                  ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" }
                   : { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" }}
               >
                 Overall Result: {qcSubmitted.overall_result}
@@ -1501,7 +1796,7 @@ export default function BatchPanel() {
           ) : (
             <>
               <button onClick={() => setPackModalOpen(false)} disabled={packSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-              <button onClick={handleGeneratePack} disabled={packSaving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+              <button onClick={handleGeneratePack} disabled={packSaving || packQcGateBlocked} title={packQcGateBlocked ? "This LOB requires a passing QC record before a pack can be generated" : undefined} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
                 {packSaving ? "Generating…" : "Generate Pack"}
               </button>
             </>
@@ -1510,9 +1805,11 @@ export default function BatchPanel() {
       >
         <div className="flex flex-col gap-4">
           {packError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {packError}
-            </div>
+            <InlineAlert>{packError}</InlineAlert>
+          )}
+
+          {!generatedPack && packQcRequired && (
+            <InlineAlert variant="warning">This LOB requires QC — select a QC record below with result PASS to generate a pack.</InlineAlert>
           )}
 
           {generatedPack ? (
@@ -1552,7 +1849,7 @@ export default function BatchPanel() {
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Link QC Record (optional)</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Link QC Record{packQcRequired ? " (required — must PASS)" : " (optional)"}</label>
                 <select value={packForm.qc_id} onChange={(e) => setPackForm((f: Row) => ({ ...f, qc_id: e.target.value }))} className={inputCls} style={S.input}>
                   <option value="">None</option>
                   {packQcRecords.map((q) => <option key={q.qc_id} value={q.qc_id}>{q.qc_date} — {q.overall_result}</option>)}

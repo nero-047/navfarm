@@ -38,7 +38,14 @@ export class QrCodeService {
   }
 
   /** Walks batch_input_line.source_batch_id recursively — the exact traceability chain Phase 5 built. */
-  private async buildOriginChain(batchId: string): Promise<any> {
+  private async buildOriginChain(batchId: string, visited: Set<string> = new Set()): Promise<any> {
+    // source_batch_id should always point strictly backward in time, but
+    // there's no DB constraint enforcing that — a defensive visited-set stops
+    // a circular chain (however it arose) from recursing forever instead of
+    // silently overflowing the stack.
+    if (visited.has(batchId)) return null;
+    visited.add(batchId);
+
     const [batch] = await this.db.select().from(schema.batchHeader).where(eq(schema.batchHeader.batch_id, batchId)).limit(1);
     if (!batch) return null;
 
@@ -46,7 +53,7 @@ export class QrCodeService {
     const parents: any[] = [];
     for (const line of inputLines) {
       if (!line.source_batch_id) continue;
-      const parentChain = await this.buildOriginChain(line.source_batch_id);
+      const parentChain = await this.buildOriginChain(line.source_batch_id, visited);
       if (parentChain) parents.push(parentChain);
     }
 
@@ -89,6 +96,18 @@ export class QrCodeService {
       const gradedResult = qcResults.find((r) => r.grade_assigned);
       grade = gradedResult?.grade_assigned || null;
       qcSummary = { qc_id: qc.qc_id, overall_result: qc.overall_result, disposition: qc.disposition, qc_date: qc.qc_date };
+
+      const [lob] = await this.db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, batch.lob_id)).limit(1);
+      if (lob?.qc_required === 'YES' && qc.overall_result !== 'PASS') {
+        throw new BadRequestException(
+          `This LOB requires QC before a pack can be generated — the linked QC record's overall_result is '${qc.overall_result}', not PASS.`
+        );
+      }
+    } else {
+      const [lob] = await this.db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, batch.lob_id)).limit(1);
+      if (lob?.qc_required === 'YES') {
+        throw new BadRequestException('This LOB requires QC — link a passing QC record before generating a pack.');
+      }
     }
 
     const packNo = await this.generatePackNo(tenantId, dto.company_id);

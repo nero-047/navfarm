@@ -204,6 +204,24 @@ export class StockAdjustmentService {
       throw new BadRequestException('Cannot post a Stock Adjustment with no lines.');
     }
 
+    // Claim the DRAFT -> POSTED transition atomically before writing any
+    // ledger/GL entries — see goods-issue.service.ts's post() for the full
+    // rationale (closes both the double-post race and the "retry after a
+    // partial failure duplicates the successful lines" hole).
+    const [claim] = await this.db
+      .update(schema.stockAdjustment)
+      .set({
+        status: 'POSTED',
+        posted_at: toMysqlTimestamp() as any,
+        posted_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      })
+      .where(and(eq(schema.stockAdjustment.adjustment_id, id), eq(schema.stockAdjustment.status, 'DRAFT')));
+
+    if (claim.affectedRows === 0) {
+      throw new BadRequestException('Stock Adjustment cannot be posted — it was already posted by another request.');
+    }
+
     for (const line of adjustment.lines) {
       const quantity = Number(line.quantity);
       if (quantity > 0) {
@@ -241,16 +259,6 @@ export class StockAdjustmentService {
         await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
       }
     }
-
-    await this.db
-      .update(schema.stockAdjustment)
-      .set({
-        status: 'POSTED',
-        posted_at: toMysqlTimestamp() as any,
-        posted_by: userPayload?.userId || null,
-        updated_by: userPayload?.userId || null,
-      })
-      .where(eq(schema.stockAdjustment.adjustment_id, id));
 
     await this.auditService.log({
       tenantId,

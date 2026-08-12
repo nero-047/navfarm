@@ -113,6 +113,21 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
   const checkOnboardingStatus = async (storedUser: NavUser, tenantId: string) => {
     if (!tenantId) { setCheckingOnboard(false); setReady(true); return; }
+    // Completing the setup wizard (legal entity details, registration numbers,
+    // NOB/LOB, admin registration) is a company-admin task — a standard user's
+    // role typically doesn't even grant COMPANY.SETTINGS.view, so the company
+    // list fetch below 403s for them regardless of whether their company is
+    // actually onboarded. That used to fall into the catch-all below and get
+    // misread as "not onboarded", incorrectly routing already-active staff
+    // into the wizard. Standard users never need this gate: by the time an
+    // admin can invite one, the company they're being added to already exists
+    // and (in normal use) is already set up.
+    if (storedUser.userType === "STANDARD_USER") {
+      setIsOnboarded(true);
+      setCheckingOnboard(false);
+      setReady(true);
+      return;
+    }
     try {
       const companiesList = await api.get(`/company/tenant/${tenantId}`);
       let filtered = companiesList;

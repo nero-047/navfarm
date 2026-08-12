@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Search, AlertCircle, Loader2, Inbox, Eye } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, Inbox, Eye } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { InlineAlert } from "@/components/ui/alert";
+import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+
+const PAGE_SIZE = 25;
 
 type Row = Record<string, any>;
 
@@ -34,6 +38,8 @@ export default function SchedulerPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const [nobs, setNobs] = useState<Row[]>([]);
   const [lobs, setLobs] = useState<Row[]>([]);
@@ -72,6 +78,9 @@ export default function SchedulerPanel() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  useEffect(() => { setPage(1); }, [search, pageSize]);
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -199,9 +208,7 @@ export default function SchedulerPanel() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-        </div>
+        <InlineAlert>{error}</InlineAlert>
       )}
 
       <div className="overflow-hidden rounded-2xl border" style={S.surface}>
@@ -222,7 +229,7 @@ export default function SchedulerPanel() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={5} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No schedulers yet.</td></tr>
               ) : (
-                rows.map((row) => (
+                pagedRows.map((row) => (
                   <tr key={row.scheduler_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
                     <td className="whitespace-nowrap px-4 py-3 font-semibold" style={S.primary}>{row.scheduler_code}</td>
                     <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.scheduler_name}</td>
@@ -245,6 +252,11 @@ export default function SchedulerPanel() {
             </tbody>
           </table>
         </div>
+        {!loading && rows.length > 0 && (
+          <div className="border-t px-2" style={{ borderColor: "var(--border)" }}>
+            <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          </div>
+        )}
       </div>
 
       {/* Create modal */}
@@ -264,9 +276,7 @@ export default function SchedulerPanel() {
       >
         <div className="flex flex-col gap-4">
           {formError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formError}
-            </div>
+            <InlineAlert>{formError}</InlineAlert>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -372,7 +382,7 @@ export default function SchedulerPanel() {
                     )}
                     <td className="px-2 py-1.5 w-20"><input type="number" value={line.critical_threshold_pct} onChange={(e) => setLineField(idx, "critical_threshold_pct", e.target.value)} placeholder="20" className={inputCls} style={S.input} /></td>
                     <td className="px-2 py-1.5">
-                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </td>
                   </tr>
                 ))}

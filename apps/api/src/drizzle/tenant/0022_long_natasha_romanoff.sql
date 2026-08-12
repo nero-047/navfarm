@@ -1,0 +1,1 @@
+ALTER TABLE `batch_header` ADD `renewed_from_batch_id` varchar(36);

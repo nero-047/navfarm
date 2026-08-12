@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2, Inbox } from "lucide-react";
+import { Loader2, Inbox } from "lucide-react";
 import { api } from "@/services/api-client";
+import { InlineAlert } from "@/components/ui/alert";
+import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+
+const PAGE_SIZE = 25;
 
 type Row = Record<string, any>;
 
@@ -37,6 +41,8 @@ export default function InventoryLedgerPanel() {
   const [transactionType, setTransactionType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const companyId = getActiveCompanyId();
 
@@ -64,6 +70,9 @@ export default function InventoryLedgerPanel() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId, transactionType, dateFrom, dateTo]);
+
+  useEffect(() => { setPage(1); }, [itemId, transactionType, dateFrom, dateTo, pageSize]);
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -102,9 +111,7 @@ export default function InventoryLedgerPanel() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-        </div>
+        <InlineAlert>{error}</InlineAlert>
       )}
 
       <div className="overflow-hidden rounded-2xl border" style={S.surface}>
@@ -129,7 +136,7 @@ export default function InventoryLedgerPanel() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={9} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No ledger entries yet — post a Goods Receipt to see movements here.</td></tr>
               ) : (
-                rows.map((row) => (
+                pagedRows.map((row) => (
                   <tr key={row.ledger_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
                     <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.posting_date}</td>
                     <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.document_no}</td>
@@ -146,6 +153,11 @@ export default function InventoryLedgerPanel() {
             </tbody>
           </table>
         </div>
+        {!loading && rows.length > 0 && (
+          <div className="border-t px-2" style={{ borderColor: "var(--border)" }}>
+            <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          </div>
+        )}
       </div>
     </div>
   );

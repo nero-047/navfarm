@@ -39,11 +39,14 @@ export class AlertService {
       .offset(offset);
   }
 
-  async markRead(id: string, userPayload?: any) {
+  // Scoped by company_id, not just alert_id: within one tenant's physical DB,
+  // alerts span every company the tenant has — without this check a user
+  // could mark another company's alert read just by guessing/enumerating IDs.
+  async markRead(id: string, companyId: string, userPayload?: any) {
     const [alert] = await this.db
       .select()
       .from(schema.notificationAlertLog)
-      .where(eq(schema.notificationAlertLog.alert_id, id))
+      .where(and(eq(schema.notificationAlertLog.alert_id, id), eq(schema.notificationAlertLog.company_id, companyId)))
       .limit(1);
 
     if (!alert) {
@@ -53,7 +56,7 @@ export class AlertService {
     await this.db
       .update(schema.notificationAlertLog)
       .set({ is_read: true, read_by: userPayload?.userId || null, read_at: toMysqlTimestamp() as any })
-      .where(eq(schema.notificationAlertLog.alert_id, id));
+      .where(and(eq(schema.notificationAlertLog.alert_id, id), eq(schema.notificationAlertLog.company_id, companyId)));
 
     return { ...alert, is_read: true };
   }

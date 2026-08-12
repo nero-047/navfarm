@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Search, AlertCircle, Loader2, Inbox, Eye, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, Inbox, Eye, CheckCircle2 } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { InlineAlert } from "@/components/ui/alert";
+import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+
+const PAGE_SIZE = 25;
 
 type Row = Record<string, any>;
 
@@ -28,8 +32,8 @@ const emptyLine = () => ({ gl_account_id: "", debit_amount: "", credit_amount: "
 
 const STATUS_STYLE: Record<string, any> = {
   DRAFT: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" },
-  POSTED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--accent-muted)" },
-  CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" },
+  POSTED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
+  CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" },
 };
 
 export default function JournalPanel() {
@@ -51,6 +55,8 @@ export default function JournalPanel() {
   const [posting, setPosting] = useState(false);
 
   const companyId = getActiveCompanyId();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const load = async () => {
     setLoading(true);
@@ -74,6 +80,9 @@ export default function JournalPanel() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter]);
+
+  useEffect(() => { setPage(1); }, [search, statusFilter, pageSize]);
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -185,11 +194,7 @@ export default function JournalPanel() {
         </div>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-        </div>
-      )}
+      {error && <InlineAlert>{error}</InlineAlert>}
 
       <div className="overflow-hidden rounded-2xl border" style={S.surface}>
         <div className="overflow-x-auto">
@@ -211,7 +216,7 @@ export default function JournalPanel() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No journal entries yet.</td></tr>
               ) : (
-                rows.map((row) => (
+                pagedRows.map((row) => (
                   <tr key={row.journal_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
                     <td className="whitespace-nowrap px-4 py-3 font-semibold" style={S.primary}>{row.journal_no}</td>
                     <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.posting_date}</td>
@@ -232,6 +237,11 @@ export default function JournalPanel() {
             </tbody>
           </table>
         </div>
+        {!loading && rows.length > 0 && (
+          <div className="border-t px-2" style={{ borderColor: "var(--border)" }}>
+            <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          </div>
+        )}
       </div>
 
       {/* Create modal */}
@@ -250,11 +260,7 @@ export default function JournalPanel() {
         }
       >
         <div className="flex flex-col gap-4">
-          {formError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formError}
-            </div>
-          )}
+          {formError && <InlineAlert>{formError}</InlineAlert>}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -298,7 +304,7 @@ export default function JournalPanel() {
                     <td className="px-2 py-1.5 w-28"><input type="number" value={line.credit_amount} onChange={(e) => setLineField(idx, "credit_amount", e.target.value)} className={inputCls} style={S.input} /></td>
                     <td className="px-2 py-1.5"><input value={line.description} onChange={(e) => setLineField(idx, "description", e.target.value)} className={inputCls} style={S.input} /></td>
                     <td className="px-2 py-1.5">
-                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </td>
                   </tr>
                 ))}

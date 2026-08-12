@@ -23,6 +23,23 @@ const S = {
 
 const inputCls = "w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none";
 
+// GET /auth/users returns each user's assigned role as flat fields
+// (role_id/role_code/role_name/assign_id) directly on the user object, but
+// every place this page displays "assigned roles" (the summary stat, the
+// table column, and the edit modal's Role Assignment section) reads a
+// `roles: [...]` array — the shape GET /user/:id actually returns. Without
+// this normalization, a user who already has a role assigned still shows
+// "No roles assigned" everywhere until you open the edit modal and trigger
+// its own re-fetch, which made a real assignment look like it had silently
+// failed. Apply this to every raw /auth/users response before it hits state.
+function normalizeUserRoles(u: any) {
+  if (Array.isArray(u.roles)) return u;
+  return {
+    ...u,
+    roles: u.role_id ? [{ role_id: u.role_id, role_code: u.role_code, role_name: u.role_name, assign_id: u.assign_id }] : [],
+  };
+}
+
 function Label({ children }: { children: React.ReactNode }) {
   return <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>{children}</label>;
 }
@@ -468,10 +485,11 @@ export default function UsersPage() {
   const loadData = async (storedUser: NavUser, tid: string) => {
     setLoading(true); setError("");
     try {
-      const [usersList, companiesList] = await Promise.all([
+      const [usersListRaw, companiesList] = await Promise.all([
         api.get("/auth/users"),
         api.get(`/company/tenant/${tid}`),
       ]);
+      const usersList = (Array.isArray(usersListRaw) ? usersListRaw : []).map(normalizeUserRoles);
       setCompanies(Array.isArray(companiesList) ? companiesList : []);
 
       const activeId = getActiveCompanyId() || storedUser.companyId || (storedUser as any).company_id;
@@ -549,7 +567,7 @@ export default function UsersPage() {
       setShowAddForm(false);
       setNewUser({ email: "", password_hash: "", full_name: "", phone: "", user_type: user?.userType === "TENANT_ADMIN" ? "COMPANY_ADMIN" : "STANDARD_USER" });
       const list = await api.get("/auth/users");
-      setUsers(Array.isArray(list) ? list : []);
+      setUsers((Array.isArray(list) ? list : []).map(normalizeUserRoles));
     } catch (err: any) { setError(err?.message || "Failed to register user."); }
     finally { setSubmitting(false); }
   };
@@ -829,7 +847,7 @@ export default function UsersPage() {
             setEditingMember(null);
             setSuccess("Member updated successfully.");
             const list = await api.get("/auth/users");
-            setUsers(Array.isArray(list) ? list : []);
+            setUsers((Array.isArray(list) ? list : []).map(normalizeUserRoles));
           }}
         />
       )}

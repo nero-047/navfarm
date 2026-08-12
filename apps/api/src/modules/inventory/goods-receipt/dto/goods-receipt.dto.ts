@@ -7,6 +7,7 @@ import {
   IsInt,
   Min,
   IsNumber,
+  IsPositive,
   IsDateString,
   IsArray,
   ValidateNested,
@@ -22,6 +23,7 @@ export class GoodsReceiptLineInput {
 
   @ApiProperty({ description: 'Quantity received', example: 100 })
   @IsNumber()
+  @IsPositive()
   @IsNotEmpty()
   quantity: number;
 
@@ -32,6 +34,7 @@ export class GoodsReceiptLineInput {
 
   @ApiProperty({ description: 'Rate per unit', required: false })
   @IsNumber()
+  @IsPositive()
   @IsOptional()
   rate?: number;
 

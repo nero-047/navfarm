@@ -212,6 +212,24 @@ export class StockTransferService {
       throw new BadRequestException('Cannot post a Stock Transfer with no lines.');
     }
 
+    // Claim the DRAFT -> POSTED transition atomically before writing any
+    // ledger/GL entries — see goods-issue.service.ts's post() for the full
+    // rationale (closes both the double-post race and the "retry after a
+    // partial failure duplicates the successful lines" hole).
+    const [claim] = await this.db
+      .update(schema.stockTransfer)
+      .set({
+        status: 'POSTED',
+        posted_at: toMysqlTimestamp() as any,
+        posted_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      })
+      .where(and(eq(schema.stockTransfer.transfer_id, id), eq(schema.stockTransfer.status, 'DRAFT')));
+
+    if (claim.affectedRows === 0) {
+      throw new BadRequestException('Stock Transfer cannot be posted — it was already posted by another request.');
+    }
+
     for (const line of transfer.lines) {
       const { shipment, receipt } = await this.ledgerService.writeTransferEntries({
         tenantId,
@@ -234,16 +252,6 @@ export class StockTransferService {
       await this.glPostingService.postInventoryLedgerEntry(shipment, userPayload?.userId);
       await this.glPostingService.postInventoryLedgerEntry(receipt, userPayload?.userId);
     }
-
-    await this.db
-      .update(schema.stockTransfer)
-      .set({
-        status: 'POSTED',
-        posted_at: toMysqlTimestamp() as any,
-        posted_by: userPayload?.userId || null,
-        updated_by: userPayload?.userId || null,
-      })
-      .where(eq(schema.stockTransfer.transfer_id, id));
 
     await this.auditService.log({
       tenantId,
