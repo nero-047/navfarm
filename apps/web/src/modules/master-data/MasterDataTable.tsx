@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import type { MasterDataConfig, MasterDataField } from "./types";
 
 const PAGE_SIZE = 25;
@@ -77,6 +78,7 @@ function displayValue(row: Row, key: string): string {
 }
 
 export default function MasterDataTable({ config }: { config: MasterDataConfig }) {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -119,7 +121,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       const list = unwrap<Row[]>(res);
       setRows(Array.isArray(list) ? list : []);
     } catch (err: any) {
-      setError(err?.message || "Failed to load records.");
+      setError(err?.message || t("mdFailedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -259,7 +261,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       setModalOpen(false);
       load();
     } catch (err: any) {
-      setFormError(err?.message || "Failed to save record.");
+      setFormError(err?.message || t("mdFailedToSave"));
     } finally {
       setSaving(false);
     }
@@ -273,7 +275,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       setConfirmDelete(null);
       load();
     } catch (err: any) {
-      setError(err?.message || "Failed to delete record.");
+      setError(err?.message || t("mdFailedToDelete"));
     } finally {
       setDeleting(false);
     }
@@ -309,7 +311,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     if (f.type === "select") {
       return (
         <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={inputCls} style={S.input}>
-          <option value="">Select…</option>
+          <option value="">{t("selectPlaceholder")}</option>
           {f.options?.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -326,7 +328,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       const parentLabel = parents.map((k) => config.fields.find((pf) => pf.key === k)?.label || k).join(" & ");
       return (
         <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={inputCls} style={S.input} disabled={disabled}>
-          <option value="">{disabled ? `Select ${parentLabel} first…` : "Select…"}</option>
+          <option value="">{disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder")}</option>
           {options.map((o) => (
             <option key={o[f.entityValueKey || "id"]} value={o[f.entityValueKey || "id"]}>
               {entityLabel(o, f)}
@@ -364,7 +366,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 className="rounded-lg border py-1.5 px-2 text-xs outline-none"
                 style={S.input}
               >
-                <option value="">All Nature of Business</option>
+                <option value="">{t("allNob")}</option>
                 {nobFilterOptions.map((n) => (
                   <option key={n.nob_id} value={n.nob_id}>{n.nob_code}</option>
                 ))}
@@ -376,7 +378,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 style={S.input}
                 disabled={!nobFilter}
               >
-                <option value="">{nobFilter ? "All Lines of Business" : "Select NOB first…"}</option>
+                <option value="">{nobFilter ? t("allLob") : t("selectNobFirst")}</option>
                 {lobFilterOptions.map((l) => (
                   <option key={l.lob_id} value={l.lob_id}>{l.lob_code}</option>
                 ))}
@@ -388,7 +390,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search…"
+              placeholder={t("searchPlaceholder")}
               className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none"
               style={S.input}
             />
@@ -398,7 +400,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
             style={{ backgroundColor: "var(--accent)" }}
           >
-            <Plus className="h-3.5 w-3.5" /> Add {config.label.replace(/s$/, "")}
+            <Plus className="h-3.5 w-3.5" /> {t("addItem", { name: config.label.replace(/s$/, "") })}
           </button>
         </div>
       </div>
@@ -413,23 +415,23 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 {columns.map((c) => (
                   <th key={c.key} className="whitespace-nowrap px-4 py-3">{c.label}</th>
                 ))}
-                <th className="px-4 py-3 text-right">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-right">{t("statusColumn")}</th>
+                <th className="px-4 py-3 text-right">{t("actionsColumn")}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={columns.length + 2} className="px-4 py-10 text-center text-xs" style={S.sub}>
-                    <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…
+                    <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("loadingEllipsis")}
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length + 2} className="px-4 py-10 text-center text-xs" style={S.sub}>
                     <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
-                    No {config.label.toLowerCase()} yet.
-                    <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>+ Add the first one</button>
+                    {t("noRecordsYet", { name: config.label.toLowerCase() })}
+                    <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>{t("addFirstOne")}</button>
                   </td>
                 </tr>
               ) : (
@@ -447,15 +449,15 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                             ? { color: "var(--text-muted)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }
                             : { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" }}
                         >
-                          {inactive ? "Inactive" : "Active"}
+                          {inactive ? t("statusInactive") : t("statusActive")}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button onClick={() => openEdit(row)} title="Edit" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                          <button onClick={() => openEdit(row)} title={t("edit")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button onClick={() => setConfirmDelete(row)} title="Deactivate" className="rounded-lg p-1.5 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}>
+                          <button onClick={() => setConfirmDelete(row)} title={t("deactivate")} className="rounded-lg p-1.5 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -477,12 +479,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title={editing ? `Edit ${config.label.replace(/s$/, "")}` : `Add ${config.label.replace(/s$/, "")}`}
+        title={editing ? t("editItem", { name: config.label.replace(/s$/, "") }) : t("addItem", { name: config.label.replace(/s$/, "") })}
         maxWidth="lg"
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>
-              Cancel
+              {t("cancel")}
             </button>
             <button
               onClick={handleSave}
@@ -490,7 +492,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               style={{ backgroundColor: "var(--accent)" }}
             >
-              {saving ? "Saving…" : editing ? "Save Changes" : "Create"}
+              {saving ? t("saving") : editing ? t("saveChanges") : t("create")}
             </button>
           </>
         }
@@ -514,21 +516,21 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       <Dialog
         open={!!confirmDelete}
         onClose={() => !deleting && setConfirmDelete(null)}
-        title="Deactivate record"
-        description={confirmDelete ? `This will remove "${confirmDelete[columns[0]?.key] ?? confirmDelete[config.idKey]}" from ${config.label}. This can't be undone from this screen.` : undefined}
+        title={t("deactivateRecordTitle")}
+        description={confirmDelete ? t("deactivateRecordDesc", { name: confirmDelete[columns[0]?.key] ?? confirmDelete[config.idKey], label: config.label }) : undefined}
         maxWidth="sm"
         footer={
           <>
             <button onClick={() => setConfirmDelete(null)} disabled={deleting} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>
-              Cancel
+              {t("cancel")}
             </button>
             <button onClick={handleDelete} disabled={deleting} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}>
-              {deleting ? "Deactivating…" : "Deactivate"}
+              {deleting ? t("deactivating") : t("deactivate")}
             </button>
           </>
         }
       >
-        <p className="text-sm" style={S.sub}>Please confirm you want to deactivate this record.</p>
+        <p className="text-sm" style={S.sub}>{t("confirmDeactivate")}</p>
       </Dialog>
     </div>
   );

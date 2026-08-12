@@ -24,8 +24,10 @@ import {
 } from "lucide-react";
 import { getStoredUser, getStoredToken, clearSession, hasPermission, getActiveCompanyId, setActiveCompanyId, NavUser, CompanyRef } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
+import { useLanguage } from "../../hooks/useLanguage";
 import { api } from "../../services/api-client";
 import OnboardingWizard from "../../components/console/onboarding-wizard";
+import { LanguageSelector } from "../../components/ui/language-selector";
 
 // ── Clean circular theme toggle for the header ─────────────────────────────
 function ThemeIconButton() {
@@ -53,6 +55,7 @@ interface ConsoleSidebarItem {
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
   const [tenantPlanInfo, setTenantPlanInfo] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -208,8 +211,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           </span>
           <div className="ml-auto flex items-center gap-3">
             <ThemeIconButton />
-            <button onClick={handleLogout} aria-label="Sign out" className="text-sm flex h-10 items-center gap-1.5 rounded-xl px-2 sm:px-3" style={{ color: "var(--text-secondary)" }}>
-              <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Sign Out</span>
+            <button onClick={handleLogout} aria-label={t("signOut")} className="text-sm flex h-10 items-center gap-1.5 rounded-xl px-2 sm:px-3" style={{ color: "var(--text-secondary)" }}>
+              <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">{t("signOut")}</span>
             </button>
           </div>
         </header>
@@ -238,16 +241,16 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }
 
   const navItems: ConsoleSidebarItem[] = [
-    { label: "Dashboard",       href: "/console/dashboard",      icon: LayoutDashboard, show: user.userType === "TENANT_ADMIN" || user.userType === "COMPANY_ADMIN" },
-    { label: "Companies",       href: "/console/companies",      icon: Building2,       show: hasPermission(user, "COMPANY", "SETTINGS", "can_view") },
-    { label: "Master Data",     href: "/console/master-data",    icon: Database,        show: hasPermission(user, "MASTER_DATA", "UOM", "can_view") },
-    { label: "Inventory",       href: "/console/inventory",      icon: Boxes,           show: hasPermission(user, "INVENTORY", "GOODS_RECEIPT", "can_view") },
-    { label: "Finance",         href: "/console/finance",        icon: Landmark,        show: hasPermission(user, "FINANCE", "JOURNAL", "can_view") },
-    { label: "Production",      href: "/console/production",     icon: Sprout,          show: hasPermission(user, "PRODUCTION", "BATCH", "can_view") },
-    { label: "Team Management", href: "/console/users",          icon: Users,           show: hasPermission(user, "RBAC", "USER", "can_view") },
-    { label: "Role Permissions",href: "/console/roles",          icon: ShieldAlert,     show: hasPermission(user, "RBAC", "ROLE", "can_view") },
-    { label: "Audit Ledger",    href: "/console/audit",          icon: History,         show: hasPermission(user, "AUDIT", "LOGS", "can_view") },
-    { label: "Notifications",   href: "/console/notifications",  icon: Bell,            show: hasPermission(user, "NOTIFICATION", "SETTINGS", "can_view") },
+    { label: t("dashboard"),       href: "/console/dashboard",      icon: LayoutDashboard, show: user.userType === "TENANT_ADMIN" || user.userType === "COMPANY_ADMIN" },
+    { label: t("companies"),       href: "/console/companies",      icon: Building2,       show: hasPermission(user, "COMPANY", "SETTINGS", "can_view") },
+    { label: t("masterData"),      href: "/console/master-data",    icon: Database,        show: hasPermission(user, "MASTER_DATA", "UOM", "can_view") },
+    { label: t("inventory"),       href: "/console/inventory",      icon: Boxes,           show: hasPermission(user, "INVENTORY", "GOODS_RECEIPT", "can_view") },
+    { label: t("finance"),         href: "/console/finance",        icon: Landmark,        show: hasPermission(user, "FINANCE", "JOURNAL", "can_view") },
+    { label: t("production"),      href: "/console/production",     icon: Sprout,          show: hasPermission(user, "PRODUCTION", "BATCH", "can_view") },
+    { label: t("teamManagement"),  href: "/console/users",          icon: Users,           show: hasPermission(user, "RBAC", "USER", "can_view") },
+    { label: t("rolePermissions"), href: "/console/roles",          icon: ShieldAlert,     show: hasPermission(user, "RBAC", "ROLE", "can_view") },
+    { label: t("auditLedger"),     href: "/console/audit",          icon: History,         show: hasPermission(user, "AUDIT", "LOGS", "can_view") },
+    { label: t("notifications"),   href: "/console/notifications",  icon: Bell,            show: hasPermission(user, "NOTIFICATION", "SETTINGS", "can_view") },
   ].filter((i) => i.show);
 
   const initials = user.fullName?.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase() || "U";
@@ -297,7 +300,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
             <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white">{initials}<span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0b1248] bg-emerald-400" /></span>
             <span className="min-w-0"><span className="block truncate text-xs font-semibold text-white">{user.fullName}</span><span className="mt-0.5 block truncate text-[9px] text-white/38">{user.email}</span></span>
           </div>
-          <button onClick={handleLogout} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-medium text-white/50 transition hover:border-red-400/25 hover:bg-red-400/10 hover:text-red-300"><LogOut size={14} /> Sign out</button>
+          <button onClick={handleLogout} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-medium text-white/50 transition hover:border-red-400/25 hover:bg-red-400/10 hover:text-red-300"><LogOut size={14} /> {t("signOut")}</button>
         </div>
       </div>
     );
@@ -480,7 +483,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                                   {c.company_name}
                                 </p>
                                 {c.is_primary && (
-                                  <p style={{ margin: 0, fontSize: 10, color: "var(--text-muted)", fontWeight: 500 }}>Home company</p>
+                                  <p style={{ margin: 0, fontSize: 10, color: "var(--text-muted)", fontWeight: 500 }}>{t("homeCompany")}</p>
                                 )}
                               </div>
                               {isCurrent && (
@@ -499,6 +502,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               );
             })()}
 
+            <LanguageSelector />
             <ThemeIconButton />
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
               <div style={{

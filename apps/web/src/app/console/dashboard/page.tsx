@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
+import { useLanguage } from "../../../hooks/useLanguage";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -67,7 +69,7 @@ export default function DashboardPage() {
         null;
       setActiveCompany(assigned);
     } catch (e: any) {
-      setError(e?.message || "Failed to load dashboard.");
+      setError(e?.message || t("failedToLoadDashboard"));
     } finally {
       setLoading(false);
     }
@@ -77,7 +79,7 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="animate-spin w-5 h-5 mr-2" style={{ color: "var(--accent)" }} />
-        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Loading dashboard…</span>
+        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{t("loadingDashboard")}</span>
       </div>
     );
   }
@@ -97,9 +99,9 @@ export default function DashboardPage() {
   const isTenantAdmin = user?.userType === "TENANT_ADMIN";
 
   const quickActions = [
-    { label: "Companies",       description: "Manage company setup & settings", href: "/console/companies",     icon: Building2,  color: "#2563EB" },
-    { label: "Team Management", description: "Invite and manage users",          href: "/console/users",         icon: Users,      color: "#16A34A" },
-    { label: "Role Permissions",description: "Configure RBAC policies",          href: "/console/roles",         icon: ShieldAlert, color: "#7C3AED" },
+    { label: t("companies"),       description: t("manageCompanySetup"),     href: "/console/companies",     icon: Building2,  color: "#2563EB" },
+    { label: t("teamManagement"),  description: t("inviteAndManageUsers"),   href: "/console/users",         icon: Users,      color: "#16A34A" },
+    { label: t("rolePermissions"), description: t("configureRbacPolicies"), href: "/console/roles",         icon: ShieldAlert, color: "#7C3AED" },
   ];
 
   const statCard = (
@@ -132,10 +134,10 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
-            {isTenantAdmin ? "Operational Dashboard" : "Company Dashboard"}
+            {isTenantAdmin ? t("operationalDashboard") : t("companyDashboard")}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
-            Welcome back, <span className="font-medium" style={{ color: "var(--text-primary)" }}>{user?.fullName}</span>
+            {t("welcomeBack")} <span className="font-medium" style={{ color: "var(--text-primary)" }}>{user?.fullName}</span>
           </p>
         </div>
         <span className="text-xs font-semibold uppercase tracking-wider px-3 py-1.5 rounded-lg border"
@@ -149,7 +151,7 @@ export default function DashboardPage() {
         {/* Active Company */}
         <div className="rounded-lg p-5 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Active Company</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("activeCompany")}</span>
             <Building2 className="w-4 h-4" style={{ color: "var(--accent)" }} />
           </div>
           <div className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
@@ -157,28 +159,28 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2 flex items-center gap-1.5">
             {activeCompany?.onboarding_status === "COMPLETED" ? (
-              <><CheckCircle className="w-3.5 h-3.5 text-green-500" /><span className="text-xs text-green-600 font-medium">Setup Complete</span></>
+              <><CheckCircle className="w-3.5 h-3.5 text-green-500" /><span className="text-xs text-green-600 font-medium">{t("setupComplete")}</span></>
             ) : (
-              <><AlertCircle className="w-3.5 h-3.5 text-amber-500" /><span className="text-xs text-amber-600 font-medium">Setup Pending</span></>
+              <><AlertCircle className="w-3.5 h-3.5 text-amber-500" /><span className="text-xs text-amber-600 font-medium">{t("setupPending")}</span></>
             )}
           </div>
         </div>
 
-        {statCard("Companies", Building2,
+        {statCard(t("companies"), Building2,
           <span className="text-3xl font-black">{companies.length}</span>,
-          `of ${tenantPlanInfo?.max_companies || 1} limit · ${compPercent.toFixed(0)}%`,
+          t("ofLimitPct", { max: tenantPlanInfo?.max_companies || 1, pct: compPercent.toFixed(0) }),
           { pct: compPercent, color: "#6366F1" }
         )}
 
-        {statCard("Team Members", Users,
+        {statCard(t("teamMembers"), Users,
           <span className="text-3xl font-black">{users.length}</span>,
-          `of ${tenantPlanInfo?.max_users || 5} seats · ${userPercent.toFixed(0)}%`,
+          t("ofSeatsPct", { max: tenantPlanInfo?.max_users || 5, pct: userPercent.toFixed(0) }),
           { pct: userPercent, color: "#16A34A" }
         )}
 
-        {statCard("Subscription", TrendingUp,
+        {statCard(t("subscription"), TrendingUp,
           tenantPlanInfo?.plan_id?.replace("PLAN_", "") || "—",
-          `${tenantPlanInfo?.billing_cycle || "Monthly"} · ${tenantPlanInfo?.db_name || "—"}`
+          `${tenantPlanInfo?.billing_cycle || t("monthly")} · ${tenantPlanInfo?.db_name || "—"}`
         )}
       </div>
 
@@ -186,17 +188,17 @@ export default function DashboardPage() {
       {activeCompany && (
         <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
           <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Active Company Details</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("activeCompanyDetails")}</h2>
             <Link href="/console/companies" className="text-xs font-medium flex items-center gap-1" style={{ color: "var(--accent)" }}>
-              <Settings className="w-3.5 h-3.5" /> Manage
+              <Settings className="w-3.5 h-3.5" /> {t("manage")}
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: "var(--border)" }}>
             {[
-              { label: "Company Name",   value: activeCompany.company_name || "—" },
-              { label: "Registration No.", value: activeCompany.registration_no || "—" },
-              { label: "Country",        value: activeCompany.country_id || "—" },
-              { label: "Onboarding",     value: activeCompany.onboarding_status || "—" },
+              { label: t("companyName"),   value: activeCompany.company_name || "—" },
+              { label: t("registrationNo"), value: activeCompany.registration_no || "—" },
+              { label: t("country"),        value: activeCompany.country_id || "—" },
+              { label: t("onboardingLabel"), value: activeCompany.onboarding_status || "—" },
             ].map((row) => (
               <div key={row.label} className="px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
                 <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-muted)" }}>{row.label}</div>
@@ -209,7 +211,7 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)" }}>Quick Actions</h2>
+        <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)" }}>{t("quickActionsHeading")}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {quickActions.map((action) => (
             <Link

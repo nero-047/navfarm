@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useLanguage } from '../../hooks/useLanguage';
 
 export function FullPageOverlay({
   children,
@@ -12,6 +13,7 @@ export function FullPageOverlay({
   onClose: () => void;
   className?: string;
 }) {
+  const { t } = useLanguage();
   const closeRef = useRef(onClose);
   const panelRef = useRef<HTMLDivElement>(null);
   closeRef.current = onClose;
@@ -47,7 +49,7 @@ export function FullPageOverlay({
     <div className="fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overflow-y-auto p-4 sm:p-6">
       <button
         type="button"
-        aria-label="Close dialog"
+        aria-label={t("closeDialog")}
         className="fixed inset-0 bg-black/45 backdrop-blur-sm"
         onClick={onClose}
       />

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, NavUser } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { MASTER_DATA_CONFIGS, MASTER_DATA_GROUPS, getConfig } from "@/modules/master-data/configs";
 import MasterDataTable from "@/modules/master-data/MasterDataTable";
 import { ShieldAlert } from "lucide-react";
@@ -16,6 +17,7 @@ const S = {
 
 export default function MasterDataPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
   const [ready, setReady] = useState(false);
   const [activeKey, setActiveKey] = useState(MASTER_DATA_CONFIGS[0].key);
@@ -41,8 +43,8 @@ export default function MasterDataPage() {
         >
           <ShieldAlert className="h-5 w-5 shrink-0" />
           <div>
-            <p className="text-sm font-semibold">Master Data is managed by Company Admins</p>
-            <p className="mt-1 text-xs" style={S.sub}>Your account ({user.userType.replace(/_/g, " ").toLowerCase()}) doesn&apos;t have access to this section. Contact your company administrator if you need a change made here.</p>
+            <p className="text-sm font-semibold">{t("masterDataAccessDeniedTitle")}</p>
+            <p className="mt-1 text-xs" style={S.sub}>{t("masterDataAccessDeniedDesc", { type: user.userType.replace(/_/g, " ").toLowerCase() })}</p>
           </div>
         </div>
       </div>
@@ -54,8 +56,8 @@ export default function MasterDataPage() {
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-7">
       <div className="mb-5">
-        <h1 className="text-xl font-bold" style={S.primary}>Master Data</h1>
-        <p className="mt-0.5 text-sm" style={S.sub}>Operational reference data for your company — farms, inventory, livestock, partners and finance dimensions.</p>
+        <h1 className="text-xl font-bold" style={S.primary}>{t("masterData")}</h1>
+        <p className="mt-0.5 text-sm" style={S.sub}>{t("masterDataPageDescription")}</p>
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row">

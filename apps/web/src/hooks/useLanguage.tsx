@@ -5,10 +5,19 @@ import { translations, TranslationKeys } from "../utils/translations";
 
 export type Language = "en" | "hi" | "mr" | "es" | "fr" | "bn" | "te" | "ta";
 
+type TranslationVars = Record<string, string | number>;
+
+function interpolate(template: string, vars?: TranslationVars): string {
+  if (!vars) return template;
+  return template.replace(/\{\{(\w+)\}\}/g, (match, name) =>
+    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match
+  );
+}
+
 interface LanguageContextValue {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: TranslationKeys) => string;
+  t: (key: TranslationKeys, vars?: TranslationVars) => string;
 }
 
 const LanguageContext = createContext<LanguageContextValue>({
@@ -41,9 +50,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("navfarm_lang", lang);
   };
 
-  const t = (key: TranslationKeys): string => {
-    const dict = translations[language] || translations.en;
-    return dict[key] || translations.en[key] || key;
+  const t = (key: TranslationKeys, vars?: TranslationVars): string => {
+    const dict = (translations[language] || translations.en) as Partial<Record<TranslationKeys, string>>;
+    const template = dict[key] || translations.en[key] || key;
+    return interpolate(template, vars);
   };
 
   return (
