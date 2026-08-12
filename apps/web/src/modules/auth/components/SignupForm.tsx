@@ -37,8 +37,8 @@ export function SignupForm() {
     }
     setSubmitting(true);
     try {
-      await signup({ tenantName, tenantCode, name, email, password });
-      router.push('/company-selection');
+      const signedInUser = await signup({ tenantName, tenantCode, name, email, password });
+      router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to create workspace');
     } finally {

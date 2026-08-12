@@ -1,4 +1,3 @@
-export { CompanyCard } from './components/CompanyCard';
 export {
   COMPANIES,
   NOB_OPTIONS,

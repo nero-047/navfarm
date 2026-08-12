@@ -7,8 +7,17 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    const user = localStorage.getItem('navfarm_auth_user');
-    router.replace(user ? '/company-selection' : '/login');
+    const raw = localStorage.getItem('navfarm_auth_user');
+    if (!raw) {
+      router.replace('/login');
+      return;
+    }
+    try {
+      const user = JSON.parse(raw);
+      router.replace(user.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
+    } catch {
+      router.replace('/login');
+    }
   }, [router]);
 
   return (
