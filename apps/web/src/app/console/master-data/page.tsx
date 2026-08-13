@@ -34,7 +34,7 @@ export default function MasterDataPage() {
 
   if (!ready || !user) return null;
 
-  if (user.userType !== "COMPANY_ADMIN" && user.userType !== "SYSTEM_ADMIN") {
+  if (user.userType !== "COMPANY_ADMIN" && user.userType !== "SYSTEM_ADMIN" && user.userType !== "TENANT_ADMIN") {
     return (
       <div className="mx-auto max-w-2xl p-8">
         <div

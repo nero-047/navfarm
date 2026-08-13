@@ -4,10 +4,10 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2, RefreshCw, AlertCircle, CheckCircle,
-  Settings, ArrowLeft, Activity, Plus,
+  Settings, ArrowLeft, Activity, Plus, ArrowRightLeft,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
-import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, NavUser } from "../../../hooks/useAuth";
+import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser } from "../../../hooks/useAuth";
 import CompanyTab from "../../../components/console/console-tabs/company-tab";
 import { Dialog } from "../../../components/ui/dialog";
 
@@ -320,13 +320,35 @@ export default function CompaniesPage() {
                   <td className="px-5 py-4"><StatusBadge status={co.onboarding_status} /></td>
                   <td className="px-5 py-4">
                     {co.onboarding_status === "COMPLETED" ? (
-                      <button
-                        onClick={() => setManagingCompany(co)}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-                        style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
-                        <Settings className="w-3.5 h-3.5" />
-                        Manage
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setManagingCompany(co)}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
+                          style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
+                          <Settings className="w-3.5 h-3.5" />
+                          Manage
+                        </button>
+                        {!(isTenantCompanyMode() && co.company_id === (getActiveCompanyId() || user?.companyId)) && (
+                          <button
+                            onClick={() => {
+                              const currentUser = getStoredUser();
+                              if (currentUser) {
+                                const patched = { ...currentUser, companyId: co.company_id, company_id: co.company_id };
+                                localStorage.setItem("user", JSON.stringify(patched));
+                                localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
+                              }
+                              setActiveCompanyId(co.company_id);
+                              setTenantCompanyMode(true);
+                              window.location.href = "/console/dashboard";
+                            }}
+                            title={`Switch into ${co.company_name} — operate the console as this company`}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
+                            style={{ backgroundColor: "var(--surface-raised)", color: "var(--text-primary)", borderColor: "var(--border)" }}>
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                            Switch
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <button
                         onClick={() => {

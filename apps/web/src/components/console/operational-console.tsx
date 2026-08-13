@@ -66,10 +66,7 @@ export default function OperationalConsole({
   onLogout,
 }: OperationalConsoleProps) {
   const hasPermission = (moduleCode: string, resource: string, action: "can_view" | "can_create" | "can_edit") => {
-    if (currentUser?.userType === "COMPANY_ADMIN") return true;
-    if (currentUser?.userType === "TENANT_ADMIN") {
-      return (moduleCode === "COMPANY" && resource === "SETTINGS") || moduleCode === "PLAN" || (moduleCode === "RBAC" && resource !== "ROLE");
-    }
+    if (currentUser?.userType === "COMPANY_ADMIN" || currentUser?.userType === "TENANT_ADMIN") return true;
     const perms = currentUser?.permissions || [];
     return perms.some((p: any) => {
       const matchesModule = p.moduleCode === 'ALL' || p.moduleCode === moduleCode;

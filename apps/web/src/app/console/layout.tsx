@@ -21,8 +21,9 @@ import {
   RefreshCw,
   Sun,
   Moon,
+  ArrowLeft,
 } from "lucide-react";
-import { getStoredUser, getStoredToken, clearSession, hasPermission, getActiveCompanyId, setActiveCompanyId, NavUser, CompanyRef } from "../../hooks/useAuth";
+import { getStoredUser, getStoredToken, clearSession, hasPermission, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser, CompanyRef } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { useLanguage } from "../../hooks/useLanguage";
 import { api } from "../../services/api-client";
@@ -64,6 +65,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   // Multi-company switcher
   const [headerSwitcherOpen,  setHeaderSwitcherOpen]  = useState(false);
   const [currentActiveCompanyId, setCurrentActiveCompanyId] = useState<string | null>(null);
+  // Tenant Admin only: whether they've explicitly entered a company's
+  // operational context (via "Switch" on the Companies list) — gates the
+  // company-scoped sidebar tabs (Master Data/Inventory/Finance/Production/
+  // Role Permissions/Audit Ledger/Notifications). Starts false on every
+  // login so a tenant admin lands on the tenant-wide view first.
+  const [companyMode, setCompanyMode] = useState(false);
 
   // Onboarding wizard state
   const [checkingOnboard, setCheckingOnboard] = useState(true);
@@ -102,6 +109,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
     setCurrentActiveCompanyId(initialActiveId);
     if (initialActiveId && !storedActiveId) setActiveCompanyId(initialActiveId);
+    setCompanyMode(isTenantCompanyMode());
 
     if (tenantId) {
       api.get(`/tenant/${tenantId}`).then((data: any) => setTenantPlanInfo(data)).catch(() => setTenantPlanInfo(null));
@@ -240,17 +248,26 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     );
   }
 
+  // Tenant Admin's company-scoped tabs (Master Data/Inventory/Finance/Production/
+  // Role Permissions/Audit Ledger/Notifications) only appear once they've
+  // explicitly entered a company via "Switch" on the Companies list — before
+  // that, they only see the tenant-wide tabs (Dashboard/Companies/Team
+  // Management). Every other user type is unaffected (always governed by
+  // their normal hasPermission() check).
+  const isTenantAdmin = user.userType === "TENANT_ADMIN";
+  const companyScoped = !isTenantAdmin || companyMode;
+
   const navItems: ConsoleSidebarItem[] = [
     { label: t("dashboard"),       href: "/console/dashboard",      icon: LayoutDashboard, show: user.userType === "TENANT_ADMIN" || user.userType === "COMPANY_ADMIN" },
     { label: t("companies"),       href: "/console/companies",      icon: Building2,       show: hasPermission(user, "COMPANY", "SETTINGS", "can_view") },
-    { label: t("masterData"),      href: "/console/master-data",    icon: Database,        show: hasPermission(user, "MASTER_DATA", "UOM", "can_view") },
-    { label: t("inventory"),       href: "/console/inventory",      icon: Boxes,           show: hasPermission(user, "INVENTORY", "GOODS_RECEIPT", "can_view") },
-    { label: t("finance"),         href: "/console/finance",        icon: Landmark,        show: hasPermission(user, "FINANCE", "JOURNAL", "can_view") },
-    { label: t("production"),      href: "/console/production",     icon: Sprout,          show: hasPermission(user, "PRODUCTION", "BATCH", "can_view") },
+    { label: t("masterData"),      href: "/console/master-data",    icon: Database,        show: companyScoped && hasPermission(user, "MASTER_DATA", "UOM", "can_view") },
+    { label: t("inventory"),       href: "/console/inventory",      icon: Boxes,           show: companyScoped && hasPermission(user, "INVENTORY", "GOODS_RECEIPT", "can_view") },
+    { label: t("finance"),         href: "/console/finance",        icon: Landmark,        show: companyScoped && hasPermission(user, "FINANCE", "JOURNAL", "can_view") },
+    { label: t("production"),      href: "/console/production",     icon: Sprout,          show: companyScoped && hasPermission(user, "PRODUCTION", "BATCH", "can_view") },
     { label: t("teamManagement"),  href: "/console/users",          icon: Users,           show: hasPermission(user, "RBAC", "USER", "can_view") },
-    { label: t("rolePermissions"), href: "/console/roles",          icon: ShieldAlert,     show: hasPermission(user, "RBAC", "ROLE", "can_view") },
-    { label: t("auditLedger"),     href: "/console/audit",          icon: History,         show: hasPermission(user, "AUDIT", "LOGS", "can_view") },
-    { label: t("notifications"),   href: "/console/notifications",  icon: Bell,            show: hasPermission(user, "NOTIFICATION", "SETTINGS", "can_view") },
+    { label: t("rolePermissions"), href: "/console/roles",          icon: ShieldAlert,     show: companyScoped && hasPermission(user, "RBAC", "ROLE", "can_view") },
+    { label: t("auditLedger"),     href: "/console/audit",          icon: History,         show: companyScoped && hasPermission(user, "AUDIT", "LOGS", "can_view") },
+    { label: t("notifications"),   href: "/console/notifications",  icon: Bell,            show: companyScoped && hasPermission(user, "NOTIFICATION", "SETTINGS", "can_view") },
   ].filter((i) => i.show);
 
   const initials = user.fullName?.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase() || "U";
@@ -353,6 +370,56 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           </nav>
           {/* Right side: company switcher + theme + user */}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+
+            {/* ── "Managing {company} — Back to Tenant" — Tenant Admin only, shown while
+                they've explicitly entered a company's operational context ── */}
+            {user?.userType === "TENANT_ADMIN" && companyMode && activeCompany && (() => {
+              const homeCompanyId = user.companies?.find((c) => c.is_primary)?.company_id || user.companies?.[0]?.company_id || activeCompany.company_id;
+              return (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "5px 6px 5px 10px",
+                  borderRadius: 999,
+                  border: "1.5px solid var(--warning)",
+                  backgroundColor: "var(--warning-muted)",
+                  color: "var(--warning)",
+                  fontSize: 12, fontWeight: 700,
+                  whiteSpace: "nowrap",
+                }}>
+                  <Building2 style={{ width: 13, height: 13, flexShrink: 0 }} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220, whiteSpace: "nowrap" }}>
+                    Managing: {activeCompany.company_name}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const currentUser = getStoredUser();
+                      if (currentUser) {
+                        const patched = { ...currentUser, companyId: homeCompanyId, company_id: homeCompanyId };
+                        localStorage.setItem("user", JSON.stringify(patched));
+                        localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
+                      }
+                      setActiveCompanyId(homeCompanyId);
+                      setTenantCompanyMode(false);
+                      window.location.href = "/console/companies";
+                    }}
+                    title="Back to Tenant Admin — exit this company's context"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      padding: "4px 8px",
+                      borderRadius: 999,
+                      border: "none",
+                      backgroundColor: "var(--warning)",
+                      color: "#fff",
+                      fontSize: 11, fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <ArrowLeft style={{ width: 11, height: 11 }} />
+                    Back to Tenant
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* ── Company Switcher Pill (header) — only when ≥2 companies ── */}
             {user?.companies && user.companies.length > 1 && (() => {

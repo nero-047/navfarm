@@ -63,6 +63,27 @@ export function setActiveCompanyId(companyId: string): void {
   localStorage.setItem("active_company_id", companyId);
 }
 
+/**
+ * Whether a TENANT_ADMIN has explicitly entered a company's operational
+ * context (via "Switch" on the Companies list). Separate from
+ * getActiveCompanyId() — a tenant admin's active company defaults to their
+ * home company even before they've "entered" it, and the sidebar's
+ * company-scoped tabs (Master Data, Inventory, Finance, Production, Role
+ * Permissions, Audit Ledger, Notifications) should stay hidden until this
+ * flag is explicitly set, showing only the tenant-wide tabs (Dashboard,
+ * Companies, Team Management) by default.
+ */
+export function isTenantCompanyMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("tenant_company_mode") === "1";
+}
+
+export function setTenantCompanyMode(on: boolean): void {
+  if (typeof window === "undefined") return;
+  if (on) localStorage.setItem("tenant_company_mode", "1");
+  else localStorage.removeItem("tenant_company_mode");
+}
+
 export function clearSession() {
   if (typeof window === "undefined") return;
   clearAuthSession();
@@ -80,14 +101,7 @@ export function hasPermission(
   action: "can_view" | "can_create" | "can_edit"
 ): boolean {
   if (!user) return false;
-  if (user.userType === "COMPANY_ADMIN") return true;
-  if (user.userType === "TENANT_ADMIN") {
-    return (
-      (moduleCode === "COMPANY" && resource === "SETTINGS") ||
-      moduleCode === "PLAN" ||
-      (moduleCode === "RBAC" && resource !== "ROLE")
-    );
-  }
+  if (user.userType === "COMPANY_ADMIN" || user.userType === "TENANT_ADMIN") return true;
   const perms = user.permissions || [];
   return perms.some((p) => {
     const matchModule   = p.moduleCode === "ALL" || p.moduleCode === moduleCode;

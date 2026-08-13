@@ -38,19 +38,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User session context missing.');
     }
 
-    if (user.userType === 'SYSTEM_ADMIN' || user.userType === 'COMPANY_ADMIN') {
-      return true;
-    }
-
-    if (user.userType === 'TENANT_ADMIN') {
-      const isAllowed =
-        (requiredPermission.moduleCode === 'COMPANY' && requiredPermission.resource === 'SETTINGS') ||
-        requiredPermission.moduleCode === 'PLAN' ||
-        (requiredPermission.moduleCode === 'RBAC' && requiredPermission.resource !== 'ROLE');
-
-      if (!isAllowed) {
-        throw new ForbiddenException('Tenant Administrators cannot manage company-specific operations.');
-      }
+    if (user.userType === 'SYSTEM_ADMIN' || user.userType === 'COMPANY_ADMIN' || user.userType === 'TENANT_ADMIN') {
       return true;
     }
 
