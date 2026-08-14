@@ -2,6 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": true,
+    /* Callbacks passed to page.evaluate() are compiled here but execute in the
+       browser, so the specs legitimately reference DOM globals. */
+    "lib": ["es2022", "dom"],
     "outDir": "out-tsc/playwright",
     "sourceMap": false,
     "types": ["node"]

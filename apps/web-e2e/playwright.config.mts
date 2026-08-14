@@ -23,6 +23,19 @@ const baseURL = process.env['BASE_URL'] || 'http://localhost:3000';
  */
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
+  /* Declared after the preset spread so they override its defaults (which are
+     no `timeout` — i.e. Playwright's 30s — and `retries: 0`).
+
+     Three browser projects run in parallel against a Turbopack dev server that
+     compiles routes on demand. Measured locally, the same Firefox assertions
+     cost ~0.7s warm on a single worker and up to ~22.9s under four-worker
+     contention: green code, but only ~7s inside a 30s budget with no retry.
+     60s restores headroom without masking a real hang, since nothing in the
+     shell suite legitimately takes even 30s. */
+  timeout: 60_000,
+  /* Locally a retry would hide flake we want to see; on CI a single contended
+     machine is the expected condition, so retry rather than fail the gate. */
+  retries: process.env['CI'] ? 2 : 0,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL,

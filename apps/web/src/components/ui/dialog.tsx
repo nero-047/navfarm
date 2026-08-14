@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '../../hooks/useLanguage';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 interface DialogProps {
   open: boolean;
@@ -33,11 +34,10 @@ export function Dialog({ open, onClose, title, description, children, footer, ma
   const descriptionId = `${dialogId}-description`;
   closeRef.current = onClose;
 
+  useScrollLock(open);
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     panelRef.current?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
@@ -53,7 +53,6 @@ export function Dialog({ open, onClose, title, description, children, footer, ma
 
     window.addEventListener('keydown', onKeyDown);
     return () => {
-      document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', onKeyDown);
       previous?.focus();
     };

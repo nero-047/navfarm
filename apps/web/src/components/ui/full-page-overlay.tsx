@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../../hooks/useLanguage';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 export function FullPageOverlay({
   children,
@@ -18,10 +19,9 @@ export function FullPageOverlay({
   const panelRef = useRef<HTMLDivElement>(null);
   closeRef.current = onClose;
 
+  useScrollLock();
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     panelRef.current?.focus();
 
     function closeOnEscape(event: KeyboardEvent) {
@@ -37,7 +37,6 @@ export function FullPageOverlay({
 
     document.addEventListener('keydown', closeOnEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', closeOnEscape);
       previousFocus?.focus();
     };

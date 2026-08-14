@@ -116,6 +116,170 @@ body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   APPLICATION SHELL GEOMETRY
+
+   Below 1024px the shell is an ordinary document: the page scrolls, the
+   header sticks, and the navigation is an off-canvas drawer.
+
+   From 1024px the shell owns the viewport. The root is exactly one dynamic
+   viewport tall and does not scroll, which is what makes the navigation and
+   the header stationary without taking them out of flow. `<main>` is the
+   single primary content scroller.
+
+   Every element between the root and a scroller declares `min-height: 0` and
+   flexible tracks are `minmax(0, 1fr)`: the default `min-height: auto` on
+   grid and flex items lets a tall child inflate its track instead of
+   overflowing it, which silently hands scrolling back to the document. No
+   intermediary overflow container sits between `<main>` and the page header
+   inside it, so `position: sticky` there resolves against the real scroller.
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-shell-root] {
+  display: block;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+[data-shell-scrim] {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  cursor: default;
+  background: rgba(0, 0, 0, 0.5);
+  border: 0;
+}
+
+[data-shell-region='primary-nav'] {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(280px, 86vw);
+  min-height: 0;
+  background: var(--sidebar-bg);
+  /* Hidden rather than merely translated: an off-screen drawer that is still
+     visible remains focusable and still reachable by a screen reader. */
+  visibility: hidden;
+  transform: translateX(-100%);
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), visibility 240ms;
+}
+
+[data-shell-region='primary-nav'][data-open='true'] {
+  visibility: visible;
+  transform: translateX(0);
+}
+
+/* The navigation's own link list is the only thing inside the rail that
+   scrolls; the brand block and the account footer stay pinned to it. */
+[data-shell-nav-scroll] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-shell-region='header'] {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  height: 56px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+}
+
+[data-shell-region='workspace'] {
+  display: block;
+  min-height: 0;
+}
+
+[data-shell-region='context-nav'] {
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+[data-shell-region='content'] {
+  display: block;
+  min-height: 0;
+}
+
+[data-shell-region='page-header'] {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+}
+
+@media (min-width: 1024px) {
+  [data-shell-root] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Becomes a real grid column spanning both rows — stationary because the
+     root itself never scrolls, not because it is positioned out of flow. */
+  [data-shell-region='primary-nav'] {
+    position: relative;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    width: 260px;
+    height: 100%;
+    visibility: visible;
+    transform: none;
+    transition: none;
+  }
+
+  [data-shell-region='header'] {
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  [data-shell-region='workspace'] {
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  [data-shell-region='workspace'][data-has-context-nav='true'] {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  [data-shell-region='context-nav'] {
+    width: 240px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-bottom: 0;
+    border-inline-end: 1px solid var(--border);
+  }
+
+  [data-shell-region='content'] {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Held by useScrollLock() only. Nothing else writes body overflow. */
+html[data-scroll-locked] body {
+  overflow: hidden;
+}
+
 h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
   font-weight: 600;

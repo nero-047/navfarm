@@ -1,0 +1,76 @@
+"use client";
+
+import { Boxes, Database, Landmark, LayoutDashboard, Sprout, Users } from "lucide-react";
+import { AppShell } from "../../../components/shell/AppShell";
+
+const NAV_ITEMS = [
+  { label: "Dashboard", href: "/dev/shell-harness", icon: LayoutDashboard },
+  { label: "Master Data", href: "/dev/shell-harness/master-data", icon: Database },
+  { label: "Inventory", href: "/dev/shell-harness/inventory", icon: Boxes },
+  { label: "Finance", href: "/dev/shell-harness/finance", icon: Landmark },
+  { label: "Production", href: "/dev/shell-harness/production", icon: Sprout },
+  { label: "Team Management", href: "/dev/shell-harness/users", icon: Users },
+];
+
+/** Long enough that the column must scroll on its own at every test viewport. */
+const CONTEXT_ITEMS = Array.from({ length: 40 }, (_, i) => `Context entry ${i + 1}`);
+
+/** Long enough that the content region must scroll on its own. */
+const CONTENT_ROWS = Array.from({ length: 60 }, (_, i) => i + 1);
+
+export function ShellHarness({ withContextNav }: { withContextNav: boolean }) {
+  const contextNav = (
+    <div className="p-3" data-testid="harness-context-nav">
+      <p className="px-2 pb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Section</p>
+      <ul className="space-y-0.5">
+        {CONTEXT_ITEMS.map((label, index) => (
+          <li key={label}>
+            <button
+              type="button"
+              data-testid={index === CONTEXT_ITEMS.length - 1 ? "harness-context-last" : undefined}
+              className="w-full rounded-[var(--radius-sm)] px-2 py-2 text-left text-[13px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
+            >
+              {label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  return (
+    <AppShell
+      brandHref="/dev/shell-harness"
+      brandSubtitle="Shell harness"
+      navSectionLabel="Organization"
+      navItems={NAV_ITEMS}
+      pathname="/dev/shell-harness"
+      userInitials="SH"
+      userName="Shell Harness"
+      userEmail="harness@navfarm.test"
+      onLogout={() => undefined}
+      signOutLabel="Sign out"
+      breadcrumbRoot="Harness"
+      breadcrumbCurrent="Shell geometry"
+      contextNav={withContextNav ? contextNav : undefined}
+      pageHeader={
+        <div className="border-b border-[var(--border)] px-6 py-5" data-testid="harness-page-header">
+          <h1 className="text-[28px] font-semibold tracking-tight text-[var(--text-primary)]">Shell geometry</h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">Fixture route for shell layout tests.</p>
+        </div>
+      }
+    >
+      <div className="px-6 py-6" data-testid="harness-content">
+        {CONTENT_ROWS.map((row) => (
+          <p
+            key={row}
+            data-testid={row === CONTENT_ROWS.length ? "harness-content-last" : undefined}
+            className="border-b border-[var(--border-subtle)] py-6 text-sm text-[var(--text-secondary)]"
+          >
+            Content row {row}
+          </p>
+        ))}
+      </div>
+    </AppShell>
+  );
+}
