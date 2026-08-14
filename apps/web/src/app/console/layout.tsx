@@ -41,6 +41,19 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   // Multi-company switcher
   const [headerSwitcherOpen,  setHeaderSwitcherOpen]  = useState(false);
   const [currentActiveCompanyId, setCurrentActiveCompanyId] = useState<string | null>(null);
+
+  // Escape dismisses the switcher popover, matching the drawer and dialog.
+  // It previously only closed via click-away or selecting an entry, so it was
+  // the one overlay in the app a keyboard user could not back out of.
+  useEffect(() => {
+    if (!headerSwitcherOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHeaderSwitcherOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [headerSwitcherOpen]);
+
   // Tenant Admin only: whether they've explicitly entered a company's
   // operational context (via "Switch" on the Companies list) — gates the
   // company-scoped sidebar tabs (Master Data/Inventory/Finance/Production/

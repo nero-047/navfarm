@@ -1886,7 +1886,7 @@ export default function CompanyTab({
               <p className="text-sm leading-6 text-(--text-secondary)">Are you sure you want to deactivate this account?</p>
               <div className="flex flex-col-reverse gap-3 border-t border-(--border) pt-4 sm:flex-row sm:justify-end">
                 <button type="button" onClick={() => setUserPendingDeletion(null)} className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
-                <button type="button" onClick={() => userPendingDeletion && handleDeleteUser(userPendingDeletion)} className="min-h-10 rounded-lg bg-(--danger) px-5 text-sm font-semibold text-white hover:bg-(--danger)">Deactivate</button>
+                <button type="button" onClick={() => userPendingDeletion && handleDeleteUser(userPendingDeletion)} className="min-h-10 rounded-[var(--radius-sm)] bg-(--danger) px-5 text-sm font-semibold text-white transition-colors hover:bg-(--danger-hover)">Deactivate</button>
               </div>
             </div>
           </Dialog>

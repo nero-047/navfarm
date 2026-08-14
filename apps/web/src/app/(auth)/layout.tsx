@@ -14,8 +14,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <Link href="/" className="flex items-center gap-2">
             <img src={NAVFARM_LOGO_SRC} alt="Navfarm" className="h-8 w-8 rounded-[var(--radius-xs)]" />
+            {/* This panel is always dark navy, so the accent must be the
+                on-dark variant. --color-primary has no dark override and sits
+                at 2.55:1 here; --sidebar-active-accent is the token that
+                already exists for brand accent on dark chrome (3.74:1 light,
+                4.31:1 dark) and tracks the theme. */}
             <span className="text-xl font-semibold text-white tracking-tight">
-              NAV<span className="text-[var(--color-primary)]">Farm</span>
+              NAV<span className="text-(--sidebar-active-accent)">Farm</span>
             </span>
           </Link>
 

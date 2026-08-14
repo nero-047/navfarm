@@ -136,7 +136,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
               <button
                 type="button"
                 onClick={handleClearLogo}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-(--danger-muted) text-(--danger) border border-(--danger) text-xs font-semibold hover:bg-(--danger-muted) transition-all"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-sm)] bg-(--danger-muted) text-(--danger) border border-(--danger) text-xs font-semibold transition-colors hover:bg-(--danger) hover:text-white"
               >
                 <X className="w-3.5 h-3.5" />
                 Remove

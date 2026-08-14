@@ -41,6 +41,7 @@
   --accent-hover: #a9382a;
   --accent-muted: rgba(194, 67, 50, 0.1);
   --danger: #c24332;
+  --danger-hover: #a9382a;
   --danger-muted: rgba(194, 67, 50, 0.08);
   --success: #2f7d5b;
   --success-muted: rgba(47, 125, 91, 0.1);
@@ -311,6 +312,7 @@ html[data-theme='dark'] {
   --accent-hover: #eb937d;
   --accent-muted: rgba(217, 105, 79, 0.18);
   --danger: #e0785f;
+  --danger-hover: #eb937d;
   --danger-muted: rgba(217, 105, 79, 0.16);
   --success: #4ba57e;
   --success-muted: rgba(75, 165, 126, 0.16);
