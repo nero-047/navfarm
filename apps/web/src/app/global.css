@@ -13,62 +13,87 @@
 :root {
   color-scheme: light;
 
-  /* NAVFarm brand: navy structure + coral/orange accent (matches the
-     wordmark — "NAV" in navy/white, "Farm" in orange). Light mode keeps a
-     neutral canvas so dense ERP tables stay readable, but every accent,
-     link, and primary action pulls from the same orange used in the
-     sidebar, not a generic blue. */
-  --color-primary: #ff6f4c;
-  --color-primary-hover: #e85a37;
-  --color-primary-soft: #fff1ee;
-  --color-navy: #0b1248;
-  --color-navy-light: #18225f;
-  --color-blue-accent: #2457b7;
-  --color-blue-soft: #eef4ff;
+  /* Navfarm brand: warm red mark + deep navy wordmark, per apple.design.md.
+     Red is reserved for primary action / active state / meaningful
+     emphasis — the app stays neutral otherwise. */
+  --color-primary: #c24332;
+  --color-primary-hover: #a9382a;
+  --color-primary-soft: #f8e7e3;
+  --color-navy: #2e313f;
+  --color-navy-light: #3a3d4a;
+  --color-blue-accent: #4e6e9e;
+  --color-blue-soft: #eef2f7;
 
   /* Semantic design tokens */
-  --bg: #f4f5f8;
+  --bg: #f7f7f8;
   --surface: #ffffff;
-  --surface-raised: #fafbfc;
+  --surface-raised: #ffffff;
+  --surface-secondary: #f2f3f5;
   --surface-overlay: rgba(255, 255, 255, 0.88);
-  --border: rgba(11, 18, 72, 0.12);
-  --border-subtle: rgba(11, 18, 72, 0.07);
-  --text-primary: #10122a;
-  --text-secondary: #5c6484;
-  --text-muted: #8b93b0;
-  --accent: #ff6f4c;
-  --accent-hover: #e85a37;
-  --accent-muted: rgba(255, 111, 76, 0.1);
-  --danger: #d7263d;
-  --danger-muted: rgba(215, 38, 61, 0.08);
-  --success: #1a9c63;
-  --success-muted: rgba(26, 156, 99, 0.1);
-  --warning: #b3760a;
-  --warning-muted: rgba(179, 118, 10, 0.1);
-  --info: #2457b7;
+  --border: rgba(46, 49, 63, 0.12);
+  --border-subtle: rgba(46, 49, 63, 0.08);
+  --border-strong: rgba(46, 49, 63, 0.18);
+  --text-primary: #2e313f;
+  --text-secondary: #5f6370;
+  --text-muted: #7b7f89;
+  --text-disabled: #a7aab1;
+  --accent: #c24332;
+  --accent-hover: #a9382a;
+  --accent-muted: rgba(194, 67, 50, 0.1);
+  --danger: #c24332;
+  --danger-muted: rgba(194, 67, 50, 0.08);
+  --success: #2f7d5b;
+  --success-muted: rgba(47, 125, 91, 0.1);
+  --warning: #b7791f;
+  --warning-muted: rgba(183, 121, 31, 0.1);
+  --info: #4e6e9e;
 
-  --sidebar-bg: #0b1248;
-  --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-text: rgba(255, 255, 255, 0.7);
-  --sidebar-active-bg: #ffffff;
-  --sidebar-active-text: #0b1248;
+  --sidebar-bg: #2e313f;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-text: rgba(255, 255, 255, 0.62);
+  --sidebar-active-bg: rgba(194, 67, 50, 0.18);
+  --sidebar-active-text: #ffffff;
+  --sidebar-active-accent: #d9694f;
   --header-bg: rgba(255, 255, 255, 0.88);
   --input-bg: #ffffff;
-  --input-text: #10122a;
-  --input-placeholder: #8b93b0;
-  --input-border: rgba(11, 18, 72, 0.18);
-  --input-border-focus: #ff6f4c;
+  --input-text: #2e313f;
+  --input-placeholder: #7b7f89;
+  --input-border: rgba(46, 49, 63, 0.18);
+  --input-border-focus: #c24332;
   --card-bg: #ffffff;
-  --card-border: rgba(11, 18, 72, 0.1);
-  --row-hover: rgba(11, 18, 72, 0.035);
-  --row-border: #e7e9f0;
-  --badge-bg: rgba(11, 18, 72, 0.06);
+  --card-border: rgba(46, 49, 63, 0.1);
+  --row-hover: rgba(46, 49, 63, 0.035);
+  --row-border: #ececed;
+  --badge-bg: rgba(46, 49, 63, 0.06);
 
+  /* Radius scale — apple.design.md §10. Structural surfaces stay 0,
+     small controls 8px, contained UI 11–18px, actions/icons pill. */
+  --radius-none: 0px;
+  --radius-xs: 5px;
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 14px;
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --shadow-md: 0 12px 30px rgba(16, 24, 40, 0.08);
+  --radius-md: 11px;
+  --radius-lg: 18px;
+  --radius-pill: 9999px;
+
+  /* Shadows — near-zero by default, per apple.design.md §11. --shadow-md
+     is the one allowed exception for genuinely floating surfaces. */
+  --shadow-sm: none;
+  --shadow-md: 0 8px 32px rgba(46, 49, 63, 0.12);
+
+  /* Focus ring — theme-aware so the indicator stays legible on both canvases. */
+  --focus-ring: rgba(194, 67, 50, 0.35);
+  --selection-text: #2e313f;
+
+  /* Spacing scale — apple.design.md §9 */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  --space-section: 64px;
+  --space-section-lg: 80px;
 }
 
 html {
@@ -92,6 +117,7 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
+  font-weight: 600;
   text-wrap: balance;
 }
 
@@ -100,10 +126,63 @@ p { text-wrap: pretty; }
 button, a, select, input, textarea { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled), select { cursor: pointer; }
 
-::selection { background: var(--accent-muted); color: var(--color-navy); }
+::selection { background: var(--accent-muted); color: var(--selection-text); }
+
+/* Type ladder — apple.design.md §8. Weight discipline: 600 for headings,
+   400 for body, 300 rare, 700 reserved for exceptional emphasis, 500
+   avoided. Use these instead of ad hoc size/weight utility combinations. */
+.nf-text-hero {
+  font-size: clamp(2.5rem, 4vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.07;
+  letter-spacing: -0.02em;
+}
+.nf-text-display {
+  font-size: clamp(2.25rem, 3vw, 2.5rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+.nf-text-section {
+  font-size: clamp(1.75rem, 2vw, 2.125rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.nf-text-lead {
+  font-size: 1.375rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.nf-text-body {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.47;
+}
+.nf-text-body-strong {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.nf-text-label {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+.nf-text-label-strong {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.nf-text-caption {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
 
 :where(a, button, summary, input, select, textarea, [role='button']):focus-visible {
-  outline: 3px solid var(--accent-muted);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -111,16 +190,70 @@ input, select, textarea {
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
-:where(input:not(.nf-embedded-input), select, textarea):focus-visible {
-  outline: none;
+/* apple.design.md §19. Uses outline rather than box-shadow: Tailwind owns the
+   box-shadow custom-property chain on any element carrying a shadow utility,
+   so a shadow-based ring here is silently discarded and the field ends up with
+   no visible focus state at all. Outline is not composited that way. */
+input:not(.nf-embedded-input):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
   border-color: var(--input-border-focus) !important;
-  box-shadow: 0 0 0 4px var(--accent-muted);
 }
 
 .nf-embedded-input:focus-visible { outline: none; box-shadow: none; }
+
+/* The two control sizes the application actually uses: a standard form field
+   and a compact filter/toolbar control. These existed as six slightly
+   different `inputCls` constants copied between panels, which is how their
+   radius and focus treatment drifted apart. Defined once here so a native
+   control matches the Input/Select primitives without re-declaring them. */
+.nf-input {
+  width: 100%;
+  border-width: 1px;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition: border-color 160ms ease;
+}
+.nf-input-sm {
+  border-width: 1px;
+  border-radius: var(--radius-sm);
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  transition: border-color 160ms ease;
+}
+.nf-input:focus-visible,
+.nf-input-sm:focus-visible { border-color: var(--input-border-focus); }
+
+/* Wrapper-free select styling. The <Select> primitive positions its chevron in
+   a relative wrapper, which is right for standalone form fields but adds a box
+   inside dense filter bars and table cells. This gives those selects the same
+   appearance without changing their layout. Chevron is an inline data: URI so
+   it needs no extra element, and it flips with the theme via currentColor's
+   two variants below. */
+.nf-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237b7f89' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1rem;
+  padding-right: 2rem;
+}
+html[data-theme='dark'] .nf-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239095a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
 .nf-glass { background: var(--surface-overlay); backdrop-filter: blur(20px) saturate(160%); }
 .nf-card { border: 1px solid var(--card-border); background: var(--card-bg); border-radius: var(--radius-lg); }
 .nf-touch { min-height: 44px; min-width: 44px; }
+
+/* Interaction — apple.design.md §18. Quiet, physical, never bouncy. */
+.nf-press { transition: transform 120ms ease, opacity 120ms ease; }
+.nf-press:active { transform: scale(0.98); }
+@media (prefers-reduced-motion: reduce) {
+  .nf-press:active { transform: none; }
+}
 
 /* Legacy company settings content is kept functional but presented in the
    same light NAVFarm workspace language as the surrounding console. */
@@ -155,46 +288,56 @@ input, select, textarea {
 
 html[data-theme='dark'] {
   color-scheme: dark;
-  /* Same navy family as the logo/sidebar, not a generic near-black — the
-     whole app should read as one continuous surface with the sidebar,
-     not two different dark themes stitched together. */
-  --bg: #0b0f1f;
-  --surface: #141a33;
-  --surface-raised: #1b2140;
-  --surface-overlay: rgba(20, 26, 51, 0.88);
-  --border: #252c4d;
-  --border-subtle: rgba(37, 44, 77, 0.6);
-  --text-primary: #f5f6fa;
-  --text-secondary: #8b93b0;
-  --text-muted: #5c6486;
-  --accent: #ff6f4c;
-  --accent-hover: #ff8563;
-  --accent-muted: rgba(255, 111, 76, 0.16);
-  --danger: #f2555a;
-  --danger-muted: rgba(242, 85, 90, 0.14);
-  --success: #3dd68c;
-  --success-muted: rgba(61, 214, 140, 0.14);
-  --warning: #f5b94d;
-  --warning-muted: rgba(245, 185, 77, 0.14);
-  --info: #64b5ff;
-  --sidebar-bg: #090d31;
-  --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-text: rgba(255, 255, 255, 0.7);
-  --sidebar-active-bg: #ffffff;
-  --sidebar-active-text: #0b1248;
-  --header-bg: rgba(11, 15, 31, 0.88);
-  --input-bg: #141a33;
-  --input-text: #f5f6fa;
-  --input-placeholder: #5c6486;
-  --input-border: #2b3358;
-  --input-border-focus: #ff6f4c;
-  --card-bg: #141a33;
-  --card-border: #252c4d;
+  /* Dark mode preserves light mode's *relationship*, not its values: chrome
+     recedes, content lifts toward the viewer. Light mode does this with a
+     dark sidebar against a near-white canvas; here the same intent is carried
+     by an explicit luminance ladder —
+       sidebar (#14161c, recessed)  <  canvas (#1c1e27)  <  surface (#272932)
+     Flattening those three toward one value is what makes a dark theme read
+     as an inversion rather than a design. */
+  --bg: #1c1e27;
+  --surface: #272932;
+  --surface-raised: #2e3039;
+  --surface-secondary: #22242d;
+  --surface-overlay: rgba(39, 41, 50, 0.9);
+  --border: #383a46;
+  --border-subtle: rgba(56, 58, 70, 0.6);
+  --border-strong: #4a4c58;
+  --text-primary: #f5f5f6;
+  --text-secondary: #a7aab1;
+  --text-muted: #9095a0;
+  --text-disabled: #5f6370;
+  --accent: #e0785f;
+  --accent-hover: #eb937d;
+  --accent-muted: rgba(217, 105, 79, 0.18);
+  --danger: #e0785f;
+  --danger-muted: rgba(217, 105, 79, 0.16);
+  --success: #4ba57e;
+  --success-muted: rgba(75, 165, 126, 0.16);
+  --warning: #d99a3f;
+  --warning-muted: rgba(217, 154, 63, 0.16);
+  --info: #7996c2;
+  --focus-ring: rgba(224, 120, 95, 0.55);
+  --selection-text: #f5f5f6;
+  --sidebar-bg: #14161c;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-text: rgba(255, 255, 255, 0.62);
+  --sidebar-active-bg: rgba(217, 105, 79, 0.2);
+  --sidebar-active-text: #ffffff;
+  --sidebar-active-accent: #e0785f;
+  --header-bg: rgba(28, 30, 39, 0.88);
+  --input-bg: #24262f;
+  --input-text: #f5f5f6;
+  --input-placeholder: #7b7f89;
+  --input-border: #3a3c48;
+  --input-border-focus: #d9694f;
+  --card-bg: #24262f;
+  --card-border: #383a46;
   --row-hover: rgba(255, 255, 255, 0.035);
-  --row-border: #252c4d;
+  --row-border: #33353f;
   --badge-bg: rgba(255, 255, 255, 0.06);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.4);
+  --shadow-sm: none;
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-reduced-motion: reduce) {

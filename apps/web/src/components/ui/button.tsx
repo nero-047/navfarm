@@ -3,22 +3,22 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(194,67,50,0.2)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'nf-press inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(194,67,50,0.3)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        default: 'bg-[#0b1248] text-white shadow-sm hover:bg-[#151d5e] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm',
-        destructive: 'bg-red-600 text-white hover:bg-red-700',
-        outline: 'border border-(--border) bg-(--surface) hover:bg-(--surface-raised) text-(--text-primary)',
-        secondary: 'bg-[#0b1248] text-white hover:bg-[#151d5e]',
-        ghost: 'hover:bg-(--surface-raised) text-(--text-secondary)',
+        default: 'rounded-[var(--radius-pill)] bg-(--accent) text-white hover:bg-(--accent-hover)',
+        destructive: 'rounded-[var(--radius-pill)] bg-(--danger) text-white hover:opacity-90',
+        outline: 'rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) hover:bg-(--surface-secondary) text-(--text-primary)',
+        secondary: 'rounded-[var(--radius-sm)] bg-(--surface-secondary) text-(--text-primary) hover:bg-(--border)',
+        ghost: 'rounded-[var(--radius-sm)] hover:bg-(--surface-secondary) text-(--text-secondary)',
         link: 'text-(--accent) underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-12 px-6 py-2.5',
-        sm: 'h-9 rounded-lg px-4',
-        lg: 'h-12 rounded-xl px-8',
-        icon: 'h-10 w-10 rounded-xl',
+        default: 'h-11 px-5',
+        sm: 'h-9 rounded-[var(--radius-xs)] px-4 text-[13px]',
+        lg: 'h-12 px-7',
+        icon: 'h-10 w-10 rounded-full p-0',
       },
     },
     defaultVariants: {

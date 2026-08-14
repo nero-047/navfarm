@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2, Search, Loader2, Inbox, Eye, Pencil } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
@@ -21,7 +22,7 @@ const S = {
   input: { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-(--input-border-focus)";
+const inputCls = "nf-input";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
@@ -253,7 +254,7 @@ export default function SchedulerPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>Schedulers</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>Schedulers</h2>
           <p className="mt-0.5 text-xs" style={S.sub}>Period-based KPI monitoring plans, attached to a batch at creation.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -261,9 +262,9 @@ export default function SchedulerPanel() {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none" style={S.input} />
           </div>
-          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm" style={{ backgroundColor: "var(--accent)" }}>
+          <Button onClick={openCreate} >
             <Plus className="h-3.5 w-3.5" /> New Scheduler
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -271,11 +272,11 @@ export default function SchedulerPanel() {
         <InlineAlert>{error}</InlineAlert>
       )}
 
-      <div className="overflow-hidden rounded-2xl border" style={S.surface}>
+      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
+              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
                 <th className="whitespace-nowrap px-4 py-3">Code</th>
                 <th className="whitespace-nowrap px-4 py-3">Name</th>
                 <th className="whitespace-nowrap px-4 py-3">Duration</th>
@@ -345,9 +346,9 @@ export default function SchedulerPanel() {
           ) : (
             <>
               <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+              <Button onClick={handleSave} disabled={saving} >
                 {saving ? "Saving…" : "Save"}
-              </button>
+              </Button>
             </>
           )
         }
@@ -369,34 +370,34 @@ export default function SchedulerPanel() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Nature of Business <span className="text-red-500">*</span></label>
-              <select value={nobId} onChange={(e) => { setNobId(e.target.value); setHeader((h) => ({ ...h, lob_id: "" })); }} className={inputCls} style={S.input} disabled={!!editingId}>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Nature of Business <span className="text-(--danger)">*</span></label>
+              <select value={nobId} onChange={(e) => { setNobId(e.target.value); setHeader((h) => ({ ...h, lob_id: "" })); }} className={`${inputCls} nf-select`} style={S.input} disabled={!!editingId}>
                 <option value="">Select…</option>
                 {nobs.map((n) => <option key={n.nob_id} value={n.nob_id}>{n.nob_code} — {n.nob_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Line of Business <span className="text-red-500">*</span></label>
-              <select value={header.lob_id} onChange={(e) => setHeader((h) => ({ ...h, lob_id: e.target.value }))} className={inputCls} style={S.input} disabled={!nobId || !!editingId}>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Line of Business <span className="text-(--danger)">*</span></label>
+              <select value={header.lob_id} onChange={(e) => setHeader((h) => ({ ...h, lob_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!nobId || !!editingId}>
                 <option value="">{nobId ? "Select…" : "Select Nature of Business first…"}</option>
                 {lobs.map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Code <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Code <span className="text-(--danger)">*</span></label>
               <input value={header.scheduler_code} onChange={(e) => setHeader((h) => ({ ...h, scheduler_code: e.target.value }))} placeholder="SCH-PLT-CB-42D" className={inputCls} style={S.input} disabled={!!editingId} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Name <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Name <span className="text-(--danger)">*</span></label>
               <input value={header.scheduler_name} onChange={(e) => setHeader((h) => ({ ...h, scheduler_name: e.target.value }))} placeholder="Broiler 42-Day Standard" className={inputCls} style={S.input} disabled={isLocked} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Duration <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Duration <span className="text-(--danger)">*</span></label>
               <input type="number" value={header.duration_value} onChange={(e) => setHeader((h) => ({ ...h, duration_value: e.target.value }))} placeholder="42" className={inputCls} style={S.input} disabled={!!editingId} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Duration Unit</label>
-              <select value={header.duration_unit} onChange={(e) => setHeader((h) => ({ ...h, duration_unit: e.target.value }))} className={inputCls} style={S.input} disabled={!!editingId}>
+              <select value={header.duration_unit} onChange={(e) => setHeader((h) => ({ ...h, duration_unit: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!!editingId}>
                 <option value="DAY">Day</option>
                 <option value="WEEK">Week</option>
                 <option value="MONTH">Month</option>
@@ -404,7 +405,7 @@ export default function SchedulerPanel() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Breed (optional)</label>
-              <select value={header.breed_id} onChange={(e) => setHeader((h) => ({ ...h, breed_id: e.target.value }))} className={inputCls} style={S.input} disabled={!!editingId}>
+              <select value={header.breed_id} onChange={(e) => setHeader((h) => ({ ...h, breed_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!!editingId}>
                 <option value="">Select…</option>
                 {breeds.map((b) => <option key={b.breed_id} value={b.breed_id}>{b.breed_code} — {b.breed_name}</option>)}
               </select>
@@ -439,7 +440,7 @@ export default function SchedulerPanel() {
             )}
           </div>
 
-          <div className="overflow-x-auto rounded-xl border" style={S.surface}>
+          <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--border)" }}>
@@ -464,7 +465,7 @@ export default function SchedulerPanel() {
                   return (
                   <tr key={idx} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
                     <td className="px-2 py-1.5 min-w-[200px]">
-                      <select value={line.parameter_id} onChange={(e) => setLineField(idx, "parameter_id", e.target.value)} className={inputCls} style={S.input} disabled={isLocked}>
+                      <select value={line.parameter_id} onChange={(e) => setLineField(idx, "parameter_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
                         <option value="">Select…</option>
                         {parameters.map((p) => <option key={p.parameter_id} value={p.parameter_id}>{p.parameter_code} — {p.parameter_name}</option>)}
                       </select>
@@ -475,7 +476,7 @@ export default function SchedulerPanel() {
                     <td className="px-2 py-1.5 min-w-[140px] text-[11px]" style={S.sub}>{selectedParam?.item_id ? itemLabel(selectedParam.item_id) : "—"}</td>
                     <td className="px-2 py-1.5 w-16 text-[11px]" style={S.sub}>{selectedParam?.default_uom || "—"}</td>
                     <td className="px-2 py-1.5 w-28">
-                      <select value={line.occurrence} onChange={(e) => setLineField(idx, "occurrence", e.target.value)} className={inputCls} style={S.input} disabled={isLocked}>
+                      <select value={line.occurrence} onChange={(e) => setLineField(idx, "occurrence", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
                         {OCCURRENCES.map((o) => <option key={o} value={o}>{o.charAt(0) + o.slice(1).toLowerCase()}</option>)}
                       </select>
                     </td>
@@ -484,7 +485,7 @@ export default function SchedulerPanel() {
                     <td className="px-2 py-1.5 w-32"><input value={line.period_label} onChange={(e) => setLineField(idx, "period_label", e.target.value)} placeholder="Week 1" className={inputCls} style={S.input} disabled={isLocked} /></td>
                     <td className="px-2 py-1.5 w-28"><input type="number" value={line.expected_qty_override} onChange={(e) => setLineField(idx, "expected_qty_override", e.target.value)} placeholder="From param" className={inputCls} style={S.input} disabled={isLocked} /></td>
                     <td className="px-2 py-1.5 w-24">
-                      <select value={line.kpi_mode} onChange={(e) => setLineField(idx, "kpi_mode", e.target.value)} className={inputCls} style={S.input} disabled={isLocked}>
+                      <select value={line.kpi_mode} onChange={(e) => setLineField(idx, "kpi_mode", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
                         <option value="PCT">PCT</option>
                         <option value="VALUE">VALUE</option>
                       </select>

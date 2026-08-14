@@ -3,26 +3,24 @@
 import Link from 'next/link';
 import { useLanguage } from '@/hooks/useLanguage';
 
+const NAVFARM_LOGO_SRC = "https://nav-cdn.pages.dev/images/favicon.png";
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   return (
     <div className="min-h-screen flex">
       {/* Left branding panel */}
-      <div className="hidden md:flex md:w-[55%] bg-gradient-to-br from-[#0b1248] via-[#151d5e] to-[#1c4aa9] relative overflow-hidden">
-        {/* Decorative circles */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-white/[0.03]" />
-        <div className="absolute bottom-20 right-10 w-64 h-64 rounded-full bg-white/[0.04]" />
-        <div className="absolute top-1/3 left-1/4 w-40 h-40 rounded-full bg-[#c24332]/10" />
-
+      <div className="hidden md:flex md:w-[55%] bg-[var(--color-navy)] relative overflow-hidden">
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <Link href="/" className="flex items-center gap-1">
-            <span className="text-2xl font-bold text-white tracking-tight">
-              NAV<span className="text-[#c24332]">Farm</span>
+          <Link href="/" className="flex items-center gap-2">
+            <img src={NAVFARM_LOGO_SRC} alt="Navfarm" className="h-8 w-8 rounded-[var(--radius-xs)]" />
+            <span className="text-xl font-semibold text-white tracking-tight">
+              NAV<span className="text-[var(--color-primary)]">Farm</span>
             </span>
           </Link>
 
           <div className="animate-fade-in">
-            <h1 className="text-4xl font-semibold text-white leading-tight tracking-tight mb-4">
+            <h1 className="nf-text-display text-white mb-4">
               {t('authTagline')}
               <br />
               {t('authTaglineLine2')}
@@ -33,7 +31,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <p className="text-white/30 text-sm">
-            © {new Date().getFullYear()} NAVFarm. {t('authAllRightsReserved')}
+            © {new Date().getFullYear()} Navfarm. {t('authAllRightsReserved')}
           </p>
         </div>
       </div>
@@ -42,8 +40,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex-1 flex flex-col bg-(--bg)">
         {/* Mobile logo */}
         <div className="md:hidden px-6 pt-8 pb-4">
-          <Link href="/" className="inline-flex items-center gap-1">
-            <span className="text-xl font-bold text-(--text-primary) tracking-tight">
+          <Link href="/" className="inline-flex items-center gap-2">
+            <img src={NAVFARM_LOGO_SRC} alt="Navfarm" className="h-7 w-7 rounded-[var(--radius-xs)]" />
+            <span className="text-lg font-semibold text-(--text-primary) tracking-tight">
               NAV<span className="text-(--accent)">Farm</span>
             </span>
           </Link>

@@ -21,12 +21,12 @@ export default function Index() {
   }, [router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f8f8f8]">
+    <div className="flex min-h-screen items-center justify-center bg-(--surface-secondary)">
       <div className="text-center">
-        <p className="text-xl font-bold tracking-tight text-[#0b1248]">
-          NAV<span className="text-[#c24332]">Farm</span>
+        <p className="text-xl font-semibold tracking-tight text-(--text-primary)">
+          NAV<span className="text-(--accent)">Farm</span>
         </p>
-        <p className="mt-2 text-sm text-[#707070]">Opening your workspace…</p>
+        <p className="mt-2 text-sm text-(--text-secondary)">Opening your workspace…</p>
       </div>
     </div>
   );

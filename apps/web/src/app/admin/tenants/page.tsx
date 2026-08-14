@@ -10,6 +10,8 @@ import {
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
+import { Field } from "../../../components/ui/field";
+import { Badge } from "../../../components/ui/badge";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -172,7 +174,7 @@ export default function AdminTenantsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold" style={S.primary}>Tenant Registry</h1>
+          <h1 className="text-xl font-semibold" style={S.primary}>Tenant Registry</h1>
           <p className="text-sm mt-0.5" style={S.sub}>{tenants.length} tenants registered on platform</p>
         </div>
         <div className="flex w-full items-center gap-3 sm:w-auto">
@@ -191,8 +193,8 @@ export default function AdminTenantsPage() {
         </div>
       </div>
 
-      {error   && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
-      {success && <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
+      {error   && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
+      {success && <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
 
       <Dialog
         open={Boolean(upgradingTenant)}
@@ -204,7 +206,7 @@ export default function AdminTenantsPage() {
           <form onSubmit={handleUpgrade} className="space-y-5">
             <label className="block text-xs font-semibold uppercase tracking-wider" style={S.sub}>New plan</label>
             <select value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)}
-              className="min-h-11 w-full rounded-lg border px-3 text-sm" style={S.input}>
+              className="min-h-11 w-full rounded-lg border px-3 text-sm nf-select" style={S.input}>
               <option value="">— Select new plan —</option>
               {plans.map((p) => (
                 <option key={p.plan_id} value={p.plan_id}>{p.plan_name} ({p.billing_cycle})</option>
@@ -214,7 +216,7 @@ export default function AdminTenantsPage() {
               <button type="button" disabled={upgrading} onClick={() => { setUpgradingTenant(null); setSelectedPlanId(""); }}
                 className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">Cancel</button>
               <button type="submit" disabled={!selectedPlanId || upgrading}
-                className="min-h-10 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
+                className="min-h-10 rounded-lg bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                 {upgrading ? "Updating…" : "Apply plan change"}
               </button>
             </div>
@@ -227,7 +229,7 @@ export default function AdminTenantsPage() {
           <thead>
             <tr className="border-b" style={S.raised}>
               {["#", "Tenant Name", "Email", "Plan", "Status", "Actions"].map((h) => (
-                <th key={h} className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
+                <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -249,36 +251,36 @@ export default function AdminTenantsPage() {
                     </td>
                     <td className="px-5 py-3.5 text-xs" style={S.sub}>{tenant.billing_email || "—"}</td>
                     <td className="px-5 py-3.5">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded border"
-                        style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
-                        {tenant.plan_id?.replace("PLAN_", "") || "—"}
-                      </span>
+                      {/* Plan tier is neutral metadata, not a status — colouring it
+                          brand-red made every row shout for attention. */}
+                      <Badge variant="neutral">{tenant.plan_id?.replace("PLAN_", "") || "—"}</Badge>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`text-[11px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${active ? "bg-green-50 text-green-700 border-green-200" : "bg-(--surface-raised) text-(--text-secondary) border-(--border)"}`}>
+                      <span className={`text-[11px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${active ? "bg-(--success-muted) text-(--success) border-(--success)" : "bg-(--surface-raised) text-(--text-secondary) border-(--border)"}`}>
                         {active ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                         {active ? "Active" : "Inactive"}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3 flex-wrap">
+                      {/* Peer row actions share one treatment. Giving each its own
+                          colour turned a three-item action list into a traffic
+                          light and implied a severity difference that isn't real. */}
+                      <div className="flex flex-wrap items-center gap-4">
                         <button onClick={() => handleExpand(tenant)}
-                          className="text-xs font-medium flex items-center gap-1 hover:underline"
-                          style={S.accent}>
+                          className="flex items-center gap-1 text-xs font-semibold text-(--text-secondary) transition-colors hover:text-(--text-primary) hover:underline">
                           {isExpanded ? <><ChevronUp className="w-3.5 h-3.5" /> Hide</> : <><ChevronDown className="w-3.5 h-3.5" /> Companies</>}
                         </button>
                         <Link href={`/admin/tenants/${tenant.tenant_id}`}
-                          className="text-xs font-medium flex items-center gap-1 hover:underline"
-                          style={{ color: "#6366F1" }}>
+                          className="flex items-center gap-1 text-xs font-semibold text-(--text-secondary) transition-colors hover:text-(--text-primary) hover:underline">
                           <Eye className="w-3.5 h-3.5" /> Details
                         </Link>
                         {tenant.tenant_id === "00000000-0000-0000-0000-000000000000" || tenant.tenant_code === "system" ? (
-                          <span className="text-xs font-medium flex items-center gap-1 text-(--text-muted) cursor-not-allowed opacity-50" title="System plan cannot be changed">
+                          <span className="flex cursor-not-allowed items-center gap-1 text-xs font-semibold text-(--text-disabled)" title="System plan cannot be changed">
                             <ArrowUpRight className="w-3.5 h-3.5" /> Upgrade
                           </span>
                         ) : (
                           <button onClick={() => { setUpgradingTenant(tenant); setSelectedPlanId(""); }}
-                            className="text-xs font-medium flex items-center gap-1 hover:underline text-amber-500">
+                            className="flex items-center gap-1 text-xs font-semibold text-(--text-secondary) transition-colors hover:text-(--text-primary) hover:underline">
                             <ArrowUpRight className="w-3.5 h-3.5" /> Upgrade
                           </button>
                         )}
@@ -290,7 +292,7 @@ export default function AdminTenantsPage() {
                   {isExpanded && (
                     <tr key={`${tenant.tenant_id}-detail`}>
                       <td colSpan={6} className="px-8 py-5 border-b" style={{ backgroundColor: "var(--accent-muted)", borderColor: "var(--border)" }}>
-                        <p className="text-xs font-bold uppercase tracking-wider mb-3" style={S.muted}>
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={S.muted}>
                           Companies under {tenant.tenant_name}
                         </p>
                         {loadingCos ? (
@@ -307,7 +309,7 @@ export default function AdminTenantsPage() {
                                 style={{ ...S.surface, ...S.primary }}>
                                 <Building className="w-3 h-3 shrink-0" style={S.muted} />
                                 {co.company_name}
-                                <span className={`text-[10px] font-bold ${co.onboarding_status === "COMPLETED" ? "text-green-600" : "text-amber-500"}`}>
+                                <span className={`text-[10px] font-semibold ${co.onboarding_status === "COMPLETED" ? "text-(--success)" : "text-(--warning)"}`}>
                                   {co.onboarding_status === "COMPLETED" ? "✓" : "⚠"}
                                 </span>
                               </span>
@@ -338,66 +340,59 @@ export default function AdminTenantsPage() {
       >
             <form onSubmit={handleCreateTenant} className="space-y-6">
               {createError && (
-                <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
+                <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-3 text-sm">
                   <AlertCircle className="w-4 h-4 shrink-0" /> {createError}
                 </div>
               )}
 
               <div className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-(--accent)">1. Tenant & Invoicing Info</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-(--accent)">1. Tenant & Invoicing Info</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Legal Tenant Name *</label>
+                  <Field label="Legal Tenant Name *">
                     <input required placeholder="e.g. Green Valley Farms" value={createForm.tenant_name}
                       onChange={e => setCreateForm(f => ({ ...f, tenant_name: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Subdomain / Code *</label>
+                      className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
+                  </Field>
+                  <Field label="Subdomain / Code *">
                     <input required placeholder="e.g. gvf" value={createForm.tenant_code}
                       onChange={e => setCreateForm(f => ({ ...f, tenant_code: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "") }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Billing/Invoicing Email *</label>
+                      className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
+                  </Field>
+                  <Field label="Billing/Invoicing Email *">
                     <input required type="email" placeholder="billing@greenvalley.com" value={createForm.billing_email}
                       onChange={e => setCreateForm(f => ({ ...f, billing_email: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Pricing Plan *</label>
+                      className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
+                  </Field>
+                  <Field label="Pricing Plan *">
                     <select required value={createForm.plan_id}
                       onChange={e => setCreateForm(f => ({ ...f, plan_id: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input}>
+                      className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus) nf-select" style={S.input}>
                       <option value="PLAN_BASIC">Basic Plan ($49/mo)</option>
                       <option value="PLAN_PRO">Pro Plan ($149/mo)</option>
                       <option value="PLAN_ENTERPRISE">Enterprise Plan ($499/mo)</option>
                     </select>
-                  </div>
+                  </Field>
                 </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t" style={S.border}>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-(--accent)">2. Initial Tenant Admin Account</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-(--accent)">2. Initial Tenant Admin Account</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Administrator Name *</label>
+                  <Field label="Administrator Name *">
                     <input required placeholder="e.g. John Doe" value={createForm.admin_name}
                       onChange={e => setCreateForm(f => ({ ...f, admin_name: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Administrator Email *</label>
+                      className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
+                  </Field>
+                  <Field label="Administrator Email *">
                     <input required type="email" placeholder="admin@domain.com" value={createForm.admin_email}
                       onChange={e => setCreateForm(f => ({ ...f, admin_email: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Administrator Password *</label>
+                      className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
+                  </Field>
+                  <Field label="Administrator Password *">
                     <input required type="password" placeholder="At least 8 characters" value={createForm.admin_password}
                       onChange={e => setCreateForm(f => ({ ...f, admin_password: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
-                  </div>
+                      className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
+                  </Field>
                 </div>
               </div>
 
@@ -405,7 +400,7 @@ export default function AdminTenantsPage() {
               <div className="space-y-4 pt-4 border-t" style={S.border}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-(--accent)">3. Permitted Business Sectors (NOB & LOB)</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-(--accent)">3. Permitted Business Sectors (NOB & LOB)</h3>
                     <p className="text-xs mt-0.5" style={S.muted}>Select which Nature of Business (NOB) & Line of Business (LOB) options this tenant is licensed to use.</p>
                   </div>
                   <button
@@ -459,7 +454,7 @@ export default function AdminTenantsPage() {
                             borderColor: isNobChecked ? "var(--accent)" : "var(--border)",
                           }}
                         >
-                          <label className="flex items-center gap-2.5 cursor-pointer font-bold text-xs select-none" style={S.primary}>
+                          <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-xs select-none" style={S.primary}>
                             <input
                               type="checkbox"
                               checked={isNobChecked}
@@ -518,7 +513,7 @@ export default function AdminTenantsPage() {
                   Cancel
                 </button>
                 <button type="submit" disabled={creating}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                   {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   {creating ? "Provisioning..." : "Provision Tenant"}
                 </button>

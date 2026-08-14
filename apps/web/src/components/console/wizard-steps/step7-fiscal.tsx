@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Select } from "@/components/ui/select";
 import Button from "../../source-ui/button";
 import { Calendar } from "lucide-react";
 
@@ -44,8 +45,8 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-(--accent)" />
+        <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-(--text-muted)" />
           Step 7: Fiscal Year & Ledger Configuration
         </h2>
         <p className="text-xs text-(--text-secondary)">Define accounting start months, depreciation models, tax audit settings, and decimal precision.</p>
@@ -54,67 +55,67 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Fiscal Year Start Month</label>
-          <select
+          <Select
             value={formData.fiscal_start_month}
             onChange={(e) => setFormData({ ...formData, fiscal_start_month: parseInt(e.target.value) })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value={1}>January</option>
             <option value={4}>April</option>
             <option value={7}>July</option>
             <option value={10}>October</option>
-          </select>
+          </Select>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Inventory Valuation Model</label>
-          <select
+          <Select
             value={formData.valuation_method}
             onChange={(e) => setFormData({ ...formData, valuation_method: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value="FIFO">First-In, First-Out (FIFO)</option>
             <option value="STANDARD">Standard Costing</option>
             <option value="WEIGHTED_AVG">Weighted Average Cost</option>
-          </select>
+          </Select>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Asset Depreciation Model</label>
-          <select
+          <Select
             value={formData.depreciation_method}
             onChange={(e) => setFormData({ ...formData, depreciation_method: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value="SLM">Straight Line Method (SLM)</option>
             <option value="WDV">Written Down Value (WDV)</option>
             <option value="UNITS_OF_PRODUCTION">Units of Production</option>
-          </select>
+          </Select>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">GST / Tax Filing Frequency</label>
-          <select
+          <Select
             value={formData.gst_filing_frequency}
             onChange={(e) => setFormData({ ...formData, gst_filing_frequency: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value="MONTHLY">Monthly Filing</option>
             <option value="QUARTERLY">Quarterly Filing</option>
-          </select>
+          </Select>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Decimal Precision (Amounts & Qty)</label>
-          <select
+          <Select
             value={formData.decimal_places}
             onChange={(e) => setFormData({ ...formData, decimal_places: parseInt(e.target.value) })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value={2}>2 Decimal Places (e.g. 100.50)</option>
             <option value={3}>3 Decimal Places (e.g. 100.500 for KG/Liters)</option>
             <option value={4}>4 Decimal Places (High Precision)</option>
-          </select>
+          </Select>
         </div>
 
         <div className="flex items-center gap-3 mt-6">

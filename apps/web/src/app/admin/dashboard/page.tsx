@@ -10,13 +10,13 @@ import {
   Plus,
   Database,
   Activity,
-  ArrowUpRight,
-  RefreshCw,
-  AlertCircle
+  ArrowUpRight
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { useLanguage } from "../../../hooks/useLanguage";
+import { LoadingState, ErrorState } from "../../../components/ui/states";
+import { Badge } from "../../../components/ui/badge";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -68,21 +68,13 @@ export default function AdminDashboardPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="animate-spin w-5 h-5 mr-2" style={S.accent} />
-        <span className="text-sm" style={S.sub}>Loading system stats…</span>
-      </div>
-    );
+    return <LoadingState label="Loading system stats…" />;
   }
 
   if (error) {
     return (
       <div className="p-6">
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {error}
-        </div>
+        <ErrorState message={error} />
       </div>
     );
   }
@@ -104,21 +96,19 @@ export default function AdminDashboardPage() {
     return (count / totalTenants) * 100;
   };
 
-  const actionBadge = (action: string) => {
+  const actionBadgeVariant = (action: string): "success" | "warning" | "danger" | "info" => {
     const act = action?.toUpperCase() || "";
-    let bg = "#EFF6FF", color = "#1D4ED8", border = "#BFDBFE";
-    if (act.includes("CREATE") || act.includes("REGISTER")) {
-      bg = "#F0FDF4"; color = "#15803D"; border = "#BBF7D0";
-    } else if (act.includes("UPDATE") || act.includes("EDIT") || act.includes("ASSIGN")) {
-      bg = "#FFFBEB"; color = "#B45309"; border = "#FDE68A";
-    } else if (act.includes("DELETE") || act.includes("REMOVE") || act.includes("REVOKE")) {
-      bg = "#FEF2F2"; color = "#B91C1C"; border = "#FECACA";
-    }
-    return (
-      <span className="text-[10px] font-bold uppercase font-mono px-2 py-0.5 rounded border"
-        style={{ backgroundColor: bg, color, borderColor: border }}>{action}</span>
-    );
+    if (act.includes("CREATE") || act.includes("REGISTER")) return "success";
+    if (act.includes("UPDATE") || act.includes("EDIT") || act.includes("ASSIGN")) return "warning";
+    if (act.includes("DELETE") || act.includes("REMOVE") || act.includes("REVOKE")) return "danger";
+    return "info";
   };
+
+  const actionBadge = (action: string) => (
+    <Badge variant={actionBadgeVariant(action)} className="rounded-[var(--radius-xs)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide font-mono">
+      {action}
+    </Badge>
+  );
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
@@ -126,7 +116,7 @@ export default function AdminDashboardPage() {
       {/* Welcome Banner */}
       <div>
         <div>
-          <h1 className="text-2xl font-black tracking-tight" style={S.primary}>{t("controlTowerDashboard")}</h1>
+          <h1 className="nf-text-section" style={S.primary}>{t("controlTowerDashboard")}</h1>
           <p className="text-sm mt-0.5" style={S.sub}>
             {t("platformWideSaaSAnalytics")}
           </p>
@@ -136,51 +126,51 @@ export default function AdminDashboardPage() {
       {/* Stats Widgets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Tenants */}
-        <div className="rounded-xl border p-5 shadow-sm transition-all hover:shadow-md" style={S.surface}>
+        <div className="rounded-[var(--radius-lg)] border p-5" style={S.surface}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("registeredTenants")}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("registeredTenants")}</span>
             <Building className="w-4 h-4" style={S.accent} />
           </div>
-          <div className="text-3xl font-black" style={S.primary}>{totalTenants}</div>
+          <div className="text-3xl font-semibold" style={S.primary}>{totalTenants}</div>
           <div className="mt-2 text-xs flex items-center gap-2" style={S.sub}>
-            <span className="text-green-500 font-semibold">{activeTenants} {t("active")}</span>
+            <span className="font-semibold" style={{ color: "var(--success)" }}>{activeTenants} {t("active")}</span>
             <span className="opacity-40">·</span>
             <span className="font-semibold" style={S.muted}>{inactiveTenants} {t("inactive")}</span>
           </div>
         </div>
 
         {/* Total Pricing Plans */}
-        <div className="rounded-xl border p-5 shadow-sm transition-all hover:shadow-md" style={S.surface}>
+        <div className="rounded-[var(--radius-lg)] border p-5" style={S.surface}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("pricingPlans")}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("pricingPlans")}</span>
             <Layers className="w-4 h-4" style={S.accent} />
           </div>
-          <div className="text-3xl font-black" style={S.primary}>{plans.length}</div>
+          <div className="text-3xl font-semibold" style={S.primary}>{plans.length}</div>
           <div className="mt-2 text-xs" style={S.sub}>
             {t("activeSaaSTierPlans")}
           </div>
         </div>
 
         {/* Database Health */}
-        <div className="rounded-xl border p-5 shadow-sm transition-all hover:shadow-md" style={S.surface}>
+        <div className="rounded-[var(--radius-lg)] border p-5" style={S.surface}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("controlPlaneHost")}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("controlPlaneHost")}</span>
             <Database className="w-4 h-4" style={S.accent} />
           </div>
-          <div className="text-base font-extrabold truncate" style={S.primary}>localhost:3306</div>
+          <div className="text-base font-semibold truncate" style={S.primary}>localhost:3306</div>
           <div className="mt-2 text-xs flex items-center gap-1.5" style={S.sub}>
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
-            <span className="text-green-600 font-bold">{t("sqlConnectionsHealthy")}</span>
+            <span className="w-2 h-2 rounded-full animate-pulse inline-block" style={{ backgroundColor: "var(--success)" }} />
+            <span className="font-semibold" style={{ color: "var(--success)" }}>{t("sqlConnectionsHealthy")}</span>
           </div>
         </div>
 
         {/* Platform Uptime */}
-        <div className="rounded-xl border p-5 shadow-sm transition-all hover:shadow-md" style={S.surface}>
+        <div className="rounded-[var(--radius-lg)] border p-5" style={S.surface}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("platformUptime")}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("platformUptime")}</span>
             <Activity className="w-4 h-4" style={S.accent} />
           </div>
-          <div className="text-3xl font-black text-green-500">99.98%</div>
+          <div className="text-3xl font-semibold" style={{ color: "var(--success)" }}>99.98%</div>
           <div className="mt-2 text-xs" style={S.sub}>
             {t("continuousTelemetry")}
           </div>
@@ -191,9 +181,9 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Plan Breakdown Card */}
-        <div className="lg:col-span-1 rounded-xl border p-6 space-y-6 shadow-sm" style={S.surface}>
+        <div className="lg:col-span-1 rounded-[var(--radius-lg)] border p-6 space-y-6" style={S.surface}>
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider" style={S.sub}>{t("tenantSubscriptionShare")}</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider" style={S.sub}>{t("tenantSubscriptionShare")}</h3>
             <p className="text-xs" style={S.muted}>{t("planDistributionAcrossActive")}</p>
           </div>
 
@@ -211,7 +201,7 @@ export default function AdminDashboardPage() {
                     <div className="h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${pct}%`,
-                        backgroundColor: p.plan_id === "SYSTEM_PLAN" ? "#6366F1" : "var(--accent)"
+                        backgroundColor: p.plan_id === "SYSTEM_PLAN" ? "var(--color-navy)" : "var(--accent)"
                       }} />
                   </div>
                 </div>
@@ -221,10 +211,10 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Recent Platform Signups Card */}
-        <div className="lg:col-span-2 rounded-xl border overflow-hidden shadow-sm" style={S.surface}>
+        <div className="lg:col-span-2 rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
           <div className="px-6 py-4 border-b flex items-center justify-between" style={S.border}>
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider" style={S.sub}>{t("recentTenantRegistrations")}</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider" style={S.sub}>{t("recentTenantRegistrations")}</h3>
               <p className="text-xs" style={S.muted}>{t("newlyOnboardedEntities")}</p>
             </div>
             <Link href="/admin/tenants" className="text-xs font-semibold hover:underline flex items-center gap-1" style={S.accent}>
@@ -238,15 +228,15 @@ export default function AdminDashboardPage() {
               tenants.slice(-4).reverse().map((tItem) => (
                 <div key={tItem.tenant_id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap hover:bg-(--surface-raised) transition-colors">
                   <div>
-                    <div className="text-sm font-bold" style={S.primary}>{tItem.tenant_name}</div>
+                    <div className="text-sm font-semibold" style={S.primary}>{tItem.tenant_name}</div>
                     <div className="text-xs font-mono" style={S.muted}>{tItem.tenant_code} · {tItem.billing_email}</div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-semibold border px-2.5 py-0.5 rounded-full"
+                    <span className="text-[11px] font-semibold border px-2.5 py-0.5 rounded-[var(--radius-pill)]"
                       style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
                       {tItem.plan_id?.replace("PLAN_", "") || "—"}
                     </span>
-                    <span className={`text-[11px] font-bold ${tItem.is_active !== false ? "text-green-600" : ""}`} style={tItem.is_active !== false ? undefined : S.muted}>
+                    <span className="text-[11px] font-semibold" style={tItem.is_active !== false ? { color: "var(--success)" } : S.muted}>
                       {tItem.is_active !== false ? t("active") : t("inactive")}
                     </span>
                   </div>
@@ -262,23 +252,23 @@ export default function AdminDashboardPage() {
 
         {/* Quick Actions */}
         <div className="lg:col-span-1 space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider" style={S.muted}>{t("managementControls")}</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider" style={S.muted}>{t("managementControls")}</h3>
 
           <div className="grid grid-cols-1 gap-3">
             {[
-              { label: t("addNewTenant"), icon: Plus, color: "#10B981", href: "/admin/tenants", desc: t("provisionNewDbAdmin") },
-              { label: t("configurePricingPlans"), icon: Layers, color: "#F59E0B", href: "/admin/plans", desc: t("manageQuotasRates") },
-              { label: t("masterRegistries"), icon: Database, color: "#3B82F6", href: "/admin/masters", desc: t("seedGlobalStaticCatalogs") },
-              { label: t("complianceAuditLogs"), icon: History, color: "#8B5CF6", href: "/admin/audit", desc: t("platformSecurityActivity") }
+              { label: t("addNewTenant"), icon: Plus, href: "/admin/tenants", desc: t("provisionNewDbAdmin") },
+              { label: t("configurePricingPlans"), icon: Layers, href: "/admin/plans", desc: t("manageQuotasRates") },
+              { label: t("masterRegistries"), icon: Database, href: "/admin/masters", desc: t("seedGlobalStaticCatalogs") },
+              { label: t("complianceAuditLogs"), icon: History, href: "/admin/audit", desc: t("platformSecurityActivity") }
             ].map((action) => (
               <Link key={action.label} href={action.href}
-                className="rounded-xl border p-4 flex items-start gap-3.5 shadow-sm transition-all hover:translate-x-1 hover:shadow-md"
+                className="nf-press rounded-[var(--radius-lg)] border p-4 flex items-start gap-3.5 transition-all hover:translate-x-1"
                 style={S.surface}>
-                <div className="p-2.5 rounded-lg shrink-0" style={{ backgroundColor: `${action.color}15` }}>
-                  <action.icon className="w-5 h-5" style={{ color: action.color }} />
+                <div className="p-2.5 rounded-[var(--radius-sm)] shrink-0" style={S.raised}>
+                  <action.icon className="w-5 h-5" style={S.sub} />
                 </div>
                 <div>
-                  <div className="text-sm font-bold" style={S.primary}>{action.label}</div>
+                  <div className="text-sm font-semibold" style={S.primary}>{action.label}</div>
                   <div className="text-xs mt-0.5" style={S.sub}>{action.desc}</div>
                 </div>
               </Link>
@@ -287,10 +277,10 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Audit Log Feed */}
-        <div className="lg:col-span-2 rounded-xl border overflow-hidden shadow-sm" style={S.surface}>
+        <div className="lg:col-span-2 rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
           <div className="px-6 py-4 border-b flex items-center justify-between" style={S.border}>
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider" style={S.sub}>{t("platformAuditFeed")}</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider" style={S.sub}>{t("platformAuditFeed")}</h3>
               <p className="text-xs" style={S.muted}>{t("recentMutationsSystem")}</p>
             </div>
             <Link href="/admin/audit" className="text-xs font-semibold hover:underline flex items-center gap-1" style={S.accent}>
@@ -306,7 +296,7 @@ export default function AdminDashboardPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       {actionBadge(log.action)}
-                      <span className="text-xs font-bold" style={S.primary}>{log.entity_name}</span>
+                      <span className="text-xs font-semibold" style={S.primary}>{log.entity_name}</span>
                     </div>
                     <div className="text-xs" style={S.sub}>
                       {t("mutatedBy")} <span className="font-semibold" style={S.primary}>{log.user_name || t("system")}</span>

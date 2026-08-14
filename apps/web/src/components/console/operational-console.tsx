@@ -146,7 +146,7 @@ export default function OperationalConsole({
         {/* Mobile Navigation Dropdown */}
         <div style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }} className="block md:hidden">
           <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>Navigation Menu</label>
-          <select
+          <select className="nf-select"
             value={activeConsoleTab}
             onChange={(e) => setActiveConsoleTab(e.target.value as any)}
             style={{ width: "100%", height: 44, border: "1px solid var(--input-border)", borderRadius: 10, padding: "0 12px", fontSize: 14, cursor: "pointer" }}
@@ -163,7 +163,7 @@ export default function OperationalConsole({
 
         {/* Header info */}
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white capitalize">
+          <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-white capitalize">
             {activeConsoleTab === "dashboard" && (currentUser?.userType === "COMPANY_ADMIN" ? "Company Dashboard" : "Console Dashboard")}
             {activeConsoleTab === "company" && "Company Profile Settings"}
             {activeConsoleTab === "users" && "Team User Accounts"}

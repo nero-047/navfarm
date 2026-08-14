@@ -100,7 +100,7 @@ export default function PacksPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>Packs</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>Packs</h2>
           <p className="mt-0.5 text-xs" style={S.sub}>Generated traceability packs (QR codes) for batch output — farm-to-pack lineage.</p>
         </div>
         <div className="relative">
@@ -114,20 +114,20 @@ export default function PacksPanel() {
       )}
 
       {loading ? (
-        <div className="rounded-2xl border py-10 text-center text-xs" style={S.surface}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</div>
+        <div className="rounded-[var(--radius-md)] border py-10 text-center text-xs" style={S.surface}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border py-10 text-center text-xs" style={{ ...S.surface, ...S.sub }}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No packs generated yet.</div>
+        <div className="rounded-[var(--radius-md)] border py-10 text-center text-xs" style={{ ...S.surface, ...S.sub }}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No packs generated yet.</div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {pagedFiltered.map((row) => (
             <button
               key={row.qr_id}
               onClick={() => setViewing(row)}
-              className="flex flex-col items-start gap-2 rounded-2xl border p-3 text-left transition hover:bg-(--surface-raised)"
+              className="flex flex-col items-start gap-2 rounded-[var(--radius-md)] border p-3 text-left transition hover:bg-(--surface-raised)"
               style={{ ...S.surface, opacity: row.is_voided ? 0.5 : 1 }}
             >
               <div className="flex w-full items-center justify-between">
-                <span className="text-xs font-bold" style={S.primary}>{row.pack_no}</span>
+                <span className="text-xs font-semibold" style={S.primary}>{row.pack_no}</span>
                 {row.is_voided && <span className="rounded-full border px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }}>VOIDED</span>}
                 {row.grade && !row.is_voided && <span className="rounded-full border px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>Grade {row.grade}</span>}
               </div>
@@ -166,7 +166,7 @@ export default function PacksPanel() {
       >
         {viewing && (
           <div className="flex flex-col items-center gap-4">
-            <div className="rounded-xl bg-white p-4">
+            <div className="rounded-[var(--radius-sm)] bg-white p-4">
               <QRCode value={JSON.stringify(viewing.qr_data)} size={200} />
             </div>
             <div className="grid w-full grid-cols-2 gap-3 text-xs">
@@ -182,7 +182,7 @@ export default function PacksPanel() {
             {viewing.origin_batch_chain && (
               <div className="w-full">
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Origin Chain</p>
-                <pre className="overflow-x-auto rounded-xl border p-3 text-[10px]" style={S.surface}>{JSON.stringify(viewing.origin_batch_chain, null, 2)}</pre>
+                <pre className="overflow-x-auto rounded-[var(--radius-sm)] border p-3 text-[10px]" style={S.surface}>{JSON.stringify(viewing.origin_batch_chain, null, 2)}</pre>
               </div>
             )}
           </div>

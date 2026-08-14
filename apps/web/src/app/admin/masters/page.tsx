@@ -8,6 +8,7 @@ import {
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
+import { Field } from "../../../components/ui/field";
 
 // ── Shared style tokens ─────────────────────────────────────────────────────
 const S = {
@@ -22,16 +23,8 @@ const S = {
 };
 
 // ── Reusable input / select ─────────────────────────────────────────────────
-const inputCls = "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none";
+const inputCls = "nf-input";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>{label}</label>
-      {children}
-    </div>
-  );
-}
 
 type MasterTab = "nobs" | "currencies" | "languages";
 
@@ -177,29 +170,29 @@ export default function AdminMastersPage() {
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold" style={S.primary}>Master Data</h1>
+        <h1 className="text-xl font-semibold" style={S.primary}>Master Data</h1>
         <p className="text-sm mt-0.5" style={S.sub}>Manage global seed data: NOBs, LOBs, Currencies, Languages</p>
       </div>
 
-      {error   && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
-      {success && <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
+      {error   && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
+      {success && <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
 
-      {/* Tab Card */}
-      <div className="rounded-lg border shadow-sm" style={S.surface}>
-        {/* Tab Bar */}
-        <div className="flex border-b px-2" style={S.border}>
+      {/* Tabs sit directly on the page. Boxing them added a second frame
+          around content that already gets its own containment below. */}
+      <div>
+        <div className="flex overflow-x-auto border-b" style={S.border}>
           {tabBtn("nobs",       `NOBs / LOBs (${nobs.length})`)}
           {tabBtn("currencies", `Currencies (${currencies.length})`)}
           {tabBtn("languages",  `Languages (${languages.length})`)}
         </div>
 
-        <div className="p-6">
+        <div className="pt-6">
 
           {/* ═══ NOBs TAB ═══════════════════════════════════════════════════ */}
           {activeTab === "nobs" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={S.muted}>Nature of Business</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Nature of Business</p>
                 <button onClick={() => setShowNobForm(!showNobForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
                   <Plus className="w-3.5 h-3.5" /> Add NOB
@@ -224,54 +217,54 @@ export default function AdminMastersPage() {
                   <Field label="Costing Method">
                     <select value={nobForm.default_costing_method}
                       onChange={(e) => setNobForm({ ...nobForm, default_costing_method: e.target.value })}
-                      className={inputCls} style={S.input}>
+                      className={`${inputCls} nf-select`} style={S.input}>
                       <option value="FIFO">FIFO</option>
                       <option value="STANDARD">Standard</option>
                       <option value="BIO">Bio Asset (IAS 41)</option>
                     </select>
                   </Field>
-                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
                     <button type="submit" disabled={savingNob}
-                      className="h-11 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
+                      className="h-11 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                       {savingNob ? "Saving…" : "Save NOB"}
                     </button>
                     <button type="button" onClick={() => setShowNobForm(false)}
-                      className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
                       Cancel
                     </button>
                   </div>
                 </form>
               </Dialog>
 
-              <div className="space-y-2">
-                {nobs.length === 0 && <p className="text-sm text-center py-4" style={S.muted}>No NOBs configured.</p>}
+              {/* One list of peers separated by hairlines, not a stack of
+                  cards — each row is a sibling entry, not its own module. */}
+              <div className="border-t" style={S.border}>
+                {nobs.length === 0 && <p className="text-sm text-center py-8" style={S.muted}>No NOBs configured.</p>}
                 {nobs.map((nob) => {
                   const isExp = expandedNob === nob.nob_id;
                   return (
-                    <div key={nob.nob_id} className="border rounded-lg overflow-hidden" style={S.border}>
+                    <div key={nob.nob_id} className="border-b" style={S.border}>
                       <button
                         onClick={() => handleExpandNob(nob.nob_id)}
-                        className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors"
-                        style={{ backgroundColor: isExp ? "var(--accent-muted)" : "var(--surface-raised)" }}>
+                        aria-expanded={isExp}
+                        className="w-full flex min-h-12 items-center justify-between px-1 py-3 text-left transition-colors hover:bg-(--row-hover)">
                         <div className="flex items-center gap-3">
                           {isExp
                             ? <ChevronDown  className="w-4 h-4 shrink-0" style={S.muted} />
                             : <ChevronRight className="w-4 h-4 shrink-0" style={S.muted} />
                           }
                           <span className="font-semibold text-sm" style={S.primary}>{nob.nob_name}</span>
-                          <span className="text-[11px] font-mono border rounded px-2 py-0.5"
-                            style={{ ...S.raised, ...S.muted }}>{nob.nob_code}</span>
-                          <span className="text-[11px] border rounded px-2 py-0.5"
-                            style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
-                            {nob.default_costing_method}
-                          </span>
+                          <span className="font-mono text-[11px]" style={S.muted}>{nob.nob_code}</span>
+                          {/* Costing method is a configured value, not a status —
+                              it reads as plain metadata rather than a red chip. */}
+                          <span className="text-[11px]" style={S.muted}>{nob.default_costing_method}</span>
                         </div>
                       </button>
 
                       {isExp && (
                         <div className="px-4 py-3 border-t" style={{ ...S.surface, ...S.border }}>
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-[11px] font-bold uppercase tracking-wider" style={S.muted}>Lines of Business</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Lines of Business</p>
                             <button onClick={() => setShowLobForm(showLobForm === nob.nob_id ? null : nob.nob_id)}
                               className="text-xs font-semibold flex items-center gap-1" style={S.accent}>
                               <Plus className="w-3.5 h-3.5" /> Add LOB
@@ -290,13 +283,13 @@ export default function AdminMastersPage() {
                                     placeholder={p} className={inputCls} style={S.input} />
                                 </Field>
                               ))}
-                              <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
+                              <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
                                 <button type="submit" disabled={savingLob}
-                                  className="h-11 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
+                                  className="h-11 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                                   {savingLob ? "Saving…" : "Save LOB"}
                                 </button>
                                 <button type="button" onClick={() => setShowLobForm(null)}
-                                  className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
+                                  className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
                                   Cancel
                                 </button>
                               </div>
@@ -334,7 +327,7 @@ export default function AdminMastersPage() {
           {activeTab === "currencies" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={S.muted}>Supported Currencies</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Supported Currencies</p>
                 <button onClick={() => setShowCurrForm(!showCurrForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
                   <Plus className="w-3.5 h-3.5" /> Add Currency
@@ -357,18 +350,18 @@ export default function AdminMastersPage() {
                   <Field label="Symbol Position">
                     <select value={currForm.symbol_position}
                       onChange={(e) => setCurrForm({ ...currForm, symbol_position: e.target.value })}
-                      className={inputCls} style={S.input}>
+                      className={`${inputCls} nf-select`} style={S.input}>
                       <option value="BEFORE">Before amount</option>
                       <option value="AFTER">After amount</option>
                     </select>
                   </Field>
-                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
                     <button type="submit" disabled={savingCurr}
-                      className="h-11 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
+                      className="h-11 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                       {savingCurr ? "Saving…" : "Add Currency"}
                     </button>
                     <button type="button" onClick={() => setShowCurrForm(false)}
-                      className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
                   </div>
                 </form>
               </Dialog>
@@ -381,11 +374,11 @@ export default function AdminMastersPage() {
                   <div key={curr.iso_code}
                     className="border rounded-lg p-4 text-center shadow-sm"
                     style={S.raised}>
-                    <div className="text-2xl font-black mb-1" style={S.primary}>{curr.symbol}</div>
-                    <div className="text-xs font-bold" style={S.primary}>{curr.iso_code}</div>
+                    <div className="text-2xl font-semibold mb-1" style={S.primary}>{curr.symbol}</div>
+                    <div className="text-xs font-semibold" style={S.primary}>{curr.iso_code}</div>
                     <div className="text-[10px] mt-0.5 truncate" style={S.muted}>{curr.currency_name}</div>
                     {curr.is_system_default && (
-                      <span className="mt-1.5 inline-block text-[10px] font-bold px-2 py-0.5 rounded"
+                      <span className="mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded"
                         style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)" }}>Default</span>
                     )}
                   </div>
@@ -398,7 +391,7 @@ export default function AdminMastersPage() {
           {activeTab === "languages" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={S.muted}>Supported Languages</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Supported Languages</p>
                 <button onClick={() => setShowLangForm(!showLangForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
                   <Plus className="w-3.5 h-3.5" /> Add Language
@@ -421,18 +414,18 @@ export default function AdminMastersPage() {
                   <Field label="Script Direction">
                     <select value={langForm.script}
                       onChange={(e) => setLangForm({ ...langForm, script: e.target.value })}
-                      className={inputCls} style={S.input}>
+                      className={`${inputCls} nf-select`} style={S.input}>
                       <option value="LTR">Left to Right (LTR)</option>
                       <option value="RTL">Right to Left (RTL)</option>
                     </select>
                   </Field>
-                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
                     <button type="submit" disabled={savingLang}
-                      className="h-11 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
+                      className="h-11 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                       {savingLang ? "Saving…" : "Add Language"}
                     </button>
                     <button type="button" onClick={() => setShowLangForm(false)}
-                      className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
                   </div>
                 </form>
               </Dialog>
@@ -442,7 +435,7 @@ export default function AdminMastersPage() {
                   <thead>
                     <tr className="border-b" style={S.raised}>
                       {["Code", "English Name", "Native", "Script", "Default"].map((h) => (
-                        <th key={h} className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={S.muted}>{h}</th>
+                        <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -452,7 +445,7 @@ export default function AdminMastersPage() {
                     )}
                     {languages.map((lang) => (
                       <tr key={lang.lang_code} className="border-b" style={S.border}>
-                        <td className="px-4 py-3 font-mono text-xs font-bold" style={S.accent}>{lang.lang_code}</td>
+                        <td className="px-4 py-3 font-mono text-xs font-semibold" style={S.accent}>{lang.lang_code}</td>
                         <td className="px-4 py-3 font-semibold" style={S.primary}>{lang.lang_name_english}</td>
                         <td className="px-4 py-3" style={S.sub}>{lang.lang_name_native}</td>
                         <td className="px-4 py-3">
@@ -461,7 +454,7 @@ export default function AdminMastersPage() {
                         </td>
                         <td className="px-4 py-3">
                           {lang.is_system_default
-                            ? <CheckCircle className="w-4 h-4 text-green-500" />
+                            ? <CheckCircle className="w-4 h-4 text-(--success)" />
                             : <X className="w-4 h-4" style={S.muted} />
                           }
                         </td>

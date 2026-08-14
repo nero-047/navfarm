@@ -25,8 +25,8 @@ function unwrap<T = any>(res: any): T {
 }
 
 const SEVERITY_STYLE: Record<string, any> = {
-  WARNING: { color: "#b45309", borderColor: "#b45309", backgroundColor: "rgba(180,83,9,0.1)" },
-  CRITICAL: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "rgba(220,38,38,0.1)" },
+  WARNING: { color: "var(--warning)", borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)" },
+  CRITICAL: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" },
 };
 
 export default function AlertPanel() {
@@ -83,16 +83,16 @@ export default function AlertPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>Alert Center</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>Alert Center</h2>
           <p className="mt-0.5 text-xs" style={S.sub}>KPI deviations detected on batch daily entries against their attached Scheduler.</p>
         </div>
         <div className="flex items-center gap-2">
-          <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none" style={S.input}>
+          <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none nf-select" style={S.input}>
             <option value="">All severities</option>
             <option value="WARNING">Warning</option>
             <option value="CRITICAL">Critical</option>
           </select>
-          <select value={readFilter} onChange={(e) => setReadFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none" style={S.input}>
+          <select value={readFilter} onChange={(e) => setReadFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none nf-select" style={S.input}>
             <option value="">All</option>
             <option value="false">Unread</option>
             <option value="true">Read</option>
@@ -106,12 +106,12 @@ export default function AlertPanel() {
 
       <div className="flex flex-col gap-2">
         {loading ? (
-          <div className="rounded-2xl border p-10 text-center text-xs" style={S.surface}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</div>
+          <div className="rounded-[var(--radius-md)] border p-10 text-center text-xs" style={S.surface}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</div>
         ) : rows.length === 0 ? (
-          <div className="rounded-2xl border p-10 text-center text-xs" style={{ ...S.surface, ...S.sub }}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No alerts.</div>
+          <div className="rounded-[var(--radius-md)] border p-10 text-center text-xs" style={{ ...S.surface, ...S.sub }}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No alerts.</div>
         ) : (
           pagedRows.map((alert) => (
-            <div key={alert.alert_id} className="flex items-start justify-between gap-3 rounded-2xl border p-4" style={{ ...S.surface, opacity: alert.is_read ? 0.6 : 1 }}>
+            <div key={alert.alert_id} className="flex items-start justify-between gap-3 rounded-[var(--radius-md)] border p-4" style={{ ...S.surface, opacity: alert.is_read ? 0.6 : 1 }}>
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: SEVERITY_STYLE[alert.severity]?.color }} />
                 <div>

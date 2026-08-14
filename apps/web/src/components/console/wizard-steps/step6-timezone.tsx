@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Select } from "@/components/ui/select";
 import Input from "../../source-ui/input";
 import Button from "../../source-ui/button";
 import { Clock } from "lucide-react";
@@ -32,8 +33,8 @@ export default function Step6Timezone({ onSubmit, isSubmitting, initialTz, initi
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
-          <Clock className="w-5 h-5 text-(--accent)" />
+        <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
+          <Clock className="w-5 h-5 text-(--text-muted)" />
           Step 6: Timezone & Country Preferences
         </h2>
         <p className="text-xs text-(--text-secondary)">Choose operations time-sync settings and national parameters.</p>
@@ -42,16 +43,16 @@ export default function Step6Timezone({ onSubmit, isSubmitting, initialTz, initi
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Operating Timezone</label>
-          <select
+          <Select
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
             <option value="UTC">UTC</option>
             <option value="America/New_York">America/New_York (EST)</option>
             <option value="Europe/London">Europe/London (GMT)</option>
-          </select>
+          </Select>
         </div>
 
         <Input

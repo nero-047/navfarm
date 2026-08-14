@@ -88,8 +88,8 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
-          <Layers className="w-5 h-5 text-(--accent)" />
+        <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
+          <Layers className="w-5 h-5 text-(--text-muted)" />
           Step 8: Nature of Farming Business
         </h2>
         <p className="text-xs text-(--text-secondary)">Enable lines of businesses to activate standard templates and workflows.</p>
@@ -97,7 +97,7 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         {nobs.length === 0 ? (
-          <div className="p-4 bg-(--surface-raised) rounded-xl text-(--text-secondary) text-sm">Loading business modules catalog...</div>
+          <div className="p-4 bg-(--surface-raised) rounded-[var(--radius-sm)] text-(--text-secondary) text-sm">Loading business modules catalog...</div>
         ) : (
           nobs.map((n: any) => {
             const isChecked = selectedNobs.includes(n.nob_code);
@@ -105,14 +105,14 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
               <div
                 key={n.nob_id}
                 onClick={() => handleNobToggle(n.nob_code, n.nob_id)}
-                className={`p-4 border rounded-2xl flex flex-col gap-2 cursor-pointer transition-all ${
+                className={`p-4 border rounded-[var(--radius-md)] flex flex-col gap-2 cursor-pointer transition-all ${
                   isChecked
                     ? "border-(--accent) bg-(--accent-muted)"
                     : "border-(--border) bg-(--surface-raised) hover:border-(--accent)"
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-(--text-primary)">{n.nob_name}</span>
+                  <span className="font-semibold text-sm text-(--text-primary)">{n.nob_name}</span>
                   <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
                     isChecked ? "bg-(--accent) border-(--accent) text-white" : "border-(--border)"
                   }`}>
@@ -124,7 +124,7 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
                 {/* Sub-LOBs options rendered inside the parent NOB card */}
                 {isChecked && (
                   <div className="mt-3 pt-3 border-t border-(--border) flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[10px] font-bold text-(--accent) uppercase tracking-wider">Select Active Operations (LOBs):</span>
+                    <span className="text-[10px] font-semibold text-(--accent) uppercase tracking-wider">Select Active Operations (LOBs):</span>
                     {loadingLobs[n.nob_id] ? (
                       <div className="text-[11px] text-(--text-secondary) animate-pulse py-1">Loading active sub-sectors...</div>
                     ) : !lobMap[n.nob_id] || lobMap[n.nob_id].length === 0 ? (

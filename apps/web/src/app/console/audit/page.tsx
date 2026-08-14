@@ -2,9 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, AlertCircle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
+import { LoadingState, ErrorState } from "../../../components/ui/states";
+import { Badge } from "../../../components/ui/badge";
+import { Input } from "../../../components/ui/input";
 
 export default function AuditPage() {
   const router = useRouter();
@@ -47,29 +50,23 @@ export default function AuditPage() {
 
   const actionBadge = (action: string) => {
     const act = action?.toUpperCase() || "";
-    let bg = "#EFF6FF", color = "#1D4ED8", border = "#BFDBFE";
+    let variant: "success" | "warning" | "danger" | "info" = "info";
     if (act.includes("CREATE") || act.includes("REGISTER") || act.includes("ONBOARD")) {
-      bg = "#F0FDF4"; color = "#15803D"; border = "#BBF7D0";
+      variant = "success";
     } else if (act.includes("UPDATE") || act.includes("EDIT") || act.includes("ASSIGN")) {
-      bg = "#FFFBEB"; color = "#B45309"; border = "#FDE68A";
+      variant = "warning";
     } else if (act.includes("DELETE") || act.includes("REMOVE") || act.includes("REVOKE")) {
-      bg = "#FEF2F2"; color = "#B91C1C"; border = "#FECACA";
+      variant = "danger";
     }
     return (
-      <span className="text-[11px] font-bold uppercase font-mono px-2 py-0.5 rounded border"
-        style={{ backgroundColor: bg, color, borderColor: border }}>
+      <Badge variant={variant} className="font-mono uppercase">
         {action}
-      </span>
+      </Badge>
     );
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="animate-spin w-5 h-5 mr-2" style={{ color: "var(--accent)" }} />
-        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Loading audit logs…</span>
-      </div>
-    );
+    return <LoadingState label="Loading audit logs…" />;
   }
 
   return (
@@ -77,36 +74,31 @@ export default function AuditPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Audit Ledger</h1>
+          <h1 className="nf-text-section" style={{ color: "var(--text-primary)" }}>Audit Ledger</h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>{auditLogs.length} events recorded</p>
         </div>
         <div className="w-full sm:w-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
-            <input
+            <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search logs…"
-              className="w-full rounded-lg border py-2 pl-9 pr-4 text-sm sm:w-64"
-              style={{ borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)", color: "var(--input-text)" }}
+              className="pl-9 sm:w-64"
             />
           </div>
         </div>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-        </div>
-      )}
+      {error && <ErrorState message={error} />}
 
       {/* Table */}
-      <div className="rounded-lg border overflow-hidden shadow-sm" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+      <div className="rounded-[var(--radius-md)] border overflow-hidden" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
+            <tr className="border-b" style={{ backgroundColor: "var(--surface-secondary)", borderColor: "var(--border)" }}>
               {["#", "Timestamp", "Action", "Entity", "User"].map((h) => (
-                <th key={h} className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{h}</th>
+                <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -119,7 +111,7 @@ export default function AuditPage() {
               </tr>
             ) : (
               filtered.map((log, idx) => (
-                <tr key={log.audit_id || idx} className="border-b transition-colors" style={{ borderColor: "var(--border)" }}>
+                <tr key={log.audit_id || idx} className="border-b transition-colors hover:bg-(--row-hover) last:border-0" style={{ borderColor: "var(--border)" }}>
                   <td className="px-5 py-3.5 font-mono text-xs" style={{ color: "var(--text-muted)" }}>{idx + 1}</td>
                   <td className="px-5 py-3.5 font-mono text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                     {log.created_at ? new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—"}

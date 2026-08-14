@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
 import {
   LayoutDashboard,
   Building2,
@@ -15,41 +14,19 @@ import {
   Landmark,
   Sprout,
   LogOut,
-  Menu,
-  X,
   ChevronRight,
   RefreshCw,
-  Sun,
-  Moon,
   ArrowLeft,
 } from "lucide-react";
 import { getStoredUser, getStoredToken, clearSession, hasPermission, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser, CompanyRef } from "../../hooks/useAuth";
-import { useTheme } from "../../hooks/useTheme";
 import { useLanguage } from "../../hooks/useLanguage";
 import { api } from "../../services/api-client";
 import OnboardingWizard from "../../components/console/onboarding-wizard";
 import { LanguageSelector } from "../../components/ui/language-selector";
+import { AppShell, AppShellNavItem } from "../../components/shell/AppShell";
+import { ThemeIconButton } from "../../components/shell/ThemeIconButton";
 
-// ── Clean circular theme toggle for the header ─────────────────────────────
-function ThemeIconButton() {
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
-  return (
-    <button
-      onClick={toggleTheme}
-      title={isDark ? "Switch to Light" : "Switch to Dark"}
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-raised)] hover:text-[var(--color-navy)]"
-    >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </button>
-  );
-}
-
-interface ConsoleSidebarItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
+interface ConsoleSidebarItem extends AppShellNavItem {
   show: boolean;
 }
 
@@ -59,7 +36,6 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const { t } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
   const [tenantPlanInfo, setTenantPlanInfo] = useState<any>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ready, setReady] = useState(false);
 
   // Multi-company switcher
@@ -211,7 +187,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     return (
       <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--bg)", color: "var(--text-primary)" }}>
         <header className="h-14 flex items-center px-4 sm:px-6 shrink-0 border-b" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-          <span className="text-lg font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+          <span className="text-lg font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
             NAV<span style={{ color: "var(--accent)" }}>Farm</span>
           </span>
           <span className="ml-2 hidden text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded sm:inline-flex" style={{ color: "var(--text-muted)", backgroundColor: "var(--surface-raised)" }}>
@@ -219,7 +195,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           </span>
           <div className="ml-auto flex items-center gap-3">
             <ThemeIconButton />
-            <button onClick={handleLogout} aria-label={t("signOut")} className="text-sm flex h-10 items-center gap-1.5 rounded-xl px-2 sm:px-3" style={{ color: "var(--text-secondary)" }}>
+            <button onClick={handleLogout} aria-label={t("signOut")} className="text-sm flex h-10 items-center gap-1.5 rounded-[var(--radius-sm)] px-2 sm:px-3" style={{ color: "var(--text-secondary)" }}>
               <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">{t("signOut")}</span>
             </button>
           </div>
@@ -273,121 +249,39 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const initials = user.fullName?.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase() || "U";
   const breadcrumbLabel = navItems.find((i) => pathname.startsWith(i.href))?.label || "Console";
 
-  const SidebarContent = () => {
-    const planName = (tenantPlanInfo?.plan_id?.replace("PLAN_", "") || "STANDARD").toUpperCase();
-    return (
-      <div className="flex h-full flex-col">
-        <div className="border-b border-white/[0.08] px-5 pb-4 pt-5">
-          <Link href="/console/dashboard" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#f16d50,#c24332)] text-sm font-black text-white shadow-lg">NF</span>
-            <span>
-              <span className="block text-xl font-bold tracking-tight text-white">NAV<span className="text-[#f16d50]">Farm</span></span>
-              <span className="block text-[8px] font-semibold uppercase tracking-[0.22em] text-white/35">Management console</span>
-            </span>
-          </Link>
-          <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.06] p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/40">Current plan</span>
-              <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Active</span>
-            </div>
-            <p className="mt-1 text-sm font-bold text-white">{planName}</p>
-          </div>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto p-3">
-          <p className="px-3 pb-2 pt-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/30">Organization</p>
-          <ul className="space-y-1">
-            {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <li key={item.href}>
-                  <Link href={item.href} onClick={() => setSidebarOpen(false)} className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-medium transition-all ${isActive ? "bg-white text-[#111a4f] shadow-[0_8px_22px_rgba(0,0,0,0.16)]" : "text-white/62 hover:bg-white/[0.07] hover:text-white"}`}>
-                    {isActive && <span className="absolute -left-3 h-5 w-1 rounded-r-full bg-[#ed6a4f]" />}
-                    <item.icon size={17} strokeWidth={isActive ? 2 : 1.6} />
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        <div className="border-t border-white/[0.08] p-4">
-          <div className="flex items-center gap-3 px-1 pb-3">
-            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white">{initials}<span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0b1248] bg-emerald-400" /></span>
-            <span className="min-w-0"><span className="block truncate text-xs font-semibold text-white">{user.fullName}</span><span className="mt-0.5 block truncate text-[9px] text-white/38">{user.email}</span></span>
-          </div>
-          <button onClick={handleLogout} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-medium text-white/50 transition hover:border-red-400/25 hover:bg-red-400/10 hover:text-red-300"><LogOut size={14} /> {t("signOut")}</button>
-        </div>
+  const planName = (tenantPlanInfo?.plan_id?.replace("PLAN_", "") || "STANDARD").toUpperCase();
+  const sidebarSummary = (
+    <div className="rounded-[var(--radius-sm)] border border-white/10 bg-white/[0.05] px-3 py-2.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">Current plan</span>
+        <span className="flex items-center gap-1 text-[10px] font-semibold text-(--success)">
+          <span className="h-1.5 w-1.5 rounded-full bg-(--success)" /> Active
+        </span>
       </div>
-    );
-  };
+      <p className="mt-1 text-sm font-semibold text-white">{planName}</p>
+    </div>
+  );
 
-  return (
-    <div className="min-h-screen bg-[var(--bg)] lg:flex">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] text-white lg:flex"><SidebarContent /></aside>
-
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button aria-label="Close navigation" onClick={() => setSidebarOpen(false)} className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
-          <aside className="relative h-full w-[min(300px,86vw)] bg-[linear-gradient(180deg,#0a1244_0%,#111b55_58%,#071039_100%)] shadow-2xl">
-            <button onClick={() => setSidebarOpen(false)} aria-label="Close navigation" className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"><X size={19} /></button>
-            <SidebarContent />
-          </aside>
-        </div>
-      )}
-
-      {/* ── Main content area ── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}
-        className="min-w-0 lg:ml-[264px]">
-        {/* Top header */}
-        <header style={{
-          backgroundColor: "var(--header-bg)",
-          backdropFilter: "blur(20px)",
-          height: 56,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 24px",
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
-          borderBottom: "1px solid var(--border)",
-          flexShrink: 0,
-        }}>
-          {/* Hamburger — mobile only */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            style={{ color: "var(--text-secondary)", marginRight: 12, cursor: "pointer", background: "none", border: "none" }}
-            className="md:hidden"
-          >
-            <Menu style={{ width: 20, height: 20 }} />
-          </button>
-          {/* Breadcrumb */}
-          <nav style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--text-muted)" }}>
-            <span style={{ fontWeight: 500, color: "var(--text-secondary)" }}>Console</span>
-            <ChevronRight style={{ width: 14, height: 14 }} />
-            <span style={{ fontWeight: 600, color: "var(--text-primary)", textTransform: "capitalize" }}>{breadcrumbLabel}</span>
-          </nav>
-          {/* Right side: company switcher + theme + user */}
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-
-            {/* ── "Managing {company} — Back to Tenant" — Tenant Admin only, shown while
-                they've explicitly entered a company's operational context ── */}
-            {user?.userType === "TENANT_ADMIN" && companyMode && activeCompany && (() => {
+  const headerRight = (
+    <>
+      {/* ── "Managing {company} — Back to Tenant" — Tenant Admin only, shown while
+          they've explicitly entered a company's operational context ── */}
+      {user?.userType === "TENANT_ADMIN" && companyMode && activeCompany && (() => {
               const homeCompanyId = user.companies?.find((c) => c.is_primary)?.company_id || user.companies?.[0]?.company_id || activeCompany.company_id;
+              // Impersonation context is a standing state, not an action — it is
+              // marked, not shouted, so the page's real primary action stays the
+              // loudest thing on screen.
               return (
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "5px 6px 5px 10px",
-                  borderRadius: 999,
-                  border: "1.5px solid var(--warning)",
-                  backgroundColor: "var(--warning-muted)",
-                  color: "var(--warning)",
-                  fontSize: 12, fontWeight: 700,
-                  whiteSpace: "nowrap",
-                }}>
-                  <Building2 style={{ width: 13, height: 13, flexShrink: 0 }} />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220, whiteSpace: "nowrap" }}>
+                <div
+                  className="flex min-w-0 items-center gap-2 rounded-[var(--radius-pill)] py-[5px] pl-2.5 pr-1.5 text-xs font-semibold"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "var(--warning-muted)",
+                    color: "var(--warning)",
+                  }}
+                >
+                  <Building2 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden truncate xl:inline" style={{ maxWidth: 200 }}>
                     Managing: {activeCompany.company_name}
                   </span>
                   <button
@@ -403,19 +297,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                       window.location.href = "/console/companies";
                     }}
                     title="Back to Tenant Admin — exit this company's context"
-                    style={{
-                      display: "flex", alignItems: "center", gap: 4,
-                      padding: "4px 8px",
-                      borderRadius: 999,
-                      border: "none",
-                      backgroundColor: "var(--warning)",
-                      color: "#fff",
-                      fontSize: 11, fontWeight: 700,
-                      cursor: "pointer",
-                    }}
+                    aria-label="Back to Tenant Admin"
+                    className="nf-press flex min-h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-pill)] px-2.5 py-1.5 text-[11px] font-semibold underline-offset-2 hover:underline sm:min-h-0"
+                    style={{ border: "none", background: "transparent", color: "var(--warning)", cursor: "pointer" }}
                   >
-                    <ArrowLeft style={{ width: 11, height: 11 }} />
-                    Back to Tenant
+                    <ArrowLeft className="h-3 w-3 shrink-0" />
+                    <span className="hidden sm:inline">Back to Tenant</span>
                   </button>
                 </div>
               );
@@ -425,45 +312,28 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
             {user?.companies && user.companies.length > 1 && (() => {
               const active = user.companies.find((c) => c.company_id === currentActiveCompanyId) || user.companies[0];
               return (
-                <div style={{ position: "relative" }}>
+                <div className="relative shrink-0">
                   <button
                     onClick={() => setHeaderSwitcherOpen((o) => !o)}
+                    className="nf-press flex min-h-9 min-w-0 max-w-[190px] items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-pill)] border py-[5px] pl-2.5 pr-2 text-xs font-semibold transition-colors sm:min-h-0"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "5px 10px 5px 8px",
-                      borderRadius: 999,
-                      border: "1.5px solid var(--accent)",
-                      backgroundColor: "var(--accent-muted)",
-                      color: "var(--accent)",
-                      fontSize: 12,
-                      fontWeight: 700,
+                      borderColor: "var(--border)",
+                      backgroundColor: "var(--surface-secondary)",
+                      color: "var(--text-primary)",
                       cursor: "pointer",
-                      whiteSpace: "nowrap",
-                      maxWidth: 180,
-                      overflow: "hidden",
-                      transition: "background-color 150ms, box-shadow 150ms",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px var(--accent-muted)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
                     title="Switch active company"
+                    aria-label={`Switch active company — current: ${active.company_name}`}
                   >
-                    {/* dot indicator */}
-                    <span style={{
-                      width: 7, height: 7, borderRadius: "50%",
-                      backgroundColor: "var(--accent)",
-                      flexShrink: 0,
-                    }} />
-                    <Building2 style={{ width: 13, height: 13, flexShrink: 0 }} />
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 110 }}>
-                      {active.company_name}
-                    </span>
-                    <ChevronRight style={{
-                      width: 12, height: 12, flexShrink: 0,
-                      transform: headerSwitcherOpen ? "rotate(90deg)" : "rotate(0deg)",
-                      transition: "transform 200ms",
-                    }} />
+                    <Building2 className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--text-muted)" }} />
+                    <span className="hidden truncate md:inline">{active.company_name}</span>
+                    <ChevronRight
+                      className="h-3 w-3 shrink-0 transition-transform"
+                      style={{
+                        color: "var(--text-muted)",
+                        transform: headerSwitcherOpen ? "rotate(90deg)" : "rotate(0deg)",
+                      }}
+                    />
                   </button>
 
                   {/* Dropdown */}
@@ -569,22 +439,38 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               );
             })()}
 
-            <LanguageSelector />
-            <ThemeIconButton />
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                backgroundColor: "var(--accent)", color: "#fff",
-                fontSize: 11, fontWeight: 700,
-              }}>
-                {initials}
-              </div>
-            </div>
-          </div>
-        </header>
-        <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+      {/* Language is a set-once preference, not a per-task control — it yields
+          first on narrow screens so the header never forces page overflow. */}
+      <span className="hidden shrink-0 sm:inline-flex"><LanguageSelector /></span>
+      <ThemeIconButton />
+      <div
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
+        style={{ backgroundColor: "var(--accent)", color: "#fff" }}
+        title={user.fullName}
+      >
+        {initials}
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <AppShell
+      brandHref="/console/dashboard"
+      brandSubtitle="Management console"
+      sidebarSummary={sidebarSummary}
+      navSectionLabel="Organization"
+      navItems={navItems}
+      pathname={pathname}
+      userInitials={initials}
+      userName={user.fullName}
+      userEmail={user.email}
+      onLogout={handleLogout}
+      signOutLabel={t("signOut")}
+      breadcrumbRoot="Console"
+      breadcrumbCurrent={breadcrumbLabel}
+      headerRight={headerRight}
+    >
+      {children}
+    </AppShell>
   );
 }

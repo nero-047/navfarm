@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, Search, Loader2, Inbox } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
@@ -21,7 +22,7 @@ const S = {
   input: { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-(--input-border-focus)";
+const inputCls = "nf-input";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
@@ -149,11 +150,11 @@ export default function ParameterPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>Parameters</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>Parameters</h2>
           <p className="mt-0.5 text-xs" style={S.sub}>Reusable expected-value definitions used to build Schedulers (e.g. &quot;Starter Feed Consumption&quot;).</p>
         </div>
         <div className="flex items-center gap-2">
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none" style={S.input}>
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none nf-select" style={S.input}>
             <option value="">All types</option>
             {PARAMETER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -161,9 +162,9 @@ export default function ParameterPanel() {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none" style={S.input} />
           </div>
-          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm" style={{ backgroundColor: "var(--accent)" }}>
+          <Button onClick={openCreate} >
             <Plus className="h-3.5 w-3.5" /> New Parameter
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -171,11 +172,11 @@ export default function ParameterPanel() {
         <InlineAlert>{error}</InlineAlert>
       )}
 
-      <div className="overflow-hidden rounded-2xl border" style={S.surface}>
+      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
+              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
                 <th className="whitespace-nowrap px-4 py-3">Code</th>
                 <th className="whitespace-nowrap px-4 py-3">Name</th>
                 <th className="whitespace-nowrap px-4 py-3">Type</th>
@@ -220,9 +221,9 @@ export default function ParameterPanel() {
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+            <Button onClick={handleSave} disabled={saving} >
               {saving ? "Saving…" : "Save"}
-            </button>
+            </Button>
           </>
         }
       >
@@ -232,22 +233,22 @@ export default function ParameterPanel() {
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Code <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Code <span className="text-(--danger)">*</span></label>
               <input value={form.parameter_code} onChange={(e) => setForm((f: Row) => ({ ...f, parameter_code: e.target.value }))} placeholder="PARAM-CONS-FEED-STARTER" className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Name <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Name <span className="text-(--danger)">*</span></label>
               <input value={form.parameter_name} onChange={(e) => setForm((f: Row) => ({ ...f, parameter_name: e.target.value }))} placeholder="Starter Feed Consumption" className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Type</label>
-              <select value={form.parameter_type} onChange={(e) => setForm((f: Row) => ({ ...f, parameter_type: e.target.value, item_id: "", resource_id: "" }))} className={inputCls} style={S.input}>
+              <select value={form.parameter_type} onChange={(e) => setForm((f: Row) => ({ ...f, parameter_type: e.target.value, item_id: "", resource_id: "" }))} className={`${inputCls} nf-select`} style={S.input}>
                 {PARAMETER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Quantity Method</label>
-              <select value={form.qty_method} onChange={(e) => setForm((f: Row) => ({ ...f, qty_method: e.target.value }))} className={inputCls} style={S.input}>
+              <select value={form.qty_method} onChange={(e) => setForm((f: Row) => ({ ...f, qty_method: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
                 {QTY_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
@@ -255,7 +256,7 @@ export default function ParameterPanel() {
             {["CONSUMPTION", "OUTPUT"].includes(form.parameter_type) && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Item</label>
-                <select value={form.item_id} onChange={(e) => setForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={inputCls} style={S.input}>
+                <select value={form.item_id} onChange={(e) => setForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
                   <option value="">Select…</option>
                   {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
                 </select>
@@ -264,7 +265,7 @@ export default function ParameterPanel() {
             {form.parameter_type === "OVERHEAD" && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Resource (optional)</label>
-                <select value={form.resource_id} onChange={(e) => setForm((f: Row) => ({ ...f, resource_id: e.target.value }))} className={inputCls} style={S.input}>
+                <select value={form.resource_id} onChange={(e) => setForm((f: Row) => ({ ...f, resource_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
                   <option value="">None</option>
                   {resources.map((r) => <option key={r.resource_id} value={r.resource_id}>{r.resource_code}</option>)}
                 </select>
@@ -273,7 +274,7 @@ export default function ParameterPanel() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Default UOM</label>
-              <select value={form.default_uom} onChange={(e) => setForm((f: Row) => ({ ...f, default_uom: e.target.value }))} className={inputCls} style={S.input}>
+              <select value={form.default_uom} onChange={(e) => setForm((f: Row) => ({ ...f, default_uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
                 <option value="">Select…</option>
                 {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
               </select>

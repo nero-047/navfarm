@@ -11,11 +11,11 @@ import {
   TrendingUp,
   CheckCircle,
   AlertCircle,
-  RefreshCw,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
 import { useLanguage } from "../../../hooks/useLanguage";
+import { LoadingState, ErrorState } from "../../../components/ui/states";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -75,21 +75,12 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="animate-spin w-5 h-5 mr-2" style={{ color: "var(--accent)" }} />
-        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{t("loadingDashboard")}</span>
-      </div>
-    );
-  }
+  if (loading) return <LoadingState label={t("loadingDashboard")} />;
 
   if (error) {
     return (
       <div className="p-6">
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0" />{error}
-        </div>
+        <ErrorState message={error} onRetry={() => user && loadDashboard(user, getStoredTenantId() || "")} />
       </div>
     );
   }
@@ -99,9 +90,9 @@ export default function DashboardPage() {
   const isTenantAdmin = user?.userType === "TENANT_ADMIN";
 
   const quickActions = [
-    { label: t("companies"),       description: t("manageCompanySetup"),     href: "/console/companies",     icon: Building2,  color: "#2563EB" },
-    { label: t("teamManagement"),  description: t("inviteAndManageUsers"),   href: "/console/users",         icon: Users,      color: "#16A34A" },
-    { label: t("rolePermissions"), description: t("configureRbacPolicies"), href: "/console/roles",         icon: ShieldAlert, color: "#7C3AED" },
+    { label: t("companies"),       description: t("manageCompanySetup"),     href: "/console/companies",     icon: Building2 },
+    { label: t("teamManagement"),  description: t("inviteAndManageUsers"),   href: "/console/users",         icon: Users },
+    { label: t("rolePermissions"), description: t("configureRbacPolicies"), href: "/console/roles",         icon: ShieldAlert },
   ];
 
   const statCard = (
@@ -109,19 +100,26 @@ export default function DashboardPage() {
     icon: React.ElementType,
     main: React.ReactNode,
     sub: React.ReactNode,
-    bar?: { pct: number; color: string }
+    bar?: { pct: number }
   ) => (
-    <div className="rounded-lg p-5 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+    <div className="rounded-[var(--radius-md)] p-5 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{label}</span>
-        {React.createElement(icon, { className: "w-4 h-4", style: { color: "var(--accent)" } })}
+        <span className="nf-text-caption font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{label}</span>
+        {React.createElement(icon, { className: "w-4 h-4", style: { color: "var(--text-muted)" } })}
       </div>
-      <div className="text-xl font-black" style={{ color: "var(--text-primary)" }}>{main}</div>
+      <div className="text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>{main}</div>
       <div className="mt-1 text-xs" style={{ color: "var(--text-secondary)" }}>{sub}</div>
       {bar && (
         <div className="mt-3">
           <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--border)" }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${bar.pct}%`, backgroundColor: bar.color }} />
+            {/* Neutral until the plan limit is genuinely close — colour marks pressure, not decoration. */}
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${bar.pct}%`,
+                backgroundColor: bar.pct >= 90 ? "var(--danger)" : bar.pct >= 75 ? "var(--warning)" : "var(--text-muted)",
+              }}
+            />
           </div>
         </div>
       )}
@@ -133,15 +131,15 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+          <h1 className="nf-text-section" style={{ color: "var(--text-primary)" }}>
             {isTenantAdmin ? t("operationalDashboard") : t("companyDashboard")}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
-            {t("welcomeBack")} <span className="font-medium" style={{ color: "var(--text-primary)" }}>{user?.fullName}</span>
+            {t("welcomeBack")} <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{user?.fullName}</span>
           </p>
         </div>
-        <span className="text-xs font-semibold uppercase tracking-wider px-3 py-1.5 rounded-lg border"
-          style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
+        <span className="nf-text-caption shrink-0 whitespace-nowrap font-semibold uppercase tracking-wider px-3 py-1.5 rounded-[var(--radius-pill)]"
+          style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
           {user?.userType?.replace("_", " ")}
         </span>
       </div>
@@ -149,33 +147,33 @@ export default function DashboardPage() {
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Active Company */}
-        <div className="rounded-lg p-5 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+        <div className="rounded-[var(--radius-md)] p-5 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("activeCompany")}</span>
-            <Building2 className="w-4 h-4" style={{ color: "var(--accent)" }} />
+            <span className="nf-text-caption font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("activeCompany")}</span>
+            <Building2 className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
           </div>
-          <div className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
+          <div className="text-base font-semibold truncate" style={{ color: "var(--text-primary)" }}>
             {activeCompany?.company_name || "—"}
           </div>
           <div className="mt-2 flex items-center gap-1.5">
             {activeCompany?.onboarding_status === "COMPLETED" ? (
-              <><CheckCircle className="w-3.5 h-3.5 text-green-500" /><span className="text-xs text-green-600 font-medium">{t("setupComplete")}</span></>
+              <><CheckCircle className="w-3.5 h-3.5" style={{ color: "var(--success)" }} /><span className="text-xs font-medium" style={{ color: "var(--success)" }}>{t("setupComplete")}</span></>
             ) : (
-              <><AlertCircle className="w-3.5 h-3.5 text-amber-500" /><span className="text-xs text-amber-600 font-medium">{t("setupPending")}</span></>
+              <><AlertCircle className="w-3.5 h-3.5" style={{ color: "var(--warning)" }} /><span className="text-xs font-medium" style={{ color: "var(--warning)" }}>{t("setupPending")}</span></>
             )}
           </div>
         </div>
 
         {statCard(t("companies"), Building2,
-          <span className="text-3xl font-black">{companies.length}</span>,
+          <span className="text-2xl font-semibold">{companies.length}</span>,
           t("ofLimitPct", { max: tenantPlanInfo?.max_companies || 1, pct: compPercent.toFixed(0) }),
-          { pct: compPercent, color: "#6366F1" }
+          { pct: compPercent }
         )}
 
         {statCard(t("teamMembers"), Users,
-          <span className="text-3xl font-black">{users.length}</span>,
+          <span className="text-2xl font-semibold">{users.length}</span>,
           t("ofSeatsPct", { max: tenantPlanInfo?.max_users || 5, pct: userPercent.toFixed(0) }),
-          { pct: userPercent, color: "#16A34A" }
+          { pct: userPercent }
         )}
 
         {statCard(t("subscription"), TrendingUp,
@@ -184,53 +182,51 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Active Company Card */}
+      {/* Active company detail — lives directly on the page; a hairline and
+          spacing carry the grouping without another container. */}
       {activeCompany && (
-        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-          <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("activeCompanyDetails")}</h2>
-            <Link href="/console/companies" className="text-xs font-medium flex items-center gap-1" style={{ color: "var(--accent)" }}>
+        <section className="border-t pt-5" style={{ borderColor: "var(--border)" }}>
+          <div className="flex items-center justify-between">
+            <h2 className="nf-text-caption font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("activeCompanyDetails")}</h2>
+            <Link href="/console/companies" className="text-xs font-semibold flex items-center gap-1 hover:underline" style={{ color: "var(--accent)" }}>
               <Settings className="w-3.5 h-3.5" /> {t("manage")}
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: "var(--border)" }}>
+          <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
             {[
               { label: t("companyName"),   value: activeCompany.company_name || "—" },
               { label: t("registrationNo"), value: activeCompany.registration_no || "—" },
               { label: t("country"),        value: activeCompany.country_id || "—" },
               { label: t("onboardingLabel"), value: activeCompany.onboarding_status || "—" },
             ].map((row) => (
-              <div key={row.label} className="px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-                <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-muted)" }}>{row.label}</div>
-                <div className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>{row.value}</div>
+              <div key={row.label} className="min-w-0">
+                <dt className="nf-text-caption mb-1" style={{ color: "var(--text-muted)" }}>{row.label}</dt>
+                <dd className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>{row.value}</dd>
               </div>
             ))}
-          </div>
-        </div>
+          </dl>
+        </section>
       )}
 
-      {/* Quick Actions */}
-      <div>
-        <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)" }}>{t("quickActionsHeading")}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Quick actions — a plain list of destinations, not three cards. */}
+      <section className="border-t pt-5" style={{ borderColor: "var(--border)" }}>
+        <h2 className="nf-text-caption font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-muted)" }}>{t("quickActionsHeading")}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3">
           {quickActions.map((action) => (
             <Link
               key={action.href}
               href={action.href}
-              className="rounded-lg p-5 border flex items-start gap-4 transition-all hover:shadow-md"
-              style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+              className="nf-press group -mx-2 flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-3 transition-colors hover:bg-(--row-hover)"
             >
-              <div className="p-2.5 rounded-lg shrink-0" style={{ backgroundColor: "var(--accent-muted)" }}>
-                <action.icon className="w-5 h-5" style={{ color: action.color }} />
-              </div>
-              <div>
+              <action.icon className="h-4 w-4 shrink-0" strokeWidth={1.6} style={{ color: "var(--text-muted)" }} />
+              <div className="min-w-0">
                 <div className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{action.label}</div>
-                <div className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>{action.description}</div>
+                <div className="text-xs mt-0.5 truncate" style={{ color: "var(--text-secondary)" }}>{action.description}</div>
               </div>
             </Link>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -43,8 +43,8 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
-          <Contact className="w-5 h-5 text-(--accent)" />
+        <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
+          <Contact className="w-5 h-5 text-(--text-muted)" />
           Step 3: Primary Contact Details
         </h2>
         <p className="text-xs text-(--text-secondary)">Provide the contact profile for administrative alerts and reporting.</p>

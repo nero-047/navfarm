@@ -6,6 +6,7 @@ import { RefreshCw, AlertCircle, CheckCircle, Plus, Edit2, X } from "lucide-reac
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
+import { Field } from "../../../components/ui/field";
 
 const s = {
   input: { borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)", color: "var(--input-text)" },
@@ -103,7 +104,7 @@ export default function AdminPlansPage() {
     finally { setSaving(false); }
   };
 
-  const inputCls = "w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none";
+  const inputCls = "nf-input";
 
   if (loading) {
     return (
@@ -118,7 +119,7 @@ export default function AdminPlansPage() {
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={s.text}>Subscription Plans</h1>
+          <h1 className="text-xl font-semibold" style={s.text}>Subscription Plans</h1>
           <p className="text-sm mt-0.5" style={s.sub}>{plans.length} plans configured</p>
         </div>
         <button onClick={() => handleOpen()}
@@ -128,8 +129,8 @@ export default function AdminPlansPage() {
         </button>
       </div>
 
-      {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
-      {success && <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
+      {error && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
+      {success && <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
 
       {/* Form */}
       <Dialog open={showForm} onClose={() => setShowForm(false)} title={editingPlan ? "Edit subscription plan" : "Create subscription plan"} description="Set billing, capacity, and feature availability." maxWidth="lg">
@@ -139,43 +140,38 @@ export default function AdminPlansPage() {
               { key: "plan_name", label: "Plan Name", placeholder: "Basic Starter" },
               { key: "price", label: "Price (USD)", placeholder: "49.00" },
             ].map(({ key, label, placeholder, disabled }) => (
-              <div key={key}>
-                <label className="block text-xs font-semibold mb-1 uppercase tracking-wider" style={s.sub}>{label}</label>
+              <Field label="{label}">
                 <input required value={(form as any)[key]}
                   onChange={(e) => setForm({ ...form, [key]: e.target.value })}
                   placeholder={placeholder} disabled={disabled}
                   className={inputCls} style={{ ...s.input, opacity: disabled ? 0.6 : 1 }} />
-              </div>
+              </Field>
             ))}
 
-            <div>
-              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider" style={s.sub}>Billing Cycle</label>
+            <Field label="Billing Cycle">
               <select value={form.billing_cycle} onChange={(e) => setForm({ ...form, billing_cycle: e.target.value })}
-                className={inputCls} style={s.input}>
+                className={`${inputCls} nf-select`} style={s.input}>
                 <option value="MONTHLY">Monthly</option>
                 <option value="ANNUAL">Annual</option>
               </select>
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider" style={s.sub}>Max Companies</label>
+            <Field label="Max Companies">
               <input type="number" min={1} value={form.max_companies}
                 onChange={(e) => setForm({ ...form, max_companies: +e.target.value })}
                 className={inputCls} style={s.input} />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider" style={s.sub}>Max Users</label>
+            <Field label="Max Users">
               <input type="number" min={1} value={form.max_users}
                 onChange={(e) => setForm({ ...form, max_users: +e.target.value })}
                 className={inputCls} style={s.input} />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider" style={s.sub}>Storage (GB)</label>
+            <Field label="Storage (GB)">
               <input value={form.storage_limit_gb} onChange={(e) => setForm({ ...form, storage_limit_gb: e.target.value })}
                 className={inputCls} style={s.input} />
-            </div>
+            </Field>
 
             <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer text-sm" style={s.text}>
@@ -192,14 +188,14 @@ export default function AdminPlansPage() {
               </label>
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:col-span-2 sm:flex-row sm:justify-end lg:col-span-3">
+            <div className="flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:col-span-2 sm:flex-row sm:justify-end lg:col-span-3">
               <button type="submit" disabled={saving}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
+                className="flex h-11 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                 {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
                 {saving ? "Saving…" : editingPlan ? "Save Changes" : "Create Plan"}
               </button>
               <button type="button" onClick={() => setShowForm(false)}
-                className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">
+                className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">
                 Cancel
               </button>
             </div>
@@ -211,8 +207,8 @@ export default function AdminPlansPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b" style={s.raised}>
-              {["Plan ID", "Name", "Price", "Cycle", "Cos.", "Users", "QR", "API", ""].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={s.muted}>{h}</th>
+              {["Plan ID", "Name", "Price", "Cycle", "Companies", "Users", "QR", "API", ""].map((h) => (
+                <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider" style={s.muted}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -231,8 +227,8 @@ export default function AdminPlansPage() {
                 </td>
                 <td className="px-4 py-3 text-center font-semibold" style={s.text}>{plan.max_companies}</td>
                 <td className="px-4 py-3 text-center font-semibold" style={s.text}>{plan.max_users}</td>
-                <td className="px-4 py-3 text-center">{plan.feature_flags?.qr_traceability ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</td>
-                <td className="px-4 py-3 text-center">{plan.feature_flags?.api_access ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</td>
+                <td className="px-4 py-3 text-center">{plan.feature_flags?.qr_traceability ? <CheckCircle className="w-4 h-4 text-(--success) mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</td>
+                <td className="px-4 py-3 text-center">{plan.feature_flags?.api_access ? <CheckCircle className="w-4 h-4 text-(--success) mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</td>
                 <td className="px-4 py-3">
                   <button onClick={() => handleOpen(plan)} className="text-xs font-medium flex items-center gap-1" style={s.accent}>
                     <Edit2 className="w-3.5 h-3.5" /> Edit

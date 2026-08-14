@@ -30,11 +30,11 @@ export function AdminShell({
   ];
   return (
     <div className="min-h-screen bg-(--bg)">
-      <header className="border-b border-white/10 bg-[#0b1248] text-white">
+      <header className="border-b border-white/10 bg-(--accent) text-white">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div>
-            <Link href="/console" className="text-xl font-bold">
-              NAV<span className="text-[#c24332]">Farm</span>
+            <Link href="/console" className="text-xl font-semibold">
+              NAV<span className="text-(--accent)">Farm</span>
             </Link>
             <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/45">
               {eyebrow}

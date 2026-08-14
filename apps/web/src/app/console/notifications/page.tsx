@@ -1,25 +1,15 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Field } from "@/components/ui/field";
 import { useRouter } from "next/navigation";
 import { Bell, RefreshCw, AlertCircle, CheckCircle, Save, Send, Mail, Globe, Eye, EyeOff } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser, getStoredTenantId, type NavUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
 
-// Reusable labelled input for this page
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-const inputCls = "w-full border rounded-lg px-3 py-2.5 text-sm focus:ring-1";
+const inputCls = "nf-input";
 const inputStyle = {
   borderColor: "var(--input-border)",
   backgroundColor: "var(--input-bg)",
@@ -168,19 +158,19 @@ export default function NotificationsPage() {
     <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6 xl:p-8">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Notification Engine</h1>
+        <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>Notification Engine</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
           Configure outbound alert channels for <span className="font-medium">{activeCompany?.company_name || "—"}</span>
         </p>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
+        <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4 text-sm">
+        <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm">
           <CheckCircle className="w-4 h-4 shrink-0" /> {success}
         </div>
       )}
@@ -203,7 +193,7 @@ export default function NotificationsPage() {
         <div className="p-6">
           {activeChannel === "EMAIL" && (
             <form onSubmit={handleSaveEmail} className="space-y-5">
-              <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>SMTP Configuration</h2>
+              <h2 className="nf-text-label-strong" style={{ color: "var(--text-primary)" }}>SMTP Configuration</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="SMTP Host">
                   <input value={emailForm.smtp_host} onChange={(e) => setEmailForm({ ...emailForm, smtp_host: e.target.value })}
@@ -252,7 +242,7 @@ export default function NotificationsPage() {
 
           {activeChannel === "WEBHOOK" && (
             <form onSubmit={handleSaveWebhook} className="space-y-5">
-              <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Webhook Configuration</h2>
+              <h2 className="nf-text-label-strong" style={{ color: "var(--text-primary)" }}>Webhook Configuration</h2>
               <div className="space-y-4">
                 <Field label="Webhook URL">
                   <input type="url" value={webhookForm.webhook_url}
@@ -279,10 +269,10 @@ export default function NotificationsPage() {
       </div>
 
       {/* Test Send */}
-      <div className="flex flex-col gap-4 rounded-xl border bg-(--surface) p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+      <div className="flex flex-col gap-4 rounded-[var(--radius-sm)] border bg-(--surface) p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
         style={{ borderColor: "var(--border)" }}>
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
+          <div className="rounded-lg bg-(--info-muted) p-2 text-(--info)">
             <Send className="h-4 w-4" />
           </div>
           <div>
@@ -293,7 +283,7 @@ export default function NotificationsPage() {
           </div>
         </div>
         <button type="button" onClick={() => setShowTestDialog(true)}
-          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#101b52] px-4 text-sm font-semibold text-white transition hover:bg-[#17266d]">
+          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-(--accent) px-4 text-sm font-semibold text-white transition hover:bg-(--accent-hover)">
           <Send className="h-4 w-4" /> Send test
         </button>
       </div>
@@ -320,7 +310,7 @@ export default function NotificationsPage() {
               Cancel
             </button>
             <button type="submit" disabled={testing || !testRecipient}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#101b52] px-5 text-sm font-semibold text-white hover:bg-[#17266d] disabled:opacity-50">
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
               {testing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {testing ? "Sending…" : "Send test"}
             </button>
@@ -332,8 +322,8 @@ export default function NotificationsPage() {
       <div className="rounded-lg border shadow-sm" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
         <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
           <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4" style={{ color: "var(--accent)" }} />
-            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Outbound Notification Logs</h2>
+            <Bell className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
+            <h2 className="nf-text-label-strong" style={{ color: "var(--text-primary)" }}>Outbound Notification Logs</h2>
           </div>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
             {logs.length} Log Entries
@@ -342,7 +332,7 @@ export default function NotificationsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
                 <th className="p-4 w-12 text-center">#</th>
                 <th className="p-4 w-32">Timestamp</th>
                 <th className="p-4 w-24">Channel</th>
@@ -371,14 +361,9 @@ export default function NotificationsPage() {
                         {new Date(log.sent_at).toLocaleString('en-IN', { hour12: true })}
                       </td>
                       <td className="p-4">
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded border"
-                          style={{
-                            backgroundColor: log.channel === "EMAIL" ? "rgba(99, 102, 241, 0.08)" : "rgba(16, 185, 129, 0.08)",
-                            color: log.channel === "EMAIL" ? "#6366F1" : "#10B981",
-                            borderColor: log.channel === "EMAIL" ? "rgba(99, 102, 241, 0.2)" : "rgba(16, 185, 129, 0.2)",
-                          }}>
-                          {log.channel}
-                        </span>
+                        {/* Channel is which pipe carried the message, not a
+                            status — two colours here implied one was better. */}
+                        <Badge variant="neutral">{log.channel}</Badge>
                       </td>
                       <td className="p-4 font-medium font-mono" style={{ color: "var(--text-secondary)" }}>{log.recipient}</td>
                       <td className="p-4">
@@ -388,10 +373,10 @@ export default function NotificationsPage() {
                         )}
                       </td>
                       <td className="p-4 text-center">
-                        <span className={`text-[9px] font-bold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${
+                        <span className={`text-[9px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${
                           isSuccess
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : "bg-red-50 text-red-700 border-red-200"
+                            ? "bg-(--success-muted) text-(--success) border-(--success)"
+                            : "bg-(--danger-muted) text-(--danger) border-(--danger)"
                         }`}>
                           {isSuccess ? "Sent" : "Failed"}
                         </span>

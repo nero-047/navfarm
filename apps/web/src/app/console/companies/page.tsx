@@ -3,13 +3,18 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Building2, RefreshCw, AlertCircle, CheckCircle,
+  Building2, RefreshCw, CheckCircle,
   Settings, ArrowLeft, Activity, Plus, ArrowRightLeft,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser } from "../../../hooks/useAuth";
 import CompanyTab from "../../../components/console/console-tabs/company-tab";
 import { Dialog } from "../../../components/ui/dialog";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import { Select } from "../../../components/ui/select";
+import { Badge } from "../../../components/ui/badge";
+import { LoadingState, ErrorState } from "../../../components/ui/states";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -19,19 +24,15 @@ const S = {
   muted:    { color: "var(--text-muted)" },
   accent:   { color: "var(--accent)" },
   border:   { borderColor: "var(--border)" },
-  input:    { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
 function StatusBadge({ status }: { status: string }) {
   const ok = status === "COMPLETED";
-  return ok ? (
-    <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200 px-2.5 py-0.5 rounded-full">
-      <CheckCircle className="w-3 h-3" /> Complete
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full">
-      <Activity className="w-3 h-3" /> Pending
-    </span>
+  return (
+    <Badge variant={ok ? "success" : "warning"}>
+      {ok ? <CheckCircle className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
+      {ok ? "Complete" : "Pending"}
+    </Badge>
   );
 }
 
@@ -114,12 +115,7 @@ export default function CompaniesPage() {
     finally { setCreating(false); }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <RefreshCw className="animate-spin w-5 h-5 mr-2" style={S.accent} />
-      <span className="text-sm" style={S.sub}>Loading companies…</span>
-    </div>
-  );
+  if (loading) return <LoadingState label="Loading companies…" />;
 
   // ════════════════════════════════════════════════════════════════════════════
   // TENANT ADMIN VIEW
@@ -131,23 +127,24 @@ export default function CompaniesPage() {
       return (
         <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 lg:p-7">
           {/* Compact navigation and company identity toolbar */}
-          <div className="flex items-center gap-3 rounded-2xl border border-(--border) bg-(--surface) p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
-            <button
+          <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-4">
+            <Button
               type="button"
               onClick={() => setManagingCompany(null)}
               aria-label="Back to companies"
               title="Back to companies"
-              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#e3e7ee] px-3 text-sm font-semibold text-[#0b1248] transition hover:bg-[#f5f7fb]"
+              variant="outline"
+              size="sm"
             >
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Companies</span>
-            </button>
-            <div className="mx-1 hidden h-8 w-px bg-[#e7eaf0] sm:block" />
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-sm font-black text-white">
+            </Button>
+            <div className="mx-1 hidden h-8 w-px sm:block" style={{ backgroundColor: "var(--border)" }} />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-sm font-semibold text-white" style={{ backgroundColor: "var(--color-navy)" }}>
               {managingCompany.company_code?.substring(0, 2) || managingCompany.company_name?.substring(0, 2) || "CO"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-base font-semibold text-[#2e313f]">{managingCompany.company_name}</div>
+              <div className="text-base font-semibold" style={S.primary}>{managingCompany.company_name}</div>
               <div className="text-xs flex items-center gap-3 mt-0.5" style={S.muted}>
                 <span className="font-mono">{managingCompany.company_code}</span>
                 {managingCompany.registration_no && <span>Reg: {managingCompany.registration_no}</span>}
@@ -157,7 +154,7 @@ export default function CompaniesPage() {
             <StatusBadge status={managingCompany.onboarding_status} />
           </div>
 
-          {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
+          {error && <ErrorState message={error} />}
 
           {/* Company settings — pass ONLY this one company */}
           <div>
@@ -182,115 +179,99 @@ export default function CompaniesPage() {
         {/* Header */}
           <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold" style={S.primary}>Companies</h1>
+            <h1 className="nf-text-section" style={S.primary}>Companies</h1>
             <p className="text-sm mt-0.5" style={S.sub}>
               {companies.length} company record{companies.length !== 1 ? "s" : ""} in this tenant
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => { setCreateError(""); setShowAddModal(true); }}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-sm"
-              style={{ backgroundColor: "var(--accent)" }}>
+            <Button onClick={() => { setCreateError(""); setShowAddModal(true); }}>
               <Plus className="w-4 h-4" /> Add Company
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Add Company Modal */}
         <Dialog open={showAddModal} onClose={() => setShowAddModal(false)} title="Add a company" description="Create the legal company record. Detailed setup continues after creation." maxWidth="lg">
               <form onSubmit={handleCreateCompany} className="space-y-5">
-                {createError && (
-                  <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
-                    <AlertCircle className="w-4 h-4 shrink-0" /> {createError}
-                  </div>
-                )}
+                {createError && <ErrorState message={createError} />}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Company Code *</label>
-                    <input required placeholder="e.g. ARUN12" value={createForm.company_code}
-                      onChange={e => setCreateForm(f => ({ ...f, company_code: e.target.value.toUpperCase() }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>Company Code *</label>
+                    <Input required placeholder="e.g. ARUN12" value={createForm.company_code}
+                      onChange={e => setCreateForm(f => ({ ...f, company_code: e.target.value.toUpperCase() }))} />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Legal Entity Name *</label>
-                    <input required placeholder="e.g. Arun Private Limited" value={createForm.company_name}
-                      onChange={e => setCreateForm(f => ({ ...f, company_name: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>Legal Entity Name *</label>
+                    <Input required placeholder="e.g. Arun Private Limited" value={createForm.company_name}
+                      onChange={e => setCreateForm(f => ({ ...f, company_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Display / Brand Name</label>
-                    <input placeholder="e.g. Arun Technology" value={createForm.company_display_name}
-                      onChange={e => setCreateForm(f => ({ ...f, company_display_name: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>Display / Brand Name</label>
+                    <Input placeholder="e.g. Arun Technology" value={createForm.company_display_name}
+                      onChange={e => setCreateForm(f => ({ ...f, company_display_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Classification *</label>
-                    <select required value={createForm.company_type}
-                      onChange={e => setCreateForm(f => ({ ...f, company_type: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input}>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>Classification *</label>
+                    <Select required value={createForm.company_type}
+                      onChange={e => setCreateForm(f => ({ ...f, company_type: e.target.value }))}>
                       {["Pvt Ltd","Ltd","LLP","Partnership","Proprietorship","Trust","NGO"].map(t => (
                         <option key={t} value={t}>{t}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Industry *</label>
-                    <select required value={createForm.industry_type}
-                      onChange={e => setCreateForm(f => ({ ...f, industry_type: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input}>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>Industry *</label>
+                    <Select required value={createForm.industry_type}
+                      onChange={e => setCreateForm(f => ({ ...f, industry_type: e.target.value }))}>
                       {["Poultry Farming","Aquaculture","Dairy","Crop Farming","Agro Processing","Livestock","Other"].map(t => (
                         <option key={t} value={t}>{t}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Registration No.</label>
-                    <input placeholder="e.g. U01100MH2020PTC123456" value={createForm.registration_no}
-                      onChange={e => setCreateForm(f => ({ ...f, registration_no: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>Registration No.</label>
+                    <Input placeholder="e.g. U01100MH2020PTC123456" value={createForm.registration_no}
+                      onChange={e => setCreateForm(f => ({ ...f, registration_no: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Tax ID (GSTIN / PAN)</label>
-                    <input placeholder="e.g. 27AABCU9603R1ZX" value={createForm.tax_id}
-                      onChange={e => setCreateForm(f => ({ ...f, tax_id: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input} />
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>Tax ID (GSTIN / PAN)</label>
+                    <Input placeholder="e.g. 27AABCU9603R1ZX" value={createForm.tax_id}
+                      onChange={e => setCreateForm(f => ({ ...f, tax_id: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>Country *</label>
-                    <select required value={createForm.country_id}
-                      onChange={e => setCreateForm(f => ({ ...f, country_id: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={S.input}>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>Country *</label>
+                    <Select required value={createForm.country_id}
+                      onChange={e => setCreateForm(f => ({ ...f, country_id: e.target.value }))}>
                       <option value="IND">India</option>
                       <option value="USA">United States</option>
                       <option value="GBR">United Kingdom</option>
                       <option value="ARE">UAE</option>
                       <option value="SGP">Singapore</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
-                <div className="flex flex-col-reverse gap-3 border-t border-[#edf0f4] pt-5 sm:flex-row sm:justify-end">
-                  <button type="submit" disabled={creating}
-                    className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0b1248] px-5 text-sm font-semibold text-white hover:bg-[#151d5e] disabled:opacity-50">
+                <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end" style={S.border}>
+                  <Button type="submit" disabled={creating}>
                     {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                     {creating ? "Creating…" : "Create Company"}
-                  </button>
-                  <button type="button" onClick={() => setShowAddModal(false)}
-                    className="h-11 rounded-xl border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </form>
         </Dialog>
 
-        {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
+        {error && <ErrorState message={error} />}
 
         {/* Clean companies table — no inline expand */}
-        <div className="rounded-lg border shadow-sm overflow-hidden" style={S.surface}>
+        <div className="rounded-[var(--radius-md)] border overflow-hidden" style={S.surface}>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b" style={S.raised}>
+              <tr className="border-b" style={{ ...S.border, backgroundColor: "var(--surface-secondary)" }}>
                 {["#", "Company", "Reg. No.", "Country", "Onboarding", ""].map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
+                  <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -300,13 +281,13 @@ export default function CompaniesPage() {
               )}
               {companies.map((co, idx) => (
                 <tr key={co.company_id}
-                  className="border-b transition-colors hover:opacity-90"
+                  className="border-b transition-colors hover:bg-(--row-hover) last:border-0"
                   style={S.border}>
                   <td className="px-5 py-4 font-mono text-xs" style={S.muted}>{idx + 1}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-md flex items-center justify-center text-white text-[11px] font-black shrink-0"
-                        style={{ backgroundColor: "var(--accent)" }}>
+                      <div className="w-8 h-8 rounded-[var(--radius-xs)] flex items-center justify-center text-white text-[11px] font-semibold shrink-0"
+                        style={{ backgroundColor: "var(--color-navy)" }}>
                         {co.company_code?.substring(0, 2) || "CO"}
                       </div>
                       <div>
@@ -321,15 +302,12 @@ export default function CompaniesPage() {
                   <td className="px-5 py-4">
                     {co.onboarding_status === "COMPLETED" ? (
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setManagingCompany(co)}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-                          style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
+                        <Button onClick={() => setManagingCompany(co)} variant="outline" size="sm">
                           <Settings className="w-3.5 h-3.5" />
                           Manage
-                        </button>
+                        </Button>
                         {!(isTenantCompanyMode() && co.company_id === (getActiveCompanyId() || user?.companyId)) && (
-                          <button
+                          <Button
                             onClick={() => {
                               const currentUser = getStoredUser();
                               if (currentUser) {
@@ -342,15 +320,16 @@ export default function CompaniesPage() {
                               window.location.href = "/console/dashboard";
                             }}
                             title={`Switch into ${co.company_name} — operate the console as this company`}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-                            style={{ backgroundColor: "var(--surface-raised)", color: "var(--text-primary)", borderColor: "var(--border)" }}>
+                            variant="secondary"
+                            size="sm"
+                          >
                             <ArrowRightLeft className="w-3.5 h-3.5" />
                             Switch
-                          </button>
+                          </Button>
                         )}
                       </div>
                     ) : (
-                      <button
+                      <Button
                         onClick={() => {
                           const currentUser = getStoredUser();
                           if (currentUser) {
@@ -365,11 +344,12 @@ export default function CompaniesPage() {
                           setActiveCompanyId(co.company_id);
                           window.location.reload();
                         }}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-                        style={{ backgroundColor: "var(--surface-raised)", color: "var(--text-primary)", borderColor: "var(--border)" }}>
-                        <Activity className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                        variant="secondary"
+                        size="sm"
+                      >
+                        <Activity className="w-3.5 h-3.5" style={{ color: "var(--warning)" }} />
                         Continue Setup
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -387,7 +367,7 @@ export default function CompaniesPage() {
   if (!myCompany) {
     return (
       <div className="mx-auto max-w-7xl p-4 sm:p-6 xl:p-8">
-        <div className="rounded-lg border p-12 text-center" style={S.surface}>
+        <div className="rounded-[var(--radius-md)] border p-12 text-center" style={S.surface}>
           <Building2 className="w-10 h-10 mx-auto mb-3" style={S.muted} />
           <p className="text-sm font-semibold" style={S.sub}>No company assigned to your account yet.</p>
           <p className="text-xs mt-1" style={S.muted}>Contact your Tenant Admin to set up your company.</p>
@@ -399,12 +379,12 @@ export default function CompaniesPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 xl:p-8">
       {/* Company identity header */}
-      <div className="flex items-center gap-4 rounded-2xl border border-(--border) bg-(--surface) p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#1c4aa9,#0b1248)] text-sm font-black text-white">
+      <div className="flex items-center gap-4 rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-sm font-semibold text-white" style={{ backgroundColor: "var(--color-navy)" }}>
           {myCompany.company_code?.substring(0, 2) || myCompany.company_name?.substring(0, 2) || "CO"}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-base font-bold" style={S.primary}>{myCompany.company_name}</div>
+          <div className="text-base font-semibold" style={S.primary}>{myCompany.company_name}</div>
           <div className="text-xs flex items-center gap-3 mt-0.5" style={S.muted}>
             <span className="font-mono">{myCompany.company_code}</span>
             {myCompany.registration_no && <span>Reg: {myCompany.registration_no}</span>}
@@ -413,7 +393,7 @@ export default function CompaniesPage() {
         <StatusBadge status={myCompany.onboarding_status} />
       </div>
 
-      {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
+      {error && <ErrorState message={error} />}
 
       <CompanyTab
           activeCompany={myCompany}

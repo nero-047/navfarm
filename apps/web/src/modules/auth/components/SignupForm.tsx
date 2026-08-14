@@ -141,7 +141,7 @@ export function SignupForm() {
         {t('authAlreadyHaveAccount')}{' '}
         <Link
           href="/login"
-          className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
+          className="font-medium text-(--text-primary) hover:text-(--accent) transition-colors"
         >
           {t('authSignInLink')}
         </Link>

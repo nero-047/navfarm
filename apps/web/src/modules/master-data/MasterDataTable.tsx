@@ -24,7 +24,7 @@ const S = {
   input: { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-(--input-border-focus)";
+const inputCls = "nf-input";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
@@ -310,7 +310,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     }
     if (f.type === "select") {
       return (
-        <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={inputCls} style={S.input}>
+        <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
           <option value="">{t("selectPlaceholder")}</option>
           {f.options?.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -327,7 +327,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       const disabled = f.dependsOnMode !== "query" && parents.length > 0 && !resolvedEp;
       const parentLabel = parents.map((k) => tLabel(config.fields.find((pf) => pf.key === k)?.label || k)).join(" & ");
       return (
-        <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={inputCls} style={S.input} disabled={disabled}>
+        <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={disabled}>
           <option value="">{disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder")}</option>
           {options.map((o) => (
             <option key={o[f.entityValueKey || "id"]} value={o[f.entityValueKey || "id"]}>
@@ -354,16 +354,16 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>{tLabel(config.label)}</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>{tLabel(config.label)}</h2>
           {config.description && <p className="mt-0.5 text-xs" style={S.sub}>{tLabel(config.description)}</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {config.supportsNobLobFilter && (
             <>
               <select
                 value={nobFilter}
                 onChange={(e) => setNobFilter(e.target.value)}
-                className="rounded-lg border py-1.5 px-2 text-xs outline-none"
+                className="nf-input-sm nf-select"
                 style={S.input}
               >
                 <option value="">{t("allNob")}</option>
@@ -374,7 +374,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               <select
                 value={lobFilter}
                 onChange={(e) => setLobFilter(e.target.value)}
-                className="rounded-lg border py-1.5 px-2 text-xs outline-none"
+                className="nf-input-sm nf-select"
                 style={S.input}
                 disabled={!nobFilter}
               >
@@ -391,7 +391,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("searchPlaceholder")}
-              className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none"
+              className="nf-input-sm pl-8"
               style={S.input}
             />
           </div>
@@ -407,11 +407,11 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
       {error && <InlineAlert>{error}</InlineAlert>}
 
-      <div className="overflow-hidden rounded-2xl border" style={S.surface}>
+      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
+              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
                 {columns.map((c) => (
                   <th key={c.key} className="whitespace-nowrap px-4 py-3">{tLabel(c.label)}</th>
                 ))}
@@ -503,7 +503,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             {visibleFields.map((f) => (
               <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>
-                  {tLabel(f.label)}{f.required && <span className="text-red-500"> *</span>}
+                  {tLabel(f.label)}{f.required && <span className="text-(--danger)"> *</span>}
                 </label>
                 {renderField(f)}
                 {f.helpText && <p className="text-[11px]" style={S.muted}>{f.helpText}</p>}

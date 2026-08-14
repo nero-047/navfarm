@@ -78,7 +78,7 @@ export default function UsersTab({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-(--border) text-[10px] font-bold text-(--text-secondary) uppercase tracking-wider bg-(--surface)">
+                <tr className="border-b border-(--border) text-[10px] font-semibold text-(--text-secondary) uppercase tracking-wider bg-(--surface)">
                   <th className="p-4 w-12 text-center">#</th>
                   <th className="p-4">Full Name</th>
                   <th className="p-4">Email</th>
@@ -100,7 +100,7 @@ export default function UsersTab({
                         <td className="p-4 text-center font-mono text-(--text-muted)">{idx + 1}</td>
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-(--accent)/10 border border-(--accent)/20 text-(--accent) font-bold flex items-center justify-center text-xs tracking-wider">
+                            <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-(--accent)/10 border border-(--accent)/20 text-(--accent) font-semibold flex items-center justify-center text-xs tracking-wider">
                               {initials}
                             </div>
                             <span className="font-semibold text-(--text-primary)">{u.full_name}</span>
@@ -110,14 +110,14 @@ export default function UsersTab({
                         <td className="p-4">
                           {u.role_name ? (
                             <div className="flex items-center gap-2">
-                              <span className="bg-(--accent)/10 text-(--accent) border border-(--accent)/20 text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase font-mono">
+                              <span className="bg-(--accent)/10 text-(--accent) border border-(--accent)/20 text-[9px] font-semibold px-2 py-0.5 rounded-lg uppercase font-mono">
                                 {u.role_code}
                               </span>
                               <span className="text-[11px] text-(--text-secondary)">{u.role_name}</span>
                               {onUnassignRole && u.assign_id && (
                                 <button
                                   onClick={() => onUnassignRole(u.assign_id)}
-                                  className="text-[9px] text-(--text-muted) hover:text-red-500 ml-1.5 cursor-pointer bg-(--surface-raised) p-1 rounded-md border border-(--border) transition-colors"
+                                  className="text-[9px] text-(--text-muted) hover:text-(--danger) ml-1.5 cursor-pointer bg-(--surface-raised) p-1 rounded-md border border-(--border) transition-colors"
                                   title="Unassign role"
                                 >
                                   ✕
@@ -129,8 +129,8 @@ export default function UsersTab({
                           )}
                         </td>
                         <td className="p-4 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-bold border ${
-                            u.is_active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'
+                          <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-semibold border ${
+                            u.is_active ? 'bg-(--success-muted) text-(--success) border-(--success)' : 'bg-(--danger-muted) text-(--danger) border-(--danger)'
                           }`}>
                             {u.is_active ? "Active" : "Inactive"}
                           </span>
@@ -141,7 +141,7 @@ export default function UsersTab({
                               setSelectedUserForAssign(u);
                               setTargetRoleId(u.role_id || (roles.length > 0 ? roles[0].role_id : ""));
                             }}
-                            className="text-[10px] font-bold text-(--accent) hover:text-(--accent-hover) cursor-pointer bg-(--surface-raised) py-1.5 px-3 rounded-lg border border-(--border) transition-colors"
+                            className="text-[10px] font-semibold text-(--accent) hover:text-(--accent-hover) cursor-pointer bg-(--surface-raised) py-1.5 px-3 rounded-lg border border-(--border) transition-colors"
                           >
                             Assign Role
                           </button>
@@ -158,7 +158,7 @@ export default function UsersTab({
 
       {/* Add User Panel */}
       <Card className="lg:col-span-4 p-6 border-(--border) bg-(--surface)">
-        <h3 className="font-bold text-(--text-primary) text-sm flex items-center gap-2 mb-4 pb-2 border-b border-(--border)">
+        <h3 className="font-semibold text-(--text-primary) text-sm flex items-center gap-2 mb-4 pb-2 border-b border-(--border)">
           <UserPlus className="w-4 h-4 text-(--accent)" />
           Invite Team Member
         </h3>
@@ -195,11 +195,11 @@ export default function UsersTab({
           />
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] text-(--text-secondary) font-bold uppercase tracking-wider">Account Role Class</label>
+            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Account Role Class</label>
             <select
               value={newUser.user_type}
               onChange={(e) => setNewUser({ ...newUser, user_type: e.target.value })}
-              className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-xs text-(--input-text) focus:outline-none focus:border-(--input-border-focus) cursor-pointer"
+              className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-xs text-(--input-text) focus:border-(--input-border-focus) cursor-pointer nf-select"
             >
               {isTenantAdmin ? (
                 <>
@@ -222,16 +222,16 @@ export default function UsersTab({
           {selectedUserForAssign && <div className="flex flex-col gap-5">
 
             <div className="flex flex-col gap-1.5 mt-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Available Roles</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Available Roles</label>
               {roles.length === 0 ? (
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-center text-xs text-[var(--text-secondary)]">
+                <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-center text-xs text-[var(--text-secondary)]">
                   No roles defined. Please create a role first in the Roles tab.
                 </div>
               ) : (
                 <select
                   value={targetRoleId}
                   onChange={(e) => setTargetRoleId(e.target.value)}
-                  className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none"
+                  className="w-full rounded-[var(--radius-sm)] border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none nf-select"
                 >
                   {roles.map((role) => (
                     <option key={role.role_id} value={role.role_id}>

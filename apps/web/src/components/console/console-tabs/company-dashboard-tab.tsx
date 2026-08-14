@@ -85,17 +85,17 @@ export default function CompanyDashboardTab({
       {/* Session Context Card — User Identity + Role */}
       <Card className="p-6 border-(--border) bg-(--surface)">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-(--accent)/10 border border-(--accent)/20 flex items-center justify-center text-(--accent) font-bold text-lg tracking-wider">
+          <div className="w-14 h-14 rounded-[var(--radius-md)] bg-(--accent)/10 border border-(--accent)/20 flex items-center justify-center text-(--accent) font-semibold text-lg tracking-wider">
             {initials}
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-bold text-(--text-primary)">{currentUser?.fullName || "User"}</h2>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${userTypeColor.border} ${userTypeColor.text} ${userTypeColor.iconBg}`}>
+              <h2 className="text-lg font-semibold text-(--text-primary)">{currentUser?.fullName || "User"}</h2>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${userTypeColor.border} ${userTypeColor.text} ${userTypeColor.iconBg}`}>
                 {currentUser?.userType || "USER"}
               </span>
               {currentUserRecord?.role_code && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold border border-blue-500/20 text-blue-400 bg-blue-500/10">
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold border border-(--info) text-(--info) bg-(--info-muted)">
                   {currentUserRecord.role_code}
                 </span>
               )}
@@ -113,13 +113,13 @@ export default function CompanyDashboardTab({
 
       {/* Role & Permissions Card */}
       <Card className="p-6 border-(--border) bg-(--surface)">
-        <h3 className="text-sm font-bold text-(--text-primary) mb-4 flex items-center gap-2 border-b border-(--border) pb-3">
+        <h3 className="text-sm font-semibold text-(--text-primary) mb-4 flex items-center gap-2 border-b border-(--border) pb-3">
           <Shield className="w-4 h-4 text-(--accent)" />
           Your Access Scope
         </h3>
 
         {hasAllAccess ? (
-          <div className="flex items-center gap-3 bg-(--accent)/5 border border-(--accent)/10 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-3 bg-(--accent)/5 border border-(--accent)/10 rounded-[var(--radius-sm)] px-4 py-3">
             <CheckCircle className="w-5 h-5 text-(--accent) shrink-0" />
             <div>
               <span className="text-sm font-semibold text-(--text-primary)">Full Administrative Access</span>
@@ -133,13 +133,13 @@ export default function CompanyDashboardTab({
           <div className="flex flex-col gap-3">
             {/* RBAC Role Assignment */}
             {currentUserRecord?.role_name ? (
-              <div className="flex items-center gap-3 bg-blue-500/5 border border-blue-500/10 rounded-xl px-4 py-3">
-                <ShieldAlert className="w-5 h-5 text-blue-400 shrink-0" />
+              <div className="flex items-center gap-3 bg-(--info-muted) border border-(--info) rounded-[var(--radius-sm)] px-4 py-3">
+                <ShieldAlert className="w-5 h-5 text-(--info) shrink-0" />
                 <div>
                   <span className="text-sm font-semibold text-(--text-primary)">
                     Assigned Role: {currentUserRecord.role_name}
                   </span>
-                  <span className="ml-2 bg-(--surface-raised) border border-(--border) text-(--text-secondary) text-[10px] font-bold px-2 py-0.5 rounded font-mono">
+                  <span className="ml-2 bg-(--surface-raised) border border-(--border) text-(--text-secondary) text-[10px] font-semibold px-2 py-0.5 rounded font-mono">
                     {currentUserRecord.role_code}
                   </span>
                   <p className="text-[11px] text-(--text-secondary) mt-0.5">
@@ -148,8 +148,8 @@ export default function CompanyDashboardTab({
                 </div>
               </div>
             ) : !isAdmin ? (
-              <div className="flex items-center gap-3 bg-amber-500/5 border border-amber-500/10 rounded-xl px-4 py-3">
-                <XCircle className="w-5 h-5 text-amber-400 shrink-0" />
+              <div className="flex items-center gap-3 bg-(--warning-muted) border border-(--warning) rounded-[var(--radius-sm)] px-4 py-3">
+                <XCircle className="w-5 h-5 text-(--warning) shrink-0" />
                 <div>
                   <span className="text-sm font-semibold text-(--text-primary)">No Role Assigned</span>
                   <p className="text-[11px] text-(--text-secondary) mt-0.5">
@@ -162,7 +162,7 @@ export default function CompanyDashboardTab({
             {/* Granular Permissions Summary */}
             {userPermissions.length > 0 && !hasAllAccess && (
               <div className="mt-2">
-                <p className="text-[10px] text-(--text-secondary) font-bold uppercase tracking-wider mb-2">Granular Permissions</p>
+                <p className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider mb-2">Granular Permissions</p>
                 <div className="flex flex-wrap gap-2">
                   {userPermissions.slice(0, 8).map((p: any, i: number) => (
                     <span key={i} className="bg-(--surface-raised) border border-(--border) rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-(--text-secondary)">
@@ -182,7 +182,7 @@ export default function CompanyDashboardTab({
             {/* RBAC-specific: show available roles in the company */}
             {isAdmin && roles.length > 0 && (
               <div className="mt-2">
-                <p className="text-[10px] text-(--text-secondary) font-bold uppercase tracking-wider mb-2">Available RBAC Roles in Company</p>
+                <p className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider mb-2">Available RBAC Roles in Company</p>
                 <div className="flex flex-wrap gap-2">
                   {roles.map((r: any) => (
                     <span key={r.role_id} className="bg-(--surface-raised) border border-(--border) rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-(--text-secondary)">
@@ -202,27 +202,27 @@ export default function CompanyDashboardTab({
         <div className="absolute top-0 right-0 w-32 h-32 bg-(--accent)/[0.03] rounded-bl-full pointer-events-none group-hover:bg-(--accent)/[0.06] transition-all" />
         <div>
           <div className="flex justify-between items-start">
-            <span className="text-(--text-secondary) text-[10px] font-bold uppercase tracking-widest">Active Company</span>
-            <div className="p-2 rounded-xl bg-(--accent)/10 border border-(--accent)/20 text-(--accent)">
+            <span className="text-(--text-secondary) text-[10px] font-semibold uppercase tracking-widest">Active Company</span>
+            <div className="p-2 rounded-[var(--radius-sm)] bg-(--accent)/10 border border-(--accent)/20 text-(--accent)">
               <Building2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-extrabold text-(--text-primary) mt-4 tracking-tight">
+          <div className="text-xl font-semibold text-(--text-primary) mt-4 tracking-tight">
             {activeCompany?.company_name || "Unassigned"}
           </div>
           <div className="text-[10px] text-(--text-muted) font-mono mt-1">
             ID: {activeCompany?.company_id?.substring(0, 8)}...
           </div>
         </div>
-        <div className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5 mt-6 bg-emerald-500/5 border border-emerald-500/10 py-1 px-2.5 rounded-lg w-fit">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+        <div className="text-[11px] text-(--success) font-semibold flex items-center gap-1.5 mt-6 bg-(--success-muted) border border-(--success) py-1 px-2.5 rounded-lg w-fit">
+          <span className="w-1.5 h-1.5 rounded-full bg-(--success) inline-block animate-pulse" />
           Onboarding: Complete
         </div>
       </Card>
 
       {/* Quick Actions */}
       <div>
-        <h3 className="text-sm font-bold text-(--text-primary) mb-4 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-(--text-primary) mb-4 flex items-center gap-2">
           <ArrowRight className="w-4 h-4 text-(--accent)" />
           Quick Actions
         </h3>
@@ -233,12 +233,12 @@ export default function CompanyDashboardTab({
               <button
                 key={action.tab}
                 onClick={() => onNavigateTab(action.tab)}
-                className="p-5 rounded-2xl bg-(--surface) border border-(--border) hover:border-(--accent)/30 transition-all duration-200 text-left group cursor-pointer hover:scale-[1.02]"
+                className="p-5 rounded-[var(--radius-md)] bg-(--surface) border border-(--border) hover:border-(--accent)/30 transition-all duration-200 text-left group cursor-pointer hover:scale-[1.02]"
               >
-                <div className="w-10 h-10 rounded-xl bg-(--accent)/10 border border-(--accent)/20 flex items-center justify-center text-(--accent) mb-3">
+                <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-(--accent)/10 border border-(--accent)/20 flex items-center justify-center text-(--accent) mb-3">
                   <Icon className="w-5 h-5" />
                 </div>
-                <h4 className="font-bold text-(--text-primary) text-sm group-hover:text-(--accent) transition-colors">{action.label}</h4>
+                <h4 className="font-semibold text-(--text-primary) text-sm group-hover:text-(--accent) transition-colors">{action.label}</h4>
                 <p className="text-[11px] text-(--text-secondary) mt-1">{action.description}</p>
                 <div className="flex items-center gap-1 mt-3 text-[10px] font-semibold text-(--accent) opacity-0 group-hover:opacity-100 transition-opacity">
                   Navigate <ArrowRight className="w-3 h-3" />

@@ -262,10 +262,10 @@ export default function OnboardingWizard({
   return (
     <div className="nf-onboarding flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 md:p-12 flex flex-col md:flex-row gap-4 md:gap-8 overflow-y-auto">
 
-      <div className="rounded-2xl border border-(--border) bg-(--surface) p-4 text-(--text-primary) shadow-lg md:hidden">
+      <div className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-4 text-(--text-primary) md:hidden">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-(--accent)">Company setup</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-(--accent)">Company setup</p>
             <p className="mt-1 text-sm font-semibold text-(--text-primary)">Step {activeWizardStep} of 9</p>
           </div>
           <span className="rounded-full border border-(--border) bg-(--surface-raised) px-3 py-1 text-[10px] font-semibold text-(--text-secondary)">
@@ -279,8 +279,10 @@ export default function OnboardingWizard({
 
       {/* Progress Menu (Left Sidebar) */}
       <aside className="hidden md:flex md:w-72 shrink-0 flex-col gap-3">
-        <div className="p-4 bg-(--surface) border border-(--border) rounded-2xl flex flex-col gap-1 mb-2">
-          <h3 className="font-bold text-(--text-primary) text-sm">ERP Setup Wizard</h3>
+        {/* Intro copy is the column's heading, not a module — a box around it
+            would imply it is a separate thing from the steps beneath it. */}
+        <div className="mb-4 flex flex-col gap-1 px-3">
+          <h3 className="text-sm font-semibold text-(--text-primary)">ERP Setup Wizard</h3>
           <p className="text-xs text-(--text-secondary)">Configure your company settings to activate agricultural management.</p>
         </div>
 
@@ -304,7 +306,7 @@ export default function OnboardingWizard({
               type="button"
               disabled={!isClickable}
               onClick={() => setActiveWizardStep(step.order)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all text-left outline-none ${
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-sm)] border text-sm font-medium transition-all text-left outline-none ${
                 isActive
                   ? "bg-(--accent-muted) border-(--accent) text-(--text-primary) shadow-sm"
                   : isCompleted
@@ -325,7 +327,7 @@ export default function OnboardingWizard({
       </aside>
 
       {/* Wizard Form Panel (Right Side) */}
-      <main className="flex-1 bg-(--surface) border border-(--border) rounded-3xl p-5 sm:p-8 shadow-xl flex flex-col gap-6 justify-between animate-fade-in">
+      <main className="flex-1 bg-(--surface) border border-(--border) rounded-[var(--radius-lg)] p-5 sm:p-8 flex flex-col gap-6 justify-between animate-fade-in">
         <div className="flex-1">
           {loadingDetails ? (
             <div className="flex items-center justify-center h-48">

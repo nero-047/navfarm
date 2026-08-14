@@ -20,7 +20,7 @@ const S = {
   input: { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "rounded-lg border py-1.5 px-2 text-xs outline-none";
+const inputCls = "nf-input-sm";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
@@ -85,16 +85,16 @@ export default function InventoryLedgerPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-bold" style={S.primary}>Inventory Ledger</h2>
+        <h2 className="text-lg font-semibold" style={S.primary}>Inventory Ledger</h2>
         <p className="mt-0.5 text-xs" style={S.sub}>Read-only movement history. Entries are written automatically when documents (Goods Receipt, etc.) are posted.</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <select value={itemId} onChange={(e) => setItemId(e.target.value)} className={inputCls} style={S.input}>
+        <select value={itemId} onChange={(e) => setItemId(e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
           <option value="">All items</option>
           {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
         </select>
-        <select value={transactionType} onChange={(e) => setTransactionType(e.target.value)} className={inputCls} style={S.input}>
+        <select value={transactionType} onChange={(e) => setTransactionType(e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
           <option value="">All transaction types</option>
           {["PURCHASE", "CONSUMPTION", "OUTPUT", "TRANSFER_SHIPMENT", "TRANSFER_RECEIPT", "SALES", "VARIANCE_POSITIVE", "VARIANCE_NEGATIVE"].map((t) => (
             <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
@@ -114,11 +114,11 @@ export default function InventoryLedgerPanel() {
         <InlineAlert>{error}</InlineAlert>
       )}
 
-      <div className="overflow-hidden rounded-2xl border" style={S.surface}>
+      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
+              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
                 <th className="whitespace-nowrap px-4 py-3">Posting Date</th>
                 <th className="whitespace-nowrap px-4 py-3">Document</th>
                 <th className="whitespace-nowrap px-4 py-3">Item</th>

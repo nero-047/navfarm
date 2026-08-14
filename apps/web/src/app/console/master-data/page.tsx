@@ -38,7 +38,7 @@ export default function MasterDataPage() {
     return (
       <div className="mx-auto max-w-2xl p-8">
         <div
-          className="flex items-center gap-3 rounded-2xl border p-5"
+          className="flex items-center gap-3 rounded-[var(--radius-md)] border p-5"
           style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}
         >
           <ShieldAlert className="h-5 w-5 shrink-0" />
@@ -56,16 +56,16 @@ export default function MasterDataPage() {
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-7">
       <div className="mb-5">
-        <h1 className="text-xl font-bold" style={S.primary}>{t("masterData")}</h1>
+        <h1 className="nf-text-section" style={S.primary}>{t("masterData")}</h1>
         <p className="mt-0.5 text-sm" style={S.sub}>{t("masterDataPageDescription")}</p>
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row">
         <aside className="shrink-0 lg:w-64">
-          <nav className="rounded-2xl border p-2" style={S.surface}>
+          <nav className="lg:border-r lg:pr-2" style={{ borderColor: "var(--border)" }}>
             {MASTER_DATA_GROUPS.map((group) => (
               <div key={group} className="mb-1 last:mb-0">
-                <p className="px-3 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest" style={S.muted}>{tLabel(group)}</p>
+                <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest" style={S.muted}>{tLabel(group)}</p>
                 <ul className="flex flex-col gap-0.5">
                   {MASTER_DATA_CONFIGS.filter((c) => c.group === group).map((c) => {
                     const isActive = c.key === activeKey;
@@ -73,7 +73,7 @@ export default function MasterDataPage() {
                       <li key={c.key}>
                         <button
                           onClick={() => setActiveKey(c.key)}
-                          className="w-full rounded-xl px-3 py-2 text-left text-[13px] font-medium transition-colors"
+                          className="nf-press w-full rounded-[var(--radius-sm)] px-3 py-2 text-left text-[13px] font-medium transition-colors"
                           style={isActive
                             ? { backgroundColor: "var(--accent-muted)", color: "var(--accent)" }
                             : { color: "var(--text-secondary)" }}

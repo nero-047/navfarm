@@ -63,14 +63,14 @@ export function Dialog({ open, onClose, title, description, children, footer, ma
 
   return createPortal(
     <div className="fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overflow-y-auto p-4 sm:p-6" role="presentation">
-      <button type="button" aria-label={t("closeDialog")} onClick={onClose} className="absolute inset-0 cursor-default bg-[#070a20]/50 backdrop-blur-[2px]" />
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={cn('relative my-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[0_24px_80px_rgba(0,0,0,0.24)] outline-none sm:max-h-[calc(100dvh-3rem)]', widths[maxWidth], className)}>
+      <button type="button" aria-label={t("closeDialog")} onClick={onClose} className="absolute inset-0 cursor-default bg-[rgba(46,49,63,0.5)]" />
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={cn('relative my-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[var(--shadow-md)] outline-none sm:max-h-[calc(100dvh-3rem)]', widths[maxWidth], className)}>
         <header className="flex shrink-0 items-start gap-4 border-b border-[var(--border-subtle)] px-5 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{title}</h2>
+            <h2 id={titleId} className="nf-text-body-strong text-lg text-[var(--text-primary)]">{title}</h2>
             {description && <p id={descriptionId} className="mt-1 text-sm leading-5 text-[var(--text-secondary)]">{description}</p>}
           </div>
-          <button type="button" onClick={onClose} aria-label={t("close")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text-secondary)] transition hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]"><X size={18} /></button>
+          <button type="button" onClick={onClose} aria-label={t("close")} className="nf-press flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"><X size={18} /></button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
         {footer && <footer className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-[var(--border-subtle)] bg-[var(--surface-raised)] px-5 py-4 sm:px-6">{footer}</footer>}

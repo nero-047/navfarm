@@ -49,7 +49,7 @@ export default function AdminAuditPage() {
     else if (act.includes("UPDATE") || act.includes("EDIT") || act.includes("ASSIGN")) { bg = "#FFFBEB"; color = "#B45309"; border = "#FDE68A"; }
     else if (act.includes("DELETE") || act.includes("REMOVE") || act.includes("REVOKE")) { bg = "#FEF2F2"; color = "#B91C1C"; border = "#FECACA"; }
     return (
-      <span className="text-[11px] font-bold uppercase font-mono px-2 py-0.5 rounded border"
+      <span className="text-[11px] font-semibold uppercase font-mono px-2 py-0.5 rounded border"
         style={{ backgroundColor: bg, color, borderColor: border }}>{action}</span>
     );
   };
@@ -67,7 +67,7 @@ export default function AdminAuditPage() {
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>{t("systemAuditLogs")}</h1>
+          <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>{t("systemAuditLogs")}</h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>{auditLogs.length} {t("platformWideEventsRecorded")}</p>
         </div>
         <div className="w-full sm:w-auto">
@@ -81,7 +81,7 @@ export default function AdminAuditPage() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
+        <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
@@ -91,7 +91,7 @@ export default function AdminAuditPage() {
           <thead>
             <tr className="border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
               {["#", t("timestamp"), t("action"), t("entity"), t("user")].map((h, idx) => (
-                <th key={idx} className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{h}</th>
+                <th key={idx} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{h}</th>
               ))}
             </tr>
           </thead>

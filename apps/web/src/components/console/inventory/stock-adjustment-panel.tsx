@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2, Search, Loader2, Inbox, Eye, CheckCircle2 } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
@@ -22,7 +23,7 @@ const S = {
   input: { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-(--input-border-focus)";
+const inputCls = "nf-input";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
@@ -178,11 +179,11 @@ export default function StockAdjustmentPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>Stock Adjustment</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>Stock Adjustment</h2>
           <p className="mt-0.5 text-xs" style={S.sub}>Correct stock for physical counts, damage or loss. Positive quantity = found stock (needs a rate); negative = missing/damaged (costed via FIFO).</p>
         </div>
         <div className="flex items-center gap-2">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none" style={S.input}>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none nf-select" style={S.input}>
             <option value="">All statuses</option>
             <option value="DRAFT">Draft</option>
             <option value="POSTED">Posted</option>
@@ -192,9 +193,9 @@ export default function StockAdjustmentPanel() {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none" style={S.input} />
           </div>
-          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm" style={{ backgroundColor: "var(--accent)" }}>
+          <Button onClick={openCreate} >
             <Plus className="h-3.5 w-3.5" /> New Adjustment
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -202,11 +203,11 @@ export default function StockAdjustmentPanel() {
         <InlineAlert>{error}</InlineAlert>
       )}
 
-      <div className="overflow-hidden rounded-2xl border" style={S.surface}>
+      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
+              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
                 <th className="whitespace-nowrap px-4 py-3">Adjustment No.</th>
                 <th className="whitespace-nowrap px-4 py-3">Posting Date</th>
                 <th className="whitespace-nowrap px-4 py-3">Warehouse</th>
@@ -257,9 +258,9 @@ export default function StockAdjustmentPanel() {
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+            <Button onClick={handleSave} disabled={saving} >
               {saving ? "Saving…" : "Save Draft"}
-            </button>
+            </Button>
           </>
         }
       >
@@ -270,14 +271,14 @@ export default function StockAdjustmentPanel() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Warehouse <span className="text-red-500">*</span></label>
-              <select value={header.warehouse_id} onChange={(e) => setHeader((h) => ({ ...h, warehouse_id: e.target.value }))} className={inputCls} style={S.input}>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Warehouse <span className="text-(--danger)">*</span></label>
+              <select value={header.warehouse_id} onChange={(e) => setHeader((h) => ({ ...h, warehouse_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
                 <option value="">Select…</option>
                 {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code} — {w.warehouse_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date <span className="text-(--danger)">*</span></label>
               <input type="date" value={header.posting_date} onChange={(e) => setHeader((h) => ({ ...h, posting_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -297,7 +298,7 @@ export default function StockAdjustmentPanel() {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border" style={S.surface}>
+          <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--border)" }}>
@@ -312,14 +313,14 @@ export default function StockAdjustmentPanel() {
                 {lines.map((line, idx) => (
                   <tr key={idx} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
                     <td className="px-2 py-1.5">
-                      <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={inputCls} style={S.input}>
+                      <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
                       </select>
                     </td>
                     <td className="px-2 py-1.5 w-28"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} placeholder="e.g. -5 or 10" className={inputCls} style={S.input} /></td>
                     <td className="px-2 py-1.5 w-28">
-                      <select value={line.uom} onChange={(e) => setLineField(idx, "uom", e.target.value)} className={inputCls} style={S.input}>
+                      <select value={line.uom} onChange={(e) => setLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
@@ -367,7 +368,7 @@ export default function StockAdjustmentPanel() {
               {viewing.posted_at && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Posted At</p><p style={S.primary}>{viewing.posted_at}</p></div>}
             </div>
 
-            <div className="overflow-x-auto rounded-xl border" style={S.surface}>
+            <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b" style={{ borderColor: "var(--border)" }}>

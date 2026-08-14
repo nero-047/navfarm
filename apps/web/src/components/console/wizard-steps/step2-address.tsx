@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Select } from "@/components/ui/select";
 import Input from "../../source-ui/input";
 import Button from "../../source-ui/button";
 import { MapPin } from "lucide-react";
@@ -49,8 +50,8 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-(--accent)" />
+        <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-(--text-muted)" />
           Step 2: Operating Addresses
         </h2>
         <p className="text-xs text-(--text-secondary)">Provide operating physical addresses for billing and tax allocations.</p>
@@ -100,15 +101,15 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
         />
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Location Type</label>
-          <select
+          <Select
             value={formData.address_type}
             onChange={(e) => setFormData({ ...formData, address_type: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value="HEAD_OFFICE">Head Office</option>
             <option value="FARM">Farm Location</option>
             <option value="WAREHOUSE">Warehouse</option>
-          </select>
+          </Select>
         </div>
       </div>
       <Button type="submit" disabled={isSubmitting} className="mt-4 self-end">

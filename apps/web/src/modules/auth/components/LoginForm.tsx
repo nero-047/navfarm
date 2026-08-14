@@ -99,7 +99,7 @@ export function LoginForm() {
         {t('authNoAccount')}{' '}
         <Link
           href="/signup"
-          className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
+          className="font-medium text-(--text-primary) hover:text-(--accent) transition-colors"
         >
           {t('authCreateOne')}
         </Link>

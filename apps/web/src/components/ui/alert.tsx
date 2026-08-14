@@ -12,7 +12,7 @@ const VARIANT_STYLE: Record<AlertVariant, { icon: typeof AlertCircle; color: str
   info: { icon: Info, color: "var(--info)", bg: "var(--accent-muted)" },
 };
 
-/** Theme-aware inline alert — replaces the old hardcoded `bg-red-50 text-red-700`
+/** Theme-aware inline alert — replaces the old hardcoded `bg-(--danger-muted) text-(--danger)`
  * pattern that rendered as a jarring light-pink box in dark mode. */
 export function InlineAlert({ variant = "danger", children }: { variant?: AlertVariant; children: ReactNode }) {
   const v = VARIANT_STYLE[variant];

@@ -256,7 +256,7 @@ export default function RolesTab({
       {/* Roles List (Left Sidebar) */}
       <div className="md:col-span-4 flex flex-col gap-4">
         <div className="flex justify-between items-center pb-3 border-b" style={S.border}>
-          <span className="text-[11px] font-bold uppercase tracking-wider" style={S.textSecondary}>Available Scopes</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider" style={S.textSecondary}>Available Scopes</span>
           <button
             onClick={() => setIsCreateModalOpen(true)}
             className="flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg shadow-sm cursor-pointer transition-transform hover:scale-[1.02]"
@@ -268,7 +268,7 @@ export default function RolesTab({
 
         <div className="flex flex-col gap-3">
           {visibleRoles.length === 0 ? (
-            <div className="p-8 text-center text-xs border border-dashed rounded-xl" style={{ ...S.surface, ...S.textMuted }}>
+            <div className="p-8 text-center text-xs border border-dashed rounded-[var(--radius-sm)]" style={{ ...S.surface, ...S.textMuted }}>
               No custom roles configured yet.
             </div>
           ) : (
@@ -277,7 +277,7 @@ export default function RolesTab({
               return (
                 <div
                   key={r.role_id}
-                  className={`p-4 transition-all border rounded-xl relative overflow-hidden flex flex-col gap-3 cursor-pointer ${
+                  className={`p-4 transition-all border rounded-[var(--radius-sm)] relative overflow-hidden flex flex-col gap-3 cursor-pointer ${
                     isCurrent
                       ? "shadow-sm"
                       : "hover:border-(--accent)"
@@ -291,8 +291,8 @@ export default function RolesTab({
                   {isCurrent && <div className="absolute left-0 top-0 bottom-0 w-[4px]" style={{ backgroundColor: "var(--accent)" }} />}
                   <div>
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-sm" style={S.textPrimary}>{r.role_name}</h4>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
+                      <h4 className="font-semibold text-sm" style={S.textPrimary}>{r.role_name}</h4>
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
                         {r.role_code}
                       </span>
                     </div>
@@ -330,7 +330,7 @@ export default function RolesTab({
           <Card className="p-6 flex flex-col gap-6" style={S.surface}>
             <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b pb-4 gap-4" style={S.border}>
               <div>
-                <h3 className="font-bold text-sm flex items-center gap-2" style={S.textPrimary}>
+                <h3 className="font-semibold text-sm flex items-center gap-2" style={S.textPrimary}>
                   <ShieldAlert className="w-4 h-4" style={S.accent} />
                   Access Matrix: {selectedRole.role_name}
                 </h3>
@@ -356,7 +356,7 @@ export default function RolesTab({
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.border, ...S.textMuted }}>
+                    <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.border, ...S.textMuted }}>
                       <th className="pb-3 font-semibold">Module Resource</th>
                       {["View", "Create", "Edit", "Delete", "Approve"].map(h => (
                         <th key={h} className="pb-3 text-center w-20 font-semibold">{h}</th>
@@ -395,7 +395,7 @@ export default function RolesTab({
             )}
           </Card>
         ) : (
-          <div className="text-center p-16 rounded-xl border border-dashed flex flex-col items-center justify-center" style={{ ...S.surface, ...S.textMuted }}>
+          <div className="text-center p-16 rounded-[var(--radius-sm)] border border-dashed flex flex-col items-center justify-center" style={{ ...S.surface, ...S.textMuted }}>
             <ShieldAlert className="w-10 h-10 mb-3 opacity-30 animate-pulse" style={S.accent} />
             <span className="text-xs font-semibold">Select or create a role to define granular resource policies.</span>
           </div>

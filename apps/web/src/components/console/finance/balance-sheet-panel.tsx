@@ -17,7 +17,7 @@ const S = {
   input: { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "rounded-lg border py-1.5 px-2 text-xs outline-none";
+const inputCls = "nf-input-sm";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
@@ -25,9 +25,9 @@ function unwrap<T = any>(res: any): T {
 
 function Section({ title, lines, total }: { title: string; lines: Row[]; total: number }) {
   return (
-    <div className="overflow-hidden rounded-2xl border" style={S.surface}>
+    <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
       <div className="border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
-        <h3 className="text-sm font-bold" style={S.primary}>{title}</h3>
+        <h3 className="text-sm font-semibold" style={S.primary}>{title}</h3>
       </div>
       <table className="w-full text-left text-sm">
         <tbody>
@@ -86,7 +86,7 @@ export default function BalanceSheetPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>Balance Sheet</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>Balance Sheet</h2>
           <p className="mt-0.5 text-xs" style={S.sub}>Assets, Liabilities and Equity as of a date.</p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -106,7 +106,7 @@ export default function BalanceSheetPanel() {
           <Section title="Assets" lines={report.assets} total={report.totalAssets} />
           <Section title="Liabilities" lines={report.liabilities} total={report.totalLiabilities} />
           <Section title="Equity" lines={report.equity} total={report.totalEquity} />
-          <div className="flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold" style={S.surface}>
+          <div className="flex items-center justify-between rounded-[var(--radius-md)] border px-4 py-3 text-sm font-semibold" style={S.surface}>
             <span style={S.sub}>Assets vs. Liabilities + Equity</span>
             <span style={{ color: report.isBalanced ? "var(--success)" : "var(--danger)" }}>
               {report.totalAssets.toFixed(2)} {report.isBalanced ? "=" : "≠"} {report.totalLiabilitiesAndEquity.toFixed(2)}

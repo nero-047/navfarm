@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, Search, Loader2, Inbox } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
@@ -21,7 +22,7 @@ const S = {
   input: { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-(--input-border-focus)";
+const inputCls = "nf-input";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
@@ -151,7 +152,7 @@ export default function QcParameterPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>QC Parameters</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>QC Parameters</h2>
           <p className="mt-0.5 text-xs" style={S.sub}>Per-LOB inspection criteria used to grade batch output during QC (e.g. &quot;Live Bird Weight&quot;).</p>
         </div>
         <div className="flex items-center gap-2">
@@ -159,9 +160,9 @@ export default function QcParameterPanel() {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none" style={S.input} />
           </div>
-          <button onClick={openCreate} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm" style={{ backgroundColor: "var(--accent)" }}>
+          <Button onClick={openCreate} >
             <Plus className="h-3.5 w-3.5" /> New QC Parameter
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -169,11 +170,11 @@ export default function QcParameterPanel() {
         <InlineAlert>{error}</InlineAlert>
       )}
 
-      <div className="overflow-hidden rounded-2xl border" style={S.surface}>
+      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
+              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
                 <th className="whitespace-nowrap px-4 py-3">Code</th>
                 <th className="whitespace-nowrap px-4 py-3">Name</th>
                 <th className="whitespace-nowrap px-4 py-3">Type</th>
@@ -220,9 +221,9 @@ export default function QcParameterPanel() {
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
+            <Button onClick={handleSave} disabled={saving} >
               {saving ? "Saving…" : "Save"}
-            </button>
+            </Button>
           </>
         }
       >
@@ -232,36 +233,36 @@ export default function QcParameterPanel() {
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Nature of Business <span className="text-red-500">*</span></label>
-              <select value={nobId} onChange={(e) => { setNobId(e.target.value); setForm((f) => ({ ...f, lob_id: "" })); }} className={inputCls} style={S.input}>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Nature of Business <span className="text-(--danger)">*</span></label>
+              <select value={nobId} onChange={(e) => { setNobId(e.target.value); setForm((f) => ({ ...f, lob_id: "" })); }} className={`${inputCls} nf-select`} style={S.input}>
                 <option value="">Select…</option>
                 {nobs.map((n) => <option key={n.nob_id} value={n.nob_id}>{n.nob_code} — {n.nob_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Line of Business <span className="text-red-500">*</span></label>
-              <select value={form.lob_id} onChange={(e) => setForm((f: Row) => ({ ...f, lob_id: e.target.value }))} className={inputCls} style={S.input} disabled={!nobId}>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Line of Business <span className="text-(--danger)">*</span></label>
+              <select value={form.lob_id} onChange={(e) => setForm((f: Row) => ({ ...f, lob_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!nobId}>
                 <option value="">{nobId ? "Select…" : "Select Nature of Business first…"}</option>
                 {lobs.map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Code <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Code <span className="text-(--danger)">*</span></label>
               <input value={form.param_code} onChange={(e) => setForm((f: Row) => ({ ...f, param_code: e.target.value }))} placeholder="QC_BIRD_WEIGHT" className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Name <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Name <span className="text-(--danger)">*</span></label>
               <input value={form.param_name} onChange={(e) => setForm((f: Row) => ({ ...f, param_name: e.target.value }))} placeholder="Live Bird Weight at Slaughter" className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Type</label>
-              <select value={form.param_type} onChange={(e) => setForm((f: Row) => ({ ...f, param_type: e.target.value }))} className={inputCls} style={S.input}>
+              <select value={form.param_type} onChange={(e) => setForm((f: Row) => ({ ...f, param_type: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
                 {PARAM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Mandatory</label>
-              <select value={form.is_mandatory ? "yes" : "no"} onChange={(e) => setForm((f: Row) => ({ ...f, is_mandatory: e.target.value === "yes" }))} className={inputCls} style={S.input}>
+              <select value={form.is_mandatory ? "yes" : "no"} onChange={(e) => setForm((f: Row) => ({ ...f, is_mandatory: e.target.value === "yes" }))} className={`${inputCls} nf-select`} style={S.input}>
                 <option value="yes">Yes — must pass for overall QC to pass</option>
                 <option value="no">No — informational only</option>
               </select>
@@ -279,7 +280,7 @@ export default function QcParameterPanel() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>UOM</label>
-                  <select value={form.uom} onChange={(e) => setForm((f: Row) => ({ ...f, uom: e.target.value }))} className={inputCls} style={S.input}>
+                  <select value={form.uom} onChange={(e) => setForm((f: Row) => ({ ...f, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
                     <option value="">Select…</option>
                     {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                   </select>

@@ -49,7 +49,7 @@ export function ResetPasswordForm() {
         <p className="mt-8 text-[14px]">
           <Link
             href="/login"
-            className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
+            className="font-medium text-(--text-primary) hover:text-(--accent) transition-colors"
           >
             {t('authBackToSignIn')}
           </Link>
@@ -98,7 +98,7 @@ export function ResetPasswordForm() {
       <p className="mt-8 text-center text-[14px] text-(--text-secondary)">
         <Link
           href="/login"
-          className="font-medium text-(--text-primary) hover:text-[#c24332] transition-colors"
+          className="font-medium text-(--text-primary) hover:text-(--accent) transition-colors"
         >
           {t('authBackToSignIn')}
         </Link>

@@ -40,7 +40,8 @@ export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChan
           <select
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="rounded-lg border py-1 px-1.5 text-xs outline-none"
+            aria-label="Rows per page"
+            className="nf-input-sm nf-select"
             style={S.input}
           >
             {pageSizeOptions.map((n) => (<option key={n} value={n}>{t("paginationPerPage", { n })}</option>))}

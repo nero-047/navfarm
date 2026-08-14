@@ -5,6 +5,7 @@ import {
   RefreshCw, AlertCircle, X, Shield, Building2, UserCheck, ChevronDown,
 } from "lucide-react";
 import { api } from "../../services/api-client";
+import { Badge, type BadgeProps } from "../ui/badge";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -16,36 +17,27 @@ const S = {
   input:    { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none";
+const inputCls = "nf-input";
 
 export function Label({ children }: { children: React.ReactNode }) {
-  return <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={S.sub}>{children}</label>;
+  return <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{children}</label>;
 }
 
 export function UserTypeBadge({ type }: { type: string }) {
-  const styles: Record<string, React.CSSProperties> = {
-    TENANT_ADMIN:  { background: "#eef0f8", color: "#0b1248", border: "1px solid #ccd1e3" },
-    COMPANY_ADMIN: { background: "#eaf1ff", color: "#1c4aa9", border: "1px solid #bfd0f3" },
-    STANDARD_USER: { background: "var(--surface-raised)", color: "var(--text-secondary)", border: "1px solid var(--border)" },
-    SYSTEM_ADMIN:  { background: "#FEE2E2", color: "#DC2626", border: "1px solid #FCA5A5" },
+  const variants: Record<string, BadgeProps["variant"]> = {
+    TENANT_ADMIN: "neutral",
+    COMPANY_ADMIN: "neutral",
+    STANDARD_USER: "neutral",
+    SYSTEM_ADMIN: "danger",
   };
-  const st = styles[type] || styles.STANDARD_USER;
-  return (
-    <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide" style={st}>
-      {type?.replace(/_/g, " ")}
-    </span>
-  );
+  return <Badge variant={variants[type] || "neutral"}>{type?.replace(/_/g, " ")}</Badge>;
 }
 
 export function ActiveStatusBadge({ isActive }: { isActive: boolean }) {
-  return isActive ? (
-    <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide" style={{ background: "var(--success-muted)", color: "var(--success)", border: "1px solid var(--success)" }}>
-      Active
-    </span>
-  ) : (
-    <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide" style={{ background: "var(--danger-muted)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
-      Inactive
-    </span>
+  return (
+    <Badge variant={isActive ? "success" : "danger"} dot>
+      {isActive ? "Active" : "Inactive"}
+    </Badge>
   );
 }
 
@@ -184,10 +176,10 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(46,49,63,0.5)" }}>
       <div
-        className="w-full max-w-lg mx-4 rounded-2xl shadow-2xl overflow-hidden"
-        style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)" }}
+        className="w-full max-w-lg mx-4 rounded-[var(--radius-lg)] overflow-hidden"
+        style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}
       >
         {/* Header */}
         <div
@@ -196,13 +188,13 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
         >
           <div className="flex items-center gap-3">
             <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
               style={{ backgroundColor: "var(--accent)" }}
             >
               {member.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "?"}
             </div>
             <div>
-              <p className="text-sm font-bold" style={S.primary}>{member.full_name}</p>
+              <p className="text-sm font-semibold" style={S.primary}>{member.full_name}</p>
               <p className="text-xs" style={S.muted}>{member.email}</p>
             </div>
           </div>
@@ -214,7 +206,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
         <div className="overflow-y-auto max-h-[70vh]">
           {/* Profile Form */}
           <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
-            <p className="text-xs font-bold uppercase tracking-widest" style={S.muted}>Profile Details</p>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>Profile Details</p>
 
             {error && (
               <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ backgroundColor: "var(--danger-muted)", borderColor: "var(--danger)", color: "var(--danger)" }}>
@@ -252,7 +244,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                 <div>
                   <Label>User Type</Label>
                   <select value={form.user_type} onChange={(e) => setForm({ ...form, user_type: e.target.value })}
-                    className={inputCls} style={S.input}>
+                    className={`${inputCls} nf-select`} style={S.input}>
                     <option value="STANDARD_USER">Standard User</option>
                     <option value="COMPANY_ADMIN">Company Admin</option>
                   </select>
@@ -304,7 +296,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
           {/* Role Assignment Section */}
           {!isTenantAdmin && (
             <div className="px-6 pb-6 space-y-3 border-t" style={{ borderColor: "var(--border)", paddingTop: "1.25rem" }}>
-              <p className="text-xs font-bold uppercase tracking-widest" style={S.muted}>Role Assignment</p>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>Role Assignment</p>
 
               {assignError && (
                 <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ backgroundColor: "var(--danger-muted)", borderColor: "var(--danger)", color: "var(--danger)" }}>
@@ -325,7 +317,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                       {r.assign_id && (
                         <button
                           onClick={() => handleUnassignRole(r.assign_id)}
-                          className="ml-0.5 hover:text-red-500 transition-colors"
+                          className="ml-0.5 hover:text-(--danger) transition-colors"
                           title="Remove role"
                         >
                           <X className="w-3 h-3" />
@@ -344,7 +336,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   <select
                     value={selectedRoleId}
                     onChange={(e) => setSelectedRoleId(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none appearance-none pr-8"
+                    className="w-full border rounded-lg px-3 py-2 text-sm appearance-none pr-8 nf-select"
                     style={S.input}
                   >
                     <option value="">— Select a role to assign —</option>
@@ -379,7 +371,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
           <div className="px-6 pb-6 space-y-3 border-t" style={{ borderColor: "var(--border)", paddingTop: "1.25rem" }}>
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4" style={S.accent} />
-              <p className="text-xs font-bold uppercase tracking-widest" style={S.muted}>Company Access</p>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>Company Access</p>
             </div>
 
             {companyAssignError && (
@@ -405,11 +397,11 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   >
                     <Building2 className="w-3 h-3" />
                     {a.company_name}
-                    {a.is_primary && <span className="text-[9px] font-bold">(Home)</span>}
+                    {a.is_primary && <span className="text-[9px] font-semibold">(Home)</span>}
                     {!a.is_primary && (
                       <button
                         onClick={() => handleRemoveCompany(a.assign_id)}
-                        className="ml-0.5 hover:text-red-500 transition-colors"
+                        className="ml-0.5 hover:text-(--danger) transition-colors"
                         title="Remove from company"
                       >
                         <X className="w-3 h-3" />
@@ -429,7 +421,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   <select
                     defaultValue=""
                     onChange={(e) => { if (e.target.value) { handleAddCompany(e.target.value); e.target.value = ""; } }}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none appearance-none pr-8"
+                    className="w-full border rounded-lg px-3 py-2 text-sm appearance-none pr-8 nf-select"
                     style={S.input}
                     disabled={addingCompany}
                   >

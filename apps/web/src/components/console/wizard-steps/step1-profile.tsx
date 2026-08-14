@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Select } from "@/components/ui/select";
 import Input from "../../source-ui/input";
 import Button from "../../source-ui/button";
 import { Building2, Upload, X, Image as ImageIcon } from "lucide-react";
@@ -93,16 +94,16 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-(--text-primary) flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-(--accent)" />
+        <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
+          <Building2 className="w-5 h-5 text-(--text-muted)" />
           Step 1: Register Company Profile
         </h2>
         <p className="text-xs text-(--text-secondary)">Provide registration names, company logo, and brand details. Limits set by pricing plan are applied.</p>
       </div>
 
       {/* ── Company Logo Upload Section ── */}
-      <div className="p-4 rounded-xl border border-(--border) bg-(--surface-raised) flex flex-col sm:flex-row items-center gap-4">
-        <div className="w-20 h-20 rounded-xl border border-dashed border-(--border) bg-(--input-bg) flex items-center justify-center overflow-hidden relative group shrink-0">
+      <div className="p-4 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) flex flex-col sm:flex-row items-center gap-4">
+        <div className="w-20 h-20 rounded-[var(--radius-sm)] border border-dashed border-(--border) bg-(--input-bg) flex items-center justify-center overflow-hidden relative group shrink-0">
           {logoUrl ? (
             <img
               src={logoUrl.startsWith('/') ? `${backendUrl}${logoUrl}` : logoUrl}
@@ -119,7 +120,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           <p className="text-[11px] text-(--text-secondary)">Supported formats: PNG, JPG, SVG, WebP (Max 5MB). Saved to server /uploads folder.</p>
 
           <div className="flex items-center gap-3 mt-1">
-            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-(--accent-muted) text-(--accent) border border-(--accent) text-xs font-semibold hover:bg-(--accent-muted) transition-all">
+            <label className="nf-press cursor-pointer inline-flex min-h-9 items-center gap-2 px-3 py-1.5 rounded-[var(--radius-sm)] bg-(--surface-secondary) text-(--text-primary) border border-(--border) text-xs font-semibold transition-colors hover:bg-(--border)">
               <Upload className="w-3.5 h-3.5" />
               {uploadingLogo ? "Uploading..." : logoUrl ? "Change Logo" : "Upload Logo"}
               <input
@@ -135,7 +136,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
               <button
                 type="button"
                 onClick={handleClearLogo}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/30 text-xs font-semibold hover:bg-red-500/20 transition-all"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-(--danger-muted) text-(--danger) border border-(--danger) text-xs font-semibold hover:bg-(--danger-muted) transition-all"
               >
                 <X className="w-3.5 h-3.5" />
                 Remove
@@ -170,23 +171,23 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
         />
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Business Class</label>
-          <select
+          <Select
             value={formData.company_type}
             onChange={(e) => setFormData({ ...formData, company_type: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value="Sole Proprietor">Sole Proprietor</option>
             <option value="Partnership">Partnership</option>
             <option value="Pvt Ltd">Pvt Ltd</option>
             <option value="LLP">LLP</option>
-          </select>
+          </Select>
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Industry Classification</label>
-          <select
+          <Select
             value={formData.industry_type}
             onChange={(e) => setFormData({ ...formData, industry_type: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value="Poultry Farming">Poultry Farming</option>
             <option value="Livestock">Livestock Farming</option>
@@ -194,7 +195,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             <option value="Aquaculture">Aquaculture & Fisheries</option>
             <option value="Insect Farming">Insect Farming & Apiaries</option>
             <option value="Feed & Processing">Feed Mill & Food Processing</option>
-          </select>
+          </Select>
         </div>
         <Input
           label="Registration Certificate No"
@@ -210,15 +211,15 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
         />
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Tax Regime</label>
-          <select
+          <Select
             value={formData.tax_regime}
             onChange={(e) => setFormData({ ...formData, tax_regime: e.target.value })}
-            className="bg-(--input-bg) border border-(--input-border) rounded-xl px-4 h-12 text-sm text-(--input-text) focus:outline-none focus:border-(--input-border-focus)"
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
             <option value="STANDARD">Standard Scheme</option>
             <option value="COMPOSITION">Composition Scheme</option>
             <option value="EXEMPT">Exempt / Non-Taxable</option>
-          </select>
+          </Select>
         </div>
         <Input
           label="Incorporation Date"

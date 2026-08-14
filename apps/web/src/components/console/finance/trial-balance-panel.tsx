@@ -17,7 +17,7 @@ const S = {
   input: { backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)" },
 };
 
-const inputCls = "rounded-lg border py-1.5 px-2 text-xs outline-none";
+const inputCls = "nf-input-sm";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
@@ -55,7 +55,7 @@ export default function TrialBalancePanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold" style={S.primary}>Trial Balance</h2>
+          <h2 className="text-lg font-semibold" style={S.primary}>Trial Balance</h2>
           <p className="mt-0.5 text-xs" style={S.sub}>Debit/credit totals per GL account, as of a date.</p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -68,11 +68,11 @@ export default function TrialBalancePanel() {
         <InlineAlert>{error}</InlineAlert>
       )}
 
-      <div className="overflow-hidden rounded-2xl border" style={S.surface}>
+      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
+              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
                 <th className="whitespace-nowrap px-4 py-3">Code</th>
                 <th className="whitespace-nowrap px-4 py-3">Account</th>
                 <th className="whitespace-nowrap px-4 py-3">Type</th>
