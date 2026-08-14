@@ -19,13 +19,36 @@ describe('Page', () => {
     expect(replace).toHaveBeenCalledWith('/login');
   });
 
-  it('sends an authenticated user to company selection', () => {
+  it('sends an authenticated user to the console', () => {
     const replace = jest.fn();
     (useRouter as jest.Mock).mockReturnValue({ replace });
     localStorage.setItem('navfarm_auth_user', JSON.stringify({ email: 'demo@navfarm.com' }));
 
     render(<Page />);
 
-    expect(replace).toHaveBeenCalledWith('/company-selection');
+    expect(replace).toHaveBeenCalledWith('/console');
+  });
+
+  it('sends a system admin to the admin area', () => {
+    const replace = jest.fn();
+    (useRouter as jest.Mock).mockReturnValue({ replace });
+    localStorage.setItem(
+      'navfarm_auth_user',
+      JSON.stringify({ email: 'admin@navfarm.com', userType: 'SYSTEM_ADMIN' }),
+    );
+
+    render(<Page />);
+
+    expect(replace).toHaveBeenCalledWith('/admin');
+  });
+
+  it('sends a user with unreadable stored auth back to login', () => {
+    const replace = jest.fn();
+    (useRouter as jest.Mock).mockReturnValue({ replace });
+    localStorage.setItem('navfarm_auth_user', 'not-json');
+
+    render(<Page />);
+
+    expect(replace).toHaveBeenCalledWith('/login');
   });
 });
