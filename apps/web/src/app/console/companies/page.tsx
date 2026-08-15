@@ -9,7 +9,7 @@ import {
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser } from "../../../hooks/useAuth";
 import CompanyTab from "../../../components/console/console-tabs/company-tab";
-import { Dialog } from "../../../components/ui/dialog";
+import { Drawer } from "../../../components/ui/drawer";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
@@ -193,7 +193,10 @@ export default function CompaniesPage() {
         />
 
         {/* Add Company Modal */}
-        <Dialog open={showAddModal} onClose={() => setShowAddModal(false)} title="Add a company" description="Create the legal company record. Detailed setup continues after creation." maxWidth="lg">
+        {/* Eight fields of legal-entity detail — a drawer. As with the invite
+            form, the actions stay inside the <form> so submit behaviour is
+            untouched. */}
+        <Drawer open={showAddModal} onClose={() => setShowAddModal(false)} title="Add a company" description="Create the legal company record. Detailed setup continues after creation." size="lg">
               <form onSubmit={handleCreateCompany} className="space-y-5">
                 {createError && <ErrorState message={createError} />}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -262,7 +265,7 @@ export default function CompaniesPage() {
                   </Button>
                 </div>
               </form>
-        </Dialog>
+        </Drawer>
 
         {error && <ErrorState message={error} />}
 

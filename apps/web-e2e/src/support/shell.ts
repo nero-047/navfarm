@@ -13,6 +13,12 @@ export const PAGE_HEADER = '[data-shell-region="page-header"]';
 export const BREADCRUMB = '[data-shell-breadcrumb]';
 export const PAGE_TITLE = '[data-page-title]';
 
+/** The drawer, portalled to <body> — outside every shell region. */
+export const DRAWER_PANEL = '[data-drawer-panel]';
+export const DRAWER_SCRIM = '[data-drawer-scrim]';
+export const DRAWER_BODY = '[data-drawer-body]';
+export const DRAWER_FOOTER = '[data-drawer-footer]';
+
 /** The contextual navigation itself, inside the shell's context-nav region. */
 export const CONTEXT_NAV_LIST = '[data-context-nav]';
 export const CONTEXT_NAV_ITEM = '[data-context-nav-item]';
@@ -69,6 +75,13 @@ export interface ConsoleSessionOptions {
   path?: string;
   /** Companies on the session user. Two or more reveal the workspace switcher. */
   companies?: SessionCompany[];
+  /**
+   * The session user's type. `COMPANY_ADMIN` is the default and the one nearly
+   * every test wants. `TENANT_ADMIN` is what reveals the tenant-wide views —
+   * the companies directory, and so the Add Company action — which a company
+   * admin never sees.
+   */
+  userType?: 'COMPANY_ADMIN' | 'TENANT_ADMIN';
 }
 
 /**
@@ -79,7 +92,11 @@ export interface ConsoleSessionOptions {
  */
 export async function gotoConsole(
   page: Page,
-  { path = '/console/master-data', companies = [DEFAULT_COMPANY] }: ConsoleSessionOptions = {},
+  {
+    path = '/console/master-data',
+    companies = [DEFAULT_COMPANY],
+    userType = 'COMPANY_ADMIN',
+  }: ConsoleSessionOptions = {},
 ): Promise<void> {
   // Registered first so the specific handlers below take precedence:
   // Playwright matches the most recently registered route first.
@@ -94,16 +111,16 @@ export async function gotoConsole(
     }),
   );
 
-  await page.addInitScript((sessionCompanies: SessionCompany[]) => {
+  await page.addInitScript((session: { companies: SessionCompany[]; userType: string }) => {
     const user = {
       userId: 'user-e2e',
       email: 'e2e@navfarm.test',
       fullName: 'E2E Operator',
-      userType: 'COMPANY_ADMIN',
+      userType: session.userType,
       companyId: 'company-e2e',
       company_id: 'company-e2e',
       tenantId: 'tenant-e2e',
-      companies: sessionCompanies,
+      companies: session.companies,
     };
     localStorage.setItem('navfarm_auth_user', JSON.stringify(user));
     localStorage.setItem('user', JSON.stringify(user));
@@ -112,7 +129,7 @@ export async function gotoConsole(
     localStorage.setItem('navfarm_tenant_id', 'tenant-e2e');
     localStorage.setItem('tenant_id', 'tenant-e2e');
     localStorage.setItem('active_company_id', 'company-e2e');
-  }, companies);
+  }, { companies, userType });
 
   await page.goto(path);
   await page.waitForSelector(SHELL_ROOT);

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Search, Loader2, Inbox } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { Drawer } from "@/components/ui/drawer";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
@@ -487,11 +488,17 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         )}
       </div>
 
-      <Dialog
+      {/* A record create/edit form, which is the drawer case in the taxonomy
+          (plan Phase 5): these configs run to a dozen fields, well past the
+          0–2 a dialog is for. Nothing inside changed — the same fields, the
+          same `handleSave`, the same validation and the same requests. Only
+          the surface moved, from a centred modal to a work panel beside the
+          table it edits, with the actions pinned below a scrolling body. */}
+      <Drawer
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
         title={editing ? t("editItem", { name: tLabel(config.label.replace(/s$/, "")) }) : t("addItem", { name: tLabel(config.label.replace(/s$/, "")) })}
-        maxWidth="lg"
+        size="lg"
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>
@@ -522,7 +529,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             ))}
           </div>
         </div>
-      </Dialog>
+      </Drawer>
 
       <Dialog
         open={!!confirmDelete}

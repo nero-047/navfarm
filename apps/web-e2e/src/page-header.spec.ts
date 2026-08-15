@@ -114,7 +114,6 @@ test.describe('breadcrumb', () => {
         const a = document.querySelector(crumbSel!);
         const b = document.querySelector(titleSel!);
         if (!a || !b) return null;
-        // eslint-disable-next-line no-bitwise
         return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
       },
       [BREADCRUMB, PAGE_TITLE],

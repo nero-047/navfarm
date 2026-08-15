@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
-import { Dialog } from "../../../components/ui/dialog";
+import { Drawer } from "../../../components/ui/drawer";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
@@ -241,7 +241,11 @@ export default function UsersPage() {
       {success && <Toast variant="success" message={success} onClose={() => setSuccess("")} />}
 
       {/* ── Add User Form ── */}
-      <Dialog open={showAddForm} onClose={() => setShowAddForm(false)} title="Invite a team member" description="Create an account and assign it to the appropriate company workspace." maxWidth="lg">
+      {/* Six fields of account creation — a drawer, not a dialog. The actions
+          stay inside the <form> rather than moving to the drawer footer: a
+          submit button outside its form would change how this form submits,
+          and submit semantics are not this phase's to change. */}
+      <Drawer open={showAddForm} onClose={() => setShowAddForm(false)} title="Invite a team member" description="Create an account and assign it to the appropriate company workspace." size="lg">
           <form onSubmit={handleAddUser} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <Label>Full Name</Label>
@@ -296,7 +300,7 @@ export default function UsersPage() {
               </Button>
             </div>
           </form>
-      </Dialog>
+      </Drawer>
 
       {/* ── Users Table ── */}
       <div className="overflow-hidden rounded-[var(--radius-md)] border border-(--border) bg-(--surface)">

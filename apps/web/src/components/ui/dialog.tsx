@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useScrollLock } from '../../hooks/useScrollLock';
+import { useOverlayFocus, useTopmostEscape } from '../../hooks/useOverlayFocus';
 
 interface DialogProps {
   open: boolean;
@@ -35,42 +36,11 @@ export function Dialog({ open, onClose, title, description, children, footer, ma
   closeRef.current = onClose;
 
   useScrollLock(open);
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') closeRef.current();
-      if (event.key !== 'Tab' || !panelRef.current) return;
-      // Rendered boxes only. The selector matches elements that cannot take
-      // focus — a `display: none` file input behind an upload label is the one
-      // in this codebase — and now that the trap drives every Tab itself, a
-      // `.focus()` that silently does nothing would strand Tab on the entry
-      // before it instead of the browser skipping past it.
-      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter((el) => el.getClientRects().length > 0);
-      // The trap drives every Tab itself rather than only correcting the two
-      // boundaries. Boundary-only wrapping assumes the browser's own tab order
-      // keeps focus inside the panel in between, and that assumption does not
-      // hold: focus sits on the panel (not in the list) right after opening,
-      // and WebKit omits buttons from sequential navigation entirely, so a
-      // dialog whose controls are all buttons leaks focus on the first Tab.
-      event.preventDefault();
-      if (!focusable.length) return;
-      const index = focusable.indexOf(document.activeElement as HTMLElement);
-      const step = event.shiftKey ? -1 : 1;
-      const next = index === -1
-        ? (event.shiftKey ? focusable.length - 1 : 0)
-        : (index + step + focusable.length) % focusable.length;
-      focusable[next].focus();
-    }
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      previous?.focus();
-    };
-  }, [open]);
+  // Focus entry, trap and restoration are shared with Drawer and
+  // FullPageOverlay — see `hooks/useOverlayFocus`. Escape stays here: which
+  // overlay a key closes is a per-overlay decision.
+  useOverlayFocus(panelRef, open);
+  useTopmostEscape(open, () => closeRef.current());
 
   if (!open || typeof document === 'undefined') return null;
 

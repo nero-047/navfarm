@@ -851,6 +851,190 @@ html[data-scroll-locked] body {
   box-shadow: 0 0 0 3px var(--accent-muted);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   OVERLAY FOUNDATION — DRAWER / SHEET
+
+   The focused-task end of the taxonomy (apple.design.md §25): record detail,
+   create/edit forms of more than two fields. A drawer is not a wider dialog —
+   it opens a work surface beside the page rather than interrupting it, so it
+   is anchored to an edge, keeps the page visible behind the scrim, and pins
+   its actions below a body that scrolls on its own.
+
+   One element, two presentations: a right-hand panel on desktop at one of two
+   deliberate widths, and the same element as a bottom sheet below the desktop
+   breakpoint. Semantics never change between them.
+
+   Restraint per §26 and §33: one border, the single sanctioned floating
+   shadow, no gradient, no blur, no stack of rounded containers. Behaviour
+   lives in `components/ui/drawer.tsx`.
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-drawer-root] {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+}
+
+[data-drawer-scrim] {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  cursor: default;
+  background: rgba(46, 49, 63, 0.5);
+}
+
+[data-drawer-panel] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* The sizing chain that makes the body — and only the body — scroll. */
+  min-height: 0;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  outline: none;
+}
+
+/* ── mobile / tablet: bottom sheet ──────────────────────────────────────── */
+
+[data-drawer-root] {
+  /* Sheet sits at the bottom edge; the panel below claims the width. */
+  align-items: flex-end;
+}
+
+[data-drawer-panel] {
+  width: 100%;
+  max-height: 92dvh;
+  /* Only the leading edges round: the sheet is attached to the bottom of the
+     viewport, and rounding all four would make it a floating card. */
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-bottom: 0;
+}
+
+[data-drawer-grabber] {
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+@media (min-width: 1024px) {
+  /* ── desktop: right-hand panel ────────────────────────────────────────── */
+  [data-drawer-root] {
+    align-items: stretch;
+    justify-content: flex-end;
+  }
+
+  [data-drawer-panel] {
+    /* Two deliberate tiers, not a per-screen width. `min()` keeps the panel
+       from outgrowing a small laptop viewport, where a fixed 720px would
+       leave no page visible behind it at all. */
+    width: min(480px, 100vw);
+    max-height: none;
+    height: 100%;
+    border-radius: 0;
+    border-block: 0;
+    border-inline-end: 0;
+  }
+
+  [data-drawer-panel][data-size='lg'] {
+    width: min(720px, 100vw);
+  }
+
+  [data-drawer-grabber] {
+    display: none;
+  }
+}
+
+/* ── header / body / footer ─────────────────────────────────────────────── */
+
+[data-drawer-header] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  flex-shrink: 0;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* The grabber spans the header's full width above the title row. */
+[data-drawer-grabber] {
+  grid-column: 1 / -1;
+}
+
+[data-drawer-heading] {
+  min-width: 0;
+}
+
+[data-drawer-title] {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+[data-drawer-description] {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+[data-drawer-close] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+[data-drawer-close]:hover {
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+}
+
+/* The one scroll region. `min-height: 0` is what stops a tall form from
+   inflating the panel instead of scrolling inside it, and `contain` stops the
+   scroll from chaining out to the shell behind the scrim. */
+[data-drawer-body] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px;
+}
+
+[data-drawer-footer] {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  /* Clears the home indicator on a sheet; collapses to nothing on desktop. */
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  [data-drawer-header] { padding: 24px 24px 18px; }
+  [data-drawer-body] { padding: 24px; }
+  [data-drawer-footer] { padding: 16px 24px; }
+}
+
 h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
   font-weight: 600;
