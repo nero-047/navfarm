@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, hasPermission, NavUser } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import StockBalancePanel from "@/components/console/inventory/stock-balance-panel";
 import GoodsReceiptPanel from "@/components/console/inventory/goods-receipt-panel";
 import GoodsIssuePanel from "@/components/console/inventory/goods-issue-panel";
@@ -29,6 +31,7 @@ const SECTIONS = [
 
 export default function InventoryPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
   const [ready, setReady] = useState(false);
   const [activeKey, setActiveKey] = useState(SECTIONS[0].key);
@@ -42,6 +45,24 @@ export default function InventoryPage() {
     setUser(stored);
     setReady(true);
   }, [router]);
+
+  // Same permission the render path checks below — the module index is not
+  // offered to someone who cannot open the module.
+  const mayViewInventory = Boolean(user && hasPermission(user, "INVENTORY", "GOODS_RECEIPT", "can_view"));
+
+  // Flat, six entries: one ungrouped group, which is what makes this a tab
+  // strip rather than a selector below the desktop breakpoint.
+  const contextNav = useMemo<ContextNavModel | null>(() => {
+    if (!ready || !mayViewInventory) return null;
+    return {
+      label: t("moduleSections", { module: "Inventory" }),
+      groups: [{ items: SECTIONS.map((s) => ({ key: s.key, label: s.label })) }],
+      activeKey,
+      onSelect: setActiveKey,
+    };
+  }, [ready, mayViewInventory, activeKey, t]);
+
+  useContextNav(contextNav);
 
   if (!ready || !user) return null;
 
@@ -66,39 +87,14 @@ export default function InventoryPage() {
         <p className="mt-0.5 text-sm" style={S.sub}>Goods movement, lot/serial tracking and the Inventory Ledger.</p>
       </div>
 
-      <div className="flex flex-col gap-5 lg:flex-row">
-        <aside className="shrink-0 lg:w-56">
-          <nav className="lg:border-r lg:pr-2" style={{ borderColor: "var(--border)" }}>
-            <ul className="flex flex-col gap-0.5">
-              {SECTIONS.map((s) => {
-                const isActive = s.key === activeKey;
-                return (
-                  <li key={s.key}>
-                    <button
-                      onClick={() => setActiveKey(s.key)}
-                      className="nf-press w-full rounded-[var(--radius-md)] px-3 py-2 text-left text-[13px] font-semibold transition-colors"
-                      style={isActive
-                        ? { backgroundColor: "var(--accent-muted)", color: "var(--accent)" }
-                        : { color: "var(--text-secondary)" }}
-                    >
-                      {s.label}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        </aside>
-
-        <main className="min-w-0 flex-1">
-          {activeKey === "balance" && <StockBalancePanel />}
-          {activeKey === "goods-receipt" && <GoodsReceiptPanel />}
-          {activeKey === "goods-issue" && <GoodsIssuePanel />}
-          {activeKey === "stock-transfer" && <StockTransferPanel />}
-          {activeKey === "stock-adjustment" && <StockAdjustmentPanel />}
-          {activeKey === "ledger" && <InventoryLedgerPanel />}
-        </main>
-      </div>
+      {/* Section switching moved to the shell's contextual navigation; the
+          panels themselves are untouched. */}
+      {activeKey === "balance" && <StockBalancePanel />}
+      {activeKey === "goods-receipt" && <GoodsReceiptPanel />}
+      {activeKey === "goods-issue" && <GoodsIssuePanel />}
+      {activeKey === "stock-transfer" && <StockTransferPanel />}
+      {activeKey === "stock-adjustment" && <StockAdjustmentPanel />}
+      {activeKey === "ledger" && <InventoryLedgerPanel />}
     </div>
   );
 }

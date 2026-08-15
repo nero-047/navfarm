@@ -23,6 +23,7 @@ import { api } from "../../services/api-client";
 import OnboardingWizard from "../../components/console/onboarding-wizard";
 import { LanguageSelector } from "../../components/ui/language-selector";
 import { AppShell, AppShellNavItem } from "../../components/shell/AppShell";
+import { ContextNavProvider } from "../../components/shell/ContextNav";
 import { PROFILE_ITEMS } from "../../components/shell/ProfilePopover";
 import { ThemeIconButton } from "../../components/shell/ThemeIconButton";
 import { WorkspaceSwitcher } from "../../components/shell/WorkspaceSwitcher";
@@ -349,25 +350,35 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   );
 
   return (
-    <AppShell
-      brandHref="/console/dashboard"
-      brandSubtitle="Management console"
-      sidebarSummary={sidebarSummary}
-      navSectionLabel="Organization"
-      navItems={navItems}
-      pathname={pathname}
-      userInitials={initials}
-      userName={user.fullName}
-      userEmail={user.email}
-      onLogout={handleLogout}
-      signOutLabel={t("signOut")}
-      profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key) }))}
-      profileMenuLabel={t("accountMenu")}
-      breadcrumbRoot="Console"
-      breadcrumbCurrent={breadcrumbLabel}
-      headerRight={headerRight}
-    >
-      {children}
-    </AppShell>
+    // The module index is a shell region — it has to sit outside <main> to hold
+    // still while the content scrolls — but which sections exist is page state.
+    // The provider is the seam: routes register an index, the shell renders it.
+    // Routes that register nothing stay full-width, which is every route
+    // outside Master Data, Inventory, Finance and Production.
+    <ContextNavProvider>
+      {(contextNav) => (
+        <AppShell
+          brandHref="/console/dashboard"
+          brandSubtitle="Management console"
+          sidebarSummary={sidebarSummary}
+          navSectionLabel="Organization"
+          navItems={navItems}
+          pathname={pathname}
+          userInitials={initials}
+          userName={user.fullName}
+          userEmail={user.email}
+          onLogout={handleLogout}
+          signOutLabel={t("signOut")}
+          profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key) }))}
+          profileMenuLabel={t("accountMenu")}
+          breadcrumbRoot="Console"
+          breadcrumbCurrent={breadcrumbLabel}
+          headerRight={headerRight}
+          contextNav={contextNav}
+        >
+          {children}
+        </AppShell>
+      )}
+    </ContextNavProvider>
   );
 }

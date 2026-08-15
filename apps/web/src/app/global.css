@@ -198,10 +198,18 @@ body {
   min-height: 0;
 }
 
+/* Below the desktop breakpoint the document is the scroller, so the module
+   index pins itself under the sticky header instead of scrolling away with the
+   content it indexes. It sits on the canvas, not on a raised surface: a
+   contextual index that is brighter than the work surface inverts the
+   hierarchy it is supposed to express. */
 [data-shell-region='context-nav'] {
+  position: sticky;
+  top: 56px;
+  z-index: 20;
   min-height: 0;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--bg);
 }
 
 [data-shell-region='content'] {
@@ -259,8 +267,12 @@ body {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
+  /* Its own column and its own scroller, so a twenty-entry index holds still
+     while the content beside it moves (apple.design.md §12). `contain` stops
+     the scroll from chaining into <main> when the column reaches its end. */
   [data-shell-region='context-nav'] {
-    width: 240px;
+    position: static;
+    width: 236px;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -273,6 +285,227 @@ body {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CONTEXTUAL NAVIGATION — LEVEL 2
+
+   The module index. Quieter than the primary rail above it and quieter still
+   than the page beside it, so emphasis increases as the user moves toward the
+   work surface (apple.design.md §10, §13).
+
+   The whole level is typography-led. No second dark panel, no card, no
+   shadow, and — deliberately — no filled red active state: the active entry
+   is the only accent-coloured, semibold row in the list, which is enough to
+   find it without another block of colour competing with the content.
+
+   Behaviour lives in `components/shell/ContextNav.tsx`.
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-context-nav] {
+  padding: 14px 10px 20px;
+}
+
+[data-context-nav-group] + [data-context-nav-group] {
+  margin-top: 14px;
+}
+
+/* Compact, and quieter than the entries it introduces — a caption, not a
+   heading that competes with the page title. */
+[data-context-nav-group-label] {
+  margin: 0 0 4px;
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+[data-context-nav-items] {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-context-nav-item] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+/* Grouped indexes indent their entries under the group caption; a flat index
+   has nothing to indent against and stays flush. */
+[data-context-nav][data-grouped='true'] [data-context-nav-item] {
+  padding-inline-start: 18px;
+}
+
+[data-context-nav-item-label] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-context-nav-item]:hover {
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+}
+
+[data-context-nav-item]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Weight and colour carry the active state. Nothing is filled. */
+[data-context-nav-item][aria-current='page'] {
+  color: var(--accent);
+  font-weight: 600;
+}
+[data-context-nav-item][aria-current='page']:hover {
+  background: var(--surface-secondary);
+  color: var(--accent);
+}
+
+[data-context-nav-item][aria-disabled='true'] {
+  color: var(--text-disabled);
+  cursor: default;
+}
+[data-context-nav-item][aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--text-disabled);
+}
+
+/* ── mobile: flat index becomes a scrolling tab strip ───────────────────── */
+
+@media (max-width: 1023.98px) {
+  /* One list, two geometries — the same markup that is a column on desktop is
+     a horizontal strip here, so there is no second copy of the index and no
+     second navigation landmark. */
+  [data-context-nav][data-grouped='false'] {
+    display: flex;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 0 8px;
+    scrollbar-width: none;
+  }
+  [data-context-nav][data-grouped='false']::-webkit-scrollbar {
+    display: none;
+  }
+
+  [data-context-nav][data-grouped='false'] [data-context-nav-items] {
+    flex-direction: row;
+    gap: 2px;
+  }
+
+  [data-context-nav][data-grouped='false'] [data-context-nav-item] {
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 0;
+    /* Reserved on every entry so the active underline does not shift the row. */
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+
+  [data-context-nav][data-grouped='false'] [data-context-nav-item]:hover {
+    background: transparent;
+    color: var(--text-primary);
+  }
+
+  [data-context-nav][data-grouped='false'] [data-context-nav-item][aria-current='page'] {
+    border-bottom-color: var(--accent);
+    background: transparent;
+  }
+
+  /* A grouped index cannot be a strip, so it collapses to its selector. */
+  [data-context-nav][data-grouped='true'] {
+    display: none;
+  }
+
+  [data-context-nav-trigger] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 0;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: start;
+  }
+
+  [data-context-nav-trigger] svg {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: transform 160ms ease;
+  }
+  [data-context-nav-trigger][data-state='open'] svg {
+    transform: rotate(180deg);
+  }
+}
+
+[data-context-nav-trigger-label] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The selector only exists below the desktop breakpoint. */
+[data-context-nav-selector] {
+  display: block;
+}
+[data-context-nav-selector] [data-popover-anchor] {
+  display: flex;
+  width: 100%;
+}
+@media (min-width: 1024px) {
+  [data-context-nav-selector] {
+    display: none;
+  }
+}
+
+/* The selector's trigger spans the region, so its panel does too rather than
+   sitting at the default popover width against a full-bleed control. The
+   `[data-align]` qualifier is what carries it past the base panel rule. */
+[data-context-nav-selector] [data-popover-panel][data-align='start'] {
+  inset-inline: 8px 8px;
+  max-width: none;
+}
+
+/* Group captions inside the selector's menu. */
+[data-context-nav-menu-group] + [data-context-nav-menu-group] {
+  margin-top: 6px;
+}
+[data-context-nav-menu-group-label] {
+  margin: 0 0 2px;
+  padding: 4px 10px 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
 }
 
 /* Held by useScrollLock() only. Nothing else writes body overflow. */
@@ -318,6 +551,11 @@ html[data-scroll-locked] body {
   background: var(--surface);
   box-shadow: var(--shadow-md);
   animation: nf-popover-in 120ms ease-out;
+  /* A long panel — the twenty-entry Master Data selector is the case that
+     needs it — scrolls inside itself rather than running off the viewport. */
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 [data-popover-panel][data-side='bottom'] { top: calc(100% + 6px); }

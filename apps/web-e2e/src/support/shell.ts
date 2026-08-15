@@ -7,6 +7,27 @@ export const WORKSPACE = '[data-shell-region="workspace"]';
 export const CONTEXT_NAV = '[data-shell-region="context-nav"]';
 export const CONTENT = 'main[data-shell-region="content"]';
 
+/** The contextual navigation itself, inside the shell's context-nav region. */
+export const CONTEXT_NAV_LIST = '[data-context-nav]';
+export const CONTEXT_NAV_ITEM = '[data-context-nav-item]';
+/** The grouped-index selector that replaces the column below 1024px. */
+export const CONTEXT_NAV_TRIGGER = '[data-context-nav-trigger]';
+
+/** The four routes Phase 3 gives a contextual-navigation column. */
+export const MODULE_ROUTES = [
+  '/console/master-data',
+  '/console/inventory',
+  '/console/finance',
+  '/console/production',
+] as const;
+
+/** Console routes that stay full-width content. */
+export const FULL_WIDTH_ROUTES = [
+  '/console/dashboard',
+  '/console/companies',
+  '/console/notifications',
+] as const;
+
 /**
  * Opens the shell fixture route and waits for the shell to report that it has
  * committed its layout, so nothing below depends on an arbitrary delay.

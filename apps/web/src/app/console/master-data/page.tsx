@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, NavUser } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { MASTER_DATA_CONFIGS, MASTER_DATA_GROUPS, getConfig } from "@/modules/master-data/configs";
 import MasterDataTable from "@/modules/master-data/MasterDataTable";
+import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { ShieldAlert } from "lucide-react";
 
 const S = {
   surface: { backgroundColor: "var(--surface)", borderColor: "var(--border)" },
   primary: { color: "var(--text-primary)" },
   sub: { color: "var(--text-secondary)" },
-  muted: { color: "var(--text-muted)" },
 };
 
 export default function MasterDataPage() {
@@ -31,6 +31,31 @@ export default function MasterDataPage() {
     setUser(stored);
     setReady(true);
   }, [router]);
+
+  // Mirrors the access check below. Registered as null until the user is known
+  // and allowed, so the loading and access-denied states stay full-width.
+  const mayViewMasterData =
+    user?.userType === "COMPANY_ADMIN" ||
+    user?.userType === "SYSTEM_ADMIN" ||
+    user?.userType === "TENANT_ADMIN";
+
+  const contextNav = useMemo<ContextNavModel | null>(() => {
+    if (!ready || !mayViewMasterData) return null;
+    return {
+      label: t("moduleSections", { module: t("masterData") }),
+      groups: MASTER_DATA_GROUPS.map((group) => ({
+        label: tLabel(group),
+        items: MASTER_DATA_CONFIGS.filter((c) => c.group === group).map((c) => ({
+          key: c.key,
+          label: tLabel(c.label),
+        })),
+      })),
+      activeKey,
+      onSelect: setActiveKey,
+    };
+  }, [ready, mayViewMasterData, activeKey, t, tLabel]);
+
+  useContextNav(contextNav);
 
   if (!ready || !user) return null;
 
@@ -60,39 +85,10 @@ export default function MasterDataPage() {
         <p className="mt-0.5 text-sm" style={S.sub}>{t("masterDataPageDescription")}</p>
       </div>
 
-      <div className="flex flex-col gap-5 lg:flex-row">
-        <aside className="shrink-0 lg:w-64">
-          <nav className="lg:border-r lg:pr-2" style={{ borderColor: "var(--border)" }}>
-            {MASTER_DATA_GROUPS.map((group) => (
-              <div key={group} className="mb-1 last:mb-0">
-                <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest" style={S.muted}>{tLabel(group)}</p>
-                <ul className="flex flex-col gap-0.5">
-                  {MASTER_DATA_CONFIGS.filter((c) => c.group === group).map((c) => {
-                    const isActive = c.key === activeKey;
-                    return (
-                      <li key={c.key}>
-                        <button
-                          onClick={() => setActiveKey(c.key)}
-                          className="nf-press w-full rounded-[var(--radius-sm)] px-3 py-2 text-left text-[13px] font-medium transition-colors"
-                          style={isActive
-                            ? { backgroundColor: "var(--accent-muted)", color: "var(--accent)" }
-                            : { color: "var(--text-secondary)" }}
-                        >
-                          {tLabel(c.label)}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </nav>
-        </aside>
-
-        <main className="min-w-0 flex-1">
-          <MasterDataTable key={activeConfig.key} config={activeConfig} />
-        </main>
-      </div>
+      {/* The module index used to live here as an in-page <aside>, which meant
+          it scrolled away with the table it indexes. It is a shell region now —
+          see ContextNav — so the page is only ever the work surface. */}
+      <MasterDataTable key={activeConfig.key} config={activeConfig} />
     </div>
   );
 }

@@ -167,6 +167,9 @@ export function AppShell(props: AppShellProps) {
                   <Link
                     href={item.href}
                     onClick={close}
+                    // The active module is stated, not only coloured: the tint,
+                    // the indicator and the weight are all visual-only signals.
+                    aria-current={isActive ? "page" : undefined}
                     className={`nf-press group relative flex min-h-11 items-center gap-3 rounded-[var(--radius-sm)] px-3 py-2.5 text-[13px] transition-colors ${
                       isActive
                         ? "font-semibold text-white"
@@ -176,7 +179,7 @@ export function AppShell(props: AppShellProps) {
                   >
                     {isActive && (
                       <span
-                        className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full"
+                        className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r-full"
                         style={{ backgroundColor: "var(--sidebar-active-accent)" }}
                       />
                     )}
