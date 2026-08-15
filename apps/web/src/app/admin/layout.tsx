@@ -11,6 +11,7 @@ import { getStoredUser, getStoredToken, clearSession, NavUser } from "../../hook
 import { useLanguage } from "../../hooks/useLanguage";
 import { LanguageSelector } from "../../components/ui/language-selector";
 import { AppShell } from "../../components/shell/AppShell";
+import { PROFILE_ITEMS } from "../../components/shell/ProfilePopover";
 import { ThemeIconButton } from "../../components/shell/ThemeIconButton";
 
 const adminNavItems = [
@@ -71,15 +72,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <>
       <LanguageSelector />
       <ThemeIconButton />
-      <div className="flex items-center gap-2">
-        <div
-          className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"
-          style={{ backgroundColor: "var(--accent)" }}
-        >
-          {initials}
-        </div>
-        <span className="hidden text-sm font-medium sm:block" style={{ color: "var(--text-primary)" }}>{user.fullName}</span>
-      </div>
+      {/* Identity moved into the ProfilePopover that AppShell renders — the
+          name is in the menu's heading rather than duplicated in the header. */}
     </>
   );
 
@@ -96,6 +90,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       userEmail={user.email}
       onLogout={handleLogout}
       signOutLabel={t("signOut")}
+      profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key) }))}
+      profileMenuLabel={t("accountMenu")}
       breadcrumbRoot="Admin"
       breadcrumbCurrent={breadcrumbLabel}
       headerRight={headerRight}

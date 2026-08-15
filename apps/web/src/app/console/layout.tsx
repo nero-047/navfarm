@@ -14,17 +14,18 @@ import {
   Landmark,
   Sprout,
   LogOut,
-  ChevronRight,
   RefreshCw,
   ArrowLeft,
 } from "lucide-react";
-import { getStoredUser, getStoredToken, clearSession, hasPermission, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser, CompanyRef } from "../../hooks/useAuth";
+import { getStoredUser, getStoredToken, clearSession, hasPermission, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import { api } from "../../services/api-client";
 import OnboardingWizard from "../../components/console/onboarding-wizard";
 import { LanguageSelector } from "../../components/ui/language-selector";
 import { AppShell, AppShellNavItem } from "../../components/shell/AppShell";
+import { PROFILE_ITEMS } from "../../components/shell/ProfilePopover";
 import { ThemeIconButton } from "../../components/shell/ThemeIconButton";
+import { WorkspaceSwitcher } from "../../components/shell/WorkspaceSwitcher";
 
 interface ConsoleSidebarItem extends AppShellNavItem {
   show: boolean;
@@ -38,21 +39,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [tenantPlanInfo, setTenantPlanInfo] = useState<any>(null);
   const [ready, setReady] = useState(false);
 
-  // Multi-company switcher
-  const [headerSwitcherOpen,  setHeaderSwitcherOpen]  = useState(false);
+  // Multi-company switcher. Open/dismiss state, Escape, outside click and focus
+  // restoration are the shared Popover's job now — this layout keeps only the
+  // selection effect, which is unchanged.
   const [currentActiveCompanyId, setCurrentActiveCompanyId] = useState<string | null>(null);
-
-  // Escape dismisses the switcher popover, matching the drawer and dialog.
-  // It previously only closed via click-away or selecting an entry, so it was
-  // the one overlay in the app a keyboard user could not back out of.
-  useEffect(() => {
-    if (!headerSwitcherOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setHeaderSwitcherOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [headerSwitcherOpen]);
 
   // Tenant Admin only: whether they've explicitly entered a company's
   // operational context (via "Switch" on the Companies list) — gates the
@@ -321,148 +311,40 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               );
             })()}
 
-            {/* ── Company Switcher Pill (header) — only when ≥2 companies ── */}
-            {user?.companies && user.companies.length > 1 && (() => {
-              const active = user.companies.find((c) => c.company_id === currentActiveCompanyId) || user.companies[0];
-              return (
-                <div className="relative shrink-0">
-                  <button
-                    onClick={() => setHeaderSwitcherOpen((o) => !o)}
-                    className="nf-press flex min-h-9 min-w-0 max-w-[190px] items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-pill)] border py-[5px] pl-2.5 pr-2 text-xs font-semibold transition-colors sm:min-h-0"
-                    style={{
-                      borderColor: "var(--border)",
-                      backgroundColor: "var(--surface-secondary)",
-                      color: "var(--text-primary)",
-                      cursor: "pointer",
-                    }}
-                    title="Switch active company"
-                    aria-label={`Switch active company — current: ${active.company_name}`}
-                  >
-                    <Building2 className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--text-muted)" }} />
-                    <span className="hidden truncate md:inline">{active.company_name}</span>
-                    <ChevronRight
-                      className="h-3 w-3 shrink-0 transition-transform"
-                      style={{
-                        color: "var(--text-muted)",
-                        transform: headerSwitcherOpen ? "rotate(90deg)" : "rotate(0deg)",
-                      }}
-                    />
-                  </button>
-
-                  {/* Dropdown */}
-                  {headerSwitcherOpen && (
-                    <>
-                      {/* Click-away overlay */}
-                      <div
-                        style={{ position: "fixed", inset: 0, zIndex: 40 }}
-                        onClick={() => setHeaderSwitcherOpen(false)}
-                      />
-                      <div style={{
-                        position: "absolute",
-                        top: "calc(100% + 8px)",
-                        right: 0,
-                        minWidth: 220,
-                        borderRadius: 12,
-                        border: "1px solid var(--border)",
-                        backgroundColor: "var(--surface)",
-                        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-                        overflow: "hidden",
-                        zIndex: 50,
-                      }}>
-                        {/* Header of dropdown */}
-                        <div style={{
-                          padding: "10px 14px 8px",
-                          borderBottom: "1px solid var(--border)",
-                        }}>
-                          <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)", margin: 0 }}>
-                            Switch Company
-                          </p>
-                        </div>
-                        {/* Company list */}
-                        {user.companies.map((c: CompanyRef) => {
-                          const isCurrent = c.company_id === currentActiveCompanyId;
-                          return (
-                            <button
-                              key={c.company_id}
-                              onClick={() => {
-                                // Update localStorage user so all pages see the new companyId
-                                const currentUser = getStoredUser();
-                                if (currentUser) {
-                                  const patched = {
-                                    ...currentUser,
-                                    companyId:  c.company_id,
-                                    company_id: c.company_id,
-                                  };
-                                  localStorage.setItem("user", JSON.stringify(patched));
-                                  localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
-                                }
-                                setActiveCompanyId(c.company_id);
-                                setCurrentActiveCompanyId(c.company_id);
-                                setHeaderSwitcherOpen(false);
-                                window.location.reload();
-                              }}
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                padding: "10px 14px",
-                                background: isCurrent ? "var(--accent-muted)" : "transparent",
-                                border: "none",
-                                cursor: "pointer",
-                                textAlign: "left",
-                                transition: "background 150ms",
-                              }}
-                              onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = "var(--surface-raised)"; }}
-                              onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.background = "transparent"; }}
-                            >
-                              {/* Avatar circle with initials */}
-                              <div style={{
-                                width: 30, height: 30,
-                                borderRadius: "50%",
-                                backgroundColor: isCurrent ? "var(--accent)" : "var(--surface-raised)",
-                                color: isCurrent ? "#fff" : "var(--text-secondary)",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 11, fontWeight: 700, flexShrink: 0,
-                                border: isCurrent ? "2px solid var(--accent)" : "1.5px solid var(--border)",
-                              }}>
-                                {c.company_name.substring(0, 2).toUpperCase()}
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: isCurrent ? "var(--accent)" : "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {c.company_name}
-                                </p>
-                                {c.is_primary && (
-                                  <p style={{ margin: 0, fontSize: 10, color: "var(--text-muted)", fontWeight: 500 }}>{t("homeCompany")}</p>
-                                )}
-                              </div>
-                              {isCurrent && (
-                                <span style={{
-                                  width: 8, height: 8, borderRadius: "50%",
-                                  backgroundColor: "var(--accent)", flexShrink: 0,
-                                }} />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })()}
+            {/* ── Company Switcher (header) — only when ≥2 companies ── */}
+            {user?.companies && user.companies.length > 1 && (
+              <WorkspaceSwitcher
+                companies={user.companies}
+                activeCompanyId={currentActiveCompanyId}
+                label={t("switchCompany")}
+                homeCompanyLabel={t("homeCompany")}
+                onSelect={(companyId) => {
+                  // Unchanged selection behaviour: patch the stored user so every
+                  // page reads the new companyId, record the active company, then
+                  // reload so company-scoped data refetches.
+                  const currentUser = getStoredUser();
+                  if (currentUser) {
+                    const patched = {
+                      ...currentUser,
+                      companyId:  companyId,
+                      company_id: companyId,
+                    };
+                    localStorage.setItem("user", JSON.stringify(patched));
+                    localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
+                  }
+                  setActiveCompanyId(companyId);
+                  setCurrentActiveCompanyId(companyId);
+                  window.location.reload();
+                }}
+              />
+            )}
 
       {/* Language is a set-once preference, not a per-task control — it yields
           first on narrow screens so the header never forces page overflow. */}
       <span className="hidden shrink-0 sm:inline-flex"><LanguageSelector /></span>
       <ThemeIconButton />
-      <div
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
-        style={{ backgroundColor: "var(--accent)", color: "#fff" }}
-        title={user.fullName}
-      >
-        {initials}
-      </div>
+      {/* The avatar that used to sit here is now the ProfilePopover trigger,
+          rendered by AppShell so every shell route gets the same account menu. */}
     </>
   );
 
@@ -479,6 +361,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       userEmail={user.email}
       onLogout={handleLogout}
       signOutLabel={t("signOut")}
+      profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key) }))}
+      profileMenuLabel={t("accountMenu")}
       breadcrumbRoot="Console"
       breadcrumbCurrent={breadcrumbLabel}
       headerRight={headerRight}

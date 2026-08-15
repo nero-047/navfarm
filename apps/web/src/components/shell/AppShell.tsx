@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, type ReactNode, type ElementType } from "react";
 import Link from "next/link";
-import { Menu, X, LogOut, ChevronRight } from "lucide-react";
+import { Menu, X, ChevronRight } from "lucide-react";
 import { useScrollLock } from "../../hooks/useScrollLock";
+import { ProfilePopover, type ProfileMenuItem } from "./ProfilePopover";
 
 export const NAVFARM_LOGO_SRC = "https://nav-cdn.pages.dev/images/favicon.png";
 
@@ -28,6 +29,10 @@ export interface AppShellProps {
   userEmail?: string;
   onLogout: () => void;
   signOutLabel: string;
+  /** Account entries shown above Sign out in the profile popover. */
+  profileItems: ProfileMenuItem[];
+  /** Accessible name for the avatar trigger, e.g. "Account menu". */
+  profileMenuLabel: string;
   breadcrumbRoot: string;
   breadcrumbCurrent: string;
   headerRight?: ReactNode;
@@ -61,7 +66,7 @@ export interface AppShellProps {
 export function AppShell(props: AppShellProps) {
   const {
     brandHref, brandSubtitle, sidebarSummary, navSectionLabel, navItems, pathname,
-    userInitials, userName, userEmail, onLogout, signOutLabel,
+    userInitials, userName, userEmail, onLogout, signOutLabel, profileItems, profileMenuLabel,
     breadcrumbRoot, breadcrumbCurrent, headerRight, contextNav, pageHeader, children,
   } = props;
 
@@ -188,23 +193,9 @@ export function AppShell(props: AppShellProps) {
           </ul>
         </nav>
 
-        <div className="border-t border-[var(--sidebar-border)] p-4">
-          <div className="flex items-center gap-3 px-1 pb-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
-              {userInitials}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-xs font-semibold text-white">{userName}</span>
-              <span className="mt-0.5 block truncate text-[11px] text-white/40">{userEmail}</span>
-            </span>
-          </div>
-          <button
-            onClick={onLogout}
-            className="nf-press flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-white/10 px-3 py-2.5 text-xs font-normal text-white/55 transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
-          >
-            <LogOut size={14} /> {signOutLabel}
-          </button>
-        </div>
+        {/* No account footer here. Identity and Sign out are account actions,
+            not navigation, and they live behind the header avatar — see
+            ProfilePopover. The rail carries navigation only. */}
       </div>
 
       <header data-shell-region="header" className="px-4 backdrop-blur-xl sm:px-6">
@@ -222,7 +213,18 @@ export function AppShell(props: AppShellProps) {
           <ChevronRight size={14} className="hidden shrink-0 sm:block" />
           <span className="truncate font-semibold" style={{ color: "var(--text-primary)" }}>{breadcrumbCurrent}</span>
         </nav>
-        <div className="ml-auto flex min-w-0 items-center gap-2.5">{headerRight}</div>
+        <div className="ml-auto flex min-w-0 items-center gap-2.5">
+          {headerRight}
+          <ProfilePopover
+            initials={userInitials}
+            name={userName}
+            email={userEmail}
+            items={profileItems}
+            signOutLabel={signOutLabel}
+            onSignOut={onLogout}
+            triggerLabel={profileMenuLabel}
+          />
+        </div>
       </header>
 
       <div data-shell-region="workspace" data-has-context-nav={contextNav ? "true" : "false"}>

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Boxes, Database, Landmark, LayoutDashboard, Sprout, Users } from "lucide-react";
 import { AppShell } from "../../../components/shell/AppShell";
+import { Dialog } from "../../../components/ui/dialog";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dev/shell-harness", icon: LayoutDashboard },
@@ -19,6 +21,11 @@ const CONTEXT_ITEMS = Array.from({ length: 40 }, (_, i) => `Context entry ${i + 
 const CONTENT_ROWS = Array.from({ length: 60 }, (_, i) => i + 1);
 
 export function ShellHarness({ withContextNav }: { withContextNav: boolean }) {
+  // The other half of the overlay taxonomy. The fixture carries a Dialog so the
+  // browser suite can prove the distinction Phase 2 rests on: a popover leaves
+  // the page live, a dialog blocks it and takes the shared scroll lock.
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   const contextNav = (
     <div className="p-3" data-testid="harness-context-nav">
       <p className="px-2 pb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Section</p>
@@ -50,6 +57,8 @@ export function ShellHarness({ withContextNav }: { withContextNav: boolean }) {
       userEmail="harness@navfarm.test"
       onLogout={() => undefined}
       signOutLabel="Sign out"
+      profileItems={[{ label: "Account" }, { label: "Preferences" }, { label: "Settings" }]}
+      profileMenuLabel="Account menu"
       breadcrumbRoot="Harness"
       breadcrumbCurrent="Shell geometry"
       contextNav={withContextNav ? contextNav : undefined}
@@ -61,6 +70,25 @@ export function ShellHarness({ withContextNav }: { withContextNav: boolean }) {
       }
     >
       <div className="px-6 py-6" data-testid="harness-content">
+        <button
+          type="button"
+          data-testid="harness-dialog-trigger"
+          onClick={() => setDialogOpen(true)}
+          className="nf-press mb-4 min-h-11 rounded-[var(--radius-sm)] border border-[var(--border)] px-4 text-sm text-[var(--text-primary)]"
+        >
+          Open dialog
+        </button>
+        <Dialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          title="Harness dialog"
+          description="Fixture dialog for overlay taxonomy tests."
+        >
+          <button type="button" data-testid="harness-dialog-body-action" className="min-h-11">
+            Dialog action
+          </button>
+        </Dialog>
+
         {CONTENT_ROWS.map((row) => (
           <p
             key={row}

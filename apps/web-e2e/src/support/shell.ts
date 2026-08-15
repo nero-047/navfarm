@@ -19,13 +19,41 @@ export async function gotoHarness(
   await page.waitForSelector(SHELL_ROOT);
 }
 
+export interface SessionCompany {
+  company_id: string;
+  company_name: string;
+  is_primary: boolean;
+}
+
+export const DEFAULT_COMPANY: SessionCompany = {
+  company_id: 'company-e2e',
+  company_name: 'Navfarm E2E Estate',
+  is_primary: true,
+};
+
+/** A second company, which is what makes the workspace switcher render. */
+export const SECOND_COMPANY: SessionCompany = {
+  company_id: 'company-e2e-2',
+  company_name: 'Navfarm E2E Highlands',
+  is_primary: false,
+};
+
+export interface ConsoleSessionOptions {
+  path?: string;
+  /** Companies on the session user. Two or more reveal the workspace switcher. */
+  companies?: SessionCompany[];
+}
+
 /**
  * Seeds an authenticated console session and stubs the API the console layout
  * calls on mount. The shell must be provable on a real application route, not
- * only on the fixture, and these tests are about geometry — not about the
- * backend being reachable.
+ * only on the fixture, and these tests are about geometry and interaction —
+ * not about the backend being reachable.
  */
-export async function gotoConsole(page: Page, path = '/console/master-data'): Promise<void> {
+export async function gotoConsole(
+  page: Page,
+  { path = '/console/master-data', companies = [DEFAULT_COMPANY] }: ConsoleSessionOptions = {},
+): Promise<void> {
   // Registered first so the specific handlers below take precedence:
   // Playwright matches the most recently registered route first.
   await page.route('**/api/v1/**', (route) => route.fulfill({ status: 200, json: [] }));
@@ -35,17 +63,11 @@ export async function gotoConsole(page: Page, path = '/console/master-data'): Pr
   await page.route('**/api/v1/company/tenant/*', (route) =>
     route.fulfill({
       status: 200,
-      json: [
-        {
-          company_id: 'company-e2e',
-          company_name: 'Navfarm E2E Estate',
-          onboarding_status: 'COMPLETED',
-        },
-      ],
+      json: companies.map((company) => ({ ...company, onboarding_status: 'COMPLETED' })),
     }),
   );
 
-  await page.addInitScript(() => {
+  await page.addInitScript((sessionCompanies: SessionCompany[]) => {
     const user = {
       userId: 'user-e2e',
       email: 'e2e@navfarm.test',
@@ -54,9 +76,7 @@ export async function gotoConsole(page: Page, path = '/console/master-data'): Pr
       companyId: 'company-e2e',
       company_id: 'company-e2e',
       tenantId: 'tenant-e2e',
-      companies: [
-        { company_id: 'company-e2e', company_name: 'Navfarm E2E Estate', is_primary: true },
-      ],
+      companies: sessionCompanies,
     };
     localStorage.setItem('navfarm_auth_user', JSON.stringify(user));
     localStorage.setItem('user', JSON.stringify(user));
@@ -65,7 +85,7 @@ export async function gotoConsole(page: Page, path = '/console/master-data'): Pr
     localStorage.setItem('navfarm_tenant_id', 'tenant-e2e');
     localStorage.setItem('tenant_id', 'tenant-e2e');
     localStorage.setItem('active_company_id', 'company-e2e');
-  });
+  }, companies);
 
   await page.goto(path);
   await page.waitForSelector(SHELL_ROOT);

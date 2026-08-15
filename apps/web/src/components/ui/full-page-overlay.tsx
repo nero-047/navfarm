@@ -27,12 +27,21 @@ export function FullPageOverlay({
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') closeRef.current();
       if (event.key !== 'Tab' || !panelRef.current) return;
-      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      // Rendered boxes only — see Dialog. This overlay is the one that actually
+      // wraps such an element today: the company edit form's upload control is
+      // a label around a `display: none` file input.
+      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter((el) => el.getClientRects().length > 0);
+      // Same trap correction as Dialog: own every Tab, because boundary-only
+      // wrapping leaks focus whenever the browser's tab order does not keep it
+      // inside the panel on its own.
+      event.preventDefault();
       if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      const index = focusable.indexOf(document.activeElement as HTMLElement);
+      const step = event.shiftKey ? -1 : 1;
+      const next = index === -1
+        ? (event.shiftKey ? focusable.length - 1 : 0)
+        : (index + step + focusable.length) % focusable.length;
+      focusable[next].focus();
     }
 
     document.addEventListener('keydown', closeOnEscape);
