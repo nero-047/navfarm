@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Boxes, Database, Landmark, LayoutDashboard, Sprout, Users } from "lucide-react";
 import { AppShell } from "../../../components/shell/AppShell";
 import { Dialog } from "../../../components/ui/dialog";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dev/shell-harness", icon: LayoutDashboard },
@@ -62,42 +63,55 @@ export function ShellHarness({ withContextNav }: { withContextNav: boolean }) {
       breadcrumbRoot="Harness"
       breadcrumbCurrent="Shell geometry"
       contextNav={withContextNav ? contextNav : undefined}
-      pageHeader={
-        <div className="border-b border-[var(--border)] px-6 py-5" data-testid="harness-page-header">
-          <h1 className="text-[28px] font-semibold tracking-tight text-[var(--text-primary)]">Shell geometry</h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">Fixture route for shell layout tests.</p>
-        </div>
-      }
     >
-      <div className="px-6 py-6" data-testid="harness-content">
-        <button
-          type="button"
-          data-testid="harness-dialog-trigger"
-          onClick={() => setDialogOpen(true)}
-          className="nf-press mb-4 min-h-11 rounded-[var(--radius-sm)] border border-[var(--border)] px-4 text-sm text-[var(--text-primary)]"
-        >
-          Open dialog
-        </button>
-        <Dialog
-          open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
-          title="Harness dialog"
-          description="Fixture dialog for overlay taxonomy tests."
-        >
-          <button type="button" data-testid="harness-dialog-body-action" className="min-h-11">
-            Dialog action
-          </button>
-        </Dialog>
+      {/* The page header is page content now, so the fixture renders it the
+          way a real route does: inside the page container, above the work
+          surface. Same gutter as the content below it. */}
+      <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 lg:px-7 lg:pb-7">
+        <PageHeader
+          title="Shell geometry"
+          description="Fixture route for shell layout tests."
+          actions={
+            <button
+              type="button"
+              data-testid="harness-page-action"
+              className="nf-press min-h-11 rounded-[var(--radius-sm)] border border-[var(--border)] px-4 text-sm text-[var(--text-primary)]"
+            >
+              Page action
+            </button>
+          }
+        />
 
-        {CONTENT_ROWS.map((row) => (
-          <p
-            key={row}
-            data-testid={row === CONTENT_ROWS.length ? "harness-content-last" : undefined}
-            className="border-b border-[var(--border-subtle)] py-6 text-sm text-[var(--text-secondary)]"
+        <div data-testid="harness-content">
+          <button
+            type="button"
+            data-testid="harness-dialog-trigger"
+            onClick={() => setDialogOpen(true)}
+            className="nf-press mb-4 min-h-11 rounded-[var(--radius-sm)] border border-[var(--border)] px-4 text-sm text-[var(--text-primary)]"
           >
-            Content row {row}
-          </p>
-        ))}
+            Open dialog
+          </button>
+          <Dialog
+            open={dialogOpen}
+            onClose={() => setDialogOpen(false)}
+            title="Harness dialog"
+            description="Fixture dialog for overlay taxonomy tests."
+          >
+            <button type="button" data-testid="harness-dialog-body-action" className="min-h-11">
+              Dialog action
+            </button>
+          </Dialog>
+
+          {CONTENT_ROWS.map((row) => (
+            <p
+              key={row}
+              data-testid={row === CONTENT_ROWS.length ? "harness-content-last" : undefined}
+              className="border-b border-[var(--border-subtle)] py-6 text-sm text-[var(--text-secondary)]"
+            >
+              Content row {row}
+            </p>
+          ))}
+        </div>
       </div>
     </AppShell>
   );

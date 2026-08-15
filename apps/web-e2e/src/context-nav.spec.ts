@@ -298,7 +298,11 @@ test.describe('mobile and tablet presentation', () => {
     const trigger = page.locator(CONTEXT_NAV_TRIGGER);
     await expect(trigger).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
-    await expect(trigger).toHaveText(/Farms/);
+    // Names the index, not the selection. The selected section is the page's
+    // H1 immediately below, and repeating it here made level 2 read as a
+    // second, quieter title — see the mobile hierarchy tests in
+    // page-header.spec.ts.
+    await expect(trigger).toHaveText(/master data sections/i);
 
     await trigger.click();
     const menu = page.getByRole('menu', { name: /master data sections/i });
@@ -308,7 +312,9 @@ test.describe('mobile and tablet presentation', () => {
     await expect(menu.getByRole('group', { name: 'Livestock & Health' })).toHaveCount(1);
 
     await menu.getByRole('menuitemradio', { name: 'Suppliers' }).click();
-    await expect(trigger).toHaveText(/Suppliers/);
+    // Selection still works and still moves the work surface; the trigger keeps
+    // naming the index while the H1 reports what was selected.
+    await expect(trigger).toHaveText(/master data sections/i);
     await expect(page.locator(CONTENT).getByRole('heading', { name: 'Suppliers' })).toBeVisible();
   });
 

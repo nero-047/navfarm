@@ -12,6 +12,7 @@ import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
 import { Badge } from "../../../components/ui/badge";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -169,14 +170,11 @@ export default function AdminTenantsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold" style={S.primary}>Tenant Registry</h1>
-          <p className="text-sm mt-0.5" style={S.sub}>{tenants.length} tenants registered on platform</p>
-        </div>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader
+        title="Tenant Registry"
+        description={`${tenants.length} tenants registered on platform`}
+        actions={
         <div className="flex w-full items-center gap-3 sm:w-auto">
           <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={S.muted} />
@@ -191,7 +189,8 @@ export default function AdminTenantsPage() {
             <Plus className="w-4 h-4" /> Add Tenant
           </button>
         </div>
-      </div>
+        }
+      />
 
       {error   && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
       {success && <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}

@@ -6,6 +6,7 @@ import { RefreshCw, AlertCircle, Search } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { useLanguage } from "../../../hooks/useLanguage";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 export default function AdminAuditPage() {
   const router = useRouter();
@@ -64,21 +65,19 @@ export default function AdminAuditPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>{t("systemAuditLogs")}</h1>
-          <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>{auditLogs.length} {t("platformWideEventsRecorded")}</p>
-        </div>
-        <div className="w-full sm:w-auto">
-          <div className="relative">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader
+        title={t("systemAuditLogs")}
+        description={`${auditLogs.length} ${t("platformWideEventsRecorded")}`}
+        actions={
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("searchLogs")}
               className="w-full rounded-lg border py-2 pl-9 pr-4 text-sm sm:w-64"
               style={{ borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)", color: "var(--input-text)" }} />
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {error && (
         <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm">

@@ -15,6 +15,7 @@ import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
 import { Badge } from "../../../components/ui/badge";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -125,7 +126,12 @@ export default function CompaniesPage() {
     // ── Managing a specific company ──────────────────────────────────────────
     if (managingCompany) {
       return (
-        <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 lg:p-7">
+        <div className="mx-auto max-w-7xl space-y-4 px-4 pb-4 sm:px-6 sm:pb-6 lg:px-7 lg:pb-7">
+          {/* This view had no heading at all — the identity strip below states
+              which company, but nothing stated what the page is. The strip
+              stays exactly as it was; it is metadata, not the page title. */}
+          <PageHeader title="Company settings" sticky={false} />
+
           {/* Compact navigation and company identity toolbar */}
           <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-4">
             <Button
@@ -175,21 +181,16 @@ export default function CompaniesPage() {
 
     // ── Companies directory table ────────────────────────────────────────────
     return (
-      <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-        {/* Header */}
-          <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="nf-text-section" style={S.primary}>Companies</h1>
-            <p className="text-sm mt-0.5" style={S.sub}>
-              {companies.length} company record{companies.length !== 1 ? "s" : ""} in this tenant
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+        <PageHeader
+          title="Companies"
+          description={`${companies.length} company record${companies.length !== 1 ? "s" : ""} in this tenant`}
+          actions={
             <Button onClick={() => { setCreateError(""); setShowAddModal(true); }}>
               <Plus className="w-4 h-4" /> Add Company
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Add Company Modal */}
         <Dialog open={showAddModal} onClose={() => setShowAddModal(false)} title="Add a company" description="Create the legal company record. Detailed setup continues after creation." maxWidth="lg">
@@ -366,7 +367,8 @@ export default function CompaniesPage() {
   // ════════════════════════════════════════════════════════════════════════════
   if (!myCompany) {
     return (
-      <div className="mx-auto max-w-7xl p-4 sm:p-6 xl:p-8">
+      <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+        <PageHeader title="Companies" sticky={false} />
         <div className="rounded-[var(--radius-md)] border p-12 text-center" style={S.surface}>
           <Building2 className="w-10 h-10 mx-auto mb-3" style={S.muted} />
           <p className="text-sm font-semibold" style={S.sub}>No company assigned to your account yet.</p>
@@ -377,7 +379,9 @@ export default function CompaniesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 xl:p-8">
+    <div className="mx-auto max-w-7xl space-y-4 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader title="Company settings" sticky={false} />
+
       {/* Company identity header */}
       <div className="flex items-center gap-4 rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-sm font-semibold text-white" style={{ backgroundColor: "var(--color-navy)" }}>

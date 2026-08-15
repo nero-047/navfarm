@@ -8,6 +8,7 @@ import { Bell, RefreshCw, AlertCircle, CheckCircle, Save, Send, Mail, Globe, Eye
 import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser, getStoredTenantId, type NavUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 const inputCls = "nf-input";
 const inputStyle = {
@@ -155,14 +156,16 @@ export default function NotificationsPage() {
   }`;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6 xl:p-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>Notification Engine</h1>
-        <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
-          Configure outbound alert channels for <span className="font-medium">{activeCompany?.company_name || "—"}</span>
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader
+        title="Notification Engine"
+        description={
+          <>
+            Configure outbound alert channels for{" "}
+            <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{activeCompany?.company_name || "—"}</span>
+          </>
+        }
+      />
 
       {error && (
         <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm">

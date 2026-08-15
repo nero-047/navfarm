@@ -12,6 +12,7 @@ import {
 import { api } from "../../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../../hooks/useAuth";
 import { Dialog } from "../../../../components/ui/dialog";
+import { PageHeader } from "../../../../components/ui/PageHeader";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -231,31 +232,30 @@ export default function TenantDetailPage() {
   const isSystemTenant = tenant?.tenant_id === "00000000-0000-0000-0000-000000000000" || tenant?.tenant_code === "system";
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <Link href="/admin/tenants" className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline" style={S.sub}>
+        <ArrowLeft className="w-4 h-4" /> Back to Tenants
+      </Link>
 
-      {/* Header */}
-      <div>
-        <Link href="/admin/tenants" className="inline-flex items-center gap-1.5 text-sm font-medium mb-4 hover:underline" style={S.sub}>
-          <ArrowLeft className="w-4 h-4" /> Back to Tenants
-        </Link>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-semibold" style={S.primary}>{tenant.tenant_name}</h1>
-            <p className="text-sm mt-0.5 flex items-center gap-1.5" style={S.sub}>
-              <Mail className="w-3.5 h-3.5" /> {tenant.billing_email || "—"}
-              <span className="mx-2 opacity-40">·</span>
-              <span className="font-mono text-xs">{tenant.tenant_code}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <PageHeader
+        title={tenant.tenant_name}
+        description={
+          <span className="flex items-center gap-1.5">
+            <Mail className="w-3.5 h-3.5" /> {tenant.billing_email || "—"}
+            <span className="mx-2 opacity-40">·</span>
+            <span className="font-mono text-xs">{tenant.tenant_code}</span>
+          </span>
+        }
+        actions={
+          <>
             <Badge color={tenant.is_active ? "green" : "default"}>
               {tenant.is_active ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
               {tenant.is_active ? "Active" : "Inactive"}
             </Badge>
             {tenant.is_trial && <Badge color="amber">Trial</Badge>}
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {error   && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
       {success && <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}

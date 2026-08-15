@@ -7,6 +7,12 @@ export const WORKSPACE = '[data-shell-region="workspace"]';
 export const CONTEXT_NAV = '[data-shell-region="context-nav"]';
 export const CONTENT = 'main[data-shell-region="content"]';
 
+/** The page header, inside the main content region. */
+export const PAGE_HEADER = '[data-shell-region="page-header"]';
+/** The single breadcrumb, emitted by the shell above the page header. */
+export const BREADCRUMB = '[data-shell-breadcrumb]';
+export const PAGE_TITLE = '[data-page-title]';
+
 /** The contextual navigation itself, inside the shell's context-nav region. */
 export const CONTEXT_NAV_LIST = '[data-context-nav]';
 export const CONTEXT_NAV_ITEM = '[data-context-nav-item]';

@@ -7,6 +7,7 @@ import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, N
 import RolesTab from "../../../components/console/console-tabs/roles-tab";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { Toast } from "../../../components/ui/toast";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 const S = {
   surface: { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -61,16 +62,15 @@ export default function RolesPage() {
   if (loading) return <LoadingState label="Loading roles…" />;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-      {/* Header */}
-      <div>
-        <div>
-          <h1 className="nf-text-section" style={S.primary}>Role Permissions</h1>
-          <p className="text-sm mt-0.5" style={S.sub}>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader
+        title="Role Permissions"
+        description={
+          <>
             RBAC scopes for <span className="font-semibold" style={S.primary}>{activeCompany?.company_name || "—"}</span>
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {error   && <ErrorState message={error} />}
       {success && <Toast variant="success" message={success} onClose={() => setSuccess("")} />}

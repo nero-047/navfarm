@@ -17,6 +17,7 @@ import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { useLanguage } from "../../../hooks/useLanguage";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { Badge } from "../../../components/ui/badge";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -111,17 +112,11 @@ export default function AdminDashboardPage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-
-      {/* Welcome Banner */}
-      <div>
-        <div>
-          <h1 className="nf-text-section" style={S.primary}>{t("controlTowerDashboard")}</h1>
-          <p className="text-sm mt-0.5" style={S.sub}>
-            {t("platformWideSaaSAnalytics")}
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader
+        title={t("controlTowerDashboard")}
+        description={t("platformWideSaaSAnalytics")}
+      />
 
       {/* Stats Widgets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

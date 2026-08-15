@@ -8,6 +8,7 @@ import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { Badge } from "../../../components/ui/badge";
 import { Input } from "../../../components/ui/input";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 export default function AuditPage() {
   const router = useRouter();
@@ -70,15 +71,12 @@ export default function AuditPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="nf-text-section" style={{ color: "var(--text-primary)" }}>Audit Ledger</h1>
-          <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>{auditLogs.length} events recorded</p>
-        </div>
-        <div className="w-full sm:w-auto">
-          <div className="relative">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader
+        title="Audit Ledger"
+        description={`${auditLogs.length} events recorded`}
+        actions={
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
             <Input
               value={search}
@@ -87,8 +85,8 @@ export default function AuditPage() {
               className="pl-9 sm:w-64"
             />
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {error && <ErrorState message={error} />}
 

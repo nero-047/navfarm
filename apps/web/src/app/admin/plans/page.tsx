@@ -7,6 +7,7 @@ import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 const s = {
   input: { borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)", color: "var(--input-text)" },
@@ -116,18 +117,18 @@ export default function AdminPlansPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold" style={s.text}>Subscription Plans</h1>
-          <p className="text-sm mt-0.5" style={s.sub}>{plans.length} plans configured</p>
-        </div>
-        <button onClick={() => handleOpen()}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-sm transition-colors"
-          style={{ backgroundColor: "var(--accent)" }}>
-          <Plus className="w-4 h-4" /> Add Plan
-        </button>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader
+        title="Subscription Plans"
+        description={`${plans.length} plans configured`}
+        actions={
+          <button onClick={() => handleOpen()}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-sm transition-colors"
+            style={{ backgroundColor: "var(--accent)" }}>
+            <Plus className="w-4 h-4" /> Add Plan
+          </button>
+        }
+      />
 
       {error && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
       {success && <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}

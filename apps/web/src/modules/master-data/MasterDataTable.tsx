@@ -352,11 +352,18 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold" style={S.primary}>{tLabel(config.label)}</h2>
-          {config.description && <p className="mt-0.5 text-xs" style={S.sub}>{tLabel(config.description)}</p>}
-        </div>
+      {/* No heading here any more. The record set's name and description are
+          the page's own H1 and description, rendered by PageHeader above this
+          component — this used to restate both as an <h2> immediately under a
+          "Master Data" <h1>, so every screen carried two titles for one thing.
+          What remains is this component's own toolbar: the filters, the search
+          and the create action that operate on the table below. They belong to
+          the work surface, so they stay with it. Nothing about their state,
+          their handlers or the requests they make has changed. */}
+      {/* Left-aligned, so the controls sit under the title they belong to
+          rather than drifting to the far edge now that nothing balances them
+          on the left (apple.design.md §23). */}
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {config.supportsNobLobFilter && (
             <>
@@ -391,8 +398,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("searchPlaceholder")}
-              className="nf-input-sm pl-8"
-              style={S.input}
+              className="nf-input-sm"
+              // `.nf-input-sm` sets `padding` as a shorthand, which overrode
+              // the `pl-8` utility that was here and left the icon sitting on
+              // top of the placeholder. Setting it alongside the other inline
+              // styles keeps the fix on this one field.
+              style={{ ...S.input, paddingLeft: "1.75rem" }}
             />
           </div>
           <button

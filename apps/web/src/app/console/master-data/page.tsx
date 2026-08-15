@@ -7,11 +7,10 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { MASTER_DATA_CONFIGS, MASTER_DATA_GROUPS, getConfig } from "@/modules/master-data/configs";
 import MasterDataTable from "@/modules/master-data/MasterDataTable";
 import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ShieldAlert } from "lucide-react";
 
 const S = {
-  surface: { backgroundColor: "var(--surface)", borderColor: "var(--border)" },
-  primary: { color: "var(--text-primary)" },
   sub: { color: "var(--text-secondary)" },
 };
 
@@ -61,7 +60,8 @@ export default function MasterDataPage() {
 
   if (user.userType !== "COMPANY_ADMIN" && user.userType !== "SYSTEM_ADMIN" && user.userType !== "TENANT_ADMIN") {
     return (
-      <div className="mx-auto max-w-2xl p-8">
+      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
+        <PageHeader title={t("masterData")} sticky={false} />
         <div
           className="flex items-center gap-3 rounded-[var(--radius-md)] border p-5"
           style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}
@@ -79,11 +79,18 @@ export default function MasterDataPage() {
   const activeConfig = getConfig(activeKey) || MASTER_DATA_CONFIGS[0];
 
   return (
-    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-7">
-      <div className="mb-5">
-        <h1 className="nf-text-section" style={S.primary}>{t("masterData")}</h1>
-        <p className="mt-0.5 text-sm" style={S.sub}>{t("masterDataPageDescription")}</p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 lg:px-7 lg:pb-7">
+      {/* The page title is the record set the user is actually looking at —
+          "Suppliers", not "Master Data" (apple.design.md §23). The module name
+          is already stated twice around it, by the breadcrumb above and the
+          contextual index beside it; repeating it here as the H1 forced the
+          real subject down into a second heading inside the table, which is
+          the duplicate hierarchy this phase removes. The table now renders no
+          heading of its own — see MasterDataTable. */}
+      <PageHeader
+        title={tLabel(activeConfig.label)}
+        description={activeConfig.description ? tLabel(activeConfig.description) : undefined}
+      />
 
       {/* The module index used to live here as an in-page <aside>, which meant
           it scrolled away with the table it indexes. It is a shell region now —

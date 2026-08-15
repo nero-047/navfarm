@@ -16,6 +16,7 @@ import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
 import { useLanguage } from "../../../hooks/useLanguage";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -127,22 +128,22 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="nf-text-section" style={{ color: "var(--text-primary)" }}>
-            {isTenantAdmin ? t("operationalDashboard") : t("companyDashboard")}
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
-            {t("welcomeBack")} <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{user?.fullName}</span>
-          </p>
-        </div>
-        <span className="nf-text-caption shrink-0 whitespace-nowrap font-semibold uppercase tracking-wider px-3 py-1.5 rounded-[var(--radius-pill)]"
-          style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
-          {user?.userType?.replace("_", " ")}
-        </span>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <PageHeader
+        title={isTenantAdmin ? t("operationalDashboard") : t("companyDashboard")}
+        description={
+          <>
+            {t("welcomeBack")}{" "}
+            <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{user?.fullName}</span>
+          </>
+        }
+        actions={
+          <span className="nf-text-caption shrink-0 whitespace-nowrap font-semibold uppercase tracking-wider px-3 py-1.5 rounded-[var(--radius-pill)]"
+            style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
+            {user?.userType?.replace("_", " ")}
+          </span>
+        }
+      />
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

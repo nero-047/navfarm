@@ -16,6 +16,7 @@ import { Badge } from "../../../components/ui/badge";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { Toast } from "../../../components/ui/toast";
 import { EditMemberModal, UserTypeBadge, Label } from "../../../components/console/edit-member-modal";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -205,21 +206,20 @@ export default function UsersPage() {
   if (loading) return <LoadingState label="Loading team…" />;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 xl:p-8">
-
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="nf-text-caption font-semibold uppercase tracking-[0.18em]" style={S.muted}>People & access</p>
-          <h1 className="nf-text-section mt-1" style={S.primary}>Team management</h1>
-          <p className="mt-1 text-sm leading-6" style={S.sub}>
-            Invite people, control workspace access, and assign company roles.
-          </p>
-        </div>
-        <Button onClick={() => setShowAddForm(!showAddForm)}>
-          <UserPlus className="w-4 h-4" /> Invite User
-        </Button>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      {/* The uppercase "People & access" kicker that sat above this title is
+          gone: the breadcrumb directly above now states the same location, and
+          a second label stacked over the H1 is the marketing-page hierarchy
+          this phase is meant to remove, not reproduce. */}
+      <PageHeader
+        title="Team management"
+        description="Invite people, control workspace access, and assign company roles."
+        actions={
+          <Button onClick={() => setShowAddForm(!showAddForm)}>
+            <UserPlus className="w-4 h-4" /> Invite User
+          </Button>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
         {[

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getStoredUser, hasPermission, NavUser } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
+import { PageHeader } from "@/components/ui/PageHeader";
 import StockBalancePanel from "@/components/console/inventory/stock-balance-panel";
 import GoodsReceiptPanel from "@/components/console/inventory/goods-receipt-panel";
 import GoodsIssuePanel from "@/components/console/inventory/goods-issue-panel";
@@ -12,13 +13,6 @@ import StockTransferPanel from "@/components/console/inventory/stock-transfer-pa
 import StockAdjustmentPanel from "@/components/console/inventory/stock-adjustment-panel";
 import InventoryLedgerPanel from "@/components/console/inventory/inventory-ledger-panel";
 import { ShieldAlert } from "lucide-react";
-
-const S = {
-  surface: { backgroundColor: "var(--surface)", borderColor: "var(--border)" },
-  primary: { color: "var(--text-primary)" },
-  sub: { color: "var(--text-secondary)" },
-  muted: { color: "var(--text-muted)" },
-};
 
 const SECTIONS = [
   { key: "balance", label: "Stock Balance" },
@@ -68,7 +62,8 @@ export default function InventoryPage() {
 
   if (!hasPermission(user, "INVENTORY", "GOODS_RECEIPT", "can_view")) {
     return (
-      <div className="mx-auto max-w-2xl p-8">
+      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
+        <PageHeader title="Inventory" sticky={false} />
         <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border p-5" style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}>
           <ShieldAlert className="h-5 w-5 shrink-0" />
           <div>
@@ -81,11 +76,11 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-7">
-      <div className="mb-5">
-        <h1 className="nf-text-section" style={S.primary}>Inventory</h1>
-        <p className="mt-0.5 text-sm" style={S.sub}>Goods movement, lot/serial tracking and the Inventory Ledger.</p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 lg:px-7 lg:pb-7">
+      <PageHeader
+        title="Inventory"
+        description="Goods movement, lot/serial tracking and the Inventory Ledger."
+      />
 
       {/* Section switching moved to the shell's contextual navigation; the
           panels themselves are untouched. */}

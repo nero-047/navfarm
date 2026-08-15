@@ -167,10 +167,18 @@ function ContextNavList({ model }: { model: ContextNavModel }) {
  *
  * A twenty-entry, five-group tree cannot become a tab strip, and repeating the
  * whole column above the content would push the actual work off the first
- * screen. So below the desktop breakpoint it collapses to the current section
- * plus an anchored selector, built on the Phase 2 popover rather than a second
- * overlay implementation. Grouped entries are `menuitemradio` — choosing a
- * section is a selection, not a command.
+ * screen. So below the desktop breakpoint it collapses to an anchored
+ * selector, built on the Phase 2 popover rather than a second overlay
+ * implementation. Grouped entries are `menuitemradio` — choosing a section is
+ * a selection, not a command.
+ *
+ * The trigger names the module index it opens, not the section it has selected.
+ * It used to show the active entry, which put the current section's name
+ * directly above the page's H1 — the same word twice, one line apart, with the
+ * quieter of the two sitting first and reading like the title. Level 2 states
+ * where you can go; the H1 beneath states where you are, and it states it once.
+ * The current section is still conveyed: the accessible name carries it for
+ * assistive technology, and the menu marks it `aria-checked`.
  */
 function ContextNavSelector({ model }: { model: ContextNavModel }) {
   const [open, setOpen] = useState(false);
@@ -190,7 +198,11 @@ function ContextNavSelector({ model }: { model: ContextNavModel }) {
           data-testid="context-nav-trigger"
           aria-label={`${model.label} — current: ${active?.label ?? ""}`}
         >
-          <span data-context-nav-trigger-label>{active?.label ?? model.label}</span>
+          {/* The module label, e.g. "Master Data sections" — already translated
+              by the route that registered it. The accessible name above still
+              appends the current entry, and starts with this same string, so
+              the visible label remains a prefix of the accessible one. */}
+          <span data-context-nav-trigger-label>{model.label}</span>
           <ChevronDown size={15} strokeWidth={1.75} aria-hidden="true" />
         </button>
       )}

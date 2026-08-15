@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode, type ElementType } from "react";
 import Link from "next/link";
-import { Menu, X, ChevronRight } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { ProfilePopover, type ProfileMenuItem } from "./ProfilePopover";
 
@@ -42,8 +42,13 @@ export interface AppShellProps {
    * Wired per-route in a later phase; the geometry exists now.
    */
   contextNav?: ReactNode;
-  /** Structural slot for the page header, sticky inside the content scroller. */
-  pageHeader?: ReactNode;
+  /**
+   * There is no page-header slot. The page header is page content — it is the
+   * page's own H1 and its own actions — so routes render `ui/PageHeader`
+   * themselves, inside their own container, where it aligns with the content
+   * beneath it. It carries `data-shell-region="page-header"` and pins to this
+   * scroller under the Phase 1 geometry without the shell mounting it.
+   */
   children: ReactNode;
 }
 
@@ -67,7 +72,7 @@ export function AppShell(props: AppShellProps) {
   const {
     brandHref, brandSubtitle, sidebarSummary, navSectionLabel, navItems, pathname,
     userInitials, userName, userEmail, onLogout, signOutLabel, profileItems, profileMenuLabel,
-    breadcrumbRoot, breadcrumbCurrent, headerRight, contextNav, pageHeader, children,
+    breadcrumbRoot, breadcrumbCurrent, headerRight, contextNav, children,
   } = props;
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -211,11 +216,12 @@ export function AppShell(props: AppShellProps) {
         >
           <Menu size={20} />
         </button>
-        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm" style={{ color: "var(--text-muted)" }}>
-          <span className="hidden sm:inline" style={{ color: "var(--text-secondary)" }}>{breadcrumbRoot}</span>
-          <ChevronRight size={14} className="hidden shrink-0 sm:block" />
-          <span className="truncate font-semibold" style={{ color: "var(--text-primary)" }}>{breadcrumbCurrent}</span>
-        </nav>
+        {/* The breadcrumb used to sit here, with its current segment set in
+            semibold primary text. That made it a second title competing with
+            the page's H1 from inside the chrome. It is the first step of the
+            content hierarchy, not chrome, so it moved into <main> directly
+            above the page header — see below. The header keeps its geometry,
+            its height and its global controls. */}
         <div className="ml-auto flex min-w-0 items-center gap-2.5">
           {headerRight}
           <ProfilePopover
@@ -233,7 +239,17 @@ export function AppShell(props: AppShellProps) {
       <div data-shell-region="workspace" data-has-context-nav={contextNav ? "true" : "false"}>
         {contextNav && <div data-shell-region="context-nav">{contextNav}</div>}
         <main data-shell-region="content">
-          {pageHeader && <div data-shell-region="page-header">{pageHeader}</div>}
+          {/* Step one of the content hierarchy, rendered once for every route
+              whether or not it has a PageHeader yet: one breadcrumb landmark
+              exists on every page and no page can add a second. It scrolls
+              away under the page header rather than pinning — the title is
+              what has to stay legible while the work surface moves. */}
+          <nav aria-label="Breadcrumb" data-shell-breadcrumb>
+            <ol>
+              <li>{breadcrumbRoot}</li>
+              <li aria-current="page">{breadcrumbCurrent}</li>
+            </ol>
+          </nav>
           {children}
         </main>
       </div>
