@@ -1,5 +1,5 @@
 import React from "react";
-import Card from "../../source-ui/card";
+import { Card } from "@/components/ui/card";
 import { Building2, ArrowRight, Shield, ShieldAlert, CheckCircle, XCircle, Settings, Users } from "lucide-react";
 
 interface CompanyDashboardTabProps {

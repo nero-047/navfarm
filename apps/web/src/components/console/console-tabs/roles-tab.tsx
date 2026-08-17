@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import Card from "../../source-ui/card";
-import Button from "../../source-ui/button";
-import Input from "../../source-ui/input";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { ShieldAlert, Plus, Save, RefreshCw, Edit3, Trash2 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { Dialog } from "../../ui/dialog";
@@ -404,9 +405,15 @@ export default function RolesTab({
 
       <Dialog open={isCreateModalOpen} onClose={() => !creatingRole && setIsCreateModalOpen(false)} title="Create custom role" description="Define a reusable permission role for this company." maxWidth="sm">
           <form onSubmit={handleCreateRoleSubmit} className="flex flex-col gap-4">
-            <Input label="Role Code" placeholder="e.g. FARM_SUPERVISOR" value={newRole.roleCode} onChange={(e) => setNewRole({ ...newRole, roleCode: e.target.value.toUpperCase() })} required />
-            <Input label="Role Name" placeholder="Farm Supervisor" value={newRole.roleName} onChange={(e) => setNewRole({ ...newRole, roleName: e.target.value })} required />
-            <Input label="Description" placeholder="Manages coops and biological feeds" value={newRole.description} onChange={(e) => setNewRole({ ...newRole, description: e.target.value })} />
+            <Field label="Role Code" htmlFor="create-role-code" required>
+              <Input id="create-role-code" placeholder="e.g. FARM_SUPERVISOR" value={newRole.roleCode} onChange={(e) => setNewRole({ ...newRole, roleCode: e.target.value.toUpperCase() })} required />
+            </Field>
+            <Field label="Role Name" htmlFor="create-role-name" required>
+              <Input id="create-role-name" placeholder="Farm Supervisor" value={newRole.roleName} onChange={(e) => setNewRole({ ...newRole, roleName: e.target.value })} required />
+            </Field>
+            <Field label="Description" htmlFor="create-role-description">
+              <Input id="create-role-description" placeholder="Manages coops and biological feeds" value={newRole.description} onChange={(e) => setNewRole({ ...newRole, description: e.target.value })} />
+            </Field>
             <div className="mt-2 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
               <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)} className="py-2 px-4 text-xs">Cancel</Button>
               <Button type="submit" disabled={creatingRole} className="py-2 px-4 text-xs text-white" style={{ backgroundColor: "var(--accent)" }}>{creatingRole ? "Saving..." : "Create"}</Button>
@@ -417,8 +424,12 @@ export default function RolesTab({
       <Dialog open={isEditModalOpen && Boolean(editingRole)} onClose={() => !savingEdit && setIsEditModalOpen(false)} title="Edit role" description={editingRole ? `Update ${editingRole.role_code}.` : undefined} maxWidth="sm">
           {editingRole && <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
             <div className="text-[10px] font-mono" style={S.textMuted}>Role Code: {editingRole.role_code}</div>
-            <Input label="Role Name" placeholder="Farm Supervisor" value={editName} onChange={(e) => setEditName(e.target.value)} required />
-            <Input label="Description" placeholder="Role description" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+            <Field label="Role Name" htmlFor="edit-role-name" required>
+              <Input id="edit-role-name" placeholder="Farm Supervisor" value={editName} onChange={(e) => setEditName(e.target.value)} required />
+            </Field>
+            <Field label="Description" htmlFor="edit-role-description">
+              <Input id="edit-role-description" placeholder="Role description" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+            </Field>
             <div className="mt-2 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
               <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} className="py-2 px-4 text-xs">Cancel</Button>
               <Button type="submit" disabled={savingEdit} className="py-2 px-4 text-xs text-white" style={{ backgroundColor: "var(--accent)" }}>{savingEdit ? "Saving..." : "Save Changes"}</Button>

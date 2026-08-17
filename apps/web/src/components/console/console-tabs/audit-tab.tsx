@@ -1,5 +1,5 @@
 import React from "react";
-import Card from "../../source-ui/card";
+import { Card } from "@/components/ui/card";
 
 interface AuditTabProps {
   auditLogs: any[];

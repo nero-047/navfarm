@@ -13,6 +13,12 @@ const config = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: 'test-output/jest/coverage',
   testEnvironment: 'jsdom',
+  // Mirrors the "@/*" -> "src/*" alias from tsconfig.json. next/jest only
+  // wires this up via SWC's resolvedBaseUrl, which is disabled below, so it
+  // has to be declared explicitly or every "@/..." import fails under Jest.
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
 };
 
 const jestConfig = createJestConfig(config);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Select } from "@/components/ui/select";
-import Button from "../../source-ui/button";
+import { Button } from "@/components/ui/button";
 import { Coins } from "lucide-react";
 
 interface Step5CurrencyProps {

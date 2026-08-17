@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { Select } from "@/components/ui/select";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { MapPin } from "lucide-react";
 
 interface Step2AddressProps {
@@ -11,6 +12,8 @@ interface Step2AddressProps {
 }
 
 export default function Step2Address({ onSubmit, isSubmitting, initialData }: Step2AddressProps) {
+  const uid = useId();
+  const fieldId = (name: string) => `${uid}-${name}`;
   const [formData, setFormData] = useState({
     address_label: initialData?.address_label || "",
     address_line_1: initialData?.address_line_1 || "",
@@ -58,47 +61,59 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input
-          label="Address Tag / Label"
-          placeholder="e.g. Head Office - Gate 1"
-          value={formData.address_label}
-          onChange={(e) => setFormData({ ...formData, address_label: e.target.value })}
-        />
-        <Input
-          label="Street Address line 1"
-          placeholder="Main Farm Gate Road"
-          value={formData.address_line_1}
-          onChange={(e) => setFormData({ ...formData, address_line_1: e.target.value })}
-          required
-        />
+        <Field label="Address Tag / Label" htmlFor={fieldId("address_label")}>
+          <Input
+            id={fieldId("address_label")}
+            placeholder="e.g. Head Office - Gate 1"
+            value={formData.address_label}
+            onChange={(e) => setFormData({ ...formData, address_label: e.target.value })}
+          />
+        </Field>
+        <Field label="Street Address line 1" htmlFor={fieldId("address_line_1")} required>
+          <Input
+            id={fieldId("address_line_1")}
+            placeholder="Main Farm Gate Road"
+            value={formData.address_line_1}
+            onChange={(e) => setFormData({ ...formData, address_line_1: e.target.value })}
+            required
+          />
+        </Field>
 
-        <Input
-          label="Street Address line 2"
-          placeholder="Shed Area 4"
-          value={formData.address_line_2}
-          onChange={(e) => setFormData({ ...formData, address_line_2: e.target.value })}
-        />
-        <Input
-          label="City"
-          placeholder="Gurugram"
-          value={formData.city}
-          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-          required
-        />
-        <Input
-          label="State / Province"
-          placeholder="Haryana"
-          value={formData.state_province}
-          onChange={(e) => setFormData({ ...formData, state_province: e.target.value })}
-          required
-        />
-        <Input
-          label="Postal Code"
-          placeholder="122001"
-          value={formData.postal_code}
-          onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-          required
-        />
+        <Field label="Street Address line 2" htmlFor={fieldId("address_line_2")}>
+          <Input
+            id={fieldId("address_line_2")}
+            placeholder="Shed Area 4"
+            value={formData.address_line_2}
+            onChange={(e) => setFormData({ ...formData, address_line_2: e.target.value })}
+          />
+        </Field>
+        <Field label="City" htmlFor={fieldId("city")} required>
+          <Input
+            id={fieldId("city")}
+            placeholder="Gurugram"
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            required
+          />
+        </Field>
+        <Field label="State / Province" htmlFor={fieldId("state_province")} required>
+          <Input
+            id={fieldId("state_province")}
+            placeholder="Haryana"
+            value={formData.state_province}
+            onChange={(e) => setFormData({ ...formData, state_province: e.target.value })}
+            required
+          />
+        </Field>
+        <Field label="Postal Code" htmlFor={fieldId("postal_code")} required>
+          <Input
+            id={fieldId("postal_code")}
+            placeholder="122001"
+            value={formData.postal_code}
+            onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
+            required
+          />
+        </Field>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Location Type</label>
           <Select

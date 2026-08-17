@@ -5,7 +5,12 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('rounded-[var(--radius-md)] border border-(--card-border) bg-(--card-bg)', className)}
+      className={cn(
+        // Text colour is set here rather than inherited: cards sit on several
+        // different surfaces, and without it their contents drift per surface.
+        'rounded-[var(--radius-md)] border border-(--card-border) bg-(--card-bg) text-(--text-primary)',
+        className
+      )}
       {...props}
     />
   )

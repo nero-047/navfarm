@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Toast } from "@/components/ui/toast";
-import Card from "../../source-ui/card";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
+import { Card } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Mail, Globe, Save, Send, ToggleLeft, ToggleRight } from "lucide-react";
 import { api } from "../../../services/api-client";
 
@@ -246,51 +247,63 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="SMTP Hostname"
-                  placeholder="smtp.mailgun.org"
-                  value={emailForm.smtp_host}
-                  onChange={(e) => setEmailForm({ ...emailForm, smtp_host: e.target.value })}
-                  required
-                />
-                <Input
-                  label="SMTP Port"
-                  type="number"
-                  placeholder="587"
-                  value={emailForm.smtp_port.toString()}
-                  onChange={(e) => setEmailForm({ ...emailForm, smtp_port: parseInt(e.target.value) || 587 })}
-                  required
-                />
-                <Input
-                  label="SMTP User / Key"
-                  placeholder="postmaster@yourdomain.com"
-                  value={emailForm.smtp_user}
-                  onChange={(e) => setEmailForm({ ...emailForm, smtp_user: e.target.value })}
-                  required
-                />
-                <Input
-                  label="SMTP Password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={emailForm.smtp_password_enc}
-                  onChange={(e) => setEmailForm({ ...emailForm, smtp_password_enc: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Sender Email (From)"
-                  placeholder="alerts@navfarm.com"
-                  type="email"
-                  value={emailForm.from_email}
-                  onChange={(e) => setEmailForm({ ...emailForm, from_email: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Sender Display Name"
-                  placeholder="NAVFarm Systems"
-                  value={emailForm.from_name}
-                  onChange={(e) => setEmailForm({ ...emailForm, from_name: e.target.value })}
-                  required
-                />
+                <Field label="SMTP Hostname" htmlFor="smtp-host" required>
+                  <Input
+                    id="smtp-host"
+                    placeholder="smtp.mailgun.org"
+                    value={emailForm.smtp_host}
+                    onChange={(e) => setEmailForm({ ...emailForm, smtp_host: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="SMTP Port" htmlFor="smtp-port" required>
+                  <Input
+                    id="smtp-port"
+                    type="number"
+                    placeholder="587"
+                    value={emailForm.smtp_port.toString()}
+                    onChange={(e) => setEmailForm({ ...emailForm, smtp_port: parseInt(e.target.value) || 587 })}
+                    required
+                  />
+                </Field>
+                <Field label="SMTP User / Key" htmlFor="smtp-user" required>
+                  <Input
+                    id="smtp-user"
+                    placeholder="postmaster@yourdomain.com"
+                    value={emailForm.smtp_user}
+                    onChange={(e) => setEmailForm({ ...emailForm, smtp_user: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="SMTP Password" htmlFor="smtp-password" required>
+                  <Input
+                    id="smtp-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={emailForm.smtp_password_enc}
+                    onChange={(e) => setEmailForm({ ...emailForm, smtp_password_enc: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="Sender Email (From)" htmlFor="smtp-from-email" required>
+                  <Input
+                    id="smtp-from-email"
+                    placeholder="alerts@navfarm.com"
+                    type="email"
+                    value={emailForm.from_email}
+                    onChange={(e) => setEmailForm({ ...emailForm, from_email: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="Sender Display Name" htmlFor="smtp-from-name" required>
+                  <Input
+                    id="smtp-from-name"
+                    placeholder="NAVFarm Systems"
+                    value={emailForm.from_name}
+                    onChange={(e) => setEmailForm({ ...emailForm, from_name: e.target.value })}
+                    required
+                  />
+                </Field>
               </div>
 
               <Button type="submit" disabled={isSubmitting} className="mt-4 self-end flex items-center gap-2 text-xs">
@@ -324,20 +337,24 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
               </div>
 
               <div className="flex flex-col gap-4">
-                <Input
-                  label="Endpoint URL"
-                  placeholder="https://hooks.slack.com/services/..."
-                  value={webhookForm.webhook_url}
-                  onChange={(e) => setWebhookForm({ ...webhookForm, webhook_url: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Signing Secret Key (Optional)"
-                  type="password"
-                  placeholder="Secret payload validation hash key"
-                  value={webhookForm.webhook_secret_enc}
-                  onChange={(e) => setWebhookForm({ ...webhookForm, webhook_secret_enc: e.target.value })}
-                />
+                <Field label="Endpoint URL" htmlFor="webhook-url" required>
+                  <Input
+                    id="webhook-url"
+                    placeholder="https://hooks.slack.com/services/..."
+                    value={webhookForm.webhook_url}
+                    onChange={(e) => setWebhookForm({ ...webhookForm, webhook_url: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="Signing Secret Key (Optional)" htmlFor="webhook-secret">
+                  <Input
+                    id="webhook-secret"
+                    type="password"
+                    placeholder="Secret payload validation hash key"
+                    value={webhookForm.webhook_secret_enc}
+                    onChange={(e) => setWebhookForm({ ...webhookForm, webhook_secret_enc: e.target.value })}
+                  />
+                </Field>
               </div>
 
               <Button type="submit" disabled={isSubmitting} className="mt-4 self-end flex items-center gap-2 text-xs">
@@ -353,13 +370,19 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
         <Card className="p-6 border-(--border) bg-(--surface)">
           <h4 className="font-semibold text-(--text-primary) text-sm border-b border-(--border) pb-3 mb-4">Send Test Notification</h4>
           <form onSubmit={handleSendTest} className="flex flex-col gap-4">
-            <Input
+            <Field
               label={activeChannel === "EMAIL" ? "Test Recipient Email" : "Test Endpoint URL override"}
-              placeholder={activeChannel === "EMAIL" ? "recipient@domain.com" : "Leave blank to use default endpoint"}
-              value={testRecipient}
-              onChange={(e) => setTestRecipient(e.target.value)}
+              htmlFor="test-recipient"
               required
-            />
+            >
+              <Input
+                id="test-recipient"
+                placeholder={activeChannel === "EMAIL" ? "recipient@domain.com" : "Leave blank to use default endpoint"}
+                value={testRecipient}
+                onChange={(e) => setTestRecipient(e.target.value)}
+                required
+              />
+            </Field>
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Notification Body Message</label>
               <textarea

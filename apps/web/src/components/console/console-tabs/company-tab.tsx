@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Select } from "@/components/ui/select";
-import Card from "../../source-ui/card";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
+import { Card } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Edit2,
   Save,
@@ -648,7 +649,10 @@ export default function CompanyTab({
                             setSelectedCompanyDetails(comp);
                             if (onSelectCompany) onSelectCompany(comp);
                           }}
-                          className="py-1.5 px-3 text-[10px] uppercase font-semibold tracking-wider hover:scale-[1.02] cursor-pointer"
+                          // w-full preserves the width this button had while the
+                          // legacy primitive was display:flex — it is the one
+                          // call site that sat in block flow rather than a flex row.
+                          className="w-full py-1.5 px-3 text-[10px] uppercase font-semibold tracking-wider hover:scale-[1.02] cursor-pointer"
                         >
                           Manage Profile
                         </Button>
@@ -671,26 +675,32 @@ export default function CompanyTab({
         >
             <form onSubmit={handleCreateCompany} className="flex flex-col gap-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Company Code"
-                  placeholder="UNIQUE_CODE"
-                  value={createForm.company_code}
-                  onChange={(e) => setCreateForm({ ...createForm, company_code: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Legal Entity Name"
-                  placeholder="Company Pvt Ltd"
-                  value={createForm.company_name}
-                  onChange={(e) => setCreateForm({ ...createForm, company_name: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Display / Brand Name"
-                  placeholder="Brand Name"
-                  value={createForm.company_display_name}
-                  onChange={(e) => setCreateForm({ ...createForm, company_display_name: e.target.value })}
-                />
+                <Field label="Company Code" htmlFor="create-company-code" required>
+                  <Input
+                    id="create-company-code"
+                    placeholder="UNIQUE_CODE"
+                    value={createForm.company_code}
+                    onChange={(e) => setCreateForm({ ...createForm, company_code: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="Legal Entity Name" htmlFor="create-company-name" required>
+                  <Input
+                    id="create-company-name"
+                    placeholder="Company Pvt Ltd"
+                    value={createForm.company_name}
+                    onChange={(e) => setCreateForm({ ...createForm, company_name: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="Display / Brand Name" htmlFor="create-company-display-name">
+                  <Input
+                    id="create-company-display-name"
+                    placeholder="Brand Name"
+                    value={createForm.company_display_name}
+                    onChange={(e) => setCreateForm({ ...createForm, company_display_name: e.target.value })}
+                  />
+                </Field>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Classification</label>
                   <Select
@@ -705,37 +715,47 @@ export default function CompanyTab({
                     <option value="Co-operative">Co-operative</option>
                   </Select>
                 </div>
-                <Input
-                  label="Primary Industry"
-                  placeholder="Poultry Farming"
-                  value={createForm.industry_type}
-                  onChange={(e) => setCreateForm({ ...createForm, industry_type: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Operating Country"
-                  placeholder="IND"
-                  value={createForm.country_id}
-                  onChange={(e) => setCreateForm({ ...createForm, country_id: e.target.value })}
-                />
-                <Input
-                  label="Timezone"
-                  placeholder="Asia/Kolkata"
-                  value={createForm.default_timezone_id}
-                  onChange={(e) => setCreateForm({ ...createForm, default_timezone_id: e.target.value })}
-                />
-                <Input
-                  label="Tax Registration ID"
-                  placeholder="GSTIN12345"
-                  value={createForm.tax_id}
-                  onChange={(e) => setCreateForm({ ...createForm, tax_id: e.target.value })}
-                />
-                <Input
-                  label="Corporate Registration No"
-                  placeholder="CIN12345"
-                  value={createForm.registration_no}
-                  onChange={(e) => setCreateForm({ ...createForm, registration_no: e.target.value })}
-                />
+                <Field label="Primary Industry" htmlFor="create-industry-type" required>
+                  <Input
+                    id="create-industry-type"
+                    placeholder="Poultry Farming"
+                    value={createForm.industry_type}
+                    onChange={(e) => setCreateForm({ ...createForm, industry_type: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="Operating Country" htmlFor="create-country-id">
+                  <Input
+                    id="create-country-id"
+                    placeholder="IND"
+                    value={createForm.country_id}
+                    onChange={(e) => setCreateForm({ ...createForm, country_id: e.target.value })}
+                  />
+                </Field>
+                <Field label="Timezone" htmlFor="create-timezone">
+                  <Input
+                    id="create-timezone"
+                    placeholder="Asia/Kolkata"
+                    value={createForm.default_timezone_id}
+                    onChange={(e) => setCreateForm({ ...createForm, default_timezone_id: e.target.value })}
+                  />
+                </Field>
+                <Field label="Tax Registration ID" htmlFor="create-tax-id">
+                  <Input
+                    id="create-tax-id"
+                    placeholder="GSTIN12345"
+                    value={createForm.tax_id}
+                    onChange={(e) => setCreateForm({ ...createForm, tax_id: e.target.value })}
+                  />
+                </Field>
+                <Field label="Corporate Registration No" htmlFor="create-registration-no">
+                  <Input
+                    id="create-registration-no"
+                    placeholder="CIN12345"
+                    value={createForm.registration_no}
+                    onChange={(e) => setCreateForm({ ...createForm, registration_no: e.target.value })}
+                  />
+                </Field>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Brand Hex Accent Color</label>
                   <div className="flex gap-2 items-center">
@@ -1056,23 +1076,29 @@ export default function CompanyTab({
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Input
-                            label="Company Code (Read Only)"
-                            value={profileForm.company_code}
-                            disabled
-                            className="opacity-50"
-                          />
-                          <Input
-                            label="Legal Entity Name"
-                            value={profileForm.company_name}
-                            onChange={(e) => setProfileForm({ ...profileForm, company_name: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Display / Brand Name"
-                            value={profileForm.company_display_name}
-                            onChange={(e) => setProfileForm({ ...profileForm, company_display_name: e.target.value })}
-                          />
+                          <Field label="Company Code (Read Only)" htmlFor="profile-company-code">
+                            <Input
+                              id="profile-company-code"
+                              value={profileForm.company_code}
+                              disabled
+                              className="opacity-50"
+                            />
+                          </Field>
+                          <Field label="Legal Entity Name" htmlFor="profile-company-name" required>
+                            <Input
+                              id="profile-company-name"
+                              value={profileForm.company_name}
+                              onChange={(e) => setProfileForm({ ...profileForm, company_name: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Display / Brand Name" htmlFor="profile-company-display-name">
+                            <Input
+                              id="profile-company-display-name"
+                              value={profileForm.company_display_name}
+                              onChange={(e) => setProfileForm({ ...profileForm, company_display_name: e.target.value })}
+                            />
+                          </Field>
                           <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Classification</label>
                             <Select
@@ -1087,17 +1113,21 @@ export default function CompanyTab({
                               <option value="Co-operative">Co-operative</option>
                             </Select>
                           </div>
-                          <Input
-                            label="Primary Industry"
-                            value={profileForm.industry_type}
-                            onChange={(e) => setProfileForm({ ...profileForm, industry_type: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Tax Registration ID"
-                            value={profileForm.tax_id}
-                            onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
-                          />
+                          <Field label="Primary Industry" htmlFor="profile-industry-type" required>
+                            <Input
+                              id="profile-industry-type"
+                              value={profileForm.industry_type}
+                              onChange={(e) => setProfileForm({ ...profileForm, industry_type: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Tax Registration ID" htmlFor="profile-tax-id">
+                            <Input
+                              id="profile-tax-id"
+                              value={profileForm.tax_id}
+                              onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
+                            />
+                          </Field>
                           <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Tax Regime</label>
                             <Select
@@ -1109,42 +1139,54 @@ export default function CompanyTab({
                               <option value="EXEMPT">Exempt / Non-Taxable</option>
                             </Select>
                           </div>
-                          <Input
-                            label="Corporate Registration No"
-                            value={profileForm.registration_no}
-                            onChange={(e) => setProfileForm({ ...profileForm, registration_no: e.target.value })}
-                          />
-                          <Input
-                            label="Incorporation Date"
-                            type="date"
-                            value={profileForm.incorporation_date}
-                            onChange={(e) => setProfileForm({ ...profileForm, incorporation_date: e.target.value })}
-                          />
-                          <Input
-                            label="Website URL"
-                            placeholder="https://greenvalleyfarms.in"
-                            value={profileForm.website}
-                            onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
-                          />
-                          <Input
-                            label="Email Domain (for Auto-verify)"
-                            placeholder="greenvalleyfarms.in"
-                            value={profileForm.email_domain}
-                            onChange={(e) => setProfileForm({ ...profileForm, email_domain: e.target.value })}
-                          />
-                          <Input
-                            label="Support Email"
-                            placeholder="support@greenvalleyfarms.in"
-                            type="email"
-                            value={profileForm.support_email}
-                            onChange={(e) => setProfileForm({ ...profileForm, support_email: e.target.value })}
-                          />
-                          <Input
-                            label="Primary Phone / Landline"
-                            placeholder="+91 11 2345 6789"
-                            value={profileForm.phone_primary}
-                            onChange={(e) => setProfileForm({ ...profileForm, phone_primary: e.target.value })}
-                          />
+                          <Field label="Corporate Registration No" htmlFor="profile-registration-no">
+                            <Input
+                              id="profile-registration-no"
+                              value={profileForm.registration_no}
+                              onChange={(e) => setProfileForm({ ...profileForm, registration_no: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Incorporation Date" htmlFor="profile-incorporation-date">
+                            <Input
+                              id="profile-incorporation-date"
+                              type="date"
+                              value={profileForm.incorporation_date}
+                              onChange={(e) => setProfileForm({ ...profileForm, incorporation_date: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Website URL" htmlFor="profile-website">
+                            <Input
+                              id="profile-website"
+                              placeholder="https://greenvalleyfarms.in"
+                              value={profileForm.website}
+                              onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Email Domain (for Auto-verify)" htmlFor="profile-email-domain">
+                            <Input
+                              id="profile-email-domain"
+                              placeholder="greenvalleyfarms.in"
+                              value={profileForm.email_domain}
+                              onChange={(e) => setProfileForm({ ...profileForm, email_domain: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Support Email" htmlFor="profile-support-email">
+                            <Input
+                              id="profile-support-email"
+                              placeholder="support@greenvalleyfarms.in"
+                              type="email"
+                              value={profileForm.support_email}
+                              onChange={(e) => setProfileForm({ ...profileForm, support_email: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Primary Phone / Landline" htmlFor="profile-phone-primary">
+                            <Input
+                              id="profile-phone-primary"
+                              placeholder="+91 11 2345 6789"
+                              value={profileForm.phone_primary}
+                              onChange={(e) => setProfileForm({ ...profileForm, phone_primary: e.target.value })}
+                            />
+                          </Field>
                           <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Brand Hex Accent Color</label>
                             <div className="flex gap-2 items-center">
@@ -1218,12 +1260,14 @@ export default function CompanyTab({
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Input
-                            label="Address Nickname / Tag"
-                            placeholder="e.g. Headquarters - Gate 1"
-                            value={addressForm.address_label}
-                            onChange={(e) => setAddressForm({ ...addressForm, address_label: e.target.value })}
-                          />
+                          <Field label="Address Nickname / Tag" htmlFor="address-label">
+                            <Input
+                              id="address-label"
+                              placeholder="e.g. Headquarters - Gate 1"
+                              value={addressForm.address_label}
+                              onChange={(e) => setAddressForm({ ...addressForm, address_label: e.target.value })}
+                            />
+                          </Field>
                           <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Address Type</label>
                             <Select
@@ -1236,54 +1280,70 @@ export default function CompanyTab({
                               <option value="Farm">Farm Site</option>
                             </Select>
                           </div>
-                          <Input
-                            label="Address Line 1"
-                            value={addressForm.line1}
-                            onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Address Line 2"
-                            value={addressForm.line2}
-                            onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
-                          />
-                          <Input
-                            label="City"
-                            value={addressForm.city}
-                            onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="State / Province"
-                            value={addressForm.state_id}
-                            onChange={(e) => setAddressForm({ ...addressForm, state_id: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Country"
-                            value={addressForm.country_id}
-                            onChange={(e) => setAddressForm({ ...addressForm, country_id: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Pincode"
-                            value={addressForm.pincode}
-                            onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                            required
-                          />
+                          <Field label="Address Line 1" htmlFor="address-line1" required>
+                            <Input
+                              id="address-line1"
+                              value={addressForm.line1}
+                              onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Address Line 2" htmlFor="address-line2">
+                            <Input
+                              id="address-line2"
+                              value={addressForm.line2}
+                              onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="City" htmlFor="address-city" required>
+                            <Input
+                              id="address-city"
+                              value={addressForm.city}
+                              onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="State / Province" htmlFor="address-state" required>
+                            <Input
+                              id="address-state"
+                              value={addressForm.state_id}
+                              onChange={(e) => setAddressForm({ ...addressForm, state_id: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Country" htmlFor="address-country" required>
+                            <Input
+                              id="address-country"
+                              value={addressForm.country_id}
+                              onChange={(e) => setAddressForm({ ...addressForm, country_id: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Pincode" htmlFor="address-pincode" required>
+                            <Input
+                              id="address-pincode"
+                              value={addressForm.pincode}
+                              onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
+                              required
+                            />
+                          </Field>
                           <div className="grid grid-cols-2 gap-2 sm:col-span-2">
-                            <Input
-                              label="GPS Latitude"
-                              placeholder="e.g. 28.6139"
-                              value={addressForm.gps_latitude}
-                              onChange={(e) => setAddressForm({ ...addressForm, gps_latitude: e.target.value })}
-                            />
-                            <Input
-                              label="GPS Longitude"
-                              placeholder="e.g. 77.2090"
-                              value={addressForm.gps_longitude}
-                              onChange={(e) => setAddressForm({ ...addressForm, gps_longitude: e.target.value })}
-                            />
+                            <Field label="GPS Latitude" htmlFor="address-gps-lat">
+                              <Input
+                                id="address-gps-lat"
+                                placeholder="e.g. 28.6139"
+                                value={addressForm.gps_latitude}
+                                onChange={(e) => setAddressForm({ ...addressForm, gps_latitude: e.target.value })}
+                              />
+                            </Field>
+                            <Field label="GPS Longitude" htmlFor="address-gps-lng">
+                              <Input
+                                id="address-gps-lng"
+                                placeholder="e.g. 77.2090"
+                                value={addressForm.gps_longitude}
+                                onChange={(e) => setAddressForm({ ...addressForm, gps_longitude: e.target.value })}
+                              />
+                            </Field>
                           </div>
                         </div>
                         <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
@@ -1333,36 +1393,46 @@ export default function CompanyTab({
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Input
-                            label="Key Contact Person Full Name"
-                            value={contactForm.full_name}
-                            onChange={(e) => setContactForm({ ...contactForm, full_name: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Designation Role"
-                            value={contactForm.designation}
-                            onChange={(e) => setContactForm({ ...contactForm, designation: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Primary Contact Phone"
-                            value={contactForm.phone_primary}
-                            onChange={(e) => setContactForm({ ...contactForm, phone_primary: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Secondary Contact Phone"
-                            value={contactForm.phone_secondary}
-                            onChange={(e) => setContactForm({ ...contactForm, phone_secondary: e.target.value })}
-                          />
-                          <Input
-                            label="Primary Email"
-                            type="email"
-                            value={contactForm.email}
-                            onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                            required
-                          />
+                          <Field label="Key Contact Person Full Name" htmlFor="contact-full-name" required>
+                            <Input
+                              id="contact-full-name"
+                              value={contactForm.full_name}
+                              onChange={(e) => setContactForm({ ...contactForm, full_name: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Designation Role" htmlFor="contact-designation" required>
+                            <Input
+                              id="contact-designation"
+                              value={contactForm.designation}
+                              onChange={(e) => setContactForm({ ...contactForm, designation: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Primary Contact Phone" htmlFor="contact-phone-primary" required>
+                            <Input
+                              id="contact-phone-primary"
+                              value={contactForm.phone_primary}
+                              onChange={(e) => setContactForm({ ...contactForm, phone_primary: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Secondary Contact Phone" htmlFor="contact-phone-secondary">
+                            <Input
+                              id="contact-phone-secondary"
+                              value={contactForm.phone_secondary}
+                              onChange={(e) => setContactForm({ ...contactForm, phone_secondary: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Primary Email" htmlFor="contact-email" required>
+                            <Input
+                              id="contact-email"
+                              type="email"
+                              value={contactForm.email}
+                              onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                              required
+                            />
+                          </Field>
                           <div className="flex flex-col gap-2 justify-center pt-2">
                             <label className="flex items-center gap-2 cursor-pointer text-xs">
                               <input
@@ -1444,18 +1514,22 @@ export default function CompanyTab({
                               ))}
                             </Select>
                           </div>
-                          <Input
-                            label="Timezone ID"
-                            value={localizationForm.default_timezone_id}
-                            onChange={(e) => setLocalizationForm({ ...localizationForm, default_timezone_id: e.target.value })}
-                            required
-                          />
-                          <Input
-                            label="Operating Country Code"
-                            value={localizationForm.country_id}
-                            onChange={(e) => setLocalizationForm({ ...localizationForm, country_id: e.target.value.toUpperCase() })}
-                            required
-                          />
+                          <Field label="Timezone ID" htmlFor="localization-timezone" required>
+                            <Input
+                              id="localization-timezone"
+                              value={localizationForm.default_timezone_id}
+                              onChange={(e) => setLocalizationForm({ ...localizationForm, default_timezone_id: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field label="Operating Country Code" htmlFor="localization-country" required>
+                            <Input
+                              id="localization-country"
+                              value={localizationForm.country_id}
+                              onChange={(e) => setLocalizationForm({ ...localizationForm, country_id: e.target.value.toUpperCase() })}
+                              required
+                            />
+                          </Field>
                         </div>
                         <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
                           <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Localization"}
@@ -1526,13 +1600,15 @@ export default function CompanyTab({
                               <option value={4}>April</option>
                             </Select>
                           </div>
-                          <Input
-                            label="Current Fiscal Year"
-                            placeholder="e.g. 2026-27"
-                            value={fiscalForm.current_fiscal_year}
-                            onChange={(e) => setFiscalForm({ ...fiscalForm, current_fiscal_year: e.target.value })}
-                            required
-                          />
+                          <Field label="Current Fiscal Year" htmlFor="fiscal-year" required>
+                            <Input
+                              id="fiscal-year"
+                              placeholder="e.g. 2026-27"
+                              value={fiscalForm.current_fiscal_year}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, current_fiscal_year: e.target.value })}
+                              required
+                            />
+                          </Field>
                           <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Accounting Periodicity</label>
                             <Select
@@ -1843,35 +1919,43 @@ export default function CompanyTab({
 
           <Dialog open={showAdminDialog} onClose={() => setShowAdminDialog(false)} title={isTenantAdmin ? "Add company administrator" : "Add company operator"} description={`Create an account for ${targetCompany?.company_name ?? "this company"}.`} maxWidth="md">
             <form onSubmit={handleAddCompanyAdmin} className="flex flex-col gap-5">
-              <Input
-                label="Full Name"
-                placeholder="John Doe"
-                value={adminForm.fullName}
-                onChange={(e) => setAdminForm({ ...adminForm, fullName: e.target.value })}
-                required
-              />
-              <Input
-                label="Email Address"
-                type="email"
-                placeholder="user@domain.com"
-                value={adminForm.email}
-                onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
-                required
-              />
-              <Input
-                label="Temporary Password"
-                type="password"
-                placeholder="At least 8 characters"
-                value={adminForm.password}
-                onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
-                required
-              />
-              <Input
-                label="Phone Number"
-                placeholder="+919999911111"
-                value={adminForm.phone}
-                onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
-              />
+              <Field label="Full Name" htmlFor="admin-full-name" required>
+                <Input
+                  id="admin-full-name"
+                  placeholder="John Doe"
+                  value={adminForm.fullName}
+                  onChange={(e) => setAdminForm({ ...adminForm, fullName: e.target.value })}
+                  required
+                />
+              </Field>
+              <Field label="Email Address" htmlFor="admin-email" required>
+                <Input
+                  id="admin-email"
+                  type="email"
+                  placeholder="user@domain.com"
+                  value={adminForm.email}
+                  onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                  required
+                />
+              </Field>
+              <Field label="Temporary Password" htmlFor="admin-password" required>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  placeholder="At least 8 characters"
+                  value={adminForm.password}
+                  onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                  required
+                />
+              </Field>
+              <Field label="Phone Number" htmlFor="admin-phone">
+                <Input
+                  id="admin-phone"
+                  placeholder="+919999911111"
+                  value={adminForm.phone}
+                  onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
+                />
+              </Field>
               <div className="mt-1 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
               <button type="button" onClick={() => setShowAdminDialog(false)} className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
               <Button type="submit" disabled={addingAdmin} className="flex h-11 items-center justify-center gap-2 bg-(--accent) px-5 text-xs text-white hover:bg-(--accent-hover)">

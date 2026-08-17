@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
+import React, { useEffect, useId, useState } from "react";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Contact } from "lucide-react";
 
 interface Step3ContactProps {
@@ -10,6 +11,8 @@ interface Step3ContactProps {
 }
 
 export default function Step3Contact({ onSubmit, isSubmitting, initialData }: Step3ContactProps) {
+  const uid = useId();
+  const fieldId = (name: string) => `${uid}-${name}`;
   const [formData, setFormData] = useState({
     contact_name: initialData?.contact_name || "",
     contact_email: initialData?.contact_email || "",
@@ -51,39 +54,49 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input
-          label="Contact Person Name"
-          placeholder="Amit Sharma"
-          value={formData.contact_name}
-          onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-          required
-        />
-        <Input
-          label="Email Address"
-          placeholder="amit@greenvalley.com"
-          value={formData.contact_email}
-          onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-          required
-        />
-        <Input
-          label="Primary Mobile Phone"
-          placeholder="+91 99999 88888"
-          value={formData.contact_phone}
-          onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-          required
-        />
-        <Input
-          label="Secondary / Alternate Phone"
-          placeholder="+91 99999 77777"
-          value={formData.phone_secondary}
-          onChange={(e) => setFormData({ ...formData, phone_secondary: e.target.value })}
-        />
-        <Input
-          label="Job Designation"
-          placeholder="Operations Manager"
-          value={formData.designation}
-          onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-        />
+        <Field label="Contact Person Name" htmlFor={fieldId("contact_name")} required>
+          <Input
+            id={fieldId("contact_name")}
+            placeholder="Amit Sharma"
+            value={formData.contact_name}
+            onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+            required
+          />
+        </Field>
+        <Field label="Email Address" htmlFor={fieldId("contact_email")} required>
+          <Input
+            id={fieldId("contact_email")}
+            placeholder="amit@greenvalley.com"
+            value={formData.contact_email}
+            onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+            required
+          />
+        </Field>
+        <Field label="Primary Mobile Phone" htmlFor={fieldId("contact_phone")} required>
+          <Input
+            id={fieldId("contact_phone")}
+            placeholder="+91 99999 88888"
+            value={formData.contact_phone}
+            onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+            required
+          />
+        </Field>
+        <Field label="Secondary / Alternate Phone" htmlFor={fieldId("phone_secondary")}>
+          <Input
+            id={fieldId("phone_secondary")}
+            placeholder="+91 99999 77777"
+            value={formData.phone_secondary}
+            onChange={(e) => setFormData({ ...formData, phone_secondary: e.target.value })}
+          />
+        </Field>
+        <Field label="Job Designation" htmlFor={fieldId("designation")}>
+          <Input
+            id={fieldId("designation")}
+            placeholder="Operations Manager"
+            value={formData.designation}
+            onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+          />
+        </Field>
         <div className="flex items-center gap-3 mt-4">
           <input
             type="checkbox"

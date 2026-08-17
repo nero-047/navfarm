@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { Select } from "@/components/ui/select";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
 
 interface Step6TimezoneProps {
@@ -15,6 +16,8 @@ interface Step6TimezoneProps {
 export default function Step6Timezone({ onSubmit, isSubmitting, initialTz, initialCountry, onError }: Step6TimezoneProps) {
   const [timezone, setTimezone] = useState(initialTz || "Asia/Kolkata");
   const [country, setCountry] = useState(initialCountry || "");
+  const uid = useId();
+  const countryId = `${uid}-country`;
 
   useEffect(() => {
     if (initialTz) setTimezone(initialTz);
@@ -55,14 +58,16 @@ export default function Step6Timezone({ onSubmit, isSubmitting, initialTz, initi
           </Select>
         </div>
 
-        <Input
-          label="Country Code (ISO 3-Letter)"
-          placeholder="e.g. IND, USA"
-          value={country}
-          onChange={(e) => setCountry(e.target.value)}
-          maxLength={3}
-          required
-        />
+        <Field label="Country Code (ISO 3-Letter)" htmlFor={countryId} required>
+          <Input
+            id={countryId}
+            placeholder="e.g. IND, USA"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            maxLength={3}
+            required
+          />
+        </Field>
       </div>
       <Button onClick={handleSubmit} disabled={isSubmitting} className="mt-8 self-end">
         {isSubmitting ? "Saving..." : "Save & Continue"}

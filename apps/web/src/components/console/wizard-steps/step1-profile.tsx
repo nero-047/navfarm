@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { Select } from "@/components/ui/select";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Building2, Upload, X, Image as ImageIcon } from "lucide-react";
 import { api } from "../../../services/api-client";
 
@@ -15,6 +16,8 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
   const [logoUrl, setLogoUrl] = useState(initialData?.company_logo_url || "");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoError, setLogoError] = useState("");
+  const uid = useId();
+  const fieldId = (name: string) => `${uid}-${name}`;
 
   const [formData, setFormData] = useState({
     company_code: initialData?.company_code || "",
@@ -149,26 +152,32 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input
-          label="Company Code (Short ID)"
-          placeholder="e.g. GVF"
-          value={formData.company_code}
-          onChange={(e) => setFormData({ ...formData, company_code: e.target.value.toUpperCase() })}
-          required
-        />
-        <Input
-          label="Legal Entity Name"
-          placeholder="Green Valley Farms Pvt Ltd"
-          value={formData.company_name}
-          onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-          required
-        />
-        <Input
-          label="Display Name"
-          placeholder="Green Valley Farms"
-          value={formData.company_display_name}
-          onChange={(e) => setFormData({ ...formData, company_display_name: e.target.value })}
-        />
+        <Field label="Company Code (Short ID)" htmlFor={fieldId("company_code")} required>
+          <Input
+            id={fieldId("company_code")}
+            placeholder="e.g. GVF"
+            value={formData.company_code}
+            onChange={(e) => setFormData({ ...formData, company_code: e.target.value.toUpperCase() })}
+            required
+          />
+        </Field>
+        <Field label="Legal Entity Name" htmlFor={fieldId("company_name")} required>
+          <Input
+            id={fieldId("company_name")}
+            placeholder="Green Valley Farms Pvt Ltd"
+            value={formData.company_name}
+            onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+            required
+          />
+        </Field>
+        <Field label="Display Name" htmlFor={fieldId("company_display_name")}>
+          <Input
+            id={fieldId("company_display_name")}
+            placeholder="Green Valley Farms"
+            value={formData.company_display_name}
+            onChange={(e) => setFormData({ ...formData, company_display_name: e.target.value })}
+          />
+        </Field>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Business Class</label>
           <Select
@@ -197,18 +206,22 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             <option value="Feed & Processing">Feed Mill & Food Processing</option>
           </Select>
         </div>
-        <Input
-          label="Registration Certificate No"
-          placeholder="e.g. U01403DL2023PTC123456"
-          value={formData.registration_no}
-          onChange={(e) => setFormData({ ...formData, registration_no: e.target.value })}
-        />
-        <Input
-          label="Taxpayer ID / GSTIN"
-          placeholder="e.g. 07AAAAA1111A1Z1"
-          value={formData.tax_id}
-          onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
-        />
+        <Field label="Registration Certificate No" htmlFor={fieldId("registration_no")}>
+          <Input
+            id={fieldId("registration_no")}
+            placeholder="e.g. U01403DL2023PTC123456"
+            value={formData.registration_no}
+            onChange={(e) => setFormData({ ...formData, registration_no: e.target.value })}
+          />
+        </Field>
+        <Field label="Taxpayer ID / GSTIN" htmlFor={fieldId("tax_id")}>
+          <Input
+            id={fieldId("tax_id")}
+            placeholder="e.g. 07AAAAA1111A1Z1"
+            value={formData.tax_id}
+            onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+          />
+        </Field>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-(--text-secondary) font-medium">Tax Regime</label>
           <Select
@@ -221,37 +234,47 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             <option value="EXEMPT">Exempt / Non-Taxable</option>
           </Select>
         </div>
-        <Input
-          label="Incorporation Date"
-          type="date"
-          value={formData.incorporation_date}
-          onChange={(e) => setFormData({ ...formData, incorporation_date: e.target.value })}
-        />
-        <Input
-          label="Website URL"
-          placeholder="https://greenvalleyfarms.in"
-          value={formData.website}
-          onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-        />
-        <Input
-          label="Email Domain (for Auto-verify)"
-          placeholder="greenvalleyfarms.in"
-          value={formData.email_domain}
-          onChange={(e) => setFormData({ ...formData, email_domain: e.target.value })}
-        />
-        <Input
-          label="Support Email"
-          placeholder="support@greenvalleyfarms.in"
-          type="email"
-          value={formData.support_email}
-          onChange={(e) => setFormData({ ...formData, support_email: e.target.value })}
-        />
-        <Input
-          label="Primary Phone / Landline"
-          placeholder="+91 11 2345 6789"
-          value={formData.phone_primary}
-          onChange={(e) => setFormData({ ...formData, phone_primary: e.target.value })}
-        />
+        <Field label="Incorporation Date" htmlFor={fieldId("incorporation_date")}>
+          <Input
+            id={fieldId("incorporation_date")}
+            type="date"
+            value={formData.incorporation_date}
+            onChange={(e) => setFormData({ ...formData, incorporation_date: e.target.value })}
+          />
+        </Field>
+        <Field label="Website URL" htmlFor={fieldId("website")}>
+          <Input
+            id={fieldId("website")}
+            placeholder="https://greenvalleyfarms.in"
+            value={formData.website}
+            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+          />
+        </Field>
+        <Field label="Email Domain (for Auto-verify)" htmlFor={fieldId("email_domain")}>
+          <Input
+            id={fieldId("email_domain")}
+            placeholder="greenvalleyfarms.in"
+            value={formData.email_domain}
+            onChange={(e) => setFormData({ ...formData, email_domain: e.target.value })}
+          />
+        </Field>
+        <Field label="Support Email" htmlFor={fieldId("support_email")}>
+          <Input
+            id={fieldId("support_email")}
+            placeholder="support@greenvalleyfarms.in"
+            type="email"
+            value={formData.support_email}
+            onChange={(e) => setFormData({ ...formData, support_email: e.target.value })}
+          />
+        </Field>
+        <Field label="Primary Phone / Landline" htmlFor={fieldId("phone_primary")}>
+          <Input
+            id={fieldId("phone_primary")}
+            placeholder="+91 11 2345 6789"
+            value={formData.phone_primary}
+            onChange={(e) => setFormData({ ...formData, phone_primary: e.target.value })}
+          />
+        </Field>
       </div>
       <Button type="submit" disabled={isSubmitting || uploadingLogo} className="mt-4 self-end">
         {isSubmitting ? "Registering..." : "Save & Continue"}

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import Card from "../../source-ui/card";
-import Input from "../../source-ui/input";
-import Button from "../../source-ui/button";
+import { Card } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
 import { Dialog } from "../../ui/dialog";
 
@@ -164,35 +165,43 @@ export default function UsersTab({
         </h3>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input
-            label="Full Name"
-            placeholder="Jane Doe"
-            value={newUser.full_name}
-            onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
-            required
-          />
-          <Input
-            label="Email Address"
-            placeholder="jane@company.com"
-            value={newUser.email}
-            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-            type="email"
-            required
-          />
-          <Input
-            label="Password"
-            placeholder="Minimum 8 characters"
-            value={newUser.password_hash}
-            onChange={(e) => setNewUser({ ...newUser, password_hash: e.target.value })}
-            type="password"
-            required
-          />
-          <Input
-            label="Phone Number"
-            placeholder="+919999911111"
-            value={newUser.phone}
-            onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
-          />
+          <Field label="Full Name" htmlFor="invite-user-full-name" required>
+            <Input
+              id="invite-user-full-name"
+              placeholder="Jane Doe"
+              value={newUser.full_name}
+              onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+              required
+            />
+          </Field>
+          <Field label="Email Address" htmlFor="invite-user-email" required>
+            <Input
+              id="invite-user-email"
+              placeholder="jane@company.com"
+              value={newUser.email}
+              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              type="email"
+              required
+            />
+          </Field>
+          <Field label="Password" htmlFor="invite-user-password" required>
+            <Input
+              id="invite-user-password"
+              placeholder="Minimum 8 characters"
+              value={newUser.password_hash}
+              onChange={(e) => setNewUser({ ...newUser, password_hash: e.target.value })}
+              type="password"
+              required
+            />
+          </Field>
+          <Field label="Phone Number" htmlFor="invite-user-phone">
+            <Input
+              id="invite-user-phone"
+              placeholder="+919999911111"
+              value={newUser.phone}
+              onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+            />
+          </Field>
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Account Role Class</label>
