@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -72,9 +73,8 @@ export function LoginForm() {
           <label htmlFor="password" className="block text-[13px] font-medium text-(--text-primary)">
             {t('authPassword')}
           </label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

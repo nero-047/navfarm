@@ -186,6 +186,12 @@ export const translations = {
     authTaglineLine2: "simplified.",
     authSubheading: "Manage your livestock, crops, and operations from one clean dashboard.",
     authAllRightsReserved: "All rights reserved.",
+    authShowPassword: "Show password",
+    authHidePassword: "Hide password",
+    themeLabel: "Theme",
+    themeSystem: "System",
+    themeLight: "Light",
+    themeDark: "Dark",
   },
   hi: {
     // Sidebar & Navigation
