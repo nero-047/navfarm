@@ -118,15 +118,19 @@ export default function AdminDashboardPage() {
         description={t("platformWideSaaSAnalytics")}
       />
 
-      {/* Stats Widgets */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Summary strip — one bordered surface with hairline dividers between
+          segments, not four separate cards competing for attention. */}
+      <div
+        className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-md)] border sm:grid-cols-2 lg:grid-cols-4"
+        style={{ backgroundColor: "var(--border)", borderColor: "var(--border)" }}
+      >
         {/* Total Tenants */}
-        <div className="rounded-[var(--radius-lg)] border p-5" style={S.surface}>
+        <div className="p-5" style={S.surface}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("registeredTenants")}</span>
             <Building className="w-4 h-4" style={S.accent} />
           </div>
-          <div className="text-3xl font-semibold" style={S.primary}>{totalTenants}</div>
+          <div className="text-2xl font-semibold" style={S.primary}>{totalTenants}</div>
           <div className="mt-2 text-xs flex items-center gap-2" style={S.sub}>
             <span className="font-semibold" style={{ color: "var(--success)" }}>{activeTenants} {t("active")}</span>
             <span className="opacity-40">·</span>
@@ -135,19 +139,19 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Total Pricing Plans */}
-        <div className="rounded-[var(--radius-lg)] border p-5" style={S.surface}>
+        <div className="p-5" style={S.surface}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("pricingPlans")}</span>
             <Layers className="w-4 h-4" style={S.accent} />
           </div>
-          <div className="text-3xl font-semibold" style={S.primary}>{plans.length}</div>
+          <div className="text-2xl font-semibold" style={S.primary}>{plans.length}</div>
           <div className="mt-2 text-xs" style={S.sub}>
             {t("activeSaaSTierPlans")}
           </div>
         </div>
 
         {/* Database Health */}
-        <div className="rounded-[var(--radius-lg)] border p-5" style={S.surface}>
+        <div className="p-5" style={S.surface}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("controlPlaneHost")}</span>
             <Database className="w-4 h-4" style={S.accent} />
@@ -160,23 +164,24 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Platform Uptime */}
-        <div className="rounded-[var(--radius-lg)] border p-5" style={S.surface}>
+        <div className="p-5" style={S.surface}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("platformUptime")}</span>
             <Activity className="w-4 h-4" style={S.accent} />
           </div>
-          <div className="text-3xl font-semibold" style={{ color: "var(--success)" }}>99.98%</div>
+          <div className="text-2xl font-semibold" style={{ color: "var(--success)" }}>99.98%</div>
           <div className="mt-2 text-xs" style={S.sub}>
             {t("continuousTelemetry")}
           </div>
         </div>
       </div>
 
-      {/* Main Grid: Plan Breakdown & Recent Signups */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Plan breakdown paired with recent signups in one bordered surface —
+          a divider carries the grouping instead of two adjacent cards. */}
+      <div className="grid grid-cols-1 overflow-hidden rounded-[var(--radius-lg)] border lg:grid-cols-3" style={S.surface}>
 
-        {/* Plan Breakdown Card */}
-        <div className="lg:col-span-1 rounded-[var(--radius-lg)] border p-6 space-y-6" style={S.surface}>
+        {/* Plan Breakdown */}
+        <div className="lg:col-span-1 border-b p-6 space-y-6 lg:border-b-0 lg:border-r" style={S.border}>
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider" style={S.sub}>{t("tenantSubscriptionShare")}</h3>
             <p className="text-xs" style={S.muted}>{t("planDistributionAcrossActive")}</p>
@@ -205,8 +210,8 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Recent Platform Signups Card */}
-        <div className="lg:col-span-2 rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
+        {/* Recent Platform Signups */}
+        <div className="lg:col-span-2">
           <div className="px-6 py-4 border-b flex items-center justify-between" style={S.border}>
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wider" style={S.sub}>{t("recentTenantRegistrations")}</h3>
@@ -242,37 +247,32 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Row: Quick Actions & System Audit Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Management controls paired with the audit feed in one bordered
+          surface; controls are a plain list of destinations, not four cards. */}
+      <div className="grid grid-cols-1 overflow-hidden rounded-[var(--radius-lg)] border lg:grid-cols-3" style={S.surface}>
 
-        {/* Quick Actions */}
-        <div className="lg:col-span-1 space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider" style={S.muted}>{t("managementControls")}</h3>
-
-          <div className="grid grid-cols-1 gap-3">
-            {[
-              { label: t("addNewTenant"), icon: Plus, href: "/admin/tenants", desc: t("provisionNewDbAdmin") },
-              { label: t("configurePricingPlans"), icon: Layers, href: "/admin/plans", desc: t("manageQuotasRates") },
-              { label: t("masterRegistries"), icon: Database, href: "/admin/masters", desc: t("seedGlobalStaticCatalogs") },
-              { label: t("complianceAuditLogs"), icon: History, href: "/admin/audit", desc: t("platformSecurityActivity") }
-            ].map((action) => (
-              <Link key={action.label} href={action.href}
-                className="nf-press rounded-[var(--radius-lg)] border p-4 flex items-start gap-3.5 transition-all hover:translate-x-1"
-                style={S.surface}>
-                <div className="p-2.5 rounded-[var(--radius-sm)] shrink-0" style={S.raised}>
-                  <action.icon className="w-5 h-5" style={S.sub} />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold" style={S.primary}>{action.label}</div>
-                  <div className="text-xs mt-0.5" style={S.sub}>{action.desc}</div>
-                </div>
-              </Link>
-            ))}
-          </div>
+        {/* Management Controls */}
+        <div className="lg:col-span-1 border-b p-3 lg:border-b-0 lg:border-r" style={S.border}>
+          <h3 className="px-2 pt-1.5 pb-2 text-xs font-semibold uppercase tracking-wider" style={S.muted}>{t("managementControls")}</h3>
+          {[
+            { label: t("addNewTenant"), icon: Plus, href: "/admin/tenants", desc: t("provisionNewDbAdmin") },
+            { label: t("configurePricingPlans"), icon: Layers, href: "/admin/plans", desc: t("manageQuotasRates") },
+            { label: t("masterRegistries"), icon: Database, href: "/admin/masters", desc: t("seedGlobalStaticCatalogs") },
+            { label: t("complianceAuditLogs"), icon: History, href: "/admin/audit", desc: t("platformSecurityActivity") }
+          ].map((action) => (
+            <Link key={action.label} href={action.href}
+              className="nf-press flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-3 transition-colors hover:bg-(--surface-raised)">
+              <action.icon className="w-4 h-4 shrink-0" style={S.muted} />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold" style={S.primary}>{action.label}</div>
+                <div className="text-xs mt-0.5 truncate" style={S.sub}>{action.desc}</div>
+              </div>
+            </Link>
+          ))}
         </div>
 
         {/* Audit Log Feed */}
-        <div className="lg:col-span-2 rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
+        <div className="lg:col-span-2">
           <div className="px-6 py-4 border-b flex items-center justify-between" style={S.border}>
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wider" style={S.sub}>{t("platformAuditFeed")}</h3>

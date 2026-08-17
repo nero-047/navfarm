@@ -96,14 +96,14 @@ export default function DashboardPage() {
     { label: t("rolePermissions"), description: t("configureRbacPolicies"), href: "/console/roles",         icon: ShieldAlert },
   ];
 
-  const statCard = (
+  const statCell = (
     label: string,
     icon: React.ElementType,
     main: React.ReactNode,
     sub: React.ReactNode,
     bar?: { pct: number }
   ) => (
-    <div className="rounded-[var(--radius-md)] p-5 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+    <div className="p-5" style={{ backgroundColor: "var(--surface)" }}>
       <div className="flex items-center justify-between mb-3">
         <span className="nf-text-caption font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{label}</span>
         {React.createElement(icon, { className: "w-4 h-4", style: { color: "var(--text-muted)" } })}
@@ -145,10 +145,14 @@ export default function DashboardPage() {
         }
       />
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Summary strip — one bordered surface with hairline dividers between
+          segments, not four separate cards competing for attention. */}
+      <div
+        className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-md)] border sm:grid-cols-2 lg:grid-cols-4"
+        style={{ backgroundColor: "var(--border)", borderColor: "var(--border)" }}
+      >
         {/* Active Company */}
-        <div className="rounded-[var(--radius-md)] p-5 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+        <div className="p-5" style={{ backgroundColor: "var(--surface)" }}>
           <div className="flex items-center justify-between mb-3">
             <span className="nf-text-caption font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("activeCompany")}</span>
             <Building2 className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
@@ -165,19 +169,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {statCard(t("companies"), Building2,
+        {statCell(t("companies"), Building2,
           <span className="text-2xl font-semibold">{companies.length}</span>,
           t("ofLimitPct", { max: tenantPlanInfo?.max_companies || 1, pct: compPercent.toFixed(0) }),
           { pct: compPercent }
         )}
 
-        {statCard(t("teamMembers"), Users,
+        {statCell(t("teamMembers"), Users,
           <span className="text-2xl font-semibold">{users.length}</span>,
           t("ofSeatsPct", { max: tenantPlanInfo?.max_users || 5, pct: userPercent.toFixed(0) }),
           { pct: userPercent }
         )}
 
-        {statCard(t("subscription"), TrendingUp,
+        {statCell(t("subscription"), TrendingUp,
           tenantPlanInfo?.plan_id?.replace("PLAN_", "") || "—",
           `${tenantPlanInfo?.billing_cycle || t("monthly")} · ${tenantPlanInfo?.db_name || "—"}`
         )}

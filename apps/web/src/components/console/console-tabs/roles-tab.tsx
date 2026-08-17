@@ -443,7 +443,7 @@ export default function RolesTab({
             </div>
             <div className="mt-2 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
               <Button variant="outline" onClick={() => setDeletingRoleId(null)} className="py-2 px-4 text-xs">Cancel</Button>
-              <Button onClick={() => deletingRoleId && handleDeleteRole(deletingRoleId)} disabled={deletingRole} className="py-2 px-4 text-xs text-white bg-rose-500 hover:bg-rose-600">
+              <Button variant="destructive" onClick={() => deletingRoleId && handleDeleteRole(deletingRoleId)} disabled={deletingRole} className="py-2 px-4 text-xs">
                 {deletingRole ? "Deleting..." : "Delete"}
               </Button>
             </div>

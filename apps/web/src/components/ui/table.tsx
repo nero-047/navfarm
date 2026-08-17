@@ -1,9 +1,21 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-const Table = React.forwardRef<HTMLTableElement, React.TableHTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="w-full overflow-x-auto rounded-[var(--radius-md)] border border-(--card-border)">
+interface TableProps extends React.TableHTMLAttributes<HTMLTableElement> {
+  // Lets consumers with a non-default surface (e.g. a panel already on
+  // --surface) keep that background instead of the card-bg default, without
+  // reaching past the wrapper div that owns the scroll/border/radius.
+  wrapperClassName?: string;
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, wrapperClassName, ...props }, ref) => (
+    <div
+      className={cn(
+        'w-full overflow-x-auto rounded-[var(--radius-md)] border border-(--card-border) bg-(--card-bg)',
+        wrapperClassName
+      )}
+    >
       <table ref={ref} className={cn('w-full border-collapse text-left text-sm', className)} {...props} />
     </div>
   )

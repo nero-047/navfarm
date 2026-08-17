@@ -82,6 +82,13 @@ export interface ConsoleSessionOptions {
    * admin never sees.
    */
   userType?: 'COMPANY_ADMIN' | 'TENANT_ADMIN';
+  /**
+   * Extra route stubs, registered after the built-in ones so they win:
+   * Playwright dispatches to the most-recently-registered matching handler
+   * first. Use this for a test that needs a specific endpoint (e.g. a
+   * Master Data `apiBase`) to return something other than the blanket `[]`.
+   */
+  routes?: Array<[string, Parameters<Page['route']>[1]]>;
 }
 
 /**
@@ -96,6 +103,7 @@ export async function gotoConsole(
     path = '/console/master-data',
     companies = [DEFAULT_COMPANY],
     userType = 'COMPANY_ADMIN',
+    routes = [],
   }: ConsoleSessionOptions = {},
 ): Promise<void> {
   // Registered first so the specific handlers below take precedence:
@@ -110,6 +118,10 @@ export async function gotoConsole(
       json: companies.map((company) => ({ ...company, onboarding_status: 'COMPLETED' })),
     }),
   );
+  // Caller-supplied overrides, registered last so they win over all of the above.
+  for (const [pattern, handler] of routes) {
+    await page.route(pattern, handler);
+  }
 
   await page.addInitScript((session: { companies: SessionCompany[]; userType: string }) => {
     const user = {
