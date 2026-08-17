@@ -6,6 +6,7 @@ import { api } from "@/services/api-client";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const PAGE_SIZE = 25;
 
@@ -116,41 +117,41 @@ export default function InventoryLedgerPanel() {
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
-                <th className="whitespace-nowrap px-4 py-3">Posting Date</th>
-                <th className="whitespace-nowrap px-4 py-3">Document</th>
-                <th className="whitespace-nowrap px-4 py-3">Item</th>
-                <th className="whitespace-nowrap px-4 py-3">Type</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Qty</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Remaining</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Rate</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Amount</th>
-                <th className="whitespace-nowrap px-4 py-3">Lot No.</th>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Posting Date</TableHead>
+                <TableHead className="whitespace-nowrap">Document</TableHead>
+                <TableHead className="whitespace-nowrap">Item</TableHead>
+                <TableHead className="whitespace-nowrap">Type</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Qty</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Remaining</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Rate</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Amount</TableHead>
+                <TableHead className="whitespace-nowrap">Lot No.</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-xs" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</td></tr>
+                <tr><TableCell colSpan={9} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No ledger entries yet — post a Goods Receipt to see movements here.</td></tr>
+                <tr><TableCell colSpan={9} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No ledger entries yet — post a Goods Receipt to see movements here.</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
-                  <tr key={row.ledger_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.posting_date}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.document_no}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.item_code} — {row.item_description}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.transaction_type?.replace(/_/g, " ")}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold" style={ENTRY_STYLE[row.entry_type] || S.primary}>{row.quantity}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.sub}>{row.remaining_quantity ?? "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.sub}>{row.rate ?? "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>{row.amount ?? "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.lot_no || "—"}</td>
-                  </tr>
+                  <TableRow key={row.ledger_id}>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.posting_date}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.document_no}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.item_code} — {row.item_description}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.transaction_type?.replace(/_/g, " ")}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right font-semibold" style={ENTRY_STYLE[row.entry_type] || S.primary}>{row.quantity}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.sub}>{row.remaining_quantity ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.sub}>{row.rate ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.amount ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.lot_no || "—"}</TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
         {!loading && rows.length > 0 && (

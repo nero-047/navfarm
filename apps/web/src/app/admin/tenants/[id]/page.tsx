@@ -13,6 +13,7 @@ import { api } from "../../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../../hooks/useAuth";
 import { Dialog } from "../../../../components/ui/dialog";
 import { PageHeader } from "../../../../components/ui/PageHeader";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../../components/ui/table";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -397,17 +398,17 @@ export default function TenantDetailPage() {
           </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b" style={S.raised}>
+          <table className="w-full border-collapse text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
                 {["#", "Company Name", "Reg. No.", "Country", "Currency", "NOB", "LOBs", "Onboarding", ""].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
+                  <TableHead key={h} className="whitespace-nowrap">{h}</TableHead>
                 ))}
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {companies.length === 0 ? (
-                <tr><td colSpan={9} className="text-center py-12 text-sm" style={S.muted}>No companies registered yet.</td></tr>
+                <tr><TableCell colSpan={9} className="text-center py-12" style={S.muted}>No companies registered yet.</TableCell></tr>
               ) : companies.map((co, idx) => {
                 const d          = companyDetails[co.company_id];
                 const isExpanded = expandedCompany === co.company_id;
@@ -442,13 +443,13 @@ export default function TenantDetailPage() {
 
                 return (
                   <React.Fragment key={co.company_id}>
-                    <tr
+                    <TableRow
                       onClick={() => toggleExpand(co.company_id)}
-                      className="border-b transition-colors cursor-pointer hover:opacity-90"
-                      style={{ ...S.border, backgroundColor: isExpanded ? "var(--accent-muted)" : undefined }}
+                      className="cursor-pointer hover:opacity-90"
+                      style={{ backgroundColor: isExpanded ? "var(--accent-muted)" : undefined }}
                     >
-                      <td className="px-4 py-3.5 font-mono text-xs" style={S.muted}>{idx + 1}</td>
-                      <td className="px-4 py-3.5 font-semibold" style={S.primary}>
+                      <TableCell className="font-mono" style={S.muted}>{idx + 1}</TableCell>
+                      <TableCell className="font-semibold" style={S.primary}>
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-md flex items-center justify-center text-white text-[10px] font-semibold shrink-0"
                             style={{ backgroundColor: "var(--accent)" }}>
@@ -459,13 +460,13 @@ export default function TenantDetailPage() {
                             <div className="text-[10px] font-mono" style={S.muted}>{co.company_code}</div>
                           </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-3.5 font-mono text-xs" style={S.sub}>{regNo}</td>
-                      <td className="px-4 py-3.5 text-xs" style={S.sub}>{countryName}</td>
-                      <td className="px-4 py-3.5 text-xs font-semibold" style={S.sub}>
+                      </TableCell>
+                      <TableCell className="font-mono" style={S.sub}>{regNo}</TableCell>
+                      <TableCell style={S.sub}>{countryName}</TableCell>
+                      <TableCell className="font-semibold" style={S.sub}>
                         {currencyName}
-                      </td>
-                      <td className="px-4 py-3.5">
+                      </TableCell>
+                      <TableCell>
                         {resolvedNobs.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {resolvedNobs.map((n: string) => (
@@ -474,8 +475,8 @@ export default function TenantDetailPage() {
                             ))}
                           </div>
                         ) : <span style={S.muted}>—</span>}
-                      </td>
-                      <td className="px-4 py-3.5 max-w-[220px]">
+                      </TableCell>
+                      <TableCell className="max-w-[220px]">
                         {resolvedLobs.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {resolvedLobs.slice(0, 3).map((l: string) => (
@@ -487,25 +488,25 @@ export default function TenantDetailPage() {
                             )}
                           </div>
                         ) : <span style={S.muted}>—</span>}
-                      </td>
-                      <td className="px-4 py-3.5">
+                      </TableCell>
+                      <TableCell>
                         {co.onboarding_status === "COMPLETED" ? (
                           <Badge color="green"><CheckCircle className="w-3 h-3" /> Complete</Badge>
                         ) : (
                           <Badge color="amber"><Activity className="w-3 h-3" /> {co.onboarding_status || "Pending"}</Badge>
                         )}
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
+                      </TableCell>
+                      <TableCell className="text-right">
                         <span className="text-xs font-semibold flex items-center gap-1 justify-end" style={S.accent}>
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           {isExpanded ? "Hide" : "Details"}
                         </span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
 
                     {isExpanded && (
                       <tr key={`${co.company_id}-expanded`}>
-                        <td colSpan={9} className="border-b p-0" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+                        <TableCell colSpan={9} className="border-b p-0" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                           {isLoading ? (
                             <div className="flex items-center gap-2 px-8 py-6 text-sm" style={S.muted}>
                               <RefreshCw className="w-4 h-4 animate-spin" /> Loading details…
@@ -612,19 +613,19 @@ export default function TenantDetailPage() {
                                       <Users className="w-3.5 h-3.5" /> Associated Members ({coUsers.length})
                                     </p>
                                     <div className="rounded-lg border overflow-hidden" style={S.surface}>
-                                      <table className="w-full text-xs">
-                                        <thead>
-                                          <tr className="border-b" style={S.raised}>
+                                      <table className="w-full border-collapse text-xs">
+                                        <TableHeader>
+                                          <tr className="border-b border-(--row-border)">
                                             {["#", "Name", "Email", "Phone", "Type", "Role", "Status"].map(h => (
-                                              <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{h}</th>
+                                              <TableHead key={h} className="h-auto py-2.5 text-[10px]">{h}</TableHead>
                                             ))}
                                           </tr>
-                                        </thead>
-                                        <tbody>
+                                        </TableHeader>
+                                        <TableBody>
                                           {coUsers.map((u: any, i: number) => (
-                                            <tr key={u.user_id} className="border-b" style={S.border}>
-                                              <td className="px-4 py-2.5 font-mono" style={S.muted}>{i + 1}</td>
-                                              <td className="px-4 py-2.5 font-semibold" style={S.primary}>
+                                            <TableRow key={u.user_id}>
+                                              <TableCell className="py-2.5 font-mono" style={S.muted}>{i + 1}</TableCell>
+                                              <TableCell className="py-2.5 font-semibold" style={S.primary}>
                                                 <div className="flex items-center gap-2">
                                                   <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-semibold shrink-0"
                                                     style={{ backgroundColor: "var(--accent)" }}>
@@ -632,24 +633,24 @@ export default function TenantDetailPage() {
                                                   </div>
                                                   {u.full_name || "—"}
                                                 </div>
-                                              </td>
-                                              <td className="px-4 py-2.5" style={S.sub}>{u.email || "—"}</td>
-                                              <td className="px-4 py-2.5" style={S.sub}>{u.phone || "—"}</td>
-                                              <td className="px-4 py-2.5">
+                                              </TableCell>
+                                              <TableCell className="py-2.5" style={S.sub}>{u.email || "—"}</TableCell>
+                                              <TableCell className="py-2.5" style={S.sub}>{u.phone || "—"}</TableCell>
+                                              <TableCell className="py-2.5">
                                                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded border"
                                                   style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
                                                   {u.user_type?.replace(/_/g, " ") || "—"}
                                                 </span>
-                                              </td>
-                                              <td className="px-4 py-2.5" style={S.sub}>{u.role_name || u.role_code || "—"}</td>
-                                              <td className="px-4 py-2.5">
+                                              </TableCell>
+                                              <TableCell className="py-2.5" style={S.sub}>{u.role_name || u.role_code || "—"}</TableCell>
+                                              <TableCell className="py-2.5">
                                                 <Badge color={u.is_active ? "green" : "default"}>
                                                   {u.is_active ? "Active" : "Inactive"}
                                                 </Badge>
-                                              </td>
-                                            </tr>
+                                              </TableCell>
+                                            </TableRow>
                                           ))}
-                                        </tbody>
+                                        </TableBody>
                                       </table>
                                     </div>
                                   </div>
@@ -659,13 +660,13 @@ export default function TenantDetailPage() {
                           ) : (
                             <p className="px-8 py-5 text-xs" style={S.muted}>No detailed setup found for this company.</p>
                           )}
-                        </td>
+                        </TableCell>
                       </tr>
                     )}
                   </React.Fragment>
                 );
               })}
-            </tbody>
+            </TableBody>
           </table>
         </div>
       </div>
@@ -679,21 +680,21 @@ export default function TenantDetailPage() {
           </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b" style={S.raised}>
+          <table className="w-full border-collapse text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
                 {["#", "Full Name", "Email", "Phone", "Type", "Role", "Company", "Status"].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
+                  <TableHead key={h} className="whitespace-nowrap">{h}</TableHead>
                 ))}
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {users.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-12 text-sm" style={S.muted}>No users found.</td></tr>
+                <tr><TableCell colSpan={8} className="text-center py-12" style={S.muted}>No users found.</TableCell></tr>
               ) : users.map((u, idx) => (
-                <tr key={u.user_id || idx} className="border-b hover:opacity-90 transition-opacity" style={S.border}>
-                  <td className="px-4 py-3.5 font-mono text-xs" style={S.muted}>{idx + 1}</td>
-                  <td className="px-4 py-3.5 font-semibold" style={S.primary}>
+                <TableRow key={u.user_id || idx} className="hover:opacity-90">
+                  <TableCell className="font-mono" style={S.muted}>{idx + 1}</TableCell>
+                  <TableCell className="font-semibold" style={S.primary}>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold shrink-0"
                         style={{ backgroundColor: "var(--accent)" }}>
@@ -701,17 +702,17 @@ export default function TenantDetailPage() {
                       </div>
                       {u.full_name || "—"}
                     </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-xs" style={S.sub}>{u.email || "—"}</td>
-                  <td className="px-4 py-3.5 text-xs" style={S.sub}>{u.phone || "—"}</td>
-                  <td className="px-4 py-3.5">
+                  </TableCell>
+                  <TableCell style={S.sub}>{u.email || "—"}</TableCell>
+                  <TableCell style={S.sub}>{u.phone || "—"}</TableCell>
+                  <TableCell>
                     <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border"
                       style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
                       {u.user_type?.replace(/_/g, " ") || "—"}
                     </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-xs" style={S.sub}>{u.role_name || u.role_code || "—"}</td>
-                  <td className="px-4 py-3.5 text-xs" style={S.sub}>
+                  </TableCell>
+                  <TableCell style={S.sub}>{u.role_name || u.role_code || "—"}</TableCell>
+                  <TableCell style={S.sub}>
                     {u.company_id ? (
                       <div>
                         <div className="font-semibold" style={S.primary}>{companyMap[u.company_id] || "Unknown"}</div>
@@ -722,16 +723,16 @@ export default function TenantDetailPage() {
                     ) : (
                       <span style={S.muted}>—</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3.5">
+                  </TableCell>
+                  <TableCell>
                     <Badge color={u.is_active ? "green" : "default"}>
                       {u.is_active ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                       {u.is_active ? "Active" : "Inactive"}
                     </Badge>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
+            </TableBody>
           </table>
         </div>
       </div>

@@ -15,6 +15,7 @@ import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
 import { Badge } from "../../../components/ui/badge";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 import { PageHeader } from "../../../components/ui/PageHeader";
 
 const S = {
@@ -271,24 +272,22 @@ export default function CompaniesPage() {
 
         {/* Clean companies table — no inline expand */}
         <div className="rounded-[var(--radius-md)] border overflow-hidden" style={S.surface}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b" style={{ ...S.border, backgroundColor: "var(--surface-secondary)" }}>
+          <table className="w-full border-collapse text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
                 {["#", "Company", "Reg. No.", "Country", "Onboarding", ""].map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
+                  <TableHead key={h} className="px-5 whitespace-nowrap">{h}</TableHead>
                 ))}
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {companies.length === 0 && (
-                <tr><td colSpan={6} className="text-center py-12 text-sm" style={S.muted}>No companies registered yet.</td></tr>
+                <tr><TableCell colSpan={6} className="px-5 text-center py-12" style={S.muted}>No companies registered yet.</TableCell></tr>
               )}
               {companies.map((co, idx) => (
-                <tr key={co.company_id}
-                  className="border-b transition-colors hover:bg-(--row-hover) last:border-0"
-                  style={S.border}>
-                  <td className="px-5 py-4 font-mono text-xs" style={S.muted}>{idx + 1}</td>
-                  <td className="px-5 py-4">
+                <TableRow key={co.company_id}>
+                  <TableCell className="px-5 py-4 font-mono" style={S.muted}>{idx + 1}</TableCell>
+                  <TableCell className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-[var(--radius-xs)] flex items-center justify-center text-white text-[11px] font-semibold shrink-0"
                         style={{ backgroundColor: "var(--color-navy)" }}>
@@ -299,11 +298,11 @@ export default function CompaniesPage() {
                         <div className="text-[11px] font-mono" style={S.muted}>{co.company_code}</div>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-5 py-4 font-mono text-xs" style={S.sub}>{co.registration_no || "—"}</td>
-                  <td className="px-5 py-4 text-xs" style={S.sub}>{co.country_id || "—"}</td>
-                  <td className="px-5 py-4"><StatusBadge status={co.onboarding_status} /></td>
-                  <td className="px-5 py-4">
+                  </TableCell>
+                  <TableCell className="px-5 py-4 font-mono" style={S.sub}>{co.registration_no || "—"}</TableCell>
+                  <TableCell className="px-5 py-4" style={S.sub}>{co.country_id || "—"}</TableCell>
+                  <TableCell className="px-5 py-4"><StatusBadge status={co.onboarding_status} /></TableCell>
+                  <TableCell className="px-5 py-4">
                     {co.onboarding_status === "COMPLETED" ? (
                       <div className="flex items-center gap-2">
                         <Button onClick={() => setManagingCompany(co)} variant="outline" size="sm">
@@ -355,10 +354,10 @@ export default function CompaniesPage() {
                         Continue Setup
                       </Button>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
+            </TableBody>
           </table>
         </div>
       </div>

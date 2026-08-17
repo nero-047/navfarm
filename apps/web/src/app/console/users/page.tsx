@@ -15,6 +15,7 @@ import { Select } from "../../../components/ui/select";
 import { Badge } from "../../../components/ui/badge";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { Toast } from "../../../components/ui/toast";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 import { EditMemberModal, UserTypeBadge, Label } from "../../../components/console/edit-member-modal";
 import { PageHeader } from "../../../components/ui/PageHeader";
 
@@ -315,24 +316,24 @@ export default function UsersPage() {
           </label>
         </div>
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[940px] text-sm">
-          <thead>
-            <tr className="border-b" style={{ ...S.border, backgroundColor: "var(--surface-secondary)" }}>
+        <table className="w-full min-w-[940px] border-collapse text-sm">
+          <TableHeader>
+            <tr className="border-b border-(--row-border)">
               {["#", "Name", "Email", isTenantAdmin ? "Company" : "", "Type", "Assigned Roles", "Actions"]
                 .filter(Boolean)
                 .map((h) => (
-                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-(--text-muted)">{h}</th>
+                  <TableHead key={h} className="px-5 tracking-[0.12em]">{h}</TableHead>
                 ))}
             </tr>
-          </thead>
-          <tbody>
+          </TableHeader>
+          <TableBody>
             {visibleUsers.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-sm" style={S.muted}>No team members found.</td></tr>
+              <tr><TableCell colSpan={7} className="px-5 text-center py-12" style={S.muted}>No team members found.</TableCell></tr>
             )}
             {visibleUsers.map((u, idx) => (
-              <tr key={u.user_id} className="border-b transition-colors last:border-0 hover:bg-(--row-hover)" style={S.border}>
-                <td className="px-5 py-4 text-xs" style={S.muted}>{idx + 1}</td>
-                <td className="px-5 py-3.5">
+              <TableRow key={u.user_id}>
+                <TableCell className="px-5 py-4" style={S.muted}>{idx + 1}</TableCell>
+                <TableCell className="px-5 py-3.5">
                   <div className="flex items-center gap-2">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: "var(--color-navy)" }}>
                       {u.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "?"}
@@ -351,11 +352,11 @@ export default function UsersPage() {
                       )}
                     </div>
                   </div>
-                </td>
-                <td className="px-5 py-4 text-xs" style={S.sub}>{u.email}</td>
+                </TableCell>
+                <TableCell className="px-5 py-4" style={S.sub}>{u.email}</TableCell>
 
                 {isTenantAdmin && (
-                  <td className="px-5 py-4">
+                  <TableCell className="px-5 py-4">
                     {u.company_id ? (
                       <div className="flex items-center gap-1 text-xs" style={S.sub}>
                         <Building2 className="w-3 h-3 shrink-0" style={S.muted} />
@@ -364,13 +365,13 @@ export default function UsersPage() {
                     ) : (
                       <span className="text-xs" style={S.muted}>—</span>
                     )}
-                  </td>
+                  </TableCell>
                 )}
 
-                <td className="px-5 py-4"><UserTypeBadge type={u.user_type} /></td>
+                <TableCell className="px-5 py-4"><UserTypeBadge type={u.user_type} /></TableCell>
 
                 {/* Assigned Roles */}
-                <td className="px-5 py-4">
+                <TableCell className="px-5 py-4">
                   {u.roles && u.roles.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                       {u.roles.map((r: any) => (
@@ -382,10 +383,10 @@ export default function UsersPage() {
                   ) : (
                     <span className="text-xs" style={S.muted}>No roles assigned</span>
                   )}
-                </td>
+                </TableCell>
 
                 {/* Actions */}
-                <td className="px-5 py-4">
+                <TableCell className="px-5 py-4">
                   {canEdit(u) ? (
                     <Button
                       onClick={() => setEditingMember(u)}
@@ -409,10 +410,10 @@ export default function UsersPage() {
                       <Shield className="w-3 h-3" /> Protected
                     </span>
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
+          </TableBody>
         </table>
         </div>
       </div>

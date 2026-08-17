@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ShieldAlert, Plus, Save, RefreshCw, Edit3, Trash2 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { Dialog } from "../../ui/dialog";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../ui/table";
 
 interface RolesTabProps {
   roles: any[];
@@ -355,27 +356,24 @@ export default function RolesTab({
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.border, ...S.textMuted }}>
-                      <th className="pb-3 font-semibold">Module Resource</th>
+                <table className="w-full border-collapse text-left text-xs">
+                  <TableHeader className="bg-transparent">
+                    <tr className="border-b border-(--row-border)">
+                      <TableHead className="h-auto px-0 pb-3">Module Resource</TableHead>
                       {["View", "Create", "Edit", "Delete", "Approve"].map(h => (
-                        <th key={h} className="pb-3 text-center w-20 font-semibold">{h}</th>
+                        <TableHead key={h} className="h-auto px-0 pb-3 text-center w-20">{h}</TableHead>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
+                  </TableHeader>
+                  <TableBody>
                     {permissions.map((p, idx) => (
-                      <tr key={idx} className="border-b transition-colors" style={{ ...S.border, ...S.textPrimary }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--row-hover)"}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-                      >
-                        <td className="py-3.5 font-semibold">
+                      <TableRow key={idx} style={S.textPrimary}>
+                        <TableCell className="px-0 py-3.5 font-semibold">
                           <div style={S.textPrimary}>{p.name}</div>
                           <div className="text-[9px] font-mono mt-0.5" style={S.textMuted}>{p.module_code} • {p.resource}</div>
-                        </td>
+                        </TableCell>
                         {["can_view", "can_create", "can_edit", "can_delete", "can_approve"].map(key => (
-                          <td key={key} className="py-3.5 text-center">
+                          <TableCell key={key} className="px-0 py-3.5 text-center">
                             <input
                               type="checkbox"
                               checked={p[key]}
@@ -386,11 +384,11 @@ export default function RolesTab({
                                 borderColor: "var(--input-border)",
                               }}
                             />
-                          </td>
+                          </TableCell>
                         ))}
-                      </tr>
+                      </TableRow>
                     ))}
-                  </tbody>
+                  </TableBody>
                 </table>
               </div>
             )}

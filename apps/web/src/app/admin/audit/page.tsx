@@ -7,6 +7,7 @@ import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { useLanguage } from "../../../hooks/useLanguage";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 
 export default function AdminAuditPage() {
   const router = useRouter();
@@ -86,35 +87,35 @@ export default function AdminAuditPage() {
       )}
 
       <div className="rounded-lg border overflow-hidden shadow-sm" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
+        <table className="w-full border-collapse text-sm">
+          <TableHeader>
+            <tr className="border-b border-(--row-border)">
               {["#", t("timestamp"), t("action"), t("entity"), t("user")].map((h, idx) => (
-                <th key={idx} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{h}</th>
+                <TableHead key={idx} className="px-5">{h}</TableHead>
               ))}
             </tr>
-          </thead>
-          <tbody>
+          </TableHeader>
+          <TableBody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-10 text-sm" style={{ color: "var(--text-muted)" }}>
+              <tr><TableCell colSpan={5} className="px-5 text-center" style={{ color: "var(--text-muted)" }}>
                 {search ? t("noResultsMatch") : t("noAuditEntriesFound")}
-              </td></tr>
+              </TableCell></tr>
             ) : (
               filtered.map((log, idx) => (
-                <tr key={log.audit_id || idx} className="border-b transition-colors" style={{ borderColor: "var(--border)" }}>
-                  <td className="px-5 py-3.5 font-mono text-xs" style={{ color: "var(--text-muted)" }}>{idx + 1}</td>
-                  <td className="px-5 py-3.5 font-mono text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                <TableRow key={log.audit_id || idx}>
+                  <TableCell className="px-5 font-mono" style={{ color: "var(--text-muted)" }}>{idx + 1}</TableCell>
+                  <TableCell className="px-5 font-mono whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                     {log.created_at ? new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—"}
-                  </td>
-                  <td className="px-5 py-3.5">{actionBadge(log.action)}</td>
-                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--text-primary)" }}>
+                  </TableCell>
+                  <TableCell className="px-5">{actionBadge(log.action)}</TableCell>
+                  <TableCell className="px-5 font-medium" style={{ color: "var(--text-primary)" }}>
                     {log.entity_name} <span className="font-mono text-[10px]" style={{ color: "var(--text-muted)" }}>({log.entity_id?.substring(0, 8)}…)</span>
-                  </td>
-                  <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{log.user_name || t("system")}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="px-5" style={{ color: "var(--text-secondary)" }}>{log.user_name || t("system")}</TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
+          </TableBody>
         </table>
       </div>
     </div>

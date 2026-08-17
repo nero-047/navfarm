@@ -9,6 +9,7 @@ import { api } from "../../../services/api-client";
 import { getStoredToken, getStoredUser, getStoredTenantId, type NavUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 
 const inputCls = "nf-input";
 const inputStyle = {
@@ -333,49 +334,46 @@ export default function NotificationsPage() {
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-                <th className="p-4 w-12 text-center">#</th>
-                <th className="p-4 w-32">Timestamp</th>
-                <th className="p-4 w-24">Channel</th>
-                <th className="p-4 w-44">Recipient</th>
-                <th className="p-4">Message Details</th>
-                <th className="p-4 text-center w-24">Status</th>
+          <table className="w-full border-collapse text-left text-xs">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="h-auto p-4 w-12 text-center">#</TableHead>
+                <TableHead className="h-auto p-4 w-32">Timestamp</TableHead>
+                <TableHead className="h-auto p-4 w-24">Channel</TableHead>
+                <TableHead className="h-auto p-4 w-44">Recipient</TableHead>
+                <TableHead className="h-auto p-4">Message Details</TableHead>
+                <TableHead className="h-auto p-4 text-center w-24">Status</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {logs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center" style={{ color: "var(--text-muted)" }}>
+                  <TableCell colSpan={6} className="p-8 text-center" style={{ color: "var(--text-muted)" }}>
                     No notification attempts logged for this company.
-                  </td>
+                  </TableCell>
                 </tr>
               ) : (
                 logs.map((log, idx) => {
                   const isSuccess = log.status === "SUCCESS";
                   return (
-                    <tr key={log.log_id || idx} className="border-b transition-colors" style={{ borderColor: "var(--border)" }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--row-hover)"}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-                    >
-                      <td className="p-4 text-center font-mono" style={{ color: "var(--text-muted)" }}>{idx + 1}</td>
-                      <td className="p-4 font-mono" style={{ color: "var(--text-muted)" }}>
+                    <TableRow key={log.log_id || idx}>
+                      <TableCell className="p-4 text-center font-mono" style={{ color: "var(--text-muted)" }}>{idx + 1}</TableCell>
+                      <TableCell className="p-4 font-mono" style={{ color: "var(--text-muted)" }}>
                         {new Date(log.sent_at).toLocaleString('en-IN', { hour12: true })}
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4">
                         {/* Channel is which pipe carried the message, not a
                             status — two colours here implied one was better. */}
                         <Badge variant="neutral">{log.channel}</Badge>
-                      </td>
-                      <td className="p-4 font-medium font-mono" style={{ color: "var(--text-secondary)" }}>{log.recipient}</td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4 font-medium font-mono" style={{ color: "var(--text-secondary)" }}>{log.recipient}</TableCell>
+                      <TableCell className="p-4">
                         <div style={{ color: "var(--text-primary)" }} className="font-semibold">{log.message}</div>
                         {log.error_message && (
                           <div className="text-[10px] text-rose-500 mt-1 font-mono">{log.error_message}</div>
                         )}
-                      </td>
-                      <td className="p-4 text-center">
+                      </TableCell>
+                      <TableCell className="p-4 text-center">
                         <span className={`text-[9px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${
                           isSuccess
                             ? "bg-(--success-muted) text-(--success) border-(--success)"
@@ -383,12 +381,12 @@ export default function NotificationsPage() {
                         }`}>
                           {isSuccess ? "Sent" : "Failed"}
                         </span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
       </div>

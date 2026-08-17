@@ -8,6 +8,7 @@ import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 
 const s = {
   input: { borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)", color: "var(--input-text)" },
@@ -205,39 +206,39 @@ export default function AdminPlansPage() {
 
       {/* Plans Table */}
       <div className="rounded-lg border overflow-hidden shadow-sm" style={s.surface}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b" style={s.raised}>
+        <table className="w-full border-collapse text-sm">
+          <TableHeader>
+            <tr className="border-b border-(--row-border)">
               {["Plan ID", "Name", "Price", "Cycle", "Companies", "Users", "QR", "API", ""].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider" style={s.muted}>{h}</th>
+                <TableHead key={h}>{h}</TableHead>
               ))}
             </tr>
-          </thead>
-          <tbody>
+          </TableHeader>
+          <TableBody>
             {plans.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-10 text-sm" style={s.muted}>No plans configured yet.</td></tr>
+              <tr><TableCell colSpan={9} className="text-center py-10" style={s.muted}>No plans configured yet.</TableCell></tr>
             )}
             {plans.map((plan) => (
-              <tr key={plan.plan_id} className="border-b transition-colors" style={s.border}>
-                <td className="px-4 py-3 font-mono text-xs" style={s.muted}>{plan.plan_id}</td>
-                <td className="px-4 py-3 font-semibold" style={s.text}>{plan.plan_name}</td>
-                <td className="px-4 py-3" style={s.sub}>${plan.price}</td>
-                <td className="px-4 py-3">
+              <TableRow key={plan.plan_id}>
+                <TableCell className="font-mono" style={s.muted}>{plan.plan_id}</TableCell>
+                <TableCell className="font-semibold" style={s.text}>{plan.plan_name}</TableCell>
+                <TableCell style={s.sub}>${plan.price}</TableCell>
+                <TableCell>
                   <span className="text-[11px] px-2 py-0.5 rounded font-medium"
                     style={{ backgroundColor: "var(--surface-raised)", color: "var(--text-secondary)" }}>{plan.billing_cycle}</span>
-                </td>
-                <td className="px-4 py-3 text-center font-semibold" style={s.text}>{plan.max_companies}</td>
-                <td className="px-4 py-3 text-center font-semibold" style={s.text}>{plan.max_users}</td>
-                <td className="px-4 py-3 text-center">{plan.feature_flags?.qr_traceability ? <CheckCircle className="w-4 h-4 text-(--success) mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</td>
-                <td className="px-4 py-3 text-center">{plan.feature_flags?.api_access ? <CheckCircle className="w-4 h-4 text-(--success) mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</td>
-                <td className="px-4 py-3">
+                </TableCell>
+                <TableCell className="text-center font-semibold" style={s.text}>{plan.max_companies}</TableCell>
+                <TableCell className="text-center font-semibold" style={s.text}>{plan.max_users}</TableCell>
+                <TableCell className="text-center">{plan.feature_flags?.qr_traceability ? <CheckCircle className="w-4 h-4 text-(--success) mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</TableCell>
+                <TableCell className="text-center">{plan.feature_flags?.api_access ? <CheckCircle className="w-4 h-4 text-(--success) mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</TableCell>
+                <TableCell>
                   <button onClick={() => handleOpen(plan)} className="text-xs font-medium flex items-center gap-1" style={s.accent}>
                     <Edit2 className="w-3.5 h-3.5" /> Edit
                   </button>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
+          </TableBody>
         </table>
       </div>
     </div>

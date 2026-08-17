@@ -10,6 +10,7 @@ import { getStoredToken, getStoredUser } from "../../../hooks/useAuth";
 import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 
 // ── Shared style tokens ─────────────────────────────────────────────────────
 const S = {
@@ -431,36 +432,36 @@ export default function AdminMastersPage() {
               </Dialog>
 
               <div className="rounded-lg border overflow-hidden" style={S.surface}>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b" style={S.raised}>
+                <table className="w-full border-collapse text-sm">
+                  <TableHeader>
+                    <tr className="border-b border-(--row-border)">
                       {["Code", "English Name", "Native", "Script", "Default"].map((h) => (
-                        <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{h}</th>
+                        <TableHead key={h}>{h}</TableHead>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
+                  </TableHeader>
+                  <TableBody>
                     {languages.length === 0 && (
-                      <tr><td colSpan={5} className="text-center py-8 text-sm" style={S.muted}>No languages configured.</td></tr>
+                      <tr><TableCell colSpan={5} className="text-center py-8" style={S.muted}>No languages configured.</TableCell></tr>
                     )}
                     {languages.map((lang) => (
-                      <tr key={lang.lang_code} className="border-b" style={S.border}>
-                        <td className="px-4 py-3 font-mono text-xs font-semibold" style={S.accent}>{lang.lang_code}</td>
-                        <td className="px-4 py-3 font-semibold" style={S.primary}>{lang.lang_name_english}</td>
-                        <td className="px-4 py-3" style={S.sub}>{lang.lang_name_native}</td>
-                        <td className="px-4 py-3">
+                      <TableRow key={lang.lang_code}>
+                        <TableCell className="font-mono font-semibold" style={S.accent}>{lang.lang_code}</TableCell>
+                        <TableCell className="font-semibold" style={S.primary}>{lang.lang_name_english}</TableCell>
+                        <TableCell style={S.sub}>{lang.lang_name_native}</TableCell>
+                        <TableCell>
                           <span className="text-[11px] font-semibold border rounded px-2 py-0.5"
                             style={S.raised}>{lang.script}</span>
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell>
                           {lang.is_system_default
                             ? <CheckCircle className="w-4 h-4 text-(--success)" />
                             : <X className="w-4 h-4" style={S.muted} />
                           }
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
+                  </TableBody>
                 </table>
               </div>
             </div>

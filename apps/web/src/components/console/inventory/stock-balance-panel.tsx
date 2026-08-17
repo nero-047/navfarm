@@ -5,6 +5,7 @@ import { Loader2, Inbox, AlertTriangle } from "lucide-react";
 import { api } from "@/services/api-client";
 import { InlineAlert } from "@/components/ui/alert";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 type Row = Record<string, any>;
 
@@ -121,35 +122,35 @@ export default function StockBalancePanel() {
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
-                <th className="whitespace-nowrap px-4 py-3">Item</th>
-                <th className="whitespace-nowrap px-4 py-3">Warehouse</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">On Hand</th>
-                <th className="whitespace-nowrap px-4 py-3">UOM</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Value</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Reorder Level</th>
-                <th className="whitespace-nowrap px-4 py-3">Status</th>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Item</TableHead>
+                <TableHead className="whitespace-nowrap">Warehouse</TableHead>
+                <TableHead className="whitespace-nowrap text-right">On Hand</TableHead>
+                <TableHead className="whitespace-nowrap">UOM</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Value</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Reorder Level</TableHead>
+                <TableHead className="whitespace-nowrap">Status</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</td></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No stock on hand — post a Goods Receipt to bring items into inventory.</td></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No stock on hand — post a Goods Receipt to bring items into inventory.</TableCell></tr>
               ) : (
                 rows.map((row) => {
                   const belowReorder = row.reorder_level != null && row.on_hand_qty <= row.reorder_level;
                   return (
-                    <tr key={`${row.item_id}-${row.warehouse_id}`} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
-                      <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.item_code} — {row.item_description}</td>
-                      <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.warehouse_code ? `${row.warehouse_code} — ${row.warehouse_name}` : "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold" style={S.primary}>{fmt(row.on_hand_qty)}</td>
-                      <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.uom}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>₹{fmt(row.on_hand_value)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right" style={S.sub}>{row.reorder_level != null ? fmt(row.reorder_level) : "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
+                    <TableRow key={`${row.item_id}-${row.warehouse_id}`}>
+                      <TableCell className="whitespace-nowrap" style={S.primary}>{row.item_code} — {row.item_description}</TableCell>
+                      <TableCell className="whitespace-nowrap" style={S.sub}>{row.warehouse_code ? `${row.warehouse_code} — ${row.warehouse_name}` : "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-semibold" style={S.primary}>{fmt(row.on_hand_qty)}</TableCell>
+                      <TableCell className="whitespace-nowrap" style={S.sub}>{row.uom}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right" style={S.primary}>₹{fmt(row.on_hand_value)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right" style={S.sub}>{row.reorder_level != null ? fmt(row.reorder_level) : "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {belowReorder ? (
                           <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--danger-muted, #fee2e2)", color: "var(--danger)" }}>
                             <AlertTriangle className="h-3 w-3" /> Reorder
@@ -157,12 +158,12 @@ export default function StockBalancePanel() {
                         ) : (
                           <span className="text-[10px] font-medium" style={S.muted}>OK</span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const PAGE_SIZE = 25;
 
@@ -797,43 +798,43 @@ export default function BatchPanel() {
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
-                <th className="whitespace-nowrap px-4 py-3">Batch No.</th>
-                <th className="whitespace-nowrap px-4 py-3">Start Date</th>
-                <th className="whitespace-nowrap px-4 py-3">Method</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Opening Qty</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Unit Cost</th>
-                <th className="px-4 py-3 text-right">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Batch No.</TableHead>
+                <TableHead className="whitespace-nowrap">Start Date</TableHead>
+                <TableHead className="whitespace-nowrap">Method</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Opening Qty</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Unit Cost</TableHead>
+                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</td></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No batches yet.</td></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No batches yet.</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
-                  <tr key={row.batch_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold" style={S.primary}>{row.batch_no}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.start_date}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.costing_method}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>{row.opening_quantity} {row.uom}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>{row.unit_cost ?? "—"}</td>
-                    <td className="px-4 py-3 text-right">
+                  <TableRow key={row.batch_id}>
+                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.batch_no}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.start_date}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.costing_method}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.opening_quantity} {row.uom}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.unit_cost ?? "—"}</TableCell>
+                    <TableCell className="text-right">
                       <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[row.status] || STATUS_STYLE.DRAFT}>{row.status}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    </TableCell>
+                    <TableCell className="text-right">
                       <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
         {!loading && rows.length > 0 && (
@@ -940,46 +941,46 @@ export default function BatchPanel() {
           </div>
 
           <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Source Batch</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Qty</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>UOM</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Est. Rate</th>
-                  <th className="px-3 py-2"></th>
+            <table className="w-full border-collapse text-left text-xs">
+              <TableHeader>
+                <tr className="border-b border-(--row-border)">
+                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Source Batch</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
+                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Est. Rate</TableHead>
+                  <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHeader>
+              <TableBody>
                 {inputLines.map((line, idx) => (
-                  <tr key={idx} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                    <td className="px-2 py-1.5">
+                  <TableRow key={idx}>
+                    <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setInputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5">
                       <select value={line.source_batch_id} onChange={(e) => setInputLineField(idx, "source_batch_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">None</option>
                         {batches.filter((b) => b.status === "CLOSED").map((b) => <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5 w-24"><input type="number" value={line.quantity} onChange={(e) => setInputLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></td>
-                    <td className="px-2 py-1.5 w-24">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.quantity} onChange={(e) => setInputLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-24">
                       <select value={line.uom} onChange={(e) => setInputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5 w-24"><input type="number" value={line.rate} onChange={(e) => setInputLineField(idx, "rate", e.target.value)} className={inputCls} style={S.input} /></td>
-                    <td className="px-2 py-1.5">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.rate} onChange={(e) => setInputLineField(idx, "rate", e.target.value)} className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5">
                       <button onClick={() => removeInputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
+              </TableBody>
             </table>
           </div>
           <p className="text-[11px]" style={S.muted}>Rate is an estimate only — actual cost is drawn from inventory via FIFO when the batch is activated.</p>
@@ -1021,26 +1022,26 @@ export default function BatchPanel() {
               </div>
 
               <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Std Qty/Unit/Day</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Std Rate</th>
-                      <th className="px-3 py-2"></th>
+                <table className="w-full border-collapse text-left text-xs">
+                  <TableHeader>
+                    <tr className="border-b border-(--row-border)">
+                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Std Qty/Unit/Day</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Std Rate</TableHead>
+                      <TableHead className="h-auto px-3 py-2"></TableHead>
                     </tr>
-                  </thead>
-                  <tbody>
+                  </TableHeader>
+                  <TableBody>
                     {stdConsumptionLines.map((line, idx) => (
-                      <tr key={idx} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                        <td className="px-2 py-1.5">
+                      <TableRow key={idx}>
+                        <TableCell className="px-2 py-1.5">
                           <select value={line.item_id} onChange={(e) => setStdConsumptionLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                             <option value="">Select…</option>
                             {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
                           </select>
-                        </td>
-                        <td className="px-2 py-1.5 w-32"><input type="number" value={line.std_qty_per_unit_per_day} onChange={(e) => setStdConsumptionLineField(idx, "std_qty_per_unit_per_day", e.target.value)} className={inputCls} style={S.input} /></td>
-                        <td className="px-2 py-1.5 w-28">
+                        </TableCell>
+                        <TableCell className="px-2 py-1.5 w-32"><input type="number" value={line.std_qty_per_unit_per_day} onChange={(e) => setStdConsumptionLineField(idx, "std_qty_per_unit_per_day", e.target.value)} className={inputCls} style={S.input} /></TableCell>
+                        <TableCell className="px-2 py-1.5 w-28">
                           <input
                             type="number"
                             value={line.std_rate}
@@ -1049,13 +1050,13 @@ export default function BatchPanel() {
                             className={inputCls}
                             style={S.input}
                           />
-                        </td>
-                        <td className="px-2 py-1.5">
+                        </TableCell>
+                        <TableCell className="px-2 py-1.5">
                           <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
+                  </TableBody>
                 </table>
               </div>
             </>
@@ -1133,23 +1134,23 @@ export default function BatchPanel() {
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Stage History</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                  <table className="w-full text-left text-xs">
-                    <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>From</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>To</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Transferred At</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Remarks</th>
-                    </tr></thead>
-                    <tbody>
+                  <table className="w-full border-collapse text-left text-xs">
+                    <TableHeader><tr className="border-b border-(--row-border)">
+                      <TableHead className="h-auto px-3 py-2">From</TableHead>
+                      <TableHead className="h-auto px-3 py-2">To</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Transferred At</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Remarks</TableHead>
+                    </tr></TableHeader>
+                    <TableBody>
                       {(viewing.stage_log || []).map((s: Row) => (
-                        <tr key={s.log_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                          <td className="px-3 py-2" style={S.sub}>{s.from_stage_code || "—"}</td>
-                          <td className="px-3 py-2 font-semibold" style={S.primary}>{s.to_stage_code}</td>
-                          <td className="px-3 py-2" style={S.sub}>{s.transferred_at}</td>
-                          <td className="px-3 py-2" style={S.sub}>{s.remarks || "—"}</td>
-                        </tr>
+                        <TableRow key={s.log_id}>
+                          <TableCell className="px-3 py-2" style={S.sub}>{s.from_stage_code || "—"}</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold" style={S.primary}>{s.to_stage_code}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.sub}>{s.transferred_at}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.sub}>{s.remarks || "—"}</TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
+                    </TableBody>
                   </table>
                 </div>
               </div>
@@ -1158,23 +1159,23 @@ export default function BatchPanel() {
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Lines</p>
               <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                <table className="w-full text-left text-xs">
-                  <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Source Batch</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Qty</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Rate</th>
-                  </tr></thead>
-                  <tbody>
+                <table className="w-full border-collapse text-left text-xs">
+                  <TableHeader><tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Source Batch</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Rate</TableHead>
+                  </tr></TableHeader>
+                  <TableBody>
                     {(viewing.input_lines || []).map((l: Row) => (
-                      <tr key={l.line_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                        <td className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</td>
-                        <td className="px-3 py-2" style={S.sub}>{l.source_batch_id ? batchLabel(l.source_batch_id) : "—"}</td>
-                        <td className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</td>
-                        <td className="px-3 py-2" style={S.primary}>{l.rate ?? "—"}</td>
-                      </tr>
+                      <TableRow key={l.line_id}>
+                        <TableCell className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.sub}>{l.source_batch_id ? batchLabel(l.source_batch_id) : "—"}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.primary}>{l.rate ?? "—"}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
+                  </TableBody>
                 </table>
               </div>
             </div>
@@ -1233,29 +1234,29 @@ export default function BatchPanel() {
                     {dataEntryError && <InlineAlert>{dataEntryError}</InlineAlert>}
 
                     <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                      <table className="w-full text-left text-xs">
-                        <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                          <th className="px-3 py-2 font-semibold" style={S.sub}>Parameter Type</th>
-                          <th className="px-3 py-2 font-semibold" style={S.sub}>Data Entry Type</th>
-                          <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                          <th className="px-3 py-2 font-semibold" style={S.sub}>UOM</th>
-                          <th className="px-3 py-2 font-semibold" style={S.sub}>Occurrence</th>
-                          <th className="px-3 py-2 font-semibold" style={S.sub}>Expected</th>
-                          <th className="px-3 py-2 font-semibold" style={S.sub}>Actual</th>
-                          <th className="px-3 py-2"></th>
-                        </tr></thead>
-                        <tbody>
+                      <table className="w-full border-collapse text-left text-xs">
+                        <TableHeader><tr className="border-b border-(--row-border)">
+                          <TableHead className="h-auto px-3 py-2">Parameter Type</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Data Entry Type</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                          <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Occurrence</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Expected</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Actual</TableHead>
+                          <TableHead className="h-auto px-3 py-2"></TableHead>
+                        </tr></TableHeader>
+                        <TableBody>
                           {!dataEntryLoading && dataEntryLines.length === 0 ? (
-                            <tr><td colSpan={8} className="px-3 py-6 text-center" style={S.sub}>No parameters scheduled for this date.</td></tr>
+                            <tr><TableCell colSpan={8} className="py-6 text-center" style={S.sub}>No parameters scheduled for this date.</TableCell></tr>
                           ) : dataEntryLines.map((line) => (
-                            <tr key={line.spl_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                              <td className="px-3 py-2" style={S.sub}>{line.parameter_type}</td>
-                              <td className="px-3 py-2" style={S.primary}>{line.parameter_name}</td>
-                              <td className="px-3 py-2" style={S.sub}>{line.item_label || "—"}</td>
-                              <td className="px-3 py-2" style={S.sub}>{line.uom || "—"}</td>
-                              <td className="px-3 py-2" style={S.sub}>{line.occurrence ? line.occurrence.charAt(0) + line.occurrence.slice(1).toLowerCase() : "—"}</td>
-                              <td className="px-3 py-2" style={S.primary}>{Number(line.expected_qty).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
-                              <td className="px-2 py-1.5 w-28">
+                            <TableRow key={line.spl_id}>
+                              <TableCell className="px-3 py-2" style={S.sub}>{line.parameter_type}</TableCell>
+                              <TableCell className="px-3 py-2" style={S.primary}>{line.parameter_name}</TableCell>
+                              <TableCell className="px-3 py-2" style={S.sub}>{line.item_label || "—"}</TableCell>
+                              <TableCell className="px-3 py-2" style={S.sub}>{line.uom || "—"}</TableCell>
+                              <TableCell className="px-3 py-2" style={S.sub}>{line.occurrence ? line.occurrence.charAt(0) + line.occurrence.slice(1).toLowerCase() : "—"}</TableCell>
+                              <TableCell className="px-3 py-2" style={S.primary}>{Number(line.expected_qty).toLocaleString(undefined, { maximumFractionDigits: 4 })}</TableCell>
+                              <TableCell className="px-2 py-1.5 w-28">
                                 <input
                                   type="number"
                                   value={dataEntryValues[line.spl_id] ?? ""}
@@ -1263,8 +1264,8 @@ export default function BatchPanel() {
                                   className={inputCls}
                                   style={S.input}
                                 />
-                              </td>
-                              <td className="px-2 py-1.5">
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5">
                                 <button
                                   onClick={() => handleDataEntrySave(line)}
                                   disabled={dataEntrySavingId === line.spl_id || !dataEntryValues[line.spl_id]}
@@ -1273,10 +1274,10 @@ export default function BatchPanel() {
                                 >
                                   {dataEntrySavingId === line.spl_id ? "Saving…" : "Save"}
                                 </button>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
+                        </TableBody>
                       </table>
                     </div>
                   </>
@@ -1339,27 +1340,27 @@ export default function BatchPanel() {
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Transaction Log</p>
               <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                <table className="w-full text-left text-xs">
-                  <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Date</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Type</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Qty</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Amount</th>
-                  </tr></thead>
-                  <tbody>
+                <table className="w-full border-collapse text-left text-xs">
+                  <TableHeader><tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2">Date</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Type</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Amount</TableHead>
+                  </tr></TableHeader>
+                  <TableBody>
                     {(viewing.transactions || []).length === 0 ? (
-                      <tr><td colSpan={5} className="px-3 py-6 text-center" style={S.sub}>No transactions yet.</td></tr>
+                      <tr><TableCell colSpan={5} className="py-6 text-center" style={S.sub}>No transactions yet.</TableCell></tr>
                     ) : (viewing.transactions || []).map((t: Row) => (
-                      <tr key={t.transaction_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                        <td className="px-3 py-2" style={S.primary}>{t.transaction_date}</td>
-                        <td className="px-3 py-2" style={S.sub}>{t.transaction_type}</td>
-                        <td className="px-3 py-2" style={S.primary}>{t.item_id ? itemLabel(t.item_id) : "—"}</td>
-                        <td className="px-3 py-2" style={S.primary}>{t.quantity ?? "—"}</td>
-                        <td className="px-3 py-2 font-semibold" style={Number(t.amount) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{t.amount}</td>
-                      </tr>
+                      <TableRow key={t.transaction_id}>
+                        <TableCell className="px-3 py-2" style={S.primary}>{t.transaction_date}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.sub}>{t.transaction_type}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.primary}>{t.item_id ? itemLabel(t.item_id) : "—"}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.primary}>{t.quantity ?? "—"}</TableCell>
+                        <TableCell className="px-3 py-2 font-semibold" style={Number(t.amount) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{t.amount}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
+                  </TableBody>
                 </table>
               </div>
             </div>
@@ -1372,27 +1373,27 @@ export default function BatchPanel() {
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Bio-Asset Ledger</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                  <table className="w-full text-left text-xs">
-                    <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Date</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Entry Type</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Stage</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Qty</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Cost Amount</th>
-                    </tr></thead>
-                    <tbody>
+                  <table className="w-full border-collapse text-left text-xs">
+                    <TableHeader><tr className="border-b border-(--row-border)">
+                      <TableHead className="h-auto px-3 py-2">Date</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Entry Type</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Stage</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Qty</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Cost Amount</TableHead>
+                    </tr></TableHeader>
+                    <TableBody>
                       {(viewing.bio_asset_entries || []).map((e: Row) => (
-                        <tr key={e.entry_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                          <td className="px-3 py-2" style={S.primary}>{e.posting_date}</td>
-                          <td className="px-3 py-2" style={S.sub}>{e.entry_type}</td>
-                          <td className="px-3 py-2" style={S.primary}>{itemLabel(e.bio_asset_item_id)}</td>
-                          <td className="px-3 py-2" style={S.sub}>{e.stage ?? "—"}</td>
-                          <td className="px-3 py-2" style={S.primary}>{e.quantity ?? "—"}</td>
-                          <td className="px-3 py-2 font-semibold" style={Number(e.cost_amount) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{e.cost_amount}</td>
-                        </tr>
+                        <TableRow key={e.entry_id}>
+                          <TableCell className="px-3 py-2" style={S.primary}>{e.posting_date}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.sub}>{e.entry_type}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.primary}>{itemLabel(e.bio_asset_item_id)}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.sub}>{e.stage ?? "—"}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.primary}>{e.quantity ?? "—"}</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold" style={Number(e.cost_amount) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{e.cost_amount}</TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
+                    </TableBody>
                   </table>
                 </div>
               </div>
@@ -1408,24 +1409,24 @@ export default function BatchPanel() {
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output Lines</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                  <table className="w-full text-left text-xs">
-                    <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Type</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Split %</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Qty</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Cost / Unit Cost</th>
-                      <th className="px-3 py-2 font-semibold text-right" style={S.sub}>QC / Pack</th>
-                    </tr></thead>
-                    <tbody>
+                  <table className="w-full border-collapse text-left text-xs">
+                    <TableHeader><tr className="border-b border-(--row-border)">
+                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Type</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Split %</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Qty</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Cost / Unit Cost</TableHead>
+                      <TableHead className="h-auto px-3 py-2 text-right">QC / Pack</TableHead>
+                    </tr></TableHeader>
+                    <TableBody>
                       {(viewing.output_lines || []).map((l: Row) => (
-                        <tr key={l.line_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                          <td className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</td>
-                          <td className="px-3 py-2" style={S.sub}>{l.output_type}</td>
-                          <td className="px-3 py-2" style={S.primary}>{l.cost_split_pct}%</td>
-                          <td className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</td>
-                          <td className="px-3 py-2" style={S.primary}>{l.computed_cost} / {l.unit_cost}</td>
-                          <td className="px-3 py-2 text-right">
+                        <TableRow key={l.line_id}>
+                          <TableCell className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.sub}>{l.output_type}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.primary}>{l.cost_split_pct}%</TableCell>
+                          <TableCell className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.primary}>{l.computed_cost} / {l.unit_cost}</TableCell>
+                          <TableCell className="px-3 py-2 text-right">
                             <div className="flex justify-end gap-1">
                               <button onClick={() => openRecordQc(l)} title="Record QC" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                                 <ClipboardCheck className="h-3.5 w-3.5" />
@@ -1434,10 +1435,10 @@ export default function BatchPanel() {
                                 <QrCodeIcon className="h-3.5 w-3.5" />
                               </button>
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
+                    </TableBody>
                   </table>
                 </div>
               </div>
@@ -1447,31 +1448,31 @@ export default function BatchPanel() {
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Cost Variance</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                  <table className="w-full text-left text-xs">
-                    <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Type</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Std Value</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Actual Value</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}>Variance</th>
-                      <th className="px-3 py-2 font-semibold" style={S.sub}></th>
-                    </tr></thead>
-                    <tbody>
+                  <table className="w-full border-collapse text-left text-xs">
+                    <TableHeader><tr className="border-b border-(--row-border)">
+                      <TableHead className="h-auto px-3 py-2">Type</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Std Value</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Actual Value</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Variance</TableHead>
+                      <TableHead className="h-auto px-3 py-2"></TableHead>
+                    </tr></TableHeader>
+                    <TableBody>
                       {(viewing.variances || []).map((v: Row) => (
-                        <tr key={v.variance_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                          <td className="px-3 py-2" style={S.primary}>{v.variance_type}</td>
-                          <td className="px-3 py-2" style={S.sub}>{v.item_id ? itemLabel(v.item_id) : "—"}</td>
-                          <td className="px-3 py-2" style={S.primary}>{Number(v.std_value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
-                          <td className="px-3 py-2" style={S.primary}>{Number(v.actual_value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
-                          <td className="px-3 py-2 font-semibold" style={v.is_favorable ? { color: "var(--success)" } : { color: "var(--danger)" }}>{v.variance_amount}</td>
-                          <td className="px-3 py-2">
+                        <TableRow key={v.variance_id}>
+                          <TableCell className="px-3 py-2" style={S.primary}>{v.variance_type}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.sub}>{v.item_id ? itemLabel(v.item_id) : "—"}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.primary}>{Number(v.std_value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.primary}>{Number(v.actual_value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold" style={v.is_favorable ? { color: "var(--success)" } : { color: "var(--danger)" }}>{v.variance_amount}</TableCell>
+                          <TableCell className="px-3 py-2">
                             <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={v.is_favorable ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" } : { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" }}>
                               {v.is_favorable ? "FAV" : "UNFAV"}
                             </span>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
+                    </TableBody>
                   </table>
                 </div>
               </div>
@@ -1633,60 +1634,60 @@ export default function BatchPanel() {
           </div>
 
           <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Type</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Split %</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Qty</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>UOM</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Warehouse</th>
-                  <th className="px-3 py-2"></th>
+            <table className="w-full border-collapse text-left text-xs">
+              <TableHeader>
+                <tr className="border-b border-(--row-border)">
+                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Type</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Split %</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
+                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Warehouse</TableHead>
+                  <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHeader>
+              <TableBody>
                 {outputLines.map((line, idx) => (
-                  <tr key={idx} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                    <td className="px-2 py-1.5">
+                  <TableRow key={idx}>
+                    <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setOutputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5 w-24">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 w-24">
                       <select value={line.output_type} onChange={(e) => setOutputLineField(idx, "output_type", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="MAIN">Main</option>
                         <option value="BY_PRODUCT">By-Product</option>
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5 w-20"><input type="number" value={line.cost_split_pct} onChange={(e) => setOutputLineField(idx, "cost_split_pct", e.target.value)} className={inputCls} style={S.input} /></td>
-                    <td className="px-2 py-1.5 w-20"><input type="number" value={line.quantity} onChange={(e) => setOutputLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></td>
-                    <td className="px-2 py-1.5 w-24">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.cost_split_pct} onChange={(e) => setOutputLineField(idx, "cost_split_pct", e.target.value)} className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.quantity} onChange={(e) => setOutputLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-24">
                       <select value={line.uom} onChange={(e) => setOutputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5">
                       <select value={line.warehouse_id} onChange={(e) => setOutputLineField(idx, "warehouse_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5">
                       <button onClick={() => removeOutputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t font-semibold" style={{ borderColor: "var(--border)" }}>
-                  <td colSpan={2} className="px-3 py-2" style={S.sub}>Split Total</td>
-                  <td className="px-3 py-2" style={{ color: Math.abs(splitTotal - 100) < 0.01 ? "var(--success)" : "var(--danger)" }}>{splitTotal.toFixed(2)}%</td>
-                  <td colSpan={4}></td>
+              </TableBody>
+              <TableFooter>
+                <tr>
+                  <TableCell colSpan={2} className="px-3 py-2" style={S.sub}>Split Total</TableCell>
+                  <TableCell className="px-3 py-2" style={{ color: Math.abs(splitTotal - 100) < 0.01 ? "var(--success)" : "var(--danger)" }}>{splitTotal.toFixed(2)}%</TableCell>
+                  <TableCell colSpan={4}></TableCell>
                 </tr>
-              </tfoot>
+              </TableFooter>
             </table>
           </div>
         </div>
@@ -1846,24 +1847,24 @@ export default function BatchPanel() {
               </span>
               <p className="text-xs" style={S.sub}>Disposition: {qcSubmitted.disposition}</p>
               <div className="w-full overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                <table className="w-full text-left text-xs">
-                  <thead><tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Parameter</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Value</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Result</th>
-                  </tr></thead>
-                  <tbody>
+                <table className="w-full border-collapse text-left text-xs">
+                  <TableHeader><tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2">Parameter</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Value</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Result</TableHead>
+                  </tr></TableHeader>
+                  <TableBody>
                     {(qcSubmitted.results || []).map((r: Row) => {
                       const param = qcParameters.find((p) => p.param_id === r.param_id);
                       return (
-                        <tr key={r.result_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                          <td className="px-3 py-2" style={S.primary}>{param?.param_name || r.param_id}</td>
-                          <td className="px-3 py-2" style={S.sub}>{r.actual_value}{r.grade_assigned ? ` (${r.grade_assigned})` : ""}</td>
-                          <td className="px-3 py-2 font-semibold" style={r.result_status === "PASS" ? { color: "var(--success)" } : { color: "var(--danger)" }}>{r.result_status}</td>
-                        </tr>
+                        <TableRow key={r.result_id}>
+                          <TableCell className="px-3 py-2" style={S.primary}>{param?.param_name || r.param_id}</TableCell>
+                          <TableCell className="px-3 py-2" style={S.sub}>{r.actual_value}{r.grade_assigned ? ` (${r.grade_assigned})` : ""}</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold" style={r.result_status === "PASS" ? { color: "var(--success)" } : { color: "var(--danger)" }}>{r.result_status}</TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
+                  </TableBody>
                 </table>
               </div>
             </div>

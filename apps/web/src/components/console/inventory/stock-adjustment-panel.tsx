@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const PAGE_SIZE = 25;
 
@@ -205,41 +206,41 @@ export default function StockAdjustmentPanel() {
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
-                <th className="whitespace-nowrap px-4 py-3">Adjustment No.</th>
-                <th className="whitespace-nowrap px-4 py-3">Posting Date</th>
-                <th className="whitespace-nowrap px-4 py-3">Warehouse</th>
-                <th className="whitespace-nowrap px-4 py-3">Reason</th>
-                <th className="px-4 py-3 text-right">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Adjustment No.</TableHead>
+                <TableHead className="whitespace-nowrap">Posting Date</TableHead>
+                <TableHead className="whitespace-nowrap">Warehouse</TableHead>
+                <TableHead className="whitespace-nowrap">Reason</TableHead>
+                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-xs" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</td></tr>
+                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No stock adjustments yet.</td></tr>
+                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No stock adjustments yet.</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
-                  <tr key={row.adjustment_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold" style={S.primary}>{row.adjustment_no}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.posting_date}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{warehouseLabel(row.warehouse_id)}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.reason || "—"}</td>
-                    <td className="px-4 py-3 text-right">
+                  <TableRow key={row.adjustment_id}>
+                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.adjustment_no}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.posting_date}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{warehouseLabel(row.warehouse_id)}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.reason || "—"}</TableCell>
+                    <TableCell className="text-right">
                       <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[row.status] || STATUS_STYLE.DRAFT}>{row.status}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    </TableCell>
+                    <TableCell className="text-right">
                       <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
         {!loading && rows.length > 0 && (
@@ -299,41 +300,41 @@ export default function StockAdjustmentPanel() {
           </div>
 
           <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Qty (± signed)</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>UOM</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Rate (if +)</th>
-                  <th className="px-3 py-2"></th>
+            <table className="w-full border-collapse text-left text-xs">
+              <TableHeader>
+                <tr className="border-b border-(--row-border)">
+                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Qty (± signed)</TableHead>
+                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Rate (if +)</TableHead>
+                  <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHeader>
+              <TableBody>
                 {lines.map((line, idx) => (
-                  <tr key={idx} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                    <td className="px-2 py-1.5">
+                  <TableRow key={idx}>
+                    <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5 w-28"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} placeholder="e.g. -5 or 10" className={inputCls} style={S.input} /></td>
-                    <td className="px-2 py-1.5 w-28">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} placeholder="e.g. -5 or 10" className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-28">
                       <select value={line.uom} onChange={(e) => setLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5 w-24">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 w-24">
                       <input type="number" value={line.rate} onChange={(e) => setLineField(idx, "rate", e.target.value)} disabled={Number(line.quantity) <= 0} className={inputCls} style={S.input} />
-                    </td>
-                    <td className="px-2 py-1.5">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5">
                       <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
+              </TableBody>
             </table>
           </div>
         </div>
@@ -369,25 +370,25 @@ export default function StockAdjustmentPanel() {
             </div>
 
             <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Item</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Qty</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>UOM</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Rate</th>
+              <table className="w-full border-collapse text-left text-xs">
+                <TableHeader>
+                  <tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
+                    <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Rate</TableHead>
                   </tr>
-                </thead>
-                <tbody>
+                </TableHeader>
+                <TableBody>
                   {(viewing.lines || []).map((l: Row) => (
-                    <tr key={l.line_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                      <td className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</td>
-                      <td className="px-3 py-2 font-semibold" style={Number(l.quantity) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{l.quantity}</td>
-                      <td className="px-3 py-2" style={S.primary}>{l.uom}</td>
-                      <td className="px-3 py-2" style={S.primary}>{l.rate ?? "—"}</td>
-                    </tr>
+                    <TableRow key={l.line_id}>
+                      <TableCell className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</TableCell>
+                      <TableCell className="px-3 py-2 font-semibold" style={Number(l.quantity) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{l.quantity}</TableCell>
+                      <TableCell className="px-3 py-2" style={S.primary}>{l.uom}</TableCell>
+                      <TableCell className="px-3 py-2" style={S.primary}>{l.rate ?? "—"}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
+                </TableBody>
               </table>
             </div>
           </div>

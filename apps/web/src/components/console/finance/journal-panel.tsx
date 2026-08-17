@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const PAGE_SIZE = 25;
 
@@ -213,43 +214,43 @@ export default function JournalPanel() {
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
-                <th className="whitespace-nowrap px-4 py-3">Journal No.</th>
-                <th className="whitespace-nowrap px-4 py-3">Posting Date</th>
-                <th className="whitespace-nowrap px-4 py-3">Source</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Debit</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Credit</th>
-                <th className="px-4 py-3 text-right">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Journal No.</TableHead>
+                <TableHead className="whitespace-nowrap">Posting Date</TableHead>
+                <TableHead className="whitespace-nowrap">Source</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Debit</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Credit</TableHead>
+                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</td></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No journal entries yet.</td></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No journal entries yet.</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
-                  <tr key={row.journal_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold" style={S.primary}>{row.journal_no}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.posting_date}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.source}{row.source_document_no ? ` · ${row.source_document_no}` : ""}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>{row.total_debit}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>{row.total_credit}</td>
-                    <td className="px-4 py-3 text-right">
+                  <TableRow key={row.journal_id}>
+                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.journal_no}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.posting_date}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.source}{row.source_document_no ? ` · ${row.source_document_no}` : ""}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.total_debit}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.total_credit}</TableCell>
+                    <TableCell className="text-right">
                       <Badge variant={STATUS_VARIANT[row.status] || "neutral"}>{row.status}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    </TableCell>
+                    <TableCell className="text-right">
                       <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
         {!loading && rows.length > 0 && (
@@ -296,46 +297,46 @@ export default function JournalPanel() {
           </div>
 
           <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>GL Account</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Debit</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Credit</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Description</th>
-                  <th className="px-3 py-2"></th>
+            <table className="w-full border-collapse text-left text-xs">
+              <TableHeader>
+                <tr className="border-b border-(--row-border)">
+                  <TableHead className="h-auto px-3 py-2">GL Account</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Debit</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Credit</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Description</TableHead>
+                  <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHeader>
+              <TableBody>
                 {lines.map((line, idx) => (
-                  <tr key={idx} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                    <td className="px-2 py-1.5">
+                  <TableRow key={idx}>
+                    <TableCell className="px-2 py-1.5">
                       <select value={line.gl_account_id} onChange={(e) => setLineField(idx, "gl_account_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
                         <option value="">Select…</option>
                         {glAccounts.map((a) => <option key={a.gl_account_id} value={a.gl_account_id}>{a.account_code} — {a.account_name}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5 w-28"><input type="number" value={line.debit_amount} onChange={(e) => setLineField(idx, "debit_amount", e.target.value)} className={inputCls} style={S.input} /></td>
-                    <td className="px-2 py-1.5 w-28"><input type="number" value={line.credit_amount} onChange={(e) => setLineField(idx, "credit_amount", e.target.value)} className={inputCls} style={S.input} /></td>
-                    <td className="px-2 py-1.5"><input value={line.description} onChange={(e) => setLineField(idx, "description", e.target.value)} className={inputCls} style={S.input} /></td>
-                    <td className="px-2 py-1.5">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.debit_amount} onChange={(e) => setLineField(idx, "debit_amount", e.target.value)} className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.credit_amount} onChange={(e) => setLineField(idx, "credit_amount", e.target.value)} className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5"><input value={line.description} onChange={(e) => setLineField(idx, "description", e.target.value)} className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5">
                       <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t font-semibold" style={{ borderColor: "var(--border)" }}>
-                  <td className="px-3 py-2" style={S.sub}>Total</td>
-                  <td className="px-3 py-2" style={S.primary}>{lineTotals.debit.toFixed(2)}</td>
-                  <td className="px-3 py-2" style={S.primary}>{lineTotals.credit.toFixed(2)}</td>
-                  <td colSpan={2} className="px-3 py-2">
+              </TableBody>
+              <TableFooter>
+                <tr>
+                  <TableCell className="px-3 py-2" style={S.sub}>Total</TableCell>
+                  <TableCell className="px-3 py-2" style={S.primary}>{lineTotals.debit.toFixed(2)}</TableCell>
+                  <TableCell className="px-3 py-2" style={S.primary}>{lineTotals.credit.toFixed(2)}</TableCell>
+                  <TableCell colSpan={2} className="px-3 py-2">
                     <span className="text-[11px] font-semibold" style={{ color: isBalanced ? "var(--success)" : "var(--danger)" }}>
                       {isBalanced ? "Balanced" : "Not balanced"}
                     </span>
-                  </td>
+                  </TableCell>
                 </tr>
-              </tfoot>
+              </TableFooter>
             </table>
           </div>
         </div>
@@ -370,25 +371,25 @@ export default function JournalPanel() {
             </div>
 
             <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>GL Account</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Debit</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Credit</th>
-                    <th className="px-3 py-2 font-semibold" style={S.sub}>Description</th>
+              <table className="w-full border-collapse text-left text-xs">
+                <TableHeader>
+                  <tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2">GL Account</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Debit</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Credit</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Description</TableHead>
                   </tr>
-                </thead>
-                <tbody>
+                </TableHeader>
+                <TableBody>
                   {(viewing.lines || []).map((l: Row) => (
-                    <tr key={l.line_id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                      <td className="px-3 py-2" style={S.primary}>{accountLabel(l.gl_account_id)}</td>
-                      <td className="px-3 py-2" style={S.primary}>{Number(l.debit_amount) > 0 ? l.debit_amount : "—"}</td>
-                      <td className="px-3 py-2" style={S.primary}>{Number(l.credit_amount) > 0 ? l.credit_amount : "—"}</td>
-                      <td className="px-3 py-2" style={S.sub}>{l.description || "—"}</td>
-                    </tr>
+                    <TableRow key={l.line_id}>
+                      <TableCell className="px-3 py-2" style={S.primary}>{accountLabel(l.gl_account_id)}</TableCell>
+                      <TableCell className="px-3 py-2" style={S.primary}>{Number(l.debit_amount) > 0 ? l.debit_amount : "—"}</TableCell>
+                      <TableCell className="px-3 py-2" style={S.primary}>{Number(l.credit_amount) > 0 ? l.credit_amount : "—"}</TableCell>
+                      <TableCell className="px-3 py-2" style={S.sub}>{l.description || "—"}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
+                </TableBody>
               </table>
             </div>
           </div>

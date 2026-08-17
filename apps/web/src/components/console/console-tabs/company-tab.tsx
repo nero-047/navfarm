@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -599,51 +600,51 @@ export default function CompanyTab({
 
         <Card className="p-0 border-(--border) bg-(--surface) overflow-hidden">
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-(--border) text-(--text-secondary) text-[10px] uppercase font-semibold tracking-wider">
-                  <th className="p-4 text-center w-12">#</th>
-                  <th className="p-4 w-28">Code</th>
-                  <th className="p-4">Company Name</th>
-                  <th className="p-4 w-44">Industry</th>
-                  <th className="p-4 w-48">Identifiers</th>
-                  <th className="p-4 text-center w-28">Status</th>
-                  <th className="p-4 text-right w-36">Actions</th>
+            <table className="w-full border-collapse text-left">
+              <TableHeader>
+                <tr className="border-b border-(--row-border)">
+                  <TableHead className="text-center w-12">#</TableHead>
+                  <TableHead className="w-28">Code</TableHead>
+                  <TableHead>Company Name</TableHead>
+                  <TableHead className="w-44">Industry</TableHead>
+                  <TableHead className="w-48">Identifiers</TableHead>
+                  <TableHead className="text-center w-28">Status</TableHead>
+                  <TableHead className="text-right w-36">Actions</TableHead>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHeader>
+              <TableBody>
                 {companies.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-(--text-secondary) text-xs">No corporate profiles registered. Click above to add one.</td>
+                    <TableCell colSpan={7} className="p-8 text-center" style={{ color: "var(--text-secondary)" }}>No corporate profiles registered. Click above to add one.</TableCell>
                   </tr>
                 ) : (
                   companies.map((comp, idx) => (
-                    <tr key={comp.company_id} className="border-b border-(--border) hover:bg-(--surface-raised) text-xs transition-colors">
-                      <td className="p-4 text-center text-(--text-secondary) font-mono">{idx + 1}</td>
-                      <td className="p-4">
+                    <TableRow key={comp.company_id}>
+                      <TableCell className="p-4 text-center font-mono" style={{ color: "var(--text-secondary)" }}>{idx + 1}</TableCell>
+                      <TableCell className="p-4">
                         <span className="font-mono text-(--text-primary) bg-(--surface-raised) px-2 py-1 rounded border border-(--border) font-semibold">{comp.company_code}</span>
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4">
                         <div className="flex flex-col gap-0.5">
                           <span className="font-semibold text-(--text-primary)">{comp.company_name}</span>
                           <span className="text-[10px] text-(--text-secondary)">{comp.company_display_name || comp.company_name}</span>
                         </div>
-                      </td>
-                      <td className="p-4 text-(--text-secondary)">{comp.industry_type}</td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4" style={{ color: "var(--text-secondary)" }}>{comp.industry_type}</TableCell>
+                      <TableCell className="p-4">
                         <div className="flex flex-col text-[10px] text-(--text-secondary) font-mono gap-0.5">
                           <span>Tax: {comp.tax_id || "—"}</span>
                           <span>Reg: {comp.registration_no || "—"}</span>
                         </div>
-                      </td>
-                      <td className="p-4 text-center">
+                      </TableCell>
+                      <TableCell className="p-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                           comp.onboarding_status === 'COMPLETED' ? 'bg-(--success-muted) text-(--success) border border-(--success)' : 'bg-(--warning-muted) text-(--warning) border border-(--warning)'
                         }`}>
                           {comp.onboarding_status || 'PENDING'}
                         </span>
-                      </td>
-                      <td className="p-4 text-right">
+                      </TableCell>
+                      <TableCell className="p-4 text-right">
                         <Button
                           onClick={() => {
                             setSelectedCompanyDetails(comp);
@@ -656,11 +657,11 @@ export default function CompanyTab({
                         >
                           Manage Profile
                         </Button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))
                 )}
-              </tbody>
+              </TableBody>
             </table>
           </div>
         </Card>

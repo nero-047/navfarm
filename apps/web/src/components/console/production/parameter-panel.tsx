@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const PAGE_SIZE = 25;
 
@@ -174,37 +175,37 @@ export default function ParameterPanel() {
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
-                <th className="whitespace-nowrap px-4 py-3">Code</th>
-                <th className="whitespace-nowrap px-4 py-3">Name</th>
-                <th className="whitespace-nowrap px-4 py-3">Type</th>
-                <th className="whitespace-nowrap px-4 py-3">Item / Resource</th>
-                <th className="whitespace-nowrap px-4 py-3">Method</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Default Qty</th>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Code</TableHead>
+                <TableHead className="whitespace-nowrap">Name</TableHead>
+                <TableHead className="whitespace-nowrap">Type</TableHead>
+                <TableHead className="whitespace-nowrap">Item / Resource</TableHead>
+                <TableHead className="whitespace-nowrap">Method</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Default Qty</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-xs" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</td></tr>
+                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No parameters yet.</td></tr>
+                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No parameters yet.</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
-                  <tr key={row.parameter_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold" style={S.primary}>{row.parameter_code}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.parameter_name}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.parameter_type}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.item_id ? itemLabel(row.item_id) : row.resource_id ? resourceLabel(row.resource_id) : "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.qty_method}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>
+                  <TableRow key={row.parameter_id}>
+                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.parameter_code}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.parameter_name}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.parameter_type}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.item_id ? itemLabel(row.item_id) : row.resource_id ? resourceLabel(row.resource_id) : "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.qty_method}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>
                       {row.default_qty_per_unit ? `${row.default_qty_per_unit}/unit` : row.default_qty_per_batch ? `${row.default_qty_per_batch}/batch` : "—"} {row.default_uom || ""}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
         {!loading && rows.length > 0 && (

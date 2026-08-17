@@ -5,6 +5,7 @@ import { Loader2, Inbox } from "lucide-react";
 import { InlineAlert } from "@/components/ui/alert";
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableBody, TableFooter, TableRow, TableCell } from "@/components/ui/table";
 
 type Row = Record<string, any>;
 
@@ -29,26 +30,26 @@ function Section({ title, lines, total }: { title: string; lines: Row[]; total: 
       <div className="border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
         <h3 className="text-sm font-semibold" style={S.primary}>{title}</h3>
       </div>
-      <table className="w-full text-left text-sm">
-        <tbody>
+      <table className="w-full border-collapse text-left text-sm">
+        <TableBody>
           {lines.length === 0 ? (
-            <tr><td className="px-4 py-6 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-1.5 h-5 w-5" style={S.muted} /> No activity.</td></tr>
+            <tr><TableCell className="py-6 text-center" style={S.sub}><Inbox className="mx-auto mb-1.5 h-5 w-5" style={S.muted} /> No activity.</TableCell></tr>
           ) : (
             lines.map((l: Row) => (
-              <tr key={l.gl_account_id} className="border-b text-xs last:border-0" style={{ borderColor: "var(--border)" }}>
-                <td className="px-4 py-2.5" style={S.sub}>{l.account_code}</td>
-                <td className="px-4 py-2.5" style={S.primary}>{l.account_name}</td>
-                <td className="px-4 py-2.5 text-right" style={S.primary}>{l.balance.toFixed(2)}</td>
-              </tr>
+              <TableRow key={l.gl_account_id}>
+                <TableCell className="py-2.5" style={S.sub}>{l.account_code}</TableCell>
+                <TableCell className="py-2.5" style={S.primary}>{l.account_name}</TableCell>
+                <TableCell className="py-2.5 text-right" style={S.primary}>{l.balance.toFixed(2)}</TableCell>
+              </TableRow>
             ))
           )}
-        </tbody>
-        <tfoot>
-          <tr className="border-t text-xs font-semibold" style={{ borderColor: "var(--border)" }}>
-            <td colSpan={2} className="px-4 py-2.5" style={S.sub}>Total {title}</td>
-            <td className="px-4 py-2.5 text-right" style={S.primary}>{total.toFixed(2)}</td>
+        </TableBody>
+        <TableFooter>
+          <tr>
+            <TableCell colSpan={2} className="py-2.5" style={S.sub}>Total {title}</TableCell>
+            <TableCell className="py-2.5 text-right" style={S.primary}>{total.toFixed(2)}</TableCell>
           </tr>
-        </tfoot>
+        </TableFooter>
       </table>
     </div>
   );

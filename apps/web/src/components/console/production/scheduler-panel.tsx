@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const PAGE_SIZE = 25;
 
@@ -274,43 +275,43 @@ export default function SchedulerPanel() {
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
-                <th className="whitespace-nowrap px-4 py-3">Code</th>
-                <th className="whitespace-nowrap px-4 py-3">Name</th>
-                <th className="whitespace-nowrap px-4 py-3">Duration</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Status</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Locked</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Code</TableHead>
+                <TableHead className="whitespace-nowrap">Name</TableHead>
+                <TableHead className="whitespace-nowrap">Duration</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Status</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Locked</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-xs" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</td></tr>
+                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No schedulers yet.</td></tr>
+                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No schedulers yet.</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
-                  <tr key={row.scheduler_id} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold" style={S.primary}>{row.scheduler_code}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{row.scheduler_name}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{row.duration_value} {row.duration_unit}(S)</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                  <TableRow key={row.scheduler_id}>
+                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.scheduler_code}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.scheduler_name}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.duration_value} {row.duration_unit}(S)</TableCell>
+                    <TableCell className="whitespace-nowrap text-right">
                       {row.is_active === false ? (
                         <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--text-muted)", borderColor: "var(--border)" }}>INACTIVE</span>
                       ) : (
                         <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" }}>ACTIVE</span>
                       )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right">
                       {row.is_locked ? (
                         <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>LOCKED</span>
                       ) : (
                         <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--success)", borderColor: "var(--success)" }}>EDITABLE</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    </TableCell>
+                    <TableCell className="text-right">
                       <button
                         onClick={() => openEdit(row)}
                         title={row.is_locked ? "View (locked)" : "View / Edit"}
@@ -320,11 +321,11 @@ export default function SchedulerPanel() {
                         {row.is_locked ? <Eye className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
                         {row.is_locked ? "View" : "Edit"}
                       </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
         {!loading && rows.length > 0 && (
@@ -441,30 +442,30 @@ export default function SchedulerPanel() {
           </div>
 
           <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Parameter Type / Data Entry Type</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Item Name</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>UOM</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Occurrence</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Frequency Start Day</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Frequency End Day</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Label</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Expected Qty (override)</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>KPI Mode</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Min</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Max</th>
-                  <th className="px-3 py-2 font-semibold" style={S.sub}>Critical %</th>
-                  <th className="px-3 py-2"></th>
+            <table className="w-full border-collapse text-left text-xs">
+              <TableHeader>
+                <tr className="border-b border-(--row-border)">
+                  <TableHead className="h-auto px-3 py-2">Parameter Type / Data Entry Type</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Item Name</TableHead>
+                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Occurrence</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Frequency Start Day</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Frequency End Day</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Label</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Expected Qty (override)</TableHead>
+                  <TableHead className="h-auto px-3 py-2">KPI Mode</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Min</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Max</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Critical %</TableHead>
+                  <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHeader>
+              <TableBody>
                 {lines.map((line, idx) => {
                   const selectedParam = parameters.find((p) => p.parameter_id === line.parameter_id);
                   return (
-                  <tr key={idx} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                    <td className="px-2 py-1.5 min-w-[200px]">
+                  <TableRow key={idx}>
+                    <TableCell className="px-2 py-1.5 min-w-[200px]">
                       <select value={line.parameter_id} onChange={(e) => setLineField(idx, "parameter_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
                         <option value="">Select…</option>
                         {parameters.map((p) => <option key={p.parameter_id} value={p.parameter_id}>{p.parameter_code} — {p.parameter_name}</option>)}
@@ -472,45 +473,45 @@ export default function SchedulerPanel() {
                       {selectedParam && (
                         <p className="mt-1 text-[10px]" style={S.muted}>Type: <span className="font-semibold" style={S.sub}>{selectedParam.parameter_type}</span></p>
                       )}
-                    </td>
-                    <td className="px-2 py-1.5 min-w-[140px] text-[11px]" style={S.sub}>{selectedParam?.item_id ? itemLabel(selectedParam.item_id) : "—"}</td>
-                    <td className="px-2 py-1.5 w-16 text-[11px]" style={S.sub}>{selectedParam?.default_uom || "—"}</td>
-                    <td className="px-2 py-1.5 w-28">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 min-w-[140px] text-[11px]" style={S.sub}>{selectedParam?.item_id ? itemLabel(selectedParam.item_id) : "—"}</TableCell>
+                    <TableCell className="px-2 py-1.5 w-16 text-[11px]" style={S.sub}>{selectedParam?.default_uom || "—"}</TableCell>
+                    <TableCell className="px-2 py-1.5 w-28">
                       <select value={line.occurrence} onChange={(e) => setLineField(idx, "occurrence", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
                         {OCCURRENCES.map((o) => <option key={o} value={o}>{o.charAt(0) + o.slice(1).toLowerCase()}</option>)}
                       </select>
-                    </td>
-                    <td className="px-2 py-1.5 w-20"><input type="number" value={line.period_from} onChange={(e) => setLineField(idx, "period_from", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></td>
-                    <td className="px-2 py-1.5 w-20"><input type="number" value={line.period_to} onChange={(e) => setLineField(idx, "period_to", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></td>
-                    <td className="px-2 py-1.5 w-32"><input value={line.period_label} onChange={(e) => setLineField(idx, "period_label", e.target.value)} placeholder="Week 1" className={inputCls} style={S.input} disabled={isLocked} /></td>
-                    <td className="px-2 py-1.5 w-28"><input type="number" value={line.expected_qty_override} onChange={(e) => setLineField(idx, "expected_qty_override", e.target.value)} placeholder="From param" className={inputCls} style={S.input} disabled={isLocked} /></td>
-                    <td className="px-2 py-1.5 w-24">
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.period_from} onChange={(e) => setLineField(idx, "period_from", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.period_to} onChange={(e) => setLineField(idx, "period_to", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-32"><input value={line.period_label} onChange={(e) => setLineField(idx, "period_label", e.target.value)} placeholder="Week 1" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.expected_qty_override} onChange={(e) => setLineField(idx, "expected_qty_override", e.target.value)} placeholder="From param" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-24">
                       <select value={line.kpi_mode} onChange={(e) => setLineField(idx, "kpi_mode", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
                         <option value="PCT">PCT</option>
                         <option value="VALUE">VALUE</option>
                       </select>
-                    </td>
+                    </TableCell>
                     {line.kpi_mode === "VALUE" ? (
                       <>
-                        <td className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_min_value} onChange={(e) => setLineField(idx, "kpi_min_value", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></td>
-                        <td className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_max_value} onChange={(e) => setLineField(idx, "kpi_max_value", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></td>
+                        <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_min_value} onChange={(e) => setLineField(idx, "kpi_min_value", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
+                        <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_max_value} onChange={(e) => setLineField(idx, "kpi_max_value", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
                       </>
                     ) : (
                       <>
-                        <td className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_min_pct} onChange={(e) => setLineField(idx, "kpi_min_pct", e.target.value)} placeholder="90" className={inputCls} style={S.input} disabled={isLocked} /></td>
-                        <td className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_max_pct} onChange={(e) => setLineField(idx, "kpi_max_pct", e.target.value)} placeholder="110" className={inputCls} style={S.input} disabled={isLocked} /></td>
+                        <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_min_pct} onChange={(e) => setLineField(idx, "kpi_min_pct", e.target.value)} placeholder="90" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
+                        <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_max_pct} onChange={(e) => setLineField(idx, "kpi_max_pct", e.target.value)} placeholder="110" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
                       </>
                     )}
-                    <td className="px-2 py-1.5 w-20"><input type="number" value={line.critical_threshold_pct} onChange={(e) => setLineField(idx, "critical_threshold_pct", e.target.value)} placeholder="20" className={inputCls} style={S.input} disabled={isLocked} /></td>
+                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.critical_threshold_pct} onChange={(e) => setLineField(idx, "critical_threshold_pct", e.target.value)} placeholder="20" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
                     {!isLocked && (
-                      <td className="px-2 py-1.5">
+                      <TableCell className="px-2 py-1.5">
                         <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                      </td>
+                      </TableCell>
                     )}
-                  </tr>
+                  </TableRow>
                   );
                 })}
-              </tbody>
+              </TableBody>
             </table>
           </div>
         </div>

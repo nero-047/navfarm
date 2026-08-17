@@ -13,6 +13,7 @@ import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
 import { Badge } from "../../../components/ui/badge";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -224,43 +225,42 @@ export default function AdminTenantsPage() {
 
       {/* Tenants Table */}
       <div className="rounded-lg border shadow-sm overflow-hidden" style={S.surface}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b" style={S.raised}>
+        <table className="w-full border-collapse text-sm">
+          <TableHeader>
+            <tr className="border-b border-(--row-border)">
               {["#", "Tenant Name", "Email", "Plan", "Status", "Actions"].map((h) => (
-                <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap" style={S.muted}>{h}</th>
+                <TableHead key={h} className="px-5 whitespace-nowrap">{h}</TableHead>
               ))}
             </tr>
-          </thead>
-          <tbody>
+          </TableHeader>
+          <TableBody>
             {filtered.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-10 text-sm" style={S.muted}>No tenants found.</td></tr>
+              <tr><TableCell colSpan={6} className="px-5 text-center py-10" style={S.muted}>No tenants found.</TableCell></tr>
             )}
             {filtered.map((tenant, idx) => {
               const isExpanded = expandedId === tenant.tenant_id;
               const active = tenant.is_active !== false;
               return (
                 <React.Fragment key={tenant.tenant_id}>
-                  <tr className="border-b transition-colors"
-                    style={{ ...S.border, backgroundColor: isExpanded ? "var(--accent-muted)" : undefined }}>
-                    <td className="px-5 py-3.5 font-mono text-xs" style={S.muted}>{idx + 1}</td>
-                    <td className="px-5 py-3.5 font-semibold" style={S.primary}>
+                  <TableRow style={{ backgroundColor: isExpanded ? "var(--accent-muted)" : undefined }}>
+                    <TableCell className="px-5 font-mono" style={S.muted}>{idx + 1}</TableCell>
+                    <TableCell className="px-5 font-semibold" style={S.primary}>
                       <div>{tenant.tenant_name}</div>
                       <div className="text-[10px] font-mono mt-0.5" style={S.muted}>{tenant.tenant_code}</div>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs" style={S.sub}>{tenant.billing_email || "—"}</td>
-                    <td className="px-5 py-3.5">
+                    </TableCell>
+                    <TableCell className="px-5" style={S.sub}>{tenant.billing_email || "—"}</TableCell>
+                    <TableCell className="px-5">
                       {/* Plan tier is neutral metadata, not a status — colouring it
                           brand-red made every row shout for attention. */}
                       <Badge variant="neutral">{tenant.plan_id?.replace("PLAN_", "") || "—"}</Badge>
-                    </td>
-                    <td className="px-5 py-3.5">
+                    </TableCell>
+                    <TableCell className="px-5">
                       <span className={`text-[11px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${active ? "bg-(--success-muted) text-(--success) border-(--success)" : "bg-(--surface-raised) text-(--text-secondary) border-(--border)"}`}>
                         {active ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                         {active ? "Active" : "Inactive"}
                       </span>
-                    </td>
-                    <td className="px-5 py-3.5">
+                    </TableCell>
+                    <TableCell className="px-5">
                       {/* Peer row actions share one treatment. Giving each its own
                           colour turned a three-item action list into a traffic
                           light and implied a severity difference that isn't real. */}
@@ -284,13 +284,13 @@ export default function AdminTenantsPage() {
                           </button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
 
                   {/* Expanded companies row */}
                   {isExpanded && (
                     <tr key={`${tenant.tenant_id}-detail`}>
-                      <td colSpan={6} className="px-8 py-5 border-b" style={{ backgroundColor: "var(--accent-muted)", borderColor: "var(--border)" }}>
+                      <TableCell colSpan={6} className="px-8 py-5 border-b" style={{ backgroundColor: "var(--accent-muted)", borderColor: "var(--border)" }}>
                         <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={S.muted}>
                           Companies under {tenant.tenant_name}
                         </p>
@@ -320,13 +320,13 @@ export default function AdminTenantsPage() {
                           style={S.accent}>
                           <Eye className="w-3 h-3" /> View full tenant details →
                         </Link>
-                      </td>
+                      </TableCell>
                     </tr>
                   )}
                 </React.Fragment>
               );
             })}
-          </tbody>
+          </TableBody>
         </table>
       </div>
 

@@ -5,6 +5,7 @@ import { Loader2, Inbox } from "lucide-react";
 import { InlineAlert } from "@/components/ui/alert";
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 type Row = Record<string, any>;
 
@@ -70,46 +71,46 @@ export default function TrialBalancePanel() {
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
-                <th className="whitespace-nowrap px-4 py-3">Code</th>
-                <th className="whitespace-nowrap px-4 py-3">Account</th>
-                <th className="whitespace-nowrap px-4 py-3">Type</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Debit</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Credit</th>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Code</TableHead>
+                <TableHead className="whitespace-nowrap">Account</TableHead>
+                <TableHead className="whitespace-nowrap">Type</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Debit</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Credit</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-xs" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</td></tr>
+                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
               ) : !report || report.accounts.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-xs" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No posted journal activity yet.</td></tr>
+                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No posted journal activity yet.</TableCell></tr>
               ) : (
                 report.accounts.map((a: Row) => (
-                  <tr key={a.gl_account_id} className="border-b text-xs" style={{ borderColor: "var(--border)" }}>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{a.account_code}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.primary}>{a.account_name}</td>
-                    <td className="whitespace-nowrap px-4 py-3" style={S.sub}>{a.account_type}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>{a.total_debit.toFixed(2)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right" style={S.primary}>{a.total_credit.toFixed(2)}</td>
-                  </tr>
+                  <TableRow key={a.gl_account_id}>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{a.account_code}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{a.account_name}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{a.account_type}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{a.total_debit.toFixed(2)}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{a.total_credit.toFixed(2)}</TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
+            </TableBody>
             {report && report.accounts.length > 0 && (
-              <tfoot>
-                <tr className="border-t text-xs font-semibold" style={{ borderColor: "var(--border)" }}>
-                  <td colSpan={3} className="px-4 py-3" style={S.sub}>
+              <TableFooter>
+                <tr>
+                  <TableCell colSpan={3} style={S.sub}>
                     Total{" "}
                     <span style={{ color: report.isBalanced ? "var(--success)" : "var(--danger)" }}>
                       ({report.isBalanced ? "balanced" : "not balanced"})
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right" style={S.primary}>{report.totalDebit.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right" style={S.primary}>{report.totalCredit.toFixed(2)}</td>
+                  </TableCell>
+                  <TableCell className="text-right" style={S.primary}>{report.totalDebit.toFixed(2)}</TableCell>
+                  <TableCell className="text-right" style={S.primary}>{report.totalCredit.toFixed(2)}</TableCell>
                 </tr>
-              </tfoot>
+              </TableFooter>
             )}
           </table>
         </div>

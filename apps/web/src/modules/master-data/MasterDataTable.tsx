@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Drawer } from "@/components/ui/drawer";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { MasterDataConfig, MasterDataField } from "./types";
@@ -421,40 +422,40 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-[10px] font-semibold uppercase tracking-wider" style={{ ...S.sub, borderColor: "var(--border)" }}>
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
                 {columns.map((c) => (
-                  <th key={c.key} className="whitespace-nowrap px-4 py-3">{tLabel(c.label)}</th>
+                  <TableHead key={c.key} className="whitespace-nowrap">{tLabel(c.label)}</TableHead>
                 ))}
-                <th className="px-4 py-3 text-right">{t("statusColumn")}</th>
-                <th className="px-4 py-3 text-right">{t("actionsColumn")}</th>
+                <TableHead className="text-right">{t("statusColumn")}</TableHead>
+                <TableHead className="text-right">{t("actionsColumn")}</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {loading ? (
                 <tr>
-                  <td colSpan={columns.length + 2} className="px-4 py-10 text-center text-xs" style={S.sub}>
+                  <TableCell colSpan={columns.length + 2} className="py-10 text-center" style={S.sub}>
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("loadingEllipsis")}
-                  </td>
+                  </TableCell>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 2} className="px-4 py-10 text-center text-xs" style={S.sub}>
+                  <TableCell colSpan={columns.length + 2} className="py-10 text-center" style={S.sub}>
                     <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
                     {t("noRecordsYet", { name: tLabel(config.label).toLowerCase() })}
                     <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>{t("addFirstOne")}</button>
-                  </td>
+                  </TableCell>
                 </tr>
               ) : (
                 pagedRows.map((row) => {
                   const inactive = row.is_active === false;
                   return (
-                    <tr key={row[config.idKey]} className="border-b text-xs transition-colors hover:bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
+                    <TableRow key={row[config.idKey]}>
                       {columns.map((c) => (
-                        <td key={c.key} className="whitespace-nowrap px-4 py-3" style={S.primary}>{displayValue(row, c.key)}</td>
+                        <TableCell key={c.key} className="whitespace-nowrap" style={S.primary}>{displayValue(row, c.key)}</TableCell>
                       ))}
-                      <td className="px-4 py-3 text-right">
+                      <TableCell className="text-right">
                         <span
                           className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
                           style={inactive
@@ -463,8 +464,8 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                         >
                           {inactive ? t("statusInactive") : t("statusActive")}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                      </TableCell>
+                      <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button onClick={() => openEdit(row)} title={t("edit")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                             <Pencil className="h-3.5 w-3.5" />
@@ -473,12 +474,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}
-            </tbody>
+            </TableBody>
           </table>
         </div>
         {!loading && rows.length > 0 && (
