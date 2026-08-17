@@ -222,13 +222,18 @@ export default function UsersPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* Summary strip — one bordered surface with hairline dividers between
+          segments, not three separate cards competing for attention. */}
+      <div
+        className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-md)] border sm:grid-cols-3"
+        style={{ backgroundColor: "var(--border)", borderColor: "var(--border)" }}
+      >
         {[
           { label: "Workspace members", value: displayedUsers.length, detail: "Across the organization" },
           { label: "Administrators", value: displayedUsers.filter((member) => member.user_type?.includes("ADMIN")).length, detail: "Tenant and company admins" },
           { label: "Roles assigned", value: displayedUsers.filter((member) => member.roles?.length).length, detail: `${displayedUsers.filter((member) => !member.roles?.length).length} awaiting assignment` },
         ].map((item) => (
-          <div key={item.label} className="rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-4">
+          <div key={item.label} className="p-4" style={{ backgroundColor: "var(--surface)" }}>
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-xs font-medium" style={S.sub}>{item.label}</p><p className="mt-1 text-2xl font-semibold tracking-tight" style={S.primary}>{item.value}</p></div>
               <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}><Users size={17} /></span>

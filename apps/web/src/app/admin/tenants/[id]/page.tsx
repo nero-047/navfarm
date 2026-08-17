@@ -39,7 +39,7 @@ function StatCard({ icon: Icon, label, value, sub, accent = false }: {
   icon: React.ElementType; label: string; value: React.ReactNode; sub?: string; accent?: boolean;
 }) {
   return (
-    <div className="rounded-lg p-5 border" style={S.surface}>
+    <div className="p-5" style={S.surface}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{label}</span>
         <Icon className="w-4 h-4" style={accent ? { color: "var(--accent)" } : S.muted} />
@@ -67,7 +67,7 @@ function Badge({ children, color = "default" }: { children: React.ReactNode; col
 
 function MiniCard({ label, value }: { label: string; value?: string | number | null }) {
   return (
-    <div className="rounded-lg border p-3" style={S.raised}>
+    <div className="min-w-0">
       <div className="nf-text-caption mb-1">{label}</div>
       <div className="text-xs font-semibold truncate" style={S.primary}>{value ?? "—"}</div>
     </div>
@@ -261,8 +261,12 @@ export default function TenantDetailPage() {
       {error   && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
       {success && <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Summary strip — one bordered surface with hairline dividers between
+          segments, not four separate cards competing for attention. */}
+      <div
+        className="grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-md)] border sm:grid-cols-4"
+        style={{ backgroundColor: "var(--border)", borderColor: "var(--border)" }}
+      >
         <StatCard icon={Building} label="Companies" value={companies.length}
           sub={`${completedCos} onboarded · ${companies.length - completedCos} pending`} />
         <StatCard icon={Users}    label="Users"      value={users.length}

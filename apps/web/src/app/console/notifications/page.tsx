@@ -180,7 +180,7 @@ export default function NotificationsPage() {
       )}
 
       {/* Channel Tabs */}
-      <div className="rounded-lg border shadow-sm" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+      <div className="rounded-lg border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
         <div className="flex border-b px-2" style={{ borderColor: "var(--border)" }}>
           <button onClick={() => setActiveChannel("EMAIL")}
             className={tabCls("EMAIL")}
@@ -273,7 +273,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* Test Send */}
-      <div className="flex flex-col gap-4 rounded-[var(--radius-sm)] border bg-(--surface) p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+      <div className="flex flex-col gap-4 rounded-[var(--radius-sm)] border bg-(--surface) p-5 sm:flex-row sm:items-center sm:justify-between"
         style={{ borderColor: "var(--border)" }}>
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-(--info-muted) p-2 text-(--info)">
@@ -323,7 +323,7 @@ export default function NotificationsPage() {
       </Dialog>
 
       {/* Notification Logs */}
-      <div className="rounded-lg border shadow-sm" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+      <div className="rounded-lg border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
         <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
           <div className="flex items-center gap-2">
             <Bell className="w-4 h-4" style={{ color: "var(--text-muted)" }} />

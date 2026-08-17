@@ -261,7 +261,7 @@ export default function RolesTab({
           <span className="text-[11px] font-semibold uppercase tracking-wider" style={S.textSecondary}>Available Scopes</span>
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg shadow-sm cursor-pointer transition-transform hover:scale-[1.02]"
+            className="flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg cursor-pointer transition-transform hover:scale-[1.02]"
             style={{ backgroundColor: "var(--accent)" }}
           >
             <Plus className="w-3.5 h-3.5" /> Create Role

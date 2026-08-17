@@ -86,7 +86,7 @@ export default function AdminAuditPage() {
         </div>
       )}
 
-      <div className="rounded-lg border overflow-hidden shadow-sm" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+      <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
         <table className="w-full border-collapse text-sm">
           <TableHeader>
             <tr className="border-b border-(--row-border)">

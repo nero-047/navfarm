@@ -410,7 +410,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           </div>
           <button
             onClick={openCreate}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
             style={{ backgroundColor: "var(--accent)" }}
           >
             <Plus className="h-3.5 w-3.5" /> {t("addItem", { name: tLabel(config.label.replace(/s$/, "")) })}

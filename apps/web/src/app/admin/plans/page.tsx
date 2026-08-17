@@ -124,7 +124,7 @@ export default function AdminPlansPage() {
         description={`${plans.length} plans configured`}
         actions={
           <button onClick={() => handleOpen()}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-sm transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
             style={{ backgroundColor: "var(--accent)" }}>
             <Plus className="w-4 h-4" /> Add Plan
           </button>
@@ -205,7 +205,7 @@ export default function AdminPlansPage() {
       </Dialog>
 
       {/* Plans Table */}
-      <div className="rounded-lg border overflow-hidden shadow-sm" style={s.surface}>
+      <div className="rounded-lg border overflow-hidden" style={s.surface}>
         <table className="w-full border-collapse text-sm">
           <TableHeader>
             <tr className="border-b border-(--row-border)">

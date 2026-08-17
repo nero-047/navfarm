@@ -1,10 +1,12 @@
 # Phase 7 — Visual QA Evidence
 
 Durable record of the Phase 7 review of the Navfarm application webapp
-against `apple.design.md`, at commit `4a7f527` and the Phase 7 commit on
-top of it. Captured with scripted Playwright passes against the real app
-(stubbed API responses, seeded auth session), reviewed image-by-image
-before this report was written.
+against `apple.design.md`. Captured with scripted Playwright passes
+against the real app (stubbed API responses, seeded auth session),
+reviewed image-by-image before this report was written. Two passes:
+an initial checklist audit, then a deeper product-design pass that
+checked source code directly rather than trusting screenshots alone —
+see "Correction from the deeper pass" below for why that mattered.
 
 ## Finding going in
 
@@ -12,10 +14,32 @@ Before touching any code, the reference families and a representative
 sample of the rest of the application were inspected. Nearly everything
 was **already compliant** with `apple.design.md` — this reflects real
 design-system work already done in earlier phases, not something Phase 7
-needed to redo. Phase 7's job turned out to be: confirm the reference
-families hold up under full state/viewport/theme coverage, sweep every
-remaining reachable page for violations, and fix what's actually broken
-— not a blind rewrite.
+needed to redo. The first pass's job was: confirm the reference families
+hold up under full state/viewport/theme coverage, sweep every remaining
+reachable page for violations, and fix what's actually broken — not a
+blind rewrite.
+
+## Correction from the deeper pass
+
+The first pass judged some multi-panel layouts as "one shared container"
+from screenshots alone. That was wrong in one case, caught by checking
+source directly: **`admin/tenants/[id]/page.tsx`'s stat row was itself a
+four-card KPI wall** (a `StatCard` component rendering `rounded-lg p-5
+border` individually, used ×4) — the exact anti-pattern the dashboards
+had, on the page this document had incorrectly cited as the *source* of
+the correct pattern. Light, similarly-colored borders on adjacent boxes
+can look like one container at a glance; they aren't. Fixed the same way
+as the dashboards, and the same page's `MiniCard` component (individually
+bordering every field in a 7-column detail grid, inconsistent with the
+lighter `InfoRow` pattern two sections above it on the same page) was
+brought in line too. `console/users/page.tsx` had the identical three-card
+version of the same mistake, also fixed. An exhaustive follow-up sweep
+(source-level, not visual) across every remaining reachable file confirmed
+no further instances of either pattern. Eight files also had `shadow-sm`
+on table wrappers, buttons, and pills — `apple.design.md` §33 is explicit
+that default elevation is none; all removed except the one on
+`admin/tenants/[id]`'s actual modal dialog, which is the legitimate
+floating-surface exception the same rule allows.
 
 ## Reference 1 — Master Data
 
@@ -60,12 +84,17 @@ table migration) and visually confirmed here at every breakpoint.
 ## Reference 4 — Settings/Admin
 
 `admin-tenants_*` (list, 5 images across viewports/themes),
-`admin-tenant-detail_1440_light.png` (already used the divided
-summary-strip pattern before Phase 7 touched anything — this is where
-that pattern was copied from for the dashboard fix), `admin-masters`,
-`admin-plans`, `admin-audit` (1440 light each).
+`admin-tenant-detail_1440_light.png` / `FIXED-admin-tenant-detail_1440_
+{light,dark}.png`, `admin-masters`, `FIXED-admin-masters_1440_light.png`,
+`admin-plans`, `FIXED-admin-plans_1440_light.png`, `admin-audit`,
+`FIXED-admin-audit_1440_light.png`.
 
-**Result: compliant, no changes needed** beyond the dashboard (below).
+**Result: real fixes required and made** — see "Correction from the
+deeper pass" above. `admin/tenants/[id]` (the primary reference
+implementation for this family) had its own stat-card wall and an
+inconsistent field-card pattern, both fixed; it, `admin/tenants`,
+`admin/plans`, and `admin/audit` all had an unnecessary `shadow-sm` on
+their table wrapper and/or primary action button, also removed.
 
 ## Dashboards — the one real fix
 
@@ -81,9 +110,35 @@ no clipped content and all data/calculations intact.
 
 ## Representative remaining screens
 
-`console-companies`, `console-users`, `console-roles`,
-`console-notifications`, `console-audit`, `console-inventory`, `login`
-(1440 light each) — all reviewed and compliant, no changes.
+`console-companies`, `console-audit`, `console-inventory`, `login`
+(1440 light each) — reviewed, compliant, no changes.
+
+`console-users` (Team Management) — had the same three-card KPI-wall
+mistake as the reference-family finding above; fixed
+(`FIXED-console-users_1440_light.png`, populated with real stubbed rows
+to confirm the fix didn't disturb data rendering, role badges, or the
+edit action).
+
+`console-roles`, `console-notifications` — no card-wall, but each had an
+unnecessary `shadow-sm` (a "Create Role" button, a tab-panel wrapper, a
+callout row, and a logs table); removed
+(`FIXED-console-roles_1440_light.png`, `FIXED-console-notifications_
+1440_light.png`).
+
+`/signup`, `/reset-password` (`DEEP-signup_*`, `DEEP-reset-password_*`,
+1440 + 390, light) — directly rendered and reviewed this pass, not just
+checked via source as in the first pass. Compliant: obvious purpose,
+one dominant primary action, no card-wall, restrained brand presence.
+
+Onboarding wizard (`DEEP-onboarding-wizard_1440_light.png`) — directly
+rendered. Compliant. One thing considered and deliberately not changed:
+the setup-flow header shows a permanent "Sign Out" text link, which
+brushes against §15's rule against permanent sign-out infrastructure —
+but it's the same visual weight as the adjacent theme toggle, not a
+"large" or "loud" element, and the wizard is explicitly its own
+temporary flow outside the main shell (Phase 5's taxonomy lists
+onboarding under "Full page," a distinct category). Proportionate, not
+a violation.
 
 ## Pages found and intentionally left unchanged
 
@@ -125,6 +180,14 @@ pass.
 - Reachability of `/organization`, `/privacy`, `/terms` was established
   by grepping every `router.push`/`router.replace`/`href` in the auth
   and root-redirect code paths, not by inspection of the pages alone.
-- The one code change made (dashboards) was diffed line-by-line against
-  the prior version to confirm zero data/calculation/handler changes —
-  see the Phase 6 remediation commit message for the exact method.
+- After the deeper pass found a screenshot-only review had missed a
+  card-wall (see above), every remaining reachable page was re-checked
+  by reading its source for the anti-pattern's actual JSX/CSS signature
+  (a `.map()` rendering 3+ individually `rounded-*`+`border` cells into
+  a `grid ... gap-*`), not by eyeballing another screenshot — including a
+  second, independent agent sweep across every reachable file that found
+  zero further instances.
+- Every code change made (both dashboards, `admin/tenants/[id]`,
+  `console/users`, and the eight shadow removals) was diffed line-by-line
+  against the prior version to confirm zero data/calculation/handler
+  changes — see the Phase 6/7 commit messages for the exact method.

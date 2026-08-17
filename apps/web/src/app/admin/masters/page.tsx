@@ -373,7 +373,7 @@ export default function AdminMastersPage() {
                 )}
                 {currencies.map((curr) => (
                   <div key={curr.iso_code}
-                    className="border rounded-lg p-4 text-center shadow-sm"
+                    className="border rounded-lg p-4 text-center"
                     style={S.raised}>
                     <div className="text-2xl font-semibold mb-1" style={S.primary}>{curr.symbol}</div>
                     <div className="text-xs font-semibold" style={S.primary}>{curr.iso_code}</div>

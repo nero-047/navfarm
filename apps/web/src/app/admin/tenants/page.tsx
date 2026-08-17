@@ -185,7 +185,7 @@ export default function AdminTenantsPage() {
               style={S.input} />
           </div>
           <button onClick={() => { setCreateError(""); setShowAddModal(true); }}
-            className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white shadow-sm"
+            className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white"
             style={{ backgroundColor: "var(--accent)" }}>
             <Plus className="w-4 h-4" /> Add Tenant
           </button>
@@ -224,7 +224,7 @@ export default function AdminTenantsPage() {
       </Dialog>
 
       {/* Tenants Table */}
-      <div className="rounded-lg border shadow-sm overflow-hidden" style={S.surface}>
+      <div className="rounded-lg border overflow-hidden" style={S.surface}>
         <table className="w-full border-collapse text-sm">
           <TableHeader>
             <tr className="border-b border-(--row-border)">
@@ -304,7 +304,7 @@ export default function AdminTenantsPage() {
                           <div className="flex flex-wrap gap-2">
                             {expandedCompanies.map((co: any) => (
                               <span key={co.company_id}
-                                className="text-xs border rounded-lg px-3 py-1.5 font-medium shadow-sm flex items-center gap-1.5"
+                                className="text-xs border rounded-lg px-3 py-1.5 font-medium flex items-center gap-1.5"
                                 style={{ ...S.surface, ...S.primary }}>
                                 <Building className="w-3 h-3 shrink-0" style={S.muted} />
                                 {co.company_name}
