@@ -4,8 +4,10 @@ import { eq, and, or, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
-import { CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto } from './dto/animal.dto';
+import { CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto, TransitionAnimalStageDto } from './dto/animal.dto';
+
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
@@ -209,6 +211,9 @@ export class AnimalService {
       acquisition_cost: dto.acquisition_cost.toString(),
       landing_cost: dto.landing_cost?.toString() || null,
       total_opening_asset_value: totalOpeningAssetValue.toString(),
+      current_bio_asset_value: totalOpeningAssetValue.toString(),
+      total_amortised: '0.0000',
+      book_value: totalOpeningAssetValue.toString(),
       current_stage_id: dto.current_stage_id || null,
       current_batch_id: dto.current_batch_id || null,
       current_location_id: dto.current_location_id || null,
@@ -221,6 +226,27 @@ export class AnimalService {
     };
 
     await this.db.insert(schema.animalRegister).values(newAnimal);
+
+    // Record IAS 41 Opening Acquisition in bio_asset_ledger for this tagged animal
+    await this.db.insert(schema.bioAssetLedger).values({
+      entry_id: randomUUID(),
+      tenant_id: tenantId,
+      company_id: dto.company_id,
+      bio_asset_item_id: dto.item_id,
+      animal_id: animalId,
+      entry_type: 'ACQUISITION',
+      document_no: animalCode,
+      posting_date: dto.entry_date,
+      stage: dto.current_stage_id || null,
+      status: 'ACTIVE',
+      quantity: '1.0000',
+      cost_amount: totalOpeningAssetValue.toString(),
+      cost_amount_each_unit: totalOpeningAssetValue.toString(),
+      costing_method: 'COST_ACCUMULATION',
+      nob_id: dto.nob_id,
+      lob_id: dto.lob_id,
+      created_by: userPayload?.userId || null,
+    });
 
     await this.auditService.log({
       tenantId,
@@ -235,10 +261,83 @@ export class AnimalService {
     return this.findOne(animalId);
   }
 
+  async lookupByTag(tag: string, tenantId: string) {
+    const trimmed = tag.trim();
+    if (!trimmed) {
+      throw new BadRequestException('Tag / Code query parameter cannot be empty.');
+    }
+
+    const rows = await this.db
+      .select({
+        animal: schema.animalRegister,
+        breed: schema.breedMaster,
+        stage: schema.stageMaster,
+        batch: schema.batchHeader,
+      })
+      .from(schema.animalRegister)
+      .leftJoin(schema.breedMaster, eq(schema.animalRegister.breed_id, schema.breedMaster.breed_id))
+      .leftJoin(schema.stageMaster, eq(schema.animalRegister.current_stage_id, schema.stageMaster.stage_id))
+      .leftJoin(schema.batchHeader, eq(schema.animalRegister.current_batch_id, schema.batchHeader.batch_id))
+      .where(
+        and(
+          eq(schema.animalRegister.tenant_id, tenantId),
+          or(
+            eq(schema.animalRegister.rfid_tag, trimmed),
+            eq(schema.animalRegister.ear_tag, trimmed),
+            eq(schema.animalRegister.animal_code, trimmed),
+            eq(schema.animalRegister.animal_id, trimmed)
+          )
+        )
+      )
+      .limit(1);
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`No animal found matching RFID tag, ear tag, or code '${trimmed}'.`);
+    }
+
+    const { animal, breed, stage, batch } = rows[0];
+
+    // Check active withdrawal period status
+    const medRows = await this.db
+      .select({
+        item_name: schema.itemMaster.item_name,
+        withdrawal_days: schema.itemMaster.withdrawal_days,
+        administered_date: schema.animalMedicationLog.administered_date,
+      })
+      .from(schema.animalMedicationLog)
+      .innerJoin(schema.itemMaster, eq(schema.animalMedicationLog.item_id, schema.itemMaster.item_id))
+      .where(eq(schema.animalMedicationLog.animal_id, animal.animal_id));
+
+    const todayMs = new Date().getTime();
+    const activeWithdrawals: Array<{ item_name: string; daysRemaining: number; lastDose: string }> = [];
+
+    for (const med of medRows) {
+      if (med.withdrawal_days == null) continue;
+      const daysSinceDose = Math.floor((todayMs - new Date(med.administered_date).getTime()) / 86400000);
+      if (daysSinceDose < med.withdrawal_days) {
+        activeWithdrawals.push({
+          item_name: med.item_name,
+          daysRemaining: med.withdrawal_days - daysSinceDose,
+          lastDose: med.administered_date,
+        });
+      }
+    }
+
+    return {
+      ...animal,
+      breed_name: breed?.breed_name,
+      stage_name: stage?.stage_name,
+      batch_code: batch?.batch_code,
+      hasActiveWithdrawal: activeWithdrawals.length > 0,
+      activeWithdrawals,
+    };
+  }
+
   async findOne(id: string) {
     const [animal] = await this.db
       .select()
       .from(schema.animalRegister)
+
       .where(eq(schema.animalRegister.animal_id, id))
       .limit(1);
 
@@ -420,6 +519,29 @@ export class AnimalService {
       .set(updates)
       .where(eq(schema.animalRegister.animal_id, id));
 
+    // Record IAS 41 Exit / Disposal in bio_asset_ledger for this tagged animal
+    if (bookValue != null) {
+      await this.db.insert(schema.bioAssetLedger).values({
+        entry_id: randomUUID(),
+        tenant_id: tenantId,
+        company_id: animal.company_id,
+        bio_asset_item_id: animal.item_id,
+        animal_id: id,
+        entry_type: 'TRANSFORMATION',
+        document_no: animal.animal_code,
+        posting_date: dto.disposal_date,
+        stage: animal.current_stage_id || null,
+        status: mappedStatus || 'CLOSED',
+        quantity: '-1.0000',
+        cost_amount: (-bookValue).toString(),
+        cost_amount_each_unit: bookValue.toString(),
+        costing_method: 'AMORTIZED_COST',
+        nob_id: animal.nob_id,
+        lob_id: animal.lob_id,
+        created_by: userPayload?.userId || null,
+      });
+    }
+
     await this.auditService.log({
       tenantId,
       companyId: animal.company_id,
@@ -433,4 +555,127 @@ export class AnimalService {
 
     return this.findOne(id);
   }
+
+  async getBioAssetLedger(animalId: string) {
+    await this.findOne(animalId);
+    return this.db
+      .select()
+      .from(schema.bioAssetLedger)
+      .where(eq(schema.bioAssetLedger.animal_id, animalId))
+      .orderBy(schema.bioAssetLedger.posting_date);
+  }
+
+  async transitionStage(id: string, dto: TransitionAnimalStageDto, tenantId: string, userPayload?: any) {
+    const animal = await this.findOne(id);
+    if (!animal.is_active) {
+      throw new BadRequestException(`Cannot transition disposed or inactive animal '${animal.animal_code}'.`);
+    }
+
+    // 1. Verify destination stage
+    const [destStage] = await this.db
+      .select()
+      .from(schema.stageMaster)
+      .where(and(eq(schema.stageMaster.stage_id, dto.to_stage_id), eq(schema.stageMaster.tenant_id, tenantId)))
+      .limit(1);
+
+    if (!destStage) {
+      throw new NotFoundException(`Destination Stage with ID '${dto.to_stage_id}' not found.`);
+    }
+
+    // 2. Minimum duration validation if moving from a stage that specifies min_days_before_move
+    if (animal.current_stage_id) {
+      const [currentStage] = await this.db
+        .select()
+        .from(schema.stageMaster)
+        .where(eq(schema.stageMaster.stage_id, animal.current_stage_id))
+        .limit(1);
+
+      if (currentStage?.min_days_before_move && currentStage.min_days_before_move > 0) {
+        const entryDate = animal.entry_date ? new Date(animal.entry_date) : new Date(animal.created_at);
+        const transDate = new Date(dto.transition_date);
+        const daysPassed = Math.floor((transDate.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysPassed < currentStage.min_days_before_move && !dto.reason) {
+          throw new BadRequestException(
+            `Minimum duration of ${currentStage.min_days_before_move} days required for '${currentStage.stage_name}' before transition (current: ${daysPassed} days). Provide a reason to override.`
+          );
+        }
+      }
+    }
+
+    // 3. Optional location verification
+    if (dto.to_location_id) {
+      const [loc] = await this.db
+        .select()
+        .from(schema.locationMaster)
+        .where(and(eq(schema.locationMaster.location_id, dto.to_location_id), eq(schema.locationMaster.tenant_id, tenantId)))
+        .limit(1);
+      if (!loc) {
+        throw new NotFoundException(`Destination Location with ID '${dto.to_location_id}' not found.`);
+      }
+    }
+
+    // 4. Optional batch verification
+    if (dto.to_batch_id) {
+      const [batch] = await this.db
+        .select()
+        .from(schema.batchHeader)
+        .where(and(eq(schema.batchHeader.batch_id, dto.to_batch_id), eq(schema.batchHeader.tenant_id, tenantId)))
+        .limit(1);
+      if (!batch) {
+        throw new NotFoundException(`Destination Batch with ID '${dto.to_batch_id}' not found.`);
+      }
+    }
+
+    // 5. Parity count increment check: if moving through weaning/dry from farrowing
+    let newParity = animal.parity_count || 0;
+    const destCode = destStage.stage_code?.toUpperCase();
+    if (
+      animal.gender === 'F' &&
+      (destCode === 'WEANING' || destCode === 'DRY_SOW_GESTATION' || destCode === 'FLUSH_SERVICE') &&
+      animal.current_stage?.toUpperCase()?.includes('FARROW')
+    ) {
+      newParity += 1;
+    }
+
+    const updates = {
+      current_stage_id: dto.to_stage_id,
+      current_stage: destStage.stage_name,
+      current_location_id: dto.to_location_id !== undefined ? dto.to_location_id : animal.current_location_id,
+      current_batch_id: dto.to_batch_id !== undefined ? dto.to_batch_id : animal.current_batch_id,
+      parity_count: newParity,
+      updated_by: userPayload?.userId || null,
+      updated_at: toMysqlTimestamp(),
+    };
+
+    await this.db
+      .update(schema.animalRegister)
+      .set(updates)
+      .where(eq(schema.animalRegister.animal_id, id));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: animal.company_id,
+      userId: userPayload?.userId,
+      action: 'TRANSITION_STAGE',
+      entityName: 'animal_register',
+      entityId: id,
+      oldValues: {
+        current_stage_id: animal.current_stage_id,
+        current_stage: animal.current_stage,
+        current_location_id: animal.current_location_id,
+        current_batch_id: animal.current_batch_id,
+      },
+      newValues: {
+        ...updates,
+        transition_date: dto.transition_date,
+        reason: dto.reason,
+        remarks: dto.remarks,
+      },
+    });
+
+    return this.findOne(id);
+  }
 }
+
+

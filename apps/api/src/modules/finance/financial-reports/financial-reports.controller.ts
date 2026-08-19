@@ -1,7 +1,7 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FinancialReportsService } from './financial-reports.service';
-import { TrialBalanceQueryDto, BalanceSheetQueryDto, ProfitLossQueryDto } from './dto/financial-reports.dto';
+import { TrialBalanceQueryDto, BalanceSheetQueryDto, ProfitLossQueryDto, BioAssetRollForwardQueryDto, HerdAnalyticsQueryDto, BatchCostVarianceQueryDto } from './dto/financial-reports.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -39,4 +39,32 @@ export class FinancialReportsController {
     const result = await this.reportsService.getProfitLoss(tenantId, query.companyId, query.dateFrom, query.dateTo);
     return { success: true, message: 'Profit & Loss retrieved successfully.', data: result };
   }
+
+  @Get('bio-asset-roll-forward')
+  @RequirePermission('FINANCE', 'REPORTS', 'view')
+  @ApiOperation({ summary: 'IAS 41 Biological Asset Roll-Forward — carrying amount reconciliation' })
+  async bioAssetRollForward(@Query() query: BioAssetRollForwardQueryDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.reportsService.getBiologicalAssetRollForward(tenantId, query.companyId, query.dateFrom, query.dateTo);
+    return { success: true, message: 'Biological Asset Roll-Forward statement retrieved.', data: result };
+  }
+
+  @Get('herd-analytics')
+  @RequirePermission('PIGGERY', 'ANIMAL', 'view')
+  @ApiOperation({ summary: 'Piggery Herd Analytics — headcount, parity profile, and productivity' })
+  async herdAnalytics(@Query() query: HerdAnalyticsQueryDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.reportsService.getPiggeryHerdAnalytics(tenantId, query.companyId);
+    return { success: true, message: 'Piggery Herd Analytics retrieved.', data: result };
+  }
+
+  @Get('batch-cost-variance')
+  @RequirePermission('FINANCE', 'REPORTS', 'view')
+  @ApiOperation({ summary: 'Batch Cost Variance Report — standard vs actual variance breakdown' })
+  async batchCostVariance(@Query() query: BatchCostVarianceQueryDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.reportsService.getBatchCostVarianceReport(tenantId, query.companyId, query.batchId);
+    return { success: true, message: 'Batch Cost Variance report retrieved.', data: result };
+  }
 }
+

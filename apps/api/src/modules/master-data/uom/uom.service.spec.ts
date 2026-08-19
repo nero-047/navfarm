@@ -155,4 +155,29 @@ describe('UomService', () => {
       await expect(service.findOne('non-existent-id')).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('resolveConversionFactor & convertQuantity', () => {
+    it('returns 1.0 when fromUom equals toUom', async () => {
+      const res = await service.convertQuantity('KG', 'KG', 10);
+      expect(res.conversionFactor).toBe(1.0);
+      expect(res.convertedQuantity).toBe(10);
+    });
+
+    it('resolves item-specific conversion factor', async () => {
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([
+              { conversion_factor: '50.00000000', from_uom: 'BAG', to_uom: 'KG', item_id: 'item-feed' },
+            ]),
+          }),
+        }),
+      });
+
+      const res = await service.convertQuantity('BAG', 'KG', 3, 'item-feed');
+      expect(res.conversionFactor).toBe(50);
+      expect(res.convertedQuantity).toBe(150);
+    });
+  });
 });
+

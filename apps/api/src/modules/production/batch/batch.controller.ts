@@ -12,7 +12,9 @@ import {
   DisposeBioAssetDto,
   RenewBatchDto,
   TransferStageDto,
+  BulkDailyEntryDto,
 } from './dto/batch.dto';
+
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -32,6 +34,16 @@ export class BatchController {
     const result = await this.batchService.create(dto, tenantId, req.user);
     return { success: true, message: 'Batch draft created successfully.', data: result };
   }
+
+  @Post('bulk-daily-entry')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Bulk record daily operational data (feed, mortality, water, temp) across multiple batches' })
+  async bulkDailyEntry(@Body() dto: BulkDailyEntryDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.bulkAddDailyTransactions(dto, tenantId, req.user);
+    return { success: true, message: 'Bulk daily entries recorded successfully.', data: result };
+  }
+
 
   @Get()
   @RequirePermission('PRODUCTION', 'BATCH', 'view')
@@ -158,4 +170,25 @@ export class BatchController {
     const result = await this.batchService.transferStage(id, dto, tenantId, req.user);
     return { success: true, message: 'Batch stage transferred successfully.', data: result };
   }
+
+  @Post(':id/generate-scheduler')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Auto-generate a concrete scheduler and daily target curves from breed lifecycle standards' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async generateScheduler(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.generateSchedulerForBatch(id, tenantId, req.user);
+    return { success: true, message: 'Batch scheduler auto-generated from breed standards.', data: result };
+  }
+
+  @Get(':id/performance-curves')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'Fetch day-by-day standard performance curves vs actual recorded metrics (Feed, Weight, Mortality)' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async getPerformanceCurves(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.getBatchPerformanceCurves(id, tenantId);
+    return { success: true, message: 'Performance curves retrieved successfully.', data: result };
+  }
 }
+

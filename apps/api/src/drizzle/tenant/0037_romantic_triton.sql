@@ -1,0 +1,2 @@
+ALTER TABLE `bio_asset_ledger` ADD `animal_id` varchar(36);--> statement-breakpoint
+ALTER TABLE `bio_asset_ledger` ADD CONSTRAINT `bio_asset_ledger_animal_id_animal_register_animal_id_fk` FOREIGN KEY (`animal_id`) REFERENCES `animal_register`(`animal_id`) ON DELETE restrict ON UPDATE no action;

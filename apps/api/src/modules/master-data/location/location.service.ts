@@ -502,4 +502,122 @@ export class LocationService {
 
     return this.findOne(id);
   }
+
+  async getLocationOccupancy(tenantId: string, companyId?: string) {
+    const conditions: any[] = [
+      eq(schema.locationMaster.tenant_id, tenantId),
+      eq(schema.locationMaster.is_active, true),
+      isNull(schema.locationMaster.deleted_at),
+    ];
+    if (companyId) {
+      conditions.push(
+        or(
+          eq(schema.locationMaster.company_id, companyId),
+          isNull(schema.locationMaster.company_id)
+        )
+      );
+    }
+
+    const locations = await this.db
+      .select({
+        location: schema.locationMaster,
+        farm: schema.farmMaster,
+        shed: schema.shedMaster,
+      })
+      .from(schema.locationMaster)
+      .leftJoin(schema.farmMaster, eq(schema.locationMaster.farm_id, schema.farmMaster.farm_id))
+      .leftJoin(schema.shedMaster, eq(schema.locationMaster.shed_id, schema.shedMaster.shed_id))
+      .where(and(...conditions));
+
+    // Get animal counts per location
+    const animalConditions: any[] = [
+      eq(schema.animalRegister.tenant_id, tenantId),
+      eq(schema.animalRegister.is_active, true),
+    ];
+    if (companyId) {
+      animalConditions.push(eq(schema.animalRegister.company_id, companyId));
+    }
+
+    const animals = await this.db
+      .select({
+        animal_id: schema.animalRegister.animal_id,
+        current_location_id: schema.animalRegister.current_location_id,
+        animal_type: schema.animalRegister.animal_type,
+        status: schema.animalRegister.status,
+      })
+      .from(schema.animalRegister)
+      .where(and(...animalConditions));
+
+    // Get batch counts per location
+    const batchConditions: any[] = [
+      eq(schema.batchHeader.tenant_id, tenantId),
+      eq(schema.batchHeader.status, 'ACTIVE'),
+      isNull(schema.batchHeader.deleted_at),
+    ];
+    if (companyId) {
+      batchConditions.push(eq(schema.batchHeader.company_id, companyId));
+    }
+
+    const batches = await this.db
+      .select({
+        batch_id: schema.batchHeader.batch_id,
+        batch_no: schema.batchHeader.batch_no,
+        location_id: schema.batchHeader.location_id,
+        shed_id: schema.batchHeader.shed_id,
+        current_quantity: schema.batchHeader.current_quantity,
+      })
+      .from(schema.batchHeader)
+      .where(and(...batchConditions));
+
+    // Group counts by location
+    const animalCountMap: Record<string, number> = {};
+    const sickQuarantineMap: Record<string, number> = {};
+
+    for (const a of animals) {
+      if (a.current_location_id) {
+        animalCountMap[a.current_location_id] = (animalCountMap[a.current_location_id] || 0) + 1;
+        if (a.status === 'SICK' || a.status === 'QUARANTINE') {
+          sickQuarantineMap[a.current_location_id] = (sickQuarantineMap[a.current_location_id] || 0) + 1;
+        }
+      }
+    }
+
+    const batchCountMap: Record<string, number> = {};
+    for (const b of batches) {
+      const locId = b.location_id || b.shed_id;
+      if (locId) {
+        batchCountMap[locId] = (batchCountMap[locId] || 0) + Number(b.current_quantity || 0);
+      }
+    }
+
+    return locations.map(({ location, farm, shed }) => {
+      const animalHeadcount = animalCountMap[location.location_id] || 0;
+      const batchHeadcount = batchCountMap[location.location_id] || (location.shed_id ? batchCountMap[location.shed_id] || 0 : 0);
+      const totalOccupancy = animalHeadcount + batchHeadcount;
+      const maxCap = location.max_capacity ? Number(location.max_capacity) : null;
+      const utilizationPct = maxCap && maxCap > 0 ? Math.round((totalOccupancy / maxCap) * 100) : null;
+      const isOverCapacity = maxCap != null && totalOccupancy > maxCap;
+      const sickCount = sickQuarantineMap[location.location_id] || 0;
+
+      return {
+        location_id: location.location_id,
+        location_code: location.location_code,
+        location_name: location.location_name,
+        location_type: location.location_type,
+        parent_name: shed?.shed_name || farm?.farm_name || 'General',
+        max_capacity: maxCap,
+        capacity_uom: location.capacity_uom || 'HEAD',
+        current_occupancy: totalOccupancy,
+        animal_count: animalHeadcount,
+        batch_count: batchHeadcount,
+        utilization_pct: utilizationPct,
+        is_over_capacity: isOverCapacity,
+        biosecurity_status: sickCount > 0 ? 'QUARANTINE_ACTIVE' : 'NORMAL',
+        sick_animal_count: sickCount,
+        last_cleaned_date: location.last_cleaned_date || null,
+        last_disinfected_date: location.last_disinfected_date || null,
+      };
+    });
+  }
 }
+

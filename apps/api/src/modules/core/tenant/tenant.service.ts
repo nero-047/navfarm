@@ -21,7 +21,7 @@ export class TenantService {
     private readonly connectionManager: ConnectionManagerService,
     private readonly auditService: AuditLogService,
     private readonly config: ConfigService,
-  ) {}
+  ) { }
 
   async signup(dto: SignupTenantDto) {
     // 1. Check if tenant code is already registered in master
@@ -457,7 +457,7 @@ export class TenantService {
   async getTenantUsers(tenantId: string) {
     const tenant = await this.findOne(tenantId);
     const tenantDb = await this.connectionManager.getTenantConnection(tenant);
-    
+
     const rows = await tenantDb
       .select({
         user_id: schema.userMaster.user_id,

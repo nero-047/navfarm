@@ -23,6 +23,11 @@ export class CreateGlMappingDto {
   @IsOptional()
   lob_id?: string;
 
+  @ApiProperty({ description: 'Optional Stage UUID (stage_master) — narrows this mapping to one production stage. Omit (NULL) to match all stages (wildcard). A mapping with a stage set wins over a NULL-stage mapping in the most-specific-wins resolver.', required: false })
+  @IsUUID()
+  @IsOptional()
+  stage_id?: string;
+
   @ApiProperty({ description: 'Optional costing method code (costing_method_config.method_code) — narrows this mapping to one valuation method, omit for all', required: false })
   @IsString()
   @IsOptional()
@@ -33,7 +38,7 @@ export class CreateGlMappingDto {
     example: 'PURCHASE',
     enum: [
       'PURCHASE', 'CONSUMPTION', 'TRANSFER_SHIPMENT', 'TRANSFER_RECEIPT', 'VARIANCE_POSITIVE', 'VARIANCE_NEGATIVE',
-      'BATCH_INPUT', 'BATCH_CONSUMPTION', 'BATCH_OUTPUT', 'MORTALITY', 'OVERHEAD',
+      'BATCH_INPUT', 'BATCH_CONSUMPTION', 'BATCH_OUTPUT', 'BATCH_IMPAIRMENT', 'MORTALITY', 'OVERHEAD',
       'PRICE_VARIANCE', 'USAGE_VARIANCE', 'OUTPUT_VARIANCE', 'OVERHEAD_VARIANCE',
       'BIO_ACQUISITION', 'BIO_CONSUMPTION_PREMATURE', 'BIO_CONSUMPTION_MATURE', 'BIO_OUTPUT',
       'BIO_MORTALITY_PREMATURE', 'BIO_MORTALITY_MATURE', 'BIO_OVERHEAD_PREMATURE', 'BIO_OVERHEAD_MATURE',
@@ -74,6 +79,11 @@ export class UpdateGlMappingDto {
   @IsUUID()
   @IsOptional()
   lob_id?: string;
+
+  @ApiProperty({ description: 'Set/clear the production-stage dimension. Pass null to remove (wildcard).', required: false })
+  @IsUUID()
+  @IsOptional()
+  stage_id?: string;
 
   @ApiProperty({ required: false })
   @IsString()
@@ -130,6 +140,11 @@ export class QueryGlMappingDto {
   @IsOptional()
   @IsUUID()
   lobId?: string;
+
+  @ApiProperty({ description: 'Filter by production stage UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  stageId?: string;
 
   @ApiProperty({ description: 'Filter by costing method code', required: false })
   @IsOptional()

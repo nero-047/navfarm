@@ -181,4 +181,301 @@ export class FinancialReportsService {
 
     return { dateFrom, dateTo, income, expense, totalIncome, totalExpense, netIncome: totalIncome - totalExpense };
   }
+
+  async getBiologicalAssetRollForward(tenantId: string, companyId: string, dateFrom: string, dateTo: string) {
+    const allEntries = await this.db
+      .select({
+        entry_id: schema.bioAssetLedger.entry_id,
+        entry_type: schema.bioAssetLedger.entry_type,
+        posting_date: schema.bioAssetLedger.posting_date,
+        cost_amount: schema.bioAssetLedger.cost_amount,
+        quantity: schema.bioAssetLedger.quantity,
+        batch_id: schema.bioAssetLedger.batch_id,
+        animal_id: schema.bioAssetLedger.animal_id,
+        stage: schema.bioAssetLedger.stage,
+        costing_method: schema.bioAssetLedger.costing_method,
+      })
+      .from(schema.bioAssetLedger)
+      .where(
+        and(
+          eq(schema.bioAssetLedger.tenant_id, tenantId),
+          eq(schema.bioAssetLedger.company_id, companyId),
+          lte(schema.bioAssetLedger.posting_date, dateTo)
+        )
+      )
+      .orderBy(schema.bioAssetLedger.posting_date);
+
+    let openingCarryingValue = 0;
+    let acquisitions = 0;
+    let growthCapitalization = 0;
+    let amortization = 0;
+    let fairValueAdjustments = 0;
+    let harvestTransfers = 0;
+    let disposals = 0;
+    let periodMovements = 0;
+
+    let batchCarryingValue = 0;
+    let animalCarryingValue = 0;
+
+    const periodTransactions: any[] = [];
+
+    for (const e of allEntries) {
+      const amount = Number(e.cost_amount) || 0;
+      const isPrior = e.posting_date < dateFrom;
+
+      if (isPrior) {
+        openingCarryingValue += amount;
+      } else {
+        periodMovements += amount;
+        periodTransactions.push(e);
+
+        switch (e.entry_type) {
+          case 'ACQUISITION':
+            acquisitions += amount;
+            break;
+          case 'CONSUMPTION':
+          case 'OVERHEAD':
+          case 'OVERHEAD_COST':
+          case 'GROWTH_ADJMT':
+            growthCapitalization += amount;
+            break;
+          case 'AMORTIZATION':
+            amortization += amount;
+            break;
+          case 'FAIR_VALUE_ADJMT':
+            fairValueAdjustments += amount;
+            break;
+          case 'TRANSFORMATION':
+            harvestTransfers += amount;
+            break;
+          case 'WRITEOFF':
+          case 'MORTALITY':
+          case 'DEAD_PLANT':
+            disposals += amount;
+            break;
+          default:
+            if (amount > 0) acquisitions += amount;
+            else disposals += amount;
+            break;
+        }
+      }
+
+      if (e.animal_id) {
+        animalCarryingValue += amount;
+      } else {
+        batchCarryingValue += amount;
+      }
+    }
+
+    const closingCarryingValue = openingCarryingValue + periodMovements;
+
+    // GL reconciliation check for biological asset accounts (1050 Pre-mature / 1060 Mature)
+    const glRows = await this.getAccountBalances(
+      tenantId,
+      companyId,
+      lte(schema.journalHeader.posting_date, dateTo),
+      ['ASSET']
+    );
+
+    const bioGlAccounts = glRows.filter((r) =>
+      r.account_code.startsWith('1050') ||
+      r.account_code.startsWith('1060') ||
+      r.account_name.toLowerCase().includes('biological asset')
+    );
+
+    const totalGlBalance = bioGlAccounts.reduce((sum, r) => sum + netBalance(r), 0);
+    const glReconciliationVariance = closingCarryingValue - totalGlBalance;
+
+    return {
+      dateFrom,
+      dateTo,
+      openingCarryingValue,
+      movements: {
+        acquisitions,
+        growthCapitalization,
+        amortization,
+        fairValueAdjustments,
+        harvestTransfers,
+        disposals,
+        netMovement: periodMovements,
+      },
+      closingCarryingValue,
+      assetTypeBreakdown: {
+        batchCarryingValue,
+        animalCarryingValue,
+      },
+      glReconciliation: {
+        glAccounts: bioGlAccounts.map((a) => ({
+          account_code: a.account_code,
+          account_name: a.account_name,
+          balance: netBalance(a),
+        })),
+        totalGlBalance,
+        variance: glReconciliationVariance,
+        isReconciled: Math.abs(glReconciliationVariance) < 0.01,
+      },
+      transactionCount: periodTransactions.length,
+    };
+  }
+
+  async getPiggeryHerdAnalytics(tenantId: string, companyId: string) {
+    const animals = await this.db
+      .select({
+        animal: schema.animalRegister,
+        breed: schema.breedMaster,
+        stage: schema.stageMaster,
+      })
+      .from(schema.animalRegister)
+      .leftJoin(schema.breedMaster, eq(schema.animalRegister.breed_id, schema.breedMaster.breed_id))
+      .leftJoin(schema.stageMaster, eq(schema.animalRegister.current_stage_id, schema.stageMaster.stage_id))
+      .where(
+        and(
+          eq(schema.animalRegister.tenant_id, tenantId),
+          eq(schema.animalRegister.company_id, companyId)
+        )
+      );
+
+    const activeAnimals = animals.filter((a) => a.animal.is_active);
+    const disposedAnimals = animals.filter((a) => !a.animal.is_active);
+
+    const totalHeadcount = activeAnimals.length;
+    const totalBookValue = activeAnimals.reduce(
+      (sum, a) => sum + (Number(a.animal.book_value) || Number(a.animal.total_opening_asset_value) || 0),
+      0
+    );
+
+    const genderCounts: Record<string, number> = { Female: 0, Male: 0 };
+    for (const a of activeAnimals) {
+      if (a.animal.gender === 'F') genderCounts.Female++;
+      else if (a.animal.gender === 'M') genderCounts.Male++;
+    }
+
+    const typeCounts: Record<string, number> = {};
+    for (const a of activeAnimals) {
+      const type = a.animal.animal_type || 'UNKNOWN';
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    }
+
+    const stageCounts: Record<string, { stage_name: string; count: number }> = {};
+    for (const a of activeAnimals) {
+      const stageKey = a.animal.current_stage_id || 'UNASSIGNED';
+      const stageName = a.stage?.stage_name || a.animal.current_stage_id || 'Unassigned';
+      if (!stageCounts[stageKey]) {
+        stageCounts[stageKey] = { stage_name: stageName, count: 0 };
+      }
+      stageCounts[stageKey].count++;
+    }
+
+    const breedCounts: Record<string, { breed_name: string; count: number }> = {};
+    for (const a of activeAnimals) {
+      const breedKey = a.animal.breed_id;
+      const breedName = a.breed?.breed_name || 'Unknown Breed';
+      if (!breedCounts[breedKey]) {
+        breedCounts[breedKey] = { breed_name: breedName, count: 0 };
+      }
+      breedCounts[breedKey].count++;
+    }
+
+    const parityCurve: Record<string, number> = {
+      'Parity 0 (Gilt)': 0,
+      'Parity 1': 0,
+      'Parity 2': 0,
+      'Parity 3': 0,
+      'Parity 4': 0,
+      'Parity 5': 0,
+      'Parity 6+': 0,
+    };
+
+    for (const a of activeAnimals) {
+      if (a.animal.gender === 'F') {
+        const p = a.animal.parity_count || 0;
+        if (p === 0) parityCurve['Parity 0 (Gilt)']++;
+        else if (p === 1) parityCurve['Parity 1']++;
+        else if (p === 2) parityCurve['Parity 2']++;
+        else if (p === 3) parityCurve['Parity 3']++;
+        else if (p === 4) parityCurve['Parity 4']++;
+        else if (p === 5) parityCurve['Parity 5']++;
+        else parityCurve['Parity 6+']++;
+      }
+    }
+
+    const totalPigletsBornLive = animals.reduce((sum, a) => sum + (a.animal.total_piglets_born_live || 0), 0);
+    const totalPigletsWeaned = animals.reduce((sum, a) => sum + (a.animal.total_piglets_weaned || 0), 0);
+    const weaningRate = totalPigletsBornLive > 0 ? (totalPigletsWeaned / totalPigletsBornLive) * 100 : 0;
+
+    const disposalBreakdown: Record<string, number> = {};
+    let totalGainLoss = 0;
+    for (const a of disposedAnimals) {
+      const dtype = a.animal.disposal_type || 'OTHER';
+      disposalBreakdown[dtype] = (disposalBreakdown[dtype] || 0) + 1;
+      totalGainLoss += Number(a.animal.gain_loss_on_disposal) || 0;
+    }
+
+    return {
+      totalHeadcount,
+      totalBookValue,
+      genderBreakdown: genderCounts,
+      typeBreakdown: typeCounts,
+      stageBreakdown: Object.values(stageCounts),
+      breedBreakdown: Object.values(breedCounts),
+      parityDistribution: parityCurve,
+      productivity: {
+        totalPigletsBornLive,
+        totalPigletsWeaned,
+        weaningRate: Number(weaningRate.toFixed(2)),
+      },
+      disposals: {
+        totalDisposed: disposedAnimals.length,
+        disposalBreakdown,
+        totalGainLoss,
+      },
+    };
+  }
+
+  async getBatchCostVarianceReport(tenantId: string, companyId: string, batchId?: string) {
+    const conditions: any[] = [
+      eq(schema.batchCostVariance.tenant_id, tenantId),
+      eq(schema.batchCostVariance.company_id, companyId),
+    ];
+    if (batchId) {
+      conditions.push(eq(schema.batchCostVariance.batch_id, batchId));
+    }
+
+    const rows = await this.db
+      .select({
+        variance: schema.batchCostVariance,
+        batch: schema.batchHeader,
+      })
+      .from(schema.batchCostVariance)
+      .innerJoin(schema.batchHeader, eq(schema.batchCostVariance.batch_id, schema.batchHeader.batch_id))
+      .where(and(...conditions))
+      .orderBy(schema.batchCostVariance.variance_date);
+
+    return rows.map(({ variance, batch }) => {
+      const stdCost = Number(variance.standard_cost) || 0;
+      const actCost = Number(variance.actual_cost) || 0;
+      const totalVar = Number(variance.total_variance) || 0;
+      const pct = stdCost > 0 ? (totalVar / stdCost) * 100 : 0;
+
+      return {
+        variance_id: variance.variance_id,
+        batch_id: batch.batch_id,
+        batch_code: batch.batch_code,
+        batch_name: batch.batch_name,
+        batch_type: batch.batch_type,
+        costing_method: batch.costing_method,
+        variance_date: variance.variance_date,
+        standard_cost: stdCost,
+        actual_cost: actCost,
+        price_variance: Number(variance.price_variance) || 0,
+        usage_variance: Number(variance.usage_variance) || 0,
+        output_variance: Number(variance.output_variance) || 0,
+        overhead_variance: Number(variance.overhead_variance) || 0,
+        total_variance: totalVar,
+        variance_pct: Number(pct.toFixed(2)),
+        is_favorable: totalVar <= 0,
+      };
+    });
+  }
 }
+

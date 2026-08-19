@@ -89,6 +89,28 @@ export const SYSTEM_BREED_SEED: Array<{
     productive_life_cycles: 7, avg_litter_size_born: 11.50, avg_litter_size_weaned: 10.00,
     avg_weaning_weight_kg: 7.000, farrowing_rate_pct: 85.00, boar_doses_per_week: 4.00, boar_productive_life_months: 24,
   },
+  {
+    // Large White is the European name for the same genetic line as Yorkshire; shares all the same
+    // production standards. Seeded separately because clients may register animals under either name.
+    nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', breed_code: 'LARGE_WHITE', breed_name: 'Large White', species_code: 'PIG', breed_type: 'MEAT',
+    gestation_days: 114, lactation_days: 28, productive_life_months: 36, residual_value_pct: 10.00,
+    productive_life_cycles: 7, avg_litter_size_born: 11.50, avg_litter_size_weaned: 10.00,
+    avg_weaning_weight_kg: 7.000, farrowing_rate_pct: 85.00, boar_doses_per_week: 4.00, boar_productive_life_months: 24,
+  },
+  {
+    // Landrace: prolific maternal breed, slightly longer gestation, larger litters.
+    nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', breed_code: 'LANDRACE', breed_name: 'Landrace', species_code: 'PIG', breed_type: 'MEAT',
+    gestation_days: 115, lactation_days: 28, productive_life_months: 36, residual_value_pct: 10.00,
+    productive_life_cycles: 7, avg_litter_size_born: 12.00, avg_litter_size_weaned: 10.50,
+    avg_weaning_weight_kg: 6.500, farrowing_rate_pct: 87.00, boar_doses_per_week: 4.00, boar_productive_life_months: 24,
+  },
+  {
+    // Duroc: terminal sire breed, faster growth, high meat yield — lower litter size.
+    nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', breed_code: 'DUROC', breed_name: 'Duroc', species_code: 'PIG', breed_type: 'MEAT',
+    gestation_days: 114, lactation_days: 27, productive_life_months: 30, residual_value_pct: 10.00,
+    productive_life_cycles: 6, avg_litter_size_born: 10.00, avg_litter_size_weaned: 8.50,
+    avg_weaning_weight_kg: 7.500, farrowing_rate_pct: 82.00, boar_doses_per_week: 5.00, boar_productive_life_months: 30,
+  },
   { nob_code: 'LIVESTOCK', lob_code: 'LVS_GOAT_SHEEP', breed_code: 'BOER-GOAT', breed_name: 'Boer Goat', species_code: 'GOAT', breed_type: 'MEAT' },
   { nob_code: 'AQUA', lob_code: 'AQA_FISH', breed_code: 'ROHU', breed_name: 'Rohu', species_code: 'FISH', breed_type: 'FISH' },
   { nob_code: 'INSECT', lob_code: 'INS_BEE', breed_code: 'ITALIAN-BEE', breed_name: 'Italian Honey Bee', species_code: 'BEE', breed_type: 'DUAL_PURPOSE' },
@@ -277,4 +299,89 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
 }> = [
   { series_code: 'BATCH', series_name: 'Batch Number', document_type: 'BATCH', prefix: 'BATCH', separator: '-', seq_length: 6, reset_frequency: 'NEVER' },
   { series_code: 'ANIMAL_PIGGERY', series_name: 'Piggery Animal Code', document_type: 'ANIMAL', nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', prefix: 'PIG', date_format: 'YYYY', separator: '-', seq_length: 4, reset_frequency: 'YEARLY' },
+];
+
+/**
+ * Breed Lifecycle Stages — per-stage production standards for piggery breeds.
+ *
+ * Transcribed from the spec's "Breed Lifecycle Stages" sheet (Breed Master
+ * Template workbook). Each row binds a breed_code + stage_code pair to:
+ *   feed_qty_per_head_per_day_kg — standard daily feed intake
+ *   std_adg_gpd                  — Average Daily Gain target (grams/day)
+ *   std_fcr                      — Feed Conversion Ratio target
+ *   std_body_weight_kg           — expected body weight at end of stage
+ *   std_mortality_rate_pct       — acceptable mortality % for this stage
+ *   kpi_lower_limit / kpi_upper_limit / alert_severity — alert thresholds
+ *
+ * Yorkshire and Large White share identical numeric values (same genetic line).
+ * Landrace and Duroc diverge on ADG/FCR/litter size per breed characteristics.
+ *
+ * breed_code and stage_code are resolved to UUIDs at seed time in seed-dev-tenant.ts.
+ * feed_item_code and output_item_code are resolved to item_ids from SYSTEM_ITEM_SEED.
+ */
+export const SYSTEM_BREED_LIFECYCLE_SEED: Array<{
+  breed_code: string;
+  stage_code: string;
+  calc_unit: 'DAY' | 'WEEK' | 'MONTH';
+  period_from: number;
+  period_to: number;
+  feed_item_code?: string;
+  feed_qty_per_head_per_day_kg?: number;
+  feed_wastage_pct?: number;
+  std_body_weight_kg?: number;
+  std_adg_gpd?: number;
+  std_fcr?: number;
+  std_mortality_rate_pct?: number;
+  output_item_code?: string;
+  output_uom?: string;
+  std_output_qty?: number;
+  kpi_lower_limit?: number;
+  kpi_upper_limit?: number;
+  alert_severity?: 'INFO' | 'WARNING' | 'CRITICAL';
+  notes?: string;
+}> = [
+  // -- YORKSHIRE / LARGE_WHITE (identical standards -- same genetic line) -----------
+  ...(['YORKSHIRE', 'LARGE_WHITE'] as const).flatMap((breed_code) => [
+    { breed_code, stage_code: 'QUARANTINE',        calc_unit: 'DAY' as const, period_from: 1, period_to: 30,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 1.5, feed_wastage_pct: 5.00, std_body_weight_kg: 45.0,  std_adg_gpd: 350, std_fcr: 4.30, std_mortality_rate_pct: 1.0, kpi_lower_limit: 300, kpi_upper_limit: 500, alert_severity: 'WARNING'  as const, notes: 'Isolation period. Monitor respiratory and enteric disease. Vaccinate per schedule. Target BCS 3.0 at exit.' },
+    { breed_code, stage_code: 'GILT_GROWER',       calc_unit: 'DAY' as const, period_from: 1, period_to: 77,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.2, feed_wastage_pct: 5.00, std_body_weight_kg: 125.0, std_adg_gpd: 800, std_fcr: 2.75, std_mortality_rate_pct: 0.5, kpi_lower_limit: 700, kpi_upper_limit: 950, alert_severity: 'WARNING'  as const, notes: 'Grow gilt to service weight 120-135 kg. ADG target 800 g/day. Flush feeding starts Day 70.' },
+    { breed_code, stage_code: 'FLUSH_SERVICE',     calc_unit: 'DAY' as const, period_from: 1, period_to: 10,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 3.0, feed_wastage_pct: 5.00, std_body_weight_kg: 128.0, std_mortality_rate_pct: 0.2, alert_severity: 'INFO'    as const, notes: 'Increase feed 2-3 kg/day to stimulate ovulation. Record AI/mating date. Confirm conception at Day 21 scan.' },
+    { breed_code, stage_code: 'DRY_SOW_GESTATION', calc_unit: 'DAY' as const, period_from: 1, period_to: 110, feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.5, feed_wastage_pct: 3.00, std_body_weight_kg: 165.0, std_adg_gpd: 300, std_mortality_rate_pct: 0.3, kpi_lower_limit: 200, kpi_upper_limit: 450, alert_severity: 'WARNING'  as const, notes: 'Maintain BCS 3.0-3.5. Increase to 3.0 kg/day from Day 90. Move to farrowing crate Day 110.' },
+    { breed_code, stage_code: 'FARROWING',         calc_unit: 'DAY' as const, period_from: 1, period_to: 3,   feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 1.5, feed_wastage_pct: 0, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 11.5, std_mortality_rate_pct: 0.5, kpi_lower_limit: 9.0, kpi_upper_limit: 14.0, alert_severity: 'CRITICAL' as const, notes: 'Record litter born alive and stillbirths. KPI: live born >= 11. Ramp to lactation ration Day 3.' },
+    { breed_code, stage_code: 'LACTATION',         calc_unit: 'DAY' as const, period_from: 1, period_to: 28,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 6.5, feed_wastage_pct: 3.00, std_body_weight_kg: 155.0, std_mortality_rate_pct: 0.3, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 10.0, kpi_lower_limit: 9.0, kpi_upper_limit: 12.0, alert_severity: 'WARNING'  as const, notes: 'Ad-lib sow feed to maximise milk yield. Wean at 28 days (min 21). Target weaning weight 7 kg/piglet.' },
+    { breed_code, stage_code: 'WEANING',           calc_unit: 'DAY' as const, period_from: 1, period_to: 1, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 10.0, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Record weaning weight. Sow weaning-to-service interval target <= 5 days.' },
+    { breed_code, stage_code: 'BOAR_AI',           calc_unit: 'WEEK' as const, period_from: 1, period_to: 104, feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.8, feed_wastage_pct: 3.00, std_body_weight_kg: 200.0, std_mortality_rate_pct: 0.0, kpi_lower_limit: 3.0, kpi_upper_limit: 6.0, alert_severity: 'WARNING'  as const, notes: 'Collect 4 doses/week. Evaluate semen motility each collection. Record libido score.' },
+    { breed_code, stage_code: 'CB_GROWER',         calc_unit: 'DAY' as const, period_from: 1, period_to: 77,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.5, feed_wastage_pct: 5.00, std_body_weight_kg: 115.0, std_adg_gpd: 800, std_fcr: 2.80, std_mortality_rate_pct: 1.5, output_item_code: 'LVS-DRESSED-PORK', output_uom: 'KG', std_output_qty: 82.0, kpi_lower_limit: 700, kpi_upper_limit: 950, alert_severity: 'CRITICAL' as const, notes: 'Target market weight 115 kg at 77 days. FCR must stay <= 2.8. Withdrawal periods mandatory.' },
+    { breed_code, stage_code: 'SLAUGHTER',         calc_unit: 'DAY' as const, period_from: 1, period_to: 1, output_item_code: 'LVS-DRESSED-PORK', output_uom: 'KG', std_output_qty: 82.0, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Check withdrawal periods. Record live weight, dressed weight, dressing pct, condemnations.' },
+    { breed_code, stage_code: 'DISPOSED',          calc_unit: 'DAY' as const, period_from: 1, period_to: 1, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Record disposal reason: sold, slaughtered, died, culled.' },
+  ]),
+
+  // -- LANDRACE (prolific maternal line -- higher litter, slightly lower ADG) --------
+  ...(['LANDRACE'] as const).flatMap((breed_code) => [
+    { breed_code, stage_code: 'QUARANTINE',        calc_unit: 'DAY' as const, period_from: 1, period_to: 30,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 1.5, feed_wastage_pct: 5.00, std_body_weight_kg: 43.0,  std_adg_gpd: 340, std_fcr: 4.40, std_mortality_rate_pct: 1.0, kpi_lower_limit: 280, kpi_upper_limit: 500, alert_severity: 'WARNING'  as const, notes: 'Same quarantine protocol as Yorkshire.' },
+    { breed_code, stage_code: 'GILT_GROWER',       calc_unit: 'DAY' as const, period_from: 1, period_to: 77,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.2, feed_wastage_pct: 5.00, std_body_weight_kg: 122.0, std_adg_gpd: 780, std_fcr: 2.80, std_mortality_rate_pct: 0.5, kpi_lower_limit: 680, kpi_upper_limit: 950, alert_severity: 'WARNING'  as const, notes: 'Landrace gilts service weight 120-130 kg.' },
+    { breed_code, stage_code: 'FLUSH_SERVICE',     calc_unit: 'DAY' as const, period_from: 1, period_to: 10,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 3.0, feed_wastage_pct: 5.00, std_body_weight_kg: 125.0, std_mortality_rate_pct: 0.2, alert_severity: 'INFO'    as const, notes: 'High farrowing rate 87%. Confirm conception scan Day 21.' },
+    { breed_code, stage_code: 'DRY_SOW_GESTATION', calc_unit: 'DAY' as const, period_from: 1, period_to: 115, feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.5, feed_wastage_pct: 3.00, std_body_weight_kg: 168.0, std_adg_gpd: 295, std_mortality_rate_pct: 0.3, kpi_lower_limit: 200, kpi_upper_limit: 440, alert_severity: 'WARNING'  as const, notes: 'Landrace gestation 115 days. Maintain BCS 3.0-3.5.' },
+    { breed_code, stage_code: 'FARROWING',         calc_unit: 'DAY' as const, period_from: 1, period_to: 3,   feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 1.5, feed_wastage_pct: 0, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 12.0, std_mortality_rate_pct: 0.5, kpi_lower_limit: 10.0, kpi_upper_limit: 15.0, alert_severity: 'CRITICAL' as const, notes: 'Largest litter of 4 breeds. Target live born >= 12.' },
+    { breed_code, stage_code: 'LACTATION',         calc_unit: 'DAY' as const, period_from: 1, period_to: 28,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 6.5, feed_wastage_pct: 3.00, std_body_weight_kg: 152.0, std_mortality_rate_pct: 0.3, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 10.5, kpi_lower_limit: 9.5, kpi_upper_limit: 13.0, alert_severity: 'WARNING'  as const, notes: 'Good milking ability. Target 10.5 weaned/litter.' },
+    { breed_code, stage_code: 'WEANING',           calc_unit: 'DAY' as const, period_from: 1, period_to: 1, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 10.5, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Weaning weight target 6.5 kg.' },
+    { breed_code, stage_code: 'BOAR_AI',           calc_unit: 'WEEK' as const, period_from: 1, period_to: 104, feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.8, feed_wastage_pct: 3.00, std_body_weight_kg: 195.0, std_mortality_rate_pct: 0.0, kpi_lower_limit: 3.0, kpi_upper_limit: 6.0, alert_severity: 'WARNING'  as const, notes: 'Landrace boar AI station standard protocol.' },
+    { breed_code, stage_code: 'CB_GROWER',         calc_unit: 'DAY' as const, period_from: 1, period_to: 77,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.5, feed_wastage_pct: 5.00, std_body_weight_kg: 112.0, std_adg_gpd: 770, std_fcr: 2.85, std_mortality_rate_pct: 1.5, output_item_code: 'LVS-DRESSED-PORK', output_uom: 'KG', std_output_qty: 80.0, kpi_lower_limit: 680, kpi_upper_limit: 950, alert_severity: 'CRITICAL' as const, notes: 'Slightly lower FCR than Yorkshire in finisher. Monitor closely.' },
+    { breed_code, stage_code: 'SLAUGHTER',         calc_unit: 'DAY' as const, period_from: 1, period_to: 1, output_item_code: 'LVS-DRESSED-PORK', output_uom: 'KG', std_output_qty: 80.0, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Record live weight, dressed weight, dressing pct.' },
+    { breed_code, stage_code: 'DISPOSED',          calc_unit: 'DAY' as const, period_from: 1, period_to: 1, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Record disposal reason.' },
+  ]),
+
+  // -- DUROC (terminal sire -- fastest CB growth, best FCR, fewer piglets) ----------
+  ...(['DUROC'] as const).flatMap((breed_code) => [
+    { breed_code, stage_code: 'QUARANTINE',        calc_unit: 'DAY' as const, period_from: 1, period_to: 30,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 1.8, feed_wastage_pct: 5.00, std_body_weight_kg: 48.0,  std_adg_gpd: 420, std_fcr: 4.00, std_mortality_rate_pct: 1.0, kpi_lower_limit: 350, kpi_upper_limit: 550, alert_severity: 'WARNING'  as const, notes: 'Duroc grows faster in quarantine. Same health protocol applies.' },
+    { breed_code, stage_code: 'GILT_GROWER',       calc_unit: 'DAY' as const, period_from: 1, period_to: 77,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.3, feed_wastage_pct: 5.00, std_body_weight_kg: 130.0, std_adg_gpd: 900, std_fcr: 2.60, std_mortality_rate_pct: 0.5, kpi_lower_limit: 800, kpi_upper_limit: 1050, alert_severity: 'WARNING' as const, notes: 'Higher ADG than maternal breeds. Service weight 125-140 kg.' },
+    { breed_code, stage_code: 'FLUSH_SERVICE',     calc_unit: 'DAY' as const, period_from: 1, period_to: 10,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 3.0, feed_wastage_pct: 5.00, std_body_weight_kg: 133.0, std_mortality_rate_pct: 0.2, alert_severity: 'INFO'    as const, notes: 'Farrowing rate 82%. Confirm scan Day 21.' },
+    { breed_code, stage_code: 'DRY_SOW_GESTATION', calc_unit: 'DAY' as const, period_from: 1, period_to: 114, feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.7, feed_wastage_pct: 3.00, std_body_weight_kg: 175.0, std_adg_gpd: 320, std_mortality_rate_pct: 0.3, kpi_lower_limit: 250, kpi_upper_limit: 480, alert_severity: 'WARNING'  as const, notes: 'Heavier sow requires slightly higher gestation ration.' },
+    { breed_code, stage_code: 'FARROWING',         calc_unit: 'DAY' as const, period_from: 1, period_to: 3,   feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 1.5, feed_wastage_pct: 0, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 10.0, std_mortality_rate_pct: 0.5, kpi_lower_limit: 8.0, kpi_upper_limit: 13.0, alert_severity: 'CRITICAL' as const, notes: 'Lower litter size typical of terminal sire. Piglets heavier at birth.' },
+    { breed_code, stage_code: 'LACTATION',         calc_unit: 'DAY' as const, period_from: 1, period_to: 27,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 6.5, feed_wastage_pct: 3.00, std_body_weight_kg: 158.0, std_mortality_rate_pct: 0.3, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 8.5, kpi_lower_limit: 7.5, kpi_upper_limit: 11.0, alert_severity: 'WARNING'  as const, notes: 'Duroc 27-day lactation. Heavier piglets at weaning (target 7.5 kg).' },
+    { breed_code, stage_code: 'WEANING',           calc_unit: 'DAY' as const, period_from: 1, period_to: 1, output_item_code: 'LVS-PIGLET', output_uom: 'PCS', std_output_qty: 8.5, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Weaning weight target 7.5 kg -- heavier than maternal breeds.' },
+    { breed_code, stage_code: 'BOAR_AI',           calc_unit: 'WEEK' as const, period_from: 1, period_to: 130, feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 3.0, feed_wastage_pct: 3.00, std_body_weight_kg: 230.0, std_mortality_rate_pct: 0.0, kpi_lower_limit: 4.0, kpi_upper_limit: 7.0, alert_severity: 'WARNING'  as const, notes: 'Duroc boar extended productive life (30 months). Higher dose count.' },
+    { breed_code, stage_code: 'CB_GROWER',         calc_unit: 'DAY' as const, period_from: 1, period_to: 77,  feed_item_code: 'LVS-PIG-FEED', feed_qty_per_head_per_day_kg: 2.6, feed_wastage_pct: 5.00, std_body_weight_kg: 120.0, std_adg_gpd: 950, std_fcr: 2.55, std_mortality_rate_pct: 1.5, output_item_code: 'LVS-DRESSED-PORK', output_uom: 'KG', std_output_qty: 88.0, kpi_lower_limit: 850, kpi_upper_limit: 1100, alert_severity: 'CRITICAL' as const, notes: 'Best FCR of the 4 breeds. Premium terminal sire for market pigs.' },
+    { breed_code, stage_code: 'SLAUGHTER',         calc_unit: 'DAY' as const, period_from: 1, period_to: 1, output_item_code: 'LVS-DRESSED-PORK', output_uom: 'KG', std_output_qty: 88.0, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Higher dressing percentage expected. Record condemnations.' },
+    { breed_code, stage_code: 'DISPOSED',          calc_unit: 'DAY' as const, period_from: 1, period_to: 1, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Record disposal reason.' },
+  ]),
 ];

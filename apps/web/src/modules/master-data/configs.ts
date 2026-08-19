@@ -761,6 +761,7 @@ const glMapping: MasterDataConfig = {
     { key: "item_category_id", label: "Item Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank to match all NOBs." },
     { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank to match all LOBs under the selected NOB." },
+    { key: "stage_id", label: "Production Stage", type: "select-entity", entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"], helpText: "Leave blank to match all stages (wildcard). Set to make this mapping win only when the batch/animal is in this specific stage." },
     { key: "valuation_method", label: "Valuation Method", type: "select-entity", entityEndpoint: "/costing-method", entityValueKey: "method_code", entityLabelKeys: ["method_code", "method_name"], helpText: "Leave blank to match all costing methods." },
     {
       key: "transaction_type", label: "Transaction Type", type: "select", required: true,
@@ -779,6 +780,7 @@ const glMapping: MasterDataConfig = {
         { value: "BATCH_INPUT", label: "Batch — Input Draw (on Activation)" },
         { value: "BATCH_CONSUMPTION", label: "Batch — Daily Consumption" },
         { value: "BATCH_OUTPUT", label: "Batch — Output (on Close)" },
+        { value: "BATCH_IMPAIRMENT", label: "Batch — By-Product / Waste Impairment (at-cost vs NRV)" },
         { value: "MORTALITY", label: "Batch — Mortality Write-off" },
         { value: "OVERHEAD", label: "Batch — Overhead" },
         { value: "PRICE_VARIANCE", label: "Batch — Price Variance (Standard Costing)" },

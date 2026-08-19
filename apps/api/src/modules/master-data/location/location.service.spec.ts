@@ -349,4 +349,60 @@ describe('LocationService', () => {
       expect(result.deleted_at).toBeNull();
     });
   });
+
+  describe('getLocationOccupancy', () => {
+    it('aggregates live animal and batch headcounts with capacity and biosecurity checks', async () => {
+      // 1. Locations
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          leftJoin: jest.fn().mockReturnValue({
+            leftJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([
+                {
+                  location: {
+                    location_id: 'loc-pen-1',
+                    location_code: 'PEN-01A',
+                    location_name: 'Pen 1A',
+                    location_type: 'PEN',
+                    max_capacity: '20.0000',
+                    capacity_uom: 'HEAD',
+                  },
+                  farm: { farm_name: 'Main Farm' },
+                  shed: { shed_name: 'Grower Shed 1' },
+                },
+              ]),
+            }),
+          }),
+        }),
+      });
+
+      // 2. Animals
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([
+            { animal_id: 'a-1', current_location_id: 'loc-pen-1', status: 'ACTIVE' },
+            { animal_id: 'a-2', current_location_id: 'loc-pen-1', status: 'QUARANTINE' },
+          ]),
+        }),
+      });
+
+      // 3. Batches
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      });
+
+      const res = await service.getLocationOccupancy('tenant-123', 'comp-1');
+
+      expect(res).toHaveLength(1);
+      expect(res[0].location_code).toBe('PEN-01A');
+      expect(res[0].current_occupancy).toBe(2);
+      expect(res[0].max_capacity).toBe(20);
+      expect(res[0].utilization_pct).toBe(10); // 2 / 20 = 10%
+      expect(res[0].biosecurity_status).toBe('QUARANTINE_ACTIVE');
+      expect(res[0].sick_animal_count).toBe(1);
+    });
+  });
 });
+

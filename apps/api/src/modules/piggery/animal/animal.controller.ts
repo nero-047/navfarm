@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Patch, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { AnimalService } from './animal.service';
-import { CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto } from './dto/animal.dto';
+import { CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto, TransitionAnimalStageDto } from './dto/animal.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -31,6 +31,15 @@ export class AnimalController {
     return { success: true, message: 'Animals retrieved successfully.', data: result };
   }
 
+  @Get('lookup/tag')
+  @RequirePermission('PIGGERY', 'ANIMAL', 'view')
+  @ApiOperation({ summary: 'Fast lookup by RFID tag, ear tag, or animal code for scanner wand integration' })
+  async lookupByTag(@Query('tag') tag: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.animalService.lookupByTag(tag || '', tenantId);
+    return { success: true, message: 'Animal resolved from tag.', data: result };
+  }
+
   @Get(':id')
   @RequirePermission('PIGGERY', 'ANIMAL', 'view')
   @ApiOperation({ summary: 'Fetch a single animal' })
@@ -50,6 +59,16 @@ export class AnimalController {
     return { success: true, message: 'Animal updated successfully.', data: result };
   }
 
+  @Post(':id/transition-stage')
+  @RequirePermission('PIGGERY', 'ANIMAL', 'edit')
+  @ApiOperation({ summary: 'Transition an animal to a new production lifecycle stage and pen/location' })
+  @ApiParam({ name: 'id', description: 'Animal UUID' })
+  async transitionStage(@Param('id') id: string, @Body() dto: TransitionAnimalStageDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.animalService.transitionStage(id, dto, tenantId, req.user);
+    return { success: true, message: 'Animal stage transition recorded.', data: result };
+  }
+
   @Patch(':id/dispose')
   @RequirePermission('PIGGERY', 'ANIMAL', 'edit')
   @ApiOperation({ summary: 'Dispose an animal (sold/slaughtered/died/transferred) — never physically deleted' })
@@ -59,4 +78,15 @@ export class AnimalController {
     const result = await this.animalService.dispose(id, dto, tenantId, req.user);
     return { success: true, message: 'Animal disposal recorded.', data: result };
   }
+
+  @Get(':id/bio-asset-ledger')
+  @RequirePermission('PIGGERY', 'ANIMAL', 'view')
+  @ApiOperation({ summary: 'Get IAS 41 bio-asset ledger history for an animal' })
+  @ApiParam({ name: 'id', description: 'Animal UUID' })
+  async getBioAssetLedger(@Param('id') id: string) {
+    const result = await this.animalService.getBioAssetLedger(id);
+    return { success: true, message: 'Bio-asset ledger entries retrieved.', data: result };
+  }
 }
+
+

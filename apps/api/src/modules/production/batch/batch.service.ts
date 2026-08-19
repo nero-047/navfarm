@@ -15,7 +15,9 @@ import {
   DisposeBioAssetDto,
   RenewBatchDto,
   TransferStageDto,
+  BulkDailyEntryDto,
 } from './dto/batch.dto';
+
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { InventoryLedgerService } from '../../inventory/inventory-ledger/inventory-ledger.service';
 import { GlPostingService } from '../../finance/journal/gl-posting.service';
@@ -25,7 +27,14 @@ const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 };
 
+const toDays = (value: number, calcUnit: string): number => {
+  if (calcUnit === 'WEEK') return value * 7;
+  if (calcUnit === 'MONTH') return value * 30;
+  return value;
+};
+
 @Injectable()
+
 export class BatchService {
   constructor(
     private readonly cls: ClsService,
@@ -407,6 +416,7 @@ export class BatchService {
           description: `Acquisition — ${batch.batch_no}`,
           nobId: batch.nob_id || undefined,
           lobId: batch.lob_id,
+          stageId: batch.stage_id || undefined,
           userId: userPayload?.userId,
         });
         await this.db.insert(schema.bioAssetLedger).values({
@@ -628,6 +638,7 @@ export class BatchService {
             description: `${dto.output_type} removal impairment (at-cost ₹${atCostValue.toFixed(2)} vs NRV ₹${nrvValue.toFixed(2)}) — ${batch.batch_no}`,
             nobId: batch.nob_id || undefined,
             lobId: batch.lob_id,
+            stageId: batch.stage_id || undefined,
             userId: userPayload?.userId,
           });
         }
@@ -668,6 +679,7 @@ export class BatchService {
           description: `Mortality — ${batch.batch_no}`,
           nobId: batch.nob_id || undefined,
           lobId: batch.lob_id,
+          stageId: batch.stage_id || undefined,
           userId: userPayload?.userId,
         });
         await this.db
@@ -712,6 +724,7 @@ export class BatchService {
           description: `Mortality — ${batch.batch_no}`,
           nobId: batch.nob_id || undefined,
           lobId: batch.lob_id,
+          stageId: batch.stage_id || undefined,
           userId: userPayload?.userId,
         });
       }
@@ -734,6 +747,7 @@ export class BatchService {
         description: dto.remarks || `Overhead — ${batch.batch_no}`,
         nobId: batch.nob_id || undefined,
         lobId: batch.lob_id,
+        stageId: batch.stage_id || undefined,
         userId: userPayload?.userId,
       });
 
@@ -1263,6 +1277,7 @@ export class BatchService {
         description: `${line.variance_type} Variance — ${batch.batch_no}`,
         nobId: batch.nob_id || undefined,
         lobId: batch.lob_id,
+        stageId: batch.stage_id || undefined,
         userId: userPayload?.userId,
         reverseDirection: isFavorable,
       });
@@ -1339,6 +1354,7 @@ export class BatchService {
       description: `Maturity transition — ${batch.batch_no}`,
       nobId: batch.nob_id || undefined,
       lobId: batch.lob_id,
+      stageId: batch.stage_id || undefined,
       userId: userPayload?.userId,
     });
 
@@ -1358,7 +1374,7 @@ export class BatchService {
       entry_id: randomUUID(),
       tenant_id: tenantId,
       company_id: batch.company_id,
-      bio_asset_item_id: batch.input_lines[0].item_id,
+      bio_asset_item_id: batch.input_lines?.[0]?.item_id || '',
       entry_type: 'TRANSFORMATION',
       document_no: batch.batch_no,
       batch_id: id,
@@ -1421,6 +1437,7 @@ export class BatchService {
       description: `Amortization ${period} — ${batch.batch_no}`,
       nobId: batch.nob_id || undefined,
       lobId: batch.lob_id,
+      stageId: batch.stage_id || undefined,
       userId: userPayload?.userId,
     });
 
@@ -1434,7 +1451,7 @@ export class BatchService {
       entry_id: randomUUID(),
       tenant_id: tenantId,
       company_id: batch.company_id,
-      bio_asset_item_id: batch.input_lines[0].item_id,
+      bio_asset_item_id: batch.input_lines?.[0]?.item_id || '',
       entry_type: 'AMORTIZATION',
       document_no: batch.batch_no,
       batch_id: id,
@@ -1480,6 +1497,7 @@ export class BatchService {
       description: `Fair value adjustment — ${batch.batch_no}`,
       nobId: batch.nob_id || undefined,
       lobId: batch.lob_id,
+      stageId: batch.stage_id || undefined,
       userId: userPayload?.userId,
       reverseDirection: gainLoss < 0,
     });
@@ -1494,7 +1512,7 @@ export class BatchService {
       entry_id: randomUUID(),
       tenant_id: tenantId,
       company_id: batch.company_id,
-      bio_asset_item_id: batch.input_lines[0].item_id,
+      bio_asset_item_id: batch.input_lines?.[0]?.item_id || '',
       entry_type: 'FAIR_VALUE_ADJMT',
       document_no: batch.batch_no,
       batch_id: id,
@@ -1567,6 +1585,7 @@ export class BatchService {
           description: `Disposal (sold) — ${batch.batch_no}`,
           nobId: batch.nob_id || undefined,
           lobId: batch.lob_id,
+          stageId: batch.stage_id || undefined,
           userId: userPayload?.userId,
           reverseDirection: gainLoss < 0,
         });
@@ -1584,7 +1603,7 @@ export class BatchService {
       entry_id: randomUUID(),
       tenant_id: tenantId,
       company_id: batch.company_id,
-      bio_asset_item_id: batch.input_lines[0].item_id,
+      bio_asset_item_id: batch.input_lines?.[0]?.item_id || '',
       entry_type: 'TRANSFORMATION',
       document_no: batch.batch_no,
       batch_id: id,
@@ -1655,4 +1674,484 @@ export class BatchService {
 
     return { success: true, message: `Batch '${batch.batch_no}' has been cancelled.` };
   }
+
+  async bulkAddDailyTransactions(dto: BulkDailyEntryDto, tenantId: string, userPayload?: any) {
+    let successCount = 0;
+    const errors: Array<{ batch_id: string; error: string }> = [];
+
+    for (const row of dto.entries) {
+      try {
+        // 1. Feed Consumption
+        if (row.feed_qty != null && Number(row.feed_qty) > 0) {
+          await this.addTransaction(
+            row.batch_id,
+            {
+              transaction_date: dto.entry_date,
+              transaction_type: 'CONSUMPTION',
+              item_id: row.feed_item_id || undefined,
+              quantity: Number(row.feed_qty),
+              remarks: row.remarks || 'Daily feed log',
+            },
+            tenantId,
+            userPayload
+          );
+          successCount++;
+        }
+
+        // 2. Mortality
+        if (row.mortality_count != null && Number(row.mortality_count) > 0) {
+          await this.addTransaction(
+            row.batch_id,
+            {
+              transaction_date: dto.entry_date,
+              transaction_type: 'MORTALITY',
+              quantity: Number(row.mortality_count),
+              remarks: row.remarks || 'Daily mortality log',
+            },
+            tenantId,
+            userPayload
+          );
+          successCount++;
+        }
+
+        // 3. Water intake observation
+        if (row.water_qty != null && Number(row.water_qty) > 0) {
+          await this.addTransaction(
+            row.batch_id,
+            {
+              transaction_date: dto.entry_date,
+              transaction_type: 'OBSERVATION',
+              quantity: Number(row.water_qty),
+              uom: 'L',
+              remarks: `Water Intake: ${row.water_qty} L`,
+            },
+            tenantId,
+            userPayload
+          );
+          successCount++;
+        }
+
+        // 4. Shed temperature observation
+        if (row.temperature != null) {
+          await this.addTransaction(
+            row.batch_id,
+            {
+              transaction_date: dto.entry_date,
+              transaction_type: 'OBSERVATION',
+              quantity: Number(row.temperature),
+              uom: '°C',
+              remarks: `Shed Temperature: ${row.temperature}°C`,
+            },
+            tenantId,
+            userPayload
+          );
+          successCount++;
+        }
+      } catch (err: any) {
+        errors.push({
+          batch_id: row.batch_id,
+          error: err?.message || 'Transaction recording failed',
+        });
+      }
+    }
+
+    return {
+      date: dto.entry_date,
+      totalEntries: dto.entries.length,
+      successCount,
+      errorCount: errors.length,
+      errors,
+    };
+  }
+
+  /**
+   * Auto-generates a concrete scheduler_master and scheduler_parameter_line records
+   * for a batch from its breed's breed_lifecycle_stages, then links and locks it.
+   */
+  async generateSchedulerForBatch(batchId: string, tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(batchId);
+
+    if (!batch.breed_id) {
+      throw new BadRequestException('Batch must have a breed assigned to auto-generate a scheduler from breed lifecycle standards.');
+    }
+
+    // 1. Fetch breed lifecycle stages
+    const lifecycleRows = await this.db
+      .select({
+        lifecycle: schema.breedLifecycleStages,
+        stage: schema.stageMaster,
+      })
+      .from(schema.breedLifecycleStages)
+      .innerJoin(schema.stageMaster, eq(schema.breedLifecycleStages.stage_id, schema.stageMaster.stage_id))
+      .where(
+        and(
+          eq(schema.breedLifecycleStages.breed_id, batch.breed_id),
+          eq(schema.breedLifecycleStages.tenant_id, tenantId),
+          eq(schema.breedLifecycleStages.is_active, true)
+        )
+      )
+      .orderBy(schema.breedLifecycleStages.period_from);
+
+    if (lifecycleRows.length === 0) {
+      throw new BadRequestException(`No breed lifecycle standards found for breed '${batch.breed?.breed_name || batch.breed_id}'.`);
+    }
+
+    // 2. Fetch existing or create fallback parameter_master records
+    const existingParams = await this.db
+      .select()
+      .from(schema.parameterMaster)
+      .where(
+        and(
+          eq(schema.parameterMaster.tenant_id, tenantId),
+          eq(schema.parameterMaster.is_active, true)
+        )
+      );
+
+    const findOrCreateParam = async (paramCode: string, paramName: string, paramType: string, defaultUom: string) => {
+      let foundParam = existingParams.find(p => p.parameter_code === paramCode || (p.parameter_type === paramType && p.parameter_name === paramName));
+      if (!foundParam) {
+        const newId = randomUUID();
+        await this.db.insert(schema.parameterMaster).values({
+          parameter_id: newId,
+          tenant_id: tenantId,
+          nob_id: batch.nob_id,
+          lob_id: batch.lob_id,
+          parameter_code: paramCode,
+          parameter_name: paramName,
+          parameter_type: paramType,
+          default_uom: defaultUom,
+          qty_method: 'PER_UNIT',
+          created_by: userPayload?.userId || null,
+        });
+        foundParam = {
+          parameter_id: newId,
+          tenant_id: tenantId,
+          nob_id: batch.nob_id,
+          lob_id: batch.lob_id,
+          parameter_code: paramCode,
+          parameter_name: paramName,
+          parameter_type: paramType,
+          default_uom: defaultUom,
+          qty_method: 'PER_UNIT',
+          created_by: userPayload?.userId || null,
+          created_at: new Date().toISOString(),
+          default_qty_per_unit: null,
+          default_qty_per_batch: null,
+          item_id: null,
+          resource_id: null,
+          cost_allocation_pct: '0.00',
+          is_mandatory: false,
+          is_active: true,
+        };
+      }
+      return foundParam;
+    };
+
+    const feedParam = await findOrCreateParam('FEED_STD', 'Daily Feed Consumption', 'CONSUMPTION', 'KG');
+    const mortParam = await findOrCreateParam('MORT_STD', 'Standard Mortality', 'MORTALITY', 'HEAD');
+    const weightParam = await findOrCreateParam('WEIGHT_STD', 'Body Weight Target', 'OUTPUT', 'KG');
+
+    // 3. Create scheduler_master
+    const schedulerId = randomUUID();
+    const schedulerCode = `SCHED-${batch.batch_no}`;
+    const totalDays = lifecycleRows.reduce((max, r) => {
+      const pTo = toDays(r.lifecycle.period_to, r.lifecycle.calc_unit);
+      return Math.max(max, pTo);
+    }, 180);
+
+    // If an existing scheduler with this code exists, append short timestamp
+    const [existingSched] = await this.db
+      .select()
+      .from(schema.schedulerMaster)
+      .where(and(eq(schema.schedulerMaster.tenant_id, tenantId), eq(schema.schedulerMaster.scheduler_code, schedulerCode)))
+      .limit(1);
+
+    const finalSchedCode = existingSched ? `${schedulerCode}-${Date.now().toString().slice(-4)}` : schedulerCode;
+
+    await this.db.insert(schema.schedulerMaster).values({
+      scheduler_id: schedulerId,
+      tenant_id: tenantId,
+      company_id: batch.company_id,
+      nob_id: batch.nob_id,
+      lob_id: batch.lob_id,
+      scheduler_code: finalSchedCode,
+      scheduler_name: `Scheduler for Batch ${batch.batch_no} (${batch.breed?.breed_name || 'Breed Standards'})`,
+      duration_value: totalDays,
+      duration_unit: 'DAY',
+      breed_id: batch.breed_id,
+      batch_start_from: 'Batch Start Date',
+      is_locked: true,
+      description: `Auto-generated from breed lifecycle standards for ${batch.breed?.breed_name || 'breed'}.`,
+      created_by: userPayload?.userId || null,
+    });
+
+    // 4. Create scheduler_parameter_line rows
+    let periodNo = 1;
+    for (const { lifecycle, stage } of lifecycleRows) {
+      const periodFrom = toDays(lifecycle.period_from, lifecycle.calc_unit);
+      const periodTo = toDays(lifecycle.period_to, lifecycle.calc_unit);
+
+      // Feed line
+      if (lifecycle.feed_qty_per_head_per_day_kg) {
+        await this.db.insert(schema.schedulerParameterLine).values({
+          spl_id: randomUUID(),
+          scheduler_id: schedulerId,
+          parameter_id: feedParam.parameter_id,
+          period_no: periodNo++,
+          period_from: periodFrom,
+          period_to: periodTo,
+          period_label: `${stage.stage_name} Feed`,
+          stage_code: stage.stage_code,
+          expected_qty_override: lifecycle.feed_qty_per_head_per_day_kg.toString(),
+          uom_override: 'KG',
+          kpi_enabled: true,
+          kpi_mode: 'VALUE',
+          kpi_target_value: lifecycle.feed_qty_per_head_per_day_kg.toString(),
+          kpi_min_pct: '15.00',
+          kpi_max_pct: '15.00',
+          critical_threshold_pct: '25.00',
+          notify_in_app: true,
+          notes: `Standard feed intake: ${lifecycle.feed_qty_per_head_per_day_kg} kg/head/day`,
+        });
+      }
+
+      // Mortality line
+      if (lifecycle.std_mortality_rate_pct) {
+        await this.db.insert(schema.schedulerParameterLine).values({
+          spl_id: randomUUID(),
+          scheduler_id: schedulerId,
+          parameter_id: mortParam.parameter_id,
+          period_no: periodNo++,
+          period_from: periodFrom,
+          period_to: periodTo,
+          period_label: `${stage.stage_name} Mortality`,
+          stage_code: stage.stage_code,
+          kpi_enabled: true,
+          kpi_mode: 'VALUE',
+          kpi_target_value: lifecycle.std_mortality_rate_pct.toString(),
+          critical_threshold_pct: '50.00',
+          notify_in_app: true,
+          notes: `Expected max mortality: ${lifecycle.std_mortality_rate_pct}%`,
+        });
+      }
+
+      // Weight target line
+      const targetWeight = lifecycle.std_body_weight_kg ?? lifecycle.std_output_qty;
+      if (targetWeight) {
+        await this.db.insert(schema.schedulerParameterLine).values({
+          spl_id: randomUUID(),
+          scheduler_id: schedulerId,
+          parameter_id: weightParam.parameter_id,
+          period_no: periodNo++,
+          period_from: periodFrom,
+          period_to: periodTo,
+          period_label: `${stage.stage_name} Target Weight`,
+          stage_code: stage.stage_code,
+          expected_qty_override: targetWeight.toString(),
+          uom_override: 'KG',
+          kpi_enabled: false,
+          notes: `Target body weight: ${targetWeight} kg`,
+        });
+      }
+    }
+
+    // 5. Update batch with new scheduler_id
+    await this.db
+      .update(schema.batchHeader)
+      .set({
+        scheduler_id: schedulerId,
+        updated_by: userPayload?.userId || null,
+        updated_at: toMysqlTimestamp(),
+      })
+      .where(eq(schema.batchHeader.batch_id, batchId));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: batch.company_id,
+      userId: userPayload?.userId,
+      action: 'GENERATE_SCHEDULER',
+      entityName: 'batch_header',
+      entityId: batchId,
+      newValues: { scheduler_id: schedulerId, scheduler_code: finalSchedCode },
+    });
+
+    return this.findOne(batchId);
+  }
+
+  /**
+   * Returns day-by-day standard breed performance curves vs actual recorded data for a batch.
+   */
+  async getBatchPerformanceCurves(batchId: string, tenantId: string) {
+    const batch = await this.findOne(batchId);
+    const startDate = new Date(batch.start_date);
+    const today = new Date();
+    const batchAgeDays = Math.max(1, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    // 1. Fetch all batch transactions
+    const transactions = await this.db
+      .select({
+        tx: schema.batchTransaction,
+        item: schema.itemMaster,
+      })
+      .from(schema.batchTransaction)
+      .leftJoin(schema.itemMaster, eq(schema.batchTransaction.item_id, schema.itemMaster.item_id))
+      .where(and(eq(schema.batchTransaction.batch_id, batchId), isNull(schema.batchTransaction.deleted_at)))
+      .orderBy(schema.batchTransaction.transaction_date);
+
+    // 2. Fetch scheduler lines if present
+    let scheduleLines: Array<{ spl: typeof schema.schedulerParameterLine.$inferSelect; param: typeof schema.parameterMaster.$inferSelect }> = [];
+    if (batch.scheduler_id) {
+      const lines = await this.db
+        .select({
+          spl: schema.schedulerParameterLine,
+          param: schema.parameterMaster,
+        })
+        .from(schema.schedulerParameterLine)
+        .innerJoin(schema.parameterMaster, eq(schema.schedulerParameterLine.parameter_id, schema.parameterMaster.parameter_id))
+        .where(eq(schema.schedulerParameterLine.scheduler_id, batch.scheduler_id));
+      scheduleLines = lines;
+    }
+
+    // Also fetch breed lifecycle stages for reference
+    const lifecycleStandards = batch.breed_id
+      ? await this.db
+          .select()
+          .from(schema.breedLifecycleStages)
+          .where(and(eq(schema.breedLifecycleStages.breed_id, batch.breed_id), eq(schema.breedLifecycleStages.is_active, true)))
+          .orderBy(schema.breedLifecycleStages.period_from)
+      : [];
+
+    // Group actual transactions by day
+    const dayActualFeed: Record<number, number> = {};
+    const dayActualMort: Record<number, number> = {};
+    const dayActualWeight: Record<number, number> = {};
+
+    for (const { tx, item } of transactions) {
+      const txDate = new Date(tx.transaction_date);
+      const dayNo = Math.max(1, Math.floor((txDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      const qty = Number(tx.quantity || 0);
+
+      if (tx.transaction_type === 'CONSUMPTION' || item?.item_type === 'FEED') {
+        dayActualFeed[dayNo] = (dayActualFeed[dayNo] || 0) + qty;
+      } else if (tx.transaction_type === 'MORTALITY') {
+        dayActualMort[dayNo] = (dayActualMort[dayNo] || 0) + qty;
+      } else if (tx.transaction_type === 'OUTPUT' || tx.transaction_type === 'OBSERVATION') {
+        if (tx.uom === 'KG' && qty > 0) {
+          dayActualWeight[dayNo] = qty;
+        }
+      }
+    }
+
+    // Build timeline curves (day 1 to min(batchAgeDays + 7, 180))
+    const totalDaysToProject = Math.min(Math.max(batchAgeDays + 7, 30), 180);
+    const curves: any[] = [];
+
+    let cumStdFeed = 0;
+    let cumActFeed = 0;
+    let cumStdMort = 0;
+    let cumActMort = 0;
+    let lastKnownActWeight = 1.5; // default birth weight ~1.5kg
+
+    const initialHeadcount = Number(batch.initial_quantity || 1);
+
+    for (let day = 1; day <= totalDaysToProject; day++) {
+      const curDate = new Date(startDate.getTime() + (day - 1) * 86400000).toISOString().slice(0, 10);
+
+      // Find standard feed for this day
+      let stdDailyFeedPerHead = 0;
+      let stdTargetWeight = 0;
+      let stdMortPct = 0;
+
+      // Check schedule lines
+      const activeFeedLine = scheduleLines.find(l => l.param.parameter_type === 'CONSUMPTION' && day >= l.spl.period_from && day <= l.spl.period_to);
+      if (activeFeedLine && activeFeedLine.spl.expected_qty_override) {
+        stdDailyFeedPerHead = Number(activeFeedLine.spl.expected_qty_override);
+      } else {
+        // Fallback to breed standards
+        const lc = lifecycleStandards.find(l => {
+          const pF = toDays(l.period_from, l.calc_unit);
+          const pT = toDays(l.period_to, l.calc_unit);
+          return day >= pF && day <= pT;
+        });
+        if (lc) {
+          stdDailyFeedPerHead = Number(lc.feed_qty_per_head_per_day_kg || 0);
+          stdTargetWeight = Number(lc.std_body_weight_kg || 0);
+          stdMortPct = Number(lc.std_mortality_rate_pct || 0);
+        }
+      }
+
+      const activeWeightLine = scheduleLines.find(l => l.param.parameter_type === 'OUTPUT' && day >= l.spl.period_from && day <= l.spl.period_to);
+      if (activeWeightLine && activeWeightLine.spl.expected_qty_override) {
+        stdTargetWeight = Number(activeWeightLine.spl.expected_qty_override);
+      }
+
+      const stdTotalDailyFeed = stdDailyFeedPerHead * initialHeadcount;
+      const actDailyFeed = dayActualFeed[day] || 0;
+      const actDailyMort = dayActualMort[day] || 0;
+
+      cumStdFeed += stdTotalDailyFeed;
+      if (day <= batchAgeDays) {
+        cumActFeed += actDailyFeed;
+        cumActMort += actDailyMort;
+        if (dayActualWeight[day]) {
+          lastKnownActWeight = dayActualWeight[day];
+        }
+      }
+      cumStdMort += (stdMortPct / 100) * initialHeadcount;
+
+      curves.push({
+        day,
+        date: curDate,
+        isPastOrToday: day <= batchAgeDays,
+        stdDailyFeedPerHead,
+        stdTotalDailyFeed: Math.round(stdTotalDailyFeed * 100) / 100,
+        actTotalDailyFeed: day <= batchAgeDays ? Math.round(actDailyFeed * 100) / 100 : null,
+        cumStdFeed: Math.round(cumStdFeed * 100) / 100,
+        cumActFeed: day <= batchAgeDays ? Math.round(cumActFeed * 100) / 100 : null,
+        stdTargetWeight: stdTargetWeight > 0 ? stdTargetWeight : null,
+        actWeight: day <= batchAgeDays && dayActualWeight[day] ? dayActualWeight[day] : null,
+        actDailyMort: day <= batchAgeDays ? actDailyMort : null,
+        cumActMort: day <= batchAgeDays ? cumActMort : null,
+      });
+    }
+
+    const currentHeadcount = Number(batch.current_quantity || initialHeadcount);
+    const weightGain = Math.max(0, lastKnownActWeight - 1.5);
+    const liveFcr = weightGain > 0 && cumActFeed > 0 && currentHeadcount > 0
+      ? Math.round((cumActFeed / (weightGain * currentHeadcount)) * 100) / 100
+      : null;
+
+    const feedDeviationPct = cumStdFeed > 0 && cumActFeed > 0
+      ? Math.round(((cumActFeed - cumStdFeed) / cumStdFeed) * 1000) / 10
+      : 0;
+
+    return {
+      batch: {
+        batch_id: batch.batch_id,
+        batch_no: batch.batch_no,
+        batch_name: batch.batch_name,
+        breed_id: batch.breed_id,
+        breed_name: batch.breed?.breed_name || null,
+        has_scheduler: Boolean(batch.scheduler_id),
+        scheduler_code: batch.scheduler?.scheduler_code || null,
+        start_date: batch.start_date,
+        batch_age_days: batchAgeDays,
+        initial_quantity: initialHeadcount,
+        current_quantity: currentHeadcount,
+        current_stage_code: batch.current_stage_code,
+      },
+      summary: {
+        totalStdFeedKg: Math.round(cumStdFeed),
+        totalActFeedKg: Math.round(cumActFeed),
+        feedDeviationPct,
+        totalMortality: cumActMort,
+        mortalityRatePct: Math.round((cumActMort / initialHeadcount) * 1000) / 10,
+        liveFcr,
+        lastRecordedWeightKg: lastKnownActWeight,
+      },
+      curves,
+    };
+  }
 }
+
+

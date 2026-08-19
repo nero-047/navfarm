@@ -10,6 +10,7 @@ import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import BatchPerformanceCurvesPanel from "@/components/console/production/batch-performance-curves-panel";
 
 const PAGE_SIZE = 25;
 
@@ -78,7 +79,7 @@ export default function BatchPanel() {
   const [acting, setActing] = useState(false);
   const [txForm, setTxForm] = useState<Row>(emptyTxForm());
 
-  const [detailTab, setDetailTab] = useState<"overview" | "transactions" | "data-entry">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "transactions" | "data-entry" | "curves">("overview");
   const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().slice(0, 10));
   const [dataEntryLoading, setDataEntryLoading] = useState(false);
   const [dataEntryError, setDataEntryError] = useState("");
@@ -1098,6 +1099,7 @@ export default function BatchPanel() {
             <div className="flex items-center gap-1.5 border-b" style={{ borderColor: "var(--border)" }}>
               {([
                 ["overview", "Overview"],
+                ["curves", "Performance & Curves"],
                 ["transactions", "Transactions"],
                 ["data-entry", "Data Entry"],
               ] as const).map(([key, label]) => (
@@ -1484,6 +1486,18 @@ export default function BatchPanel() {
               </button>
             )}
             </>
+            )}
+
+            {detailTab === "curves" && (
+              <div className="py-2">
+                <BatchPerformanceCurvesPanel
+                  batchId={viewing.batch_id}
+                  onSchedulerGenerated={() => {
+                    load();
+                    api.get(`/batch/${viewing.batch_id}`).then((r) => setViewing(unwrap<Row>(r)));
+                  }}
+                />
+              </div>
             )}
           </div>
         )}

@@ -206,10 +206,8 @@ async function seedDemoTenant() {
     if (!plan) throw new Error("Plan 'PLAN_PRO' not found — run db-bootstrap first.");
 
     const [existingTenant] = await masterDb.select().from(master.tenantMaster).where(eq(master.tenantMaster.tenant_code, tenantCode)).limit(1);
-    // Existing tenants must reuse their registered db_name — it can differ from
-    // tenant_<code> (e.g. under an isolated DATABASE_NAME) — recomputing it here
-    // would silently target the wrong physical database.
-    const dbName = assertDatabaseName(existingTenant?.db_name || `tenant_${tenantCode}`);
+    const defaultPrefix = masterDatabase.startsWith('piggery_') ? 'piggery_tenant_' : 'tenant_';
+    const dbName = assertDatabaseName(existingTenant?.db_name || `${defaultPrefix}${tenantCode}`);
     const tenantId = existingTenant?.tenant_id || randomUUID();
 
     const server = await mysql.createConnection({ host, port, user, password });

@@ -28,23 +28,22 @@ export class GlPostingService {
   }
 
   /**
-   * Matches gl_mapping_master on (tenant, company, transaction_type) plus up to 4 optional
-   * dimensions — category, NOB, LOB, valuation_method — where NULL on a mapping means
+   * Matches gl_mapping_master on (tenant, company, transaction_type) plus up to 5 optional
+   * dimensions — category, NOB, LOB, stage, valuation_method — where NULL on a mapping means
    * "wildcard" for that dimension. Among all mappings that don't conflict with the given
    * context, the one with the most dimensions actually pinned down wins (most-specific).
-   * `stage` is not a dimension here yet — see the file-level comment on gl_mapping_master
-   * in schema.ts for why.
    */
   private async resolveMapping(
     tenantId: string,
     companyId: string,
     transactionType: string,
-    context: { categoryId?: string | null; nobId?: string | null; lobId?: string | null; valuationMethod?: string | null } = {}
+    context: { categoryId?: string | null; nobId?: string | null; lobId?: string | null; stageId?: string | null; valuationMethod?: string | null } = {}
   ) {
     const dimensionCol = {
       categoryId: schema.glMappingMaster.item_category_id,
       nobId: schema.glMappingMaster.nob_id,
       lobId: schema.glMappingMaster.lob_id,
+      stageId: schema.glMappingMaster.stage_id,
       valuationMethod: schema.glMappingMaster.valuation_method,
     } as const;
 
@@ -71,7 +70,7 @@ export class GlPostingService {
     const scored = mappings
       .map((m) => ({
         mapping: m,
-        score: [m.item_category_id, m.nob_id, m.lob_id, m.valuation_method].filter((v) => v != null).length,
+        score: [m.item_category_id, m.nob_id, m.lob_id, m.stage_id, m.valuation_method].filter((v) => v != null).length,
       }))
       .sort((a, b) => b.score - a.score);
 
@@ -103,6 +102,7 @@ export class GlPostingService {
         categoryId: ledgerEntry.category_id,
         nobId: ledgerEntry.nob_id,
         lobId: ledgerEntry.lob_id,
+        stageId: (ledgerEntry as any).stage_id ?? null,
         valuationMethod: item?.valuation_method,
       }
     );
@@ -154,6 +154,7 @@ export class GlPostingService {
     description?: string;
     nobId?: string;
     lobId?: string;
+    stageId?: string;   // Production stage dimension for more-specific GL mapping resolution
     userId?: string;
     // Swaps the mapping's debit/credit accounts — used for favorable variances,
     // where the normal "Dr Variance / Cr Inventory-WIP" posting reverses.
@@ -162,6 +163,7 @@ export class GlPostingService {
     const mapping = await this.resolveMapping(params.tenantId, params.companyId, params.transactionType, {
       nobId: params.nobId,
       lobId: params.lobId,
+      stageId: params.stageId,
     });
     const amount = Math.abs(params.amount);
     const debitAccountId = params.reverseDirection ? mapping.credit_gl_account_id! : mapping.debit_gl_account_id!;

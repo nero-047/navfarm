@@ -51,7 +51,21 @@ export class LocationController {
     };
   }
 
+  @Get('occupancy')
+  @RequirePermission('MASTER_DATA', 'LOCATION', 'view')
+  @ApiOperation({ summary: 'Facility & Pen live occupancy, animal headcount and biosecurity tracking' })
+  async getOccupancy(@Query('companyId') companyId: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.locationService.getLocationOccupancy(tenantId, companyId);
+    return {
+      success: true,
+      message: 'Facility occupancy retrieved successfully.',
+      data: result
+    };
+  }
+
   @Get(':id')
+
   @RequirePermission('MASTER_DATA', 'LOCATION', 'view')
   @ApiOperation({ summary: 'Fetch details of a single Location by UUID' })
   @ApiParam({ name: 'id', description: 'Location UUID' })

@@ -10,6 +10,7 @@ import JournalPanel from "@/components/console/finance/journal-panel";
 import TrialBalancePanel from "@/components/console/finance/trial-balance-panel";
 import BalanceSheetPanel from "@/components/console/finance/balance-sheet-panel";
 import ProfitLossPanel from "@/components/console/finance/profit-loss-panel";
+import BioAssetRollForwardPanel from "@/components/console/finance/bio-asset-roll-forward-panel";
 import { ShieldAlert } from "lucide-react";
 
 const SECTIONS = [
@@ -17,6 +18,7 @@ const SECTIONS = [
   { key: "trial-balance", label: "Trial Balance" },
   { key: "balance-sheet", label: "Balance Sheet" },
   { key: "profit-loss", label: "Profit & Loss" },
+  { key: "bio-asset-reconciliation", label: "IAS 41 Bio-Asset Statement" },
 ];
 
 export default function FinancePage() {
@@ -87,6 +89,8 @@ export default function FinancePage() {
       {activeKey === "trial-balance" && <TrialBalancePanel />}
       {activeKey === "balance-sheet" && <BalanceSheetPanel />}
       {activeKey === "profit-loss" && <ProfitLossPanel />}
+      {activeKey === "bio-asset-reconciliation" && <BioAssetRollForwardPanel />}
     </div>
   );
 }
+

@@ -433,3 +433,59 @@ export class DisposeBioAssetDto {
   @IsOptional()
   sale_proceeds?: number;
 }
+
+export class BulkDailyEntryRowDto {
+  @ApiProperty({ description: 'Batch UUID' })
+  @IsUUID()
+  @IsNotEmpty()
+  batch_id: string;
+
+  @ApiProperty({ description: 'Feed item UUID (optional)', required: false })
+  @IsUUID()
+  @IsOptional()
+  feed_item_id?: string;
+
+  @ApiProperty({ description: 'Feed consumed quantity (kg)', required: false })
+  @IsNumber()
+  @IsOptional()
+  feed_qty?: number;
+
+  @ApiProperty({ description: 'Mortality headcount (number of dead)', required: false })
+  @IsNumber()
+  @IsOptional()
+  mortality_count?: number;
+
+  @ApiProperty({ description: 'Water intake quantity (litres)', required: false })
+  @IsNumber()
+  @IsOptional()
+  water_qty?: number;
+
+  @ApiProperty({ description: 'Shed temperature observation (°C)', required: false })
+  @IsNumber()
+  @IsOptional()
+  temperature?: number;
+
+  @ApiProperty({ description: 'Remarks / Health notes', required: false })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+}
+
+export class BulkDailyEntryDto {
+  @ApiProperty({ description: 'Company UUID' })
+  @IsUUID()
+  @IsNotEmpty()
+  company_id: string;
+
+  @ApiProperty({ description: 'Daily log date', example: '2026-08-19' })
+  @IsDateString()
+  @IsNotEmpty()
+  entry_date: string;
+
+  @ApiProperty({ description: 'List of batch daily entries', type: [BulkDailyEntryRowDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkDailyEntryRowDto)
+  entries: BulkDailyEntryRowDto[];
+}
+

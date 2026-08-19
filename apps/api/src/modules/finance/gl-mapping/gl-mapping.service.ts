@@ -140,6 +140,11 @@ export class GlMappingService {
     } else {
       queryConditions.push(isNull(schema.glMappingMaster.lob_id));
     }
+    if (dto.stage_id) {
+      queryConditions.push(eq(schema.glMappingMaster.stage_id, dto.stage_id));
+    } else {
+      queryConditions.push(isNull(schema.glMappingMaster.stage_id));
+    }
     if (dto.valuation_method) {
       queryConditions.push(eq(schema.glMappingMaster.valuation_method, dto.valuation_method));
     } else {
@@ -153,8 +158,9 @@ export class GlMappingService {
       .limit(1);
 
     if (existing.length > 0) {
-      throw new ConflictException(`G/L Mapping rule for transaction type '${dto.transaction_type}' with these same category/NOB/LOB/valuation-method dimensions already exists.`);
+      throw new ConflictException(`G/L Mapping rule for transaction type '${dto.transaction_type}' with these same category/NOB/LOB/stage/valuation-method dimensions already exists.`);
     }
+
 
     const mappingId = randomUUID();
     const newMapping = {
@@ -164,6 +170,7 @@ export class GlMappingService {
       item_category_id: dto.item_category_id || null,
       nob_id: dto.nob_id || null,
       lob_id: dto.lob_id || null,
+      stage_id: dto.stage_id || null,
       valuation_method: dto.valuation_method || null,
       transaction_type: dto.transaction_type.toUpperCase(),
       debit_gl_account_id: dto.debit_gl_account_id || null,
@@ -174,6 +181,7 @@ export class GlMappingService {
       created_by: userPayload?.userId || null,
       updated_by: userPayload?.userId || null,
     };
+
 
     await this.db.insert(schema.glMappingMaster).values(newMapping);
 
@@ -222,6 +230,9 @@ export class GlMappingService {
     if (query.lobId) {
       conditions.push(eq(schema.glMappingMaster.lob_id, query.lobId));
     }
+    if (query.stageId) {
+      conditions.push(eq(schema.glMappingMaster.stage_id, query.stageId));
+    }
     if (query.valuationMethod) {
       conditions.push(eq(schema.glMappingMaster.valuation_method, query.valuationMethod));
     }
@@ -250,6 +261,7 @@ export class GlMappingService {
     const transType = dto.transaction_type !== undefined ? dto.transaction_type : mapping.transaction_type;
     const nobId = dto.nob_id !== undefined ? dto.nob_id : mapping.nob_id;
     const lobId = dto.lob_id !== undefined ? dto.lob_id : mapping.lob_id;
+    const stageId = dto.stage_id !== undefined ? dto.stage_id : mapping.stage_id;
     const valuationMethod = dto.valuation_method !== undefined ? dto.valuation_method : mapping.valuation_method;
 
     if (dto.item_category_id && dto.item_category_id !== mapping.item_category_id) {
@@ -332,9 +344,11 @@ export class GlMappingService {
       (dto.item_category_id !== undefined && dto.item_category_id !== mapping.item_category_id) ||
       (dto.nob_id !== undefined && dto.nob_id !== mapping.nob_id) ||
       (dto.lob_id !== undefined && dto.lob_id !== mapping.lob_id) ||
+      (dto.stage_id !== undefined && dto.stage_id !== mapping.stage_id) ||
       (dto.valuation_method !== undefined && dto.valuation_method !== mapping.valuation_method) ||
       (dto.transaction_type !== undefined && dto.transaction_type.toUpperCase() !== mapping.transaction_type)
     ) {
+
       const queryConditions = [
         eq(schema.glMappingMaster.tenant_id, tenantId),
         eq(schema.glMappingMaster.company_id, mapping.company_id),
@@ -358,6 +372,11 @@ export class GlMappingService {
       } else {
         queryConditions.push(isNull(schema.glMappingMaster.lob_id));
       }
+      if (stageId) {
+        queryConditions.push(eq(schema.glMappingMaster.stage_id, stageId));
+      } else {
+        queryConditions.push(isNull(schema.glMappingMaster.stage_id));
+      }
       if (valuationMethod) {
         queryConditions.push(eq(schema.glMappingMaster.valuation_method, valuationMethod));
       } else {
@@ -371,8 +390,9 @@ export class GlMappingService {
         .limit(1);
 
       if (existing.length > 0) {
-        throw new ConflictException(`G/L Mapping rule for transaction type '${transType}' with these same category/NOB/LOB/valuation-method dimensions already exists.`);
+        throw new ConflictException(`G/L Mapping rule for transaction type '${transType}' with these same category/NOB/LOB/stage/valuation-method dimensions already exists.`);
       }
+
     }
 
     const updates: any = {
@@ -383,6 +403,7 @@ export class GlMappingService {
     if (dto.item_category_id !== undefined) updates.item_category_id = dto.item_category_id;
     if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
     if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
+    if (dto.stage_id !== undefined) updates.stage_id = dto.stage_id;
     if (dto.valuation_method !== undefined) updates.valuation_method = dto.valuation_method;
     if (dto.transaction_type !== undefined) updates.transaction_type = dto.transaction_type.toUpperCase();
     if (dto.debit_gl_account_id !== undefined) updates.debit_gl_account_id = dto.debit_gl_account_id;
@@ -390,6 +411,7 @@ export class GlMappingService {
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;
     if (dto.extension_config !== undefined) updates.extension_config = JSON.stringify(dto.extension_config);
+
 
     await this.db
       .update(schema.glMappingMaster)

@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/mysql2/migrator';
 import * as mysql from 'mysql2/promise';
 import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
-import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED } from '../core/database/system-master-data-seed';
+import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED, SYSTEM_BREED_LIFECYCLE_SEED } from '../core/database/system-master-data-seed';
 import { STARTER_GL_ACCOUNTS, STARTER_GL_MAPPINGS, STARTER_WAREHOUSE } from '../modules/system/setup-wizard/seed/starter-master-data.seed-data';
 
 /**
@@ -84,8 +84,8 @@ async function seedDevTenant() {
 
     // Existing tenants must reuse their registered db_name — it can differ from
     // tenant_<code> (e.g. under an isolated DATABASE_NAME) — recomputing it here
-    // would silently target the wrong physical database.
-    const dbName = assertDatabaseName(existingTenant?.db_name || `tenant_${tenantCode}`);
+    const defaultPrefix = masterDatabase.startsWith('piggery_') ? 'piggery_tenant_' : 'tenant_';
+    const dbName = assertDatabaseName(existingTenant?.db_name || `${defaultPrefix}${tenantCode}`);
     const tenantId = existingTenant?.tenant_id || randomUUID();
 
     const server = await mysql.createConnection({ host, port, user, password });
@@ -255,6 +255,60 @@ async function seedDevTenant() {
             next_stage_id: stage.next_stage_code ? stageIdByCode.get(stage.next_stage_code) || null : null,
             alt_next_stage_id: stage.alt_next_stage_code ? stageIdByCode.get(stage.alt_next_stage_code) || null : null,
           }).where(eq(tenant.stageMaster.stage_id, stageIdByCode.get(stage.stage_code)!));
+        }
+
+        // Seed breed lifecycle stages — per-stage production standards (FCR, ADG,
+        // feed intake, mortality rate, KPI thresholds). Resolved breed_code and
+        // stage_code to live UUIDs using the maps already built above.
+        // Existing rows are identified by (breed_id + stage_id) uniqueness — the
+        // schema has no explicit unique constraint on that pair so we track
+        // the set ourselves to keep the script idempotent on re-runs.
+        const breedIdByCode = new Map(
+          (await tenantDb.select({ code: tenant.breedMaster.breed_code, id: tenant.breedMaster.breed_id }).from(tenant.breedMaster))
+            .map((r) => [r.code, r.id]),
+        );
+        const liveStageIdByCode = new Map(
+          (await tenantDb.select({ code: tenant.stageMaster.stage_code, id: tenant.stageMaster.stage_id }).from(tenant.stageMaster))
+            .map((r) => [r.code, r.id]),
+        );
+        // Existing lifecycle rows keyed as "breedId:stageId" for O(1) de-dup.
+        const existingLifecycleKeys = new Set(
+          (await tenantDb.select({ b: tenant.breedLifecycleStages.breed_id, s: tenant.breedLifecycleStages.stage_id }).from(tenant.breedLifecycleStages))
+            .map((r) => `${r.b}:${r.s}`),
+        );
+        for (const lc of SYSTEM_BREED_LIFECYCLE_SEED) {
+          const breedId = breedIdByCode.get(lc.breed_code);
+          const stageId = liveStageIdByCode.get(lc.stage_code);
+          if (!breedId || !stageId) continue; // breed or stage not seeded yet — safe to skip
+          const key = `${breedId}:${stageId}`;
+          if (existingLifecycleKeys.has(key)) continue;
+          existingLifecycleKeys.add(key);
+          const feedItemId  = lc.feed_item_code   ? itemIdByCode.get(lc.feed_item_code)   : undefined;
+          const outputItemId = lc.output_item_code ? itemIdByCode.get(lc.output_item_code) : undefined;
+          await tenantDb.insert(tenant.breedLifecycleStages).values({
+            lifecycle_id:                 randomUUID(),
+            tenant_id:                    tenantId,
+            breed_id:                     breedId,
+            stage_id:                     stageId,
+            calc_unit:                    lc.calc_unit,
+            period_from:                  lc.period_from,
+            period_to:                    lc.period_to,
+            feed_item_id:                 feedItemId   || null,
+            feed_qty_per_head_per_day_kg: lc.feed_qty_per_head_per_day_kg != null ? lc.feed_qty_per_head_per_day_kg.toString() : null,
+            feed_wastage_pct:             lc.feed_wastage_pct             != null ? lc.feed_wastage_pct.toString()             : null,
+            std_body_weight_kg:           lc.std_body_weight_kg           != null ? lc.std_body_weight_kg.toString()           : null,
+            std_adg_gpd:                  lc.std_adg_gpd                  != null ? lc.std_adg_gpd.toString()                  : null,
+            std_fcr:                      lc.std_fcr                      != null ? lc.std_fcr.toString()                      : null,
+            std_mortality_rate_pct:       lc.std_mortality_rate_pct       != null ? lc.std_mortality_rate_pct.toString()       : null,
+            output_item_id:               outputItemId || null,
+            output_uom:                   lc.output_uom  || null,
+            std_output_qty:               lc.std_output_qty               != null ? lc.std_output_qty.toString()               : null,
+            kpi_lower_limit:              lc.kpi_lower_limit              != null ? lc.kpi_lower_limit.toString()              : null,
+            kpi_upper_limit:              lc.kpi_upper_limit              != null ? lc.kpi_upper_limit.toString()              : null,
+            alert_severity:               lc.alert_severity  || null,
+            notes:                        lc.notes           || null,
+            is_active:                    true,
+          });
         }
       }
 

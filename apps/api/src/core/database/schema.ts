@@ -765,6 +765,8 @@ export const locationMaster = mysqlTable('location_master', {
   silo_reorder_days: int('silo_reorder_days'),
   // Mandatory empty days between batches at this location for biosecurity.
   downtime_days_required: int('downtime_days_required'),
+  last_cleaned_date: date('last_cleaned_date', { mode: 'string' }),
+  last_disinfected_date: date('last_disinfected_date', { mode: 'string' }),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -1374,13 +1376,13 @@ export const glMappingMaster = mysqlTable('gl_mapping_master', {
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull(),
   item_category_id: varchar('item_category_id', { length: 36 }),
-  // Additive lookup-key dimensions toward the spec's 6-dimensional gl_posting_setup model
-  // (nob_id, lob_id, stage, transaction_type, posting_group, valuation_method). NULL on any
-  // of these means "wildcard" — existing mappings created before this phase have all three
-  // NULL and keep matching exactly what they matched before. `stage` is deliberately not
-  // included yet — see gl-posting.service.ts's resolveMapping() comment.
+  // Additive lookup-key dimensions — the spec's full 6-dimensional gl_posting_setup model
+  // (nob_id, lob_id, stage_id, transaction_type, posting_group/item_category, valuation_method).
+  // NULL on any of these means "wildcard" — existing mappings created before this phase have
+  // all five NULL and keep matching exactly what they matched before.
   nob_id: varchar('nob_id', { length: 36 }),
   lob_id: varchar('lob_id', { length: 36 }),
+  stage_id: varchar('stage_id', { length: 36 }),   // 6th dimension: production stage (NULL = any stage)
   valuation_method: varchar('valuation_method', { length: 30 }),
   transaction_type: varchar('transaction_type', { length: 50 }).notNull(), // PURCHASE, CONSUMPTION, OUTPUT, SALE, ADJUSTMENT, MORTALITY, etc.
   debit_gl_account_id: varchar('debit_gl_account_id', { length: 36 }),
@@ -1413,6 +1415,11 @@ export const glMappingMaster = mysqlTable('gl_mapping_master', {
     columns: [table.lob_id],
     foreignColumns: [lobMaster.lob_id],
     name: 'gl_map_lob_id_fk'
+  }).onDelete('restrict'),
+  stageFk: foreignKey({
+    columns: [table.stage_id],
+    foreignColumns: [stageMaster.stage_id],
+    name: 'gl_map_stage_id_fk'
   }).onDelete('restrict'),
   valuationMethodFk: foreignKey({
     columns: [table.valuation_method],
@@ -2306,6 +2313,7 @@ export const bioAssetLedger = mysqlTable('bio_asset_ledger', {
   asset_rfid_no: varchar('asset_rfid_no', { length: 100 }),
   batch_no: varchar('batch_no', { length: 50 }),
   batch_id: varchar('batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  animal_id: varchar('animal_id', { length: 36 }).references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
   stage: varchar('stage', { length: 50 }),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   quantity: decimal('quantity', { precision: 18, scale: 4 }),
@@ -2490,6 +2498,7 @@ export const inventoryApplicationRelations = relations(inventoryApplication, ({ 
 export const bioAssetLedgerRelations = relations(bioAssetLedger, ({ one }) => ({
   item: one(itemMaster, { fields: [bioAssetLedger.bio_asset_item_id], references: [itemMaster.item_id] }),
   batch: one(batchHeader, { fields: [bioAssetLedger.batch_id], references: [batchHeader.batch_id] }),
+  animal: one(animalRegister, { fields: [bioAssetLedger.animal_id], references: [animalRegister.animal_id] }),
 }));
 
 export const goodsReceiptRelations = relations(goodsReceipt, ({ one, many }) => ({
@@ -2657,3 +2666,105 @@ export const stockAdjustmentLineRelations = relations(stockAdjustmentLine, ({ on
   adjustment: one(stockAdjustment, { fields: [stockAdjustmentLine.adjustment_id], references: [stockAdjustment.adjustment_id] }),
   item: one(itemMaster, { fields: [stockAdjustmentLine.item_id], references: [itemMaster.item_id] }),
 }));
+
+// Piggery Breeding & Reproduction Tables per OneDrive_2_18-08-2026 Sheet 15_PIGGERY
+export const breedingRecord = mysqlTable('breeding_record', {
+  breeding_id: varchar('breeding_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  sow_animal_id: varchar('sow_animal_id', { length: 36 }).notNull().references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
+  batch_id: varchar('batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'set null' }),
+  mating_type: varchar('mating_type', { length: 20 }).notNull(), // AI, NATURAL_MATING
+  boar_animal_id: varchar('boar_animal_id', { length: 36 }).references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
+  semen_lot_id: varchar('semen_lot_id', { length: 36 }),
+  semen_dose_qty: decimal('semen_dose_qty', { precision: 6, scale: 2 }).default('1.00'),
+  mating_date: date('mating_date', { mode: 'string' }).notNull(),
+  second_mating_date: date('second_mating_date', { mode: 'string' }),
+  expected_farrowing_date: date('expected_farrowing_date', { mode: 'string' }).notNull(), // mating_date + 114 days
+  preg_check_date: date('preg_check_date', { mode: 'string' }), // mating_date + 28 days
+  preg_check_method: varchar('preg_check_method', { length: 20 }).default('ULTRASOUND'), // ULTRASOUND, RECTAL, VISUAL, NOT_CHECKED
+  pregnancy_confirmed: boolean('pregnancy_confirmed'), // null = pending, true = confirmed, false = failed
+  conception_result: varchar('conception_result', { length: 20 }).default('PENDING').notNull(), // CONFIRMED, REPEAT, FAILED, PENDING
+  parity_number: int('parity_number').notNull(),
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const farrowingRecord = mysqlTable('farrowing_record', {
+  farrow_id: varchar('farrow_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  sow_animal_id: varchar('sow_animal_id', { length: 36 }).notNull().references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
+  breeding_id: varchar('breeding_id', { length: 36 }).references(() => breedingRecord.breeding_id, { onDelete: 'set null' }),
+  batch_id: varchar('batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'set null' }),
+  farrowing_date: date('farrowing_date', { mode: 'string' }).notNull(),
+  piglets_born_total: int('piglets_born_total').default(0).notNull(),
+  piglets_born_live: int('piglets_born_live').default(0).notNull(),
+  piglets_stillborn: int('piglets_stillborn').default(0).notNull(),
+  piglets_mummified: int('piglets_mummified').default(0).notNull(),
+  avg_birth_weight_kg: decimal('avg_birth_weight_kg', { precision: 6, scale: 3 }),
+  total_litter_weight_kg: decimal('total_litter_weight_kg', { precision: 8, scale: 3 }),
+  farrowing_status: varchar('farrowing_status', { length: 20 }).default('NORMAL').notNull(), // NORMAL, ASSISTED, C_SECTION, COMPLICATIONS
+  foster_received: int('foster_received').default(0).notNull(),
+  fostered_out: int('fostered_out').default(0).notNull(),
+  weaning_date: date('weaning_date', { mode: 'string' }),
+  piglets_weaned: int('piglets_weaned').default(0).notNull(),
+  avg_weaning_weight_kg: decimal('avg_weaning_weight_kg', { precision: 6, scale: 3 }),
+  cost_per_piglet: decimal('cost_per_piglet', { precision: 18, scale: 4 }),
+  parity_number: int('parity_number').notNull(),
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const semenBatch = mysqlTable('semen_batch', {
+  semen_batch_id: varchar('semen_batch_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  boar_animal_id: varchar('boar_animal_id', { length: 36 }).notNull().references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
+  boar_batch_id: varchar('boar_batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'set null' }),
+  collection_date: date('collection_date', { mode: 'string' }).notNull(),
+  period_from: date('period_from', { mode: 'string' }),
+  period_to: date('period_to', { mode: 'string' }),
+  amortisation_period: decimal('amortisation_period', { precision: 18, scale: 4 }).default('0.0000'),
+  feed_cost_period: decimal('feed_cost_period', { precision: 18, scale: 4 }).default('0.0000'),
+  drug_cost_period: decimal('drug_cost_period', { precision: 18, scale: 4 }).default('0.0000'),
+  overhead_cost_period: decimal('overhead_cost_period', { precision: 18, scale: 4 }).default('0.0000'),
+  running_cost_period: decimal('running_cost_period', { precision: 18, scale: 4 }).default('0.0000'),
+  doses_collected: decimal('doses_collected', { precision: 10, scale: 2 }).notNull(),
+  unit_cost_per_dose: decimal('unit_cost_per_dose', { precision: 18, scale: 6 }).default('0.000000'),
+  doses_used_internal: decimal('doses_used_internal', { precision: 10, scale: 2 }).default('0.00'),
+  doses_sold: decimal('doses_sold', { precision: 10, scale: 2 }).default('0.00'),
+  output_item_id: varchar('output_item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'set null' }),
+  inventory_posted: boolean('inventory_posted').default(false).notNull(),
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+export const breedingRecordRelations = relations(breedingRecord, ({ one, many }) => ({
+  company: one(companyMaster, { fields: [breedingRecord.company_id], references: [companyMaster.company_id] }),
+  sow: one(animalRegister, { fields: [breedingRecord.sow_animal_id], references: [animalRegister.animal_id], relationName: 'sow_breedings' }),
+  boar: one(animalRegister, { fields: [breedingRecord.boar_animal_id], references: [animalRegister.animal_id], relationName: 'boar_breedings' }),
+  batch: one(batchHeader, { fields: [breedingRecord.batch_id], references: [batchHeader.batch_id] }),
+  farrowings: many(farrowingRecord),
+}));
+
+export const farrowingRecordRelations = relations(farrowingRecord, ({ one }) => ({
+  company: one(companyMaster, { fields: [farrowingRecord.company_id], references: [companyMaster.company_id] }),
+  sow: one(animalRegister, { fields: [farrowingRecord.sow_animal_id], references: [animalRegister.animal_id] }),
+  breeding: one(breedingRecord, { fields: [farrowingRecord.breeding_id], references: [breedingRecord.breeding_id] }),
+  batch: one(batchHeader, { fields: [farrowingRecord.batch_id], references: [batchHeader.batch_id] }),
+}));
+
+export const semenBatchRelations = relations(semenBatch, ({ one }) => ({
+  company: one(companyMaster, { fields: [semenBatch.company_id], references: [companyMaster.company_id] }),
+  boar: one(animalRegister, { fields: [semenBatch.boar_animal_id], references: [animalRegister.animal_id] }),
+  batch: one(batchHeader, { fields: [semenBatch.boar_batch_id], references: [batchHeader.batch_id] }),
+  outputItem: one(itemMaster, { fields: [semenBatch.output_item_id], references: [itemMaster.item_id] }),
+}));
+

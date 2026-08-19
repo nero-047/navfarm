@@ -499,4 +499,104 @@ export class UomService {
 
     return { success: true, message: 'UOM conversion has been successfully soft-deleted.' };
   }
+
+  /**
+   * Resolves the conversion factor to convert quantity from fromUom to toUom.
+   * Checks item-specific conversion first, then falls back to global conversion.
+   * If fromUom === toUom, returns 1.
+   */
+  async resolveConversionFactor(
+    fromUom: string,
+    toUom: string,
+    itemId?: string,
+    companyId?: string,
+    tenantId?: string
+  ): Promise<number> {
+    const fromClean = fromUom.toUpperCase().trim();
+    const toClean = toUom.toUpperCase().trim();
+
+    if (fromClean === toClean) return 1.0;
+
+    // 1. Check item-specific conversion if itemId is provided
+    if (itemId) {
+      const itemConv = await this.db
+        .select()
+        .from(schema.uomConversionMaster)
+        .where(
+          and(
+            eq(schema.uomConversionMaster.from_uom, fromClean),
+            eq(schema.uomConversionMaster.to_uom, toClean),
+            eq(schema.uomConversionMaster.item_id, itemId),
+            eq(schema.uomConversionMaster.is_active, true),
+            isNull(schema.uomConversionMaster.deleted_at)
+          )
+        )
+        .limit(1);
+
+      if (itemConv.length > 0) {
+        return Number(itemConv[0].conversion_factor);
+      }
+    }
+
+    // 2. Check global conversion
+    const globalConv = await this.db
+      .select()
+      .from(schema.uomConversionMaster)
+      .where(
+        and(
+          eq(schema.uomConversionMaster.from_uom, fromClean),
+          eq(schema.uomConversionMaster.to_uom, toClean),
+          isNull(schema.uomConversionMaster.item_id),
+          eq(schema.uomConversionMaster.is_active, true),
+          isNull(schema.uomConversionMaster.deleted_at)
+        )
+      )
+      .limit(1);
+
+    if (globalConv.length > 0) {
+      return Number(globalConv[0].conversion_factor);
+    }
+
+    // 3. Check inverse conversion (toUom -> fromUom)
+    const inverseConv = await this.db
+      .select()
+      .from(schema.uomConversionMaster)
+      .where(
+        and(
+          eq(schema.uomConversionMaster.from_uom, toClean),
+          eq(schema.uomConversionMaster.to_uom, fromClean),
+          eq(schema.uomConversionMaster.is_active, true),
+          isNull(schema.uomConversionMaster.deleted_at)
+        )
+      )
+      .limit(1);
+
+    if (inverseConv.length > 0) {
+      const factor = Number(inverseConv[0].conversion_factor);
+      if (factor > 0) return 1.0 / factor;
+    }
+
+    throw new BadRequestException(
+      `No UOM conversion rule found between '${fromClean}' and '${toClean}'${itemId ? ` for item '${itemId}'` : ''}.`
+    );
+  }
+
+  async convertQuantity(
+    fromUom: string,
+    toUom: string,
+    quantity: number,
+    itemId?: string,
+    companyId?: string,
+    tenantId?: string
+  ) {
+    const factor = await this.resolveConversionFactor(fromUom, toUom, itemId, companyId, tenantId);
+    return {
+      fromUom: fromUom.toUpperCase().trim(),
+      toUom: toUom.toUpperCase().trim(),
+      inputQuantity: quantity,
+      conversionFactor: factor,
+      convertedQuantity: quantity * factor,
+    };
+  }
 }
+

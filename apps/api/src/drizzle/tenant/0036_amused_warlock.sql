@@ -1,0 +1,2 @@
+ALTER TABLE `gl_mapping_master` ADD `stage_id` varchar(36);--> statement-breakpoint
+ALTER TABLE `gl_mapping_master` ADD CONSTRAINT `gl_map_stage_id_fk` FOREIGN KEY (`stage_id`) REFERENCES `stage_master`(`stage_id`) ON DELETE restrict ON UPDATE no action;

@@ -7,6 +7,9 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { PageHeader } from "@/components/ui/PageHeader";
 import BatchPanel from "@/components/console/production/batch-panel";
+import BulkDailyEntryPanel from "@/components/console/production/bulk-daily-entry-panel";
+import AnimalPanel from "@/components/console/piggery/animal-panel";
+import { BreedingPanel } from "@/components/console/piggery/breeding-panel";
 import ParameterPanel from "@/components/console/production/parameter-panel";
 import SchedulerPanel from "@/components/console/production/scheduler-panel";
 import AlertPanel from "@/components/console/production/alert-panel";
@@ -16,12 +19,16 @@ import { ShieldAlert } from "lucide-react";
 
 const SECTIONS = [
   { key: "batches", label: "Batches" },
+  { key: "daily-entry", label: "Daily Data Entry" },
+  { key: "animals", label: "Animal Register" },
+  { key: "breeding", label: "Breeding & Litters" },
   { key: "schedulers", label: "Schedulers" },
   { key: "parameters", label: "Parameters" },
   { key: "alerts", label: "Alerts" },
   { key: "qc-parameters", label: "QC Parameters" },
   { key: "packs", label: "Packs" },
 ];
+
 
 export default function ProductionPage() {
   const router = useRouter();
@@ -85,11 +92,15 @@ export default function ProductionPage() {
       {/* Section switching moved to the shell's contextual navigation; the
           panels themselves are untouched. */}
       {activeKey === "batches" && <BatchPanel />}
+      {activeKey === "daily-entry" && <BulkDailyEntryPanel />}
+      {activeKey === "animals" && <AnimalPanel />}
+      {activeKey === "breeding" && <BreedingPanel />}
       {activeKey === "schedulers" && <SchedulerPanel />}
       {activeKey === "parameters" && <ParameterPanel />}
       {activeKey === "alerts" && <AlertPanel />}
       {activeKey === "qc-parameters" && <QcParameterPanel />}
       {activeKey === "packs" && <PacksPanel />}
+
     </div>
   );
 }

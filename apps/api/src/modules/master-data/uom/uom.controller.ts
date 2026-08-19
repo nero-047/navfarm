@@ -76,7 +76,35 @@ export class UomController {
     };
   }
 
+  @Get('convert')
+  @RequirePermission('MASTER_DATA', 'UOM', 'view')
+  @ApiOperation({ summary: 'Live calculate UOM conversion quantity and factor' })
+  async convertQuantity(
+    @Query('from') fromUom: string,
+    @Query('to') toUom: string,
+    @Query('quantity') quantity: number,
+    @Query('itemId') itemId: string,
+    @Query('companyId') companyId: string,
+    @Req() req: any
+  ) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.uomService.convertQuantity(
+      fromUom || '',
+      toUom || '',
+      quantity != null ? Number(quantity) : 1,
+      itemId,
+      companyId,
+      tenantId
+    );
+    return {
+      success: true,
+      message: 'UOM conversion calculated.',
+      data: result,
+    };
+  }
+
   @Get(':id')
+
   @RequirePermission('MASTER_DATA', 'UOM', 'view')
   @ApiOperation({ summary: 'Fetch details of a single UOM by UUID' })
   @ApiParam({ name: 'id', description: 'UOM UUID' })

@@ -320,3 +320,36 @@ export class QueryAnimalDto {
   @Min(0)
   offset?: number;
 }
+
+export class TransitionAnimalStageDto {
+  @ApiProperty({ description: 'Destination Stage UUID' })
+  @IsUUID()
+  @IsNotEmpty()
+  to_stage_id: string;
+
+  @ApiProperty({ description: 'Destination Location / Pen UUID (optional)', required: false })
+  @IsUUID()
+  @IsOptional()
+  to_location_id?: string;
+
+  @ApiProperty({ description: 'Destination Batch UUID (optional)', required: false })
+  @IsUUID()
+  @IsOptional()
+  to_batch_id?: string;
+
+  @ApiProperty({ description: 'Date of stage movement', example: '2026-08-19' })
+  @IsDateString()
+  @IsNotEmpty()
+  transition_date: string;
+
+  @ApiProperty({ description: 'Reason for transition / Trigger condition (e.g. PREGNANCY_CONFIRMED, WEANED, MANUAL)', required: false })
+  @IsString()
+  @IsOptional()
+  reason?: string;
+
+  @ApiProperty({ description: 'Additional notes', required: false })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+}
+
