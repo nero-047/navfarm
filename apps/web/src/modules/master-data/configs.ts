@@ -391,6 +391,7 @@ const item: MasterDataConfig = {
     { key: "max_stock_level", label: "Max Stock Level", type: "number", step: "0.01" },
     { key: "reorder_level", label: "Reorder Level", type: "number", step: "0.01" },
     { key: "shelf_life_days", label: "Shelf Life (days)", type: "number" },
+    { key: "withdrawal_days", label: "Withdrawal Period (days)", type: "number", helpText: "Required for MEDICINE/VACCINE items — minimum days after last administration before an animal treated with this item may be slaughtered." },
     { key: "is_qr_enabled", label: "QR Tracking Enabled", type: "boolean" },
     {
       key: "attributes", label: "Attribute Values (JSON array)", type: "json",
@@ -758,6 +759,9 @@ const glMapping: MasterDataConfig = {
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "item_category_id", label: "Item Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank to match all NOBs." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank to match all LOBs under the selected NOB." },
+    { key: "valuation_method", label: "Valuation Method", type: "select-entity", entityEndpoint: "/costing-method", entityValueKey: "method_code", entityLabelKeys: ["method_code", "method_name"], helpText: "Leave blank to match all costing methods." },
     {
       key: "transaction_type", label: "Transaction Type", type: "select", required: true,
       // Kept in sync with every transactionType string the GL posting engine actually

@@ -10,6 +10,9 @@ import { SetupWizardModule } from './modules/system/setup-wizard/setup-wizard.mo
 import { RoleModule } from './modules/core/role/role.module';
 import { LanguageModule } from './modules/system/language/language.module';
 import { CurrencyModule } from './modules/system/currency/currency.module';
+import { TimezoneModule } from './modules/system/timezone/timezone.module';
+import { CountryModule } from './modules/system/country/country.module';
+import { CostingMethodModule } from './modules/system/costing-method/costing-method.module';
 import { AuditLogModule } from './modules/system/audit-log/audit-log.module';
 import { NumberSeriesModule } from './modules/system/number-series/number-series.module';
 import { EncryptionModule } from './modules/system/encryption/encryption.module';
@@ -82,6 +85,9 @@ import { SystemController } from './system/system.controller';
     RoleModule,
     LanguageModule,
     CurrencyModule,
+    TimezoneModule,
+    CountryModule,
+    CostingMethodModule,
     AuditLogModule,
     NumberSeriesModule,
     EncryptionModule,

@@ -50,6 +50,53 @@ export class AnimalService {
     return rows[0];
   }
 
+  /**
+   * Spec: "At the time of a slaughter entry the system must check that today minus the
+   * last administration date for each medicine given to that animal is greater than or
+   * equal to withdrawal_days. Block the slaughter if not." Reduced in JS rather than a SQL
+   * GROUP BY — per-animal medication log volume is small (a few dozen rows at most).
+   */
+  private async assertWithdrawalPeriodsElapsed(animalId: string, disposalDate: string) {
+    const rows = await this.db
+      .select({
+        item_id: schema.itemMaster.item_id,
+        item_name: schema.itemMaster.item_name,
+        item_type: schema.itemMaster.item_type,
+        withdrawal_days: schema.itemMaster.withdrawal_days,
+        administered_date: schema.animalMedicationLog.administered_date,
+      })
+      .from(schema.animalMedicationLog)
+      .innerJoin(schema.itemMaster, eq(schema.animalMedicationLog.item_id, schema.itemMaster.item_id))
+      .where(eq(schema.animalMedicationLog.animal_id, animalId));
+
+    const lastDoseByItem = new Map<string, { item_name: string; withdrawal_days: number; lastDate: string }>();
+    for (const row of rows) {
+      if (row.withdrawal_days == null) continue;
+      if (!['MEDICINE', 'VACCINE'].includes(row.item_type)) continue;
+      const existing = lastDoseByItem.get(row.item_id);
+      if (!existing || row.administered_date > existing.lastDate) {
+        lastDoseByItem.set(row.item_id, {
+          item_name: row.item_name,
+          withdrawal_days: row.withdrawal_days,
+          lastDate: row.administered_date,
+        });
+      }
+    }
+
+    const disposalMs = new Date(disposalDate).getTime();
+    const violations: string[] = [];
+    for (const { item_name, withdrawal_days, lastDate } of lastDoseByItem.values()) {
+      const daysSinceDose = Math.floor((disposalMs - new Date(lastDate).getTime()) / 86400000);
+      if (daysSinceDose < withdrawal_days) {
+        violations.push(`${item_name} (${withdrawal_days - daysSinceDose} day(s) remaining, last dose ${lastDate})`);
+      }
+    }
+
+    if (violations.length > 0) {
+      throw new BadRequestException(`Cannot slaughter — withdrawal period not elapsed for: ${violations.join('; ')}`);
+    }
+  }
+
   async create(dto: CreateAnimalDto, tenantId: string, userPayload?: any) {
     await this.assertExists(
       this.db.select().from(schema.companyMaster).where(eq(schema.companyMaster.company_id, dto.company_id)),
@@ -346,6 +393,10 @@ export class AnimalService {
 
     if (!animal.is_active) {
       throw new BadRequestException(`Animal '${animal.animal_code}' has already been disposed.`);
+    }
+
+    if (dto.disposal_type === 'SLAUGHTERED') {
+      await this.assertWithdrawalPeriodsElapsed(id, dto.disposal_date);
     }
 
     const bookValue = animal.book_value != null ? Number(animal.book_value) : null;

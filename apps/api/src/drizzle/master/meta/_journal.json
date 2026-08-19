@@ -15,6 +15,20 @@
       "when": 1784632896737,
       "tag": "0001_military_expediter",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787119843569,
+      "tag": "0002_good_expediter",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787123051994,
+      "tag": "0003_vengeful_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

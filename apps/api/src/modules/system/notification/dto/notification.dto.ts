@@ -33,10 +33,10 @@ export class CreateNotificationConfigDto {
   @IsOptional()
   smtp_user?: string;
 
-  @ApiProperty({ description: 'Encrypted SMTP password', required: false })
+  @ApiProperty({ description: 'SMTP password (plaintext in, encrypted at rest, never returned)', required: false })
   @IsString()
   @IsOptional()
-  smtp_password_enc?: string;
+  smtp_password?: string;
 
   @ApiProperty({ description: 'Sender email address', required: false, example: 'noreply@farm.com' })
   @IsString()
@@ -53,30 +53,30 @@ export class CreateNotificationConfigDto {
   @IsOptional()
   sms_provider?: string;
 
-  @ApiProperty({ description: 'Encrypted SMS API key', required: false })
+  @ApiProperty({ description: 'SMS API key (plaintext in, encrypted at rest, never returned)', required: false })
   @IsString()
   @IsOptional()
-  sms_api_key_enc?: string;
+  sms_api_key?: string;
 
   @ApiProperty({ description: 'SMS sender ID', required: false, example: 'NAVFRM' })
   @IsString()
   @IsOptional()
   sms_sender_id?: string;
 
-  @ApiProperty({ description: 'Encrypted FCM server key (for Push)', required: false })
+  @ApiProperty({ description: 'FCM server key for Push (plaintext in, encrypted at rest, never returned)', required: false })
   @IsString()
   @IsOptional()
-  push_fcm_key_enc?: string;
+  push_fcm_key?: string;
 
   @ApiProperty({ description: 'Webhook URL', required: false, example: 'https://hooks.slack.com/services/...' })
   @IsString()
   @IsOptional()
   webhook_url?: string;
 
-  @ApiProperty({ description: 'Encrypted webhook signing secret', required: false })
+  @ApiProperty({ description: 'Webhook signing secret (plaintext in, encrypted at rest, never returned)', required: false })
   @IsString()
   @IsOptional()
-  webhook_secret_enc?: string;
+  webhook_secret?: string;
 }
 
 export class UpdateNotificationConfigDto {
@@ -100,10 +100,10 @@ export class UpdateNotificationConfigDto {
   @IsOptional()
   smtp_user?: string;
 
-  @ApiProperty({ description: 'Encrypted SMTP password', required: false })
+  @ApiProperty({ description: 'SMTP password (plaintext in, encrypted at rest, never returned)', required: false })
   @IsString()
   @IsOptional()
-  smtp_password_enc?: string;
+  smtp_password?: string;
 
   @ApiProperty({ description: 'Sender email address', required: false })
   @IsString()
@@ -120,30 +120,30 @@ export class UpdateNotificationConfigDto {
   @IsOptional()
   sms_provider?: string;
 
-  @ApiProperty({ description: 'Encrypted SMS API key', required: false })
+  @ApiProperty({ description: 'SMS API key (plaintext in, encrypted at rest, never returned)', required: false })
   @IsString()
   @IsOptional()
-  sms_api_key_enc?: string;
+  sms_api_key?: string;
 
   @ApiProperty({ description: 'SMS sender ID', required: false })
   @IsString()
   @IsOptional()
   sms_sender_id?: string;
 
-  @ApiProperty({ description: 'Encrypted FCM server key', required: false })
+  @ApiProperty({ description: 'FCM server key for Push (plaintext in, encrypted at rest, never returned)', required: false })
   @IsString()
   @IsOptional()
-  push_fcm_key_enc?: string;
+  push_fcm_key?: string;
 
   @ApiProperty({ description: 'Webhook URL', required: false })
   @IsString()
   @IsOptional()
   webhook_url?: string;
 
-  @ApiProperty({ description: 'Encrypted webhook signing secret', required: false })
+  @ApiProperty({ description: 'Webhook signing secret (plaintext in, encrypted at rest, never returned)', required: false })
   @IsString()
   @IsOptional()
-  webhook_secret_enc?: string;
+  webhook_secret?: string;
 
   @ApiProperty({ description: 'Is Active flag', required: false, example: true })
   @IsBoolean()

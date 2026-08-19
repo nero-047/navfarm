@@ -115,6 +115,13 @@
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/sync-nob-lob.ts"
         }
       },
+      "db-sync-locale-master": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/sync-locale-master.ts"
+        }
+      },
       "db-migrate-master": {
         "executor": "nx:run-commands",
         "options": {

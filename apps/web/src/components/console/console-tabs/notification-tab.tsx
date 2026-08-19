@@ -24,14 +24,14 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
     smtp_host: "",
     smtp_port: 587,
     smtp_user: "",
-    smtp_password_enc: "",
+    smtp_password: "",
     from_email: "",
     from_name: "NAVFarm Alerts"
   });
 
   const [webhookForm, setWebhookForm] = useState({
     webhook_url: "",
-    webhook_secret_enc: ""
+    webhook_secret: ""
   });
 
   // Test send state
@@ -50,14 +50,16 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
       const list = await api.get(`/notification/company/${companyId}`);
       setConfigs(list || []);
 
-      // Pre-fill forms if config exists
+      // Pre-fill forms if config exists. smtp_password / webhook_secret are never
+      // returned by the API once saved (encrypted at rest) — leave blank; submitting
+      // blank keeps the existing secret, typing a new value replaces it.
       const email = list.find((c: any) => c.channel === "EMAIL");
       if (email) {
         setEmailForm({
           smtp_host: email.smtp_host || "",
           smtp_port: email.smtp_port || 587,
           smtp_user: email.smtp_user || "",
-          smtp_password_enc: email.smtp_password_enc || "",
+          smtp_password: "",
           from_email: email.from_email || "",
           from_name: email.from_name || "NAVFarm Alerts"
         });
@@ -67,7 +69,7 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
       if (webhook) {
         setWebhookForm({
           webhook_url: webhook.webhook_url || "",
-          webhook_secret_enc: webhook.webhook_secret_enc || ""
+          webhook_secret: ""
         });
       }
     } catch (e: any) {
@@ -84,10 +86,15 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
     setActionError("");
     setActionSuccess("");
     try {
+      // Omit smtp_password entirely when left blank, so re-saving other fields
+      // never wipes an already-configured secret the server won't echo back.
+      const { smtp_password, ...emailFormRest } = emailForm;
+      const emailPayload = smtp_password ? { ...emailFormRest, smtp_password } : emailFormRest;
+
       const existing = configs.find(c => c.channel === "EMAIL");
       if (existing) {
         await api.put(`/notification/${existing.notif_id}`, {
-          ...emailForm,
+          ...emailPayload,
           is_enabled: true
         });
       } else {
@@ -95,9 +102,10 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
           company_id: companyId,
           channel: "EMAIL",
           is_enabled: true,
-          ...emailForm
+          ...emailPayload
         });
       }
+      setEmailForm(f => ({ ...f, smtp_password: "" }));
       setActionSuccess("Email SMTP configuration saved successfully!");
       fetchConfigs();
     } catch (err: any) {
@@ -113,10 +121,13 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
     setActionError("");
     setActionSuccess("");
     try {
+      const { webhook_secret, ...webhookFormRest } = webhookForm;
+      const webhookPayload = webhook_secret ? { ...webhookFormRest, webhook_secret } : webhookFormRest;
+
       const existing = configs.find(c => c.channel === "WEBHOOK");
       if (existing) {
         await api.put(`/notification/${existing.notif_id}`, {
-          ...webhookForm,
+          ...webhookPayload,
           is_enabled: true
         });
       } else {
@@ -124,9 +135,10 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
           company_id: companyId,
           channel: "WEBHOOK",
           is_enabled: true,
-          ...webhookForm
+          ...webhookPayload
         });
       }
+      setWebhookForm(f => ({ ...f, webhook_secret: "" }));
       setActionSuccess("Outgoing webhook settings updated successfully!");
       fetchConfigs();
     } catch (err: any) {
@@ -275,14 +287,18 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
                     required
                   />
                 </Field>
-                <Field label="SMTP Password" htmlFor="smtp-password" required>
+                <Field
+                  label={configs.find(c => c.channel === "EMAIL")?.smtp_password_configured ? "SMTP Password (configured — leave blank to keep)" : "SMTP Password"}
+                  htmlFor="smtp-password"
+                  required={!configs.find(c => c.channel === "EMAIL")}
+                >
                   <Input
                     id="smtp-password"
                     type="password"
                     placeholder="••••••••"
-                    value={emailForm.smtp_password_enc}
-                    onChange={(e) => setEmailForm({ ...emailForm, smtp_password_enc: e.target.value })}
-                    required
+                    value={emailForm.smtp_password}
+                    onChange={(e) => setEmailForm({ ...emailForm, smtp_password: e.target.value })}
+                    required={!configs.find(c => c.channel === "EMAIL")}
                   />
                 </Field>
                 <Field label="Sender Email (From)" htmlFor="smtp-from-email" required>
@@ -346,13 +362,16 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
                     required
                   />
                 </Field>
-                <Field label="Signing Secret Key (Optional)" htmlFor="webhook-secret">
+                <Field
+                  label={configs.find(c => c.channel === "WEBHOOK")?.webhook_secret_configured ? "Signing Secret Key (configured — leave blank to keep)" : "Signing Secret Key (Optional)"}
+                  htmlFor="webhook-secret"
+                >
                   <Input
                     id="webhook-secret"
                     type="password"
                     placeholder="Secret payload validation hash key"
-                    value={webhookForm.webhook_secret_enc}
-                    onChange={(e) => setWebhookForm({ ...webhookForm, webhook_secret_enc: e.target.value })}
+                    value={webhookForm.webhook_secret}
+                    onChange={(e) => setWebhookForm({ ...webhookForm, webhook_secret: e.target.value })}
                   />
                 </Field>
               </div>

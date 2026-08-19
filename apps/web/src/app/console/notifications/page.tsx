@@ -31,10 +31,10 @@ export default function NotificationsPage() {
   const [activeChannel, setActiveChannel] = useState<"EMAIL" | "WEBHOOK">("EMAIL");
 
   const [emailForm, setEmailForm] = useState({
-    smtp_host: "", smtp_port: 587, smtp_user: "", smtp_password_enc: "",
+    smtp_host: "", smtp_port: 587, smtp_user: "", smtp_password: "",
     from_email: "", from_name: "NAVFarm Alerts",
   });
-  const [webhookForm, setWebhookForm] = useState({ webhook_url: "", webhook_secret_enc: "" });
+  const [webhookForm, setWebhookForm] = useState({ webhook_url: "", webhook_secret: "" });
   const [testRecipient, setTestRecipient] = useState("");
   const [testMessage, setTestMessage] = useState("This is a live test notification from your NAVFarm workspace.");
 
@@ -68,13 +68,16 @@ export default function NotificationsPage() {
 
         const emailCfg = configs?.find((c: any) => c.channel === "EMAIL");
         const webhookCfg = configs?.find((c: any) => c.channel === "WEBHOOK");
+        // smtp_password / webhook_secret are never returned by the API once saved (encrypted
+        // at rest, write-only from here) — leave blank; submitting blank keeps the existing
+        // secret, typing a new value replaces it. *_configured tells the UI whether one is set.
         if (emailCfg) setEmailForm({
           smtp_host: emailCfg.smtp_host || "", smtp_port: emailCfg.smtp_port || 587,
-          smtp_user: emailCfg.smtp_user || "", smtp_password_enc: emailCfg.smtp_password_enc || "",
+          smtp_user: emailCfg.smtp_user || "", smtp_password: "",
           from_email: emailCfg.from_email || "", from_name: emailCfg.from_name || "NAVFarm Alerts",
         });
         if (webhookCfg) setWebhookForm({
-          webhook_url: webhookCfg.webhook_url || "", webhook_secret_enc: webhookCfg.webhook_secret_enc || "",
+          webhook_url: webhookCfg.webhook_url || "", webhook_secret: "",
         });
       }
     } catch (e: any) {
@@ -89,13 +92,20 @@ export default function NotificationsPage() {
     if (!activeCompany) return;
     setSaving(true); setError(""); setSuccess("");
     try {
+      // Omit smtp_password entirely when left blank, so re-saving other fields
+      // never wipes an already-configured secret the server won't echo back.
+      const { smtp_password, ...emailFormRest } = emailForm;
+      const payload = smtp_password ? { ...emailFormRest, smtp_password } : emailFormRest;
+
       const existing = configs.find((config) => config.channel === "EMAIL");
       if (existing) {
-        await api.put(`/notification/${existing.notif_id}`, emailForm);
+        const updated = await api.put(`/notification/${existing.notif_id}`, payload);
+        setConfigs((current) => current.map((c) => (c.notif_id === updated.notif_id ? updated : c)));
       } else {
-        const created = await api.post("/notification", { company_id: activeCompany.company_id, channel: "EMAIL", ...emailForm });
+        const created = await api.post("/notification", { company_id: activeCompany.company_id, channel: "EMAIL", ...payload });
         setConfigs((current) => [...current, created]);
       }
+      setEmailForm((f) => ({ ...f, smtp_password: "" }));
       setSuccess("Email notification settings saved.");
     } catch (err: any) { setError(err?.message || "Failed to save."); }
     finally { setSaving(false); }
@@ -106,13 +116,18 @@ export default function NotificationsPage() {
     if (!activeCompany) return;
     setSaving(true); setError(""); setSuccess("");
     try {
+      const { webhook_secret, ...webhookFormRest } = webhookForm;
+      const payload = webhook_secret ? { ...webhookFormRest, webhook_secret } : webhookFormRest;
+
       const existing = configs.find((config) => config.channel === "WEBHOOK");
       if (existing) {
-        await api.put(`/notification/${existing.notif_id}`, webhookForm);
+        const updated = await api.put(`/notification/${existing.notif_id}`, payload);
+        setConfigs((current) => current.map((c) => (c.notif_id === updated.notif_id ? updated : c)));
       } else {
-        const created = await api.post("/notification", { company_id: activeCompany.company_id, channel: "WEBHOOK", ...webhookForm });
+        const created = await api.post("/notification", { company_id: activeCompany.company_id, channel: "WEBHOOK", ...payload });
         setConfigs((current) => [...current, created]);
       }
+      setWebhookForm((f) => ({ ...f, webhook_secret: "" }));
       setSuccess("Webhook settings saved.");
     } catch (err: any) { setError(err?.message || "Failed to save."); }
     finally { setSaving(false); }
@@ -211,11 +226,11 @@ export default function NotificationsPage() {
                   <input value={emailForm.smtp_user} onChange={(e) => setEmailForm({ ...emailForm, smtp_user: e.target.value })}
                     placeholder="your@gmail.com" className={inputCls} style={inputStyle} />
                 </Field>
-                <Field label="App Password">
+                <Field label={`App Password${configs.find((c) => c.channel === "EMAIL")?.smtp_password_configured ? " (configured — leave blank to keep)" : ""}`}>
                   <div className="relative">
                     <input type={showPassword ? "text" : "password"}
-                      value={emailForm.smtp_password_enc}
-                      onChange={(e) => setEmailForm({ ...emailForm, smtp_password_enc: e.target.value })}
+                      value={emailForm.smtp_password}
+                      onChange={(e) => setEmailForm({ ...emailForm, smtp_password: e.target.value })}
                       placeholder="App-specific password" className={`${inputCls} pr-10`} style={inputStyle} />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
@@ -253,9 +268,9 @@ export default function NotificationsPage() {
                     onChange={(e) => setWebhookForm({ ...webhookForm, webhook_url: e.target.value })}
                     placeholder="https://hooks.slack.com/services/…" className={inputCls} style={inputStyle} />
                 </Field>
-                <Field label="Secret Key (Optional)">
-                  <input value={webhookForm.webhook_secret_enc}
-                    onChange={(e) => setWebhookForm({ ...webhookForm, webhook_secret_enc: e.target.value })}
+                <Field label={`Secret Key (Optional)${configs.find((c) => c.channel === "WEBHOOK")?.webhook_secret_configured ? " — configured, leave blank to keep" : ""}`}>
+                  <input value={webhookForm.webhook_secret}
+                    onChange={(e) => setWebhookForm({ ...webhookForm, webhook_secret: e.target.value })}
                     placeholder="Signing secret for payload verification" className={inputCls} style={inputStyle} />
                 </Field>
               </div>

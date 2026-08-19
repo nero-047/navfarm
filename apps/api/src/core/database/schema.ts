@@ -199,6 +199,51 @@ export const exchangeRate = mysqlTable('exchange_rate', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
 });
 
+export const timezoneMaster = mysqlTable('timezone_master', {
+  tz_id: varchar('tz_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tz_code: varchar('tz_code', { length: 60 }).notNull().unique(), // IANA timezone code
+  tz_name: varchar('tz_name', { length: 100 }).notNull(),
+  utc_offset: varchar('utc_offset', { length: 10 }).notNull(),
+  offset_minutes: int('offset_minutes').notNull(),
+  is_dst: boolean('is_dst').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull()
+});
+
+export const countryMaster = mysqlTable('country_master', {
+  country_id: varchar('country_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  iso2: char('iso2', { length: 2 }).notNull().unique(),
+  iso3: char('iso3', { length: 3 }).notNull().unique(),
+  country_name: varchar('country_name', { length: 100 }).notNull(),
+  phone_code: varchar('phone_code', { length: 10 }),
+  default_tz_id: varchar('default_tz_id', { length: 36 }),
+  default_currency_id: varchar('default_currency_id', { length: 36 }),
+  flag_emoji: varchar('flag_emoji', { length: 10 }),
+  is_active: boolean('is_active').default(true).notNull()
+}, (table) => ({
+  // Explicit short names — the drizzle-default auto-generated name for the
+  // currency FK exceeds MySQL's 64-char identifier limit.
+  defaultTzFk: foreignKey({
+    columns: [table.default_tz_id],
+    foreignColumns: [timezoneMaster.tz_id],
+    name: 'country_master_default_tz_id_fk'
+  }).onDelete('set null'),
+  defaultCurrencyFk: foreignKey({
+    columns: [table.default_currency_id],
+    foreignColumns: [currencyMaster.currency_id],
+    name: 'country_master_default_currency_id_fk'
+  }).onDelete('set null')
+}));
+
+export const stateProvince = mysqlTable('state_province', {
+  state_id: varchar('state_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  country_id: varchar('country_id', { length: 36 }).notNull().references(() => countryMaster.country_id, { onDelete: 'cascade' }),
+  state_code: varchar('state_code', { length: 10 }).notNull(),
+  state_name: varchar('state_name', { length: 100 }).notNull(),
+  is_active: boolean('is_active').default(true).notNull()
+}, (table) => ({
+  uqStateCodePerCountry: uniqueIndex('uq_state_province_country_code').on(table.country_id, table.state_code)
+}));
+
 export const companyCurrencyConfig = mysqlTable('company_currency_config', {
   curr_config_id: varchar('curr_config_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
@@ -396,6 +441,24 @@ export const nobLobExtensionConfig = mysqlTable('nob_lob_extension_config', {
   is_active: boolean('is_active').default(true).notNull()
 });
 
+// Extensible costing methods — "add new methods here, no code change" per spec. Additive
+// reference data only: nob_master.default_costing_method / lob_master.costing_method_allowed
+// and batch.service.ts's costing_method branches are untouched — they stay free-text/literal
+// exactly as they are today. This table exists so those strings have something authoritative
+// behind them, not to re-validate against yet.
+export const costingMethodConfig = mysqlTable('costing_method_config', {
+  method_code: varchar('method_code', { length: 30 }).primaryKey(),
+  method_name: varchar('method_name', { length: 100 }).notNull(),
+  variance_auto: varchar('variance_auto', { length: 50 }).notNull(), // YES = auto-post variance entries at batch close
+  layer_tracking: boolean('layer_tracking').default(false).notNull(), // TRUE = FIFO layer per lot receipt
+  bio_asset_support: boolean('bio_asset_support').default(false).notNull(), // TRUE = supports IAS 41 biological asset accounting
+  fair_value_option: boolean('fair_value_option').default(false).notNull(),
+  amort_option: boolean('amort_option').default(false).notNull(),
+  description: text('description'),
+  is_system: boolean('is_system').default(false).notNull(), // TRUE = cannot delete
+  is_active: boolean('is_active').default(true).notNull()
+});
+
 // ==========================================
 // 8. MASTER TABLES (UOM, ITEM, BREED, LOCATION)
 // ==========================================
@@ -458,6 +521,10 @@ export const itemMaster = mysqlTable('item_master', {
   uom_secondary: varchar('uom_secondary', { length: 20 }),
   uom_conversion_factor: decimal('uom_conversion_factor', { precision: 18, scale: 6 }),
   valuation_method: varchar('valuation_method', { length: 20 }),
+  // Drives gl_posting_setup's posting_group lookup dimension (Phase 14). Not assumed
+  // identical to item_type even though the spec's value list overlaps heavily with it —
+  // defaulted from item_type at create time, but independently overridable.
+  posting_group: varchar('posting_group', { length: 30 }),
   standard_cost: decimal('standard_cost', { precision: 18, scale: 6 }),
   is_lot_tracked: boolean('is_lot_tracked').default(false).notNull(),
   is_serial_tracked: boolean('is_serial_tracked').default(false).notNull(),
@@ -470,6 +537,10 @@ export const itemMaster = mysqlTable('item_master', {
   shelf_life_days: int('shelf_life_days'),
   storage_temp_min: decimal('storage_temp_min', { precision: 6, scale: 2 }),
   storage_temp_max: decimal('storage_temp_max', { precision: 6, scale: 2 }),
+  // Mandatory for MEDICINE/VACCINE per spec — AnimalService.dispose() (Phase 12) blocks a
+  // SLAUGHTERED disposal until today minus the animal's last logged administration date
+  // (animal_medication_log) is >= withdrawal_days for every such item.
+  withdrawal_days: int('withdrawal_days'),
   is_qr_enabled: boolean('is_qr_enabled').default(false).notNull(),
   qr_trigger_event: varchar('qr_trigger_event', { length: 30 }),
   is_active: boolean('is_active').default(true).notNull(),
@@ -1303,6 +1374,14 @@ export const glMappingMaster = mysqlTable('gl_mapping_master', {
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull(),
   item_category_id: varchar('item_category_id', { length: 36 }),
+  // Additive lookup-key dimensions toward the spec's 6-dimensional gl_posting_setup model
+  // (nob_id, lob_id, stage, transaction_type, posting_group, valuation_method). NULL on any
+  // of these means "wildcard" — existing mappings created before this phase have all three
+  // NULL and keep matching exactly what they matched before. `stage` is deliberately not
+  // included yet — see gl-posting.service.ts's resolveMapping() comment.
+  nob_id: varchar('nob_id', { length: 36 }),
+  lob_id: varchar('lob_id', { length: 36 }),
+  valuation_method: varchar('valuation_method', { length: 30 }),
   transaction_type: varchar('transaction_type', { length: 50 }).notNull(), // PURCHASE, CONSUMPTION, OUTPUT, SALE, ADJUSTMENT, MORTALITY, etc.
   debit_gl_account_id: varchar('debit_gl_account_id', { length: 36 }),
   credit_gl_account_id: varchar('credit_gl_account_id', { length: 36 }),
@@ -1324,6 +1403,21 @@ export const glMappingMaster = mysqlTable('gl_mapping_master', {
     columns: [table.item_category_id],
     foreignColumns: [itemCategoryMaster.category_id],
     name: 'gl_map_category_id_fk'
+  }).onDelete('restrict'),
+  nobFk: foreignKey({
+    columns: [table.nob_id],
+    foreignColumns: [nobMaster.nob_id],
+    name: 'gl_map_nob_id_fk'
+  }).onDelete('restrict'),
+  lobFk: foreignKey({
+    columns: [table.lob_id],
+    foreignColumns: [lobMaster.lob_id],
+    name: 'gl_map_lob_id_fk'
+  }).onDelete('restrict'),
+  valuationMethodFk: foreignKey({
+    columns: [table.valuation_method],
+    foreignColumns: [costingMethodConfig.method_code],
+    name: 'gl_map_valuation_method_fk'
   }).onDelete('restrict'),
   debitGlFk: foreignKey({
     columns: [table.debit_gl_account_id],
@@ -2352,6 +2446,24 @@ export const animalRegister = mysqlTable('animal_register', {
   uqAnimalCode: uniqueIndex('uq_animal_register_tenant_code').on(table.tenant_id, table.animal_code),
   uqRfidTag: uniqueIndex('uq_animal_register_tenant_rfid').on(table.tenant_id, table.rfid_tag),
 }));
+
+// Purpose-built per-animal medication event log — not derived from the batch-scoped
+// consumption ledger (inventory_ledger/batch_input_line have no animal_id dimension; see
+// animal.service.ts's dispose() for the withdrawal-period check this exists to support).
+export const animalMedicationLog = mysqlTable('animal_medication_log', {
+  log_id: varchar('log_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  animal_id: varchar('animal_id', { length: 36 }).notNull().references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  administered_date: date('administered_date', { mode: 'string' }).notNull(),
+  dose_qty: decimal('dose_qty', { precision: 18, scale: 4 }),
+  uom: varchar('uom', { length: 20 }),
+  administered_by: varchar('administered_by', { length: 200 }), // free text — a vet/handler, not necessarily a system user
+  notes: text('notes'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
 
 export const inventoryLedgerRelations = relations(inventoryLedger, ({ one, many }) => ({
   item: one(itemMaster, { fields: [inventoryLedger.item_id], references: [itemMaster.item_id] }),

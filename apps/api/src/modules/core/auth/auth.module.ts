@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 import { AuditLogModule } from '../../system/audit-log/audit-log.module';
+import { EncryptionModule } from '../../system/encryption/encryption.module';
 import { resolveJwtSecret } from '../../../config/jwt.config';
 
 @Module({
@@ -21,6 +22,7 @@ import { resolveJwtSecret } from '../../../config/jwt.config';
       inject: [ConfigService],
     }),
     AuditLogModule,
+    EncryptionModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

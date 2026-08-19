@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { SchedulerService } from './scheduler.service';
-import { CreateSchedulerDto, UpdateSchedulerDto, QuerySchedulerDto } from './dto/scheduler.dto';
+import { CreateSchedulerDto, UpdateSchedulerDto, QuerySchedulerDto, SuggestParameterLinesDto } from './dto/scheduler.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -29,6 +29,15 @@ export class SchedulerController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.schedulerService.findAll(query, tenantId);
     return { success: true, message: 'Schedulers retrieved successfully.', data: result };
+  }
+
+  @Get('suggest-lines')
+  @RequirePermission('PRODUCTION', 'SCHEDULER', 'view')
+  @ApiOperation({ summary: 'Suggest parameter_lines from breed_lifecycle_stages for a new Scheduler — review before create()' })
+  async suggestParameterLines(@Query() query: SuggestParameterLinesDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.schedulerService.suggestParameterLines(query.breedId, query.nobId, query.lobId, tenantId);
+    return { success: true, message: 'Suggested parameter lines generated.', data: result };
   }
 
   @Get(':id')

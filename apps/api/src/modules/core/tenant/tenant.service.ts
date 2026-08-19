@@ -85,7 +85,27 @@ export class TenantService {
       if (masterCurrs.length > 0) {
         await tenantDb.insert(schema.currencyMaster).values(masterCurrs);
       }
-      
+
+      const masterTimezones = await this.db.select().from(masterSchema.timezoneMaster);
+      if (masterTimezones.length > 0) {
+        await tenantDb.insert(schema.timezoneMaster).values(masterTimezones);
+      }
+
+      const masterCountries = await this.db.select().from(masterSchema.countryMaster);
+      if (masterCountries.length > 0) {
+        await tenantDb.insert(schema.countryMaster).values(masterCountries);
+      }
+
+      const masterStates = await this.db.select().from(masterSchema.stateProvince);
+      if (masterStates.length > 0) {
+        await tenantDb.insert(schema.stateProvince).values(masterStates);
+      }
+
+      const masterCostingMethods = await this.db.select().from(masterSchema.costingMethodConfig);
+      if (masterCostingMethods.length > 0) {
+        await tenantDb.insert(schema.costingMethodConfig).values(masterCostingMethods);
+      }
+
       const masterSteps = await this.db.select().from(masterSchema.setupStepMaster);
       if (masterSteps.length > 0) {
         await tenantDb.insert(schema.setupStepMaster).values(masterSteps);
@@ -631,7 +651,10 @@ export class TenantService {
       throw new NotFoundException(`Tenant with ID '${id}' not found.`);
     }
 
-    const dbName = `tenant_${tenant.tenant_code}`;
+    // Must use the tenant's registered db_name, not a recomputed tenant_<code> —
+    // they can differ (e.g. under an isolated DATABASE_NAME), and dropping the
+    // wrong physical database here is unrecoverable.
+    const dbName = tenant.db_name;
 
     // 1. Drop dynamic MySQL database
     try {

@@ -28,7 +28,7 @@ const S = {
 const inputCls = "nf-input";
 
 
-type MasterTab = "nobs" | "currencies" | "languages";
+type MasterTab = "nobs" | "currencies" | "languages" | "timezones" | "countries" | "costingMethods";
 
 export default function AdminMastersPage() {
   const router = useRouter();
@@ -61,6 +61,30 @@ export default function AdminMastersPage() {
   const [langForm,    setLangForm]     = useState({ lang_code: "", lang_name_english: "", lang_name_native: "", script: "LTR", is_system_default: false });
   const [savingLang,  setSavingLang]   = useState(false);
 
+  // Timezones
+  const [timezones,    setTimezones]    = useState<any[]>([]);
+  const [showTzForm,   setShowTzForm]   = useState(false);
+  const [tzForm,       setTzForm]       = useState({ tz_code: "", tz_name: "", utc_offset: "", offset_minutes: 0, is_dst: false });
+  const [savingTz,     setSavingTz]     = useState(false);
+
+  // Countries + nested States
+  const [countries,       setCountries]       = useState<any[]>([]);
+  const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
+  const [states,          setStates]          = useState<Record<string, any[]>>({});
+  const [loadingStates,   setLoadingStates]   = useState<Record<string, boolean>>({});
+  const [showCountryForm, setShowCountryForm] = useState(false);
+  const [countryForm,     setCountryForm]     = useState({ iso2: "", iso3: "", country_name: "", phone_code: "", flag_emoji: "" });
+  const [showStateForm,   setShowStateForm]   = useState<string | null>(null);
+  const [stateForm,       setStateForm]       = useState({ state_code: "", state_name: "" });
+  const [savingCountry,   setSavingCountry]   = useState(false);
+  const [savingState,     setSavingState]     = useState(false);
+
+  // Costing Methods
+  const [costingMethods,   setCostingMethods]   = useState<any[]>([]);
+  const [showCostingForm,  setShowCostingForm]  = useState(false);
+  const [costingForm,      setCostingForm]      = useState({ method_code: "", method_name: "", variance_auto: "NO", layer_tracking: false, bio_asset_support: false, fair_value_option: false, amort_option: false });
+  const [savingCosting,    setSavingCosting]    = useState(false);
+
   useEffect(() => {
     const token = getStoredToken();
     const user  = getStoredUser();
@@ -71,12 +95,16 @@ export default function AdminMastersPage() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [nobList, currList, langList] = await Promise.all([
+      const [nobList, currList, langList, tzList, countryList, costingList] = await Promise.all([
         api.get("/setup/wizard/nobs"),
         api.get("/currency"),
         api.get("/language"),
+        api.get("/timezone"),
+        api.get("/country"),
+        api.get("/costing-method"),
       ]);
       setNobs(nobList); setCurrencies(currList); setLanguages(langList);
+      setTimezones(tzList); setCountries(countryList); setCostingMethods(costingList);
     } catch (e: any) { setError(e?.message || "Failed to load master data."); }
     finally { setLoading(false); }
   };
@@ -146,6 +174,71 @@ export default function AdminMastersPage() {
     finally { setSavingLang(false); }
   };
 
+  const handleSaveTimezone = async (e: React.FormEvent) => {
+    e.preventDefault(); setSavingTz(true); setError(""); setSuccess("");
+    try {
+      await api.post("/timezone", tzForm);
+      setSuccess("Timezone added.");
+      setShowTzForm(false);
+      setTzForm({ tz_code: "", tz_name: "", utc_offset: "", offset_minutes: 0, is_dst: false });
+      setTimezones(await api.get("/timezone"));
+    } catch (err: any) { setError(err?.message || "Failed to create timezone."); }
+    finally { setSavingTz(false); }
+  };
+
+  const loadStates = async (countryId: string) => {
+    if (states[countryId]) return;
+    setLoadingStates((p) => ({ ...p, [countryId]: true }));
+    try {
+      const list = await api.get(`/country/${countryId}/states`);
+      setStates((p) => ({ ...p, [countryId]: list }));
+    } catch { setStates((p) => ({ ...p, [countryId]: [] })); }
+    finally { setLoadingStates((p) => ({ ...p, [countryId]: false })); }
+  };
+
+  const handleExpandCountry = (countryId: string) => {
+    if (expandedCountry === countryId) { setExpandedCountry(null); return; }
+    setExpandedCountry(countryId);
+    loadStates(countryId);
+  };
+
+  const handleSaveCountry = async (e: React.FormEvent) => {
+    e.preventDefault(); setSavingCountry(true); setError(""); setSuccess("");
+    try {
+      await api.post("/country", countryForm);
+      setSuccess("Country added.");
+      setShowCountryForm(false);
+      setCountryForm({ iso2: "", iso3: "", country_name: "", phone_code: "", flag_emoji: "" });
+      setCountries(await api.get("/country"));
+    } catch (err: any) { setError(err?.message || "Failed to create country."); }
+    finally { setSavingCountry(false); }
+  };
+
+  const handleSaveCostingMethod = async (e: React.FormEvent) => {
+    e.preventDefault(); setSavingCosting(true); setError(""); setSuccess("");
+    try {
+      await api.post("/costing-method", costingForm);
+      setSuccess("Costing method added.");
+      setShowCostingForm(false);
+      setCostingForm({ method_code: "", method_name: "", variance_auto: "NO", layer_tracking: false, bio_asset_support: false, fair_value_option: false, amort_option: false });
+      setCostingMethods(await api.get("/costing-method"));
+    } catch (err: any) { setError(err?.message || "Failed to create costing method."); }
+    finally { setSavingCosting(false); }
+  };
+
+  const handleSaveState = async (e: React.FormEvent, countryId: string) => {
+    e.preventDefault(); setSavingState(true); setError(""); setSuccess("");
+    try {
+      await api.post(`/country/${countryId}/states`, stateForm);
+      setSuccess("State/province added.");
+      setShowStateForm(null);
+      setStateForm({ state_code: "", state_name: "" });
+      setStates((p) => ({ ...p, [countryId]: [] }));
+      loadStates(countryId);
+    } catch (err: any) { setError(err?.message || "Failed to create state."); }
+    finally { setSavingState(false); }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -172,7 +265,7 @@ export default function AdminMastersPage() {
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
       <PageHeader
         title="Master Data"
-        description="Manage global seed data: NOBs, LOBs, Currencies, Languages"
+        description="Manage global seed data: NOBs, LOBs, Currencies, Languages, Timezones, Countries & States, Costing Methods"
       />
 
       {error   && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
@@ -185,6 +278,9 @@ export default function AdminMastersPage() {
           {tabBtn("nobs",       `NOBs / LOBs (${nobs.length})`)}
           {tabBtn("currencies", `Currencies (${currencies.length})`)}
           {tabBtn("languages",  `Languages (${languages.length})`)}
+          {tabBtn("timezones",  `Timezones (${timezones.length})`)}
+          {tabBtn("countries",  `Countries (${countries.length})`)}
+          {tabBtn("costingMethods", `Costing Methods (${costingMethods.length})`)}
         </div>
 
         <div className="pt-6">
@@ -459,6 +555,278 @@ export default function AdminMastersPage() {
                             : <X className="w-4 h-4" style={S.muted} />
                           }
                         </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ TIMEZONES TAB ══════════════════════════════════════════════ */}
+          {activeTab === "timezones" && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Supported Timezones</p>
+                <button onClick={() => setShowTzForm(!showTzForm)}
+                  className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
+                  <Plus className="w-3.5 h-3.5" /> Add Timezone
+                </button>
+              </div>
+
+              <Dialog open={showTzForm} onClose={() => setShowTzForm(false)} title="Add timezone" description="Add an IANA timezone to the system catalog." maxWidth="md">
+                <form onSubmit={handleSaveTimezone} className="grid grid-cols-2 gap-4">
+                  <Field label="IANA Code">
+                    <input required value={tzForm.tz_code}
+                      onChange={(e) => setTzForm({ ...tzForm, tz_code: e.target.value })}
+                      placeholder="Asia/Kolkata" className={inputCls} style={S.input} />
+                  </Field>
+                  <Field label="Display Name">
+                    <input required value={tzForm.tz_name}
+                      onChange={(e) => setTzForm({ ...tzForm, tz_name: e.target.value })}
+                      placeholder="India Standard Time" className={inputCls} style={S.input} />
+                  </Field>
+                  <Field label="UTC Offset">
+                    <input required value={tzForm.utc_offset}
+                      onChange={(e) => setTzForm({ ...tzForm, utc_offset: e.target.value })}
+                      placeholder="+05:30" className={inputCls} style={S.input} />
+                  </Field>
+                  <Field label="Offset (minutes)">
+                    <input required type="number" value={tzForm.offset_minutes}
+                      onChange={(e) => setTzForm({ ...tzForm, offset_minutes: parseInt(e.target.value) || 0 })}
+                      placeholder="330" className={inputCls} style={S.input} />
+                  </Field>
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
+                    <button type="submit" disabled={savingTz}
+                      className="h-11 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
+                      {savingTz ? "Saving…" : "Add Timezone"}
+                    </button>
+                    <button type="button" onClick={() => setShowTzForm(false)}
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                  </div>
+                </form>
+              </Dialog>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                {timezones.length === 0 && (
+                  <p className="text-sm col-span-full text-center py-4" style={S.muted}>No timezones configured.</p>
+                )}
+                {timezones.map((tz) => (
+                  <div key={tz.tz_code} className="border rounded-lg p-4 text-center" style={S.raised}>
+                    <div className="text-sm font-semibold mb-1" style={S.primary}>{tz.utc_offset}</div>
+                    <div className="text-xs font-mono" style={S.accent}>{tz.tz_code}</div>
+                    <div className="text-[10px] mt-0.5 truncate" style={S.muted}>{tz.tz_name}</div>
+                    {tz.is_dst && (
+                      <span className="mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded"
+                        style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)" }}>Observes DST</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ═══ COUNTRIES TAB (expands to States/Provinces) ═══════════════════ */}
+          {activeTab === "countries" && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Countries</p>
+                <button onClick={() => setShowCountryForm(!showCountryForm)}
+                  className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
+                  <Plus className="w-3.5 h-3.5" /> Add Country
+                </button>
+              </div>
+
+              <Dialog open={showCountryForm} onClose={() => setShowCountryForm(false)} title="Add country" description="Add a country to the system catalog." maxWidth="md">
+                <form onSubmit={handleSaveCountry} className="grid grid-cols-2 gap-4">
+                  {[
+                    { k: "iso2",         l: "ISO2 Code",  p: "IN"    },
+                    { k: "iso3",         l: "ISO3 Code",  p: "IND"   },
+                    { k: "country_name", l: "Name",       p: "India" },
+                    { k: "phone_code",   l: "Phone Code", p: "+91"   },
+                    { k: "flag_emoji",   l: "Flag Emoji", p: "🇮🇳"   },
+                  ].map(({ k, l, p }) => (
+                    <Field key={k} label={l}>
+                      <input required={k !== "phone_code" && k !== "flag_emoji"} value={(countryForm as any)[k]}
+                        onChange={(e) => setCountryForm({ ...countryForm, [k]: e.target.value })}
+                        placeholder={p} className={inputCls} style={S.input} />
+                    </Field>
+                  ))}
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
+                    <button type="submit" disabled={savingCountry}
+                      className="h-11 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
+                      {savingCountry ? "Saving…" : "Add Country"}
+                    </button>
+                    <button type="button" onClick={() => setShowCountryForm(false)}
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                  </div>
+                </form>
+              </Dialog>
+
+              <div className="border-t" style={S.border}>
+                {countries.length === 0 && <p className="text-sm text-center py-8" style={S.muted}>No countries configured.</p>}
+                {countries.map((country) => {
+                  const isExp = expandedCountry === country.country_id;
+                  return (
+                    <div key={country.country_id} className="border-b" style={S.border}>
+                      <button
+                        onClick={() => handleExpandCountry(country.country_id)}
+                        aria-expanded={isExp}
+                        className="w-full flex min-h-12 items-center justify-between px-1 py-3 text-left transition-colors hover:bg-(--row-hover)">
+                        <div className="flex items-center gap-3">
+                          {isExp
+                            ? <ChevronDown  className="w-4 h-4 shrink-0" style={S.muted} />
+                            : <ChevronRight className="w-4 h-4 shrink-0" style={S.muted} />
+                          }
+                          {country.flag_emoji && <span>{country.flag_emoji}</span>}
+                          <span className="font-semibold text-sm" style={S.primary}>{country.country_name}</span>
+                          <span className="font-mono text-[11px]" style={S.muted}>{country.iso2} / {country.iso3}</span>
+                          {country.phone_code && <span className="text-[11px]" style={S.muted}>{country.phone_code}</span>}
+                        </div>
+                      </button>
+
+                      {isExp && (
+                        <div className="px-4 py-3 border-t" style={{ ...S.surface, ...S.border }}>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>States / Provinces</p>
+                            <button onClick={() => setShowStateForm(showStateForm === country.country_id ? null : country.country_id)}
+                              className="text-xs font-semibold flex items-center gap-1" style={S.accent}>
+                              <Plus className="w-3.5 h-3.5" /> Add State
+                            </button>
+                          </div>
+
+                          <Dialog open={showStateForm === country.country_id} onClose={() => setShowStateForm(null)} title="Add state/province" description={`Add a state/province beneath ${country.country_name}.`} maxWidth="md">
+                            <form onSubmit={(e) => handleSaveState(e, country.country_id)} className="grid grid-cols-2 gap-4">
+                              <Field label="State Code">
+                                <input required value={stateForm.state_code}
+                                  onChange={(e) => setStateForm({ ...stateForm, state_code: e.target.value })}
+                                  placeholder="MH" className={inputCls} style={S.input} />
+                              </Field>
+                              <Field label="State Name">
+                                <input required value={stateForm.state_name}
+                                  onChange={(e) => setStateForm({ ...stateForm, state_name: e.target.value })}
+                                  placeholder="Maharashtra" className={inputCls} style={S.input} />
+                              </Field>
+                              <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
+                                <button type="submit" disabled={savingState}
+                                  className="h-11 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
+                                  {savingState ? "Saving…" : "Save State"}
+                                </button>
+                                <button type="button" onClick={() => setShowStateForm(null)}
+                                  className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
+                                  Cancel
+                                </button>
+                              </div>
+                            </form>
+                          </Dialog>
+
+                          {loadingStates[country.country_id] ? (
+                            <div className="text-xs flex items-center gap-1.5" style={S.muted}>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading…
+                            </div>
+                          ) : (states[country.country_id] || []).length === 0 ? (
+                            <p className="text-xs" style={S.muted}>No states/provinces defined yet.</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {(states[country.country_id] || []).map((state: any) => (
+                                <span key={state.state_id}
+                                  className="text-xs border rounded-lg px-2.5 py-1 font-medium"
+                                  style={{ ...S.raised, ...S.primary }}>
+                                  {state.state_name}
+                                  <span className="font-mono ml-1.5 text-[10px]" style={S.muted}>({state.state_code})</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ═══ COSTING METHODS TAB ═══════════════════════════════════════════ */}
+          {activeTab === "costingMethods" && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Costing Methods</p>
+                <button onClick={() => setShowCostingForm(!showCostingForm)}
+                  className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
+                  <Plus className="w-3.5 h-3.5" /> Add Costing Method
+                </button>
+              </div>
+
+              <Dialog open={showCostingForm} onClose={() => setShowCostingForm(false)} title="Add costing method" description="Add an extensible costing method to the system catalog — no code change required to use it as reference data." maxWidth="md">
+                <form onSubmit={handleSaveCostingMethod} className="grid grid-cols-2 gap-4">
+                  <Field label="Method Code">
+                    <input required value={costingForm.method_code}
+                      onChange={(e) => setCostingForm({ ...costingForm, method_code: e.target.value.toUpperCase() })}
+                      placeholder="WEIGHTED_AVG" className={inputCls} style={S.input} />
+                  </Field>
+                  <Field label="Method Name">
+                    <input required value={costingForm.method_name}
+                      onChange={(e) => setCostingForm({ ...costingForm, method_name: e.target.value })}
+                      placeholder="Weighted Average Costing" className={inputCls} style={S.input} />
+                  </Field>
+                  <Field label="Auto-post Variance">
+                    <select value={costingForm.variance_auto}
+                      onChange={(e) => setCostingForm({ ...costingForm, variance_auto: e.target.value })}
+                      className={`${inputCls} nf-select`} style={S.input}>
+                      <option value="NO">No</option>
+                      <option value="YES">Yes</option>
+                    </select>
+                  </Field>
+                  <div />
+                  {[
+                    { k: "layer_tracking",    l: "FIFO layer tracking" },
+                    { k: "bio_asset_support", l: "IAS 41 bio-asset support" },
+                    { k: "fair_value_option", l: "Fair value revaluation" },
+                    { k: "amort_option",      l: "Amortisation posting" },
+                  ].map(({ k, l }) => (
+                    <label key={k} className="flex items-center gap-2 text-sm" style={S.primary}>
+                      <input type="checkbox" checked={(costingForm as any)[k]}
+                        onChange={(e) => setCostingForm({ ...costingForm, [k]: e.target.checked })} />
+                      {l}
+                    </label>
+                  ))}
+                  <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
+                    <button type="submit" disabled={savingCosting}
+                      className="h-11 rounded-[var(--radius-sm)] bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
+                      {savingCosting ? "Saving…" : "Add Costing Method"}
+                    </button>
+                    <button type="button" onClick={() => setShowCostingForm(false)}
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                  </div>
+                </form>
+              </Dialog>
+
+              <div className="rounded-lg border overflow-hidden" style={S.surface}>
+                <table className="w-full border-collapse text-sm">
+                  <TableHeader>
+                    <tr className="border-b border-(--row-border)">
+                      {["Code", "Name", "Layer Tracking", "Bio-Asset", "Fair Value", "Amortisation"].map((h) => (
+                        <TableHead key={h}>{h}</TableHead>
+                      ))}
+                    </tr>
+                  </TableHeader>
+                  <TableBody>
+                    {costingMethods.length === 0 && (
+                      <tr><TableCell colSpan={6} className="text-center py-8" style={S.muted}>No costing methods configured.</TableCell></tr>
+                    )}
+                    {costingMethods.map((cm) => (
+                      <TableRow key={cm.method_code}>
+                        <TableCell className="font-mono font-semibold" style={S.accent}>{cm.method_code}</TableCell>
+                        <TableCell className="font-semibold" style={S.primary}>{cm.method_name}</TableCell>
+                        {["layer_tracking", "bio_asset_support", "fair_value_option", "amort_option"].map((flag) => (
+                          <TableCell key={flag}>
+                            {cm[flag]
+                              ? <CheckCircle className="w-4 h-4 text-(--success)" />
+                              : <X className="w-4 h-4" style={S.muted} />
+                            }
+                          </TableCell>
+                        ))}
                       </TableRow>
                     ))}
                   </TableBody>

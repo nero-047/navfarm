@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -24,6 +24,13 @@ export class ItemService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /** withdrawal_days is mandatory for MEDICINE/VACCINE item types per spec. */
+  private assertWithdrawalDays(itemType: string, withdrawalDays?: number | null) {
+    if ((itemType === 'MEDICINE' || itemType === 'VACCINE') && withdrawalDays == null) {
+      throw new BadRequestException(`${itemType} items require withdrawal_days to be set.`);
+    }
   }
 
   async create(dto: CreateItemDto, tenantId: string, userPayload?: any) {
@@ -79,6 +86,8 @@ export class ItemService {
       throw new ConflictException(`Item with code '${dto.item_code}' already exists in this scope.`);
     }
 
+    this.assertWithdrawalDays(dto.item_type, dto.withdrawal_days);
+
     const itemId = randomUUID();
     const newItem = {
       item_id: itemId,
@@ -96,6 +105,7 @@ export class ItemService {
       uom_secondary: dto.uom_secondary || null,
       uom_conversion_factor: dto.uom_conversion_factor?.toString() || null,
       valuation_method: dto.valuation_method || null,
+      posting_group: dto.posting_group || dto.item_type,
       standard_cost: dto.standard_cost?.toString() || null,
       is_lot_tracked: dto.is_lot_tracked || false,
       is_serial_tracked: dto.is_serial_tracked || false,
@@ -108,6 +118,7 @@ export class ItemService {
       shelf_life_days: dto.shelf_life_days ?? null,
       storage_temp_min: dto.storage_temp_min?.toString() || null,
       storage_temp_max: dto.storage_temp_max?.toString() || null,
+      withdrawal_days: dto.withdrawal_days ?? null,
       is_qr_enabled: dto.is_qr_enabled || false,
       qr_trigger_event: dto.qr_trigger_event || null,
       is_active: true,
@@ -278,6 +289,10 @@ export class ItemService {
       }
     }
 
+    const effectiveItemType = dto.item_type ?? item.item_type;
+    const effectiveWithdrawalDays = dto.withdrawal_days !== undefined ? dto.withdrawal_days : item.withdrawal_days;
+    this.assertWithdrawalDays(effectiveItemType, effectiveWithdrawalDays);
+
     const updates: any = {
       updated_by: userPayload?.userId || null,
       updated_at: toMysqlTimestamp(),
@@ -295,6 +310,7 @@ export class ItemService {
     if (dto.uom_secondary !== undefined) updates.uom_secondary = dto.uom_secondary;
     if (dto.uom_conversion_factor !== undefined) updates.uom_conversion_factor = dto.uom_conversion_factor?.toString() || null;
     if (dto.valuation_method !== undefined) updates.valuation_method = dto.valuation_method;
+    if (dto.posting_group !== undefined) updates.posting_group = dto.posting_group;
     if (dto.standard_cost !== undefined) updates.standard_cost = dto.standard_cost?.toString() || null;
     if (dto.is_lot_tracked !== undefined) updates.is_lot_tracked = dto.is_lot_tracked;
     if (dto.is_serial_tracked !== undefined) updates.is_serial_tracked = dto.is_serial_tracked;
@@ -307,6 +323,7 @@ export class ItemService {
     if (dto.shelf_life_days !== undefined) updates.shelf_life_days = dto.shelf_life_days;
     if (dto.storage_temp_min !== undefined) updates.storage_temp_min = dto.storage_temp_min?.toString() || null;
     if (dto.storage_temp_max !== undefined) updates.storage_temp_max = dto.storage_temp_max?.toString() || null;
+    if (dto.withdrawal_days !== undefined) updates.withdrawal_days = dto.withdrawal_days;
     if (dto.is_qr_enabled !== undefined) updates.is_qr_enabled = dto.is_qr_enabled;
     if (dto.qr_trigger_event !== undefined) updates.qr_trigger_event = dto.qr_trigger_event;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;

@@ -60,6 +60,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [activeWizardStep, setActiveWizardStep] = useState(1);
   const [languages, setLanguages] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
+  const [timezones, setTimezones] = useState<any[]>([]);
+  const [countries, setCountries] = useState<any[]>([]);
   const [nobs, setNobs] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, setWizardError] = useState("");
@@ -148,13 +150,17 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           setActiveWizardStep(firstPending ? firstPending.stepOrder : 8);
         }
       }
-      const [langList, currList, nobList] = await Promise.all([
+      const [langList, currList, tzList, countryList, nobList] = await Promise.all([
         api.get("/language").catch(() => []),
         api.get("/currency").catch(() => []),
+        api.get("/timezone").catch(() => []),
+        api.get("/country").catch(() => []),
         api.get("/setup/wizard/nobs").catch(() => []),
       ]);
       setLanguages(langList);
       setCurrencies(currList);
+      setTimezones(tzList);
+      setCountries(countryList);
       setNobs(nobList);
     } catch {
       setIsOnboarded(false);
@@ -213,6 +219,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           tenantId={localStorage.getItem("tenant_id") || ""}
           languages={languages}
           currencies={currencies}
+          timezones={timezones}
+          countries={countries}
           nobs={nobs}
           isSubmitting={isSubmitting}
           setIsSubmitting={setIsSubmitting}

@@ -226,6 +226,23 @@ export class UpdateSchedulerDto {
   parameter_lines?: SchedulerParameterLineInput[];
 }
 
+export class SuggestParameterLinesDto {
+  @ApiProperty({ description: 'Breed UUID to pull breed_lifecycle_stages standards from' })
+  @IsUUID()
+  @IsNotEmpty()
+  breedId: string;
+
+  @ApiProperty({ description: 'Nature of Business UUID (scopes which parameter_master rows are eligible)' })
+  @IsString()
+  @IsNotEmpty()
+  nobId: string;
+
+  @ApiProperty({ description: 'Line of Business UUID (scopes which parameter_master rows are eligible)' })
+  @IsString()
+  @IsNotEmpty()
+  lobId: string;
+}
+
 export class QuerySchedulerDto {
   @ApiProperty({ required: false })
   @IsOptional()

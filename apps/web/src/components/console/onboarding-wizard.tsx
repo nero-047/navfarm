@@ -20,6 +20,8 @@ interface OnboardingWizardProps {
   tenantId: string;
   languages: any[];
   currencies: any[];
+  timezones: any[];
+  countries: any[];
   nobs: any[];
   isSubmitting: boolean;
   setIsSubmitting: (val: boolean) => void;
@@ -38,6 +40,8 @@ export default function OnboardingWizard({
   tenantId,
   languages,
   currencies,
+  timezones,
+  countries,
   nobs,
   isSubmitting,
   setIsSubmitting,
@@ -390,6 +394,8 @@ export default function OnboardingWizard({
                 <Step6Timezone
                   onSubmit={handleStep6Submit}
                   isSubmitting={isSubmitting}
+                  timezones={timezones}
+                  countries={countries}
                   initialTz={setupDetails?.company?.default_timezone_id || activeCompany?.default_timezone_id}
                   initialCountry={setupDetails?.company?.country_id || activeCompany?.country_id}
                   onError={setActionError}

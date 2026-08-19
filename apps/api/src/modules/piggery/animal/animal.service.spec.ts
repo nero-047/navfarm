@@ -176,5 +176,51 @@ describe('AnimalService', () => {
         service.dispose('a-1', { disposal_type: 'SOLD', disposal_date: '2026-06-01' }, 'tenant-123'),
       ).rejects.toThrow(BadRequestException);
     });
+
+    const joinedMedicationRows = (rows: any[]) => ({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(rows) }),
+      }),
+    });
+
+    it('blocks SLAUGHTERED disposal when a medicine withdrawal period has not elapsed', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', is_active: true, book_value: null, animal_code: 'PIG-2026-0004' }))
+        .mockReturnValueOnce(joinedMedicationRows([
+          { item_id: 'item-med', item_name: 'Amoxicillin', item_type: 'MEDICINE', withdrawal_days: 10, administered_date: '2026-06-05' },
+        ]));
+
+      await expect(
+        service.dispose('a-1', { disposal_type: 'SLAUGHTERED', disposal_date: '2026-06-10' }, 'tenant-123'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('allows SLAUGHTERED disposal once the withdrawal period has elapsed', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', is_active: true, book_value: null, animal_code: 'PIG-2026-0005' }))
+        .mockReturnValueOnce(joinedMedicationRows([
+          { item_id: 'item-med', item_name: 'Amoxicillin', item_type: 'MEDICINE', withdrawal_days: 10, administered_date: '2026-05-01' },
+        ]))
+        .mockReturnValueOnce(found({ animal_id: 'a-1', is_active: false, status: 'SLAUGHTERED' }));
+
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      const result = await service.dispose('a-1', { disposal_type: 'SLAUGHTERED', disposal_date: '2026-06-10' }, 'tenant-123');
+
+      expect(result.status).toBe('SLAUGHTERED');
+    });
+
+    it('allows SLAUGHTERED disposal when no medication has ever been logged', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', is_active: true, book_value: null, animal_code: 'PIG-2026-0006' }))
+        .mockReturnValueOnce(joinedMedicationRows([]))
+        .mockReturnValueOnce(found({ animal_id: 'a-1', is_active: false, status: 'SLAUGHTERED' }));
+
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      const result = await service.dispose('a-1', { disposal_type: 'SLAUGHTERED', disposal_date: '2026-06-10' }, 'tenant-123');
+
+      expect(result.status).toBe('SLAUGHTERED');
+    });
   });
 });

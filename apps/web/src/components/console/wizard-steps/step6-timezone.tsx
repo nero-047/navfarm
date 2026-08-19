@@ -1,21 +1,22 @@
 import React, { useEffect, useId, useState } from "react";
 import { Select } from "@/components/ui/select";
 import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
 
 interface Step6TimezoneProps {
   onSubmit: (timezone: string, country: string) => Promise<void>;
   isSubmitting: boolean;
+  timezones: any[];
+  countries: any[];
   initialTz?: string;
   initialCountry?: string;
   onError: (msg: string) => void;
 }
 
-export default function Step6Timezone({ onSubmit, isSubmitting, initialTz, initialCountry, onError }: Step6TimezoneProps) {
+export default function Step6Timezone({ onSubmit, isSubmitting, timezones, countries, initialTz, initialCountry, onError }: Step6TimezoneProps) {
   const [timezone, setTimezone] = useState(initialTz || "Asia/Kolkata");
-  const [country, setCountry] = useState(initialCountry || "");
+  const [country, setCountry] = useState(initialCountry || (countries.find((c) => c.iso3 === "IND") ? "IND" : ""));
   const uid = useId();
   const countryId = `${uid}-country`;
 
@@ -27,7 +28,7 @@ export default function Step6Timezone({ onSubmit, isSubmitting, initialTz, initi
 
   const handleSubmit = () => {
     if (!country) {
-      onError("Please choose or input a country code (e.g. IND, USA).");
+      onError("Please select a country.");
       return;
     }
     onSubmit(timezone, country);
@@ -51,22 +52,29 @@ export default function Step6Timezone({ onSubmit, isSubmitting, initialTz, initi
             onChange={(e) => setTimezone(e.target.value)}
             className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
-            <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-            <option value="UTC">UTC</option>
-            <option value="America/New_York">America/New_York (EST)</option>
-            <option value="Europe/London">Europe/London (GMT)</option>
+            {timezones.map((tz) => (
+              <option key={tz.tz_code} value={tz.tz_code}>
+                {tz.tz_code} ({tz.utc_offset}) — {tz.tz_name}
+              </option>
+            ))}
           </Select>
         </div>
 
-        <Field label="Country Code (ISO 3-Letter)" htmlFor={countryId} required>
-          <Input
+        <Field label="Country" htmlFor={countryId} required>
+          <Select
             id={countryId}
-            placeholder="e.g. IND, USA"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
-            maxLength={3}
+            className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
             required
-          />
+          >
+            <option value="" disabled>Select a country</option>
+            {countries.map((c) => (
+              <option key={c.iso3} value={c.iso3}>
+                {c.flag_emoji ? `${c.flag_emoji} ` : ""}{c.country_name} ({c.iso3})
+              </option>
+            ))}
+          </Select>
         </Field>
       </div>
       <Button onClick={handleSubmit} disabled={isSubmitting} className="mt-8 self-end">

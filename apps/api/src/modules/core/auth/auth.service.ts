@@ -13,6 +13,7 @@ import { LoginDto } from './dto/login.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { ConnectionManagerService } from '../../../core/database/connection-manager.service';
+import { EncryptionService } from '../../system/encryption/encryption.service';
 import * as nodemailer from 'nodemailer';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly masterDb: MySql2Database<typeof masterSchema>,
     private readonly auditLogService: AuditLogService,
     private readonly connectionManager: ConnectionManagerService,
+    private readonly encryptionService: EncryptionService,
   ) { }
 
   private get db(): MySql2Database<typeof schema> {
@@ -754,7 +756,9 @@ export class AuthService {
     const host = smtpConfig?.smtp_host || process.env.SMTP_HOST || 'smtp.mailtrap.io';
     const port = Number(smtpConfig?.smtp_port || process.env.SMTP_PORT || 2525);
     const user = smtpConfig?.smtp_user || process.env.SMTP_USER || '';
-    const password = smtpConfig?.smtp_password_enc || process.env.SMTP_PASSWORD || '';
+    const password = smtpConfig?.smtp_password_enc
+      ? this.encryptionService.decrypt(smtpConfig.smtp_password_enc)
+      : process.env.SMTP_PASSWORD || '';
     const fromEmail = smtpConfig?.from_email || process.env.SMTP_FROM_EMAIL || 'no-reply@navfarm.com';
     const fromName = smtpConfig?.from_name || process.env.SMTP_FROM_NAME || 'NAVFarm Support';
 

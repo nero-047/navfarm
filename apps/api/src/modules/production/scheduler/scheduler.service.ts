@@ -9,6 +9,13 @@ import { AuditLogService } from '../../system/audit-log/audit-log.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
 
+/** breed_lifecycle_stages.period_from/to are in calc_unit; scheduler_parameter_line's are day-of-batch. */
+const toDays = (value: number, calcUnit: string): number => {
+  if (calcUnit === 'WEEK') return value * 7;
+  if (calcUnit === 'MONTH') return value * 30; // approximation — no calendar-month lookup at this layer
+  return value;
+};
+
 @Injectable()
 export class SchedulerService {
   constructor(
@@ -22,6 +29,116 @@ export class SchedulerService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /**
+   * Suggests parameter_lines for a new scheduler from breed_lifecycle_stages — a
+   * read-only helper the caller reviews/edits before calling create(), not an
+   * automatic insert. LOB-agnostic by design: matches parameter_master rows by
+   * (nob_id, lob_id, parameter_type, item_id) rather than any piggery-specific
+   * code, so it works for any breed/LOB that has lifecycle-stage data.
+   *
+   * Deliberately does not touch kpi_lower_limit/kpi_upper_limit — those bound an
+   * unspecified single metric per stage row in the spec's own model, and forcing
+   * them onto one parameter line here would be guessing which one. Returns an
+   * empty array (not an error) when the breed has no lifecycle-stage data yet,
+   * which today is every breed — see breed_lifecycle_stages seeding notes.
+   */
+  async suggestParameterLines(breedId: string, nobId: string, lobId: string, tenantId: string) {
+    const lifecycleRows = await this.db
+      .select({ lifecycle: schema.breedLifecycleStages, stage: schema.stageMaster })
+      .from(schema.breedLifecycleStages)
+      .innerJoin(schema.stageMaster, eq(schema.breedLifecycleStages.stage_id, schema.stageMaster.stage_id))
+      .where(
+        and(
+          eq(schema.breedLifecycleStages.breed_id, breedId),
+          eq(schema.breedLifecycleStages.tenant_id, tenantId),
+          eq(schema.breedLifecycleStages.is_active, true)
+        )
+      )
+      .orderBy(schema.breedLifecycleStages.period_from);
+
+    if (lifecycleRows.length === 0) return [];
+
+    const params = await this.db
+      .select()
+      .from(schema.parameterMaster)
+      .where(
+        and(
+          eq(schema.parameterMaster.nob_id, nobId),
+          eq(schema.parameterMaster.lob_id, lobId),
+          eq(schema.parameterMaster.is_active, true)
+        )
+      );
+
+    const findParam = (type: string, itemId?: string | null) =>
+      (itemId && params.find((p) => p.parameter_type === type && p.item_id === itemId)) ||
+      params.find((p) => p.parameter_type === type && !p.item_id) ||
+      params.find((p) => p.parameter_type === type);
+
+    const lines: any[] = [];
+    let periodNo = 1;
+
+    for (const { lifecycle, stage } of lifecycleRows) {
+      const periodFrom = toDays(lifecycle.period_from, lifecycle.calc_unit);
+      const periodTo = toDays(lifecycle.period_to, lifecycle.calc_unit);
+
+      if (lifecycle.feed_qty_per_head_per_day_kg) {
+        const feedParam = findParam('CONSUMPTION', lifecycle.feed_item_id);
+        if (feedParam) {
+          lines.push({
+            parameter_id: feedParam.parameter_id,
+            period_no: periodNo++,
+            period_from: periodFrom,
+            period_to: periodTo,
+            period_label: stage.stage_name,
+            stage_code: stage.stage_code,
+            expected_qty_override: Number(lifecycle.feed_qty_per_head_per_day_kg),
+            uom_override: feedParam.default_uom || 'KG',
+            kpi_enabled: false,
+            notes: 'Auto-suggested from breed_lifecycle_stages — review before saving.',
+          });
+        }
+      }
+
+      if (lifecycle.std_mortality_rate_pct) {
+        const mortParam = findParam('MORTALITY');
+        if (mortParam) {
+          lines.push({
+            parameter_id: mortParam.parameter_id,
+            period_no: periodNo++,
+            period_from: periodFrom,
+            period_to: periodTo,
+            period_label: stage.stage_name,
+            stage_code: stage.stage_code,
+            kpi_enabled: true,
+            kpi_target_value: Number(lifecycle.std_mortality_rate_pct),
+            notes: 'Target mortality rate % for display — actual entries are headcount, not directly comparable without population size.',
+          });
+        }
+      }
+
+      const outputQty = lifecycle.std_output_qty ?? lifecycle.std_body_weight_kg;
+      if (outputQty) {
+        const outputParam = findParam('OUTPUT', lifecycle.output_item_id);
+        if (outputParam) {
+          lines.push({
+            parameter_id: outputParam.parameter_id,
+            period_no: periodNo++,
+            period_from: periodFrom,
+            period_to: periodTo,
+            period_label: stage.stage_name,
+            stage_code: stage.stage_code,
+            expected_qty_override: Number(outputQty),
+            uom_override: lifecycle.output_uom || outputParam.default_uom || undefined,
+            kpi_enabled: false,
+            notes: 'Auto-suggested from breed_lifecycle_stages — review before saving.',
+          });
+        }
+      }
+    }
+
+    return lines;
   }
 
   async create(dto: CreateSchedulerDto, tenantId: string, userPayload?: any) {

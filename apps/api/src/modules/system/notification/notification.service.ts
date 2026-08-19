@@ -5,10 +5,16 @@ import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
+import { EncryptionService } from '../encryption/encryption.service';
+
+const SECRET_FIELDS = ['smtp_password', 'sms_api_key', 'push_fcm_key', 'webhook_secret'] as const;
 
 @Injectable()
 export class NotificationService {
-  constructor(private readonly cls: ClsService) {}
+  constructor(
+    private readonly cls: ClsService,
+    private readonly encryptionService: EncryptionService,
+  ) {}
 
   private get db(): MySql2Database<typeof schema> {
     const tenantDb = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
@@ -16,6 +22,33 @@ export class NotificationService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /**
+   * Never returns the *_enc columns — these are true secrets (SMTP password, API keys,
+   * webhook secret), not something like a bank account number where a last-4 partial
+   * reveal is a normal UX convention. A boolean "is this configured" flag is the safer
+   * masked representation here.
+   */
+  private maskConfig(config: typeof schema.notificationConfig.$inferSelect) {
+    const { smtp_password_enc, sms_api_key_enc, push_fcm_key_enc, webhook_secret_enc, ...rest } = config;
+    return {
+      ...rest,
+      smtp_password_configured: !!smtp_password_enc,
+      sms_api_key_configured: !!sms_api_key_enc,
+      push_fcm_key_configured: !!push_fcm_key_enc,
+      webhook_secret_configured: !!webhook_secret_enc,
+    };
+  }
+
+  private encryptSecretFields(data: Record<string, any>) {
+    const encrypted: Record<string, any> = {};
+    for (const field of SECRET_FIELDS) {
+      if (data[field] !== undefined) {
+        encrypted[`${field}_enc`] = data[field] ? this.encryptionService.encrypt(data[field]) : null;
+      }
+    }
+    return encrypted;
   }
 
   async create(data: any) {
@@ -28,34 +61,28 @@ export class NotificationService {
       smtp_host: data.smtp_host || null,
       smtp_port: data.smtp_port || null,
       smtp_user: data.smtp_user || null,
-      smtp_password_enc: data.smtp_password_enc || null,
       from_email: data.from_email || null,
       from_name: data.from_name || null,
       sms_provider: data.sms_provider || null,
-      sms_api_key_enc: data.sms_api_key_enc || null,
       sms_sender_id: data.sms_sender_id || null,
-      push_fcm_key_enc: data.push_fcm_key_enc || null,
       webhook_url: data.webhook_url || null,
-      webhook_secret_enc: data.webhook_secret_enc || null,
+      ...this.encryptSecretFields(data),
     });
 
-    const [config] = await this.db
-      .select()
-      .from(schema.notificationConfig)
-      .where(eq(schema.notificationConfig.notif_id, notifId))
-      .limit(1);
-
-    return config;
+    return this.findOne(notifId);
   }
 
   async findByCompany(companyId: string) {
-    return this.db
+    const rows = await this.db
       .select()
       .from(schema.notificationConfig)
       .where(eq(schema.notificationConfig.company_id, companyId));
+
+    return rows.map((row) => this.maskConfig(row));
   }
 
-  async findOne(id: string) {
+  /** Internal, unmasked fetch — only for callers that need the real *_enc values (e.g. sendTest). */
+  private async findRaw(id: string) {
     const [config] = await this.db
       .select()
       .from(schema.notificationConfig)
@@ -69,21 +96,23 @@ export class NotificationService {
     return config;
   }
 
+  async findOne(id: string) {
+    const config = await this.findRaw(id);
+    return this.maskConfig(config);
+  }
+
   async update(id: string, data: any) {
-    const existing = await this.findOne(id);
+    await this.findRaw(id);
+
+    const updates: Record<string, any> = { ...data };
+    for (const field of SECRET_FIELDS) delete updates[field];
 
     await this.db
       .update(schema.notificationConfig)
-      .set(data)
+      .set({ ...updates, ...this.encryptSecretFields(data) })
       .where(eq(schema.notificationConfig.notif_id, id));
 
-    const [updated] = await this.db
-      .select()
-      .from(schema.notificationConfig)
-      .where(eq(schema.notificationConfig.notif_id, id))
-      .limit(1);
-
-    return updated;
+    return this.findOne(id);
   }
 
   async remove(id: string) {
@@ -105,7 +134,7 @@ export class NotificationService {
   }
 
   async sendTest(configId: string, recipient: string, message?: string) {
-    const config = await this.findOne(configId);
+    const config = await this.findRaw(configId);
 
     const testMessage = message || `This is a test notification sent via ${config.channel} channel.`;
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -115,7 +144,9 @@ export class NotificationService {
         const host = config.smtp_host || process.env.SMTP_HOST || 'smtp.mailtrap.io';
         const port = Number(config.smtp_port || process.env.SMTP_PORT || 2525);
         const user = config.smtp_user || process.env.SMTP_USER || '';
-        const password = config.smtp_password_enc || process.env.SMTP_PASSWORD || '';
+        const password = config.smtp_password_enc
+          ? this.encryptionService.decrypt(config.smtp_password_enc)
+          : process.env.SMTP_PASSWORD || '';
         const fromEmail = config.from_email || process.env.SMTP_FROM_EMAIL || 'no-reply@navfarm.com';
         const fromName = config.from_name || process.env.SMTP_FROM_NAME || 'NAVFarm Test';
 

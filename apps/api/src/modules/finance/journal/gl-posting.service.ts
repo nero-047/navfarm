@@ -27,7 +27,27 @@ export class GlPostingService {
     return tenantDb;
   }
 
-  private async resolveMapping(tenantId: string, companyId: string, transactionType: string, categoryId?: string | null) {
+  /**
+   * Matches gl_mapping_master on (tenant, company, transaction_type) plus up to 4 optional
+   * dimensions — category, NOB, LOB, valuation_method — where NULL on a mapping means
+   * "wildcard" for that dimension. Among all mappings that don't conflict with the given
+   * context, the one with the most dimensions actually pinned down wins (most-specific).
+   * `stage` is not a dimension here yet — see the file-level comment on gl_mapping_master
+   * in schema.ts for why.
+   */
+  private async resolveMapping(
+    tenantId: string,
+    companyId: string,
+    transactionType: string,
+    context: { categoryId?: string | null; nobId?: string | null; lobId?: string | null; valuationMethod?: string | null } = {}
+  ) {
+    const dimensionCol = {
+      categoryId: schema.glMappingMaster.item_category_id,
+      nobId: schema.glMappingMaster.nob_id,
+      lobId: schema.glMappingMaster.lob_id,
+      valuationMethod: schema.glMappingMaster.valuation_method,
+    } as const;
+
     const conditions = [
       eq(schema.glMappingMaster.tenant_id, tenantId),
       eq(schema.glMappingMaster.company_id, companyId),
@@ -35,24 +55,32 @@ export class GlPostingService {
       eq(schema.glMappingMaster.is_active, true),
       isNull(schema.glMappingMaster.deleted_at),
     ];
-    conditions.push(
-      categoryId
-        ? or(eq(schema.glMappingMaster.item_category_id, categoryId), isNull(schema.glMappingMaster.item_category_id))!
-        : isNull(schema.glMappingMaster.item_category_id)
-    );
+    for (const key of Object.keys(dimensionCol) as Array<keyof typeof dimensionCol>) {
+      const value = context[key];
+      const col = dimensionCol[key];
+      // A mapping matches this dimension if it's wildcard (NULL) or pinned to this exact value.
+      conditions.push((value ? or(eq(col, value), isNull(col)) : isNull(col))!);
+    }
 
     const mappings = await this.db
       .select()
       .from(schema.glMappingMaster)
       .where(and(...conditions));
 
-    // Prefer a category-specific mapping over a category-wildcard (item_category_id IS NULL) one.
-    const mapping = mappings.find((m) => m.item_category_id === categoryId) ?? mappings.find((m) => !m.item_category_id);
+    // Most-specific-wins: score by how many dimensions are pinned (non-null) on the mapping.
+    const scored = mappings
+      .map((m) => ({
+        mapping: m,
+        score: [m.item_category_id, m.nob_id, m.lob_id, m.valuation_method].filter((v) => v != null).length,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const mapping = scored[0]?.mapping;
 
     if (!mapping || !mapping.debit_gl_account_id || !mapping.credit_gl_account_id) {
       throw new BadRequestException(
         `No GL mapping configured for company '${companyId}', transaction type '${transactionType}'` +
-          (categoryId ? `, item category '${categoryId}'` : '') +
+          (context.categoryId ? `, item category '${context.categoryId}'` : '') +
           '. Add one under Master Data → GL Mappings before posting this document.'
       );
     }
@@ -61,11 +89,22 @@ export class GlPostingService {
   }
 
   async postInventoryLedgerEntry(ledgerEntry: typeof schema.inventoryLedger.$inferSelect, userId?: string) {
+    const [item] = await this.db
+      .select({ valuation_method: schema.itemMaster.valuation_method })
+      .from(schema.itemMaster)
+      .where(eq(schema.itemMaster.item_id, ledgerEntry.item_id))
+      .limit(1);
+
     const mapping = await this.resolveMapping(
       ledgerEntry.tenant_id,
       ledgerEntry.company_id,
       ledgerEntry.transaction_type,
-      ledgerEntry.category_id
+      {
+        categoryId: ledgerEntry.category_id,
+        nobId: ledgerEntry.nob_id,
+        lobId: ledgerEntry.lob_id,
+        valuationMethod: item?.valuation_method,
+      }
     );
 
     const amount = Math.abs(Number(ledgerEntry.amount ?? 0));
@@ -120,7 +159,10 @@ export class GlPostingService {
     // where the normal "Dr Variance / Cr Inventory-WIP" posting reverses.
     reverseDirection?: boolean;
   }) {
-    const mapping = await this.resolveMapping(params.tenantId, params.companyId, params.transactionType);
+    const mapping = await this.resolveMapping(params.tenantId, params.companyId, params.transactionType, {
+      nobId: params.nobId,
+      lobId: params.lobId,
+    });
     const amount = Math.abs(params.amount);
     const debitAccountId = params.reverseDirection ? mapping.credit_gl_account_id! : mapping.debit_gl_account_id!;
     const creditAccountId = params.reverseDirection ? mapping.debit_gl_account_id! : mapping.credit_gl_account_id!;

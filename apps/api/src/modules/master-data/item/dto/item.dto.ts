@@ -80,6 +80,11 @@ export class CreateItemDto {
   @IsOptional()
   valuation_method?: string;
 
+  @ApiProperty({ description: 'GL posting classification — defaults from item_type if omitted', required: false })
+  @IsString()
+  @IsOptional()
+  posting_group?: string;
+
   @ApiProperty({ description: 'Standard unit cost valuation', required: false })
   @IsNumber()
   @IsOptional()
@@ -140,6 +145,12 @@ export class CreateItemDto {
   @IsNumber()
   @IsOptional()
   storage_temp_max?: number;
+
+  @ApiProperty({ description: 'Days after last administration before an animal treated with this item may be slaughtered. Mandatory for MEDICINE/VACCINE items.', required: false })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  withdrawal_days?: number;
 
   @ApiProperty({ description: 'Is QR code tracking enabled', default: false, required: false })
   @IsBoolean()
@@ -225,6 +236,11 @@ export class UpdateItemDto {
   valuation_method?: string;
 
   @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  posting_group?: string;
+
+  @ApiProperty({ required: false })
   @IsNumber()
   @IsOptional()
   standard_cost?: number;
@@ -284,6 +300,12 @@ export class UpdateItemDto {
   @IsNumber()
   @IsOptional()
   storage_temp_max?: number;
+
+  @ApiProperty({ required: false })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  withdrawal_days?: number;
 
   @ApiProperty({ required: false })
   @IsBoolean()

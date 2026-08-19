@@ -218,6 +218,41 @@
       "when": 1787113439990,
       "tag": "0030_motionless_pride",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1787117852577,
+      "tag": "0031_blue_runaways",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1787120038880,
+      "tag": "0032_loud_tarot",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1787121596594,
+      "tag": "0033_zippy_mindworm",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1787123083243,
+      "tag": "0034_cuddly_miss_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1787124249750,
+      "tag": "0035_equal_terrax",
+      "breakpoints": true
     }
   ]
 }

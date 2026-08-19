@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ItemService } from './item.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('ItemService', () => {
   let service: ItemService;
@@ -159,6 +159,26 @@ describe('ItemService', () => {
 
       expect(mockDb.transaction).toHaveBeenCalled();
       expect(result.item_code).toBe('ITEM-001');
+    });
+
+    it('should reject a MEDICINE item with no withdrawal_days', async () => {
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) });
+
+      await expect(
+        service.create(
+          {
+            company_id: 'comp-1',
+            item_code: 'MED-001',
+            item_name: 'Amoxicillin',
+            item_type: 'MEDICINE',
+            nob_id: 'nob-1',
+            uom_primary: 'ML',
+          },
+          'tenant-123',
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

@@ -206,7 +206,10 @@ async function seedDemoTenant() {
     if (!plan) throw new Error("Plan 'PLAN_PRO' not found — run db-bootstrap first.");
 
     const [existingTenant] = await masterDb.select().from(master.tenantMaster).where(eq(master.tenantMaster.tenant_code, tenantCode)).limit(1);
-    const dbName = assertDatabaseName(`tenant_${tenantCode}`);
+    // Existing tenants must reuse their registered db_name — it can differ from
+    // tenant_<code> (e.g. under an isolated DATABASE_NAME) — recomputing it here
+    // would silently target the wrong physical database.
+    const dbName = assertDatabaseName(existingTenant?.db_name || `tenant_${tenantCode}`);
     const tenantId = existingTenant?.tenant_id || randomUUID();
 
     const server = await mysql.createConnection({ host, port, user, password });
@@ -223,12 +226,20 @@ async function seedDemoTenant() {
 
       const masterLangs = await masterDb.select().from(master.languageMaster);
       const masterCurrs = await masterDb.select().from(master.currencyMaster);
+      const masterTimezones = await masterDb.select().from(master.timezoneMaster);
+      const masterCountries = await masterDb.select().from(master.countryMaster);
+      const masterStates = await masterDb.select().from(master.stateProvince);
+      const masterCostingMethods = await masterDb.select().from(master.costingMethodConfig);
       const masterSteps = await masterDb.select().from(master.setupStepMaster);
       const masterNobs = await masterDb.select().from(master.nobMaster);
       const masterLobs = await masterDb.select().from(master.lobMaster);
 
       for (const row of masterLangs) await tenantDb.insert(tenant.languageMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });
       for (const row of masterCurrs) await tenantDb.insert(tenant.currencyMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });
+      for (const row of masterTimezones) await tenantDb.insert(tenant.timezoneMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });
+      for (const row of masterCountries) await tenantDb.insert(tenant.countryMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });
+      for (const row of masterStates) await tenantDb.insert(tenant.stateProvince).values(row).onDuplicateKeyUpdate({ set: { ...row } });
+      for (const row of masterCostingMethods) await tenantDb.insert(tenant.costingMethodConfig).values(row).onDuplicateKeyUpdate({ set: { ...row } });
       for (const row of masterSteps) await tenantDb.insert(tenant.setupStepMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });
       for (const row of masterNobs) await tenantDb.insert(tenant.nobMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });
       for (const row of masterLobs) await tenantDb.insert(tenant.lobMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });

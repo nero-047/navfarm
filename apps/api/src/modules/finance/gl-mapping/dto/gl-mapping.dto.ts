@@ -13,6 +13,21 @@ export class CreateGlMappingDto {
   @IsOptional()
   item_category_id?: string;
 
+  @ApiProperty({ description: 'Optional Nature of Business UUID — narrows this mapping to one NOB, omit for all NOBs', required: false })
+  @IsUUID()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Optional Line of Business UUID — narrows this mapping to one LOB, omit for all LOBs', required: false })
+  @IsUUID()
+  @IsOptional()
+  lob_id?: string;
+
+  @ApiProperty({ description: 'Optional costing method code (costing_method_config.method_code) — narrows this mapping to one valuation method, omit for all', required: false })
+  @IsString()
+  @IsOptional()
+  valuation_method?: string;
+
   @ApiProperty({
     description: 'The inventory_ledger transaction type this mapping resolves GL accounts for — must match a value GlPostingService actually posts (see inventory-ledger.service.ts / batch.service.ts / *.service.ts callers of postInventoryLedgerEntry / postBatchCostEntry)',
     example: 'PURCHASE',
@@ -49,6 +64,21 @@ export class UpdateGlMappingDto {
   @IsUUID()
   @IsOptional()
   item_category_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  lob_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  valuation_method?: string;
 
   @ApiProperty({ required: false })
   @IsString()
@@ -90,6 +120,21 @@ export class QueryGlMappingDto {
   @IsOptional()
   @IsUUID()
   itemCategoryId?: string;
+
+  @ApiProperty({ description: 'Filter by Nature of Business UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  nobId?: string;
+
+  @ApiProperty({ description: 'Filter by Line of Business UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  lobId?: string;
+
+  @ApiProperty({ description: 'Filter by costing method code', required: false })
+  @IsOptional()
+  @IsString()
+  valuationMethod?: string;
 
   @ApiProperty({ description: 'Filter by inventory transaction type', required: false })
   @IsOptional()

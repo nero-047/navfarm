@@ -56,6 +56,31 @@ export class GlMappingService {
       }
     }
 
+    if (dto.nob_id) {
+      const [nob] = await this.db.select().from(schema.nobMaster).where(eq(schema.nobMaster.nob_id, dto.nob_id)).limit(1);
+      if (!nob) {
+        throw new NotFoundException(`NOB with ID '${dto.nob_id}' not found.`);
+      }
+    }
+
+    if (dto.lob_id) {
+      const [lob] = await this.db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, dto.lob_id)).limit(1);
+      if (!lob) {
+        throw new NotFoundException(`LOB with ID '${dto.lob_id}' not found.`);
+      }
+    }
+
+    if (dto.valuation_method) {
+      const [method] = await this.db
+        .select()
+        .from(schema.costingMethodConfig)
+        .where(eq(schema.costingMethodConfig.method_code, dto.valuation_method))
+        .limit(1);
+      if (!method) {
+        throw new NotFoundException(`Costing method '${dto.valuation_method}' not found.`);
+      }
+    }
+
     // 3. Verify debit G/L account exists if specified
     if (dto.debit_gl_account_id) {
       const [debitGl] = await this.db
@@ -92,7 +117,7 @@ export class GlMappingService {
       }
     }
 
-    // 5. Verify no duplicate mapping rule exists for the same category + transaction type within the company scope
+    // 5. Verify no duplicate mapping rule exists for the same dimensions within the company scope
     const queryConditions = [
       eq(schema.glMappingMaster.tenant_id, tenantId),
       eq(schema.glMappingMaster.company_id, dto.company_id),
@@ -105,6 +130,21 @@ export class GlMappingService {
     } else {
       queryConditions.push(isNull(schema.glMappingMaster.item_category_id));
     }
+    if (dto.nob_id) {
+      queryConditions.push(eq(schema.glMappingMaster.nob_id, dto.nob_id));
+    } else {
+      queryConditions.push(isNull(schema.glMappingMaster.nob_id));
+    }
+    if (dto.lob_id) {
+      queryConditions.push(eq(schema.glMappingMaster.lob_id, dto.lob_id));
+    } else {
+      queryConditions.push(isNull(schema.glMappingMaster.lob_id));
+    }
+    if (dto.valuation_method) {
+      queryConditions.push(eq(schema.glMappingMaster.valuation_method, dto.valuation_method));
+    } else {
+      queryConditions.push(isNull(schema.glMappingMaster.valuation_method));
+    }
 
     const existing = await this.db
       .select()
@@ -113,7 +153,7 @@ export class GlMappingService {
       .limit(1);
 
     if (existing.length > 0) {
-      throw new ConflictException(`G/L Mapping rule for transaction type '${dto.transaction_type}' and category already exists.`);
+      throw new ConflictException(`G/L Mapping rule for transaction type '${dto.transaction_type}' with these same category/NOB/LOB/valuation-method dimensions already exists.`);
     }
 
     const mappingId = randomUUID();
@@ -122,6 +162,9 @@ export class GlMappingService {
       tenant_id: tenantId,
       company_id: dto.company_id,
       item_category_id: dto.item_category_id || null,
+      nob_id: dto.nob_id || null,
+      lob_id: dto.lob_id || null,
+      valuation_method: dto.valuation_method || null,
       transaction_type: dto.transaction_type.toUpperCase(),
       debit_gl_account_id: dto.debit_gl_account_id || null,
       credit_gl_account_id: dto.credit_gl_account_id || null,
@@ -173,6 +216,15 @@ export class GlMappingService {
     if (query.itemCategoryId) {
       conditions.push(eq(schema.glMappingMaster.item_category_id, query.itemCategoryId));
     }
+    if (query.nobId) {
+      conditions.push(eq(schema.glMappingMaster.nob_id, query.nobId));
+    }
+    if (query.lobId) {
+      conditions.push(eq(schema.glMappingMaster.lob_id, query.lobId));
+    }
+    if (query.valuationMethod) {
+      conditions.push(eq(schema.glMappingMaster.valuation_method, query.valuationMethod));
+    }
     if (query.transactionType) {
       conditions.push(eq(schema.glMappingMaster.transaction_type, query.transactionType.toUpperCase()));
     }
@@ -196,6 +248,9 @@ export class GlMappingService {
 
     const categoryId = dto.item_category_id !== undefined ? dto.item_category_id : mapping.item_category_id;
     const transType = dto.transaction_type !== undefined ? dto.transaction_type : mapping.transaction_type;
+    const nobId = dto.nob_id !== undefined ? dto.nob_id : mapping.nob_id;
+    const lobId = dto.lob_id !== undefined ? dto.lob_id : mapping.lob_id;
+    const valuationMethod = dto.valuation_method !== undefined ? dto.valuation_method : mapping.valuation_method;
 
     if (dto.item_category_id && dto.item_category_id !== mapping.item_category_id) {
       const [category] = await this.db
@@ -211,6 +266,31 @@ export class GlMappingService {
 
       if (!category) {
         throw new NotFoundException(`Item Category with ID '${dto.item_category_id}' not found.`);
+      }
+    }
+
+    if (dto.nob_id && dto.nob_id !== mapping.nob_id) {
+      const [nob] = await this.db.select().from(schema.nobMaster).where(eq(schema.nobMaster.nob_id, dto.nob_id)).limit(1);
+      if (!nob) {
+        throw new NotFoundException(`NOB with ID '${dto.nob_id}' not found.`);
+      }
+    }
+
+    if (dto.lob_id && dto.lob_id !== mapping.lob_id) {
+      const [lob] = await this.db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, dto.lob_id)).limit(1);
+      if (!lob) {
+        throw new NotFoundException(`LOB with ID '${dto.lob_id}' not found.`);
+      }
+    }
+
+    if (dto.valuation_method && dto.valuation_method !== mapping.valuation_method) {
+      const [method] = await this.db
+        .select()
+        .from(schema.costingMethodConfig)
+        .where(eq(schema.costingMethodConfig.method_code, dto.valuation_method))
+        .limit(1);
+      if (!method) {
+        throw new NotFoundException(`Costing method '${dto.valuation_method}' not found.`);
       }
     }
 
@@ -250,6 +330,9 @@ export class GlMappingService {
 
     if (
       (dto.item_category_id !== undefined && dto.item_category_id !== mapping.item_category_id) ||
+      (dto.nob_id !== undefined && dto.nob_id !== mapping.nob_id) ||
+      (dto.lob_id !== undefined && dto.lob_id !== mapping.lob_id) ||
+      (dto.valuation_method !== undefined && dto.valuation_method !== mapping.valuation_method) ||
       (dto.transaction_type !== undefined && dto.transaction_type.toUpperCase() !== mapping.transaction_type)
     ) {
       const queryConditions = [
@@ -265,6 +348,21 @@ export class GlMappingService {
       } else {
         queryConditions.push(isNull(schema.glMappingMaster.item_category_id));
       }
+      if (nobId) {
+        queryConditions.push(eq(schema.glMappingMaster.nob_id, nobId));
+      } else {
+        queryConditions.push(isNull(schema.glMappingMaster.nob_id));
+      }
+      if (lobId) {
+        queryConditions.push(eq(schema.glMappingMaster.lob_id, lobId));
+      } else {
+        queryConditions.push(isNull(schema.glMappingMaster.lob_id));
+      }
+      if (valuationMethod) {
+        queryConditions.push(eq(schema.glMappingMaster.valuation_method, valuationMethod));
+      } else {
+        queryConditions.push(isNull(schema.glMappingMaster.valuation_method));
+      }
 
       const existing = await this.db
         .select()
@@ -273,7 +371,7 @@ export class GlMappingService {
         .limit(1);
 
       if (existing.length > 0) {
-        throw new ConflictException(`G/L Mapping rule for transaction type '${transType}' and category already exists.`);
+        throw new ConflictException(`G/L Mapping rule for transaction type '${transType}' with these same category/NOB/LOB/valuation-method dimensions already exists.`);
       }
     }
 
@@ -283,6 +381,9 @@ export class GlMappingService {
     };
 
     if (dto.item_category_id !== undefined) updates.item_category_id = dto.item_category_id;
+    if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
+    if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
+    if (dto.valuation_method !== undefined) updates.valuation_method = dto.valuation_method;
     if (dto.transaction_type !== undefined) updates.transaction_type = dto.transaction_type.toUpperCase();
     if (dto.debit_gl_account_id !== undefined) updates.debit_gl_account_id = dto.debit_gl_account_id;
     if (dto.credit_gl_account_id !== undefined) updates.credit_gl_account_id = dto.credit_gl_account_id;

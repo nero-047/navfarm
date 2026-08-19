@@ -8,9 +8,10 @@ import {
   decimal, 
   char, 
   json, 
-  text, 
+  text,
   primaryKey,
-  foreignKey
+  foreignKey,
+  uniqueIndex
 } from 'drizzle-orm/mysql-core';
 import { relations } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -99,6 +100,51 @@ export const currencyMaster = mysqlTable('currency_master', {
   is_active: boolean('is_active').default(true).notNull()
 });
 
+export const timezoneMaster = mysqlTable('timezone_master', {
+  tz_id: varchar('tz_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tz_code: varchar('tz_code', { length: 60 }).notNull().unique(), // IANA timezone code
+  tz_name: varchar('tz_name', { length: 100 }).notNull(),
+  utc_offset: varchar('utc_offset', { length: 10 }).notNull(),
+  offset_minutes: int('offset_minutes').notNull(),
+  is_dst: boolean('is_dst').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull()
+});
+
+export const countryMaster = mysqlTable('country_master', {
+  country_id: varchar('country_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  iso2: char('iso2', { length: 2 }).notNull().unique(),
+  iso3: char('iso3', { length: 3 }).notNull().unique(),
+  country_name: varchar('country_name', { length: 100 }).notNull(),
+  phone_code: varchar('phone_code', { length: 10 }),
+  default_tz_id: varchar('default_tz_id', { length: 36 }),
+  default_currency_id: varchar('default_currency_id', { length: 36 }),
+  flag_emoji: varchar('flag_emoji', { length: 10 }),
+  is_active: boolean('is_active').default(true).notNull()
+}, (table) => ({
+  // Explicit short names — the drizzle-default auto-generated name for the
+  // currency FK exceeds MySQL's 64-char identifier limit.
+  defaultTzFk: foreignKey({
+    columns: [table.default_tz_id],
+    foreignColumns: [timezoneMaster.tz_id],
+    name: 'country_master_default_tz_id_fk'
+  }).onDelete('set null'),
+  defaultCurrencyFk: foreignKey({
+    columns: [table.default_currency_id],
+    foreignColumns: [currencyMaster.currency_id],
+    name: 'country_master_default_currency_id_fk'
+  }).onDelete('set null')
+}));
+
+export const stateProvince = mysqlTable('state_province', {
+  state_id: varchar('state_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  country_id: varchar('country_id', { length: 36 }).notNull().references(() => countryMaster.country_id, { onDelete: 'cascade' }),
+  state_code: varchar('state_code', { length: 10 }).notNull(),
+  state_name: varchar('state_name', { length: 100 }).notNull(),
+  is_active: boolean('is_active').default(true).notNull()
+}, (table) => ({
+  uqStateCodePerCountry: uniqueIndex('uq_state_province_country_code').on(table.country_id, table.state_code)
+}));
+
 export const setupStepMaster = mysqlTable('setup_step_master', {
   step_id: varchar('step_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   step_code: varchar('step_code', { length: 50 }).notNull().unique(),
@@ -144,6 +190,21 @@ export const lobMaster = mysqlTable('lob_master', {
   created_at: date('created_at', { mode: 'string' }),
   updated_at: date('updated_at', { mode: 'string' }),
   extension_config: json('extension_config')
+});
+
+// Extensible costing methods — "add new methods here, no code change" per spec. Additive
+// reference data only — see schema.ts's costingMethodConfig for the full rationale.
+export const costingMethodConfig = mysqlTable('costing_method_config', {
+  method_code: varchar('method_code', { length: 30 }).primaryKey(),
+  method_name: varchar('method_name', { length: 100 }).notNull(),
+  variance_auto: varchar('variance_auto', { length: 50 }).notNull(),
+  layer_tracking: boolean('layer_tracking').default(false).notNull(),
+  bio_asset_support: boolean('bio_asset_support').default(false).notNull(),
+  fair_value_option: boolean('fair_value_option').default(false).notNull(),
+  amort_option: boolean('amort_option').default(false).notNull(),
+  description: text('description'),
+  is_system: boolean('is_system').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull()
 });
 
 export const auditLog = mysqlTable('audit_log', {
