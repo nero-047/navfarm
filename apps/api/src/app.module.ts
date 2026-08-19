@@ -11,6 +11,8 @@ import { RoleModule } from './modules/core/role/role.module';
 import { LanguageModule } from './modules/system/language/language.module';
 import { CurrencyModule } from './modules/system/currency/currency.module';
 import { AuditLogModule } from './modules/system/audit-log/audit-log.module';
+import { NumberSeriesModule } from './modules/system/number-series/number-series.module';
+import { EncryptionModule } from './modules/system/encryption/encryption.module';
 import { NotificationModule } from './modules/system/notification/notification.module';
 import { UserModule } from './modules/core/user/user.module';
 import { UserCompanyModule } from './modules/core/user-company/user-company.module';
@@ -42,11 +44,13 @@ import { JournalModule } from './modules/finance/journal/journal.module';
 import { FinancialReportsModule } from './modules/finance/financial-reports/financial-reports.module';
 import { BatchModule } from './modules/production/batch/batch.module';
 import { ParameterModule } from './modules/production/parameter/parameter.module';
+import { StageModule } from './modules/production/stage/stage.module';
 import { SchedulerModule } from './modules/production/scheduler/scheduler.module';
 import { AlertModule } from './modules/production/alert/alert.module';
 import { QcParameterModule } from './modules/production/qc-parameter/qc-parameter.module';
 import { QcModule } from './modules/production/qc/qc.module';
 import { QrCodeModule } from './modules/production/qr-code/qr-code.module';
+import { AnimalModule } from './modules/piggery/animal/animal.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -79,6 +83,8 @@ import { SystemController } from './system/system.controller';
     LanguageModule,
     CurrencyModule,
     AuditLogModule,
+    NumberSeriesModule,
+    EncryptionModule,
     NotificationModule,
     UserModule,
     UserCompanyModule,
@@ -110,11 +116,13 @@ import { SystemController } from './system/system.controller';
     FinancialReportsModule,
     BatchModule,
     ParameterModule,
+    StageModule,
     SchedulerModule,
     AlertModule,
     QcParameterModule,
     QcModule,
     QrCodeModule,
+    AnimalModule,
   ],
   controllers: [SystemController],
   providers: [],

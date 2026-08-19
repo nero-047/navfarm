@@ -19,6 +19,7 @@ import {
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { InventoryLedgerService } from '../../inventory/inventory-ledger/inventory-ledger.service';
 import { GlPostingService } from '../../finance/journal/gl-posting.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -31,6 +32,7 @@ export class BatchService {
     private readonly auditService: AuditLogService,
     private readonly ledgerService: InventoryLedgerService,
     private readonly glPostingService: GlPostingService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -45,14 +47,11 @@ export class BatchService {
   // when called from inside one (see `create()`) — `.for('update')` locks the
   // counted rows so a second concurrent call blocks until the first commits its
   // insert, instead of both reading the same count and generating the same number.
+  // Delegates to the shared, tenant-configurable number series engine (see
+  // number-series.service.ts) rather than locking/counting batch_header rows directly.
+  // uq_batch_header_tenant_company_no stays as defense-in-depth either way.
   private async generateBatchNo(tenantId: string, companyId: string, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
-    const [row] = await executor
-      .select({ total: count() })
-      .from(schema.batchHeader)
-      .where(and(eq(schema.batchHeader.tenant_id, tenantId), eq(schema.batchHeader.company_id, companyId)))
-      .for('update');
-    const seq = Number(row?.total || 0) + 1;
-    return `BATCH-${String(seq).padStart(6, '0')}`;
+    return this.numberSeriesService.generateNext('BATCH', tenantId, companyId, executor);
   }
 
   async create(dto: CreateBatchDto, tenantId: string, userPayload?: any) {
@@ -303,10 +302,28 @@ export class BatchService {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
 
+    // Opportunistic link to stage_master: if this LOB has a seeded stage matching
+    // the given code, record it alongside current_stage_code. If not (LOB has no
+    // Stage Master data, or the code is hand-typed/custom), stage_id just stays
+    // null — current_stage_code remains fully authoritative either way.
+    const [matchedStage] = await this.db
+      .select({ stage_id: schema.stageMaster.stage_id })
+      .from(schema.stageMaster)
+      .where(
+        and(
+          eq(schema.stageMaster.lob_id, batch.lob_id),
+          eq(schema.stageMaster.stage_code, dto.to_stage_code.toUpperCase()),
+          eq(schema.stageMaster.is_active, true),
+          isNull(schema.stageMaster.deleted_at),
+        )
+      )
+      .limit(1);
+
     await this.db
       .update(schema.batchHeader)
       .set({
         current_stage_code: dto.to_stage_code,
+        stage_id: matchedStage?.stage_id || null,
         sub_location_id: dto.to_location_id || null,
         updated_by: userPayload?.userId || null,
         updated_at: toMysqlTimestamp(),

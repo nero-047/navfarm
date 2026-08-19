@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsInt, Min, Max, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsInt, Min, Max, IsNumber, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // ==========================================
@@ -106,7 +106,7 @@ export class CreateBreedDto {
   @IsOptional()
   species?: string;
 
-  @ApiProperty({ description: 'Breed type classification', example: 'BROILER', enum: ['BROILER', 'LAYER', 'BREEDER', 'DUAL_PURPOSE', 'DAIRY', 'BEEF', 'TREE', 'FISH'] })
+  @ApiProperty({ description: 'Breed type classification', example: 'BROILER', enum: ['BROILER', 'LAYER', 'BREEDER', 'DUAL_PURPOSE', 'DAIRY', 'BEEF', 'MEAT', 'TREE', 'FISH'] })
   @IsString()
   @IsNotEmpty()
   breed_type: string;
@@ -169,6 +169,62 @@ export class CreateBreedDto {
   @IsNumber()
   @IsOptional()
   avg_yield_per_unit?: number;
+
+  @ApiProperty({ description: 'Nursing/lactation duration in days', required: false, example: 28 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  lactation_days?: number;
+
+  @ApiProperty({ description: 'Salvage value as percent of total opening asset value — amortisation denominator input', required: false, example: 10.0 })
+  @IsNumber()
+  @IsOptional()
+  residual_value_pct?: number;
+
+  @ApiProperty({ description: 'Expected number of parities/cycles in productive life', required: false, example: 7 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  productive_life_cycles?: number;
+
+  @ApiProperty({ description: 'Average piglets born live per farrowing', required: false, example: 11.5 })
+  @IsNumber()
+  @IsOptional()
+  avg_litter_size_born?: number;
+
+  @ApiProperty({ description: 'Average piglets weaned per litter', required: false, example: 10.0 })
+  @IsNumber()
+  @IsOptional()
+  avg_litter_size_weaned?: number;
+
+  @ApiProperty({ description: 'Standard piglet weight at weaning, KG', required: false, example: 7.0 })
+  @IsNumber()
+  @IsOptional()
+  avg_weaning_weight_kg?: number;
+
+  @ApiProperty({ description: 'Percent of matings/AI resulting in a successful farrowing', required: false, example: 85.0 })
+  @IsNumber()
+  @IsOptional()
+  farrowing_rate_pct?: number;
+
+  @ApiProperty({ description: 'Boar species only: expected semen doses collected per week', required: false, example: 4.0 })
+  @IsNumber()
+  @IsOptional()
+  boar_doses_per_week?: number;
+
+  @ApiProperty({ description: 'Boar species only: productive life in months for amortisation', required: false, example: 24 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  boar_productive_life_months?: number;
+
+  @ApiProperty({ description: 'Standard lifetime vaccination schedule (auto-populates scheduler params on batch create)', required: false })
+  @IsOptional()
+  vaccination_schedule?: any;
+
+  @ApiProperty({ description: 'Stage labels by week range for UI display on the data entry screen header', required: false })
+  @IsOptional()
+  age_labels?: any;
 
   @ApiProperty({ description: 'Additional description details', required: false })
   @IsString()
@@ -280,6 +336,62 @@ export class UpdateBreedDto {
   @IsOptional()
   avg_yield_per_unit?: number;
 
+  @ApiProperty({ required: false, example: 28 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  lactation_days?: number;
+
+  @ApiProperty({ required: false, example: 10.0 })
+  @IsNumber()
+  @IsOptional()
+  residual_value_pct?: number;
+
+  @ApiProperty({ required: false, example: 7 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  productive_life_cycles?: number;
+
+  @ApiProperty({ required: false, example: 11.5 })
+  @IsNumber()
+  @IsOptional()
+  avg_litter_size_born?: number;
+
+  @ApiProperty({ required: false, example: 10.0 })
+  @IsNumber()
+  @IsOptional()
+  avg_litter_size_weaned?: number;
+
+  @ApiProperty({ required: false, example: 7.0 })
+  @IsNumber()
+  @IsOptional()
+  avg_weaning_weight_kg?: number;
+
+  @ApiProperty({ required: false, example: 85.0 })
+  @IsNumber()
+  @IsOptional()
+  farrowing_rate_pct?: number;
+
+  @ApiProperty({ required: false, example: 4.0 })
+  @IsNumber()
+  @IsOptional()
+  boar_doses_per_week?: number;
+
+  @ApiProperty({ required: false, example: 24 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  boar_productive_life_months?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  vaccination_schedule?: any;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  age_labels?: any;
+
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
@@ -336,6 +448,268 @@ export class QueryBreedDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiProperty({ description: 'Results per page', default: 50, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @ApiProperty({ description: 'Pagination offset', default: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
+
+// ==========================================
+// BREED LIFECYCLE STAGE DTOs
+// ==========================================
+
+const CALC_UNITS = ['DAY', 'WEEK', 'MONTH'] as const;
+const ALERT_SEVERITIES = ['INFO', 'WARNING', 'CRITICAL'] as const;
+
+export class CreateBreedLifecycleStageDto {
+  @ApiProperty({ description: 'Breed UUID this standard is for' })
+  @IsUUID()
+  @IsNotEmpty()
+  breed_id: string;
+
+  @ApiProperty({ description: 'Stage UUID this standard applies to' })
+  @IsUUID()
+  @IsNotEmpty()
+  stage_id: string;
+
+  @ApiProperty({ description: 'Unit for the from/to period range', enum: CALC_UNITS })
+  @IsString()
+  @IsIn(CALC_UNITS)
+  calc_unit: string;
+
+  @ApiProperty({ description: 'Start of this standard range in calc_unit', example: 1 })
+  @IsInt()
+  period_from: number;
+
+  @ApiProperty({ description: 'End of this standard range in calc_unit', example: 11 })
+  @IsInt()
+  period_to: number;
+
+  @ApiProperty({ description: 'Season this standard applies to, if seasonal', required: false, example: 'Winter' })
+  @IsString()
+  @IsOptional()
+  season_type?: string;
+
+  @ApiProperty({ description: 'Standard feed item UUID for this stage/period range', required: false })
+  @IsUUID()
+  @IsOptional()
+  feed_item_id?: string;
+
+  @ApiProperty({ description: 'Standard feed quantity per animal per day, KG', required: false })
+  @IsNumber()
+  @IsOptional()
+  feed_qty_per_head_per_day_kg?: number;
+
+  @ApiProperty({ description: 'Allowance for feed wastage in forecast calculation, %', required: false })
+  @IsNumber()
+  @IsOptional()
+  feed_wastage_pct?: number;
+
+  @ApiProperty({ description: 'Expected average body weight at end of this range, KG', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_body_weight_kg?: number;
+
+  @ApiProperty({ description: 'Standard Average Daily Gain, grams/day', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_adg_gpd?: number;
+
+  @ApiProperty({ description: 'Standard Feed Conversion Ratio', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_fcr?: number;
+
+  @ApiProperty({ description: 'Acceptable mortality percentage for this stage/range', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_mortality_rate_pct?: number;
+
+  @ApiProperty({ description: 'Expected output item UUID at this stage', required: false })
+  @IsUUID()
+  @IsOptional()
+  output_item_id?: string;
+
+  @ApiProperty({ description: 'UOM code for the output quantity', required: false })
+  @IsString()
+  @IsOptional()
+  output_uom?: string;
+
+  @ApiProperty({ description: 'Expected output per animal/sow at end of this range', required: false })
+  @IsNumber()
+  @IsOptional()
+  std_output_qty?: number;
+
+  @ApiProperty({ description: 'Standard medication schedule for this stage', required: false })
+  @IsOptional()
+  medication_protocol?: any;
+
+  @ApiProperty({ description: 'Standard vaccination schedule for this stage', required: false })
+  @IsOptional()
+  vaccination_protocol?: any;
+
+  @ApiProperty({ description: 'Labour standard for this stage, used in resource planning', required: false })
+  @IsOptional()
+  resource_requirements?: any;
+
+  @ApiProperty({ description: 'Alert if actual KPI falls below this', required: false })
+  @IsNumber()
+  @IsOptional()
+  kpi_lower_limit?: number;
+
+  @ApiProperty({ description: 'Alert if actual KPI exceeds this', required: false })
+  @IsNumber()
+  @IsOptional()
+  kpi_upper_limit?: number;
+
+  @ApiProperty({ description: 'Severity if the KPI limits are breached', enum: ALERT_SEVERITIES, required: false })
+  @IsString()
+  @IsOptional()
+  @IsIn(ALERT_SEVERITIES)
+  alert_severity?: string;
+
+  @ApiProperty({ description: 'Instructions for farm staff, shown as a tooltip on the data entry screen', required: false })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+export class UpdateBreedLifecycleStageDto {
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  stage_id?: string;
+
+  @ApiProperty({ required: false, enum: CALC_UNITS })
+  @IsString()
+  @IsOptional()
+  @IsIn(CALC_UNITS)
+  calc_unit?: string;
+
+  @ApiProperty({ required: false })
+  @IsInt()
+  @IsOptional()
+  period_from?: number;
+
+  @ApiProperty({ required: false })
+  @IsInt()
+  @IsOptional()
+  period_to?: number;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  season_type?: string;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  feed_item_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  feed_qty_per_head_per_day_kg?: number;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  feed_wastage_pct?: number;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  std_body_weight_kg?: number;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  std_adg_gpd?: number;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  std_fcr?: number;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  std_mortality_rate_pct?: number;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  output_item_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  output_uom?: string;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  std_output_qty?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  medication_protocol?: any;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  vaccination_protocol?: any;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  resource_requirements?: any;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  kpi_lower_limit?: number;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  kpi_upper_limit?: number;
+
+  @ApiProperty({ required: false, enum: ALERT_SEVERITIES })
+  @IsString()
+  @IsOptional()
+  @IsIn(ALERT_SEVERITIES)
+  alert_severity?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @ApiProperty({ required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_active?: boolean;
+}
+
+export class QueryBreedLifecycleStageDto {
+  @ApiProperty({ description: 'Filter by breed UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  breedId?: string;
+
+  @ApiProperty({ description: 'Filter by stage UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  stageId?: string;
 
   @ApiProperty({ description: 'Results per page', default: 50, required: false })
   @IsOptional()

@@ -104,4 +104,18 @@ export class SupplierController {
       data: result
     };
   }
+
+  @Patch(':id/approve')
+  @RequirePermission('MASTER_DATA', 'SUPPLIER', 'approve')
+  @ApiOperation({ summary: 'Approve a Supplier — required before it can be used on a PO/GRN' })
+  @ApiParam({ name: 'id', description: 'Supplier UUID' })
+  async approve(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.supplierService.approve(id, tenantId, req.user);
+    return {
+      success: true,
+      message: 'Supplier approved successfully.',
+      data: result
+    };
+  }
 }

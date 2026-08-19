@@ -1,17 +1,18 @@
 // NAVFarm ERP Consolidated Drizzle Schema Definitions
 // Target Database: PostgreSQL
 
-import { 
-  mysqlTable, 
-  varchar, 
-  int, 
-  boolean, 
-  timestamp, 
-  date, 
-  decimal, 
-  char, 
-  json, 
-  text, 
+import {
+  mysqlTable,
+  varchar,
+  int,
+  bigint,
+  boolean,
+  timestamp,
+  date,
+  decimal,
+  char,
+  json,
+  text,
   primaryKey,
   foreignKey,
   uniqueIndex,
@@ -573,6 +574,18 @@ export const breedMaster = mysqlTable('breed_master', {
   productive_life_months: int('productive_life_months'),
   premature_years: decimal('premature_years', { precision: 5, scale: 2 }),
   avg_yield_per_unit: decimal('avg_yield_per_unit', { precision: 10, scale: 4 }),
+  // Piggery-specific fields below — nullable/additive, unused by non-piggery breeds.
+  lactation_days: int('lactation_days'),
+  residual_value_pct: decimal('residual_value_pct', { precision: 5, scale: 2 }),
+  productive_life_cycles: int('productive_life_cycles'),
+  avg_litter_size_born: decimal('avg_litter_size_born', { precision: 6, scale: 2 }),
+  avg_litter_size_weaned: decimal('avg_litter_size_weaned', { precision: 6, scale: 2 }),
+  avg_weaning_weight_kg: decimal('avg_weaning_weight_kg', { precision: 6, scale: 3 }),
+  farrowing_rate_pct: decimal('farrowing_rate_pct', { precision: 5, scale: 2 }),
+  boar_doses_per_week: decimal('boar_doses_per_week', { precision: 5, scale: 2 }),
+  boar_productive_life_months: int('boar_productive_life_months'),
+  vaccination_schedule: json('vaccination_schedule'),
+  age_labels: json('age_labels'),
   description: text('description'),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
@@ -662,8 +675,9 @@ export const locationMaster = mysqlTable('location_master', {
   warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
   location_code: varchar('location_code', { length: 50 }).notNull(),
   location_name: varchar('location_name', { length: 200 }).notNull(),
+  location_address: varchar('location_address', { length: 500 }),
   location_level: int('location_level').notNull(),
-  location_type: varchar('location_type', { length: 50 }).notNull(), // FARM, SHED, AREA, SECTION etc.
+  location_type: varchar('location_type', { length: 50 }).notNull(), // FARM, SHED, AREA, SECTION, PEN, SILO etc.
   parent_location_id: varchar('parent_location_id', { length: 36 }),
   area_size: decimal('area_size', { precision: 18, scale: 4 }),
   area_unit: varchar('area_unit', { length: 10 }),
@@ -674,6 +688,12 @@ export const locationMaster = mysqlTable('location_master', {
   gps_longitude: decimal('gps_longitude', { precision: 11, scale: 8 }),
   storage_type: varchar('storage_type', { length: 30 }),
   is_quarantine_zone: boolean('is_quarantine_zone').default(false).notNull(),
+  // Maximum feed capacity of this Silo in KG. Required when location_type = SILO.
+  silo_capacity_kg: decimal('silo_capacity_kg', { precision: 12, scale: 2 }),
+  // Alert when silo stock covers less than this many days of consumption. Required when location_type = SILO.
+  silo_reorder_days: int('silo_reorder_days'),
+  // Mandatory empty days between batches at this location for biosecurity.
+  downtime_days_required: int('downtime_days_required'),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -698,6 +718,9 @@ export const locationMaster = mysqlTable('location_master', {
     foreignColumns: [shedMaster.shed_id],
     name: 'loc_master_shed_id_fk'
   }).onDelete('restrict'),
+  uqLocationCode: uniqueIndex('uq_location_master_tenant_company_code').on(
+    table.tenant_id, table.company_id, table.location_code
+  ),
 }));
 
 // ==========================================
@@ -921,6 +944,17 @@ export const supplierMaster = mysqlTable('supplier_master', {
   state: varchar('state', { length: 100 }),
   country: varchar('country', { length: 100 }),
   pincode: varchar('pincode', { length: 20 }),
+  // Piggery-specific fields below — nullable/additive, unused by generic suppliers.
+  vendor_type: varchar('vendor_type', { length: 30 }).default('GENERAL').notNull(), // ANIMAL_SUPPLIER, BREEDING_FARM, SEMEN_SUPPLIER, FEED_SUPPLIER, MEDICINE_SUPPLIER, EQUIPMENT_SUPPLIER, SERVICES, GENERAL
+  is_approved: boolean('is_approved').default(false).notNull(),
+  approved_by: varchar('approved_by', { length: 36 }).references(() => userMaster.user_id, { onDelete: 'restrict' }),
+  approved_at: timestamp('approved_at', { mode: 'string' }),
+  health_cert_url: varchar('health_cert_url', { length: 500 }), // required for ANIMAL_SUPPLIER — checked at GRN post
+  breeding_farm_code: varchar('breeding_farm_code', { length: 50 }), // required for ANIMAL_SUPPLIER / BREEDING_FARM
+  // Ciphertext only — see encryption.service.ts. Never read back in plaintext over the API.
+  bank_account_no_enc: text('bank_account_no_enc'),
+  bank_ifsc: varchar('bank_ifsc', { length: 20 }),
+  credit_limit: decimal('credit_limit', { precision: 18, scale: 4 }),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -1430,6 +1464,128 @@ export const journalLineRelations = relations(journalLine, ({ one }) => ({
 // Bio-asset (IAS41) batch accounting is a separate, deferred model.
 // ==========================================
 
+// Production lifecycle stages per NOB/LOB (e.g. piggery: QUARANTINE -> GILT_GROWER ->
+// FLUSH_SERVICE -> ... -> DISPOSED). Self-referential next_stage_id/alt_next_stage_id
+// define the default and conditional-fallback transition. batch_header.stage_id links
+// to this opportunistically — see batch.service.ts transferStage().
+export const stageMaster = mysqlTable('stage_master', {
+  stage_id: varchar('stage_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }), // null = tenant-wide
+  nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  stage_code: varchar('stage_code', { length: 50 }).notNull(),
+  stage_name: varchar('stage_name', { length: 100 }).notNull(),
+  stage_category: varchar('stage_category', { length: 30 }).notNull(), // PRE_PRODUCTIVE, PRODUCTIVE, OUTPUT, DISPOSAL
+  stage_sequence: int('stage_sequence').notNull(),
+  typical_duration_days: int('typical_duration_days'),
+  min_days_before_move: int('min_days_before_move').default(0).notNull(),
+  transition_trigger: varchar('transition_trigger', { length: 20 }).notNull(), // AUTO_BY_DAY, MANUAL, EVENT_BASED, KPI_BASED
+  auto_move_on_day: int('auto_move_on_day'),
+  next_stage_id: varchar('next_stage_id', { length: 36 }),
+  alt_next_stage_id: varchar('alt_next_stage_id', { length: 36 }),
+  alt_trigger_condition: varchar('alt_trigger_condition', { length: 50 }),
+  required_kpi_to_pass: json('required_kpi_to_pass'),
+  data_entry_form: varchar('data_entry_form', { length: 20 }).default('STANDARD').notNull(), // STANDARD, FARROWING, WEANING, SLAUGHTER
+  scheduler_auto_create: boolean('scheduler_auto_create').default(true).notNull(),
+  show_on_animal_card: boolean('show_on_animal_card').default(true).notNull(),
+  icon_code: varchar('icon_code', { length: 30 }),
+  stage_description: text('stage_description'),
+  sort_order: int('sort_order'),
+  is_system: boolean('is_system').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config'),
+}, (table) => ({
+  nextStageFk: foreignKey({
+    columns: [table.next_stage_id],
+    foreignColumns: [table.stage_id],
+    name: 'stage_master_next_stage_id_fk'
+  }).onDelete('set null'),
+  altNextStageFk: foreignKey({
+    columns: [table.alt_next_stage_id],
+    foreignColumns: [table.stage_id],
+    name: 'stage_master_alt_next_stage_id_fk'
+  }).onDelete('set null'),
+  uqStageCode: uniqueIndex('uq_stage_master_tenant_company_lob_code').on(
+    table.tenant_id, table.company_id, table.lob_id, table.stage_code
+  ),
+}));
+
+// Per-breed, per-stage production standards — feed rate, ADG, FCR, mortality,
+// expected output — for a period range within that stage. Drives scheduler
+// auto-population and feed forecasting once those are built. stage_id is a real
+// FK from the start (no legacy stage_name column to migrate away from, unlike
+// batch_header.current_stage_code).
+export const breedLifecycleStages = mysqlTable('breed_lifecycle_stages', {
+  lifecycle_id: varchar('lifecycle_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'cascade' }),
+  stage_id: varchar('stage_id', { length: 36 }).notNull().references(() => stageMaster.stage_id, { onDelete: 'restrict' }),
+  calc_unit: varchar('calc_unit', { length: 10 }).notNull(), // DAY, WEEK, MONTH
+  period_from: int('period_from').notNull(),
+  period_to: int('period_to').notNull(),
+  season_type: varchar('season_type', { length: 20 }),
+  feed_item_id: varchar('feed_item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  feed_qty_per_head_per_day_kg: decimal('feed_qty_per_head_per_day_kg', { precision: 8, scale: 4 }),
+  feed_wastage_pct: decimal('feed_wastage_pct', { precision: 5, scale: 2 }),
+  std_body_weight_kg: decimal('std_body_weight_kg', { precision: 8, scale: 3 }),
+  std_adg_gpd: decimal('std_adg_gpd', { precision: 8, scale: 2 }), // standard Average Daily Gain, grams/day
+  std_fcr: decimal('std_fcr', { precision: 5, scale: 3 }),
+  std_mortality_rate_pct: decimal('std_mortality_rate_pct', { precision: 5, scale: 3 }),
+  output_item_id: varchar('output_item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  output_uom: varchar('output_uom', { length: 20 }),
+  std_output_qty: decimal('std_output_qty', { precision: 10, scale: 3 }),
+  medication_protocol: json('medication_protocol'),
+  vaccination_protocol: json('vaccination_protocol'),
+  resource_requirements: json('resource_requirements'),
+  kpi_lower_limit: decimal('kpi_lower_limit', { precision: 18, scale: 4 }),
+  kpi_upper_limit: decimal('kpi_upper_limit', { precision: 18, scale: 4 }),
+  alert_severity: varchar('alert_severity', { length: 10 }), // INFO, WARNING, CRITICAL
+  notes: text('notes'),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+// Reusable, concurrency-safe business-code generator. generateNext() in
+// number-series.service.ts locks a single row here (SELECT ... FOR UPDATE) rather
+// than the range-lock generateBatchNo() in batch.service.ts currently does on
+// batch_header directly — that call site is being migrated onto this table.
+export const noSeriesMaster = mysqlTable('no_series_master', {
+  series_id: varchar('series_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }), // null = tenant-wide
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  series_code: varchar('series_code', { length: 30 }).notNull(),
+  series_name: varchar('series_name', { length: 150 }).notNull(),
+  document_type: varchar('document_type', { length: 50 }).notNull(),
+  prefix: varchar('prefix', { length: 20 }),
+  date_format: varchar('date_format', { length: 20 }), // e.g. 'YYYY' — no date segment if unset
+  separator: varchar('separator', { length: 1 }).default('-').notNull(),
+  seq_length: int('seq_length').notNull(),
+  current_seq: bigint('current_seq', { mode: 'number' }).default(0).notNull(),
+  last_generated_code: varchar('last_generated_code', { length: 80 }),
+  reset_frequency: varchar('reset_frequency', { length: 20 }).default('NEVER').notNull(), // YEARLY, MONTHLY, NEVER
+  allow_manual: boolean('allow_manual').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config'),
+}, (table) => ({
+  uqSeriesCode: uniqueIndex('uq_no_series_master_tenant_company_code').on(
+    table.tenant_id, table.company_id, table.series_code
+  ),
+}));
+
 export const batchHeader = mysqlTable('batch_header', {
   batch_id: varchar('batch_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
@@ -1453,6 +1609,10 @@ export const batchHeader = mysqlTable('batch_header', {
   // the CURRENT sub-location, updated by transferStage(). History lives in
   // batch_stage_log.
   current_stage_code: varchar('current_stage_code', { length: 50 }),
+  // Opportunistic link to stage_master when current_stage_code resolves to a real
+  // seeded stage for this batch's LOB (see transferStage()). Nullable and additive —
+  // current_stage_code stays authoritative for LOBs without Stage Master data.
+  stage_id: varchar('stage_id', { length: 36 }),
   sub_location_id: varchar('sub_location_id', { length: 36 }),
   start_date: date('start_date', { mode: 'string' }).notNull(),
   expected_end_date: date('expected_end_date', { mode: 'string' }),
@@ -1482,6 +1642,11 @@ export const batchHeader = mysqlTable('batch_header', {
     foreignColumns: [locationMaster.location_id],
     name: 'batch_header_location_id_fk'
   }).onDelete('restrict'),
+  stageFk: foreignKey({
+    columns: [table.stage_id],
+    foreignColumns: [stageMaster.stage_id],
+    name: 'batch_header_stage_id_fk'
+  }).onDelete('set null'),
   // Defense in depth alongside the row-locked generator in batch.service.ts —
   // a duplicate batch_no under concurrent inserts fails loudly instead of
   // silently corrupting the document sequence.
@@ -2110,6 +2275,83 @@ export const goodsReceiptLine = mysqlTable('goods_receipt_line', {
   expiry_date: date('expiry_date', { mode: 'string' }),
   remarks: varchar('remarks', { length: 500 }),
 });
+
+// Individual animal lifetime identity — permanent record from entry to disposal, never
+// physically deleted (is_active=false + disposal_* fields mark disposal instead). Distinct
+// from bio_asset_ledger/batch_bio_asset_state, which are batch/cohort-scoped, not per-animal —
+// current_bio_asset_value/total_amortised/book_value here are plain columns (not derived from
+// the ledger) until that ledger gets a per-animal dimension, a larger change than this table
+// alone. current_stage_id is a real FK from the start (no legacy free-text column to preserve,
+// unlike batch_header.current_stage_code).
+export const animalRegister = mysqlTable('animal_register', {
+  animal_id: varchar('animal_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  animal_code: varchar('animal_code', { length: 30 }).notNull(), // AUTO via no_series_master (ANIMAL_PIGGERY)
+  animal_type: varchar('animal_type', { length: 20 }).notNull(), // SOW, BOAR, GILT, PIGLET, COMMERCIAL_PIG
+  breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
+  gender: char('gender', { length: 1 }).notNull(), // F, M
+  dob: date('dob', { mode: 'string' }),
+  entry_type: varchar('entry_type', { length: 30 }).notNull(), // PURCHASED_IMPORTED, PURCHASED_LOCAL, BORN_ON_FARM, TRANSFERRED_IN
+  entry_date: date('entry_date', { mode: 'string' }).notNull(),
+  // Spec's "source_grn_id" — named to match this codebase's actual table (goods_receipt, not GRN).
+  source_receipt_id: varchar('source_receipt_id', { length: 36 }).references(() => goodsReceipt.receipt_id, { onDelete: 'restrict' }),
+  source_batch_id: varchar('source_batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
+  rfid_tag: varchar('rfid_tag', { length: 50 }),
+  ear_tag: varchar('ear_tag', { length: 50 }),
+  sire_animal_id: varchar('sire_animal_id', { length: 36 }),
+  dam_animal_id: varchar('dam_animal_id', { length: 36 }),
+  acquisition_cost: decimal('acquisition_cost', { precision: 18, scale: 4 }).notNull(),
+  landing_cost: decimal('landing_cost', { precision: 18, scale: 4 }),
+  total_opening_asset_value: decimal('total_opening_asset_value', { precision: 18, scale: 4 }).notNull(), // CALC at create
+  current_stage_id: varchar('current_stage_id', { length: 36 }),
+  current_batch_id: varchar('current_batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  current_location_id: varchar('current_location_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
+  parity_count: int('parity_count').default(0).notNull(),
+  total_piglets_born_live: int('total_piglets_born_live').default(0).notNull(),
+  total_piglets_weaned: int('total_piglets_weaned').default(0).notNull(),
+  // Not ledger-derived in this phase — see file-level comment above.
+  current_bio_asset_value: decimal('current_bio_asset_value', { precision: 18, scale: 4 }),
+  total_amortised: decimal('total_amortised', { precision: 18, scale: 4 }),
+  book_value: decimal('book_value', { precision: 18, scale: 4 }),
+  residual_value: decimal('residual_value', { precision: 18, scale: 4 }),
+  amortisation_monthly: decimal('amortisation_monthly', { precision: 18, scale: 4 }),
+  productive_life_start: date('productive_life_start', { mode: 'string' }),
+  expected_cull_date: date('expected_cull_date', { mode: 'string' }),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(), // ACTIVE, QUARANTINE, SICK, PREGNANT, LACTATING, DRY, CULLED, DEAD, SOLD, SLAUGHTERED
+  disposal_date: date('disposal_date', { mode: 'string' }),
+  disposal_type: varchar('disposal_type', { length: 20 }), // SOLD, SLAUGHTERED, DIED, TRANSFERRED
+  disposal_value: decimal('disposal_value', { precision: 18, scale: 4 }),
+  gain_loss_on_disposal: decimal('gain_loss_on_disposal', { precision: 18, scale: 4 }), // CALC at disposal
+  notes: text('notes'),
+  // Never physically deleted — is_active=false marks disposal, not a generic soft-delete.
+  is_active: boolean('is_active').default(true).notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  sireFk: foreignKey({
+    columns: [table.sire_animal_id],
+    foreignColumns: [table.animal_id],
+    name: 'animal_register_sire_animal_id_fk'
+  }).onDelete('set null'),
+  damFk: foreignKey({
+    columns: [table.dam_animal_id],
+    foreignColumns: [table.animal_id],
+    name: 'animal_register_dam_animal_id_fk'
+  }).onDelete('set null'),
+  currentStageFk: foreignKey({
+    columns: [table.current_stage_id],
+    foreignColumns: [stageMaster.stage_id],
+    name: 'animal_register_current_stage_id_fk'
+  }).onDelete('set null'),
+  uqAnimalCode: uniqueIndex('uq_animal_register_tenant_code').on(table.tenant_id, table.animal_code),
+  uqRfidTag: uniqueIndex('uq_animal_register_tenant_rfid').on(table.tenant_id, table.rfid_tag),
+}));
 
 export const inventoryLedgerRelations = relations(inventoryLedger, ({ one, many }) => ({
   item: one(itemMaster, { fields: [inventoryLedger.item_id], references: [itemMaster.item_id] }),

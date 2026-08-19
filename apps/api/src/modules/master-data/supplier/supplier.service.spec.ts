@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SupplierService } from './supplier.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { EncryptionService } from '../../system/encryption/encryption.service';
+import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('SupplierService', () => {
   let service: SupplierService;
   let clsService: ClsService;
   let auditLogService: AuditLogService;
+  let encryptionService: EncryptionService;
 
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
@@ -39,12 +41,20 @@ describe('SupplierService', () => {
             log: jest.fn().mockResolvedValue({}),
           },
         },
+        {
+          provide: EncryptionService,
+          useValue: {
+            encrypt: jest.fn((v: string) => `enc(${v})`),
+            decrypt: jest.fn((v: string) => v.replace(/^enc\(/, '').replace(/\)$/, '')),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<SupplierService>(SupplierService);
     clsService = module.get<ClsService>(ClsService);
     auditLogService = module.get<AuditLogService>(AuditLogService);
+    encryptionService = module.get<EncryptionService>(EncryptionService);
   });
 
   it('should be defined', () => {
@@ -147,6 +157,82 @@ describe('SupplierService', () => {
 
       expect(mockDbInsert).toHaveBeenCalled();
       expect(result.supplier_code).toBe('SUP01');
+    });
+
+    it('should reject an ANIMAL_SUPPLIER missing health_cert_url and breeding_farm_code', async () => {
+      // Selects in order: company found, no duplicate code — the COND check runs after both.
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) });
+
+      await expect(
+        service.create(
+          {
+            company_id: 'comp-1',
+            supplier_code: 'SUP02',
+            supplier_name: 'Animal Supplier Co',
+            vendor_type: 'ANIMAL_SUPPLIER',
+          },
+          'tenant-123',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should encrypt bank_account_no before insert and never store it as plaintext', async () => {
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ supplier_code: 'SUP03', bank_account_no_enc: 'enc(1234567890)' }]) }) }) });
+
+      let insertedValues: any;
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockImplementation((v) => { insertedValues = v; return Promise.resolve({}); }) });
+
+      const result = await service.create(
+        { company_id: 'comp-1', supplier_code: 'SUP03', supplier_name: 'Feed Co', bank_account_no: '1234567890' },
+        'tenant-123',
+      );
+
+      expect(encryptionService.encrypt).toHaveBeenCalledWith('1234567890');
+      expect(insertedValues.bank_account_no_enc).toBe('enc(1234567890)');
+      expect((result as any).bank_account_no_enc).toBeUndefined();
+      expect(result.bank_account_last4).toBe('****7890');
+    });
+  });
+
+  describe('update', () => {
+    it('should re-validate vendor_type requirements against effective values', async () => {
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ supplier_id: 's-1', company_id: 'comp-1', vendor_type: 'GENERAL', health_cert_url: null, breeding_farm_code: null }]) }) }),
+      });
+
+      await expect(
+        service.update('s-1', { vendor_type: 'BREEDING_FARM' }, 'tenant-123'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('approve', () => {
+    it('should set is_approved and reject re-approving an already-approved supplier', async () => {
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ supplier_id: 's-1', company_id: 'comp-1', is_approved: true, supplier_name: 'Feed Co' }]) }) }),
+      });
+
+      await expect(service.approve('s-1', 'tenant-123')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should approve a not-yet-approved supplier', async () => {
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ supplier_id: 's-1', company_id: 'comp-1', is_approved: false, supplier_name: 'Feed Co' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ supplier_id: 's-1', is_approved: true }]) }) }) });
+
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      const result = await service.approve('s-1', 'tenant-123', { userId: 'user-1' });
+
+      const setArg = (mockDbUpdate.mock.results[0].value.set as jest.Mock).mock.calls[0][0];
+      expect(setArg.is_approved).toBe(true);
+      expect(setArg.approved_by).toBe('user-1');
+      expect(result.is_approved).toBe(true);
     });
   });
 });

@@ -224,6 +224,21 @@ export class GoodsReceiptService {
       throw new BadRequestException('Cannot post a Goods Receipt with no lines.');
     }
 
+    // Spec: ANIMAL_SUPPLIER vendors must have a valid health certificate on file before
+    // their receipts can post — see supplier.service.ts's vendor_type/health_cert_url fields.
+    if (receipt.supplier_id) {
+      const [supplier] = await this.db
+        .select()
+        .from(schema.supplierMaster)
+        .where(eq(schema.supplierMaster.supplier_id, receipt.supplier_id))
+        .limit(1);
+      if (supplier?.vendor_type === 'ANIMAL_SUPPLIER' && !supplier.health_cert_url) {
+        throw new BadRequestException(
+          `Supplier '${supplier.supplier_name}' is an ANIMAL_SUPPLIER without a health certificate on file — cannot post this receipt.`
+        );
+      }
+    }
+
     // Claim the DRAFT -> POSTED transition atomically before writing any
     // ledger/GL entries — see goods-issue.service.ts's post() for the full
     // rationale (closes both the double-post race and the "retry after a

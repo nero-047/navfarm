@@ -43,12 +43,17 @@ export class CreateLocationDto {
   @IsNotEmpty()
   location_name: string;
 
+  @ApiProperty({ description: 'Full postal/physical address shown on batch and reports', example: 'Porta Farm - ABC' })
+  @IsString()
+  @IsNotEmpty()
+  location_address: string;
+
   @ApiProperty({ description: 'Hierarchy level in hierarchy tree', default: 1 })
   @IsInt()
   @Min(1)
   location_level: number;
 
-  @ApiProperty({ description: 'Location classification type', example: 'ROOM', enum: ['FARM', 'SHED', 'AREA', 'SECTION', 'ROOM', 'AISLE', 'SHELF'] })
+  @ApiProperty({ description: 'Location classification type', example: 'ROOM', enum: ['FARM', 'SHED', 'AREA', 'SECTION', 'ROOM', 'AISLE', 'SHELF', 'PEN', 'SILO'] })
   @IsString()
   @IsNotEmpty()
   location_type: string;
@@ -103,6 +108,24 @@ export class CreateLocationDto {
   @IsOptional()
   is_quarantine_zone?: boolean;
 
+  @ApiProperty({ description: 'Maximum feed capacity of this Silo in KG. Required when location_type = SILO.', required: false })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  silo_capacity_kg?: number;
+
+  @ApiProperty({ description: 'Alert when silo stock covers less than this many days of consumption. Required when location_type = SILO.', required: false })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  silo_reorder_days?: number;
+
+  @ApiProperty({ description: 'Mandatory empty days between batches at this location for biosecurity.', required: false })
+  @IsInt()
+  @IsOptional()
+  @Min(0)
+  downtime_days_required?: number;
+
   @ApiProperty({ description: 'Flexible custom config configurations in JSON format', required: false })
   @IsOptional()
   extension_config?: any;
@@ -148,6 +171,11 @@ export class UpdateLocationDto {
   @IsString()
   @IsOptional()
   location_name?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  location_address?: string;
 
   @ApiProperty({ required: false })
   @IsInt()
@@ -209,6 +237,24 @@ export class UpdateLocationDto {
   @IsBoolean()
   @IsOptional()
   is_quarantine_zone?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  silo_capacity_kg?: number;
+
+  @ApiProperty({ required: false })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  silo_reorder_days?: number;
+
+  @ApiProperty({ required: false })
+  @IsInt()
+  @IsOptional()
+  @Min(0)
+  downtime_days_required?: number;
 
   @ApiProperty({ required: false })
   @IsBoolean()

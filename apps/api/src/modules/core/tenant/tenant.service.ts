@@ -4,7 +4,7 @@ import { eq, sql, and, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import * as masterSchema from '../../../core/database/master-schema';
 import * as schema from '../../../core/database/schema';
-import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED } from '../../../core/database/system-master-data-seed';
+import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED } from '../../../core/database/system-master-data-seed';
 import { MASTER_CONNECTION } from '../../../core/database/database.module';
 import { ConnectionManagerService } from '../../../core/database/connection-manager.service';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
@@ -135,6 +135,17 @@ export class TenantService {
           breed_name: breed.breed_name,
           species_id: speciesId || null,
           breed_type: breed.breed_type,
+          gestation_days: breed.gestation_days ?? null,
+          lactation_days: breed.lactation_days ?? null,
+          productive_life_months: breed.productive_life_months ?? null,
+          residual_value_pct: breed.residual_value_pct?.toString() ?? null,
+          productive_life_cycles: breed.productive_life_cycles ?? null,
+          avg_litter_size_born: breed.avg_litter_size_born?.toString() ?? null,
+          avg_litter_size_weaned: breed.avg_litter_size_weaned?.toString() ?? null,
+          avg_weaning_weight_kg: breed.avg_weaning_weight_kg?.toString() ?? null,
+          farrowing_rate_pct: breed.farrowing_rate_pct?.toString() ?? null,
+          boar_doses_per_week: breed.boar_doses_per_week?.toString() ?? null,
+          boar_productive_life_months: breed.boar_productive_life_months ?? null,
         });
       }
 
@@ -180,6 +191,79 @@ export class TenantService {
           default_qty_per_unit: param.default_qty_per_unit != null ? param.default_qty_per_unit.toString() : null,
           default_qty_per_batch: param.default_qty_per_batch != null ? param.default_qty_per_batch.toString() : null,
           is_mandatory: param.is_mandatory ?? false,
+        });
+      }
+
+      // The 11 seeded LVS_PIGGERY production stages (see SYSTEM_STAGE_SEED — piggery-only,
+      // other LOBs get theirs via the normal Stage CRUD API once documented). Two passes,
+      // not one: next_stage_id/alt_next_stage_id are FKs MySQL checks per-statement (no
+      // deferred constraint checking like Postgres), and BOAR_AI even points at itself —
+      // so every row is inserted first with those two columns null, then a second pass
+      // of UPDATEs wires the chain now that every row actually exists.
+      const pigLobId = lobIdByCode.get('LVS_PIGGERY');
+      const pigNobId = nobIdByCode.get('LIVESTOCK');
+      if (pigLobId && pigNobId) {
+        const stageIdByCode = new Map(SYSTEM_STAGE_SEED.map((s) => [s.stage_code, randomUUID()]));
+
+        for (const stage of SYSTEM_STAGE_SEED) {
+          await tenantDb.insert(schema.stageMaster).values({
+            stage_id: stageIdByCode.get(stage.stage_code)!,
+            tenant_id: tenantId,
+            company_id: null,
+            nob_id: pigNobId,
+            lob_id: pigLobId,
+            stage_code: stage.stage_code,
+            stage_name: stage.stage_name,
+            stage_category: stage.stage_category,
+            stage_sequence: stage.stage_sequence,
+            typical_duration_days: stage.typical_duration_days ?? null,
+            min_days_before_move: stage.min_days_before_move,
+            transition_trigger: stage.transition_trigger,
+            auto_move_on_day: stage.auto_move_on_day ?? null,
+            alt_trigger_condition: stage.alt_trigger_condition || null,
+            data_entry_form: stage.data_entry_form,
+            show_on_animal_card: stage.show_on_animal_card,
+            stage_description: stage.stage_description,
+            sort_order: stage.stage_sequence,
+            is_system: true,
+          });
+        }
+
+        for (const stage of SYSTEM_STAGE_SEED) {
+          if (!stage.next_stage_code && !stage.alt_next_stage_code) continue;
+          await tenantDb
+            .update(schema.stageMaster)
+            .set({
+              next_stage_id: stage.next_stage_code ? stageIdByCode.get(stage.next_stage_code) || null : null,
+              alt_next_stage_id: stage.alt_next_stage_code ? stageIdByCode.get(stage.alt_next_stage_code) || null : null,
+            })
+            .where(eq(schema.stageMaster.stage_id, stageIdByCode.get(stage.stage_code)!));
+        }
+      }
+
+      // Number Series (see SYSTEM_NO_SERIES_SEED) — BATCH is tenant-wide; generateBatchNo() in
+      // batch.service.ts relies on it existing for every tenant. ANIMAL_PIGGERY is scoped to
+      // LIVESTOCK/LVS_PIGGERY, skipped if that NOB/LOB combo isn't seeded for this tenant.
+      for (const series of SYSTEM_NO_SERIES_SEED) {
+        const seriesNobId = series.nob_code ? nobIdByCode.get(series.nob_code) : undefined;
+        const seriesLobId = series.lob_code ? lobIdByCode.get(series.lob_code) : undefined;
+        if ((series.nob_code && !seriesNobId) || (series.lob_code && !seriesLobId)) continue;
+
+        await tenantDb.insert(schema.noSeriesMaster).values({
+          series_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: seriesNobId || null,
+          lob_id: seriesLobId || null,
+          series_code: series.series_code,
+          series_name: series.series_name,
+          document_type: series.document_type,
+          prefix: series.prefix || null,
+          date_format: series.date_format || null,
+          separator: series.separator,
+          seq_length: series.seq_length,
+          current_seq: 0,
+          reset_frequency: series.reset_frequency,
         });
       }
 

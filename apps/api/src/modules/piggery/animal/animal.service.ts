@@ -1,0 +1,385 @@
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { MySql2Database } from 'drizzle-orm/mysql2';
+import { eq, and, or, like } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
+import { ClsService } from 'nestjs-cls';
+import * as schema from '../../../core/database/schema';
+import { CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto } from './dto/animal.dto';
+import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
+
+const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
+
+// Maps a disposal_type to the terminal `status` it leaves the animal in. TRANSFERRED has no
+// direct status match in the spec's STATUSES enum (it means the animal left this tenant's
+// register, not that it died/sold/slaughtered here) — SOLD is the closest "left the register"
+// status other than the disposal-specific ones, but rather than guessing, TRANSFERRED keeps
+// whatever status it already had and only is_active flips false.
+const DISPOSAL_STATUS_MAP: Record<string, string | undefined> = {
+  SOLD: 'SOLD',
+  SLAUGHTERED: 'SLAUGHTERED',
+  DIED: 'DEAD',
+  TRANSFERRED: undefined,
+};
+
+@Injectable()
+export class AnimalService {
+  constructor(
+    private readonly cls: ClsService,
+    private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
+  ) {}
+
+  private get db(): MySql2Database<typeof schema> {
+    const tenantDb = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
+    if (!tenantDb) {
+      throw new Error('Tenant database connection context not established.');
+    }
+    return tenantDb;
+  }
+
+  private async assertExists<T extends { limit: (n: number) => Promise<any[]> }>(
+    query: T,
+    label: string,
+    id: string,
+  ) {
+    const rows = await query.limit(1);
+    if (rows.length === 0) {
+      throw new NotFoundException(`${label} with ID '${id}' not found.`);
+    }
+    return rows[0];
+  }
+
+  async create(dto: CreateAnimalDto, tenantId: string, userPayload?: any) {
+    await this.assertExists(
+      this.db.select().from(schema.companyMaster).where(eq(schema.companyMaster.company_id, dto.company_id)),
+      'Company', dto.company_id,
+    );
+    await this.assertExists(
+      this.db.select().from(schema.nobMaster).where(eq(schema.nobMaster.nob_id, dto.nob_id)),
+      'NOB', dto.nob_id,
+    );
+    await this.assertExists(
+      this.db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, dto.lob_id)),
+      'LOB', dto.lob_id,
+    );
+    await this.assertExists(
+      this.db.select().from(schema.breedMaster).where(eq(schema.breedMaster.breed_id, dto.breed_id)),
+      'Breed', dto.breed_id,
+    );
+    await this.assertExists(
+      this.db.select().from(schema.itemMaster).where(eq(schema.itemMaster.item_id, dto.item_id)),
+      'Item', dto.item_id,
+    );
+
+    // COND rules from the spec: source_receipt_id required for purchased entries,
+    // source_batch_id required for on-farm births.
+    if (['PURCHASED_IMPORTED', 'PURCHASED_LOCAL'].includes(dto.entry_type) && !dto.source_receipt_id) {
+      throw new BadRequestException(`source_receipt_id is required when entry_type is '${dto.entry_type}'.`);
+    }
+    if (dto.entry_type === 'BORN_ON_FARM' && !dto.source_batch_id) {
+      throw new BadRequestException(`source_batch_id is required when entry_type is 'BORN_ON_FARM'.`);
+    }
+
+    if (dto.source_receipt_id) {
+      await this.assertExists(
+        this.db.select().from(schema.goodsReceipt).where(eq(schema.goodsReceipt.receipt_id, dto.source_receipt_id)),
+        'Goods receipt', dto.source_receipt_id,
+      );
+    }
+    if (dto.source_batch_id) {
+      await this.assertExists(
+        this.db.select().from(schema.batchHeader).where(eq(schema.batchHeader.batch_id, dto.source_batch_id)),
+        'Batch', dto.source_batch_id,
+      );
+    }
+    if (dto.sire_animal_id) {
+      await this.assertExists(
+        this.db.select().from(schema.animalRegister).where(eq(schema.animalRegister.animal_id, dto.sire_animal_id)),
+        'Sire animal', dto.sire_animal_id,
+      );
+    }
+    if (dto.dam_animal_id) {
+      await this.assertExists(
+        this.db.select().from(schema.animalRegister).where(eq(schema.animalRegister.animal_id, dto.dam_animal_id)),
+        'Dam animal', dto.dam_animal_id,
+      );
+    }
+    if (dto.current_stage_id) {
+      await this.assertExists(
+        this.db.select().from(schema.stageMaster).where(eq(schema.stageMaster.stage_id, dto.current_stage_id)),
+        'Stage', dto.current_stage_id,
+      );
+    }
+    if (dto.current_batch_id) {
+      await this.assertExists(
+        this.db.select().from(schema.batchHeader).where(eq(schema.batchHeader.batch_id, dto.current_batch_id)),
+        'Batch', dto.current_batch_id,
+      );
+    }
+    if (dto.current_location_id) {
+      await this.assertExists(
+        this.db.select().from(schema.locationMaster).where(eq(schema.locationMaster.location_id, dto.current_location_id)),
+        'Location', dto.current_location_id,
+      );
+    }
+
+    if (dto.rfid_tag) {
+      const duplicateRfid = await this.db
+        .select()
+        .from(schema.animalRegister)
+        .where(and(eq(schema.animalRegister.tenant_id, tenantId), eq(schema.animalRegister.rfid_tag, dto.rfid_tag)))
+        .limit(1);
+      if (duplicateRfid.length > 0) {
+        throw new ConflictException(`RFID tag '${dto.rfid_tag}' is already registered to another animal.`);
+      }
+    }
+
+    const animalId = randomUUID();
+    const animalCode = await this.numberSeriesService.generateNext('ANIMAL_PIGGERY', tenantId, dto.company_id);
+    const totalOpeningAssetValue = dto.acquisition_cost + (dto.landing_cost || 0);
+
+    const newAnimal = {
+      animal_id: animalId,
+      tenant_id: tenantId,
+      company_id: dto.company_id,
+      nob_id: dto.nob_id,
+      lob_id: dto.lob_id,
+      animal_code: animalCode,
+      animal_type: dto.animal_type,
+      breed_id: dto.breed_id,
+      gender: dto.gender,
+      dob: dto.dob || null,
+      entry_type: dto.entry_type,
+      entry_date: dto.entry_date,
+      source_receipt_id: dto.source_receipt_id || null,
+      source_batch_id: dto.source_batch_id || null,
+      item_id: dto.item_id,
+      rfid_tag: dto.rfid_tag || null,
+      ear_tag: dto.ear_tag || null,
+      sire_animal_id: dto.sire_animal_id || null,
+      dam_animal_id: dto.dam_animal_id || null,
+      acquisition_cost: dto.acquisition_cost.toString(),
+      landing_cost: dto.landing_cost?.toString() || null,
+      total_opening_asset_value: totalOpeningAssetValue.toString(),
+      current_stage_id: dto.current_stage_id || null,
+      current_batch_id: dto.current_batch_id || null,
+      current_location_id: dto.current_location_id || null,
+      productive_life_start: dto.productive_life_start || null,
+      status: dto.status || 'ACTIVE',
+      notes: dto.notes || null,
+      is_active: true,
+      created_by: userPayload?.userId || null,
+      updated_by: userPayload?.userId || null,
+    };
+
+    await this.db.insert(schema.animalRegister).values(newAnimal);
+
+    await this.auditService.log({
+      tenantId,
+      companyId: dto.company_id,
+      userId: userPayload?.userId,
+      action: 'CREATE',
+      entityName: 'animal_register',
+      entityId: animalId,
+      newValues: newAnimal,
+    });
+
+    return this.findOne(animalId);
+  }
+
+  async findOne(id: string) {
+    const [animal] = await this.db
+      .select()
+      .from(schema.animalRegister)
+      .where(eq(schema.animalRegister.animal_id, id))
+      .limit(1);
+
+    if (!animal) {
+      throw new NotFoundException(`Animal with ID '${id}' not found.`);
+    }
+    return animal;
+  }
+
+  async findAll(query: QueryAnimalDto, tenantId: string) {
+    const conditions: any[] = [eq(schema.animalRegister.tenant_id, tenantId)];
+
+    if (!query.includeDisposed) conditions.push(eq(schema.animalRegister.is_active, true));
+    if (query.companyId) conditions.push(eq(schema.animalRegister.company_id, query.companyId));
+    if (query.breedId) conditions.push(eq(schema.animalRegister.breed_id, query.breedId));
+    if (query.animalType) conditions.push(eq(schema.animalRegister.animal_type, query.animalType));
+    if (query.status) conditions.push(eq(schema.animalRegister.status, query.status));
+    if (query.currentBatchId) conditions.push(eq(schema.animalRegister.current_batch_id, query.currentBatchId));
+    if (query.currentLocationId) conditions.push(eq(schema.animalRegister.current_location_id, query.currentLocationId));
+    if (query.search) {
+      conditions.push(
+        or(
+          like(schema.animalRegister.animal_code, `%${query.search}%`),
+          like(schema.animalRegister.rfid_tag, `%${query.search}%`),
+          like(schema.animalRegister.ear_tag, `%${query.search}%`)
+        )
+      );
+    }
+
+    const limit = query.limit || 50;
+    const offset = query.offset || 0;
+
+    return this.db
+      .select()
+      .from(schema.animalRegister)
+      .where(and(...conditions))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async update(id: string, dto: UpdateAnimalDto, tenantId: string, userPayload?: any) {
+    const animal = await this.findOne(id);
+
+    if (dto.breed_id) {
+      await this.assertExists(
+        this.db.select().from(schema.breedMaster).where(eq(schema.breedMaster.breed_id, dto.breed_id)),
+        'Breed', dto.breed_id,
+      );
+    }
+    if (dto.sire_animal_id) {
+      if (dto.sire_animal_id === id) {
+        throw new BadRequestException('An animal cannot be its own sire.');
+      }
+      await this.assertExists(
+        this.db.select().from(schema.animalRegister).where(eq(schema.animalRegister.animal_id, dto.sire_animal_id)),
+        'Sire animal', dto.sire_animal_id,
+      );
+    }
+    if (dto.dam_animal_id) {
+      if (dto.dam_animal_id === id) {
+        throw new BadRequestException('An animal cannot be its own dam.');
+      }
+      await this.assertExists(
+        this.db.select().from(schema.animalRegister).where(eq(schema.animalRegister.animal_id, dto.dam_animal_id)),
+        'Dam animal', dto.dam_animal_id,
+      );
+    }
+    if (dto.current_stage_id) {
+      await this.assertExists(
+        this.db.select().from(schema.stageMaster).where(eq(schema.stageMaster.stage_id, dto.current_stage_id)),
+        'Stage', dto.current_stage_id,
+      );
+    }
+    if (dto.current_batch_id) {
+      await this.assertExists(
+        this.db.select().from(schema.batchHeader).where(eq(schema.batchHeader.batch_id, dto.current_batch_id)),
+        'Batch', dto.current_batch_id,
+      );
+    }
+    if (dto.current_location_id) {
+      await this.assertExists(
+        this.db.select().from(schema.locationMaster).where(eq(schema.locationMaster.location_id, dto.current_location_id)),
+        'Location', dto.current_location_id,
+      );
+    }
+    if (dto.rfid_tag && dto.rfid_tag !== animal.rfid_tag) {
+      const duplicateRfid = await this.db
+        .select()
+        .from(schema.animalRegister)
+        .where(and(eq(schema.animalRegister.tenant_id, tenantId), eq(schema.animalRegister.rfid_tag, dto.rfid_tag)))
+        .limit(1);
+      if (duplicateRfid.length > 0) {
+        throw new ConflictException(`RFID tag '${dto.rfid_tag}' is already registered to another animal.`);
+      }
+    }
+
+    const updates: any = {
+      updated_by: userPayload?.userId || null,
+      updated_at: toMysqlTimestamp(),
+    };
+
+    if (dto.breed_id !== undefined) updates.breed_id = dto.breed_id;
+    if (dto.dob !== undefined) updates.dob = dto.dob;
+    if (dto.rfid_tag !== undefined) updates.rfid_tag = dto.rfid_tag;
+    if (dto.ear_tag !== undefined) updates.ear_tag = dto.ear_tag;
+    if (dto.sire_animal_id !== undefined) updates.sire_animal_id = dto.sire_animal_id;
+    if (dto.dam_animal_id !== undefined) updates.dam_animal_id = dto.dam_animal_id;
+    if (dto.current_stage_id !== undefined) updates.current_stage_id = dto.current_stage_id;
+    if (dto.current_batch_id !== undefined) updates.current_batch_id = dto.current_batch_id;
+    if (dto.current_location_id !== undefined) updates.current_location_id = dto.current_location_id;
+    if (dto.parity_count !== undefined) updates.parity_count = dto.parity_count;
+    if (dto.total_piglets_born_live !== undefined) updates.total_piglets_born_live = dto.total_piglets_born_live;
+    if (dto.total_piglets_weaned !== undefined) updates.total_piglets_weaned = dto.total_piglets_weaned;
+    if (dto.current_bio_asset_value !== undefined) updates.current_bio_asset_value = dto.current_bio_asset_value?.toString() ?? null;
+    if (dto.total_amortised !== undefined) updates.total_amortised = dto.total_amortised?.toString() ?? null;
+    if (dto.book_value !== undefined) updates.book_value = dto.book_value?.toString() ?? null;
+    if (dto.residual_value !== undefined) updates.residual_value = dto.residual_value?.toString() ?? null;
+    if (dto.amortisation_monthly !== undefined) updates.amortisation_monthly = dto.amortisation_monthly?.toString() ?? null;
+    if (dto.productive_life_start !== undefined) updates.productive_life_start = dto.productive_life_start;
+    if (dto.expected_cull_date !== undefined) updates.expected_cull_date = dto.expected_cull_date;
+    if (dto.status !== undefined) updates.status = dto.status;
+    if (dto.notes !== undefined) updates.notes = dto.notes;
+
+    await this.db
+      .update(schema.animalRegister)
+      .set(updates)
+      .where(eq(schema.animalRegister.animal_id, id));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: animal.company_id,
+      userId: userPayload?.userId,
+      action: 'UPDATE',
+      entityName: 'animal_register',
+      entityId: id,
+      oldValues: animal,
+      newValues: updates,
+    });
+
+    return this.findOne(id);
+  }
+
+  /**
+   * Animals are never physically deleted (spec: "must never be physically deleted").
+   * Disposal is its own action rather than a generic remove()/restore() toggle —
+   * it records how/when/for-how-much the animal left, and computes the gain/loss
+   * only when book_value is already known (it's a plain column in this phase, not
+   * ledger-derived — see schema.ts's animal_register comment).
+   */
+  async dispose(id: string, dto: DisposeAnimalDto, tenantId: string, userPayload?: any) {
+    const animal = await this.findOne(id);
+
+    if (!animal.is_active) {
+      throw new BadRequestException(`Animal '${animal.animal_code}' has already been disposed.`);
+    }
+
+    const bookValue = animal.book_value != null ? Number(animal.book_value) : null;
+    const gainLoss = dto.disposal_value != null && bookValue != null ? dto.disposal_value - bookValue : null;
+    const mappedStatus = DISPOSAL_STATUS_MAP[dto.disposal_type];
+
+    const updates: any = {
+      is_active: false,
+      disposal_date: dto.disposal_date,
+      disposal_type: dto.disposal_type,
+      disposal_value: dto.disposal_value?.toString() ?? null,
+      gain_loss_on_disposal: gainLoss != null ? gainLoss.toString() : null,
+      notes: dto.notes !== undefined ? dto.notes : animal.notes,
+      updated_by: userPayload?.userId || null,
+      updated_at: toMysqlTimestamp(),
+    };
+    if (mappedStatus) updates.status = mappedStatus;
+
+    await this.db
+      .update(schema.animalRegister)
+      .set(updates)
+      .where(eq(schema.animalRegister.animal_id, id));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: animal.company_id,
+      userId: userPayload?.userId,
+      action: 'DISPOSE',
+      entityName: 'animal_register',
+      entityId: id,
+      oldValues: animal,
+      newValues: updates,
+    });
+
+    return this.findOne(id);
+  }
+}

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -6,6 +6,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateSupplierDto, UpdateSupplierDto, QuerySupplierDto } from './dto/supplier.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { EncryptionService } from '../../system/encryption/encryption.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +17,7 @@ export class SupplierService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -24,6 +26,30 @@ export class SupplierService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /** ANIMAL_SUPPLIER needs both docs; BREEDING_FARM needs its registration code. */
+  private assertVendorTypeRequirements(vendorType: string, healthCertUrl?: string | null, breedingFarmCode?: string | null) {
+    if (vendorType === 'ANIMAL_SUPPLIER' && (!healthCertUrl || !breedingFarmCode)) {
+      throw new BadRequestException('ANIMAL_SUPPLIER vendors require both health_cert_url and breeding_farm_code.');
+    }
+    if (vendorType === 'BREEDING_FARM' && !breedingFarmCode) {
+      throw new BadRequestException('BREEDING_FARM vendors require breeding_farm_code.');
+    }
+  }
+
+  /** Never returns bank_account_no_enc — replaces it with a decrypt-only-to-mask last-4 display value. */
+  private maskSupplier(supplier: typeof schema.supplierMaster.$inferSelect) {
+    const { bank_account_no_enc, ...rest } = supplier;
+    let bank_account_last4: string | null = null;
+    if (bank_account_no_enc) {
+      try {
+        bank_account_last4 = EncryptionService.maskLast4(this.encryptionService.decrypt(bank_account_no_enc));
+      } catch {
+        bank_account_last4 = null;
+      }
+    }
+    return { ...rest, bank_account_last4 };
   }
 
   async create(dto: CreateSupplierDto, tenantId: string, userPayload?: any) {
@@ -56,6 +82,9 @@ export class SupplierService {
       throw new ConflictException(`Supplier with code '${dto.supplier_code}' already exists in this company.`);
     }
 
+    const vendorType = dto.vendor_type || 'GENERAL';
+    this.assertVendorTypeRequirements(vendorType, dto.health_cert_url, dto.breeding_farm_code);
+
     const supplierId = randomUUID();
     const newSupplier = {
       supplier_id: supplierId,
@@ -72,6 +101,13 @@ export class SupplierService {
       state: dto.state || null,
       country: dto.country || null,
       pincode: dto.pincode || null,
+      vendor_type: vendorType,
+      health_cert_url: dto.health_cert_url || null,
+      breeding_farm_code: dto.breeding_farm_code || null,
+      bank_account_no_enc: dto.bank_account_no ? this.encryptionService.encrypt(dto.bank_account_no) : null,
+      bank_ifsc: dto.bank_ifsc || null,
+      credit_limit: dto.credit_limit?.toString() || null,
+      is_approved: false,
       is_active: true,
       status: 'ACTIVE',
       extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
@@ -88,7 +124,7 @@ export class SupplierService {
       action: 'CREATE',
       entityName: 'supplier_master',
       entityId: supplierId,
-      newValues: newSupplier,
+      newValues: { ...newSupplier, bank_account_no_enc: newSupplier.bank_account_no_enc ? '[REDACTED]' : null },
     });
 
     return this.findOne(supplierId);
@@ -105,7 +141,7 @@ export class SupplierService {
       throw new NotFoundException(`Supplier with ID '${id}' not found.`);
     }
 
-    return supplier;
+    return this.maskSupplier(supplier);
   }
 
   async findAll(query: QuerySupplierDto, tenantId: string) {
@@ -120,6 +156,12 @@ export class SupplierService {
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.supplierMaster.is_active, query.isActive));
     }
+    if (query.vendorType) {
+      conditions.push(eq(schema.supplierMaster.vendor_type, query.vendorType));
+    }
+    if (query.isApproved !== undefined) {
+      conditions.push(eq(schema.supplierMaster.is_approved, query.isApproved));
+    }
     if (query.search) {
       conditions.push(
         or(
@@ -133,12 +175,14 @@ export class SupplierService {
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
-    return this.db
+    const rows = await this.db
       .select()
       .from(schema.supplierMaster)
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
+
+    return rows.map((row) => this.maskSupplier(row));
   }
 
   async update(id: string, dto: UpdateSupplierDto, tenantId: string, userPayload?: any) {
@@ -164,6 +208,13 @@ export class SupplierService {
       }
     }
 
+    // Re-validate COND rules against the effective (post-update) values, same "dto value if
+    // touched, else existing row's" pattern used across every other phase's update() methods.
+    const effectiveVendorType = dto.vendor_type ?? supplier.vendor_type;
+    const effectiveHealthCertUrl = dto.health_cert_url !== undefined ? dto.health_cert_url : supplier.health_cert_url;
+    const effectiveBreedingFarmCode = dto.breeding_farm_code !== undefined ? dto.breeding_farm_code : supplier.breeding_farm_code;
+    this.assertVendorTypeRequirements(effectiveVendorType, effectiveHealthCertUrl, effectiveBreedingFarmCode);
+
     const updates: any = {
       updated_by: userPayload?.userId || null,
       updated_at: toMysqlTimestamp(),
@@ -180,6 +231,12 @@ export class SupplierService {
     if (dto.state !== undefined) updates.state = dto.state;
     if (dto.country !== undefined) updates.country = dto.country;
     if (dto.pincode !== undefined) updates.pincode = dto.pincode;
+    if (dto.vendor_type !== undefined) updates.vendor_type = dto.vendor_type;
+    if (dto.health_cert_url !== undefined) updates.health_cert_url = dto.health_cert_url;
+    if (dto.breeding_farm_code !== undefined) updates.breeding_farm_code = dto.breeding_farm_code;
+    if (dto.bank_account_no !== undefined) updates.bank_account_no_enc = dto.bank_account_no ? this.encryptionService.encrypt(dto.bank_account_no) : null;
+    if (dto.bank_ifsc !== undefined) updates.bank_ifsc = dto.bank_ifsc;
+    if (dto.credit_limit !== undefined) updates.credit_limit = dto.credit_limit?.toString() || null;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;
     if (dto.extension_config !== undefined) updates.extension_config = JSON.stringify(dto.extension_config);
@@ -197,7 +254,43 @@ export class SupplierService {
       entityName: 'supplier_master',
       entityId: id,
       oldValues: supplier,
-      newValues: updates,
+      newValues: { ...updates, bank_account_no_enc: updates.bank_account_no_enc !== undefined ? '[REDACTED]' : undefined },
+    });
+
+    return this.findOne(id);
+  }
+
+  /**
+   * Distinct business action, not folded into update() — a vendor cannot be used in a PO
+   * until is_approved=TRUE per spec (this codebase has no PO entity yet to enforce that
+   * against, so this just records the approval; enforcement is a documented follow-up).
+   */
+  async approve(id: string, tenantId: string, userPayload?: any) {
+    const supplier = await this.findOne(id);
+
+    if (supplier.is_approved) {
+      throw new BadRequestException(`Supplier '${supplier.supplier_name}' is already approved.`);
+    }
+
+    await this.db
+      .update(schema.supplierMaster)
+      .set({
+        is_approved: true,
+        approved_by: userPayload?.userId || null,
+        approved_at: toMysqlTimestamp() as any,
+        updated_by: userPayload?.userId || null,
+        updated_at: toMysqlTimestamp(),
+      })
+      .where(eq(schema.supplierMaster.supplier_id, id));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: supplier.company_id,
+      userId: userPayload?.userId,
+      action: 'APPROVE',
+      entityName: 'supplier_master',
+      entityId: id,
+      newValues: { is_approved: true, approved_by: userPayload?.userId },
     });
 
     return this.findOne(id);

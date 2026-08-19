@@ -87,10 +87,11 @@ const location: MasterDataConfig = {
     { key: "parent_location_id", label: "Parent Location (sub-location nesting)", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"] },
     { key: "location_code", label: "Location Code", type: "text", required: true, placeholder: "LOC-A" },
     { key: "location_name", label: "Location Name", type: "text", required: true, placeholder: "Storage Area A" },
+    { key: "location_address", label: "Location Address", type: "text", required: true, placeholder: "Porta Farm - ABC" },
     { key: "location_level", label: "Hierarchy Level", type: "number", required: true },
     {
       key: "location_type", label: "Location Type", type: "select", required: true,
-      options: ["FARM", "SHED", "AREA", "SECTION", "ROOM", "AISLE", "SHELF"].map((v) => ({ value: v, label: v })),
+      options: ["FARM", "SHED", "AREA", "SECTION", "ROOM", "AISLE", "SHELF", "PEN", "SILO"].map((v) => ({ value: v, label: v })),
     },
     { key: "area_size", label: "Area Size", type: "number", step: "0.01" },
     { key: "area_unit", label: "Area Unit", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
@@ -101,6 +102,9 @@ const location: MasterDataConfig = {
     { key: "gps_longitude", label: "GPS Longitude", type: "number", step: "0.000001" },
     { key: "storage_type", label: "Storage Conditions", type: "text" },
     { key: "is_quarantine_zone", label: "Quarantine Zone", type: "boolean" },
+    { key: "silo_capacity_kg", label: "Silo Capacity (KG)", type: "number", step: "0.01", helpText: "Required for SILO locations." },
+    { key: "silo_reorder_days", label: "Silo Reorder Days", type: "number", helpText: "Required for SILO locations. Alerts when stock covers fewer than this many days." },
+    { key: "downtime_days_required", label: "Downtime Days Required", type: "number", helpText: "Mandatory empty days between batches at this location for biosecurity." },
   ],
 };
 
@@ -130,6 +134,148 @@ const shed: MasterDataConfig = {
     { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this shed is shared across all business verticals." },
     { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this shed is shared across all LOBs under the selected NOB." },
     { key: "capacity", label: "Capacity", type: "number" },
+  ],
+};
+
+// ── Production ───────────────────────────────────────────────────────────────
+
+const stage: MasterDataConfig = {
+  key: "stage",
+  label: "Stages",
+  description: "Production lifecycle stages per NOB/LOB (e.g. piggery: Quarantine → Gilt Grower → ... → Disposed) — sequencing and transition rules for batches.",
+  apiBase: "/stage",
+  idKey: "stage_id",
+  group: "Production",
+  supportsNobLobFilter: true,
+  columns: [
+    { key: "stage_sequence", label: "#" },
+    { key: "stage_code", label: "Code" },
+    { key: "stage_name", label: "Name" },
+    { key: "stage_category", label: "Category" },
+    { key: "transition_trigger", label: "Trigger" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"] },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id" },
+    { key: "stage_code", label: "Stage Code", type: "text", required: true, placeholder: "QUARANTINE" },
+    { key: "stage_name", label: "Stage Name", type: "text", required: true, placeholder: "Quarantine" },
+    {
+      key: "stage_category", label: "Category", type: "select", required: true,
+      options: ["PRE_PRODUCTIVE", "PRODUCTIVE", "OUTPUT", "DISPOSAL"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+    { key: "stage_sequence", label: "Display Order", type: "number", required: true, helpText: "Must be unique per Line of Business." },
+    { key: "typical_duration_days", label: "Typical Duration (days)", type: "number" },
+    { key: "min_days_before_move", label: "Min Days Before Move", type: "number", helpText: "Minimum days in this stage before a transition is allowed." },
+    {
+      key: "transition_trigger", label: "Transition Trigger", type: "select", required: true,
+      options: ["AUTO_BY_DAY", "MANUAL", "EVENT_BASED", "KPI_BASED"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+    { key: "auto_move_on_day", label: "Auto-Move On Day", type: "number", helpText: "Required when Transition Trigger is Auto By Day." },
+    { key: "next_stage_id", label: "Next Stage", type: "select-entity", entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"], helpText: "Leave blank for a terminal stage." },
+    { key: "alt_next_stage_id", label: "Alternate Next Stage", type: "select-entity", entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"] },
+    { key: "alt_trigger_condition", label: "Alternate Trigger Condition", type: "text", placeholder: "PREGNANCY_FAILED" },
+    {
+      key: "data_entry_form", label: "Data Entry Form", type: "select",
+      options: ["STANDARD", "FARROWING", "WEANING", "SLAUGHTER"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "scheduler_auto_create", label: "Auto-Create Scheduler", type: "boolean" },
+    { key: "show_on_animal_card", label: "Show on Animal Card", type: "boolean" },
+    { key: "stage_description", label: "Description", type: "text" },
+  ],
+};
+
+const numberSeries: MasterDataConfig = {
+  key: "number-series",
+  label: "Number Series",
+  description: "Concurrency-safe business-code generators (e.g. \"BATCH\" → BATCH-000001) — other modules call these by series code instead of counting rows themselves.",
+  apiBase: "/number-series",
+  idKey: "series_id",
+  group: "Production",
+  columns: [
+    { key: "series_code", label: "Code" },
+    { key: "series_name", label: "Name" },
+    { key: "document_type", label: "Document Type" },
+    { key: "last_generated_code", label: "Last Generated" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank for a series shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id" },
+    { key: "series_code", label: "Series Code", type: "text", required: true, placeholder: "BATCH" },
+    { key: "series_name", label: "Series Name", type: "text", required: true, placeholder: "Batch Number" },
+    { key: "document_type", label: "Document Type", type: "text", required: true, placeholder: "BATCH" },
+    { key: "prefix", label: "Prefix", type: "text", placeholder: "BATCH" },
+    { key: "date_format", label: "Date Format", type: "text", placeholder: "YYYY", helpText: "Leave blank for no date segment." },
+    { key: "separator", label: "Separator", type: "text", placeholder: "-" },
+    { key: "seq_length", label: "Sequence Digits", type: "number", required: true, placeholder: "6" },
+    {
+      key: "reset_frequency", label: "Reset Frequency", type: "select",
+      options: ["NEVER", "MONTHLY", "YEARLY"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "allow_manual", label: "Allow Manual Entry", type: "boolean", helpText: "Let a user type their own code instead of generating one." },
+    { key: "current_seq", label: "Current Sequence", type: "number", hideInForm: true },
+    { key: "last_generated_code", label: "Last Generated Code", type: "text", hideInForm: true },
+  ],
+};
+
+// ── Piggery ──────────────────────────────────────────────────────────────────
+
+const animal: MasterDataConfig = {
+  key: "animal",
+  label: "Animal Register",
+  description: "Individual animal lifetime identity — lineage, entry, cost, current stage/location. Never physically deleted; use Dispose to record sale/slaughter/death.",
+  apiBase: "/animal",
+  idKey: "animal_id",
+  group: "Piggery",
+  columns: [
+    { key: "animal_code", label: "Code" },
+    { key: "animal_type", label: "Type" },
+    { key: "gender", label: "Gender" },
+    { key: "status", label: "Status" },
+  ],
+  fields: [
+    { key: "animal_code", label: "Animal Code", type: "text", hideInForm: true, helpText: "Auto-generated (PIG-YYYY-SEQ)." },
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"] },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id" },
+    {
+      key: "animal_type", label: "Animal Type", type: "select", required: true,
+      options: ["SOW", "BOAR", "GILT", "PIGLET", "COMMERCIAL_PIG"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+    { key: "breed_id", label: "Breed", type: "select-entity", required: true, entityEndpoint: "/breed", entityValueKey: "breed_id", entityLabelKeys: ["breed_code", "breed_name"] },
+    {
+      key: "gender", label: "Gender", type: "select", required: true,
+      options: [{ value: "F", label: "Female" }, { value: "M", label: "Male" }],
+    },
+    { key: "dob", label: "Date of Birth", type: "date", helpText: "Leave blank if born on this farm and unknown, or imported/unknown." },
+    {
+      key: "entry_type", label: "Entry Type", type: "select", required: true,
+      options: ["PURCHASED_IMPORTED", "PURCHASED_LOCAL", "BORN_ON_FARM", "TRANSFERRED_IN"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+    { key: "entry_date", label: "Entry Date", type: "date", required: true },
+    { key: "source_receipt_id", label: "Source Goods Receipt", type: "select-entity", entityEndpoint: "/goods-receipt", entityValueKey: "receipt_id", entityLabelKeys: ["receipt_no"], helpText: "Required for PURCHASED_IMPORTED / PURCHASED_LOCAL entries." },
+    { key: "source_batch_id", label: "Source Batch", type: "select-entity", entityEndpoint: "/batch", entityValueKey: "batch_id", entityLabelKeys: ["batch_no"], helpText: "Required for BORN_ON_FARM entries." },
+    { key: "item_id", label: "Item (Living Asset)", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+    { key: "rfid_tag", label: "RFID Tag", type: "text", helpText: "Unique if set." },
+    { key: "ear_tag", label: "Ear Tag (Visual)", type: "text" },
+    { key: "sire_animal_id", label: "Sire (Father)", type: "select-entity", entityEndpoint: "/animal", entityValueKey: "animal_id", entityLabelKeys: ["animal_code"] },
+    { key: "dam_animal_id", label: "Dam (Mother)", type: "select-entity", entityEndpoint: "/animal", entityValueKey: "animal_id", entityLabelKeys: ["animal_code"] },
+    { key: "acquisition_cost", label: "Acquisition Cost", type: "number", step: "0.01", required: true },
+    { key: "landing_cost", label: "Landing Cost", type: "number", step: "0.01", helpText: "Transport/import duty/quarantine charges for imported animals." },
+    { key: "total_opening_asset_value", label: "Total Opening Asset Value", type: "number", hideInForm: true },
+    { key: "current_stage_id", label: "Current Stage", type: "select-entity", entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"] },
+    { key: "current_batch_id", label: "Current Batch", type: "select-entity", entityEndpoint: "/batch", entityValueKey: "batch_id", entityLabelKeys: ["batch_no"] },
+    { key: "current_location_id", label: "Current Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"] },
+    { key: "parity_count", label: "Parity Count", type: "number", hideInForm: true },
+    { key: "total_piglets_born_live", label: "Total Piglets Born Live", type: "number", hideInForm: true },
+    { key: "total_piglets_weaned", label: "Total Piglets Weaned", type: "number", hideInForm: true },
+    { key: "productive_life_start", label: "Productive Life Start", type: "date" },
+    {
+      key: "status", label: "Status", type: "select",
+      options: ["ACTIVE", "QUARANTINE", "SICK", "PREGNANT", "LACTATING", "DRY", "CULLED", "DEAD", "SOLD", "SLAUGHTERED"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "notes", label: "Notes", type: "textarea" },
   ],
 };
 
@@ -297,7 +443,7 @@ const breed: MasterDataConfig = {
     { key: "species_id", label: "Species", type: "select-entity", required: true, entityEndpoint: "/species", entityValueKey: "species_id", entityLabelKeys: ["species_code", "species_name"] },
     {
       key: "breed_type", label: "Breed Type", type: "select", required: true,
-      options: ["BROILER", "LAYER", "BREEDER", "DUAL_PURPOSE", "DAIRY", "BEEF", "TREE", "FISH"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+      options: ["BROILER", "LAYER", "BREEDER", "DUAL_PURPOSE", "DAIRY", "BEEF", "MEAT", "TREE", "FISH"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
     },
     { key: "avg_growth_rate_g_day", label: "Avg Growth Rate (g/day)", type: "number", step: "0.01" },
     { key: "avg_fcr", label: "Avg FCR", type: "number", step: "0.01" },
@@ -305,11 +451,63 @@ const breed: MasterDataConfig = {
     { key: "avg_lay_rate_pct", label: "Avg Lay Rate %", type: "number", step: "0.01" },
     { key: "incubation_days", label: "Incubation Days", type: "number" },
     { key: "gestation_days", label: "Gestation Days", type: "number" },
-    { key: "avg_litter_size", label: "Avg Litter Size", type: "number", step: "0.01" },
+    { key: "lactation_days", label: "Lactation Days", type: "number" },
+    { key: "avg_litter_size", label: "Avg Litter Size (legacy/generic)", type: "number", step: "0.01" },
+    { key: "avg_litter_size_born", label: "Avg Litter Size Born", type: "number", step: "0.01" },
+    { key: "avg_litter_size_weaned", label: "Avg Litter Size Weaned", type: "number", step: "0.01" },
+    { key: "avg_weaning_weight_kg", label: "Avg Weaning Weight (KG)", type: "number", step: "0.001" },
+    { key: "farrowing_rate_pct", label: "Farrowing Rate %", type: "number", step: "0.01" },
     { key: "mature_age_months", label: "Mature Age (months)", type: "number" },
     { key: "productive_life_months", label: "Productive Life (months)", type: "number" },
+    { key: "productive_life_cycles", label: "Productive Life Cycles", type: "number", helpText: "Expected number of parities in productive life." },
+    { key: "residual_value_pct", label: "Residual Value %", type: "number", step: "0.01", helpText: "Salvage value as percent of opening asset value — amortisation input." },
+    { key: "boar_doses_per_week", label: "Boar Doses per Week", type: "number", step: "0.01", helpText: "Boar species only." },
+    { key: "boar_productive_life_months", label: "Boar Productive Life (months)", type: "number", helpText: "Boar species only." },
     { key: "avg_yield_per_unit", label: "Avg Yield per Unit", type: "number", step: "0.01" },
     { key: "description", label: "Description", type: "textarea" },
+  ],
+};
+
+const breedLifecycleStage: MasterDataConfig = {
+  key: "breed-lifecycle-stage",
+  label: "Breed Lifecycle Stages",
+  description: "Per-breed, per-stage production standards — feed rate, ADG, FCR, mortality, expected output — for a period range within that stage.",
+  apiBase: "/breed-lifecycle-stage",
+  idKey: "lifecycle_id",
+  group: "Livestock & Health",
+  columns: [
+    { key: "calc_unit", label: "Unit" },
+    { key: "period_from", label: "From" },
+    { key: "period_to", label: "To" },
+    { key: "std_fcr", label: "Std FCR" },
+  ],
+  fields: [
+    { key: "breed_id", label: "Breed", type: "select-entity", required: true, entityEndpoint: "/breed", entityValueKey: "breed_id", entityLabelKeys: ["breed_code", "breed_name"] },
+    { key: "stage_id", label: "Stage", type: "select-entity", required: true, entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"] },
+    {
+      key: "calc_unit", label: "Period Unit", type: "select", required: true,
+      options: ["DAY", "WEEK", "MONTH"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "period_from", label: "Period From", type: "number", required: true },
+    { key: "period_to", label: "Period To", type: "number", required: true },
+    { key: "season_type", label: "Season", type: "text", placeholder: "Winter" },
+    { key: "feed_item_id", label: "Feed Item", type: "select-entity", entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+    { key: "feed_qty_per_head_per_day_kg", label: "Feed Qty per Head per Day (KG)", type: "number", step: "0.0001" },
+    { key: "feed_wastage_pct", label: "Feed Wastage %", type: "number", step: "0.01" },
+    { key: "std_body_weight_kg", label: "Std Body Weight (KG)", type: "number", step: "0.001" },
+    { key: "std_adg_gpd", label: "Std ADG (g/day)", type: "number", step: "0.01" },
+    { key: "std_fcr", label: "Std FCR", type: "number", step: "0.001" },
+    { key: "std_mortality_rate_pct", label: "Std Mortality Rate %", type: "number", step: "0.001" },
+    { key: "output_item_id", label: "Output Item", type: "select-entity", entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+    { key: "output_uom", label: "Output UOM", type: "text" },
+    { key: "std_output_qty", label: "Std Output Qty", type: "number", step: "0.001" },
+    { key: "kpi_lower_limit", label: "KPI Lower Limit", type: "number", step: "0.0001" },
+    { key: "kpi_upper_limit", label: "KPI Upper Limit", type: "number", step: "0.0001" },
+    {
+      key: "alert_severity", label: "Alert Severity", type: "select",
+      options: ["INFO", "WARNING", "CRITICAL"].map((v) => ({ value: v, label: v })),
+    },
+    { key: "notes", label: "Notes", type: "textarea", helpText: "Shown as a tooltip on the data entry screen." },
   ],
 };
 
@@ -410,22 +608,33 @@ const supplier: MasterDataConfig = {
   columns: [
     { key: "supplier_code", label: "Code" },
     { key: "supplier_name", label: "Name" },
-    { key: "email", label: "Email" },
-    { key: "phone", label: "Phone" },
+    { key: "vendor_type", label: "Type" },
+    { key: "is_approved", label: "Approved" },
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "supplier_code", label: "Supplier Code", type: "text", required: true, placeholder: "SUP-001" },
     { key: "supplier_name", label: "Supplier Name", type: "text", required: true, placeholder: "Feed Ingredients Corp Ltd" },
+    {
+      key: "vendor_type", label: "Vendor Type", type: "select",
+      options: ["ANIMAL_SUPPLIER", "BREEDING_FARM", "SEMEN_SUPPLIER", "FEED_SUPPLIER", "MEDICINE_SUPPLIER", "EQUIPMENT_SUPPLIER", "SERVICES", "GENERAL"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
     { key: "email", label: "Email", type: "email", placeholder: "orders@feedingredients.com" },
     { key: "phone", label: "Phone", type: "text" },
     { key: "tax_number", label: "Tax Registration No.", type: "text", placeholder: "GSTIN123456789A" },
     { key: "payment_terms", label: "Payment Terms", type: "text", placeholder: "NET30" },
+    { key: "credit_limit", label: "Credit Limit", type: "number", step: "0.01" },
     { key: "address_line1", label: "Address Line 1", type: "text" },
     { key: "city", label: "City", type: "text" },
     { key: "state", label: "State", type: "text" },
     { key: "country", label: "Country", type: "text" },
     { key: "pincode", label: "Pincode", type: "text" },
+    { key: "health_cert_url", label: "Health Certificate URL", type: "text", helpText: "Required for ANIMAL_SUPPLIER — checked before a Goods Receipt from this vendor can post." },
+    { key: "breeding_farm_code", label: "Breeding Farm Registration No.", type: "text", helpText: "Required for ANIMAL_SUPPLIER / BREEDING_FARM." },
+    { key: "bank_account_no", label: "Bank Account Number", type: "text", helpText: "Stored encrypted. Enter a value here to replace it; leave blank to keep the existing one." },
+    { key: "bank_ifsc", label: "Bank IFSC / Routing Code", type: "text" },
+    { key: "bank_account_last4", label: "Bank Account (masked)", type: "text", hideInForm: true },
+    { key: "is_approved", label: "Approved", type: "boolean", hideInForm: true, helpText: "Use the Approve action, not direct edit." },
   ],
 };
 
@@ -619,13 +828,15 @@ const costCenter: MasterDataConfig = {
 
 export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   farm, warehouse, location, shed,
+  stage, numberSeries,
+  animal,
   itemCategory, uom, item, itemAttribute,
-  species, breed, disease, medicine, feedFormula,
+  species, breed, breedLifecycleStage, disease, medicine, feedFormula,
   supplier, customer, resource,
   glAccount, glMapping, costCenter,
 ];
 
-export const MASTER_DATA_GROUPS = ["Farm Operations", "Inventory", "Livestock & Health", "Business Partners", "Finance"] as const;
+export const MASTER_DATA_GROUPS = ["Farm Operations", "Production", "Piggery", "Inventory", "Livestock & Health", "Business Partners", "Finance"] as const;
 
 export function getConfig(key: string): MasterDataConfig | undefined {
   return MASTER_DATA_CONFIGS.find((c) => c.key === key);

@@ -36,6 +36,45 @@ export class LocationService {
     }
   }
 
+  /** SILO locations must carry both silo tracking fields. */
+  private assertSiloFieldsWhenSilo(
+    locationType: string | null | undefined,
+    siloCapacityKg?: number | null,
+    siloReorderDays?: number | null,
+  ) {
+    if (locationType === 'SILO' && (siloCapacityKg == null || siloReorderDays == null)) {
+      throw new ConflictException(
+        'A SILO location requires both silo_capacity_kg and silo_reorder_days.'
+      );
+    }
+  }
+
+  /** Validates a UOM code exists (tenant + company-or-global scope) before it's stored on a location. */
+  private async assertUomExists(uomCode: string | null | undefined, tenantId: string, companyId?: string | null) {
+    if (!uomCode) return;
+
+    const conditions = [
+      eq(schema.uomMaster.tenant_id, tenantId),
+      eq(schema.uomMaster.uom_code, uomCode.toUpperCase()),
+      isNull(schema.uomMaster.deleted_at),
+    ];
+    if (companyId) {
+      conditions.push(or(eq(schema.uomMaster.company_id, companyId), isNull(schema.uomMaster.company_id))!);
+    } else {
+      conditions.push(isNull(schema.uomMaster.company_id));
+    }
+
+    const [uom] = await this.db
+      .select()
+      .from(schema.uomMaster)
+      .where(and(...conditions))
+      .limit(1);
+
+    if (!uom) {
+      throw new NotFoundException(`UOM code '${uomCode}' not found.`);
+    }
+  }
+
   async create(dto: CreateLocationDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists (if provided)
     if (dto.company_id) {
@@ -95,7 +134,14 @@ export class LocationService {
       }
     }
 
-    // 4. Check duplicate location code
+    // 4. SILO locations must carry silo tracking fields
+    this.assertSiloFieldsWhenSilo(dto.location_type, dto.silo_capacity_kg, dto.silo_reorder_days);
+
+    // 5. area_unit / capacity_uom must resolve to a real UOM
+    await this.assertUomExists(dto.area_unit, tenantId, dto.company_id);
+    await this.assertUomExists(dto.capacity_uom, tenantId, dto.company_id);
+
+    // 6. Check duplicate location code
     const duplicateConditions = [
       eq(schema.locationMaster.tenant_id, tenantId),
       eq(schema.locationMaster.location_code, dto.location_code.toUpperCase()),
@@ -129,6 +175,7 @@ export class LocationService {
       warehouse_id: dto.warehouse_id || null,
       location_code: dto.location_code.toUpperCase(),
       location_name: dto.location_name,
+      location_address: dto.location_address,
       location_level: dto.location_level,
       location_type: dto.location_type,
       parent_location_id: dto.parent_location_id || null,
@@ -141,6 +188,9 @@ export class LocationService {
       gps_longitude: dto.gps_longitude?.toString() || null,
       storage_type: dto.storage_type || null,
       is_quarantine_zone: dto.is_quarantine_zone || false,
+      silo_capacity_kg: dto.silo_capacity_kg?.toString() || null,
+      silo_reorder_days: dto.silo_reorder_days ?? null,
+      downtime_days_required: dto.downtime_days_required ?? null,
       is_active: true,
       status: 'ACTIVE',
       extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
@@ -295,6 +345,20 @@ export class LocationService {
       }
     }
 
+    // SILO locations must carry silo tracking fields — validate against effective values so a
+    // partial update that doesn't touch these fields doesn't spuriously fail.
+    const effectiveLocationType = dto.location_type !== undefined ? dto.location_type : location.location_type;
+    const effectiveSiloCapacity = dto.silo_capacity_kg !== undefined ? dto.silo_capacity_kg : location.silo_capacity_kg;
+    const effectiveSiloReorderDays = dto.silo_reorder_days !== undefined ? dto.silo_reorder_days : location.silo_reorder_days;
+    this.assertSiloFieldsWhenSilo(effectiveLocationType, effectiveSiloCapacity as any, effectiveSiloReorderDays as any);
+
+    if (dto.area_unit !== undefined) {
+      await this.assertUomExists(dto.area_unit, tenantId, dto.company_id !== undefined ? dto.company_id : location.company_id);
+    }
+    if (dto.capacity_uom !== undefined) {
+      await this.assertUomExists(dto.capacity_uom, tenantId, dto.company_id !== undefined ? dto.company_id : location.company_id);
+    }
+
     if (dto.location_code && dto.location_code.toUpperCase() !== location.location_code) {
       const duplicateConditions = [
         eq(schema.locationMaster.tenant_id, tenantId),
@@ -333,6 +397,7 @@ export class LocationService {
     if (dto.warehouse_id !== undefined) updates.warehouse_id = dto.warehouse_id;
     if (dto.location_code !== undefined) updates.location_code = dto.location_code.toUpperCase();
     if (dto.location_name !== undefined) updates.location_name = dto.location_name;
+    if (dto.location_address !== undefined) updates.location_address = dto.location_address;
     if (dto.location_level !== undefined) updates.location_level = dto.location_level;
     if (dto.location_type !== undefined) updates.location_type = dto.location_type;
     if (dto.parent_location_id !== undefined) updates.parent_location_id = dto.parent_location_id;
@@ -345,6 +410,9 @@ export class LocationService {
     if (dto.gps_longitude !== undefined) updates.gps_longitude = dto.gps_longitude?.toString() || null;
     if (dto.storage_type !== undefined) updates.storage_type = dto.storage_type;
     if (dto.is_quarantine_zone !== undefined) updates.is_quarantine_zone = dto.is_quarantine_zone;
+    if (dto.silo_capacity_kg !== undefined) updates.silo_capacity_kg = dto.silo_capacity_kg?.toString() || null;
+    if (dto.silo_reorder_days !== undefined) updates.silo_reorder_days = dto.silo_reorder_days;
+    if (dto.downtime_days_required !== undefined) updates.downtime_days_required = dto.downtime_days_required;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;
     if (dto.extension_config !== undefined) updates.extension_config = JSON.stringify(dto.extension_config);

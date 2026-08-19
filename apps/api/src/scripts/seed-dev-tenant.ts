@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/mysql2/migrator';
 import * as mysql from 'mysql2/promise';
 import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
-import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED } from '../core/database/system-master-data-seed';
+import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED } from '../core/database/system-master-data-seed';
 import { STARTER_GL_ACCOUNTS, STARTER_GL_MAPPINGS, STARTER_WAREHOUSE } from '../modules/system/setup-wizard/seed/starter-master-data.seed-data';
 
 /**
@@ -145,6 +145,17 @@ async function seedDevTenant() {
           breed_name: breed.breed_name,
           species_id: speciesId || null,
           breed_type: breed.breed_type,
+          gestation_days: breed.gestation_days ?? null,
+          lactation_days: breed.lactation_days ?? null,
+          productive_life_months: breed.productive_life_months ?? null,
+          residual_value_pct: breed.residual_value_pct?.toString() ?? null,
+          productive_life_cycles: breed.productive_life_cycles ?? null,
+          avg_litter_size_born: breed.avg_litter_size_born?.toString() ?? null,
+          avg_litter_size_weaned: breed.avg_litter_size_weaned?.toString() ?? null,
+          avg_weaning_weight_kg: breed.avg_weaning_weight_kg?.toString() ?? null,
+          farrowing_rate_pct: breed.farrowing_rate_pct?.toString() ?? null,
+          boar_doses_per_week: breed.boar_doses_per_week?.toString() ?? null,
+          boar_productive_life_months: breed.boar_productive_life_months ?? null,
         });
       }
 
@@ -192,6 +203,71 @@ async function seedDevTenant() {
           default_qty_per_unit: param.default_qty_per_unit != null ? param.default_qty_per_unit.toString() : null,
           default_qty_per_batch: param.default_qty_per_batch != null ? param.default_qty_per_batch.toString() : null,
           is_mandatory: param.is_mandatory ?? false,
+        });
+      }
+
+      const pigLobId = lobIdByCode.get('LVS_PIGGERY');
+      const pigNobId = nobIdByCode.get('LIVESTOCK');
+      const existingStageCodes = new Set((await tenantDb.select({ c: tenant.stageMaster.stage_code }).from(tenant.stageMaster)).map((r) => r.c));
+      if (pigLobId && pigNobId) {
+        // Two passes — next_stage_id/alt_next_stage_id are FKs MySQL checks per-statement
+        // (BOAR_AI even points at itself), so insert every row first, then wire the chain.
+        const stageIdByCode = new Map(SYSTEM_STAGE_SEED.map((s) => [s.stage_code, randomUUID()]));
+        for (const stage of SYSTEM_STAGE_SEED) {
+          if (existingStageCodes.has(stage.stage_code)) continue;
+          await tenantDb.insert(tenant.stageMaster).values({
+            stage_id: stageIdByCode.get(stage.stage_code)!,
+            tenant_id: tenantId,
+            company_id: null,
+            nob_id: pigNobId,
+            lob_id: pigLobId,
+            stage_code: stage.stage_code,
+            stage_name: stage.stage_name,
+            stage_category: stage.stage_category,
+            stage_sequence: stage.stage_sequence,
+            typical_duration_days: stage.typical_duration_days ?? null,
+            min_days_before_move: stage.min_days_before_move,
+            transition_trigger: stage.transition_trigger,
+            auto_move_on_day: stage.auto_move_on_day ?? null,
+            alt_trigger_condition: stage.alt_trigger_condition || null,
+            data_entry_form: stage.data_entry_form,
+            show_on_animal_card: stage.show_on_animal_card,
+            stage_description: stage.stage_description,
+            sort_order: stage.stage_sequence,
+            is_system: true,
+          });
+        }
+        for (const stage of SYSTEM_STAGE_SEED) {
+          if (existingStageCodes.has(stage.stage_code)) continue;
+          if (!stage.next_stage_code && !stage.alt_next_stage_code) continue;
+          await tenantDb.update(tenant.stageMaster).set({
+            next_stage_id: stage.next_stage_code ? stageIdByCode.get(stage.next_stage_code) || null : null,
+            alt_next_stage_id: stage.alt_next_stage_code ? stageIdByCode.get(stage.alt_next_stage_code) || null : null,
+          }).where(eq(tenant.stageMaster.stage_id, stageIdByCode.get(stage.stage_code)!));
+        }
+      }
+
+      const existingSeriesCodes = new Set((await tenantDb.select({ c: tenant.noSeriesMaster.series_code }).from(tenant.noSeriesMaster)).map((r) => r.c));
+      for (const series of SYSTEM_NO_SERIES_SEED) {
+        if (existingSeriesCodes.has(series.series_code)) continue;
+        const seriesNobId = series.nob_code ? nobIdByCode.get(series.nob_code) : undefined;
+        const seriesLobId = series.lob_code ? lobIdByCode.get(series.lob_code) : undefined;
+        if ((series.nob_code && !seriesNobId) || (series.lob_code && !seriesLobId)) continue;
+        await tenantDb.insert(tenant.noSeriesMaster).values({
+          series_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: seriesNobId || null,
+          lob_id: seriesLobId || null,
+          series_code: series.series_code,
+          series_name: series.series_name,
+          document_type: series.document_type,
+          prefix: series.prefix || null,
+          date_format: series.date_format || null,
+          separator: series.separator,
+          seq_length: series.seq_length,
+          current_seq: 0,
+          reset_frequency: series.reset_frequency,
         });
       }
 

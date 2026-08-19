@@ -4,13 +4,16 @@ import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
-import { 
-  CreateSpeciesDto, 
-  UpdateSpeciesDto, 
+import {
+  CreateSpeciesDto,
+  UpdateSpeciesDto,
   QuerySpeciesDto,
-  CreateBreedDto, 
-  UpdateBreedDto, 
-  QueryBreedDto 
+  CreateBreedDto,
+  UpdateBreedDto,
+  QueryBreedDto,
+  CreateBreedLifecycleStageDto,
+  UpdateBreedLifecycleStageDto,
+  QueryBreedLifecycleStageDto,
 } from './dto/breed.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 
@@ -317,6 +320,17 @@ export class BreedService {
       productive_life_months: dto.productive_life_months ?? null,
       premature_years: dto.premature_years?.toString() || null,
       avg_yield_per_unit: dto.avg_yield_per_unit?.toString() || null,
+      lactation_days: dto.lactation_days ?? null,
+      residual_value_pct: dto.residual_value_pct?.toString() || null,
+      productive_life_cycles: dto.productive_life_cycles ?? null,
+      avg_litter_size_born: dto.avg_litter_size_born?.toString() || null,
+      avg_litter_size_weaned: dto.avg_litter_size_weaned?.toString() || null,
+      avg_weaning_weight_kg: dto.avg_weaning_weight_kg?.toString() || null,
+      farrowing_rate_pct: dto.farrowing_rate_pct?.toString() || null,
+      boar_doses_per_week: dto.boar_doses_per_week?.toString() || null,
+      boar_productive_life_months: dto.boar_productive_life_months ?? null,
+      vaccination_schedule: dto.vaccination_schedule ? JSON.stringify(dto.vaccination_schedule) : null,
+      age_labels: dto.age_labels ? JSON.stringify(dto.age_labels) : null,
       description: dto.description || null,
       is_active: true,
       status: 'ACTIVE',
@@ -460,6 +474,17 @@ export class BreedService {
     if (dto.productive_life_months !== undefined) updates.productive_life_months = dto.productive_life_months;
     if (dto.premature_years !== undefined) updates.premature_years = dto.premature_years?.toString() || null;
     if (dto.avg_yield_per_unit !== undefined) updates.avg_yield_per_unit = dto.avg_yield_per_unit?.toString() || null;
+    if (dto.lactation_days !== undefined) updates.lactation_days = dto.lactation_days;
+    if (dto.residual_value_pct !== undefined) updates.residual_value_pct = dto.residual_value_pct?.toString() || null;
+    if (dto.productive_life_cycles !== undefined) updates.productive_life_cycles = dto.productive_life_cycles;
+    if (dto.avg_litter_size_born !== undefined) updates.avg_litter_size_born = dto.avg_litter_size_born?.toString() || null;
+    if (dto.avg_litter_size_weaned !== undefined) updates.avg_litter_size_weaned = dto.avg_litter_size_weaned?.toString() || null;
+    if (dto.avg_weaning_weight_kg !== undefined) updates.avg_weaning_weight_kg = dto.avg_weaning_weight_kg?.toString() || null;
+    if (dto.farrowing_rate_pct !== undefined) updates.farrowing_rate_pct = dto.farrowing_rate_pct?.toString() || null;
+    if (dto.boar_doses_per_week !== undefined) updates.boar_doses_per_week = dto.boar_doses_per_week?.toString() || null;
+    if (dto.boar_productive_life_months !== undefined) updates.boar_productive_life_months = dto.boar_productive_life_months;
+    if (dto.vaccination_schedule !== undefined) updates.vaccination_schedule = JSON.stringify(dto.vaccination_schedule);
+    if (dto.age_labels !== undefined) updates.age_labels = JSON.stringify(dto.age_labels);
     if (dto.description !== undefined) updates.description = dto.description;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;
@@ -549,5 +574,190 @@ export class BreedService {
     });
 
     return this.findOneBreed(id);
+  }
+
+  // ==========================================
+  // BREED LIFECYCLE STAGES
+  // ==========================================
+
+  private async assertItemExists(itemId: string) {
+    const [item] = await this.db
+      .select()
+      .from(schema.itemMaster)
+      .where(and(eq(schema.itemMaster.item_id, itemId), isNull(schema.itemMaster.deleted_at)))
+      .limit(1);
+    if (!item) {
+      throw new NotFoundException(`Item with ID '${itemId}' not found.`);
+    }
+  }
+
+  async createLifecycleStage(dto: CreateBreedLifecycleStageDto, tenantId: string, userPayload?: any) {
+    await this.findOneBreed(dto.breed_id);
+
+    const [stage] = await this.db
+      .select()
+      .from(schema.stageMaster)
+      .where(and(eq(schema.stageMaster.stage_id, dto.stage_id), isNull(schema.stageMaster.deleted_at)))
+      .limit(1);
+    if (!stage) {
+      throw new NotFoundException(`Stage with ID '${dto.stage_id}' not found.`);
+    }
+
+    if (dto.feed_item_id) await this.assertItemExists(dto.feed_item_id);
+    if (dto.output_item_id) await this.assertItemExists(dto.output_item_id);
+
+    const lifecycleId = randomUUID();
+    const newLifecycleStage = {
+      lifecycle_id: lifecycleId,
+      tenant_id: tenantId,
+      breed_id: dto.breed_id,
+      stage_id: dto.stage_id,
+      calc_unit: dto.calc_unit,
+      period_from: dto.period_from,
+      period_to: dto.period_to,
+      season_type: dto.season_type || null,
+      feed_item_id: dto.feed_item_id || null,
+      feed_qty_per_head_per_day_kg: dto.feed_qty_per_head_per_day_kg?.toString() || null,
+      feed_wastage_pct: dto.feed_wastage_pct?.toString() || null,
+      std_body_weight_kg: dto.std_body_weight_kg?.toString() || null,
+      std_adg_gpd: dto.std_adg_gpd?.toString() || null,
+      std_fcr: dto.std_fcr?.toString() || null,
+      std_mortality_rate_pct: dto.std_mortality_rate_pct?.toString() || null,
+      output_item_id: dto.output_item_id || null,
+      output_uom: dto.output_uom || null,
+      std_output_qty: dto.std_output_qty?.toString() || null,
+      medication_protocol: dto.medication_protocol ? JSON.stringify(dto.medication_protocol) : null,
+      vaccination_protocol: dto.vaccination_protocol ? JSON.stringify(dto.vaccination_protocol) : null,
+      resource_requirements: dto.resource_requirements ? JSON.stringify(dto.resource_requirements) : null,
+      kpi_lower_limit: dto.kpi_lower_limit?.toString() || null,
+      kpi_upper_limit: dto.kpi_upper_limit?.toString() || null,
+      alert_severity: dto.alert_severity || null,
+      notes: dto.notes || null,
+      is_active: true,
+      created_by: userPayload?.userId || null,
+    };
+
+    await this.db.insert(schema.breedLifecycleStages).values(newLifecycleStage);
+
+    await this.auditService.log({
+      tenantId,
+      userId: userPayload?.userId,
+      action: 'CREATE',
+      entityName: 'breed_lifecycle_stages',
+      entityId: lifecycleId,
+      newValues: newLifecycleStage,
+    });
+
+    return this.findOneLifecycleStage(lifecycleId);
+  }
+
+  async findOneLifecycleStage(id: string) {
+    const [lifecycleStage] = await this.db
+      .select()
+      .from(schema.breedLifecycleStages)
+      .where(eq(schema.breedLifecycleStages.lifecycle_id, id))
+      .limit(1);
+
+    if (!lifecycleStage) {
+      throw new NotFoundException(`Breed lifecycle stage with ID '${id}' not found.`);
+    }
+    return lifecycleStage;
+  }
+
+  async findAllLifecycleStages(query: QueryBreedLifecycleStageDto, tenantId: string) {
+    const conditions: any[] = [eq(schema.breedLifecycleStages.tenant_id, tenantId)];
+
+    if (query.breedId) conditions.push(eq(schema.breedLifecycleStages.breed_id, query.breedId));
+    if (query.stageId) conditions.push(eq(schema.breedLifecycleStages.stage_id, query.stageId));
+
+    const limit = query.limit || 50;
+    const offset = query.offset || 0;
+
+    return this.db
+      .select()
+      .from(schema.breedLifecycleStages)
+      .where(and(...conditions))
+      .orderBy(schema.breedLifecycleStages.period_from)
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async updateLifecycleStage(id: string, dto: UpdateBreedLifecycleStageDto, tenantId: string, userPayload?: any) {
+    const lifecycleStage = await this.findOneLifecycleStage(id);
+
+    if (dto.stage_id) {
+      const [stage] = await this.db
+        .select()
+        .from(schema.stageMaster)
+        .where(and(eq(schema.stageMaster.stage_id, dto.stage_id), isNull(schema.stageMaster.deleted_at)))
+        .limit(1);
+      if (!stage) {
+        throw new NotFoundException(`Stage with ID '${dto.stage_id}' not found.`);
+      }
+    }
+    if (dto.feed_item_id) await this.assertItemExists(dto.feed_item_id);
+    if (dto.output_item_id) await this.assertItemExists(dto.output_item_id);
+
+    const updates: any = {};
+    if (dto.stage_id !== undefined) updates.stage_id = dto.stage_id;
+    if (dto.calc_unit !== undefined) updates.calc_unit = dto.calc_unit;
+    if (dto.period_from !== undefined) updates.period_from = dto.period_from;
+    if (dto.period_to !== undefined) updates.period_to = dto.period_to;
+    if (dto.season_type !== undefined) updates.season_type = dto.season_type;
+    if (dto.feed_item_id !== undefined) updates.feed_item_id = dto.feed_item_id;
+    if (dto.feed_qty_per_head_per_day_kg !== undefined) updates.feed_qty_per_head_per_day_kg = dto.feed_qty_per_head_per_day_kg?.toString() || null;
+    if (dto.feed_wastage_pct !== undefined) updates.feed_wastage_pct = dto.feed_wastage_pct?.toString() || null;
+    if (dto.std_body_weight_kg !== undefined) updates.std_body_weight_kg = dto.std_body_weight_kg?.toString() || null;
+    if (dto.std_adg_gpd !== undefined) updates.std_adg_gpd = dto.std_adg_gpd?.toString() || null;
+    if (dto.std_fcr !== undefined) updates.std_fcr = dto.std_fcr?.toString() || null;
+    if (dto.std_mortality_rate_pct !== undefined) updates.std_mortality_rate_pct = dto.std_mortality_rate_pct?.toString() || null;
+    if (dto.output_item_id !== undefined) updates.output_item_id = dto.output_item_id;
+    if (dto.output_uom !== undefined) updates.output_uom = dto.output_uom;
+    if (dto.std_output_qty !== undefined) updates.std_output_qty = dto.std_output_qty?.toString() || null;
+    if (dto.medication_protocol !== undefined) updates.medication_protocol = JSON.stringify(dto.medication_protocol);
+    if (dto.vaccination_protocol !== undefined) updates.vaccination_protocol = JSON.stringify(dto.vaccination_protocol);
+    if (dto.resource_requirements !== undefined) updates.resource_requirements = JSON.stringify(dto.resource_requirements);
+    if (dto.kpi_lower_limit !== undefined) updates.kpi_lower_limit = dto.kpi_lower_limit?.toString() || null;
+    if (dto.kpi_upper_limit !== undefined) updates.kpi_upper_limit = dto.kpi_upper_limit?.toString() || null;
+    if (dto.alert_severity !== undefined) updates.alert_severity = dto.alert_severity;
+    if (dto.notes !== undefined) updates.notes = dto.notes;
+    if (dto.is_active !== undefined) updates.is_active = dto.is_active;
+
+    await this.db
+      .update(schema.breedLifecycleStages)
+      .set(updates)
+      .where(eq(schema.breedLifecycleStages.lifecycle_id, id));
+
+    await this.auditService.log({
+      tenantId,
+      userId: userPayload?.userId,
+      action: 'UPDATE',
+      entityName: 'breed_lifecycle_stages',
+      entityId: id,
+      oldValues: lifecycleStage,
+      newValues: updates,
+    });
+
+    return this.findOneLifecycleStage(id);
+  }
+
+  async removeLifecycleStage(id: string, tenantId: string, userPayload?: any) {
+    const lifecycleStage = await this.findOneLifecycleStage(id);
+
+    await this.db
+      .update(schema.breedLifecycleStages)
+      .set({ is_active: false })
+      .where(eq(schema.breedLifecycleStages.lifecycle_id, id));
+
+    await this.auditService.log({
+      tenantId,
+      userId: userPayload?.userId,
+      action: 'DELETE',
+      entityName: 'breed_lifecycle_stages',
+      entityId: id,
+      oldValues: lifecycleStage,
+    });
+
+    return { success: true, message: 'Breed lifecycle stage has been deactivated.' };
   }
 }
