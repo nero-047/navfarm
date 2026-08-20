@@ -1794,6 +1794,52 @@ export class BatchService {
           );
           successCount++;
         }
+
+        // 5. Transfer Line (Scheduler 6th Line Type)
+        if (row.transfer_count != null && Number(row.transfer_count) > 0) {
+          const transferRemarks = row.remarks || (row.transfer_weight ? `Transfer ${row.transfer_count} heads (${row.transfer_weight} kg)` : `Transfer ${row.transfer_count} heads`);
+          await this.addTransaction(
+            row.batch_id,
+            {
+              transaction_date: dto.entry_date,
+              transaction_type: 'TRANSFER_OUT',
+              quantity: Number(row.transfer_count),
+              uom: 'HEAD',
+              remarks: transferRemarks,
+            },
+            tenantId,
+            userPayload
+          );
+
+          if (row.to_batch_id) {
+            await this.addTransaction(
+              row.to_batch_id,
+              {
+                transaction_date: dto.entry_date,
+                transaction_type: 'TRANSFER_IN',
+                quantity: Number(row.transfer_count),
+                uom: 'HEAD',
+                remarks: `Transfer in from ${batch.batch_no || row.batch_id}`,
+              },
+              tenantId,
+              userPayload
+            );
+          }
+
+          if (row.auto_triggers_stage && row.to_stage_code) {
+            await this.transferStage(
+              row.batch_id,
+              {
+                to_stage_code: row.to_stage_code,
+                to_location_id: row.to_location_id,
+                remarks: `Auto-transition on transfer log (${dto.entry_date})`,
+              },
+              tenantId,
+              userPayload
+            );
+          }
+          successCount++;
+        }
       } catch (err: any) {
         errors.push({
           batch_id: row.batch_id,

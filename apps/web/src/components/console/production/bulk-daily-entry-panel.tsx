@@ -39,6 +39,7 @@ interface BatchRowState {
   current_quantity?: number;
   feed_qty: string;
   mortality_count: string;
+  transfer_count: string;
   water_qty: string;
   temperature: string;
   remarks: string;
@@ -95,6 +96,7 @@ export default function BulkDailyEntryPanel() {
           current_quantity: b.current_quantity != null ? Number(b.current_quantity) : Number(b.opening_quantity || 0),
           feed_qty: "",
           mortality_count: "",
+          transfer_count: "",
           water_qty: "",
           temperature: "",
           remarks: "",
@@ -131,6 +133,7 @@ export default function BulkDailyEntryPanel() {
         (r) =>
           (r.feed_qty && Number(r.feed_qty) > 0) ||
           (r.mortality_count && Number(r.mortality_count) > 0) ||
+          (r.transfer_count && Number(r.transfer_count) > 0) ||
           (r.water_qty && Number(r.water_qty) > 0) ||
           r.temperature !== "" ||
           r.remarks.trim() !== ""
@@ -140,13 +143,14 @@ export default function BulkDailyEntryPanel() {
         feed_item_id: defaultFeedItemId || undefined,
         feed_qty: r.feed_qty ? Number(r.feed_qty) : undefined,
         mortality_count: r.mortality_count ? Number(r.mortality_count) : undefined,
+        transfer_count: r.transfer_count ? Number(r.transfer_count) : undefined,
         water_qty: r.water_qty ? Number(r.water_qty) : undefined,
         temperature: r.temperature ? Number(r.temperature) : undefined,
         remarks: r.remarks || undefined,
       }));
 
     if (validEntries.length === 0) {
-      setError("Please enter daily feed, mortality, or observations for at least one batch.");
+      setError("Please enter daily feed, mortality, transfer, or observations for at least one batch.");
       setSaving(false);
       return;
     }
@@ -166,6 +170,7 @@ export default function BulkDailyEntryPanel() {
           ...r,
           feed_qty: "",
           mortality_count: "",
+          transfer_count: "",
           water_qty: "",
           temperature: "",
           remarks: "",
@@ -274,6 +279,7 @@ export default function BulkDailyEntryPanel() {
                 <TableHead className="w-24 text-right">Headcount</TableHead>
                 <TableHead className="w-32">Feed Qty (kg)</TableHead>
                 <TableHead className="w-28">Mortality (head)</TableHead>
+                <TableHead className="w-28">Transfer (head)</TableHead>
                 <TableHead className="w-28">Water (L)</TableHead>
                 <TableHead className="w-28">Temp (°C)</TableHead>
                 <TableHead>Remarks / Health</TableHead>
@@ -319,6 +325,16 @@ export default function BulkDailyEntryPanel() {
                         placeholder="0"
                         value={r.mortality_count}
                         onChange={(e) => handleRowChange(idx, "mortality_count", e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <input
+                        type="number"
+                        min="0"
+                        className="nf-input text-xs h-8 font-mono"
+                        placeholder="0"
+                        value={r.transfer_count}
+                        onChange={(e) => handleRowChange(idx, "transfer_count", e.target.value)}
                       />
                     </TableCell>
                     <TableCell>

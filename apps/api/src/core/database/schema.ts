@@ -525,6 +525,10 @@ export const itemMaster = mysqlTable('item_master', {
   // identical to item_type even though the spec's value list overlaps heavily with it —
   // defaulted from item_type at create time, but independently overridable.
   posting_group: varchar('posting_group', { length: 30 }),
+  item_tracking: varchar('item_tracking', { length: 20 }).default('NONE').notNull(), // NONE, LOT, SERIAL
+  lead_time_days: int('lead_time_days').default(0).notNull(),
+  gl_inventory_acct: varchar('gl_inventory_acct', { length: 36 }),
+  gl_cogs_acct: varchar('gl_cogs_acct', { length: 36 }),
   standard_cost: decimal('standard_cost', { precision: 18, scale: 6 }),
   is_lot_tracked: boolean('is_lot_tracked').default(false).notNull(),
   is_serial_tracked: boolean('is_serial_tracked').default(false).notNull(),
@@ -749,6 +753,9 @@ export const locationMaster = mysqlTable('location_master', {
   location_address: varchar('location_address', { length: 500 }),
   location_level: int('location_level').notNull(),
   location_type: varchar('location_type', { length: 50 }).notNull(), // FARM, SHED, AREA, SECTION, PEN, SILO etc.
+  data_entry_level: varchar('data_entry_level', { length: 20 }).default('SHED').notNull(), // FARM, SHED, PEN
+  is_storage: boolean('is_storage').default(false).notNull(),
+  parent_store_id: varchar('parent_store_id', { length: 36 }),
   parent_location_id: varchar('parent_location_id', { length: 36 }),
   area_size: decimal('area_size', { precision: 18, scale: 4 }),
   area_unit: varchar('area_unit', { length: 10 }),
@@ -1084,6 +1091,9 @@ export const resourceMaster = mysqlTable('resource_master', {
   resource_code: varchar('resource_code', { length: 50 }).notNull(),
   resource_name: varchar('resource_name', { length: 150 }).notNull(),
   resource_type: varchar('resource_type', { length: 30 }).notNull(), // LABOR, EQUIPMENT, VEHICLE
+  cost_element: varchar('cost_element', { length: 30 }).default('DIRECT_LABOR').notNull(), // DIRECT_LABOR, INDIRECT_LABOR, EQUIPMENT_HIRE, FUEL, MAINTENANCE
+  gl_cost_account: varchar('gl_cost_account', { length: 36 }),
+  department: varchar('department', { length: 100 }),
   nob_id: varchar('nob_id', { length: 36 }), // NOB scope (null = available across all NOBs)
   lob_id: varchar('lob_id', { length: 36 }), // LOB scope (null = not LOB-restricted)
   resource_sub_type: varchar('resource_sub_type', { length: 50 }), // PERMANENT/CONTRACT/DAILY (labor); OWNED/LEASED/RENTED (equipment)
@@ -2004,6 +2014,13 @@ export const schedulerParameterLine = mysqlTable('scheduler_parameter_line', {
   notify_in_app: boolean('notify_in_app').default(true).notNull(),
   notify_push: boolean('notify_push').default(false).notNull(),
   notify_email: boolean('notify_email').default(false).notNull(),
+  to_batch_id: varchar('to_batch_id', { length: 36 }),
+  to_location_id: varchar('to_location_id', { length: 36 }),
+  transfer_item_id: varchar('transfer_item_id', { length: 36 }),
+  transfer_qty_basis: varchar('transfer_qty_basis', { length: 20 }), // HEAD_COUNT, WEIGHT, BOTH
+  capture_transfer_weight: boolean('capture_transfer_weight').default(false).notNull(),
+  auto_triggers_stage: boolean('auto_triggers_stage').default(false).notNull(),
+  destination_stage_id: varchar('destination_stage_id', { length: 36 }),
   sort_order: int('sort_order'),
   notes: text('notes'),
 }, (table) => ({
@@ -2396,6 +2413,7 @@ export const animalRegister = mysqlTable('animal_register', {
   breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
   gender: char('gender', { length: 1 }).notNull(), // F, M
   dob: date('dob', { mode: 'string' }),
+  age_at_entry_weeks: int('age_at_entry_weeks'),
   entry_type: varchar('entry_type', { length: 30 }).notNull(), // PURCHASED_IMPORTED, PURCHASED_LOCAL, BORN_ON_FARM, TRANSFERRED_IN
   entry_date: date('entry_date', { mode: 'string' }).notNull(),
   // Spec's "source_grn_id" — named to match this codebase's actual table (goods_receipt, not GRN).
@@ -2736,9 +2754,12 @@ export const semenBatch = mysqlTable('semen_batch', {
   running_cost_period: decimal('running_cost_period', { precision: 18, scale: 4 }).default('0.0000'),
   doses_collected: decimal('doses_collected', { precision: 10, scale: 2 }).notNull(),
   unit_cost_per_dose: decimal('unit_cost_per_dose', { precision: 18, scale: 6 }).default('0.000000'),
+  boar_balance_sheet_val: decimal('boar_balance_sheet_val', { precision: 18, scale: 4 }).default('0.0000'),
   doses_used_internal: decimal('doses_used_internal', { precision: 10, scale: 2 }).default('0.00'),
   doses_sold: decimal('doses_sold', { precision: 10, scale: 2 }).default('0.00'),
   output_item_id: varchar('output_item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'set null' }),
+  output_lot_id: varchar('output_lot_id', { length: 50 }),
+  inventory_receipt_id: varchar('inventory_receipt_id', { length: 36 }),
   inventory_posted: boolean('inventory_posted').default(false).notNull(),
   notes: text('notes'),
   created_by: varchar('created_by', { length: 36 }),

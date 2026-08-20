@@ -918,19 +918,63 @@ export async function seedPiggeryData() {
     const glAccounts = await db.select().from(schema.glAccountMaster).where(eq(schema.glAccountMaster.company_id, companyId));
     const glMap = new Map(glAccounts.map((a) => [a.account_code, a.gl_account_id]));
 
-    // Ensure all required GL Accounts exist
+    // Ensure all required GL Accounts exist (Full Sheet 13 Piggery Standard Chart of Accounts)
     const standardAccounts = [
-      { code: '1000', name: 'Cash and Bank', type: 'ASSET' },
+      // Assets
+      { code: '1000', name: 'Cash and Bank Clearing', type: 'ASSET' },
+      { code: '1110', name: 'Primary Operating Bank Account', type: 'ASSET' },
+      { code: '1200', name: 'Accounts Receivable — Customer Trade', type: 'ASSET' },
+      { code: '1300', name: 'Feed and Raw Material Inventory', type: 'ASSET' },
+      { code: '1310', name: 'Veterinary Medicines & Vaccines Inventory', type: 'ASSET' },
+      { code: '1320', name: 'Boar Semen Inventory', type: 'ASSET' },
+      { code: '1330', name: 'Farm Consumables & Supplies Inventory', type: 'ASSET' },
+      { code: '1400', name: 'Work in Progress — Batch Production WIP', type: 'ASSET' },
+      { code: '1410', name: 'Biological Asset — Sow & Gilt Breeding Herd', type: 'ASSET' },
+      { code: '1419', name: 'Accumulated Amortisation — Sow Herd', type: 'ASSET' },
+      { code: '1420', name: 'Biological Asset — Boar Breeding Herd', type: 'ASSET' },
+      { code: '1429', name: 'Accumulated Amortisation — Boar Herd', type: 'ASSET' },
+      { code: '1430', name: 'Inventory — Commercial Piglets & Growers', type: 'ASSET' },
+      { code: '1440', name: 'Biological Asset — Cattle & Other Livestock', type: 'ASSET' },
+      { code: '1500', name: 'Farm Machinery and Equipment', type: 'ASSET' },
+      { code: '1510', name: 'Sheds and Farm Infrastructure', type: 'ASSET' },
+      // Legacy compatibility codes
       { code: '1010', name: 'Raw Material Inventory', type: 'ASSET' },
       { code: '1020', name: 'Work in Progress Inventory', type: 'ASSET' },
       { code: '1030', name: 'Finished Goods Inventory', type: 'ASSET' },
       { code: '1050', name: 'Biological Assets — Pre-mature', type: 'ASSET' },
       { code: '1060', name: 'Biological Assets — Mature', type: 'ASSET' },
-      { code: '2010', name: 'Trade Payables Clearing', type: 'LIABILITY' },
-      { code: '4010', name: 'Disposal Gain / Loss', type: 'INCOME' },
+
+      // Liabilities
+      { code: '2000', name: 'Accounts Payable — Vendor Ledger', type: 'LIABILITY' },
+      { code: '2010', name: 'Trade Payables Clearing Account', type: 'LIABILITY' },
+      { code: '2100', name: 'Accrued Farm Wages & Payroll Clearing', type: 'LIABILITY' },
+      { code: '2200', name: 'Accrued Operating & Vet Expenses', type: 'LIABILITY' },
+
+      // Equity
+      { code: '3000', name: 'Shareholder Capital', type: 'EQUITY' },
+      { code: '3100', name: 'Retained Earnings', type: 'EQUITY' },
+
+      // Revenue / Income
+      { code: '4000', name: 'Meat & Pork Output Sales Revenue', type: 'INCOME' },
+      { code: '4010', name: 'Breeding Animal Sales Revenue', type: 'INCOME' },
+      { code: '4020', name: 'Semen Dose Sales Revenue', type: 'INCOME' },
+      { code: '4200', name: 'Fair Value Gain on Biological Assets', type: 'INCOME' },
+
+      // Cost of Goods Sold & Expenses
       { code: '5010', name: 'Mortality Loss', type: 'EXPENSE' },
       { code: '5020', name: 'Feed & Overhead Expense', type: 'EXPENSE' },
-      { code: '5100', name: 'Bio-Asset Amortization Expense', type: 'EXPENSE' },
+      { code: '5100', name: 'Direct Feed Material COGS', type: 'EXPENSE' },
+      { code: '5110', name: 'Direct Veterinary Medicines & Vaccines', type: 'EXPENSE' },
+      { code: '5120', name: 'Direct AI Breeding & Semen Cost', type: 'EXPENSE' },
+      { code: '5130', name: 'Direct Farm Labour Wages', type: 'EXPENSE' },
+      { code: '5140', name: 'Equipment Hire & Farm Utilities', type: 'EXPENSE' },
+      { code: '5200', name: 'Fair Value Loss on Biological Assets', type: 'EXPENSE' },
+      { code: '5300', name: 'Mortality Loss Expense', type: 'EXPENSE' },
+      { code: '5400', name: 'Stock Adjustment & Shrinkage Loss', type: 'EXPENSE' },
+      { code: '5500', name: 'Amortisation Expense — Biological Assets', type: 'EXPENSE' },
+      { code: '5600', name: 'Farm Maintenance & Facility Repairs', type: 'EXPENSE' },
+      { code: '5700', name: 'General & Administrative Expenses', type: 'EXPENSE' },
+      { code: '5800', name: 'Depreciation Expense — Equipment & Sheds', type: 'EXPENSE' },
     ];
     for (const acc of standardAccounts) {
       let [existingAcc] = await db.select().from(schema.glAccountMaster).where(and(eq(schema.glAccountMaster.company_id, companyId), eq(schema.glAccountMaster.account_code, acc.code))).limit(1);
@@ -947,6 +991,52 @@ export async function seedPiggeryData() {
         });
       }
       glMap.set(acc.code, gId!);
+    }
+
+    // Seed Automated GL Posting Setup Rules (Sheet 13)
+    console.log('   - Seeding Automated GL Posting Setup Rules...');
+    const postingRules = [
+      { type: 'GRN', debit: '1300', credit: '2010', desc: 'Feed & Material GRN Inbound' },
+      { type: 'GRN_MEDICINE', debit: '1310', credit: '2010', desc: 'Meds & Vaccine GRN Inbound' },
+      { type: 'GRN_ANIMAL', debit: '1410', credit: '2000', desc: 'Breeding Herd Capital Acquisition' },
+      { type: 'FEED_CONSUMPTION', debit: '1400', credit: '1300', desc: 'Batch Feed Consumption (WIP)' },
+      { type: 'MEDICATION_CONSUMPTION', debit: '1400', credit: '1310', desc: 'Batch Medication Administration' },
+      { type: 'FARROWING_OUTPUT', debit: '1430', credit: '1400', desc: 'Farrowing Output Piglets Capitalisation' },
+      { type: 'WEANING_TRANSITION', debit: '1430', credit: '1400', desc: 'Weaning Phase Output Capitalisation' },
+      { type: 'SEMEN_COLLECTION', debit: '1320', credit: '1400', desc: 'Boar Semen Dose Collection' },
+      { type: 'MORTALITY', debit: '5300', credit: '1400', desc: 'Batch Piglet/Grower Mortality Loss' },
+      { type: 'AMORTISATION', debit: '5500', credit: '1419', desc: 'Sow Breeding Herd Monthly Amortisation' },
+      { type: 'STOCK_ADJUSTMENT', debit: '5400', credit: '1300', desc: 'Inventory Shrinkage / Variance' },
+      { type: 'TRANSFER_SHIPMENT', debit: '1400', credit: '1400', desc: 'Batch Animal Transfer Out' },
+      { type: 'TRANSFER_RECEIPT', debit: '1400', credit: '1400', desc: 'Batch Animal Transfer In' },
+      { type: 'SALE', debit: '1200', credit: '4000', desc: 'Commercial Pork / Animal Sales' },
+    ];
+
+    for (const rule of postingRules) {
+      const [existingRule] = await db
+        .select()
+        .from(schema.glMappingMaster)
+        .where(
+          and(
+            eq(schema.glMappingMaster.company_id, companyId),
+            eq(schema.glMappingMaster.transaction_type, rule.type)
+          )
+        )
+        .limit(1);
+
+      if (!existingRule) {
+        await db.insert(schema.glMappingMaster).values({
+          mapping_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: companyId,
+          nob_id: nobId,
+          lob_id: lobId,
+          transaction_type: rule.type,
+          debit_gl_account_id: glMap.get(rule.debit) || null,
+          credit_gl_account_id: glMap.get(rule.credit) || null,
+          is_active: true,
+        });
+      }
     }
 
     const journals = [

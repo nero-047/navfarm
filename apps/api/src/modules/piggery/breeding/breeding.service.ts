@@ -275,10 +275,28 @@ export class BreedingService {
       })
       .where(eq(schema.animalRegister.animal_id, dto.sow_animal_id));
 
+    // Check if parity limit reached for culling review
+    let cullAlert = '';
+    try {
+      if (sow.breed_id) {
+        const [breed] = await this.db
+          .select({ productive_life_cycles: schema.breedMaster.productive_life_cycles })
+          .from(schema.breedMaster)
+          .where(eq(schema.breedMaster.breed_id, sow.breed_id))
+          .limit(1);
+        const maxParity = breed?.productive_life_cycles ?? 6;
+        if (parityNumber >= maxParity) {
+          cullAlert = ` [ALERT: Sow has reached productive parity limit (${maxParity}). Flagged for culling review.]`;
+        }
+      }
+    } catch {
+      // Non-blocking parity check
+    }
+
     return {
       farrow_id: farrowId,
       ...newRecord,
-      message: `Farrowing recorded: ${live} live piglets born. Sow parity incremented to ${parityNumber} and status set to LACTATING.`,
+      message: `Farrowing recorded: ${live} live piglets born. Sow parity incremented to ${parityNumber} and status set to LACTATING.${cullAlert}`,
     };
   }
 

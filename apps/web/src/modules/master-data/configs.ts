@@ -382,6 +382,8 @@ const item: MasterDataConfig = {
     { key: "uom_primary", label: "Primary UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "uom_secondary", label: "Secondary UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "valuation_method", label: "Valuation Method", type: "select", options: ["FIFO", "LIFO", "WEIGHTED_AVG", "STANDARD"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })) },
+    { key: "item_tracking", label: "Item Tracking", type: "select", options: [{ value: "NONE", label: "None" }, { value: "LOT", label: "Lot Tracked" }, { value: "SERIAL", label: "Serial Tracked" }] },
+    { key: "lead_time_days", label: "Lead Time (days)", type: "number", placeholder: "0" },
     { key: "standard_cost", label: "Standard Cost", type: "number", step: "0.01" },
     { key: "is_lot_tracked", label: "Lot Tracked", type: "boolean" },
     { key: "is_serial_tracked", label: "Serial Tracked", type: "boolean" },
@@ -693,6 +695,12 @@ const resource: MasterDataConfig = {
       key: "resource_type", label: "Resource Type", type: "select", required: true,
       options: ["LABOR", "EQUIPMENT", "VEHICLE"].map((v) => ({ value: v, label: v })),
     },
+    {
+      key: "cost_element", label: "Cost Element", type: "select",
+      options: ["DIRECT_LABOR", "INDIRECT_LABOR", "EQUIPMENT_HIRE", "FUEL", "MAINTENANCE"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+      helpText: "GL cost classification for variance and cost accounting.",
+    },
+    { key: "department", label: "Department / Team", type: "text", placeholder: "Farm Operations" },
     {
       key: "resource_sub_type", label: "Sub-Type", type: "select",
       options: ["PERMANENT", "CONTRACT", "DAILY", "OWNED", "LEASED", "RENTED"].map((v) => ({ value: v, label: v })),

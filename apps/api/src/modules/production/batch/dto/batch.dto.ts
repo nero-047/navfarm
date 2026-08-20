@@ -469,6 +469,35 @@ export class BulkDailyEntryRowDto {
   @IsString()
   @IsOptional()
   remarks?: string;
+
+  @ApiProperty({ description: 'Transfer animal head count', required: false })
+  @IsNumber()
+  @IsOptional()
+  transfer_count?: number;
+
+  @ApiProperty({ description: 'Destination Batch UUID for transfer', required: false })
+  @IsUUID()
+  @IsOptional()
+  to_batch_id?: string;
+
+  @ApiProperty({ description: 'Destination Location/Shed/Pen UUID for transfer', required: false })
+  @IsUUID()
+  @IsOptional()
+  to_location_id?: string;
+
+  @ApiProperty({ description: 'Total transfer weight in KG', required: false })
+  @IsNumber()
+  @IsOptional()
+  transfer_weight?: number;
+
+  @ApiProperty({ description: 'Whether transfer auto-triggers stage transition', required: false })
+  @IsOptional()
+  auto_triggers_stage?: boolean;
+
+  @ApiProperty({ description: 'Destination Stage Code if triggering stage transition', required: false })
+  @IsString()
+  @IsOptional()
+  to_stage_code?: string;
 }
 
 export class BulkDailyEntryDto {
