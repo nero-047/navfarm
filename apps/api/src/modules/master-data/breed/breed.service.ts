@@ -670,16 +670,36 @@ export class BreedService {
     if (query.breedId) conditions.push(eq(schema.breedLifecycleStages.breed_id, query.breedId));
     if (query.stageId) conditions.push(eq(schema.breedLifecycleStages.stage_id, query.stageId));
 
-    const limit = query.limit || 50;
-    const offset = query.offset || 0;
+    const limit = query.limit || (query.pageSize ? Number(query.pageSize) : 100);
+    const offset = query.offset || (query.page ? (Number(query.page) - 1) * limit : 0);
 
-    return this.db
-      .select()
+    const rows = await this.db
+      .select({
+        stage: schema.breedLifecycleStages,
+        breed_code: schema.breedMaster.breed_code,
+        breed_name: schema.breedMaster.breed_name,
+        stage_code: schema.stageMaster.stage_code,
+        stage_name: schema.stageMaster.stage_name,
+        feed_item_code: schema.itemMaster.item_code,
+        feed_item_name: schema.itemMaster.item_name,
+      })
       .from(schema.breedLifecycleStages)
+      .leftJoin(schema.breedMaster, eq(schema.breedLifecycleStages.breed_id, schema.breedMaster.breed_id))
+      .leftJoin(schema.stageMaster, eq(schema.breedLifecycleStages.stage_id, schema.stageMaster.stage_id))
+      .leftJoin(schema.itemMaster, eq(schema.breedLifecycleStages.feed_item_id, schema.itemMaster.item_id))
       .where(and(...conditions))
       .orderBy(schema.breedLifecycleStages.period_from)
       .limit(limit)
       .offset(offset);
+
+    return rows.map((r) => ({
+      ...r.stage,
+      breed_code: r.breed_code,
+      breed_name: r.breed_name ? `${r.breed_code} — ${r.breed_name}` : r.breed_code,
+      stage_code: r.stage_code,
+      stage_name: r.stage_name ? `${r.stage_code} — ${r.stage_name}` : r.stage_code,
+      feed_item_name: r.feed_item_name ? `${r.feed_item_code} — ${r.feed_item_name}` : r.feed_item_code,
+    }));
   }
 
   async updateLifecycleStage(id: string, dto: UpdateBreedLifecycleStageDto, tenantId: string, userPayload?: any) {

@@ -124,7 +124,7 @@ export default function BatchPanel() {
   const [stageForm, setStageForm] = useState<Row>({});
   const [stageSaving, setStageSaving] = useState(false);
   const [stageError, setStageError] = useState("");
-  const [stageOptions, setStageOptions] = useState<string[]>([]);
+  const [stageOptions, setStageOptions] = useState<any[]>([]);
   const [stageOptionsLoading, setStageOptionsLoading] = useState(false);
 
   const companyId = getActiveCompanyId();
@@ -722,26 +722,73 @@ export default function BatchPanel() {
 
   const openTransferStage = async () => {
     if (!viewing) return;
-    setStageForm({ to_stage_code: "", remarks: "" });
+    setStageForm({ to_stage_code: "", to_location_id: viewing.sub_location_id || "", remarks: "" });
     setStageError("");
     setStageOptions([]);
     setStageModalOpen(true);
-    // Stages aren't a fixed enum — they're whatever the batch's own scheduler
-    // defines via stage-scoped parameter lines (scheduler_parameter_line.stage_code),
-    // and schedulers are themselves NOB/LOB-scoped. So the valid stage list for
-    // this batch is exactly the distinct stage codes configured on its scheduler.
-    if (!viewing.scheduler_id) return;
     setStageOptionsLoading(true);
+
     try {
-      const scheduler = unwrap<Row>(await api.get(`/scheduler/${viewing.scheduler_id}`));
-      const codes = Array.from(
-        new Set(
-          (scheduler?.parameter_lines || [])
+      // 1. Fetch all stages for this LOB / company from Stage Master
+      const params = new URLSearchParams();
+      if (companyId) params.set("companyId", companyId);
+      if (viewing.lob_id) params.set("lobId", viewing.lob_id);
+      params.set("limit", "100");
+      const stageRes = await api.get(`/stage?${params.toString()}`);
+      const allStages = unwrap<Row[]>(stageRes) || [];
+
+      // 2. Also check if scheduler has custom parameter lines
+      let schedulerCodes: string[] = [];
+      if (viewing.scheduler_id) {
+        try {
+          const scheduler = unwrap<Row>(await api.get(`/scheduler/${viewing.scheduler_id}`));
+          schedulerCodes = (scheduler?.parameter_lines || [])
             .map((l: Row) => l.stage_code)
-            .filter((c: string | null) => !!c && c !== viewing.current_stage_code)
-        )
-      ) as string[];
-      setStageOptions(codes.sort());
+            .filter(Boolean) as string[];
+        } catch {
+          // ignore
+        }
+      }
+
+      // 3. Merge stages from Stage Master + Scheduler
+      const map = new Map<string, { code: string; name: string; sequence?: number }>();
+      for (const st of allStages) {
+        if (st.stage_code && st.stage_code !== viewing.current_stage_code) {
+          map.set(st.stage_code, {
+            code: st.stage_code,
+            name: st.stage_name || st.stage_code,
+            sequence: st.stage_sequence || 0,
+          });
+        }
+      }
+      for (const code of schedulerCodes) {
+        if (code && code !== viewing.current_stage_code && !map.has(code)) {
+          map.set(code, { code, name: code.replace(/_/g, " "), sequence: 99 });
+        }
+      }
+
+      // If still empty (fallback for initial setup), provide standard piggery stages
+      if (map.size === 0) {
+        const fallbacks = [
+          { code: "DRY_SOW_GESTATION", name: "Dry Sow Gestation (114 Days)" },
+          { code: "FARROWING", name: "Farrowing & Litter Care" },
+          { code: "LACTATION", name: "Lactating Sows & Piglets" },
+          { code: "WEANER_NURSERY", name: "Weaner Nursery" },
+          { code: "GROWER", name: "Grower Pigs" },
+          { code: "FINISHER", name: "Finisher / Fattening" },
+          { code: "BOAR_STUD", name: "Boar Stud & AI Station" },
+          { code: "QUARANTINE", name: "Quarantine & Isolation" },
+          { code: "CULL", name: "Cull / Market Ready" },
+        ];
+        for (const fb of fallbacks) {
+          if (fb.code !== viewing.current_stage_code) {
+            map.set(fb.code, { code: fb.code, name: fb.name });
+          }
+        }
+      }
+
+      const list = Array.from(map.values()).sort((a, b) => (a.sequence || 0) - (b.sequence || 0) || a.name.localeCompare(b.name));
+      setStageOptions(list);
     } catch {
       setStageOptions([]);
     } finally {
@@ -754,13 +801,15 @@ export default function BatchPanel() {
     setStageSaving(true);
     setStageError("");
     try {
-      if (!stageForm.to_stage_code) throw new Error("The destination stage code is required.");
+      if (!stageForm.to_stage_code) throw new Error("Please select a destination stage.");
       const result = await api.post(`/batch/${viewing.batch_id}/transfer-stage`, {
         to_stage_code: stageForm.to_stage_code,
+        to_location_id: stageForm.to_location_id || undefined,
         remarks: stageForm.remarks || undefined,
       });
       setStageModalOpen(false);
       setViewing(unwrap<Row>(result));
+      load(); // Refresh batch table to show updated stage
     } catch (err: any) {
       setStageError(err?.message || "Failed to transfer stage.");
     } finally {
@@ -1524,7 +1573,7 @@ export default function BatchPanel() {
           <>
             <button onClick={() => setStageModalOpen(false)} disabled={stageSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
             <Button onClick={handleTransferStage} disabled={stageSaving || stageOptions.length === 0 || !stageForm.to_stage_code} >
-              {stageSaving ? "Transferring…" : "Transfer"}
+              {stageSaving ? "Transferring…" : "Transfer Stage"}
             </Button>
           </>
         }
@@ -1533,23 +1582,58 @@ export default function BatchPanel() {
           {stageError && (
             <InlineAlert>{stageError}</InlineAlert>
           )}
-          <p className="text-xs" style={S.sub}>Current stage: <span className="font-semibold" style={S.primary}>{viewing?.current_stage_code || "None"}</span>. This is a tracking event only — no cost or GL impact.</p>
+          <div className="rounded-lg border p-3" style={S.raised}>
+            <p className="text-xs" style={S.sub}>Current Stage: <span className="font-semibold text-sm ml-1" style={S.primary}>{viewing?.current_stage_code ? viewing.current_stage_code.replace(/_/g, " ") : "None"}</span></p>
+            <p className="text-[11px] mt-1" style={S.muted}>Transitioning the stage logs the batch movement and aligns daily feeding and KPI targets.</p>
+          </div>
+
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>New Stage *</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Destination Stage *</label>
             {stageOptionsLoading ? (
-              <div className="flex items-center gap-2 text-xs" style={S.sub}><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading stages for this batch's scheduler…</div>
-            ) : stageOptions.length > 0 ? (
-              <select value={stageForm.to_stage_code || ""} onChange={(e) => setStageForm((f: Row) => ({ ...f, to_stage_code: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select a stage…</option>
-                {stageOptions.map((code) => (<option key={code} value={code}>{code}</option>))}
-              </select>
+              <div className="flex items-center gap-2 text-xs py-2" style={S.sub}><Loader2 className="h-4 w-4 animate-spin" /> Loading production stages…</div>
             ) : (
-              <p className="text-xs" style={S.muted}>No stages are configured on this batch's scheduler yet — add stage-scoped parameter lines to the scheduler (Production &rarr; Schedulers) before transferring.</p>
+              <select
+                value={stageForm.to_stage_code || ""}
+                onChange={(e) => setStageForm((f: Row) => ({ ...f, to_stage_code: e.target.value }))}
+                className={`${inputCls} nf-select`}
+                style={S.input}
+              >
+                <option value="">Select Destination Stage…</option>
+                {stageOptions.map((st: any) => (
+                  <option key={st.code || st} value={st.code || st}>
+                    {st.name ? `${st.name} (${st.code})` : st}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
+
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
-            <input value={stageForm.remarks || ""} onChange={(e) => setStageForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls} style={S.input} />
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Destination Shed / Pen (Optional)</label>
+            <select
+              value={stageForm.to_location_id || ""}
+              onChange={(e) => setStageForm((f: Row) => ({ ...f, to_location_id: e.target.value }))}
+              className={`${inputCls} nf-select`}
+              style={S.input}
+            >
+              <option value="">Keep current location or select new shed/pen…</option>
+              {sheds.map((s) => (
+                <option key={s.shed_id || s.location_id} value={s.shed_id || s.location_id}>
+                  {s.shed_code ? `${s.shed_code} — ${s.shed_name}` : s.location_name || s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks / Transition Notes</label>
+            <input
+              placeholder="e.g., Transitioned to farrowing crates on day 110"
+              value={stageForm.remarks || ""}
+              onChange={(e) => setStageForm((f: Row) => ({ ...f, remarks: e.target.value }))}
+              className={inputCls}
+              style={S.input}
+            />
           </div>
         </div>
       </Dialog>

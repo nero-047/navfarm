@@ -701,6 +701,16 @@ export class UpdateBreedLifecycleStageDto {
 }
 
 export class QueryBreedLifecycleStageDto {
+  @ApiProperty({ description: 'Filter by company UUID', required: false })
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @ApiProperty({ description: 'Filter by company UUID (snake_case)', required: false })
+  @IsOptional()
+  @IsString()
+  company_id?: string;
+
   @ApiProperty({ description: 'Filter by breed UUID', required: false })
   @IsOptional()
   @IsUUID()
@@ -710,6 +720,23 @@ export class QueryBreedLifecycleStageDto {
   @IsOptional()
   @IsUUID()
   stageId?: string;
+
+  @ApiProperty({ description: 'Search term', required: false })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({ description: 'Page number', required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  page?: number;
+
+  @ApiProperty({ description: 'Page size', required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  pageSize?: number;
 
   @ApiProperty({ description: 'Results per page', default: 50, required: false })
   @IsOptional()

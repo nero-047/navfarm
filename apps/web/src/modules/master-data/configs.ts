@@ -479,9 +479,14 @@ const breedLifecycleStage: MasterDataConfig = {
   idKey: "lifecycle_id",
   group: "Livestock & Health",
   columns: [
+    { key: "breed_name", label: "Breed" },
+    { key: "stage_name", label: "Stage" },
     { key: "calc_unit", label: "Unit" },
     { key: "period_from", label: "From" },
     { key: "period_to", label: "To" },
+    { key: "feed_qty_per_head_per_day_kg", label: "Feed/Head/Day (kg)" },
+    { key: "std_body_weight_kg", label: "Std Weight (kg)" },
+    { key: "std_adg_gpd", label: "Std ADG (g/d)" },
     { key: "std_fcr", label: "Std FCR" },
   ],
   fields: [

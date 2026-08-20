@@ -31,13 +31,49 @@ function unwrap<T = any>(res: any): T {
 
 const OCCURRENCES = ["DAILY", "WEEKLY", "MONTHLY"];
 
+const LINE_TYPES = [
+  { value: "CONSUMPTION", label: "CONSUMPTION (Feed / Meds / Water)" },
+  { value: "DESCRIPTIVE", label: "DESCRIPTIVE (Weight / Mortality / Temp)" },
+  { value: "OUTPUT", label: "OUTPUT (Live Piglets / Carcass / Semen)" },
+  { value: "RESOURCE", label: "RESOURCE (Labour / Machine / Vet)" },
+  { value: "OVERHEAD", label: "OVERHEAD (Power / Rent / Facility)" },
+  { value: "TRANSFER", label: "TRANSFER (Stage Move)" },
+];
+
+function matchLineType(paramType: string, selectedLineType: string): boolean {
+  if (!selectedLineType || selectedLineType === "ALL") return true;
+  const pt = (paramType || "").toUpperCase().trim();
+  const st = (selectedLineType || "").toUpperCase().trim();
+  if (pt === st) return true;
+
+  if (st === "DESCRIPTIVE" || st === "OBSERVATION") {
+    return ["DESCRIPTIVE", "OBSERVATION", "MORTALITY", "WEIGHT", "BODYWT", "TEMP", "WATER", "GROWTH"].includes(pt);
+  }
+  if (st === "CONSUMPTION") {
+    return ["CONSUMPTION", "FEED", "MEDICATION", "VACCINE", "WATER", "INPUT"].includes(pt);
+  }
+  if (st === "OUTPUT") {
+    return ["OUTPUT", "HARVEST", "YIELD", "PRODUCTION"].includes(pt);
+  }
+  if (st === "RESOURCE") {
+    return ["RESOURCE", "LABOUR", "LABOR", "EQUIPMENT", "MACHINE", "VET"].includes(pt);
+  }
+  if (st === "OVERHEAD") {
+    return ["OVERHEAD", "EXPENSE", "UTILITY", "POWER", "RENT", "COST"].includes(pt);
+  }
+  if (st === "TRANSFER") {
+    return ["TRANSFER", "STAGE_TRANSFER", "MOVE"].includes(pt);
+  }
+  return false;
+}
+
 const emptyLine = () => ({
-  parameter_id: "", period_no: "1", period_from: "", period_to: "", period_label: "", occurrence: "WEEKLY",
+  line_type: "", parameter_id: "", period_no: "1", period_from: "", period_to: "", period_label: "", occurrence: "DAILY",
   expected_qty_override: "", kpi_mode: "PCT", kpi_min_pct: "", kpi_max_pct: "",
   kpi_min_value: "", kpi_max_value: "", critical_threshold_pct: "",
 });
 
-const emptyHeader = () => ({ lob_id: "", scheduler_code: "", scheduler_name: "", duration_value: "", duration_unit: "DAY", breed_id: "", batch_start_from: "Start Date", is_active: true, description: "" });
+const emptyHeader = () => ({ lob_id: "", scheduler_code: "", scheduler_name: "", duration_value: "", duration_unit: "DAY", breed_id: "", batch_start_from: "START_DATE", is_active: true, description: "" });
 
 export default function SchedulerPanel() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -158,21 +194,25 @@ export default function SchedulerPanel() {
         description: res.description || "",
       });
       setLines(
-        (res.parameter_lines || []).map((l: Row) => ({
-          parameter_id: l.parameter_id || "",
-          period_no: String(l.period_no ?? "1"),
-          period_from: String(l.period_from ?? ""),
-          period_to: String(l.period_to ?? ""),
-          period_label: l.period_label || "",
-          occurrence: l.occurrence || "WEEKLY",
-          expected_qty_override: l.expected_qty_override ?? "",
-          kpi_mode: l.kpi_mode || "PCT",
-          kpi_min_pct: l.kpi_min_pct ?? "",
-          kpi_max_pct: l.kpi_max_pct ?? "",
-          kpi_min_value: l.kpi_min_value ?? "",
-          kpi_max_value: l.kpi_max_value ?? "",
-          critical_threshold_pct: l.critical_threshold_pct ?? "",
-        })) || [emptyLine()]
+        (res.parameter_lines || []).map((l: Row) => {
+          const p = parameters.find((param) => param.parameter_id === l.parameter_id);
+          return {
+            line_type: l.line_type || p?.parameter_type || "",
+            parameter_id: l.parameter_id || "",
+            period_no: String(l.period_no ?? "1"),
+            period_from: String(l.period_from ?? ""),
+            period_to: String(l.period_to ?? ""),
+            period_label: l.period_label || "",
+            occurrence: l.occurrence || "DAILY",
+            expected_qty_override: l.expected_qty_override ?? "",
+            kpi_mode: l.kpi_mode || "PCT",
+            kpi_min_pct: l.kpi_min_pct ?? "",
+            kpi_max_pct: l.kpi_max_pct ?? "",
+            kpi_min_value: l.kpi_min_value ?? "",
+            kpi_max_value: l.kpi_max_value ?? "",
+            critical_threshold_pct: l.critical_threshold_pct ?? "",
+          };
+        }) || [emptyLine()]
       );
       setModalOpen(true);
     } catch (err: any) {
@@ -197,6 +237,7 @@ export default function SchedulerPanel() {
       const cleanLines = lines
         .filter((l) => l.parameter_id && l.period_from && l.period_to)
         .map((l) => ({
+          line_type: l.line_type || undefined,
           parameter_id: l.parameter_id,
           period_no: Number(l.period_no) || 1,
           period_from: Number(l.period_from),
@@ -335,7 +376,6 @@ export default function SchedulerPanel() {
         )}
       </div>
 
-      {/* Create/Edit/View modal — the same rich form is shown for locked schedulers too, just fully disabled, so nothing is hidden behind a bare read-only summary. */}
       <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
@@ -412,8 +452,13 @@ export default function SchedulerPanel() {
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Batch Start From</label>
-              <input value={header.batch_start_from} onChange={(e) => setHeader((h) => ({ ...h, batch_start_from: e.target.value }))} placeholder="Start Date" className={inputCls} style={S.input} disabled={isLocked} />
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Batch Start Baseline</label>
+              <select value={header.batch_start_from || "START_DATE"} onChange={(e) => setHeader((h) => ({ ...h, batch_start_from: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
+                <option value="START_DATE">Batch Start Date</option>
+                <option value="BIRTH_DATE">Birth Date (Age 0)</option>
+                <option value="WEANING_DATE">Weaning Date</option>
+                <option value="MATING_DATE">Mating Date</option>
+              </select>
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Description</label>
@@ -445,7 +490,8 @@ export default function SchedulerPanel() {
             <table className="w-full border-collapse text-left text-xs">
               <TableHeader>
                 <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Parameter Type / Data Entry Type</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Line Type</TableHead>
+                  <TableHead className="h-auto px-3 py-2">Parameter</TableHead>
                   <TableHead className="h-auto px-3 py-2">Item Name</TableHead>
                   <TableHead className="h-auto px-3 py-2">UOM</TableHead>
                   <TableHead className="h-auto px-3 py-2">Occurrence</TableHead>
@@ -463,15 +509,59 @@ export default function SchedulerPanel() {
               <TableBody>
                 {lines.map((line, idx) => {
                   const selectedParam = parameters.find((p) => p.parameter_id === line.parameter_id);
+                  const activeLineType = line.line_type || (selectedParam ? (matchLineType(selectedParam.parameter_type, "DESCRIPTIVE") ? "DESCRIPTIVE" : selectedParam.parameter_type) : "");
+                  const filteredParams = activeLineType
+                    ? parameters.filter((p) => matchLineType(p.parameter_type, activeLineType))
+                    : parameters;
+
                   return (
                   <TableRow key={idx}>
-                    <TableCell className="px-2 py-1.5 min-w-[200px]">
-                      <select value={line.parameter_id} onChange={(e) => setLineField(idx, "parameter_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
-                        <option value="">Select…</option>
-                        {parameters.map((p) => <option key={p.parameter_id} value={p.parameter_id}>{p.parameter_code} — {p.parameter_name}</option>)}
+                    <TableCell className="px-2 py-1.5 min-w-[170px]">
+                      <select
+                        value={activeLineType}
+                        onChange={(e) => {
+                          const newType = e.target.value;
+                          setLineField(idx, "line_type", newType);
+                          if (selectedParam && !matchLineType(selectedParam.parameter_type, newType)) {
+                            setLineField(idx, "parameter_id", "");
+                          }
+                        }}
+                        className={`${inputCls} nf-select font-medium`}
+                        style={S.input}
+                        disabled={isLocked}
+                      >
+                        <option value="">All Line Types…</option>
+                        {LINE_TYPES.map((lt) => (
+                          <option key={lt.value} value={lt.value}>{lt.label}</option>
+                        ))}
                       </select>
-                      {selectedParam && (
-                        <p className="mt-1 text-[10px]" style={S.muted}>Type: <span className="font-semibold" style={S.sub}>{selectedParam.parameter_type}</span></p>
+                    </TableCell>
+                    <TableCell className="px-2 py-1.5 min-w-[200px]">
+                      <select
+                        value={line.parameter_id}
+                        onChange={(e) => {
+                          const pId = e.target.value;
+                          setLineField(idx, "parameter_id", pId);
+                          const p = parameters.find((param) => param.parameter_id === pId);
+                          if (p && !line.line_type) {
+                            setLineField(idx, "line_type", matchLineType(p.parameter_type, "DESCRIPTIVE") ? "DESCRIPTIVE" : p.parameter_type);
+                          }
+                        }}
+                        className={`${inputCls} nf-select`}
+                        style={S.input}
+                        disabled={isLocked}
+                      >
+                        <option value="">Select Parameter…</option>
+                        {filteredParams.map((p) => (
+                          <option key={p.parameter_id} value={p.parameter_id}>
+                            {p.parameter_code} — {p.parameter_name}
+                          </option>
+                        ))}
+                      </select>
+                      {activeLineType && (
+                        <p className="mt-1 text-[10px]" style={S.muted}>
+                          Showing <span className="font-semibold" style={S.sub}>{filteredParams.length}</span> {activeLineType} parameters
+                        </p>
                       )}
                     </TableCell>
                     <TableCell className="px-2 py-1.5 min-w-[140px] text-[11px]" style={S.sub}>{selectedParam?.item_id ? itemLabel(selectedParam.item_id) : "—"}</TableCell>
