@@ -74,6 +74,7 @@ export const translations = {
     failedToLoadAuditLogs: "Failed to load audit logs.",
 
     // Console — Navigation & Shell
+    company: "Company",
     companies: "Companies",
     inventory: "Inventory",
     finance: "Finance",
@@ -266,6 +267,7 @@ export const translations = {
     failedToLoadAuditLogs: "ऑडिट लॉग लोड करने में विफल।",
 
     // Console — Navigation & Shell
+    company: "कंपनी",
     companies: "कंपनियाँ",
     inventory: "इन्वेंटरी",
     finance: "वित्त",

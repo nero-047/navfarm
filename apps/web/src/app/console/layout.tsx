@@ -247,7 +247,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
   const navItems: ConsoleSidebarItem[] = [
     { label: t("dashboard"),       href: "/console/dashboard",      icon: LayoutDashboard, show: user.userType === "TENANT_ADMIN" || user.userType === "COMPANY_ADMIN" },
-    { label: t("companies"),       href: "/console/companies",      icon: Building2,       show: hasPermission(user, "COMPANY", "SETTINGS", "can_view") },
+    { label: (isTenantAdmin && companyMode) || user.userType === "COMPANY_ADMIN" ? t("company") : t("companies"), href: "/console/companies", icon: Building2, show: hasPermission(user, "COMPANY", "SETTINGS", "can_view") },
     { label: t("masterData"),      href: "/console/master-data",    icon: Database,        show: companyScoped && hasPermission(user, "MASTER_DATA", "UOM", "can_view") },
     { label: t("inventory"),       href: "/console/inventory",      icon: Boxes,           show: companyScoped && hasPermission(user, "INVENTORY", "GOODS_RECEIPT", "can_view") },
     { label: t("finance"),         href: "/console/finance",        icon: Landmark,        show: companyScoped && hasPermission(user, "FINANCE", "JOURNAL", "can_view") },

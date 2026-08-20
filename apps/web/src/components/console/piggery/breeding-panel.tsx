@@ -23,6 +23,19 @@ function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
 }
 
+const S = {
+  surface: { backgroundColor: "var(--surface)", borderColor: "var(--border)" },
+  raised:  { backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" },
+  primary: { color: "var(--text-primary)" },
+  sub:     { color: "var(--text-secondary)" },
+  muted:   { color: "var(--text-muted)" },
+  accent:  { color: "var(--accent)" },
+  danger:  { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" },
+  warning: { color: "var(--warning)", borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)" },
+  success: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
+  input:   { backgroundColor: "var(--surface)", borderColor: "var(--border)", color: "var(--text-primary)" },
+};
+
 export function BreedingPanel() {
   const [subTab, setSubTab] = useState<"mating" | "farrowing" | "semen">("mating");
   const [loading, setLoading] = useState(true);
@@ -127,37 +140,27 @@ export function BreedingPanel() {
   }, []);
 
   const sows = animals.filter(
-    (a) =>
-      a.gender === "F" ||
-      ["SOW", "GILT"].includes(String(a.animal_type || "").toUpperCase())
+    (a) => a.animal_type === "SOW" || a.animal_type === "GILT" || a.gender === "F"
   );
   const boars = animals.filter(
-    (a) =>
-      a.gender === "M" ||
-      String(a.animal_type || "").toUpperCase() === "BOAR"
+    (a) => a.animal_type === "BOAR" || a.gender === "M"
   );
 
-  // Submit Handlers
+  // Handlers
   const handleCreateMating = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!matingForm.sow_animal_id) {
-      setError("Please select a sow.");
-      return;
-    }
     setSubmitting(true);
     setError(null);
     try {
       await api.post("/piggery/breeding/mating", {
         ...matingForm,
         semen_dose_qty: Number(matingForm.semen_dose_qty) || 1,
-        boar_animal_id: matingForm.boar_animal_id || undefined,
-        second_mating_date: matingForm.second_mating_date || undefined,
       });
-      setSuccess("Mating event recorded successfully with auto 114-day farrowing date!");
+      setSuccess("Mating event successfully recorded!");
       setShowMatingModal(false);
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Failed to record mating.");
+      setError(err.message || "Failed to record mating event.");
     } finally {
       setSubmitting(false);
     }
@@ -169,10 +172,12 @@ export function BreedingPanel() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.patch(`/piggery/breeding/mating/${selectedMating.breeding_id}/preg-check`, pregCheckForm);
-      setSuccess("Pregnancy check updated successfully.");
+      await api.post(
+        `/piggery/breeding/mating/${selectedMating.breeding_id}/pregnancy-check`,
+        pregCheckForm
+      );
+      setSuccess("Pregnancy check updated!");
       setShowPregCheckModal(false);
-      setSelectedMating(null);
       await loadData();
     } catch (err: any) {
       setError(err.message || "Failed to update pregnancy check.");
@@ -183,25 +188,22 @@ export function BreedingPanel() {
 
   const handleCreateFarrowing = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!farrowForm.sow_animal_id) {
-      setError("Please select a sow.");
-      return;
-    }
     setSubmitting(true);
     setError(null);
     try {
       await api.post("/piggery/breeding/farrowing", {
         ...farrowForm,
-        breeding_id: farrowForm.breeding_id || undefined,
         piglets_born_live: Number(farrowForm.piglets_born_live) || 0,
         piglets_stillborn: Number(farrowForm.piglets_stillborn) || 0,
         piglets_mummified: Number(farrowForm.piglets_mummified) || 0,
-        avg_birth_weight_kg: farrowForm.avg_birth_weight_kg ? Number(farrowForm.avg_birth_weight_kg) : undefined,
-        total_litter_weight_kg: farrowForm.total_litter_weight_kg ? Number(farrowForm.total_litter_weight_kg) : undefined,
+        avg_birth_weight_kg: Number(farrowForm.avg_birth_weight_kg) || 1.4,
+        total_litter_weight_kg: farrowForm.total_litter_weight_kg
+          ? Number(farrowForm.total_litter_weight_kg)
+          : undefined,
         foster_received: Number(farrowForm.foster_received) || 0,
         fostered_out: Number(farrowForm.fostered_out) || 0,
       });
-      setSuccess("Farrowing event recorded! Parity count incremented and sow set to LACTATING.");
+      setSuccess("Farrowing event recorded and piglets born live tracked!");
       setShowFarrowModal(false);
       await loadData();
     } catch (err: any) {
@@ -217,15 +219,19 @@ export function BreedingPanel() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.patch(`/piggery/breeding/farrowing/${selectedFarrow.farrow_id}/weaning`, {
-        ...weanForm,
-        piglets_weaned: Number(weanForm.piglets_weaned) || 0,
-        avg_weaning_weight_kg: weanForm.avg_weaning_weight_kg ? Number(weanForm.avg_weaning_weight_kg) : undefined,
-        cost_per_piglet: weanForm.cost_per_piglet ? Number(weanForm.cost_per_piglet) : undefined,
-      });
-      setSuccess("Weaning recorded successfully. Sow returned to ACTIVE status.");
+      await api.post(
+        `/piggery/breeding/farrowing/${selectedFarrow.farrow_id}/wean`,
+        {
+          ...weanForm,
+          piglets_weaned: Number(weanForm.piglets_weaned) || 0,
+          avg_weaning_weight_kg: Number(weanForm.avg_weaning_weight_kg) || 7,
+          cost_per_piglet: weanForm.cost_per_piglet
+            ? Number(weanForm.cost_per_piglet)
+            : undefined,
+        }
+      );
+      setSuccess("Litter weaning recorded successfully!");
       setShowWeanModal(false);
-      setSelectedFarrow(null);
       await loadData();
     } catch (err: any) {
       setError(err.message || "Failed to record weaning.");
@@ -236,10 +242,6 @@ export function BreedingPanel() {
 
   const handleCreateSemen = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!semenForm.boar_animal_id) {
-      setError("Please select a boar.");
-      return;
-    }
     setSubmitting(true);
     setError(null);
     try {
@@ -264,26 +266,37 @@ export function BreedingPanel() {
   };
 
   // KPIs
-  const activeInseminations = matings.filter((m) => m.pregnancy_confirmed !== false && m.days_until_farrowing >= 0).length;
+  const activeInseminations = matings.filter(
+    (m) => m.pregnancy_confirmed !== false && m.days_until_farrowing >= 0
+  ).length;
   const totalLitters = farrowings.length;
-  const totalBornLive = farrowings.reduce((sum, f) => sum + (Number(f.piglets_born_live) || 0), 0);
-  const totalWeaned = farrowings.reduce((sum, f) => sum + (Number(f.piglets_weaned) || 0), 0);
+  const totalBornLive = farrowings.reduce(
+    (sum, f) => sum + (Number(f.piglets_born_live) || 0),
+    0
+  );
+  const totalWeaned = farrowings.reduce(
+    (sum, f) => sum + (Number(f.piglets_weaned) || 0),
+    0
+  );
   const avgSurvivalRate =
     totalBornLive > 0 && totalWeaned > 0
       ? ((totalWeaned / totalBornLive) * 100).toFixed(1)
       : "--";
-  const totalDoses = semenBatches.reduce((sum, s) => sum + (Number(s.doses_collected) || 0), 0);
+  const totalDoses = semenBatches.reduce(
+    (sum, s) => sum + (Number(s.doses_collected) || 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ── Top Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <Heart className="w-5 h-5 text-rose-500" />
+          <h2 className="text-xl font-bold flex items-center gap-2" style={S.primary}>
+            <Heart className="w-5 h-5" style={S.accent} />
             Breeding, Farrowing & Semen AI Station
           </h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm mt-0.5" style={S.sub}>
             Track swine gestation (114 days), ultrasound pregnancy checks (28 days), litter outputs, and boar semen unit costs.
           </p>
         </div>
@@ -299,7 +312,6 @@ export function BreedingPanel() {
               else if (subTab === "farrowing") setShowFarrowModal(true);
               else setShowSemenModal(true);
             }}
-            className="bg-rose-600 hover:bg-rose-700 text-white font-medium"
           >
             <Plus className="w-4 h-4 mr-1.5" />
             {subTab === "mating" ? "Record Mating / AI" : subTab === "farrowing" ? "Record Farrowing" : "Log Semen Collection"}
@@ -310,58 +322,58 @@ export function BreedingPanel() {
       {error && <InlineAlert variant="danger">{error}</InlineAlert>}
       {success && <InlineAlert variant="success">{success}</InlineAlert>}
 
-      {/* KPI Cards */}
+      {/* ── KPI Stat Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-400 flex items-center gap-1.5 mb-1">
-            <Heart className="w-4 h-4 text-rose-400" /> Active Gestations
+        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
+            <Heart className="w-4 h-4" style={S.accent} /> Active Gestations
           </div>
-          <div className="text-2xl font-bold text-slate-100">{activeInseminations}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Sows due to farrow</div>
+          <div className="text-2xl font-bold" style={S.primary}>{activeInseminations}</div>
+          <div className="text-[11px] mt-0.5" style={S.muted}>Sows due to farrow</div>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-400 flex items-center gap-1.5 mb-1">
-            <Baby className="w-4 h-4 text-amber-400" /> Total Litters
+        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
+            <Baby className="w-4 h-4" style={S.accent} /> Total Litters
           </div>
-          <div className="text-2xl font-bold text-slate-100">{totalLitters}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Farrowing batches</div>
+          <div className="text-2xl font-bold" style={S.primary}>{totalLitters}</div>
+          <div className="text-[11px] mt-0.5" style={S.muted}>Farrowing batches</div>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-400 flex items-center gap-1.5 mb-1">
-            <Sparkles className="w-4 h-4 text-emerald-400" /> Piglets Born Live
+        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
+            <Sparkles className="w-4 h-4" style={S.success} /> Piglets Born Live
           </div>
-          <div className="text-2xl font-bold text-emerald-400">{totalBornLive}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Lifetime live births</div>
+          <div className="text-2xl font-bold" style={S.success}>{totalBornLive}</div>
+          <div className="text-[11px] mt-0.5" style={S.muted}>Lifetime live births</div>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-400 flex items-center gap-1.5 mb-1">
-            <CheckCircle2 className="w-4 h-4 text-blue-400" /> Weaning Survival
+        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
+            <CheckCircle2 className="w-4 h-4" style={S.accent} /> Weaning Survival
           </div>
-          <div className="text-2xl font-bold text-blue-400">{avgSurvivalRate}%</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{totalWeaned} weaned piglets</div>
+          <div className="text-2xl font-bold" style={S.accent}>{avgSurvivalRate}%</div>
+          <div className="text-[11px] mt-0.5" style={S.muted}>{totalWeaned} weaned piglets</div>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-400 flex items-center gap-1.5 mb-1">
-            <FlaskConical className="w-4 h-4 text-purple-400" /> Semen Doses
+        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
+            <FlaskConical className="w-4 h-4" style={S.accent} /> Semen Doses
           </div>
-          <div className="text-2xl font-bold text-purple-400">{totalDoses}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Collected from boars</div>
+          <div className="text-2xl font-bold" style={S.primary}>{totalDoses}</div>
+          <div className="text-[11px] mt-0.5" style={S.muted}>Collected from boars</div>
         </div>
       </div>
 
-      {/* Sub Tabs */}
-      <div className="flex border-b border-slate-800 gap-6">
+      {/* ── Sub Navigation Tabs ── */}
+      <div className="flex border-b gap-6" style={{ borderColor: "var(--border)" }}>
         <button
           onClick={() => setSubTab("mating")}
-          className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
-            subTab === "mating"
-              ? "border-rose-500 text-rose-400"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
+          className="pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors cursor-pointer"
+          style={{
+            borderColor: subTab === "mating" ? "var(--accent)" : "transparent",
+            color: subTab === "mating" ? "var(--accent)" : "var(--text-secondary)",
+          }}
         >
           <Heart className="w-4 h-4" />
           Mating & Insemination ({matings.length})
@@ -369,11 +381,11 @@ export function BreedingPanel() {
 
         <button
           onClick={() => setSubTab("farrowing")}
-          className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
-            subTab === "farrowing"
-              ? "border-rose-500 text-rose-400"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
+          className="pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors cursor-pointer"
+          style={{
+            borderColor: subTab === "farrowing" ? "var(--accent)" : "transparent",
+            color: subTab === "farrowing" ? "var(--accent)" : "var(--text-secondary)",
+          }}
         >
           <Baby className="w-4 h-4" />
           Farrowing & Litters ({farrowings.length})
@@ -381,30 +393,30 @@ export function BreedingPanel() {
 
         <button
           onClick={() => setSubTab("semen")}
-          className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
-            subTab === "semen"
-              ? "border-rose-500 text-rose-400"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
+          className="pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors cursor-pointer"
+          style={{
+            borderColor: subTab === "semen" ? "var(--accent)" : "transparent",
+            color: subTab === "semen" ? "var(--accent)" : "var(--text-secondary)",
+          }}
         >
           <FlaskConical className="w-4 h-4" />
           Boar Semen AI Station ({semenBatches.length})
         </button>
       </div>
 
-      {/* Content */}
+      {/* ── Tab Content ── */}
       {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center text-slate-400 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
-          <p className="text-sm">Loading reproduction records...</p>
+        <div className="py-20 flex flex-col items-center justify-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin" style={S.accent} />
+          <p className="text-sm" style={S.sub}>Loading reproduction records...</p>
         </div>
       ) : (
         <>
           {/* TAB 1: MATING & GESTATION */}
           {subTab === "mating" && (
-            <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase font-semibold border-b border-slate-800">
+            <div className="rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
+              <table className="w-full text-left text-sm border-collapse">
+                <thead className="text-xs uppercase font-semibold border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
                   <tr>
                     <th className="py-3 px-4">Sow</th>
                     <th className="py-3 px-4">Type</th>
@@ -415,66 +427,67 @@ export function BreedingPanel() {
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
                   {matings.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-500">
+                      <td colSpan={7} className="py-12 text-center" style={S.muted}>
                         No mating records found. Click &quot;Record Mating / AI&quot; to begin.
                       </td>
                     </tr>
                   ) : (
                     matings.map((m) => (
-                      <tr key={m.breeding_id} className="hover:bg-slate-800/30 transition-colors">
+                      <tr key={m.breeding_id} className="hover:bg-[var(--surface-raised)] transition-colors">
                         <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-100">{m.sow_code}</div>
-                          <div className="text-xs text-slate-400">Tag: {m.sow_tag || "--"} (Parity {m.parity_number})</div>
+                          <div className="font-semibold" style={S.primary}>{m.sow_code}</div>
+                          <div className="text-xs" style={S.sub}>Tag: {m.sow_tag || "--"} (Parity {m.parity_number})</div>
                         </td>
                         <td className="py-3.5 px-4">
                           <span
-                            className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                              m.mating_type === "AI"
-                                ? "bg-purple-950/60 text-purple-400 border border-purple-800/50"
-                                : "bg-blue-950/60 text-blue-400 border border-blue-800/50"
-                            }`}
+                            className="px-2 py-0.5 rounded text-xs font-semibold border"
+                            style={{
+                              backgroundColor: "var(--surface-raised)",
+                              borderColor: "var(--border)",
+                              color: "var(--text-primary)",
+                            }}
                           >
                             {m.mating_type}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-300 font-mono text-xs">
+                        <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
                           {m.mating_date}
                           {m.second_mating_date && (
-                            <span className="block text-[11px] text-slate-500">2nd: {m.second_mating_date}</span>
+                            <span className="block text-[11px]" style={S.muted}>2nd: {m.second_mating_date}</span>
                           )}
                         </td>
                         <td className="py-3.5 px-4">
                           {m.pregnancy_confirmed === true ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-emerald-400 font-medium">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium" style={S.success}>
                               <CheckCircle2 className="w-3.5 h-3.5" /> Confirmed
                             </span>
                           ) : m.pregnancy_confirmed === false ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-rose-400 font-medium">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium" style={S.danger}>
                               <XCircle className="w-3.5 h-3.5" /> Failed
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-xs text-amber-400 font-medium">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium" style={S.warning}>
                               <Clock className="w-3.5 h-3.5" /> Due: {m.preg_check_date}
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 text-slate-200 font-mono text-xs">
+                        <td className="py-3.5 px-4 font-mono text-xs" style={S.primary}>
                           {m.expected_farrowing_date}
                         </td>
                         <td className="py-3.5 px-4">
                           {m.days_until_farrowing < 0 ? (
-                            <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-400 font-medium">
+                            <span className="px-2 py-0.5 rounded text-xs border font-medium" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-muted)" }}>
                               Past Due / Completed
                             </span>
                           ) : m.days_until_farrowing <= 7 ? (
-                            <span className="px-2 py-0.5 rounded text-xs bg-rose-950/60 text-rose-400 border border-rose-800 font-bold animate-pulse">
+                            <span className="px-2 py-0.5 rounded text-xs border font-bold animate-pulse" style={S.warning}>
                               Due in {m.days_until_farrowing} days
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded text-xs bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 font-medium">
+                            <span className="px-2 py-0.5 rounded text-xs border font-medium" style={S.success}>
                               Due in {m.days_until_farrowing} days
                             </span>
                           )}
@@ -487,7 +500,6 @@ export function BreedingPanel() {
                               setSelectedMating(m);
                               setShowPregCheckModal(true);
                             }}
-                            className="text-xs text-slate-300 hover:text-white"
                           >
                             Update Check
                           </Button>
@@ -502,9 +514,9 @@ export function BreedingPanel() {
 
           {/* TAB 2: FARROWING & LITTERS */}
           {subTab === "farrowing" && (
-            <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase font-semibold border-b border-slate-800">
+            <div className="rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
+              <table className="w-full text-left text-sm border-collapse">
+                <thead className="text-xs uppercase font-semibold border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
                   <tr>
                     <th className="py-3 px-4">Sow</th>
                     <th className="py-3 px-4">Farrow Date</th>
@@ -515,48 +527,48 @@ export function BreedingPanel() {
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
                   {farrowings.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-500">
+                      <td colSpan={7} className="py-12 text-center" style={S.muted}>
                         No farrowing records found. Click &quot;Record Farrowing&quot; to log a litter.
                       </td>
                     </tr>
                   ) : (
                     farrowings.map((f) => (
-                      <tr key={f.farrow_id} className="hover:bg-slate-800/30 transition-colors">
+                      <tr key={f.farrow_id} className="hover:bg-[var(--surface-raised)] transition-colors">
                         <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-100">{f.sow_code}</div>
-                          <div className="text-xs text-slate-400">Tag: {f.sow_tag || "--"} (Parity {f.parity_number})</div>
+                          <div className="font-semibold" style={S.primary}>{f.sow_code}</div>
+                          <div className="text-xs" style={S.sub}>Tag: {f.sow_tag || "--"} (Parity {f.parity_number})</div>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-300 font-mono text-xs">
+                        <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
                           {f.farrowing_date}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="font-bold text-emerald-400">{f.piglets_born_live}</span>
-                          <span className="text-slate-500 text-xs"> / {f.piglets_born_total}</span>
+                          <span className="font-bold" style={S.success}>{f.piglets_born_live}</span>
+                          <span className="text-xs" style={S.muted}> / {f.piglets_born_total}</span>
                         </td>
                         <td className="py-3.5 px-4 text-xs">
-                          <span className="text-rose-400">{f.piglets_stillborn} still</span>
-                          <span className="text-slate-600"> • </span>
-                          <span className="text-slate-400">{f.piglets_mummified} mum</span>
+                          <span style={S.danger}>{f.piglets_stillborn} still</span>
+                          <span className="mx-1" style={S.muted}>•</span>
+                          <span style={S.sub}>{f.piglets_mummified} mum</span>
                         </td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-slate-300">
+                        <td className="py-3.5 px-4 text-xs font-mono" style={S.sub}>
                           {f.total_litter_weight_kg ? `${f.total_litter_weight_kg} kg` : "--"}
                           {f.avg_birth_weight_kg && (
-                            <span className="block text-[11px] text-slate-500">avg {f.avg_birth_weight_kg} kg</span>
+                            <span className="block text-[11px]" style={S.muted}>avg {f.avg_birth_weight_kg} kg</span>
                           )}
                         </td>
                         <td className="py-3.5 px-4">
                           {f.piglets_weaned > 0 ? (
                             <div>
-                              <span className="font-bold text-blue-400">{f.piglets_weaned} weaned</span>
+                              <span className="font-bold" style={S.accent}>{f.piglets_weaned} weaned</span>
                               {f.weaning_survival_rate_pct && (
-                                <span className="text-xs text-slate-400 block">{f.weaning_survival_rate_pct}% survival</span>
+                                <span className="text-xs block" style={S.muted}>{f.weaning_survival_rate_pct}% survival</span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-xs text-amber-400 font-medium">Lactating (Due {f.weaning_date})</span>
+                            <span className="text-xs font-medium" style={S.warning}>Lactating (Due {f.weaning_date})</span>
                           )}
                         </td>
                         <td className="py-3.5 px-4 text-right">
@@ -567,7 +579,6 @@ export function BreedingPanel() {
                               setSelectedFarrow(f);
                               setShowWeanModal(true);
                             }}
-                            className="text-xs text-slate-300 hover:text-white"
                           >
                             Record Weaning
                           </Button>
@@ -582,9 +593,9 @@ export function BreedingPanel() {
 
           {/* TAB 3: BOAR SEMEN AI STATION */}
           {subTab === "semen" && (
-            <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase font-semibold border-b border-slate-800">
+            <div className="rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
+              <table className="w-full text-left text-sm border-collapse">
+                <thead className="text-xs uppercase font-semibold border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
                   <tr>
                     <th className="py-3 px-4">Boar</th>
                     <th className="py-3 px-4">Collection Date</th>
@@ -594,33 +605,33 @@ export function BreedingPanel() {
                     <th className="py-3 px-4">Internal / Sold</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
                   {semenBatches.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-500">
+                      <td colSpan={6} className="py-12 text-center" style={S.muted}>
                         No semen collection logs found. Click &quot;Log Semen Collection&quot; to begin.
                       </td>
                     </tr>
                   ) : (
                     semenBatches.map((s) => (
-                      <tr key={s.semen_batch_id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="py-3.5 px-4 font-semibold text-slate-100">
+                      <tr key={s.semen_batch_id} className="hover:bg-[var(--surface-raised)] transition-colors">
+                        <td className="py-3.5 px-4 font-semibold" style={S.primary}>
                           {s.boar_code}
-                          <span className="block text-xs text-slate-400">Tag: {s.boar_tag || "--"}</span>
+                          <span className="block text-xs font-normal" style={S.sub}>Tag: {s.boar_tag || "--"}</span>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-300 font-mono text-xs">
+                        <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
                           {s.collection_date}
                         </td>
-                        <td className="py-3.5 px-4 font-bold text-purple-400">
+                        <td className="py-3.5 px-4 font-bold" style={S.accent}>
                           {s.doses_collected} doses
                         </td>
-                        <td className="py-3.5 px-4 font-mono text-xs text-slate-300">
+                        <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
                           ₹{Number(s.running_cost_period || 0).toLocaleString()}
                         </td>
-                        <td className="py-3.5 px-4 font-mono text-xs font-bold text-emerald-400">
+                        <td className="py-3.5 px-4 font-mono text-xs font-bold" style={S.success}>
                           ₹{Number(s.unit_cost_per_dose || 0).toFixed(2)} / dose
                         </td>
-                        <td className="py-3.5 px-4 text-xs text-slate-400">
+                        <td className="py-3.5 px-4 text-xs" style={S.sub}>
                           {s.doses_used_internal || 0} internal • {s.doses_sold || 0} sold
                         </td>
                       </tr>
@@ -638,15 +649,16 @@ export function BreedingPanel() {
       {/* ========================================================================= */}
       {showMatingModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <Heart className="w-5 h-5 text-rose-500" /> Record Mating / AI Insemination
+          <div className="rounded-[var(--radius-xl)] border max-w-lg w-full p-6 space-y-4 shadow-2xl" style={S.surface}>
+            <h3 className="text-lg font-bold flex items-center gap-2" style={S.primary}>
+              <Heart className="w-5 h-5" style={S.accent} /> Record Mating / AI Insemination
             </h3>
             <form onSubmit={handleCreateMating} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Sow / Gilt *</label>
+                <label className="block text-xs font-semibold mb-1" style={S.sub}>Sow / Gilt *</label>
                 <select
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+                  className="nf-input w-full text-sm"
+                  style={S.input}
                   value={matingForm.sow_animal_id}
                   onChange={(e) => setMatingForm({ ...matingForm, sow_animal_id: e.target.value })}
                   required
@@ -662,9 +674,10 @@ export function BreedingPanel() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Mating Type *</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Mating Type *</label>
                   <select
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={matingForm.mating_type}
                     onChange={(e) => setMatingForm({ ...matingForm, mating_type: e.target.value })}
                   >
@@ -674,10 +687,11 @@ export function BreedingPanel() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Mating Date *</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Mating Date *</label>
                   <input
                     type="date"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={matingForm.mating_date}
                     onChange={(e) => setMatingForm({ ...matingForm, mating_date: e.target.value })}
                     required
@@ -687,9 +701,10 @@ export function BreedingPanel() {
 
               {matingForm.mating_type === "NATURAL_MATING" ? (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Boar Animal *</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Boar Animal *</label>
                   <select
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={matingForm.boar_animal_id}
                     onChange={(e) => setMatingForm({ ...matingForm, boar_animal_id: e.target.value })}
                     required
@@ -705,21 +720,23 @@ export function BreedingPanel() {
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Semen Lot ID</label>
+                    <label className="block text-xs font-semibold mb-1" style={S.sub}>Semen Lot ID</label>
                     <input
                       type="text"
                       placeholder="e.g. SEM-BOAR-2026-01"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+                      className="nf-input w-full text-sm"
+                      style={S.input}
                       value={matingForm.semen_lot_id}
                       onChange={(e) => setMatingForm({ ...matingForm, semen_lot_id: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Dose Quantity</label>
+                    <label className="block text-xs font-semibold mb-1" style={S.sub}>Dose Quantity</label>
                     <input
                       type="number"
                       step="0.1"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+                      className="nf-input w-full text-sm"
+                      style={S.input}
                       value={matingForm.semen_dose_qty}
                       onChange={(e) => setMatingForm({ ...matingForm, semen_dose_qty: e.target.value })}
                     />
@@ -728,23 +745,24 @@ export function BreedingPanel() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Second Insemination Date (48hr repeat)</label>
+                <label className="block text-xs font-semibold mb-1" style={S.sub}>Second Insemination Date (48hr repeat)</label>
                 <input
                   type="date"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+                  className="nf-input w-full text-sm"
+                  style={S.input}
                   value={matingForm.second_mating_date}
                   onChange={(e) => setMatingForm({ ...matingForm, second_mating_date: e.target.value })}
                 />
               </div>
 
-              <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 text-xs text-slate-400 space-y-1">
+              <div className="p-3 rounded-[var(--radius-md)] border text-xs space-y-1" style={S.raised}>
                 <div className="flex justify-between">
-                  <span>Scheduled Gestation:</span>
-                  <span className="font-semibold text-slate-200">114 days</span>
+                  <span style={S.sub}>Scheduled Gestation:</span>
+                  <span className="font-semibold" style={S.primary}>114 days</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Ultrasound Check:</span>
-                  <span className="font-semibold text-slate-200">28 days post-mating</span>
+                  <span style={S.sub}>Ultrasound Check:</span>
+                  <span className="font-semibold" style={S.primary}>28 days post-mating</span>
                 </div>
               </div>
 
@@ -752,7 +770,7 @@ export function BreedingPanel() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowMatingModal(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={submitting} className="bg-rose-600 hover:bg-rose-700 text-white">
+                <Button type="submit" size="sm" disabled={submitting}>
                   {submitting ? "Recording..." : "Save Mating Event"}
                 </Button>
               </div>
@@ -766,36 +784,30 @@ export function BreedingPanel() {
       {/* ========================================================================= */}
       {showPregCheckModal && selectedMating && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" /> Record Pregnancy Check
+          <div className="rounded-[var(--radius-xl)] border max-w-md w-full p-6 space-y-4 shadow-2xl" style={S.surface}>
+            <h3 className="text-lg font-bold flex items-center gap-2" style={S.primary}>
+              <CheckCircle2 className="w-5 h-5" style={S.success} /> Record Pregnancy Check
             </h3>
-            <p className="text-xs text-slate-400">
-              Sow: <span className="font-semibold text-slate-200">{selectedMating.sow_code}</span> (Mated on {selectedMating.mating_date})
+            <p className="text-xs" style={S.sub}>
+              Sow: <span className="font-semibold" style={S.primary}>{selectedMating.sow_code}</span> (Mated on {selectedMating.mating_date})
             </p>
             <form onSubmit={handlePregCheck} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Result *</label>
+                <label className="block text-xs font-semibold mb-1" style={S.sub}>Result *</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setPregCheckForm({ ...pregCheckForm, pregnancy_confirmed: true })}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 ${
-                      pregCheckForm.pregnancy_confirmed
-                        ? "bg-emerald-950/80 border-emerald-500 text-emerald-300"
-                        : "bg-slate-950 border-slate-800 text-slate-400"
-                    }`}
+                    className="py-2 px-3 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                    style={pregCheckForm.pregnancy_confirmed ? S.success : S.surface}
                   >
                     <CheckCircle2 className="w-4 h-4" /> Confirmed Pregnant
                   </button>
                   <button
                     type="button"
                     onClick={() => setPregCheckForm({ ...pregCheckForm, pregnancy_confirmed: false })}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 ${
-                      !pregCheckForm.pregnancy_confirmed
-                        ? "bg-rose-950/80 border-rose-500 text-rose-300"
-                        : "bg-slate-950 border-slate-800 text-slate-400"
-                    }`}
+                    className="py-2 px-3 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                    style={!pregCheckForm.pregnancy_confirmed ? S.danger : S.surface}
                   >
                     <XCircle className="w-4 h-4" /> Failed / Not Pregnant
                   </button>
@@ -803,9 +815,10 @@ export function BreedingPanel() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Check Method</label>
+                <label className="block text-xs font-semibold mb-1" style={S.sub}>Check Method</label>
                 <select
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                  className="nf-input w-full text-sm"
+                  style={S.input}
                   value={pregCheckForm.preg_check_method}
                   onChange={(e) => setPregCheckForm({ ...pregCheckForm, preg_check_method: e.target.value })}
                 >
@@ -816,10 +829,11 @@ export function BreedingPanel() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Check Date</label>
+                <label className="block text-xs font-semibold mb-1" style={S.sub}>Check Date</label>
                 <input
                   type="date"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                  className="nf-input w-full text-sm"
+                  style={S.input}
                   value={pregCheckForm.preg_check_date}
                   onChange={(e) => setPregCheckForm({ ...pregCheckForm, preg_check_date: e.target.value })}
                 />
@@ -829,7 +843,7 @@ export function BreedingPanel() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowPregCheckModal(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Button type="submit" size="sm" disabled={submitting}>
                   {submitting ? "Saving..." : "Update Pregnancy Status"}
                 </Button>
               </div>
@@ -843,15 +857,16 @@ export function BreedingPanel() {
       {/* ========================================================================= */}
       {showFarrowModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <Baby className="w-5 h-5 text-amber-500" /> Record Sow Farrowing Event
+          <div className="rounded-[var(--radius-xl)] border max-w-lg w-full p-6 space-y-4 shadow-2xl" style={S.surface}>
+            <h3 className="text-lg font-bold flex items-center gap-2" style={S.primary}>
+              <Baby className="w-5 h-5" style={S.accent} /> Record Sow Farrowing Event
             </h3>
             <form onSubmit={handleCreateFarrowing} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Sow *</label>
+                <label className="block text-xs font-semibold mb-1" style={S.sub}>Sow *</label>
                 <select
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+                  className="nf-input w-full text-sm"
+                  style={S.input}
                   value={farrowForm.sow_animal_id}
                   onChange={(e) => setFarrowForm({ ...farrowForm, sow_animal_id: e.target.value })}
                   required
@@ -867,19 +882,21 @@ export function BreedingPanel() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Farrowing Date *</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Farrowing Date *</label>
                   <input
                     type="date"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={farrowForm.farrowing_date}
                     onChange={(e) => setFarrowForm({ ...farrowForm, farrowing_date: e.target.value })}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Farrowing Status</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Farrowing Status</label>
                   <select
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={farrowForm.farrowing_status}
                     onChange={(e) => setFarrowForm({ ...farrowForm, farrowing_status: e.target.value })}
                   >
@@ -893,32 +910,35 @@ export function BreedingPanel() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-emerald-400 mb-1">Born Live *</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.success}>Born Live *</label>
                   <input
                     type="number"
                     min="0"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold focus:outline-none"
+                    className="nf-input w-full text-sm font-bold"
+                    style={S.input}
                     value={farrowForm.piglets_born_live}
                     onChange={(e) => setFarrowForm({ ...farrowForm, piglets_born_live: e.target.value })}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-rose-400 mb-1">Stillborn</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.danger}>Stillborn</label>
                   <input
                     type="number"
                     min="0"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-rose-400 focus:outline-none"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={farrowForm.piglets_stillborn}
                     onChange={(e) => setFarrowForm({ ...farrowForm, piglets_stillborn: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Mummified</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Mummified</label>
                   <input
                     type="number"
                     min="0"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={farrowForm.piglets_mummified}
                     onChange={(e) => setFarrowForm({ ...farrowForm, piglets_mummified: e.target.value })}
                   />
@@ -927,23 +947,25 @@ export function BreedingPanel() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Avg Birth Weight (kg)</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Avg Birth Weight (kg)</label>
                   <input
                     type="number"
                     step="0.01"
                     placeholder="e.g. 1.45"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={farrowForm.avg_birth_weight_kg}
                     onChange={(e) => setFarrowForm({ ...farrowForm, avg_birth_weight_kg: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Total Litter Weight (kg)</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Total Litter Weight (kg)</label>
                   <input
                     type="number"
                     step="0.01"
                     placeholder="Auto-calculated if empty"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={farrowForm.total_litter_weight_kg}
                     onChange={(e) => setFarrowForm({ ...farrowForm, total_litter_weight_kg: e.target.value })}
                   />
@@ -954,7 +976,7 @@ export function BreedingPanel() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowFarrowModal(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={submitting} className="bg-amber-600 hover:bg-amber-700 text-white">
+                <Button type="submit" size="sm" disabled={submitting}>
                   {submitting ? "Saving..." : "Save Farrowing Event"}
                 </Button>
               </div>
@@ -968,19 +990,20 @@ export function BreedingPanel() {
       {/* ========================================================================= */}
       {showWeanModal && selectedFarrow && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-blue-400" /> Record Litter Weaning
+          <div className="rounded-[var(--radius-xl)] border max-w-md w-full p-6 space-y-4 shadow-2xl" style={S.surface}>
+            <h3 className="text-lg font-bold flex items-center gap-2" style={S.primary}>
+              <CheckCircle2 className="w-5 h-5" style={S.accent} /> Record Litter Weaning
             </h3>
-            <p className="text-xs text-slate-400">
-              Sow: <span className="font-semibold text-slate-200">{selectedFarrow.sow_code}</span> (Farrowed on {selectedFarrow.farrowing_date})
+            <p className="text-xs" style={S.sub}>
+              Sow: <span className="font-semibold" style={S.primary}>{selectedFarrow.sow_code}</span> (Farrowed on {selectedFarrow.farrowing_date})
             </p>
             <form onSubmit={handleWeaning} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Weaning Date *</label>
+                <label className="block text-xs font-semibold mb-1" style={S.sub}>Weaning Date *</label>
                 <input
                   type="date"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                  className="nf-input w-full text-sm"
+                  style={S.input}
                   value={weanForm.weaning_date}
                   onChange={(e) => setWeanForm({ ...weanForm, weaning_date: e.target.value })}
                   required
@@ -989,23 +1012,25 @@ export function BreedingPanel() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-blue-400 mb-1">Piglets Weaned *</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.accent}>Piglets Weaned *</label>
                   <input
                     type="number"
                     min="0"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-blue-400 font-bold focus:outline-none"
+                    className="nf-input w-full text-sm font-bold"
+                    style={S.input}
                     value={weanForm.piglets_weaned}
                     onChange={(e) => setWeanForm({ ...weanForm, piglets_weaned: e.target.value })}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Avg Wean Weight (kg)</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Avg Wean Weight (kg)</label>
                   <input
                     type="number"
                     step="0.01"
                     placeholder="e.g. 7.5"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={weanForm.avg_weaning_weight_kg}
                     onChange={(e) => setWeanForm({ ...weanForm, avg_weaning_weight_kg: e.target.value })}
                   />
@@ -1016,7 +1041,7 @@ export function BreedingPanel() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowWeanModal(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={submitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Button type="submit" size="sm" disabled={submitting}>
                   {submitting ? "Saving..." : "Save Weaning Outcome"}
                 </Button>
               </div>
@@ -1030,15 +1055,16 @@ export function BreedingPanel() {
       {/* ========================================================================= */}
       {showSemenModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <FlaskConical className="w-5 h-5 text-purple-500" /> Log Boar Semen Collection
+          <div className="rounded-[var(--radius-xl)] border max-w-lg w-full p-6 space-y-4 shadow-2xl" style={S.surface}>
+            <h3 className="text-lg font-bold flex items-center gap-2" style={S.primary}>
+              <FlaskConical className="w-5 h-5" style={S.accent} /> Log Boar Semen Collection
             </h3>
             <form onSubmit={handleCreateSemen} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Boar Animal *</label>
+                <label className="block text-xs font-semibold mb-1" style={S.sub}>Boar Animal *</label>
                 <select
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+                  className="nf-input w-full text-sm"
+                  style={S.input}
                   value={semenForm.boar_animal_id}
                   onChange={(e) => setSemenForm({ ...semenForm, boar_animal_id: e.target.value })}
                   required
@@ -1054,21 +1080,23 @@ export function BreedingPanel() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Collection Date *</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.sub}>Collection Date *</label>
                   <input
                     type="date"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none"
+                    className="nf-input w-full text-sm"
+                    style={S.input}
                     value={semenForm.collection_date}
                     onChange={(e) => setSemenForm({ ...semenForm, collection_date: e.target.value })}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-purple-400 mb-1">Doses Collected *</label>
+                  <label className="block text-xs font-semibold mb-1" style={S.accent}>Doses Collected *</label>
                   <input
                     type="number"
                     min="1"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-purple-400 font-bold focus:outline-none"
+                    className="nf-input w-full text-sm font-bold"
+                    style={S.input}
                     value={semenForm.doses_collected}
                     onChange={(e) => setSemenForm({ ...semenForm, doses_collected: e.target.value })}
                     required
@@ -1076,41 +1104,45 @@ export function BreedingPanel() {
                 </div>
               </div>
 
-              <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
-                <div className="text-xs font-semibold text-slate-300">Period Running Costs (for Unit Cost calculation)</div>
+              <div className="p-3 rounded-[var(--radius-md)] border space-y-2" style={S.raised}>
+                <div className="text-xs font-semibold" style={S.primary}>Period Running Costs (for Unit Cost calculation)</div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[11px] text-slate-400">Amortisation (₹)</label>
+                    <label className="block text-[11px]" style={S.muted}>Amortisation (₹)</label>
                     <input
                       type="number"
-                      className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200"
+                      className="nf-input w-full text-xs"
+                      style={S.input}
                       value={semenForm.amortisation_period}
                       onChange={(e) => setSemenForm({ ...semenForm, amortisation_period: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-400">Feed Cost (₹)</label>
+                    <label className="block text-[11px]" style={S.muted}>Feed Cost (₹)</label>
                     <input
                       type="number"
-                      className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200"
+                      className="nf-input w-full text-xs"
+                      style={S.input}
                       value={semenForm.feed_cost_period}
                       onChange={(e) => setSemenForm({ ...semenForm, feed_cost_period: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-400">Drugs / Med (₹)</label>
+                    <label className="block text-[11px]" style={S.muted}>Drugs / Med (₹)</label>
                     <input
                       type="number"
-                      className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200"
+                      className="nf-input w-full text-xs"
+                      style={S.input}
                       value={semenForm.drug_cost_period}
                       onChange={(e) => setSemenForm({ ...semenForm, drug_cost_period: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-400">Lab Overhead (₹)</label>
+                    <label className="block text-[11px]" style={S.muted}>Lab Overhead (₹)</label>
                     <input
                       type="number"
-                      className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200"
+                      className="nf-input w-full text-xs"
+                      style={S.input}
                       value={semenForm.overhead_cost_period}
                       onChange={(e) => setSemenForm({ ...semenForm, overhead_cost_period: e.target.value })}
                     />
@@ -1122,7 +1154,7 @@ export function BreedingPanel() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowSemenModal(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={submitting} className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Button type="submit" size="sm" disabled={submitting}>
                   {submitting ? "Calculating & Saving..." : "Save Collection Batch"}
                 </Button>
               </div>

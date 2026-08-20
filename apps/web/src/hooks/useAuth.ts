@@ -92,6 +92,7 @@ export function clearSession() {
   localStorage.removeItem("user");
   localStorage.removeItem("tenant_id");
   localStorage.removeItem("active_company_id");
+  localStorage.removeItem("tenant_company_mode");
 }
 
 export function hasPermission(

@@ -92,8 +92,12 @@ export default function InventoryLedgerPanel() {
 
       <div className="flex flex-wrap items-center gap-2">
         <select value={itemId} onChange={(e) => setItemId(e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-          <option value="">All items</option>
-          {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
+          <option value="">All items ({items.length} options)</option>
+          {items.map((it, idx) => (
+            <option key={it.item_id} value={it.item_id}>
+              {idx + 1}. {it.item_code} — {it.item_name}
+            </option>
+          ))}
         </select>
         <select value={transactionType} onChange={(e) => setTransactionType(e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
           <option value="">All transaction types</option>

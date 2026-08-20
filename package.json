@@ -15,6 +15,7 @@
     "test": "pnpm nx run-many -t test -p api web mobile",
     "lint": "pnpm nx run-many -t lint -p api web api-e2e web-e2e",
     "typecheck": "pnpm nx run-many -t typecheck -p api web api-e2e web-e2e",
+    "db:fresh-setup": "pnpm nx run api:db-fresh-setup",
     "graph": "pnpm nx graph"
   },
   "private": true,

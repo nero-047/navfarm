@@ -67,16 +67,23 @@ export default function BulkDailyEntryPanel() {
     try {
       const [bRes, iRes] = await Promise.all([
         api.get(`/batch?companyId=${companyId}&status=ACTIVE&limit=100`),
-        api.get(`/item?companyId=${companyId}&itemType=RAW_MATERIAL&limit=200`),
+        api.get(`/item?companyId=${companyId}&limit=200`),
       ]);
 
       const activeBatches = unwrap<Row[]>(bRes) || [];
-      const items = unwrap<Row[]>(iRes) || [];
+      const allItems = unwrap<Row[]>(iRes) || [];
+      const feedOnly = allItems.filter(
+        (it) => it.item_type === "FEED" || it.item_type === "RAW_MATERIAL" || it.category === "FEEDS"
+      );
+      const items = feedOnly.length > 0 ? feedOnly : allItems;
 
       setFeedItems(items);
 
       if (items.length > 0 && !defaultFeedItemId) {
-        setDefaultFeedItemId(items[0].item_id);
+        const preferred = items.find(
+          (i) => i.item_code?.includes("GEST") || i.item_code?.includes("FEED") || i.item_type === "FEED"
+        ) || items[0];
+        setDefaultFeedItemId(preferred.item_id);
       }
 
       setRows(
@@ -194,17 +201,19 @@ export default function BulkDailyEntryPanel() {
 
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={S.muted}>
-              Default Feed Ration / Item
+              Default Feed Ration / Item {feedItems.length > 0 ? `(${feedItems.length} items)` : ""}
             </label>
             <select
-              className="nf-input text-xs min-w-[220px]"
+              className="nf-input text-xs min-w-[260px]"
               value={defaultFeedItemId}
               onChange={(e) => setDefaultFeedItemId(e.target.value)}
             >
-              <option value="">Select feed item…</option>
-              {feedItems.map((item) => (
+              <option value="">
+                {feedItems.length > 0 ? `Select feed item (${feedItems.length} available)…` : "Loading feed items…"}
+              </option>
+              {feedItems.map((item, idx) => (
                 <option key={item.item_id} value={item.item_id}>
-                  {item.item_name} ({item.uom})
+                  {idx + 1}. {item.item_code ? `${item.item_code} — ${item.item_name}` : item.item_name} ({item.uom_primary || item.uom || "KG"})
                 </option>
               ))}
             </select>

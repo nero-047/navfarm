@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
+import { setTenantCompanyMode } from '@/hooks/useAuth';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -28,6 +29,7 @@ export function LoginForm() {
     }
     setSubmitting(true);
     try {
+      setTenantCompanyMode(false);
       const signedInUser = await login(email, password);
       router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
     } catch (cause) {

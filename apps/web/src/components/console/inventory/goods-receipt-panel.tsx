@@ -328,8 +328,12 @@ export default function GoodsReceiptPanel() {
                   <TableRow key={idx}>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
-                        {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
+                        <option value="">Select Item ({items.length} options)…</option>
+                        {items.map((it, i) => (
+                          <option key={it.item_id} value={it.item_id}>
+                            {i + 1}. {it.item_code} — {it.item_name}
+                          </option>
+                        ))}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>

@@ -53,6 +53,7 @@ function clearSession() {
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('tenant_id');
   localStorage.removeItem('active_company_id');
+  localStorage.removeItem('tenant_company_mode');
 }
 
 let refreshPromise: Promise<string> | null = null;

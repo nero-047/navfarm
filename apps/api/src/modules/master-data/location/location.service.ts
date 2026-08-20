@@ -564,7 +564,7 @@ export class LocationService {
         batch_no: schema.batchHeader.batch_no,
         location_id: schema.batchHeader.location_id,
         shed_id: schema.batchHeader.shed_id,
-        current_quantity: schema.batchHeader.current_quantity,
+        opening_quantity: schema.batchHeader.opening_quantity,
       })
       .from(schema.batchHeader)
       .where(and(...batchConditions));
@@ -586,7 +586,7 @@ export class LocationService {
     for (const b of batches) {
       const locId = b.location_id || b.shed_id;
       if (locId) {
-        batchCountMap[locId] = (batchCountMap[locId] || 0) + Number(b.current_quantity || 0);
+        batchCountMap[locId] = (batchCountMap[locId] || 0) + Number(b.opening_quantity || 0);
       }
     }
 

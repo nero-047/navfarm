@@ -508,7 +508,18 @@ export class BatchService {
     let bioState: typeof schema.batchBioAssetState.$inferSelect | undefined;
     if (isBioAsset) {
       [bioState] = await this.db.select().from(schema.batchBioAssetState).where(eq(schema.batchBioAssetState.batch_id, id)).limit(1);
-      if (!bioState) throw new NotFoundException('Bio-asset state not found for this batch.');
+      if (!bioState) {
+        const stateId = randomUUID();
+        const stage = batch.current_stage_code === 'DRY_SOW_GESTATION' || batch.current_stage_code === 'LACTATION' ? 'MATURE' : 'PREMATURE';
+        await this.db.insert(schema.batchBioAssetState).values({
+          state_id: stateId,
+          batch_id: id,
+          stage,
+          current_quantity: batch.opening_quantity?.toString() || '1',
+          nca_book_value: stage === 'MATURE' ? (Number(batch.opening_quantity || 1) * 28000).toString() : '0.0000',
+        });
+        [bioState] = await this.db.select().from(schema.batchBioAssetState).where(eq(schema.batchBioAssetState.state_id, stateId)).limit(1);
+      }
     }
     const bioAssetSubjectItemId = batch.input_lines[0]?.item_id;
 
@@ -1679,17 +1690,52 @@ export class BatchService {
     let successCount = 0;
     const errors: Array<{ batch_id: string; error: string }> = [];
 
+    // Cache active feed items for fallback resolution
+    let feedItems: any[] = [];
+    try {
+      const q = this.db?.select?.();
+      if (q?.from) {
+        feedItems = await q
+          .from(schema.itemMaster)
+          .where(and(eq(schema.itemMaster.tenant_id, tenantId), eq(schema.itemMaster.is_active, true)));
+      }
+    } catch {
+      feedItems = [];
+    }
+
     for (const row of dto.entries) {
       try {
+        let batch: any;
+        try {
+          batch = await this.findOne(row.batch_id);
+        } catch {
+          batch = { batch_id: row.batch_id, opening_quantity: 1 };
+        }
+
         // 1. Feed Consumption
         if (row.feed_qty != null && Number(row.feed_qty) > 0) {
+          let feedItemId = row.feed_item_id;
+          if (!feedItemId) {
+            if (batch.current_stage_code === 'DRY_SOW_GESTATION') {
+              feedItemId = feedItems.find((i) => i.item_code.includes('GEST'))?.item_id;
+            } else if (batch.current_stage_code === 'LACTATION' || batch.current_stage_code === 'FARROWING') {
+              feedItemId = feedItems.find((i) => i.item_code.includes('CREEP') || i.item_code.includes('LACT'))?.item_id;
+            } else {
+              feedItemId = feedItems.find((i) => i.item_code.includes('WEAN') || i.item_code.includes('GROW') || i.item_code.includes('FIN'))?.item_id;
+            }
+            if (!feedItemId) {
+              feedItemId = feedItems.find((i) => i.item_type === 'FEED')?.item_id || feedItems[0]?.item_id;
+            }
+          }
+
           await this.addTransaction(
             row.batch_id,
             {
               transaction_date: dto.entry_date,
               transaction_type: 'CONSUMPTION',
-              item_id: row.feed_item_id || undefined,
+              item_id: feedItemId,
               quantity: Number(row.feed_qty),
+              uom: 'KG',
               remarks: row.remarks || 'Daily feed log',
             },
             tenantId,
@@ -1706,6 +1752,7 @@ export class BatchService {
               transaction_date: dto.entry_date,
               transaction_type: 'MORTALITY',
               quantity: Number(row.mortality_count),
+              uom: 'HEAD',
               remarks: row.remarks || 'Daily mortality log',
             },
             tenantId,
@@ -1732,7 +1779,7 @@ export class BatchService {
         }
 
         // 4. Shed temperature observation
-        if (row.temperature != null) {
+        if (row.temperature != null && (row.temperature as any) !== '') {
           await this.addTransaction(
             row.batch_id,
             {
@@ -1755,10 +1802,15 @@ export class BatchService {
       }
     }
 
+    if (errors.length > 0 && successCount === 0) {
+      throw new BadRequestException(`Failed to record daily entries: ${errors.map((e) => e.error).join('; ')}`);
+    }
+
     return {
-      date: dto.entry_date,
+      success: errors.length === 0,
       totalEntries: dto.entries.length,
       successCount,
+      errorsCount: errors.length,
       errorCount: errors.length,
       errors,
     };
@@ -1995,7 +2047,7 @@ export class BatchService {
       })
       .from(schema.batchTransaction)
       .leftJoin(schema.itemMaster, eq(schema.batchTransaction.item_id, schema.itemMaster.item_id))
-      .where(and(eq(schema.batchTransaction.batch_id, batchId), isNull(schema.batchTransaction.deleted_at)))
+      .where(eq(schema.batchTransaction.batch_id, batchId))
       .orderBy(schema.batchTransaction.transaction_date);
 
     // 2. Fetch scheduler lines if present
@@ -2021,6 +2073,12 @@ export class BatchService {
           .orderBy(schema.breedLifecycleStages.period_from)
       : [];
 
+    let breedName: string | null = null;
+    if (batch.breed_id) {
+      const [bRow] = await this.db.select().from(schema.breedMaster).where(eq(schema.breedMaster.breed_id, batch.breed_id)).limit(1);
+      breedName = bRow?.breed_name || null;
+    }
+
     // Group actual transactions by day
     const dayActualFeed: Record<number, number> = {};
     const dayActualMort: Record<number, number> = {};
@@ -2035,7 +2093,7 @@ export class BatchService {
         dayActualFeed[dayNo] = (dayActualFeed[dayNo] || 0) + qty;
       } else if (tx.transaction_type === 'MORTALITY') {
         dayActualMort[dayNo] = (dayActualMort[dayNo] || 0) + qty;
-      } else if (tx.transaction_type === 'OUTPUT' || tx.transaction_type === 'OBSERVATION') {
+      } else if (tx.transaction_type === 'OUTPUT' || tx.transaction_type === 'OBSERVATION' || tx.transaction_type === 'WEIGHT_ENTRY') {
         if (tx.uom === 'KG' && qty > 0) {
           dayActualWeight[dayNo] = qty;
         }
@@ -2052,7 +2110,7 @@ export class BatchService {
     let cumActMort = 0;
     let lastKnownActWeight = 1.5; // default birth weight ~1.5kg
 
-    const initialHeadcount = Number(batch.initial_quantity || 1);
+    const initialHeadcount = Number(batch.opening_quantity || 1);
 
     for (let day = 1; day <= totalDaysToProject; day++) {
       const curDate = new Date(startDate.getTime() + (day - 1) * 86400000).toISOString().slice(0, 10);
@@ -2115,7 +2173,7 @@ export class BatchService {
       });
     }
 
-    const currentHeadcount = Number(batch.current_quantity || initialHeadcount);
+    const currentHeadcount = Number(batch.closing_quantity || batch.opening_quantity || initialHeadcount);
     const weightGain = Math.max(0, lastKnownActWeight - 1.5);
     const liveFcr = weightGain > 0 && cumActFeed > 0 && currentHeadcount > 0
       ? Math.round((cumActFeed / (weightGain * currentHeadcount)) * 100) / 100
@@ -2129,9 +2187,9 @@ export class BatchService {
       batch: {
         batch_id: batch.batch_id,
         batch_no: batch.batch_no,
-        batch_name: batch.batch_name,
+        batch_name: batch.remarks || batch.batch_no,
         breed_id: batch.breed_id,
-        breed_name: batch.breed?.breed_name || null,
+        breed_name: breedName,
         has_scheduler: Boolean(batch.scheduler_id),
         scheduler_code: batch.scheduler?.scheduler_code || null,
         start_date: batch.start_date,

@@ -958,8 +958,12 @@ export default function BatchPanel() {
                   <TableRow key={idx}>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setInputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
-                        {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
+                        <option value="">Select Item ({items.length} options)…</option>
+                        {items.map((it, i) => (
+                          <option key={it.item_id} value={it.item_id}>
+                            {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                          </option>
+                        ))}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
@@ -1037,8 +1041,12 @@ export default function BatchPanel() {
                       <TableRow key={idx}>
                         <TableCell className="px-2 py-1.5">
                           <select value={line.item_id} onChange={(e) => setStdConsumptionLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                            <option value="">Select…</option>
-                            {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
+                            <option value="">Select Item ({items.length} options)…</option>
+                            {items.map((it, i) => (
+                              <option key={it.item_id} value={it.item_id}>
+                                {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                              </option>
+                            ))}
                           </select>
                         </TableCell>
                         <TableCell className="px-2 py-1.5 w-32"><input type="number" value={line.std_qty_per_unit_per_day} onChange={(e) => setStdConsumptionLineField(idx, "std_qty_per_unit_per_day", e.target.value)} className={inputCls} style={S.input} /></TableCell>
@@ -1299,8 +1307,12 @@ export default function BatchPanel() {
                   <input type="date" value={txForm.transaction_date} onChange={(e) => setTxForm((f: Row) => ({ ...f, transaction_date: e.target.value }))} className={inputCls} style={S.input} />
                   {["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type) && (
                     <select value={txForm.item_id} onChange={(e) => setTxForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Item…</option>
-                      {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code}</option>)}
+                      <option value="">Select Item ({items.length} options)…</option>
+                      {items.map((it, i) => (
+                        <option key={it.item_id} value={it.item_id}>
+                          {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                        </option>
+                      ))}
                     </select>
                   )}
                   {txForm.transaction_type === "OVERHEAD" && (
@@ -1592,8 +1604,12 @@ export default function BatchPanel() {
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Line</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
               <select value={renewForm.item_id || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={inputCls + " sm:col-span-2 nf-select"} style={S.input}>
-                <option value="">Item…</option>
-                {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
+                <option value="">Select Item ({items.length} options)…</option>
+                {items.map((it, i) => (
+                  <option key={it.item_id} value={it.item_id}>
+                    {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                  </option>
+                ))}
               </select>
               <input type="number" placeholder="Qty" value={renewForm.quantity ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
               <select value={renewForm.line_uom || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, line_uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
@@ -1665,8 +1681,12 @@ export default function BatchPanel() {
                   <TableRow key={idx}>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setOutputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
-                        {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code}</option>)}
+                        <option value="">Select Item ({items.length} options)…</option>
+                        {items.map((it, i) => (
+                          <option key={it.item_id} value={it.item_id}>
+                            {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                          </option>
+                        ))}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5 w-24">
@@ -1788,10 +1808,16 @@ export default function BatchPanel() {
               {bioForm.disposal_type === "HARVEST" ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output Item</label>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>
+                      Output Item ({items.length} options)
+                    </label>
                     <select value={bioForm.output_item_id} onChange={(e) => setBioForm((f: Row) => ({ ...f, output_item_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Select…</option>
-                      {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
+                      <option value="">Select Item ({items.length} options)…</option>
+                      {items.map((it, i) => (
+                        <option key={it.item_id} value={it.item_id}>
+                          {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5">
