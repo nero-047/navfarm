@@ -123,7 +123,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     }
     try {
       const companiesList = await api.get(`/company/tenant/${tenantId}`);
-      let filtered = companiesList;
+      const list = Array.isArray(companiesList) ? companiesList : [];
+      let filtered = list;
 
       // Always use active company ID as the source of truth
       const activeId = getActiveCompanyId() ||
@@ -131,23 +132,34 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         (storedUser as any).company_id;
 
       if (storedUser.userType !== "TENANT_ADMIN") {
-        filtered = companiesList.filter((c: any) => c.company_id === activeId);
-        if (filtered.length === 0) filtered = companiesList; // fallback
+        filtered = list.filter((c: any) => c.company_id === activeId);
+        if (filtered.length === 0) filtered = list; // fallback
       }
       if (filtered.length === 0) {
+        // If there are literally 0 companies under this tenant, show setup step 1
         setIsOnboarded(false);
         setActiveWizardStep(1);
       } else {
-        const comp = companiesList.find((c: any) => c.company_id === activeId) || filtered[0];
+        const comp = list.find((c: any) => c.company_id === activeId) || filtered[0];
         setActiveCompany(comp);
-        if (comp.onboarding_status === "COMPLETED") {
+        // If company has already completed onboarding or is actively operating, mark onboarded
+        if (comp.onboarding_status === "COMPLETED" || comp.is_active || (storedUser as any).company_id) {
           setIsOnboarded(true);
         } else {
-          setIsOnboarded(false);
-          const steps = await api.get(`/setup/wizard/status/${comp.company_id}`);
-          setWizardSteps(steps);
-          const firstPending = steps.find((s: any) => s.status !== "COMPLETED" && s.isMandatory);
-          setActiveWizardStep(firstPending ? firstPending.stepOrder : 8);
+          try {
+            const steps = await api.get(`/setup/wizard/status/${comp.company_id}`);
+            const stepArray = Array.isArray(steps) ? steps : [];
+            setWizardSteps(stepArray);
+            const firstPending = stepArray.find((s: any) => s.status !== "COMPLETED" && s.isMandatory);
+            if (firstPending) {
+              setIsOnboarded(false);
+              setActiveWizardStep(firstPending.stepOrder || 1);
+            } else {
+              setIsOnboarded(true);
+            }
+          } catch {
+            setIsOnboarded(true);
+          }
         }
       }
       const [langList, currList, tzList, countryList, nobList] = await Promise.all([
@@ -163,7 +175,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       setCountries(countryList);
       setNobs(nobList);
     } catch {
-      setIsOnboarded(false);
+      // On network lag or transient refresh failure, keep existing company access instead of trapping user in wizard
+      setIsOnboarded(true);
     } finally {
       setCheckingOnboard(false);
       setReady(true);
