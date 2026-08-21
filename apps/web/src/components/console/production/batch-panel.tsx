@@ -128,6 +128,8 @@ export default function BatchPanel() {
   const [stageOptionsLoading, setStageOptionsLoading] = useState(false);
 
   const companyId = getActiveCompanyId();
+  const scope = typeof window !== "undefined" ? localStorage.getItem("active_workspace_scope") : "COMPANY";
+  const activeLob = typeof window !== "undefined" ? (localStorage.getItem("active_lob") || "PIGGERY") : "PIGGERY";
 
   const load = async () => {
     setLoading(true);
@@ -139,9 +141,28 @@ export default function BatchPanel() {
       if (statusFilter) params.set("status", statusFilter);
       params.set("limit", "200");
       const res = await api.get(`/batch?${params.toString()}`);
-      setRows(unwrap<Row[]>(res) || []);
+      const list = unwrap<Row[]>(res) || [];
+
+      let finalRows = Array.isArray(list) ? list : [];
+
+      if (scope === "OPERATIONAL") {
+        if (activeLob === "DAIRY") {
+          finalRows = finalRows.filter((b) => {
+            const code = (b.batch_no || b.batch_code || "").toUpperCase();
+            return code.includes("COW") || code.includes("DAIRY") || (b.lob_name || "").toUpperCase().includes("DAIRY");
+          });
+        } else if (activeLob === "PIGGERY") {
+          finalRows = finalRows.filter((b) => {
+            const code = (b.batch_no || b.batch_code || "").toUpperCase();
+            return code.includes("PIG") || code.includes("SOW") || (b.lob_name || "").toUpperCase().includes("PIG");
+          });
+        }
+      }
+
+      setRows(finalRows);
     } catch (err: any) {
-      setError(err?.message || "Failed to load batches.");
+      setError(err?.message || "Failed to load batches from database.");
+      setRows([]);
     } finally {
       setLoading(false);
     }
@@ -853,8 +874,8 @@ export default function BatchPanel() {
         maxWidth="xl"
         footer={
           <>
-            <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <Button onClick={handleSave} disabled={saving} >
+            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving} className="nf-btn-primary">
               {saving ? "Saving…" : "Save Draft"}
             </Button>
           </>
@@ -1029,7 +1050,7 @@ export default function BatchPanel() {
               <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                 <table className="w-full border-collapse text-left text-xs">
                   <TableHeader>
-                    <tr className="border-b border-(--row-border)">
+                    <tr className="border-b border-[var(--row-border)]">
                       <TableHead className="h-auto px-3 py-2">Item</TableHead>
                       <TableHead className="h-auto px-3 py-2">Std Qty/Unit/Day</TableHead>
                       <TableHead className="h-auto px-3 py-2">Std Rate</TableHead>
@@ -1077,44 +1098,68 @@ export default function BatchPanel() {
       <Dialog
         open={!!viewing}
         onClose={() => setViewing(null)}
-        title={viewing ? `Batch ${viewing.batch_no}` : ""}
+        title={viewing ? `Batch: ${viewing.batch_no}` : "Batch Details"}
+        description={viewing?.remarks || "Production batch metadata, performance telemetry, daily operations, and transactions ledger."}
         maxWidth="xl"
-        footer={<button onClick={() => setViewing(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Close</button>}
       >
         {viewing && (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Status</p><span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[viewing.status] || STATUS_STYLE.DRAFT}>{viewing.status}</span></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Method</p><p style={S.primary}>{viewing.costing_method}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Opening Qty</p><p style={S.primary}>{viewing.opening_quantity} {viewing.uom}</p></div>
-              {viewing.total_cost && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Total Cost / Unit</p><p style={S.primary}>{viewing.total_cost} / {viewing.unit_cost}</p></div>}
+          <div className="flex flex-col gap-4 text-xs">
+            {/* Top Batch Metadata Card */}
+            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4 p-3.5 rounded-[var(--radius-md)] border shadow-2xs" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Status</p>
+                <span className="mt-1 inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-bold" style={STATUS_STYLE[viewing.status] || STATUS_STYLE.DRAFT}>
+                  {viewing.status}
+                </span>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Costing Method</p>
+                <p className="font-semibold mt-0.5" style={S.primary}>{viewing.costing_method}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Opening Head / Qty</p>
+                <p className="font-semibold mt-0.5" style={S.primary}>{viewing.opening_quantity} {viewing.uom || "HEAD"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Breed / Variety</p>
+                <p className="font-semibold mt-0.5" style={S.primary}>{viewing.breed_name || viewing.breed_code || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Start Date</p>
+                <p className="font-semibold mt-0.5" style={S.primary}>{viewing.start_date || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Expected End Date</p>
+                <p className="font-semibold mt-0.5" style={S.primary}>{viewing.expected_end_date || "—"}</p>
+              </div>
               {viewing.current_stage_code && (
                 <div>
-                  <p className="font-semibold uppercase tracking-wider" style={S.muted}>Stage</p>
-                  <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Current Stage</p>
+                  <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--accent)", borderColor: "rgba(194,67,50,0.3)", backgroundColor: "var(--accent-muted)" }}>
                     {viewing.current_stage_code}
                   </span>
                 </div>
               )}
-              {viewing.scheduler && (
+              {viewing.total_cost != null && (
                 <div>
-                  <p className="font-semibold uppercase tracking-wider" style={S.muted}>Scheduler</p>
-                  <p style={S.primary}>{viewing.scheduler.scheduler_code}{(viewing.alerts || []).length > 0 ? ` — ${viewing.alerts.length} alert(s)` : ""}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Total Cost</p>
+                  <p className="font-semibold mt-0.5" style={S.primary}>₹{Number(viewing.total_cost).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 border-b" style={{ borderColor: "var(--border)" }}>
+            {/* Navigation Tabs */}
+            <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
               {([
-                ["overview", "Overview"],
+                ["overview", "Overview & Inputs"],
                 ["curves", "Performance & Curves"],
-                ["transactions", "Transactions"],
-                ["data-entry", "Data Entry"],
+                ["transactions", "Transactions Ledger"],
+                ["data-entry", "Daily Log Entry"],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setDetailTab(key)}
-                  className="rounded-t-lg px-3 py-2 text-xs font-semibold transition"
+                  className="px-3.5 py-2 text-xs font-semibold transition-colors relative"
                   style={
                     detailTab === key
                       ? { color: "var(--accent)", borderBottom: "2px solid var(--accent)" }
@@ -1129,15 +1174,15 @@ export default function BatchPanel() {
             {detailTab === "overview" && (
             <>
             {viewing.status === "DRAFT" && (
-              <Button onClick={handleActivate} disabled={acting} >
+              <Button onClick={handleActivate} disabled={acting} size="sm" className="nf-btn-primary self-start">
                 <PlayCircle className="h-4 w-4" /> {acting ? "Activating…" : "Activate Batch"}
               </Button>
             )}
 
             {viewing.status === "ACTIVE" && (
-              <button onClick={openTransferStage} className="flex items-center justify-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold self-start" style={S.surface}>
-                <RefreshCw className="h-4 w-4" /> Transfer Stage
-              </button>
+              <Button onClick={openTransferStage} variant="outline" size="sm" className="self-start gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" /> Transfer Stage
+              </Button>
             )}
 
             {(viewing.stage_log || []).length > 0 && (
@@ -1145,10 +1190,10 @@ export default function BatchPanel() {
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Stage History</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                   <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader><tr className="border-b border-(--row-border)">
-                      <TableHead className="h-auto px-3 py-2">From</TableHead>
-                      <TableHead className="h-auto px-3 py-2">To</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Transferred At</TableHead>
+                    <TableHeader><tr className="border-b border-[var(--row-border)]">
+                      <TableHead className="h-auto px-3 py-2">From Stage</TableHead>
+                      <TableHead className="h-auto px-3 py-2">To Stage</TableHead>
+                      <TableHead className="h-auto px-3 py-2">Transferred Date</TableHead>
                       <TableHead className="h-auto px-3 py-2">Remarks</TableHead>
                     </tr></TableHeader>
                     <TableBody>
@@ -1167,10 +1212,10 @@ export default function BatchPanel() {
             )}
 
             <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Lines</p>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Lines & Initial Requisitions</p>
               <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                 <table className="w-full border-collapse text-left text-xs">
-                  <TableHeader><tr className="border-b border-(--row-border)">
+                  <TableHeader><tr className="border-b border-[var(--row-border)]">
                     <TableHead className="h-auto px-3 py-2">Item</TableHead>
                     <TableHead className="h-auto px-3 py-2">Source Batch</TableHead>
                     <TableHead className="h-auto px-3 py-2">Qty</TableHead>
@@ -1179,17 +1224,16 @@ export default function BatchPanel() {
                   <TableBody>
                     {(viewing.input_lines || []).map((l: Row) => (
                       <TableRow key={l.line_id}>
-                        <TableCell className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</TableCell>
+                        <TableCell className="px-3 py-2 font-medium" style={S.primary}>{itemLabel(l.item_id)}</TableCell>
                         <TableCell className="px-3 py-2" style={S.sub}>{l.source_batch_id ? batchLabel(l.source_batch_id) : "—"}</TableCell>
                         <TableCell className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{l.rate ?? "—"}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.primary}>{l.rate ? `₹${Number(l.rate).toFixed(2)}` : "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </table>
               </div>
             </div>
-
             {viewing.costing_method === "BIO_ASSET" && viewing.bio_asset_state && (
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Bio-Asset State</p>
@@ -1208,16 +1252,16 @@ export default function BatchPanel() {
                   {viewing.status === "ACTIVE" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {viewing.bio_asset_state.stage === "PREMATURE" && (
-                        <button onClick={() => openBioAction("mature")} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: "var(--accent)" }}>Mature Herd</button>
+                        <Button size="sm" onClick={() => openBioAction("mature")} className="nf-btn-primary">Mature Herd</Button>
                       )}
                       {viewing.bio_asset_state.stage === "MATURE" && (
                         <>
-                          <button onClick={() => openBioAction("amortize")} className="rounded-lg border px-3 py-1.5 text-xs font-semibold" style={S.surface}>Run Amortization</button>
-                          <button onClick={() => openBioAction("fair-value")} className="rounded-lg border px-3 py-1.5 text-xs font-semibold" style={S.surface}>Record Fair Value</button>
+                          <Button size="sm" variant="outline" onClick={() => openBioAction("amortize")}>Run Amortization</Button>
+                          <Button size="sm" variant="outline" onClick={() => openBioAction("fair-value")}>Record Fair Value</Button>
                         </>
                       )}
                       {Number(viewing.bio_asset_state.current_quantity) > 0 && (
-                        <button onClick={() => openBioAction("dispose")} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: "var(--success)" }}>Dispose</button>
+                        <Button size="sm" onClick={() => openBioAction("dispose")} style={{ backgroundColor: "var(--success)", color: "#fff" }}>Dispose</Button>
                       )}
                     </div>
                   )}
@@ -1245,7 +1289,7 @@ export default function BatchPanel() {
 
                     <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                       <table className="w-full border-collapse text-left text-xs">
-                        <TableHeader><tr className="border-b border-(--row-border)">
+                        <TableHeader><tr className="border-b border-[var(--row-border)]">
                           <TableHead className="h-auto px-3 py-2">Parameter Type</TableHead>
                           <TableHead className="h-auto px-3 py-2">Data Entry Type</TableHead>
                           <TableHead className="h-auto px-3 py-2">Item</TableHead>
@@ -1344,7 +1388,7 @@ export default function BatchPanel() {
                     <input type="number" placeholder="NRV Rate / Unit" value={txForm.nrv_rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, nrv_rate: e.target.value }))} className={inputCls} style={S.input} />
                   )}
                   <input placeholder="Remarks" value={txForm.remarks} onChange={(e) => setTxForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls + " sm:col-span-3"} style={S.input} />
-                  <Button onClick={handleAddTransaction} disabled={acting} >
+                  <Button onClick={handleAddTransaction} disabled={acting} size="sm" className="nf-btn-primary">
                     {acting ? "Saving…" : "Add Transaction"}
                   </Button>
                 </div>
@@ -1355,7 +1399,7 @@ export default function BatchPanel() {
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Transaction Log</p>
               <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                 <table className="w-full border-collapse text-left text-xs">
-                  <TableHeader><tr className="border-b border-(--row-border)">
+                  <TableHeader><tr className="border-b border-[var(--row-border)]">
                     <TableHead className="h-auto px-3 py-2">Date</TableHead>
                     <TableHead className="h-auto px-3 py-2">Type</TableHead>
                     <TableHead className="h-auto px-3 py-2">Item</TableHead>
@@ -1388,7 +1432,7 @@ export default function BatchPanel() {
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Bio-Asset Ledger</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                   <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader><tr className="border-b border-(--row-border)">
+                    <TableHeader><tr className="border-b border-[var(--row-border)]">
                       <TableHead className="h-auto px-3 py-2">Date</TableHead>
                       <TableHead className="h-auto px-3 py-2">Entry Type</TableHead>
                       <TableHead className="h-auto px-3 py-2">Item</TableHead>
@@ -1414,9 +1458,9 @@ export default function BatchPanel() {
             )}
 
             {viewing.status === "ACTIVE" && viewing.costing_method !== "BIO_ASSET" && (
-              <button onClick={openClose} className="flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white self-start" style={{ backgroundColor: "var(--success)" }}>
+              <Button size="sm" onClick={openClose} style={{ backgroundColor: "var(--success)", color: "#fff" }} className="gap-1.5 self-start">
                 <CheckCircle2 className="h-4 w-4" /> Close Batch
-              </button>
+              </Button>
             )}
 
             {viewing.status === "CLOSED" && (viewing.output_lines || []).length > 0 && (
@@ -1424,7 +1468,7 @@ export default function BatchPanel() {
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output Lines</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                   <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader><tr className="border-b border-(--row-border)">
+                    <TableHeader><tr className="border-b border-[var(--row-border)]">
                       <TableHead className="h-auto px-3 py-2">Item</TableHead>
                       <TableHead className="h-auto px-3 py-2">Type</TableHead>
                       <TableHead className="h-auto px-3 py-2">Split %</TableHead>
@@ -1463,7 +1507,7 @@ export default function BatchPanel() {
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Cost Variance</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                   <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader><tr className="border-b border-(--row-border)">
+                    <TableHeader><tr className="border-b border-[var(--row-border)]">
                       <TableHead className="h-auto px-3 py-2">Type</TableHead>
                       <TableHead className="h-auto px-3 py-2">Item</TableHead>
                       <TableHead className="h-auto px-3 py-2">Std Value</TableHead>
@@ -1493,9 +1537,9 @@ export default function BatchPanel() {
             )}
 
             {viewing.status === "CLOSED" && renewAllowed && (
-              <button onClick={openRenew} className="flex items-center justify-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold self-start" style={S.surface}>
-                <RefreshCw className="h-4 w-4" /> Renew Batch — Start Next Cycle
-              </button>
+              <Button size="sm" variant="outline" onClick={openRenew} className="gap-1.5 self-start">
+                <RefreshCw className="h-3.5 w-3.5" /> Renew Batch — Start Next Cycle
+              </Button>
             )}
             </>
             )}
@@ -1522,8 +1566,8 @@ export default function BatchPanel() {
         title="Transfer Stage"
         footer={
           <>
-            <button onClick={() => setStageModalOpen(false)} disabled={stageSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <Button onClick={handleTransferStage} disabled={stageSaving || stageOptions.length === 0 || !stageForm.to_stage_code} >
+            <Button variant="outline" size="sm" onClick={() => setStageModalOpen(false)} disabled={stageSaving}>Cancel</Button>
+            <Button size="sm" onClick={handleTransferStage} disabled={stageSaving || stageOptions.length === 0 || !stageForm.to_stage_code} className="nf-btn-primary">
               {stageSaving ? "Transferring…" : "Transfer"}
             </Button>
           </>
@@ -1561,8 +1605,8 @@ export default function BatchPanel() {
         title="Renew Batch — Start Next Cycle"
         footer={
           <>
-            <button onClick={() => setRenewModalOpen(false)} disabled={renewSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <Button onClick={handleRenew} disabled={renewSaving} >
+            <Button variant="outline" size="sm" onClick={() => setRenewModalOpen(false)} disabled={renewSaving}>Cancel</Button>
+            <Button size="sm" onClick={handleRenew} disabled={renewSaving} className="nf-btn-primary">
               {renewSaving ? "Creating…" : "Create Next Cycle"}
             </Button>
           </>
@@ -1634,10 +1678,10 @@ export default function BatchPanel() {
         maxWidth="xl"
         footer={
           <>
-            <button onClick={() => setCloseModalOpen(false)} disabled={acting} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <button onClick={handleClose} disabled={acting} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--success)" }}>
+            <Button variant="outline" size="sm" onClick={() => setCloseModalOpen(false)} disabled={acting}>Cancel</Button>
+            <Button size="sm" onClick={handleClose} disabled={acting} className="nf-btn-primary">
               {acting ? "Closing…" : "Close Batch"}
-            </button>
+            </Button>
           </>
         }
       >
@@ -1666,7 +1710,7 @@ export default function BatchPanel() {
           <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
             <table className="w-full border-collapse text-left text-xs">
               <TableHeader>
-                <tr className="border-b border-(--row-border)">
+                <tr className="border-b border-[var(--row-border)]">
                   <TableHead className="h-auto px-3 py-2">Item</TableHead>
                   <TableHead className="h-auto px-3 py-2">Type</TableHead>
                   <TableHead className="h-auto px-3 py-2">Split %</TableHead>
@@ -1739,8 +1783,8 @@ export default function BatchPanel() {
         }
         footer={
           <>
-            <button onClick={() => setBioActionOpen(null)} disabled={bioActing} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <Button onClick={handleBioAction} disabled={bioActing} >
+            <Button variant="outline" size="sm" onClick={() => setBioActionOpen(null)} disabled={bioActing}>Cancel</Button>
+            <Button size="sm" onClick={handleBioAction} disabled={bioActing} className="nf-btn-primary">
               {bioActing ? "Saving…" : "Confirm"}
             </Button>
           </>
@@ -1858,12 +1902,10 @@ export default function BatchPanel() {
         title={qcLine ? `Record QC — ${itemLabel(qcLine.item_id)}` : "Record QC"}
         maxWidth="lg"
         footer={
-          qcSubmitted ? (
-            <button onClick={() => { setQcModalOpen(false); refreshViewing(); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: "var(--accent)" }}>Done</button>
-          ) : (
+          qcSubmitted ? undefined : (
             <>
-              <button onClick={() => setQcModalOpen(false)} disabled={qcSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-              <Button onClick={handleSaveQc} disabled={qcSaving} >
+              <Button variant="outline" size="sm" onClick={() => setQcModalOpen(false)} disabled={qcSaving}>Cancel</Button>
+              <Button size="sm" onClick={handleSaveQc} disabled={qcSaving} className="nf-btn-primary">
                 {qcSaving ? "Saving…" : "Submit Inspection"}
               </Button>
             </>
@@ -1996,14 +2038,11 @@ export default function BatchPanel() {
         title={packLine ? `Generate Pack — ${itemLabel(packLine.item_id)}` : "Generate Pack"}
         footer={
           generatedPack ? (
-            <>
-              <Button variant="outline" onClick={generateAnotherPack} >Generate Another Pack</Button>
-              <button onClick={() => setPackModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: "var(--accent)" }}>Done</button>
-            </>
+            <Button variant="outline" size="sm" onClick={generateAnotherPack}>Generate Another Pack</Button>
           ) : (
             <>
-              <button onClick={() => setPackModalOpen(false)} disabled={packSaving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-              <Button onClick={handleGeneratePack} disabled={packSaving || packQcGateBlocked} title={packQcGateBlocked ? "This LOB requires a passing QC record before a pack can be generated" : undefined} >
+              <Button variant="outline" size="sm" onClick={() => setPackModalOpen(false)} disabled={packSaving}>Cancel</Button>
+              <Button size="sm" onClick={handleGeneratePack} disabled={packSaving || packQcGateBlocked} title={packQcGateBlocked ? "This LOB requires a passing QC record before a pack can be generated" : undefined} className="nf-btn-primary">
                 {packSaving ? "Generating…" : "Generate Pack"}
               </Button>
             </>

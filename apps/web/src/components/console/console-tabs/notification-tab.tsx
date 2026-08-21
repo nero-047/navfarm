@@ -212,14 +212,15 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
       <div className="md:col-span-8 flex flex-col gap-6">
 
         {/* Toggle Channel selector */}
-        <div className="flex gap-4 p-1.5 bg-(--surface) border border-(--border) rounded-[var(--radius-md)]">
+        <div className="flex gap-4 p-1.5 rounded-[var(--radius-md)] border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
           <button
             onClick={() => setActiveChannel("EMAIL")}
             className={`flex-1 py-3 rounded-[var(--radius-sm)] text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeChannel === "EMAIL"
-                ? "bg-(--accent-muted) border border-(--accent)/20 text-(--text-primary) shadow-sm"
-                : "text-(--text-secondary) hover:text-(--text-primary)"
+                ? "border text-[var(--text-primary)] shadow-sm"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent"
             }`}
+            style={activeChannel === "EMAIL" ? { backgroundColor: "var(--accent-muted)", borderColor: "rgba(194,67,50,0.2)" } : {}}
           >
             <Mail className="w-4 h-4" /> SMTP Email Server
           </button>
@@ -227,19 +228,20 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
             onClick={() => setActiveChannel("WEBHOOK")}
             className={`flex-1 py-3 rounded-[var(--radius-sm)] text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeChannel === "WEBHOOK"
-                ? "bg-(--accent-muted) border border-(--accent)/20 text-(--text-primary) shadow-sm"
-                : "text-(--text-secondary) hover:text-(--text-primary)"
+                ? "border text-[var(--text-primary)] shadow-sm"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent"
             }`}
+            style={activeChannel === "WEBHOOK" ? { backgroundColor: "var(--accent-muted)", borderColor: "rgba(194,67,50,0.2)" } : {}}
           >
             <Globe className="w-4 h-4" /> Outgoing Webhooks
           </button>
         </div>
 
         {activeChannel === "EMAIL" && (
-          <Card className="p-6 border-(--border) bg-(--surface)">
+          <Card className="p-6" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <form onSubmit={handleSaveEmail} className="flex flex-col gap-4">
-              <div className="flex justify-between items-center border-b border-(--border) pb-3 mb-2">
-                <h3 className="font-semibold text-(--text-primary) text-sm">SMTP Gateway Integration</h3>
+              <div className="flex justify-between items-center border-b pb-3 mb-2" style={{ borderColor: "var(--border)" }}>
+                <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>SMTP Gateway Integration</h3>
                 {configs.find(c => c.channel === "EMAIL") && (
                   <button
                     type="button"
@@ -247,12 +249,13 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
                       const email = configs.find(c => c.channel === "EMAIL");
                       toggleChannelEnabled(email.notif_id, email.is_enabled);
                     }}
-                    className="text-(--text-secondary) hover:text-(--text-primary) flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+                    style={{ color: "var(--text-secondary)" }}
                   >
                     {configs.find(c => c.channel === "EMAIL")?.is_enabled ? (
-                      <>Active <ToggleRight className="w-6 h-6 text-(--accent)" /></>
+                      <>Active <ToggleRight className="w-6 h-6" style={{ color: "var(--accent)" }} /></>
                     ) : (
-                      <>Inactive <ToggleLeft className="w-6 h-6 text-(--text-muted)" /></>
+                      <>Inactive <ToggleLeft className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></>
                     )}
                   </button>
                 )}
@@ -330,10 +333,10 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
         )}
 
         {activeChannel === "WEBHOOK" && (
-          <Card className="p-6 border-(--border) bg-(--surface)">
+          <Card className="p-6" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <form onSubmit={handleSaveWebhook} className="flex flex-col gap-4">
-              <div className="flex justify-between items-center border-b border-(--border) pb-3 mb-2">
-                <h3 className="font-semibold text-(--text-primary) text-sm">HTTP Webhook Triggers</h3>
+              <div className="flex justify-between items-center border-b pb-3 mb-2" style={{ borderColor: "var(--border)" }}>
+                <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>HTTP Webhook Triggers</h3>
                 {configs.find(c => c.channel === "WEBHOOK") && (
                   <button
                     type="button"
@@ -341,12 +344,13 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
                       const webhook = configs.find(c => c.channel === "WEBHOOK");
                       toggleChannelEnabled(webhook.notif_id, webhook.is_enabled);
                     }}
-                    className="text-(--text-secondary) hover:text-(--text-primary) flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+                    style={{ color: "var(--text-secondary)" }}
                   >
                     {configs.find(c => c.channel === "WEBHOOK")?.is_enabled ? (
-                      <>Active <ToggleRight className="w-6 h-6 text-(--accent)" /></>
+                      <>Active <ToggleRight className="w-6 h-6" style={{ color: "var(--accent)" }} /></>
                     ) : (
-                      <>Inactive <ToggleLeft className="w-6 h-6 text-(--text-muted)" /></>
+                      <>Inactive <ToggleLeft className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></>
                     )}
                   </button>
                 )}
@@ -386,8 +390,8 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
 
       {/* Right Side Test Dispatch Panel */}
       <div className="md:col-span-4 flex flex-col gap-6">
-        <Card className="p-6 border-(--border) bg-(--surface)">
-          <h4 className="font-semibold text-(--text-primary) text-sm border-b border-(--border) pb-3 mb-4">Send Test Notification</h4>
+        <Card className="p-6" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <h4 className="font-semibold text-sm border-b pb-3 mb-4" style={{ color: "var(--text-primary)", borderColor: "var(--border)" }}>Send Test Notification</h4>
           <form onSubmit={handleSendTest} className="flex flex-col gap-4">
             <Field
               label={activeChannel === "EMAIL" ? "Test Recipient Email" : "Test Endpoint URL override"}
@@ -403,11 +407,11 @@ export default function NotificationTab({ companyId }: NotificationTabProps) {
               />
             </Field>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Notification Body Message</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Notification Body Message</label>
               <textarea
                 value={testMessage}
                 onChange={(e) => setTestMessage(e.target.value)}
-                className="w-full bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] p-3 text-xs text-(--input-text) h-24 focus:border-(--input-border-focus)"
+                className="nf-input w-full h-24 p-3 text-xs"
                 required
               />
             </div>

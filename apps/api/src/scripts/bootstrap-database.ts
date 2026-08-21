@@ -30,8 +30,8 @@ function assertDatabaseName(value: string): string {
 }
 
 async function bootstrap() {
-  if (!adminPassword || adminPassword.length < 12) {
-    throw new Error('SYSTEM_ADMIN_PASSWORD must contain at least 12 characters.');
+  if (!adminPassword || adminPassword.length < 8) {
+    throw new Error('SYSTEM_ADMIN_PASSWORD must be at least 8 characters long.');
   }
 
   assertDatabaseName(masterDatabase);

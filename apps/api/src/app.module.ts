@@ -19,6 +19,7 @@ import { EncryptionModule } from './modules/system/encryption/encryption.module'
 import { NotificationModule } from './modules/system/notification/notification.module';
 import { UserModule } from './modules/core/user/user.module';
 import { UserCompanyModule } from './modules/core/user-company/user-company.module';
+import { OperationalAreaModule } from './modules/core/operational-area/operational-area.module';
 import { UomModule } from './modules/master-data/uom/uom.module';
 import { BreedModule } from './modules/master-data/breed/breed.module';
 import { FarmModule } from './modules/master-data/farm/farm.module';
@@ -95,6 +96,7 @@ import { SystemController } from './system/system.controller';
     NotificationModule,
     UserModule,
     UserCompanyModule,
+    OperationalAreaModule,
     UomModule,
     BreedModule,
     FarmModule,

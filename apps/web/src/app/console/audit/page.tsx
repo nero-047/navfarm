@@ -95,7 +95,7 @@ export default function AuditPage() {
       <div className="rounded-[var(--radius-md)] border overflow-hidden" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
         <table className="w-full border-collapse text-sm">
           <TableHeader>
-            <tr className="border-b border-(--row-border)">
+            <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
               {["#", "Timestamp", "Action", "Entity", "User"].map((h) => (
                 <TableHead key={h} className="px-5">{h}</TableHead>
               ))}

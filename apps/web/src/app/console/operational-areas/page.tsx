@@ -1,0 +1,421 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import {
+  Plus,
+  ArrowRight,
+  Layers,
+  RefreshCw,
+} from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  getStoredUser,
+  getActiveCompanyId,
+  setActiveOperationalAreaId,
+  setActiveWorkspaceScope,
+  setActiveLob,
+  NavUser
+} from "@/hooks/useAuth";
+import { api } from "@/lib/api-client";
+
+interface OperationalArea {
+  area_id: string;
+  area_code: string;
+  area_name: string;
+  company_id: string;
+  nob_id: string;
+  lob_id: string;
+  farm_id?: string;
+  description?: string;
+  preseed_source: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export default function OperationalAreasPage() {
+  const [user, setUser] = useState<NavUser | null>(null);
+  const [areas, setAreas] = useState<OperationalArea[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [nobs, setNobs] = useState<any[]>([]);
+  const [lobs, setLobs] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Modal Form State
+  const [form, setForm] = useState({
+    area_code: "",
+    area_name: "",
+    nob_id: "",
+    lob_id: "",
+    description: "",
+    preseed_source: "TENANT", // TENANT, COMPANY, NONE
+  });
+
+  const activeCompanyId = getActiveCompanyId();
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const storedUser = getStoredUser();
+      setUser(storedUser);
+
+      const [areasRes, nobsRes] = await Promise.all([
+        api.get(`/operational-area${activeCompanyId ? `?company_id=${activeCompanyId}` : ""}`).catch(() => []),
+        api.get(`/setup/wizard/nobs`).catch(() => []),
+      ]);
+
+      if (Array.isArray(areasRes)) setAreas(areasRes as OperationalArea[]);
+      const nobsList = Array.isArray(nobsRes) ? (nobsRes as any[]) : [];
+      setNobs(nobsList);
+
+      // Default NOB/LOB if available
+      if (nobsList.length > 0) {
+        setForm((prev) => ({
+          ...prev,
+          nob_id: nobsList[0].nob_id,
+        }));
+        if (nobsList[0].lobs && nobsList[0].lobs.length > 0) {
+          setLobs(nobsList[0].lobs);
+          setForm((prev) => ({
+            ...prev,
+            lob_id: nobsList[0].lobs[0].lob_id,
+          }));
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleNobChange = (nobId: string) => {
+    const selected = nobs.find((n) => n.nob_id === nobId);
+    setForm({
+      ...form,
+      nob_id: nobId,
+      lob_id: selected?.lobs?.[0]?.lob_id || "",
+    });
+    setLobs(selected?.lobs || []);
+  };
+
+  const handleCreateArea = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.area_code || !form.area_name || !form.nob_id || !form.lob_id) {
+      alert("Please fill all required fields.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        ...form,
+        company_id: activeCompanyId || user?.companyId || user?.company_id,
+      };
+
+      const created = await api.post("/operational-area", payload) as any;
+      setShowModal(false);
+      await loadData();
+
+      // Enter the new area directly
+      if (created?.area_id) {
+        handleEnterArea(created as OperationalArea);
+      }
+    } catch (err: any) {
+      alert(err?.message || "Failed to create operational area");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEnterArea = (area: OperationalArea) => {
+    setActiveOperationalAreaId(area.area_id);
+    setActiveWorkspaceScope("OPERATIONAL");
+
+    const lobName = (area.lob_id || "PIGGERY").toUpperCase();
+    let normalized = "PIGGERY";
+    if (lobName.includes("DAIRY") || area.area_name.toLowerCase().includes("dairy")) normalized = "DAIRY";
+    else if (lobName.includes("POULTRY") || area.area_name.toLowerCase().includes("poultry")) normalized = "POULTRY";
+    setActiveLob(normalized);
+
+    // Patch stored user
+    if (user) {
+      const patched = {
+        ...user,
+        operationalAreaId: area.area_id,
+        operational_area_id: area.area_id,
+      };
+      localStorage.setItem("user", JSON.stringify(patched));
+      localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
+    }
+
+    window.location.href = "/console/production";
+  };
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-7 text-(--text-primary)">
+      <PageHeader
+        title="Operational Areas"
+        description="Lines of Business (LOB) operational units under this company — farm sites, breeding units, and crop sectors."
+      />
+
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs text-(--text-secondary)">
+          <span className="font-semibold text-(--text-primary)">{areas.length}</span> Active Operational Areas
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-sm)] bg-(--accent) hover:opacity-90 text-xs font-bold text-white shadow-xs transition-all"
+        >
+          <Plus className="w-4 h-4" /> Create Operational Area
+        </button>
+      </div>
+
+      {/* ── Operational Areas Cards Grid ── */}
+      {loading ? (
+        <div className="p-8 text-center text-xs text-(--text-muted) flex items-center justify-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin text-(--accent)" /> Loading operational units…
+        </div>
+      ) : areas.length === 0 ? (
+        <div className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-10 text-center">
+          <Layers className="w-10 h-10 text-(--text-muted) mx-auto mb-3" />
+          <h3 className="text-sm font-bold text-(--text-primary)">No Operational Areas Created Yet</h3>
+          <p className="text-xs text-(--text-secondary) mt-1 max-w-md mx-auto">
+            Create an operational area (e.g. Piggery Unit or Dairy Unit) with pre-seeded master data to immediately start batch operations.
+          </p>
+          <button
+            onClick={() => setShowModal(true)}
+            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-sm)] bg-(--accent) text-xs font-bold text-white shadow-xs"
+          >
+            <Plus className="w-4 h-4" /> Create First Area
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {areas.map((area) => {
+            const isPig = area.area_name.toLowerCase().includes("pig") || area.area_code.toLowerCase().includes("pig");
+            const isDairy = area.area_name.toLowerCase().includes("dairy") || area.area_code.toLowerCase().includes("dairy");
+
+            return (
+              <div
+                key={area.area_id}
+                className="rounded-[var(--radius-md)] border p-5 flex flex-col justify-between transition-all hover:bg-[var(--surface-raised)] shadow-xs group"
+                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] border"
+                        style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}
+                      >
+                        <Layers className="h-4 w-4" style={{ color: "var(--accent)" }} />
+                      </span>
+                      <div>
+                        <span className="font-mono text-[11px] font-bold" style={{ color: "var(--accent)" }}>
+                          {area.area_code}
+                        </span>
+                        <p className="text-[10px] uppercase" style={{ color: "var(--text-muted)" }}>
+                          {isPig ? "Livestock · Piggery" : isDairy ? "Livestock · Dairy" : "Agricultural Unit"}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[10px] font-medium border"
+                      style={{ backgroundColor: "var(--success-muted)", borderColor: "var(--success)", color: "var(--success)" }}
+                    >
+                      Active
+                    </span>
+                  </div>
+
+                  <h4 className="text-sm font-semibold tracking-tight mb-1" style={{ color: "var(--text-primary)" }}>
+                    {area.area_name}
+                  </h4>
+                  <p className="text-xs line-clamp-2 mb-4" style={{ color: "var(--text-secondary)" }}>
+                    {area.description || "Operational unit for livestock production, daily feeding logs, animal identification, and QC inspections."}
+                  </p>
+
+                  <div
+                    className="space-y-1.5 text-xs p-3 rounded-[var(--radius-sm)] border"
+                    style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  >
+                    <div className="flex justify-between">
+                      <span style={{ color: "var(--text-muted)" }}>Master Data Source:</span>
+                      <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                        {area.preseed_source === "COMPANY" ? "Company Master Data" : "Tenant Master Templates"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: "var(--text-muted)" }}>Operational Status:</span>
+                      <span className="font-medium" style={{ color: "var(--success)" }}>Active Unit</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 pt-3 border-t flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
+                  <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                    Created: {area.created_at ? new Date(area.created_at).toLocaleDateString() : "Active"}
+                  </span>
+                  <button
+                    onClick={() => handleEnterArea(area)}
+                    className="flex items-center gap-1 text-xs font-semibold hover:underline"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    Open Workspace <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Modal: Create Operational Area ── */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="w-full max-w-lg rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) shadow-2xl overflow-hidden text-(--text-primary) animate-scale-in">
+            <div className="px-5 py-4 border-b border-(--border) bg-(--surface-raised) flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-(--text-primary)">Create Operational Area</h3>
+                <p className="text-xs text-(--text-secondary) mt-0.5">
+                  Establish a new Line of Business farm unit with instant master data pre-seeding.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-(--text-muted) hover:text-(--text-primary) text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateArea} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                    Area Code *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. PIG-UNIT-01"
+                    value={form.area_code}
+                    onChange={(e) => setForm({ ...form, area_code: e.target.value })}
+                    className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-2 text-xs font-semibold text-(--text-primary)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                    Area Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Piggery Breeding Unit"
+                    value={form.area_name}
+                    onChange={(e) => setForm({ ...form, area_name: e.target.value })}
+                    className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-2 text-xs font-semibold text-(--text-primary)"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                    Nature of Business (NOB) *
+                  </label>
+                  <select
+                    value={form.nob_id}
+                    onChange={(e) => handleNobChange(e.target.value)}
+                    className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-2 text-xs text-(--text-primary)"
+                  >
+                    {nobs.map((n) => (
+                      <option key={n.nob_id} value={n.nob_id}>
+                        {n.nob_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                    Line of Business (LOB) *
+                  </label>
+                  <select
+                    value={form.lob_id}
+                    onChange={(e) => setForm({ ...form, lob_id: e.target.value })}
+                    className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-2 text-xs text-(--text-primary)"
+                  >
+                    {lobs.map((l) => (
+                      <option key={l.lob_id} value={l.lob_id}>
+                        {l.lob_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Pre-Seeding Source Option */}
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1.5">
+                  Pre-Seed Master Data From *
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "TENANT", label: "Tenant Master Data", desc: "Global catalog templates" },
+                    { id: "COMPANY", label: "Company Master Data", desc: "Existing company items" },
+                    { id: "NONE", label: "Blank Setup", desc: "No pre-seeding" },
+                  ].map((src) => (
+                    <div
+                      key={src.id}
+                      onClick={() => setForm({ ...form, preseed_source: src.id })}
+                      className={`cursor-pointer rounded-[var(--radius-sm)] border p-2.5 text-left transition-all ${
+                        form.preseed_source === src.id
+                          ? "border-(--accent) bg-(--accent-muted) ring-1 ring-(--accent)/30"
+                          : "border-(--border) bg-(--surface-raised) hover:bg-(--surface)"
+                      }`}
+                    >
+                      <p className="text-xs font-bold text-(--text-primary)">{src.label}</p>
+                      <p className="text-[10px] text-(--text-muted) mt-0.5">{src.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                  Description / Facility Notes
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Optional unit description..."
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-2 text-xs text-(--text-primary)"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) text-xs font-semibold text-(--text-secondary)"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 rounded-[var(--radius-sm)] bg-(--accent) hover:opacity-90 text-xs font-bold text-white shadow-xs disabled:opacity-50"
+                >
+                  {submitting ? "Creating & Pre-seeding..." : "Create & Enter Area"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { clearAuthSession } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -29,6 +30,9 @@ export function LoginForm() {
     }
     setSubmitting(true);
     try {
+      // Clear any stale tenant/auth context so a fresh DB seed isn't
+      // blocked by orphaned localStorage UUIDs from a previous session.
+      clearAuthSession();
       setTenantCompanyMode(false);
       const signedInUser = await login(email, password);
       router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');

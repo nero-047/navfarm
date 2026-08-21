@@ -53,7 +53,8 @@ export default function StockBalancePanel() {
       if (warehouseId) params.set("warehouseId", warehouseId);
       if (belowReorderOnly) params.set("belowReorderOnly", "true");
       const res = await api.get(`/inventory-ledger/balance?${params.toString()}`);
-      setRows(unwrap<Row[]>(res) || []);
+      const apiRows = unwrap<Row[]>(res) || [];
+      setRows(apiRows);
     } catch (err: any) {
       setError(err?.message || "Failed to load stock balance.");
     } finally {

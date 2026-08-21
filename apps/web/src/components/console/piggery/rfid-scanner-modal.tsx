@@ -159,11 +159,10 @@ export default function RfidScannerModal({
       description="Scan with an RFID wand or barcode reader (auto-Enter) to instantly inspect and update animals."
       maxWidth="lg"
       footer={
-        <div className="flex w-full items-center justify-between">
+        <div className="flex w-full items-center justify-start">
           <Button variant="outline" size="sm" onClick={handleNextScan}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Next Scan (Clear)
           </Button>
-          <Button variant="ghost" onClick={onClose}>Done / Close</Button>
         </div>
       }
     >

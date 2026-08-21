@@ -8,6 +8,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 25;
 
@@ -66,8 +67,8 @@ export default function PacksPanel() {
     if (companyId) params.set("companyId", companyId);
     params.set("limit", "500");
     const qs = params.toString();
-    api.get(`/item?${qs}`).then((r) => setItems(unwrap<Row[]>(r) || [])).catch(() => {});
-    api.get(`/batch?${qs}`).then((r) => setBatches(unwrap<Row[]>(r) || [])).catch(() => {});
+    api.get(`/item?${qs}`).then((r) => setItems(unwrap<Row[]>(r) || [])).catch(() => { });
+    api.get(`/batch?${qs}`).then((r) => setBatches(unwrap<Row[]>(r) || [])).catch(() => { });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -154,14 +155,18 @@ export default function PacksPanel() {
         onClose={() => setViewing(null)}
         title={viewing ? `Pack ${viewing.pack_no}` : ""}
         footer={
-          <div className="flex w-full items-center justify-between">
-            {viewing && !viewing.is_voided ? (
-              <button onClick={() => viewing && handleVoid(viewing)} disabled={voidingId === viewing.qr_id} className="flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
-                <Ban className="h-4 w-4" /> {voidingId === viewing.qr_id ? "Voiding…" : "Void Pack"}
-              </button>
-            ) : <span />}
-            <button onClick={() => setViewing(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Close</button>
-          </div>
+          viewing && !viewing.is_voided ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => viewing && handleVoid(viewing)}
+              disabled={voidingId === viewing.qr_id}
+              className="gap-1.5"
+              style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
+            >
+              <Ban className="h-4 w-4" /> {voidingId === viewing.qr_id ? "Voiding…" : "Void Pack"}
+            </Button>
+          ) : undefined
         }
       >
         {viewing && (

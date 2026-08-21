@@ -11,7 +11,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Sparkles,
+  Activity,
 } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
@@ -324,43 +324,48 @@ export function BreedingPanel() {
 
       {/* ── KPI Stat Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <Heart className="w-4 h-4" style={S.accent} /> Active Gestations
+        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between" style={S.muted}>
+            <span>Active Gestations</span>
+            <Heart className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
           </div>
-          <div className="text-2xl font-bold" style={S.primary}>{activeInseminations}</div>
+          <div className="text-2xl font-bold font-mono mt-1.5" style={S.primary}>{activeInseminations}</div>
           <div className="text-[11px] mt-0.5" style={S.muted}>Sows due to farrow</div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <Baby className="w-4 h-4" style={S.accent} /> Total Litters
+        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between" style={S.muted}>
+            <span>Total Litters</span>
+            <Baby className="w-3.5 h-3.5" style={{ color: "var(--text-secondary)" }} />
           </div>
-          <div className="text-2xl font-bold" style={S.primary}>{totalLitters}</div>
+          <div className="text-2xl font-bold font-mono mt-1.5" style={S.primary}>{totalLitters}</div>
           <div className="text-[11px] mt-0.5" style={S.muted}>Farrowing batches</div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <Sparkles className="w-4 h-4" style={S.success} /> Piglets Born Live
+        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between" style={S.muted}>
+            <span>Born Live</span>
+            <Activity className="w-3.5 h-3.5" style={{ color: "var(--success)" }} />
           </div>
-          <div className="text-2xl font-bold" style={S.success}>{totalBornLive}</div>
+          <div className="text-2xl font-bold font-mono mt-1.5" style={S.primary}>{totalBornLive}</div>
           <div className="text-[11px] mt-0.5" style={S.muted}>Lifetime live births</div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <CheckCircle2 className="w-4 h-4" style={S.accent} /> Weaning Survival
+        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between" style={S.muted}>
+            <span>Weaning Survival</span>
+            <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "var(--text-secondary)" }} />
           </div>
-          <div className="text-2xl font-bold" style={S.accent}>{avgSurvivalRate}%</div>
+          <div className="text-2xl font-bold font-mono mt-1.5" style={{ color: "var(--accent)" }}>{avgSurvivalRate}%</div>
           <div className="text-[11px] mt-0.5" style={S.muted}>{totalWeaned} weaned piglets</div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <FlaskConical className="w-4 h-4" style={S.accent} /> Semen Doses
+        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between" style={S.muted}>
+            <span>Semen Doses</span>
+            <FlaskConical className="w-3.5 h-3.5" style={{ color: "var(--text-secondary)" }} />
           </div>
-          <div className="text-2xl font-bold" style={S.primary}>{totalDoses}</div>
+          <div className="text-2xl font-bold font-mono mt-1.5" style={S.primary}>{totalDoses}</div>
           <div className="text-[11px] mt-0.5" style={S.muted}>Collected from boars</div>
         </div>
       </div>

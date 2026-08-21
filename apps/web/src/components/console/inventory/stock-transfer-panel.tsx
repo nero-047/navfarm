@@ -34,7 +34,7 @@ const emptyLine = () => ({ item_id: "", quantity: "", uom: "" });
 
 const STATUS_STYLE: Record<string, any> = {
   DRAFT: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" },
-  POSTED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--accent-muted)" },
+  POSTED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
   CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" },
 };
 
@@ -254,8 +254,8 @@ export default function StockTransferPanel() {
         maxWidth="xl"
         footer={
           <>
-            <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <Button onClick={handleSave} disabled={saving} >
+            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving} className="nf-btn-primary">
               {saving ? "Saving…" : "Save Draft"}
             </Button>
           </>
@@ -348,14 +348,12 @@ export default function StockTransferPanel() {
         footer={
           viewing?.status === "DRAFT" ? (
             <>
-              <button onClick={() => setViewing(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Close</button>
-              <button onClick={handlePost} disabled={posting} className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: "var(--success)" }}>
+              <Button variant="outline" size="sm" onClick={() => setViewing(null)}>Cancel</Button>
+              <Button size="sm" onClick={handlePost} disabled={posting} className="flex items-center gap-1.5 nf-btn-primary">
                 <CheckCircle2 className="h-4 w-4" /> {posting ? "Posting…" : "Post"}
-              </button>
+              </Button>
             </>
-          ) : (
-            <button onClick={() => setViewing(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Close</button>
-          )
+          ) : undefined
         }
       >
         {viewing && (

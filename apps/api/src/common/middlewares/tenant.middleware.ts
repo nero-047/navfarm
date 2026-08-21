@@ -84,6 +84,12 @@ export class TenantMiddleware implements NestMiddleware {
         .limit(1);
 
       if (!tenant) {
+        // On public routes (login, signup, plan catalog) a stale tenant ID
+        // from browser localStorage after a DB reset shouldn't block the
+        // request — just skip tenant scoping and let the endpoint handle it.
+        if (isPublic) {
+          return next();
+        }
         throw new BadRequestException(`Tenant connection context for '${effectiveTenantId}' not found.`);
       }
 

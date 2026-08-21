@@ -1,41 +1,49 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getStoredUser, hasPermission, NavUser } from "@/hooks/useAuth";
-import { useLanguage } from "@/hooks/useLanguage";
-import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getStoredUser, hasPermission, NavUser, getActiveLob } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import BatchPanel from "@/components/console/production/batch-panel";
-import BulkDailyEntryPanel from "@/components/console/production/bulk-daily-entry-panel";
+import OperationalBatchDataEntry from "@/components/console/production/operational-batch-data-entry";
+import DairyDailyOperationsEntry from "@/components/console/dairy/dairy-daily-operations-entry";
+import DairyLifecycleStepper from "@/components/console/dairy/dairy-lifecycle-stepper";
 import AnimalPanel from "@/components/console/piggery/animal-panel";
 import { BreedingPanel } from "@/components/console/piggery/breeding-panel";
+import PiggeryBatchStagesPanel from "@/components/console/piggery/piggery-batch-stages-panel";
+import BatchAnimalAssignmentPanel from "@/components/console/piggery/batch-animal-assignment-panel";
+import StageWiseConsumptionOutputPanel from "@/components/console/piggery/stage-wise-consumption-output-panel";
 import ParameterPanel from "@/components/console/production/parameter-panel";
 import SchedulerPanel from "@/components/console/production/scheduler-panel";
 import AlertPanel from "@/components/console/production/alert-panel";
 import QcParameterPanel from "@/components/console/production/qc-parameter-panel";
 import PacksPanel from "@/components/console/production/packs-panel";
+import MortalityHealthPanel from "@/components/console/production/mortality-health-panel";
 import { ShieldAlert } from "lucide-react";
 
 const SECTIONS = [
-  { key: "batches", label: "Batches" },
-  { key: "daily-entry", label: "Daily Data Entry" },
-  { key: "animals", label: "Animal Register" },
-  { key: "breeding", label: "Breeding & Litters" },
-  { key: "schedulers", label: "Schedulers" },
-  { key: "parameters", label: "Parameters" },
-  { key: "alerts", label: "Alerts" },
-  { key: "qc-parameters", label: "QC Parameters" },
-  { key: "packs", label: "Packs" },
+  { key: "daily-operational-entry", label: "Batch Data Entry (Operational)" },
+  { key: "batches",                 label: "Batch List" },
+  { key: "batch-stages",            label: "Batch Stages (Lifecycle)" },
+  { key: "batch-animal-assignment", label: "Batch Animal Assignment" },
+  { key: "stage-consumption",       label: "Stage-wise Consumption & Output" },
+  { key: "daily-entry",             label: "Mortality & Clinical Health Register" },
+  { key: "animals",                 label: "Animal Register" },
+  { key: "breeding",                label: "Breeding & Litters" },
+  { key: "schedulers",              label: "Schedulers" },
+  { key: "parameters",              label: "Parameters" },
+  { key: "alerts",                  label: "Alerts" },
+  { key: "qc-parameters",           label: "QC Parameters" },
+  { key: "packs",                   label: "Packs & Traceability" },
 ];
-
 
 export default function ProductionPage() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<NavUser | null>(null);
   const [ready, setReady] = useState(false);
-  const [activeKey, setActiveKey] = useState(SECTIONS[0].key);
+  const [activeKey, setActiveKey] = useState(searchParams.get("tab") || SECTIONS[0].key);
+  const [activeLob, setActiveLobState] = useState<string>("PIGGERY");
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -44,30 +52,27 @@ export default function ProductionPage() {
       return;
     }
     setUser(stored);
+    setActiveLobState(getActiveLob());
+
+    const tabParam = searchParams.get("tab");
+    if (tabParam && SECTIONS.some((s) => s.key === tabParam)) {
+      setActiveKey(tabParam);
+    }
     setReady(true);
-  }, [router]);
+  }, [router, searchParams]);
 
-  // Same permission the render path checks below — the module index is not
-  // offered to someone who cannot open the module.
-  const mayViewProduction = Boolean(user && hasPermission(user, "PRODUCTION", "BATCH", "can_view"));
-
-  // Flat set: one ungrouped group, so below the desktop breakpoint this
-  // renders as a tab strip rather than a selector.
-  const contextNav = useMemo<ContextNavModel | null>(() => {
-    if (!ready || !mayViewProduction) return null;
-    return {
-      label: t("moduleSections", { module: "Production" }),
-      groups: [{ items: SECTIONS.map((s) => ({ key: s.key, label: s.label })) }],
-      activeKey,
-      onSelect: setActiveKey,
-    };
-  }, [ready, mayViewProduction, activeKey, t]);
-
-  useContextNav(contextNav);
+  const mayViewProduction = Boolean(
+    user && (
+      user.userType === "OPERATIONAL_ADMIN" ||
+      user.userType === "COMPANY_ADMIN" ||
+      user.userType === "TENANT_ADMIN" ||
+      hasPermission(user, "PRODUCTION", "BATCH", "can_view")
+    )
+  );
 
   if (!ready || !user) return null;
 
-  if (!hasPermission(user, "PRODUCTION", "BATCH", "can_view")) {
+  if (!mayViewProduction) {
     return (
       <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
         <PageHeader title="Production" sticky={false} />
@@ -85,14 +90,21 @@ export default function ProductionPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 lg:px-7 lg:pb-7">
       <PageHeader
-        title="Production"
-        description="Batch lifecycle — inputs, daily transactions and cost-allocated closing."
+        title={SECTIONS.find((s) => s.key === activeKey)?.label || "Production Operations"}
+        description={`${activeLob} Operational Area — Lifecycle tracking, batch feed & health logs, and cost-allocated closing.`}
       />
 
-      {/* Section switching moved to the shell's contextual navigation; the
-          panels themselves are untouched. */}
+      {/* Dynamic Sub-Panel Render per LOB */}
+      {activeKey === "daily-operational-entry" && (
+        activeLob === "DAIRY" ? <DairyDailyOperationsEntry /> : <OperationalBatchDataEntry />
+      )}
       {activeKey === "batches" && <BatchPanel />}
-      {activeKey === "daily-entry" && <BulkDailyEntryPanel />}
+      {activeKey === "batch-stages" && (
+        activeLob === "DAIRY" ? <DairyLifecycleStepper /> : <PiggeryBatchStagesPanel />
+      )}
+      {activeKey === "batch-animal-assignment" && <BatchAnimalAssignmentPanel />}
+      {activeKey === "stage-consumption" && <StageWiseConsumptionOutputPanel />}
+      {activeKey === "daily-entry" && <MortalityHealthPanel />}
       {activeKey === "animals" && <AnimalPanel />}
       {activeKey === "breeding" && <BreedingPanel />}
       {activeKey === "schedulers" && <SchedulerPanel />}
@@ -100,7 +112,6 @@ export default function ProductionPage() {
       {activeKey === "alerts" && <AlertPanel />}
       {activeKey === "qc-parameters" && <QcParameterPanel />}
       {activeKey === "packs" && <PacksPanel />}
-
     </div>
   );
 }

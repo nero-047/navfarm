@@ -184,12 +184,18 @@ export default function NotificationsPage() {
       />
 
       {error && (
-        <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm">
+        <div
+          className="flex items-center gap-2 rounded-[var(--radius-sm)] border p-4 text-sm font-medium"
+          style={{ backgroundColor: "var(--danger-muted)", borderColor: "var(--danger)", color: "var(--danger)" }}
+        >
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm">
+        <div
+          className="flex items-center gap-2 rounded-[var(--radius-sm)] border p-4 text-sm font-medium"
+          style={{ backgroundColor: "var(--success-muted)", borderColor: "var(--success)", color: "var(--success)" }}
+        >
           <CheckCircle className="w-4 h-4 shrink-0" /> {success}
         </div>
       )}
@@ -288,21 +294,30 @@ export default function NotificationsPage() {
       </div>
 
       {/* Test Send */}
-      <div className="flex flex-col gap-4 rounded-[var(--radius-sm)] border bg-(--surface) p-5 sm:flex-row sm:items-center sm:justify-between"
-        style={{ borderColor: "var(--border)" }}>
+      <div
+        className="flex flex-col gap-4 rounded-[var(--radius-md)] border p-5 sm:flex-row sm:items-center sm:justify-between"
+        style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+      >
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-(--info-muted) p-2 text-(--info)">
+          <div
+            className="rounded-[var(--radius-sm)] p-2"
+            style={{ backgroundColor: "var(--surface-raised)", color: "var(--info)" }}
+          >
             <Send className="h-4 w-4" />
           </div>
           <div>
             <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Test your notification setup</h2>
-            <p className="mt-0.5 text-sm" style={{ color: "var(--text-secondary)" }}>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--text-secondary)" }}>
               Send a one-time message after saving your channel configuration.
             </p>
           </div>
         </div>
-        <button type="button" onClick={() => setShowTestDialog(true)}
-          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-(--accent) px-4 text-sm font-semibold text-white transition hover:bg-(--accent-hover)">
+        <button
+          type="button"
+          onClick={() => setShowTestDialog(true)}
+          className="nf-press inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-[var(--radius-sm)] px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+          style={{ backgroundColor: "var(--accent)" }}
+        >
           <Send className="h-4 w-4" /> Send test
         </button>
       </div>

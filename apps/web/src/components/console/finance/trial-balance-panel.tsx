@@ -73,7 +73,7 @@ export default function TrialBalancePanel() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
-              <tr className="border-b border-(--row-border)">
+              <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
                 <TableHead className="whitespace-nowrap">Code</TableHead>
                 <TableHead className="whitespace-nowrap">Account</TableHead>
                 <TableHead className="whitespace-nowrap">Type</TableHead>

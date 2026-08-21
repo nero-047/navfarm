@@ -200,6 +200,28 @@ export async function seedPiggeryData() {
       });
     }
 
+    // Operational Area: Piggery Unit (links the scope switcher to this company + LOB)
+    console.log('   - Seeding Operational Area (Piggery Unit)...');
+    let [existingArea] = await db.select().from(schema.operationalAreaMaster)
+      .where(and(eq(schema.operationalAreaMaster.company_id, companyId), eq(schema.operationalAreaMaster.lob_id, lobId)))
+      .limit(1);
+    if (!existingArea) {
+      await db.insert(schema.operationalAreaMaster).values({
+        area_id: randomUUID(),
+        tenant_id: tenantId,
+        company_id: companyId,
+        farm_id: farmId!,
+        nob_id: nobId,
+        lob_id: lobId,
+        area_code: 'APEX-PIG-01',
+        area_name: 'Apex Piggery Unit',
+        description: 'Apex Commercial Swine Complex — Breeding, Farrowing & Grow-Finish Operations',
+        preseed_source: 'TENANT',
+        is_active: true,
+        status: 'ACTIVE',
+      });
+    }
+
     const shedConfigs = [
       { code: 'SHED-GEST-01', name: 'Breeding & Gestation Complex', type: 'GESTATION' },
       { code: 'SHED-FARR-02', name: 'Farrowing & Early Weaner Barn', type: 'FARROWING' },

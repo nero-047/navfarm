@@ -693,6 +693,36 @@ export const farmMaster = mysqlTable('farm_master', {
   extension_config: json('extension_config')
 });
 
+export const operationalAreaMaster = mysqlTable('operational_area_master', {
+  area_id: varchar('area_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  farm_id: varchar('farm_id', { length: 36 }).references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
+  nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  area_code: varchar('area_code', { length: 50 }).notNull(),
+  area_name: varchar('area_name', { length: 150 }).notNull(),
+  description: text('description'),
+  preseed_source: varchar('preseed_source', { length: 50 }).default('TENANT').notNull(), // TENANT, COMPANY, NONE
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+});
+
+export const userOperationalAreaAssignment = mysqlTable('user_operational_area_assignment', {
+  assignment_id: varchar('assignment_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  user_id: varchar('user_id', { length: 36 }).notNull().references(() => userMaster.user_id, { onDelete: 'cascade' }),
+  area_id: varchar('area_id', { length: 36 }).notNull().references(() => operationalAreaMaster.area_id, { onDelete: 'cascade' }),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  is_primary: boolean('is_primary').default(true).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
 export const warehouseMaster = mysqlTable('warehouse_master', {
   warehouse_id: varchar('warehouse_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
@@ -977,6 +1007,42 @@ export const farmMasterRelations = relations(farmMaster, ({ one, many }) => ({
   }),
   sheds: many(shedMaster),
   warehouses: many(warehouseMaster)
+}));
+
+export const operationalAreaMasterRelations = relations(operationalAreaMaster, ({ one, many }) => ({
+  company: one(companyMaster, {
+    fields: [operationalAreaMaster.company_id],
+    references: [companyMaster.company_id]
+  }),
+  farm: one(farmMaster, {
+    fields: [operationalAreaMaster.farm_id],
+    references: [farmMaster.farm_id]
+  }),
+  nob: one(nobMaster, {
+    fields: [operationalAreaMaster.nob_id],
+    references: [nobMaster.nob_id]
+  }),
+  lob: one(lobMaster, {
+    fields: [operationalAreaMaster.lob_id],
+    references: [lobMaster.lob_id]
+  }),
+  userAssignments: many(userOperationalAreaAssignment),
+  batches: many(batchHeader)
+}));
+
+export const userOperationalAreaAssignmentRelations = relations(userOperationalAreaAssignment, ({ one }) => ({
+  user: one(userMaster, {
+    fields: [userOperationalAreaAssignment.user_id],
+    references: [userMaster.user_id]
+  }),
+  operationalArea: one(operationalAreaMaster, {
+    fields: [userOperationalAreaAssignment.area_id],
+    references: [operationalAreaMaster.area_id]
+  }),
+  company: one(companyMaster, {
+    fields: [userOperationalAreaAssignment.company_id],
+    references: [companyMaster.company_id]
+  })
 }));
 
 export const warehouseMasterRelations = relations(warehouseMaster, ({ one, many }) => ({
@@ -1697,6 +1763,7 @@ export const batchHeader = mysqlTable('batch_header', {
   costing_method: varchar('costing_method', { length: 20 }).notNull(), // STANDARD, FIFO
   breed_id: varchar('breed_id', { length: 36 }).references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
   scheduler_id: varchar('scheduler_id', { length: 36 }).references(() => schedulerMaster.scheduler_id, { onDelete: 'restrict' }),
+  operational_area_id: varchar('operational_area_id', { length: 36 }),
   shed_id: varchar('shed_id', { length: 36 }),
   location_id: varchar('location_id', { length: 36 }),
   // Config lineage for the renew()/copy-forward flow (perpetual/seasonal LOBs
@@ -2391,6 +2458,7 @@ export const animalRegister = mysqlTable('animal_register', {
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  operational_area_id: varchar('operational_area_id', { length: 36 }),
   animal_code: varchar('animal_code', { length: 30 }).notNull(), // AUTO via no_series_master (ANIMAL_PIGGERY)
   animal_type: varchar('animal_type', { length: 20 }).notNull(), // SOW, BOAR, GILT, PIGLET, COMMERCIAL_PIG
   breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'restrict' }),

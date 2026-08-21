@@ -136,6 +136,13 @@
           "command": "drizzle-kit generate --config drizzle.config.ts"
         }
       },
+      "db-reset-bootstrap-faltu": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/reset-and-bootstrap-faltu.ts"
+        }
+      },
       "db-seed-dev-tenant": {
         "executor": "nx:run-commands",
         "options": {

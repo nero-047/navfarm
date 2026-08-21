@@ -216,7 +216,7 @@ export default function JournalPanel() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
-              <tr className="border-b border-(--row-border)">
+              <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
                 <TableHead className="whitespace-nowrap">Journal No.</TableHead>
                 <TableHead className="whitespace-nowrap">Posting Date</TableHead>
                 <TableHead className="whitespace-nowrap">Source</TableHead>
@@ -243,7 +243,7 @@ export default function JournalPanel() {
                       <Badge variant={STATUS_VARIANT[row.status] || "neutral"}>{row.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                      <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
                     </TableCell>
@@ -280,7 +280,7 @@ export default function JournalPanel() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date <span className="text-(--danger)">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date <span style={{ color: "var(--danger)" }}>*</span></label>
               <input type="date" value={header.posting_date} onChange={(e) => setHeader((h) => ({ ...h, posting_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -299,7 +299,7 @@ export default function JournalPanel() {
           <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
             <table className="w-full border-collapse text-left text-xs">
               <TableHeader>
-                <tr className="border-b border-(--row-border)">
+                <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
                   <TableHead className="h-auto px-3 py-2">GL Account</TableHead>
                   <TableHead className="h-auto px-3 py-2">Debit</TableHead>
                   <TableHead className="h-auto px-3 py-2">Credit</TableHead>
@@ -320,7 +320,7 @@ export default function JournalPanel() {
                     <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.credit_amount} onChange={(e) => setLineField(idx, "credit_amount", e.target.value)} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5"><input value={line.description} onChange={(e) => setLineField(idx, "description", e.target.value)} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-[var(--danger-muted)]" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -373,7 +373,7 @@ export default function JournalPanel() {
             <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
               <table className="w-full border-collapse text-left text-xs">
                 <TableHeader>
-                  <tr className="border-b border-(--row-border)">
+                  <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
                     <TableHead className="h-auto px-3 py-2">GL Account</TableHead>
                     <TableHead className="h-auto px-3 py-2">Debit</TableHead>
                     <TableHead className="h-auto px-3 py-2">Credit</TableHead>

@@ -77,62 +77,62 @@ export default function FacilityOccupancyPanel() {
 
       {/* ── Top Executive KPI Cards ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
+        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Total Capacity</p>
-            <Building2 className="h-4 w-4" style={S.accent} />
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Total Capacity</p>
+            <Building2 className="h-4 w-4" style={{ color: "var(--accent)" }} />
           </div>
-          <p className="mt-2 text-3xl font-bold" style={S.primary}>
+          <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
             {totalCapacity > 0 ? totalCapacity.toLocaleString("en-IN") : "—"}{" "}
-            <span className="text-sm font-normal" style={S.muted}>head</span>
+            <span className="text-xs font-normal" style={S.muted}>head</span>
           </p>
-          <p className="mt-1 text-xs" style={S.sub}>{locations.length} configured locations/pens</p>
+          <p className="mt-1 text-[11px]" style={S.sub}>{locations.length} configured locations/pens</p>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
+        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Current Occupancy</p>
-            <Users className="h-4 w-4" style={S.accent} />
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Current Occupancy</p>
+            <Users className="h-4 w-4" style={{ color: "var(--accent)" }} />
           </div>
-          <p className="mt-2 text-3xl font-bold" style={S.primary}>
+          <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
             {totalOccupied.toLocaleString("en-IN")}{" "}
-            <span className="text-sm font-normal" style={S.muted}>head</span>
+            <span className="text-xs font-normal" style={S.muted}>head</span>
           </p>
-          <p className="mt-1 text-xs" style={S.sub}>
+          <p className="mt-1 text-[11px]" style={S.sub}>
             {totalCapacity > 0 ? `${Math.round((totalOccupied / totalCapacity) * 100)}% overall utilization` : "Headcount active"}
           </p>
         </div>
 
         <div
-          className="rounded-[var(--radius-lg)] border p-4 shadow-sm"
-          style={totalQuarantinePens > 0 ? S.warning : S.raised}
+          className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]"
+          style={totalQuarantinePens > 0 ? S.warning : { backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide">Biosecurity Alert</p>
-            {totalQuarantinePens > 0 ? <ShieldAlert className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" style={S.accent} />}
+            <p className="text-[11px] font-semibold uppercase tracking-wider">Biosecurity Alert</p>
+            {totalQuarantinePens > 0 ? <ShieldAlert className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" style={{ color: "var(--accent)" }} />}
           </div>
-          <p className="mt-2 text-3xl font-bold">
+          <p className="mt-2 text-2xl font-bold font-mono">
             {totalQuarantinePens}{" "}
-            <span className="text-sm font-normal">pens</span>
+            <span className="text-xs font-normal">pens</span>
           </p>
-          <p className="mt-1 text-xs">
+          <p className="mt-1 text-[11px]">
             {totalQuarantinePens > 0 ? "Active quarantine/sick isolation" : "All pens operating normally"}
           </p>
         </div>
 
         <div
-          className="rounded-[var(--radius-lg)] border p-4 shadow-sm"
-          style={totalOverCapacity > 0 ? S.danger : S.raised}
+          className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]"
+          style={totalOverCapacity > 0 ? S.danger : { backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide">Over-Capacity Pens</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider">Over-Capacity Pens</p>
             <AlertTriangle className="h-4 w-4" />
           </div>
-          <p className="mt-2 text-3xl font-bold">
+          <p className="mt-2 text-2xl font-bold font-mono">
             {totalOverCapacity}{" "}
-            <span className="text-sm font-normal">pens</span>
+            <span className="text-xs font-normal">pens</span>
           </p>
-          <p className="mt-1 text-xs">
+          <p className="mt-1 text-[11px]">
             {totalOverCapacity > 0 ? "Requires pen rebalancing" : "Optimal animal density"}
           </p>
         </div>

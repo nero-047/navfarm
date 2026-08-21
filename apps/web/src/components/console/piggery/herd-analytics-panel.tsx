@@ -90,54 +90,54 @@ export default function HerdAnalyticsPanel() {
         <div className="space-y-6">
           {/* ── KPI Summary Cards ── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
+            <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Active Herd Size</p>
-                <Users className="h-4 w-4" style={S.accent} />
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Active Herd Size</p>
+                <Users className="h-4 w-4" style={{ color: "var(--accent)" }} />
               </div>
-              <p className="mt-2 text-3xl font-bold" style={S.primary}>
-                {data.totalHeadcount.toLocaleString("en-IN")} <span className="text-sm font-normal" style={S.muted}>head</span>
+              <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
+                {data.totalHeadcount.toLocaleString("en-IN")} <span className="text-xs font-normal" style={S.muted}>head</span>
               </p>
-              <p className="mt-1 text-xs" style={S.sub}>
+              <p className="mt-1 text-[11px]" style={S.sub}>
                 {data.genderBreakdown.Female} Females · {data.genderBreakdown.Male} Males
               </p>
             </div>
 
-            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
+            <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Total Asset Valuation</p>
-                <TrendingUp className="h-4 w-4" style={S.accent} />
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Asset Valuation</p>
+                <TrendingUp className="h-4 w-4" style={{ color: "var(--accent)" }} />
               </div>
-              <p className="mt-2 text-3xl font-bold" style={S.primary}>
+              <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
                 {formatCurrency(data.totalBookValue)}
               </p>
-              <p className="mt-1 text-xs" style={S.sub}>
+              <p className="mt-1 text-[11px]" style={S.sub}>
                 Avg {formatCurrency(data.totalHeadcount > 0 ? data.totalBookValue / data.totalHeadcount : 0)} / head
               </p>
             </div>
 
-            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
+            <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Live Births (Lifetime)</p>
-                <HeartPulse className="h-4 w-4" style={S.accent} />
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Live Births</p>
+                <HeartPulse className="h-4 w-4" style={{ color: "var(--accent)" }} />
               </div>
-              <p className="mt-2 text-3xl font-bold" style={S.primary}>
-                {data.productivity.totalPigletsBornLive.toLocaleString("en-IN")} <span className="text-sm font-normal" style={S.muted}>piglets</span>
+              <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
+                {data.productivity.totalPigletsBornLive.toLocaleString("en-IN")} <span className="text-xs font-normal" style={S.muted}>piglets</span>
               </p>
-              <p className="mt-1 text-xs" style={S.sub}>
+              <p className="mt-1 text-[11px]" style={S.sub}>
                 {data.productivity.totalPigletsWeaned.toLocaleString("en-IN")} successfully weaned
               </p>
             </div>
 
-            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
+            <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Weaning Rate</p>
-                <Activity className="h-4 w-4" style={S.accent} />
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Weaning Rate</p>
+                <Activity className="h-4 w-4" style={{ color: "var(--accent)" }} />
               </div>
-              <p className="mt-2 text-3xl font-bold" style={S.primary}>
+              <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
                 {data.productivity.weaningRate}%
               </p>
-              <p className="mt-1 text-xs" style={S.sub}>
+              <p className="mt-1 text-[11px]" style={S.sub}>
                 {data.productivity.weaningRate >= 85 ? "Optimal weaning efficiency" : "Monitoring recommended"}
               </p>
             </div>

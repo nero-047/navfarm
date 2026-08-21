@@ -259,7 +259,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   checked={isSelf ? true : form.is_active}
                   disabled={isSelf}
                   onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                  className="w-4 h-4 rounded accent-(--accent)"
+                  className="w-4 h-4 rounded accent-[var(--accent)]"
                 />
                 Account Active
               </label>
@@ -317,7 +317,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                       {r.assign_id && (
                         <button
                           onClick={() => handleUnassignRole(r.assign_id)}
-                          className="ml-0.5 hover:text-(--danger) transition-colors"
+                          className="ml-0.5 hover:text-[var(--danger)] transition-colors"
                           title="Remove role"
                         >
                           <X className="w-3 h-3" />
@@ -401,7 +401,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                     {!a.is_primary && (
                       <button
                         onClick={() => handleRemoveCompany(a.assign_id)}
-                        className="ml-0.5 hover:text-(--danger) transition-colors"
+                        className="ml-0.5 hover:text-[var(--danger)] transition-colors"
                         title="Remove from company"
                       >
                         <X className="w-3 h-3" />

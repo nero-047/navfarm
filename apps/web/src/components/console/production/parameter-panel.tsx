@@ -177,7 +177,7 @@ export default function ParameterPanel() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
-              <tr className="border-b border-(--row-border)">
+              <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
                 <TableHead className="whitespace-nowrap">Code</TableHead>
                 <TableHead className="whitespace-nowrap">Name</TableHead>
                 <TableHead className="whitespace-nowrap">Type</TableHead>
@@ -234,11 +234,11 @@ export default function ParameterPanel() {
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Code <span className="text-(--danger)">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Code <span style={{ color: "var(--danger)" }}>*</span></label>
               <input value={form.parameter_code} onChange={(e) => setForm((f: Row) => ({ ...f, parameter_code: e.target.value }))} placeholder="PARAM-CONS-FEED-STARTER" className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Name <span className="text-(--danger)">*</span></label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Name <span style={{ color: "var(--danger)" }}>*</span></label>
               <input value={form.parameter_name} onChange={(e) => setForm((f: Row) => ({ ...f, parameter_name: e.target.value }))} placeholder="Starter Feed Consumption" className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">

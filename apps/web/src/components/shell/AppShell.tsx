@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode, type ElementType } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  Suspense,
+  type ReactNode,
+  type ElementType,
+} from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { ProfilePopover, type ProfileMenuItem } from "./ProfilePopover";
 
@@ -11,10 +20,16 @@ export const NAVFARM_LOGO_SRC = "https://nav-cdn.pages.dev/images/favicon.png";
 /** The viewport at which the shell becomes a pinned desktop workspace. */
 export const SHELL_DESKTOP_QUERY = "(min-width: 1024px)";
 
+export interface AppShellNavChild {
+  label: string;
+  href: string;
+}
+
 export interface AppShellNavItem {
   label: string;
   href: string;
   icon: ElementType;
+  children?: AppShellNavChild[];
 }
 
 export interface AppShellProps {
@@ -52,6 +67,277 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
+function isHrefActive(
+  targetHref: string,
+  currentPath: string,
+  searchParams: URLSearchParams | null,
+  allNavHrefs: string[]
+): boolean {
+  if (!targetHref) return false;
+  const [targetPath, targetQuery] = targetHref.split("?");
+
+  // Path check
+  const isPathExact = currentPath === targetPath;
+  const isSubPath = currentPath.startsWith(targetPath + "/");
+  if (!isPathExact && !isSubPath) {
+    return false;
+  }
+
+  // If target has query parameters (e.g. ?tab=schedulers)
+  if (targetQuery) {
+    const targetParams = new URLSearchParams(targetQuery);
+    for (const [key, val] of targetParams.entries()) {
+      const currentVal = searchParams ? searchParams.get(key) : null;
+      if (currentVal !== val) {
+        // If currentVal is null/empty and targetPath is /console/production and key is tab and val is default tab (daily-operational-entry)
+        if (!currentVal && targetPath === "/console/production" && key === "tab" && val === "daily-operational-entry") {
+          continue;
+        }
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // If target has NO query parameters:
+  // If the path matches, check if any other nav item in allNavHrefs has the same targetPath AND matches the current searchParams.
+  // If another nav item specifically matches the current search query, this generic item is not directly active.
+  if (searchParams && searchParams.toString().length > 0) {
+    const hasSpecificOtherMatch = allNavHrefs.some((otherHref) => {
+      if (otherHref === targetHref) return false;
+      const [otherPath, otherQuery] = otherHref.split("?");
+      if (otherPath !== targetPath || !otherQuery) return false;
+      const otherParams = new URLSearchParams(otherQuery);
+      let matches = true;
+      for (const [k, v] of otherParams.entries()) {
+        if (searchParams.get(k) !== v) {
+          matches = false;
+          break;
+        }
+      }
+      return matches;
+    });
+
+    if (hasSpecificOtherMatch) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function PrimaryNavContent({
+  navItems,
+  navSectionLabel,
+  pathname,
+  searchParams,
+  onItemClick,
+}: {
+  navItems: AppShellNavItem[];
+  navSectionLabel: string;
+  pathname: string;
+  searchParams: URLSearchParams | null;
+  onItemClick: () => void;
+}) {
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+  const allNavHrefs = useMemo(() => {
+    const hrefs: string[] = [];
+    for (const item of navItems) {
+      if (item.children && item.children.length > 0) {
+        for (const child of item.children) {
+          hrefs.push(child.href);
+        }
+      } else if (item.href) {
+        hrefs.push(item.href);
+      }
+    }
+    return hrefs;
+  }, [navItems]);
+
+  return (
+    <nav aria-label="Primary" data-shell-nav-scroll className="p-3">
+      <p className="px-3 pb-2 pt-2 text-[10px] font-normal uppercase tracking-[0.18em] text-white/35">
+        {navSectionLabel}
+      </p>
+      <ul className="space-y-0.5">
+        {navItems.map((item) => {
+          const hasChildren = Boolean(item.children && item.children.length > 0);
+
+          let isChildActive = false;
+          if (hasChildren && item.children) {
+            isChildActive = item.children.some((child) =>
+              isHrefActive(child.href, pathname, searchParams, allNavHrefs)
+            );
+          }
+
+          const isDirectActive = !hasChildren && isHrefActive(item.href, pathname, searchParams, allNavHrefs);
+          const isExpanded = expandedItems[item.label] ?? (isChildActive || true);
+
+          if (hasChildren) {
+            return (
+              <li key={item.label}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpandedItems((prev) => ({
+                      ...prev,
+                      [item.label]: !(prev[item.label] ?? isChildActive ?? true),
+                    }));
+                  }}
+                  className={`nf-press group relative flex w-full min-h-10 items-center justify-between gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-[12.5px] transition-colors ${
+                    isDirectActive
+                      ? "font-semibold text-white bg-[var(--sidebar-active-bg)]"
+                      : isChildActive
+                      ? "font-semibold text-white bg-white/[0.04]"
+                      : "font-normal text-[var(--sidebar-text)] hover:bg-white/[0.06] hover:text-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {isDirectActive && (
+                      <span
+                        className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r-full"
+                        style={{ backgroundColor: "var(--sidebar-active-accent)" }}
+                      />
+                    )}
+                    <item.icon
+                      size={16}
+                      strokeWidth={isDirectActive || isChildActive ? 2 : 1.5}
+                      color={isDirectActive || isChildActive ? "var(--sidebar-active-accent)" : undefined}
+                      className="shrink-0"
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  <ChevronDown
+                    size={13}
+                    className={`shrink-0 text-white/40 group-hover:text-white transition-transform duration-200 ${
+                      isExpanded ? "rotate-0 text-white/80" : "-rotate-90 text-white/40"
+                    }`}
+                  />
+                </button>
+                {isExpanded && (
+                  <ul className="mt-0.5 space-y-0.5 pl-6 pr-1">
+                    {item.children!.map((child) => {
+                      const childActive = isHrefActive(child.href, pathname, searchParams, allNavHrefs);
+                      return (
+                        <li key={child.label}>
+                          <Link
+                            href={child.href}
+                            onClick={onItemClick}
+                            className={`block rounded-[var(--radius-xs)] px-2.5 py-1.5 text-[11px] transition-colors ${
+                              childActive
+                                ? "font-semibold text-white bg-white/10"
+                                : "text-white/60 hover:bg-white/[0.04] hover:text-white"
+                            }`}
+                          >
+                            {child.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </li>
+            );
+          }
+
+          const isActive = isDirectActive;
+
+          return (
+            <li key={item.label}>
+              <Link
+                href={item.href}
+                onClick={onItemClick}
+                aria-current={isActive ? "page" : undefined}
+                className={`nf-press group relative flex min-h-10 items-center justify-between gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-[12.5px] transition-colors ${
+                  isActive
+                    ? "font-semibold text-white bg-[var(--sidebar-active-bg)]"
+                    : "font-normal text-[var(--sidebar-text)] hover:bg-white/[0.06] hover:text-white"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {isActive && (
+                    <span
+                      className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r-full"
+                      style={{ backgroundColor: "var(--sidebar-active-accent)" }}
+                    />
+                  )}
+                  <item.icon
+                    size={16}
+                    strokeWidth={isActive ? 2 : 1.5}
+                    color={isActive ? "var(--sidebar-active-accent)" : undefined}
+                    className="shrink-0"
+                  />
+                  <span className="truncate">{item.label}</span>
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+function PrimaryNavInner({
+  navItems,
+  navSectionLabel,
+  fallbackPathname,
+  onItemClick,
+}: {
+  navItems: AppShellNavItem[];
+  navSectionLabel: string;
+  fallbackPathname: string;
+  onItemClick: () => void;
+}) {
+  const pathnameHook = usePathname();
+  const searchParamsHook = useSearchParams();
+  const pathname = pathnameHook || fallbackPathname;
+
+  return (
+    <PrimaryNavContent
+      navItems={navItems}
+      navSectionLabel={navSectionLabel}
+      pathname={pathname}
+      searchParams={searchParamsHook}
+      onItemClick={onItemClick}
+    />
+  );
+}
+
+function PrimaryNav({
+  navItems,
+  navSectionLabel,
+  fallbackPathname,
+  onItemClick,
+}: {
+  navItems: AppShellNavItem[];
+  navSectionLabel: string;
+  fallbackPathname: string;
+  onItemClick: () => void;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <PrimaryNavContent
+          navItems={navItems}
+          navSectionLabel={navSectionLabel}
+          pathname={fallbackPathname}
+          searchParams={null}
+          onItemClick={onItemClick}
+        />
+      }
+    >
+      <PrimaryNavInner
+        navItems={navItems}
+        navSectionLabel={navSectionLabel}
+        fallbackPathname={fallbackPathname}
+        onItemClick={onItemClick}
+      />
+    </Suspense>
+  );
+}
+
 /**
  * The application shell.
  *
@@ -70,9 +356,24 @@ export interface AppShellProps {
  */
 export function AppShell(props: AppShellProps) {
   const {
-    brandHref, brandSubtitle, sidebarSummary, navSectionLabel, navItems, pathname,
-    userInitials, userName, userEmail, onLogout, signOutLabel, profileItems, profileMenuLabel,
-    breadcrumbRoot, breadcrumbCurrent, headerRight, contextNav, children,
+    brandHref,
+    brandSubtitle,
+    sidebarSummary,
+    navSectionLabel,
+    navItems,
+    pathname,
+    userInitials,
+    userName,
+    userEmail,
+    onLogout,
+    signOutLabel,
+    profileItems,
+    profileMenuLabel,
+    breadcrumbRoot,
+    breadcrumbCurrent,
+    headerRight,
+    contextNav,
+    children,
   } = props;
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -90,7 +391,9 @@ export function AppShell(props: AppShellProps) {
   // modal semantics it no longer has.
   useEffect(() => {
     const query = window.matchMedia(SHELL_DESKTOP_QUERY);
-    const onChange = () => { if (query.matches) setMobileOpen(false); };
+    const onChange = () => {
+      if (query.matches) setMobileOpen(false);
+    };
     onChange();
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);
@@ -102,7 +405,9 @@ export function AppShell(props: AppShellProps) {
   useScrollLock(mobileOpen);
   useEffect(() => {
     if (!mobileOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileOpen(false); };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
     window.addEventListener("keydown", onKeyDown);
     navRef.current?.focus();
     return () => {
@@ -160,46 +465,12 @@ export function AppShell(props: AppShellProps) {
           {sidebarSummary && <div className="mt-4">{sidebarSummary}</div>}
         </div>
 
-        <nav aria-label="Primary" data-shell-nav-scroll className="p-3">
-          <p className="px-3 pb-2 pt-2 text-[10px] font-normal uppercase tracking-[0.18em] text-white/35">
-            {navSectionLabel}
-          </p>
-          <ul className="space-y-0.5">
-            {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={close}
-                    // The active module is stated, not only coloured: the tint,
-                    // the indicator and the weight are all visual-only signals.
-                    aria-current={isActive ? "page" : undefined}
-                    className={`nf-press group relative flex min-h-11 items-center gap-3 rounded-[var(--radius-sm)] px-3 py-2.5 text-[13px] transition-colors ${
-                      isActive
-                        ? "font-semibold text-white"
-                        : "font-normal text-[var(--sidebar-text)] hover:bg-white/[0.06] hover:text-white"
-                    }`}
-                    style={isActive ? { backgroundColor: "var(--sidebar-active-bg)" } : undefined}
-                  >
-                    {isActive && (
-                      <span
-                        className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r-full"
-                        style={{ backgroundColor: "var(--sidebar-active-accent)" }}
-                      />
-                    )}
-                    <item.icon
-                      size={17}
-                      strokeWidth={isActive ? 2 : 1.5}
-                      color={isActive ? "var(--sidebar-active-accent)" : undefined}
-                    />
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        <PrimaryNav
+          navItems={navItems}
+          navSectionLabel={navSectionLabel}
+          fallbackPathname={pathname}
+          onItemClick={close}
+        />
 
         {/* No account footer here. Identity and Sign out are account actions,
             not navigation, and they live behind the header avatar — see

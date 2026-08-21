@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Loader2, Download, RefreshCw, CheckCircle2, AlertTriangle, ArrowRight,
-  Sparkles, Layers,
+  Layers,
 } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
@@ -206,14 +206,14 @@ export default function BioAssetRollForwardPanel() {
                 <p className="text-xs" style={S.muted}>Reconciliation of carrying amounts from beginning to end of period</p>
               </div>
               <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold" style={S.surface}>
-                <Sparkles className="h-3 w-3" style={S.accent} /> Standard: IAS 41 Agriculture
+                <Layers className="h-3 w-3" style={S.accent} /> Standard: IAS 41 Agriculture
               </span>
             </div>
 
             <table className="w-full text-sm">
-              <tbody>
+              <tbody className="divide-y divide-[var(--row-border)]">
                 {/* 1. Opening Carrying Value */}
-                <tr className="border-b" style={S.surface}>
+                <tr style={S.surface}>
                   <td className="px-5 py-3 font-semibold" style={S.primary}>
                     1. Opening Carrying Amount (Pre-mature + Mature)
                   </td>
@@ -223,12 +223,12 @@ export default function BioAssetRollForwardPanel() {
                 </tr>
 
                 {/* 2. Additions */}
-                <tr className="border-b" style={{ backgroundColor: "var(--surface-secondary)" }}>
+                <tr style={S.raised}>
                   <td colSpan={2} className="px-5 py-2 text-xs font-semibold uppercase tracking-wider" style={S.muted}>
                     Period Additions & Capitalization
                   </td>
                 </tr>
-                <tr className="border-b">
+                <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
                     + Acquisitions / Livestock Purchases (PO / GRN)
                   </td>
@@ -236,7 +236,7 @@ export default function BioAssetRollForwardPanel() {
                     {formatCurrency(data.movements.acquisitions)}
                   </td>
                 </tr>
-                <tr className="border-b">
+                <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
                     + Growth Capitalization (Feed, Medicine, Overhead on Pre-mature stock)
                   </td>
@@ -246,12 +246,12 @@ export default function BioAssetRollForwardPanel() {
                 </tr>
 
                 {/* 3. Deductions & Adjustments */}
-                <tr className="border-b" style={{ backgroundColor: "var(--surface-secondary)" }}>
+                <tr style={S.raised}>
                   <td colSpan={2} className="px-5 py-2 text-xs font-semibold uppercase tracking-wider" style={S.muted}>
                     Period Reductions, Amortization & Fair Value
                   </td>
                 </tr>
-                <tr className="border-b">
+                <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
                     − Amortization of Mature Breeding Assets
                   </td>
@@ -259,7 +259,7 @@ export default function BioAssetRollForwardPanel() {
                     {formatCurrency(data.movements.amortization)}
                   </td>
                 </tr>
-                <tr className="border-b">
+                <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
                     ± Fair Value Adjustments (Revaluations recognized in P&L)
                   </td>
@@ -267,7 +267,7 @@ export default function BioAssetRollForwardPanel() {
                     {formatCurrency(data.movements.fairValueAdjustments)}
                   </td>
                 </tr>
-                <tr className="border-b">
+                <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
                     − Harvest / Slaughter Transfers to Meat/Carcass Inventory
                   </td>
@@ -275,7 +275,7 @@ export default function BioAssetRollForwardPanel() {
                     {formatCurrency(data.movements.harvestTransfers)}
                   </td>
                 </tr>
-                <tr className="border-b">
+                <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
                     − Disposals, Sales & Mortality Write-Offs
                   </td>
@@ -285,7 +285,7 @@ export default function BioAssetRollForwardPanel() {
                 </tr>
 
                 {/* 4. Total Movements Subtotal */}
-                <tr className="border-b" style={S.raised}>
+                <tr style={S.raised}>
                   <td className="px-5 py-3 font-semibold" style={S.primary}>
                     Total Net Period Movements
                   </td>
@@ -295,7 +295,7 @@ export default function BioAssetRollForwardPanel() {
                 </tr>
 
                 {/* 5. Closing Carrying Value */}
-                <tr className="border-t-2" style={S.raised}>
+                <tr className="border-t-2" style={{ ...S.raised, borderTopColor: "var(--border)" }}>
                   <td className="px-5 py-4 text-base font-bold" style={S.primary}>
                     Closing Carrying Net Book Value (NBV)
                   </td>
@@ -309,19 +309,19 @@ export default function BioAssetRollForwardPanel() {
 
           {/* ── Asset Dimension Breakdown ── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-[var(--radius-lg)] border p-4" style={S.surface}>
+            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.surface}>
               <div className="flex items-center gap-2 mb-3">
                 <Layers className="h-4 w-4" style={S.accent} />
                 <h4 className="text-sm font-semibold" style={S.primary}>Asset Tracking Breakdown</h4>
               </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between py-1 border-b">
+              <div className="space-y-2 text-sm divide-y divide-[var(--row-border)]">
+                <div className="flex justify-between py-1.5">
                   <span style={S.sub}>Batch / Cohort Biological Assets</span>
                   <span className="font-mono font-medium" style={S.primary}>
                     {formatCurrency(data.assetTypeBreakdown.batchCarryingValue)}
                   </span>
                 </div>
-                <div className="flex justify-between py-1 border-b">
+                <div className="flex justify-between py-1.5">
                   <span style={S.sub}>Individual Tagged Animals (Animal Register)</span>
                   <span className="font-mono font-medium" style={S.primary}>
                     {formatCurrency(data.assetTypeBreakdown.animalCarryingValue)}
@@ -330,14 +330,14 @@ export default function BioAssetRollForwardPanel() {
               </div>
             </div>
 
-            <div className="rounded-[var(--radius-lg)] border p-4" style={S.surface}>
+            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.surface}>
               <div className="flex items-center gap-2 mb-3">
                 <ArrowRight className="h-4 w-4" style={S.accent} />
                 <h4 className="text-sm font-semibold" style={S.primary}>General Ledger Accounts</h4>
               </div>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-sm divide-y divide-[var(--row-border)]">
                 {data.glReconciliation.glAccounts.map((a: Row) => (
-                  <div key={a.account_code} className="flex justify-between py-1 border-b">
+                  <div key={a.account_code} className="flex justify-between py-1.5">
                     <span style={S.sub}>{a.account_code} — {a.account_name}</span>
                     <span className="font-mono font-medium" style={S.primary}>
                       {formatCurrency(a.balance)}
@@ -345,7 +345,7 @@ export default function BioAssetRollForwardPanel() {
                   </div>
                 ))}
                 {data.glReconciliation.glAccounts.length === 0 && (
-                  <p className="text-xs" style={S.muted}>No biological asset GL postings recorded.</p>
+                  <p className="text-xs py-2" style={S.muted}>No biological asset GL postings recorded.</p>
                 )}
               </div>
             </div>

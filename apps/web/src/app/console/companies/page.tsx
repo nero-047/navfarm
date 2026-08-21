@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2, RefreshCw, CheckCircle,
-  Settings, ArrowLeft, Activity, Plus, ArrowRightLeft,
+  Settings, ArrowLeft, Activity, Plus,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser } from "../../../hooks/useAuth";
@@ -157,7 +157,7 @@ export default function CompaniesPage() {
         />
 
         {/* Company identity toolbar */}
-        <div className="flex items-center gap-4 rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-4">
+        <div className="flex items-center gap-4 rounded-[var(--radius-md)] border p-4" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-sm font-semibold text-white" style={{ backgroundColor: "var(--color-navy)" }}>
             {targetCompany.company_code?.substring(0, 2) || targetCompany.company_name?.substring(0, 2) || "CO"}
           </div>
@@ -282,7 +282,7 @@ export default function CompaniesPage() {
         <div className="rounded-[var(--radius-md)] border overflow-hidden" style={S.surface}>
           <table className="w-full border-collapse text-sm">
             <TableHeader>
-              <tr className="border-b border-(--row-border)">
+              <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
                 {["#", "Company", "Reg. No.", "Country", "Onboarding", "Actions"].map((h) => (
                   <TableHead key={h} className="px-5 whitespace-nowrap">{h}</TableHead>
                 ))}
@@ -312,31 +312,10 @@ export default function CompaniesPage() {
                   <TableCell className="px-5 py-4"><StatusBadge status={co.onboarding_status} /></TableCell>
                   <TableCell className="px-5 py-4">
                     {co.onboarding_status === "COMPLETED" ? (
-                      <div className="flex items-center gap-2">
-                        <Button onClick={() => setManagingCompany(co)} variant="outline" size="sm">
-                          <Settings className="w-3.5 h-3.5" />
-                          Manage
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            const currentUser = getStoredUser();
-                            if (currentUser) {
-                              const patched = { ...currentUser, companyId: co.company_id, company_id: co.company_id };
-                              localStorage.setItem("user", JSON.stringify(patched));
-                              localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
-                            }
-                            setActiveCompanyId(co.company_id);
-                            setTenantCompanyMode(true);
-                            window.location.href = "/console/dashboard";
-                          }}
-                          title={`Switch into ${co.company_name} — operate the console as this company`}
-                          variant="secondary"
-                          size="sm"
-                        >
-                          <ArrowRightLeft className="w-3.5 h-3.5" />
-                          Switch
-                        </Button>
-                      </div>
+                      <Button onClick={() => setManagingCompany(co)} variant="outline" size="sm">
+                        <Settings className="w-3.5 h-3.5" />
+                        Manage
+                      </Button>
                     ) : (
                       <Button
                         onClick={() => {

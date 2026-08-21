@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import {
-  Loader2, RefreshCw, Sparkles, AlertTriangle, CheckCircle2,
-  Calendar, Scale, Utensils, Skull,
+  Loader2, RefreshCw, AlertTriangle, CheckCircle2,
+  Layers, Calendar,
+  Scale, Utensils, Skull,
 } from "lucide-react";
 
 import { api } from "@/services/api-client";
@@ -116,8 +117,8 @@ export default function BatchPerformanceCurvesPanel({
         <div className="flex items-center gap-2">
           {!batch.has_scheduler && (
             <Button size="sm" onClick={handleGenerateScheduler} disabled={generating}>
-              {generating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-              Auto-Generate Scheduler from Breed
+              {generating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Layers className="mr-1.5 h-3.5 w-3.5" />}
+              Generate Scheduler from Breed Standard
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={loadCurves} disabled={loading}>
@@ -209,7 +210,7 @@ export default function BatchPerformanceCurvesPanel({
                 <th className="px-3 py-2.5">Mortality</th>
               </tr>
             </thead>
-            <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+            <tbody className="divide-y divide-[var(--row-border)]">
               {curves.map((c) => {
                 const targetFeed = c.stdTotalDailyFeed || 0;
                 const actFeed = c.actTotalDailyFeed;
@@ -218,11 +219,11 @@ export default function BatchPerformanceCurvesPanel({
                 const isUnder = pct != null && pct < 85;
 
                 return (
-                  <tr key={c.day} className={c.day === batch.batch_age_days ? "font-semibold" : ""}>
+                  <tr key={c.day} className={`hover:bg-[var(--row-hover)] transition-colors ${c.day === batch.batch_age_days ? "font-semibold bg-[var(--surface-raised)]" : ""}`}>
                     <td className="px-3 py-2 font-mono">
                       Day {c.day}
                       {c.day === batch.batch_age_days && (
-                        <span className="ml-1.5 rounded-full px-1.5 py-0.2 text-[9px] font-bold uppercase" style={S.accent}>
+                        <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase border" style={S.accent}>
                           Today
                         </span>
                       )}

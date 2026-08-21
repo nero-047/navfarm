@@ -1918,8 +1918,22 @@ export default function CompanyTab({
             </div>
           </Card>
 
-          <Dialog open={showAdminDialog} onClose={() => setShowAdminDialog(false)} title={isTenantAdmin ? "Add company administrator" : "Add company operator"} description={`Create an account for ${targetCompany?.company_name ?? "this company"}.`} maxWidth="md">
-            <form onSubmit={handleAddCompanyAdmin} className="flex flex-col gap-5">
+          <Dialog
+            open={showAdminDialog}
+            onClose={() => setShowAdminDialog(false)}
+            title={isTenantAdmin ? "Add company administrator" : "Add company operator"}
+            description={`Create an account for ${targetCompany?.company_name ?? "this company"}.`}
+            maxWidth="md"
+            footer={
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowAdminDialog(false)}>Cancel</Button>
+                <Button type="submit" form="add-admin-form" disabled={addingAdmin} size="sm" className="flex items-center gap-1.5 nf-btn-primary">
+                  <UserPlus className="w-3.5 h-3.5" /> {addingAdmin ? "Registering..." : (isTenantAdmin ? "Add Administrator" : "Add Operator")}
+                </Button>
+              </>
+            }
+          >
+            <form id="add-admin-form" onSubmit={handleAddCompanyAdmin} className="flex flex-col gap-4 pt-1">
               <Field label="Full Name" htmlFor="admin-full-name" required>
                 <Input
                   id="admin-full-name"
@@ -1957,23 +1971,23 @@ export default function CompanyTab({
                   onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
                 />
               </Field>
-              <div className="mt-1 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setShowAdminDialog(false)} className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
-              <Button type="submit" disabled={addingAdmin} className="flex h-11 items-center justify-center gap-2 bg-(--accent) px-5 text-xs text-white hover:bg-(--accent-hover)">
-                <UserPlus className="w-4 h-4" /> {addingAdmin ? "Registering..." : (isTenantAdmin ? "Add Administrator" : "Add Operator")}
-              </Button>
-              </div>
             </form>
           </Dialog>
 
-          <Dialog open={Boolean(userPendingDeletion)} onClose={() => setUserPendingDeletion(null)} title="Deactivate account" description="The user will no longer be able to access this company workspace." maxWidth="sm">
-            <div className="space-y-5">
-              <p className="text-sm leading-6 text-(--text-secondary)">Are you sure you want to deactivate this account?</p>
-              <div className="flex flex-col-reverse gap-3 border-t border-(--border) pt-4 sm:flex-row sm:justify-end">
-                <button type="button" onClick={() => setUserPendingDeletion(null)} className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
-                <button type="button" onClick={() => userPendingDeletion && handleDeleteUser(userPendingDeletion)} className="min-h-10 rounded-[var(--radius-sm)] bg-(--danger) px-5 text-sm font-semibold text-white transition-colors hover:bg-(--danger-hover)">Deactivate</button>
-              </div>
-            </div>
+          <Dialog
+            open={Boolean(userPendingDeletion)}
+            onClose={() => setUserPendingDeletion(null)}
+            title="Deactivate account"
+            description="The user will no longer be able to access this company workspace."
+            maxWidth="sm"
+            footer={
+              <>
+                <Button variant="outline" size="sm" onClick={() => setUserPendingDeletion(null)}>Cancel</Button>
+                <Button variant="destructive" size="sm" onClick={() => userPendingDeletion && handleDeleteUser(userPendingDeletion)}>Deactivate</Button>
+              </>
+            }
+          >
+            <p className="text-xs leading-5 text-(--text-secondary) pt-1">Are you sure you want to deactivate this account?</p>
           </Dialog>
 
           {editingOperator && (

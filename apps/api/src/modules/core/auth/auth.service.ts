@@ -92,12 +92,16 @@ export class AuthService {
 
       const requesterType = requestingUser.userType;
       if (requesterType === 'TENANT_ADMIN') {
-        if (dto.user_type !== 'COMPANY_ADMIN') {
-          throw new BadRequestException('Tenant Administrators can only register Company Administrator accounts.');
+        if (dto.user_type !== 'COMPANY_ADMIN' && dto.user_type !== 'OPERATIONAL_ADMIN' && dto.user_type !== 'STANDARD_USER') {
+          throw new BadRequestException('Tenant Administrators can register Company Admins, Operational Admins, or Standard Users.');
         }
       } else if (requesterType === 'COMPANY_ADMIN') {
+        if (dto.user_type !== 'OPERATIONAL_ADMIN' && dto.user_type !== 'STANDARD_USER') {
+          throw new BadRequestException('Company Administrators can register Operational Admins and Standard Operators.');
+        }
+      } else if (requesterType === 'OPERATIONAL_ADMIN') {
         if (dto.user_type !== 'STANDARD_USER') {
-          throw new BadRequestException('Company Administrators can only register Standard Operator accounts.');
+          throw new BadRequestException('Operational Administrators can only register Standard Operators.');
         }
       } else {
         throw new ForbiddenException('Insufficient privileges to register user accounts.');
@@ -519,6 +523,28 @@ export class AuthService {
       if (homeCompany) companies = [{ ...homeCompany, is_primary: true }];
     }
 
+    let operationalAreas: any[] = [];
+    try {
+      operationalAreas = await this.db
+        .select({
+          area_id: schema.operationalAreaMaster.area_id,
+          area_code: schema.operationalAreaMaster.area_code,
+          area_name: schema.operationalAreaMaster.area_name,
+          company_id: schema.operationalAreaMaster.company_id,
+          lob_id: schema.operationalAreaMaster.lob_id,
+          nob_id: schema.operationalAreaMaster.nob_id,
+          is_primary: schema.userOperationalAreaAssignment.is_primary,
+        })
+        .from(schema.userOperationalAreaAssignment)
+        .innerJoin(
+          schema.operationalAreaMaster,
+          eq(schema.userOperationalAreaAssignment.area_id, schema.operationalAreaMaster.area_id)
+        )
+        .where(eq(schema.userOperationalAreaAssignment.user_id, user.user_id));
+    } catch {
+      // Table will exist once migrated
+    }
+
     const payload = {
       email: user.email,
       sub: user.user_id,
@@ -526,6 +552,7 @@ export class AuthService {
       companyId: user.company_id,
       userType: user.user_type,
       companies,
+      operationalAreas,
     };
 
     return {
@@ -539,6 +566,7 @@ export class AuthService {
         companyId: user.company_id,
         tenantId: user.tenant_id,
         companies,
+        operationalAreas,
         permissions,
       },
     };

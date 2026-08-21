@@ -288,11 +288,9 @@ export default function UsersPage() {
             <div>
               <Label>User Type</Label>
               <Select value={newUser.user_type} onChange={(e) => setNewUser({ ...newUser, user_type: e.target.value })}>
-                {isTenantAdmin ? (
-                  <option value="COMPANY_ADMIN">Company Administrator</option>
-                ) : (
-                  <option value="STANDARD_USER">Standard User</option>
-                )}
+                {isTenantAdmin && <option value="COMPANY_ADMIN">Company Administrator</option>}
+                <option value="OPERATIONAL_ADMIN">Operational Administrator (LOB Manager)</option>
+                <option value="STANDARD_USER">Standard Operator / User</option>
               </Select>
             </div>
 

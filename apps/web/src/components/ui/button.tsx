@@ -7,12 +7,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'rounded-[var(--radius-pill)] bg-(--accent) text-white hover:bg-(--accent-hover)',
-        destructive: 'rounded-[var(--radius-pill)] bg-(--danger) text-white hover:opacity-90',
-        outline: 'rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) hover:bg-(--surface-secondary) text-(--text-primary)',
-        secondary: 'rounded-[var(--radius-sm)] bg-(--surface-secondary) text-(--text-primary) hover:bg-(--border)',
-        ghost: 'rounded-[var(--radius-sm)] hover:bg-(--surface-secondary) text-(--text-secondary)',
-        link: 'text-(--accent) underline-offset-4 hover:underline',
+        default: 'rounded-[var(--radius-pill)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] shadow-2xs',
+        destructive: 'rounded-[var(--radius-pill)] bg-[var(--danger)] text-white hover:opacity-90',
+        outline: 'rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-raised)] text-[var(--text-primary)] shadow-2xs',
+        secondary: 'rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]',
+        ghost: 'rounded-[var(--radius-sm)] hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+        link: 'text-[var(--accent)] underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-11 px-5',

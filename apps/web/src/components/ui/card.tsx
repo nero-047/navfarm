@@ -6,9 +6,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     <div
       ref={ref}
       className={cn(
-        // Text colour is set here rather than inherited: cards sit on several
-        // different surfaces, and without it their contents drift per surface.
-        'rounded-[var(--radius-md)] border border-(--card-border) bg-(--card-bg) text-(--text-primary)',
+        'rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)]',
         className
       )}
       {...props}
@@ -28,7 +26,7 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('nf-text-section leading-none text-(--text-primary)', className)}
+      className={cn('text-base font-semibold leading-tight text-[var(--text-primary)]', className)}
       {...props}
     />
   )
@@ -39,7 +37,7 @@ const CardDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn('nf-text-label text-(--text-secondary)', className)} {...props} />
+  <p ref={ref} className={cn('text-xs text-[var(--text-secondary)]', className)} {...props} />
 ));
 CardDescription.displayName = 'CardDescription';
 

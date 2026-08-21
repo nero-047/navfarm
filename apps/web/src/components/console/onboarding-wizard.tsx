@@ -266,28 +266,27 @@ export default function OnboardingWizard({
   return (
     <div className="nf-onboarding flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 md:p-12 flex flex-col md:flex-row gap-4 md:gap-8 overflow-y-auto">
 
-      <div className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-4 text-(--text-primary) md:hidden">
+      <div className="rounded-[var(--radius-lg)] border p-4 md:hidden" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)", color: "var(--text-primary)" }}>
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-(--accent)">Company setup</p>
-            <p className="mt-1 text-sm font-semibold text-(--text-primary)">Step {activeWizardStep} of 9</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">Company setup</p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">Step {activeWizardStep} of 9</p>
           </div>
-          <span className="rounded-full border border-(--border) bg-(--surface-raised) px-3 py-1 text-[10px] font-semibold text-(--text-secondary)">
+          <span className="rounded-full border px-3 py-1 text-[10px] font-semibold" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
             {Math.round((activeWizardStep / 9) * 100)}%
           </span>
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-(--surface-raised)">
-          <div className="h-full rounded-full bg-(--accent) transition-all" style={{ width: `${(activeWizardStep / 9) * 100}%` }} />
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-raised)]">
+          <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${(activeWizardStep / 9) * 100}%` }} />
         </div>
       </div>
 
       {/* Progress Menu (Left Sidebar) */}
       <aside className="hidden md:flex md:w-72 shrink-0 flex-col gap-3">
-        {/* Intro copy is the column's heading, not a module — a box around it
-            would imply it is a separate thing from the steps beneath it. */}
+        {/* Intro copy is the column's heading, not a module */}
         <div className="mb-4 flex flex-col gap-1 px-3">
-          <h3 className="text-sm font-semibold text-(--text-primary)">ERP Setup Wizard</h3>
-          <p className="text-xs text-(--text-secondary)">Configure your company settings to activate agricultural management.</p>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">ERP Setup Wizard</h3>
+          <p className="text-xs text-[var(--text-secondary)]">Configure your company settings to activate agricultural management.</p>
         </div>
 
         {[
@@ -312,30 +311,30 @@ export default function OnboardingWizard({
               onClick={() => setActiveWizardStep(step.order)}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-sm)] border text-sm font-medium transition-all text-left outline-none ${
                 isActive
-                  ? "bg-(--accent-muted) border-(--accent) text-(--text-primary) shadow-sm"
+                  ? "bg-[var(--accent-muted)] border-[var(--accent)] text-[var(--text-primary)] shadow-sm"
                   : isCompleted
-                  ? "border-(--border) bg-(--surface-raised) text-(--text-secondary) hover:bg-(--surface) cursor-pointer"
+                  ? "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:bg-[var(--surface)] cursor-pointer"
                   : isClickable
-                  ? "border-transparent text-(--text-secondary) hover:text-(--text-primary) cursor-pointer"
-                  : "border-transparent text-(--text-muted) cursor-not-allowed opacity-50"
+                  ? "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                  : "border-transparent text-[var(--text-muted)] cursor-not-allowed opacity-50"
               }`}
             >
               <div className="flex items-center gap-2">
                 {step.icon}
                 <span>{step.label}</span>
               </div>
-              {isCompleted && <Check className="w-4 h-4 text-(--accent)" />}
+              {isCompleted && <Check className="w-4 h-4 text-[var(--accent)]" />}
             </button>
           );
         })}
       </aside>
 
       {/* Wizard Form Panel (Right Side) */}
-      <main className="flex-1 bg-(--surface) border border-(--border) rounded-[var(--radius-lg)] p-5 sm:p-8 flex flex-col gap-6 justify-between animate-fade-in">
+      <main className="flex-1 rounded-[var(--radius-lg)] border p-5 sm:p-8 flex flex-col gap-6 justify-between animate-fade-in" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
         <div className="flex-1">
           {loadingDetails ? (
             <div className="flex items-center justify-center h-48">
-              <RefreshCw className="animate-spin w-6 h-6 text-(--accent)" />
+              <RefreshCw className="animate-spin w-6 h-6 text-[var(--accent)]" />
             </div>
           ) : (
             <>

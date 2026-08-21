@@ -13,11 +13,11 @@ interface CompanyDashboardTabProps {
   roles?: any[];
 }
 
-const USER_TYPE_LABELS: Record<string, { label: string; description: string; color: string }> = {
-  SYSTEM_ADMIN: { label: "System Administrator", description: "Full platform-level access across all tenants", color: "rose" },
-  TENANT_ADMIN: { label: "Tenant Administrator", description: "Manages all companies and users within the tenant", color: "purple" },
-  COMPANY_ADMIN: { label: "Company Administrator", description: "Full access to company settings, team, and operations", color: "teal" },
-  STANDARD_USER: { label: "Standard Operator", description: "Access is governed by assigned RBAC role permissions", color: "blue" },
+const USER_TYPE_LABELS: Record<string, { label: string; description: string }> = {
+  SYSTEM_ADMIN: { label: "System Administrator", description: "Full platform-level access across all tenants" },
+  TENANT_ADMIN: { label: "Tenant Administrator", description: "Manages all companies and users within the tenant" },
+  COMPANY_ADMIN: { label: "Company Administrator", description: "Full access to company settings, team, and operations" },
+  STANDARD_USER: { label: "Standard Operator", description: "Access is governed by assigned RBAC role permissions" },
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -73,38 +73,41 @@ export default function CompanyDashboardTab({
     },
   ];
 
-  const colorMap: Record<string, { bg: string; border: string; text: string; iconBg: string; iconBorder: string }> = {
-    teal: { bg: "hover:border-(--accent)/30", border: "border-(--accent)/20", text: "text-(--accent)", iconBg: "bg-(--accent)/10", iconBorder: "border-(--accent)/20" },
-  };
-
-  const userTypeColor = colorMap.teal;
-
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
 
       {/* Session Context Card — User Identity + Role */}
-      <Card className="p-6 border-(--border) bg-(--surface)">
+      <Card className="p-6" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-[var(--radius-md)] bg-(--accent)/10 border border-(--accent)/20 flex items-center justify-center text-(--accent) font-semibold text-lg tracking-wider">
+          <div
+            className="w-14 h-14 rounded-[var(--radius-md)] border flex items-center justify-center font-semibold text-lg tracking-wider"
+            style={{ backgroundColor: "var(--accent-muted)", borderColor: "rgba(194,67,50,0.2)", color: "var(--accent)" }}
+          >
             {initials}
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-(--text-primary)">{currentUser?.fullName || "User"}</h2>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${userTypeColor.border} ${userTypeColor.text} ${userTypeColor.iconBg}`}>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>{currentUser?.fullName || "User"}</h2>
+              <span
+                className="px-2 py-0.5 rounded text-[10px] font-semibold border"
+                style={{ backgroundColor: "var(--accent-muted)", borderColor: "rgba(194,67,50,0.2)", color: "var(--accent)" }}
+              >
                 {currentUser?.userType || "USER"}
               </span>
               {currentUserRecord?.role_code && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-semibold border border-(--info) text-(--info) bg-(--info-muted)">
+                <span
+                  className="px-2 py-0.5 rounded text-[10px] font-semibold border"
+                  style={{ backgroundColor: "var(--color-blue-soft)", borderColor: "var(--info)", color: "var(--info)" }}
+                >
                   {currentUserRecord.role_code}
                 </span>
               )}
             </div>
-            <p className="text-xs text-(--text-secondary) mt-0.5">{currentUser?.email || "—"}</p>
-            <p className="text-[11px] text-(--text-secondary) mt-1.5 flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-(--accent)" />
-              <span className="font-semibold text-(--text-primary)">{userTypeInfo.label}</span>
-              <span className="text-(--text-muted)">—</span>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>{currentUser?.email || "—"}</p>
+            <p className="text-[11px] mt-1.5 flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
+              <Shield className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{userTypeInfo.label}</span>
+              <span style={{ color: "var(--text-muted)" }}>—</span>
               <span>{userTypeInfo.description}</span>
             </p>
           </div>
@@ -112,19 +115,25 @@ export default function CompanyDashboardTab({
       </Card>
 
       {/* Role & Permissions Card */}
-      <Card className="p-6 border-(--border) bg-(--surface)">
-        <h3 className="text-sm font-semibold text-(--text-primary) mb-4 flex items-center gap-2 border-b border-(--border) pb-3">
-          <Shield className="w-4 h-4 text-(--accent)" />
+      <Card className="p-6" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+        <h3
+          className="text-sm font-semibold mb-4 flex items-center gap-2 border-b pb-3"
+          style={{ color: "var(--text-primary)", borderColor: "var(--border)" }}
+        >
+          <Shield className="w-4 h-4" style={{ color: "var(--accent)" }} />
           Your Access Scope
         </h3>
 
         {hasAllAccess ? (
-          <div className="flex items-center gap-3 bg-(--accent)/5 border border-(--accent)/10 rounded-[var(--radius-sm)] px-4 py-3">
-            <CheckCircle className="w-5 h-5 text-(--accent) shrink-0" />
+          <div
+            className="flex items-center gap-3 rounded-[var(--radius-sm)] px-4 py-3 border"
+            style={{ backgroundColor: "var(--accent-muted)", borderColor: "rgba(194,67,50,0.15)" }}
+          >
+            <CheckCircle className="w-5 h-5 shrink-0" style={{ color: "var(--accent)" }} />
             <div>
-              <span className="text-sm font-semibold text-(--text-primary)">Full Administrative Access</span>
-              <p className="text-[11px] text-(--text-secondary) mt-0.5">
-                As a <strong className="text-(--accent)">{userTypeInfo.label}</strong>, you bypass all RBAC permission checks.
+              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Full Administrative Access</span>
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                As a <strong style={{ color: "var(--accent)" }}>{userTypeInfo.label}</strong>, you bypass all RBAC permission checks.
                 You have unrestricted access to all modules, resources, and actions within your scope.
               </p>
             </div>
@@ -133,26 +142,35 @@ export default function CompanyDashboardTab({
           <div className="flex flex-col gap-3">
             {/* RBAC Role Assignment */}
             {currentUserRecord?.role_name ? (
-              <div className="flex items-center gap-3 bg-(--info-muted) border border-(--info) rounded-[var(--radius-sm)] px-4 py-3">
-                <ShieldAlert className="w-5 h-5 text-(--info) shrink-0" />
+              <div
+                className="flex items-center gap-3 rounded-[var(--radius-sm)] px-4 py-3 border"
+                style={{ backgroundColor: "var(--color-blue-soft)", borderColor: "var(--info)" }}
+              >
+                <ShieldAlert className="w-5 h-5 shrink-0" style={{ color: "var(--info)" }} />
                 <div>
-                  <span className="text-sm font-semibold text-(--text-primary)">
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                     Assigned Role: {currentUserRecord.role_name}
                   </span>
-                  <span className="ml-2 bg-(--surface-raised) border border-(--border) text-(--text-secondary) text-[10px] font-semibold px-2 py-0.5 rounded font-mono">
+                  <span
+                    className="ml-2 border text-[10px] font-semibold px-2 py-0.5 rounded font-mono"
+                    style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  >
                     {currentUserRecord.role_code}
                   </span>
-                  <p className="text-[11px] text-(--text-secondary) mt-0.5">
-                    Your permissions are governed by this role's policy matrix.
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                    Your permissions are governed by this role&apos;s policy matrix.
                   </p>
                 </div>
               </div>
             ) : !isAdmin ? (
-              <div className="flex items-center gap-3 bg-(--warning-muted) border border-(--warning) rounded-[var(--radius-sm)] px-4 py-3">
-                <XCircle className="w-5 h-5 text-(--warning) shrink-0" />
+              <div
+                className="flex items-center gap-3 rounded-[var(--radius-sm)] px-4 py-3 border"
+                style={{ backgroundColor: "var(--warning-muted)", borderColor: "var(--warning)" }}
+              >
+                <XCircle className="w-5 h-5 shrink-0" style={{ color: "var(--warning)" }} />
                 <div>
-                  <span className="text-sm font-semibold text-(--text-primary)">No Role Assigned</span>
-                  <p className="text-[11px] text-(--text-secondary) mt-0.5">
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>No Role Assigned</span>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
                     Your account has no RBAC role. Contact your administrator to get access permissions.
                   </p>
                 </div>
@@ -162,18 +180,26 @@ export default function CompanyDashboardTab({
             {/* Granular Permissions Summary */}
             {userPermissions.length > 0 && !hasAllAccess && (
               <div className="mt-2">
-                <p className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider mb-2">Granular Permissions</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-secondary)" }}>
+                  Granular Permissions
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {userPermissions.slice(0, 8).map((p: any, i: number) => (
-                    <span key={i} className="bg-(--surface-raised) border border-(--border) rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-(--text-secondary)">
+                    <span
+                      key={i}
+                      className="border rounded-lg px-2.5 py-1.5 text-[10px] font-mono"
+                      style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                    >
                       {p.moduleCode}.{p.resource}
-                      <span className="text-(--text-muted) ml-1">
+                      <span className="ml-1" style={{ color: "var(--text-muted)" }}>
                         ({Object.entries(ACTION_LABELS).filter(([key]) => p[key]).map(([, label]) => label).join(", ") || "none"})
                       </span>
                     </span>
                   ))}
                   {userPermissions.length > 8 && (
-                    <span className="text-[10px] text-(--text-muted) self-center">+{userPermissions.length - 8} more</span>
+                    <span className="text-[10px] self-center" style={{ color: "var(--text-muted)" }}>
+                      +{userPermissions.length - 8} more
+                    </span>
                   )}
                 </div>
               </div>
@@ -182,12 +208,18 @@ export default function CompanyDashboardTab({
             {/* RBAC-specific: show available roles in the company */}
             {isAdmin && roles.length > 0 && (
               <div className="mt-2">
-                <p className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider mb-2">Available RBAC Roles in Company</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-secondary)" }}>
+                  Available RBAC Roles in Company
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {roles.map((r: any) => (
-                    <span key={r.role_id} className="bg-(--surface-raised) border border-(--border) rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-(--text-secondary)">
+                    <span
+                      key={r.role_id}
+                      className="border rounded-lg px-2.5 py-1.5 text-[10px] font-mono"
+                      style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                    >
                       {r.role_name}
-                      <span className="text-(--text-muted) ml-1">({r.role_code})</span>
+                      <span className="ml-1" style={{ color: "var(--text-muted)" }}>({r.role_code})</span>
                     </span>
                   ))}
                 </div>
@@ -198,32 +230,44 @@ export default function CompanyDashboardTab({
       </Card>
 
       {/* Company Info Card */}
-      <Card className="flex flex-col justify-between p-6 border-(--border) bg-(--surface) hover:border-(--accent)/30 transition-all duration-300 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-(--accent)/[0.03] rounded-bl-full pointer-events-none group-hover:bg-(--accent)/[0.06] transition-all" />
+      <Card
+        className="flex flex-col justify-between p-6 transition-all duration-300 relative overflow-hidden group"
+        style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+      >
+        <div
+          className="absolute top-0 right-0 w-32 h-32 rounded-bl-full pointer-events-none transition-all"
+          style={{ backgroundColor: "rgba(194,67,50,0.03)" }}
+        />
         <div>
           <div className="flex justify-between items-start">
-            <span className="text-(--text-secondary) text-[10px] font-semibold uppercase tracking-widest">Active Company</span>
-            <div className="p-2 rounded-[var(--radius-sm)] bg-(--accent)/10 border border-(--accent)/20 text-(--accent)">
+            <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-secondary)" }}>Active Company</span>
+            <div
+              className="p-2 rounded-[var(--radius-sm)] border"
+              style={{ backgroundColor: "var(--accent-muted)", borderColor: "rgba(194,67,50,0.2)", color: "var(--accent)" }}
+            >
               <Building2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-semibold text-(--text-primary) mt-4 tracking-tight">
+          <div className="text-xl font-semibold mt-4 tracking-tight" style={{ color: "var(--text-primary)" }}>
             {activeCompany?.company_name || "Unassigned"}
           </div>
-          <div className="text-[10px] text-(--text-muted) font-mono mt-1">
+          <div className="text-[10px] font-mono mt-1" style={{ color: "var(--text-muted)" }}>
             ID: {activeCompany?.company_id?.substring(0, 8)}...
           </div>
         </div>
-        <div className="text-[11px] text-(--success) font-semibold flex items-center gap-1.5 mt-6 bg-(--success-muted) border border-(--success) py-1 px-2.5 rounded-lg w-fit">
-          <span className="w-1.5 h-1.5 rounded-full bg-(--success) inline-block animate-pulse" />
+        <div
+          className="text-[11px] font-semibold flex items-center gap-1.5 mt-6 py-1 px-2.5 rounded-lg w-fit border"
+          style={{ color: "var(--success)", backgroundColor: "var(--success-muted)", borderColor: "var(--success)" }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full inline-block animate-pulse" style={{ backgroundColor: "var(--success)" }} />
           Onboarding: Complete
         </div>
       </Card>
 
       {/* Quick Actions */}
       <div>
-        <h3 className="text-sm font-semibold text-(--text-primary) mb-4 flex items-center gap-2">
-          <ArrowRight className="w-4 h-4 text-(--accent)" />
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+          <ArrowRight className="w-4 h-4" style={{ color: "var(--accent)" }} />
           Quick Actions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -233,14 +277,20 @@ export default function CompanyDashboardTab({
               <button
                 key={action.tab}
                 onClick={() => onNavigateTab(action.tab)}
-                className="p-5 rounded-[var(--radius-md)] bg-(--surface) border border-(--border) hover:border-(--accent)/30 transition-all duration-200 text-left group cursor-pointer hover:scale-[1.02]"
+                className="p-5 rounded-[var(--radius-md)] border transition-all duration-200 text-left group cursor-pointer hover:scale-[1.02]"
+                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(194,67,50,0.3)")}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
               >
-                <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-(--accent)/10 border border-(--accent)/20 flex items-center justify-center text-(--accent) mb-3">
+                <div
+                  className="w-10 h-10 rounded-[var(--radius-sm)] border flex items-center justify-center mb-3"
+                  style={{ backgroundColor: "var(--accent-muted)", borderColor: "rgba(194,67,50,0.2)", color: "var(--accent)" }}
+                >
                   <Icon className="w-5 h-5" />
                 </div>
-                <h4 className="font-semibold text-(--text-primary) text-sm group-hover:text-(--accent) transition-colors">{action.label}</h4>
-                <p className="text-[11px] text-(--text-secondary) mt-1">{action.description}</p>
-                <div className="flex items-center gap-1 mt-3 text-[10px] font-semibold text-(--accent) opacity-0 group-hover:opacity-100 transition-opacity">
+                <h4 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>{action.label}</h4>
+                <p className="text-[11px] mt-1" style={{ color: "var(--text-secondary)" }}>{action.description}</p>
+                <div className="flex items-center gap-1 mt-3 text-[10px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "var(--accent)" }}>
                   Navigate <ArrowRight className="w-3 h-3" />
                 </div>
               </button>

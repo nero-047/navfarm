@@ -521,7 +521,21 @@ export class BatchService {
         [bioState] = await this.db.select().from(schema.batchBioAssetState).where(eq(schema.batchBioAssetState.state_id, stateId)).limit(1);
       }
     }
-    const bioAssetSubjectItemId = batch.input_lines[0]?.item_id;
+
+    let bioAssetSubjectItemId = dto.item_id || batch.input_lines?.[0]?.item_id;
+    if (!bioAssetSubjectItemId && isBioAsset) {
+      const [fallbackItem] = await this.db
+        .select({ item_id: schema.itemMaster.item_id })
+        .from(schema.itemMaster)
+        .where(
+          and(
+            eq(schema.itemMaster.tenant_id, tenantId),
+            eq(schema.itemMaster.is_active, true),
+          )
+        )
+        .limit(1);
+      bioAssetSubjectItemId = fallbackItem?.item_id;
+    }
 
     const transactionId = randomUUID();
     let ledgerId: string | null = null;
@@ -701,25 +715,27 @@ export class BatchService {
             updated_at: toMysqlTimestamp(),
           })
           .where(eq(schema.batchBioAssetState.batch_id, id));
-        await this.db.insert(schema.bioAssetLedger).values({
-          entry_id: randomUUID(),
-          tenant_id: tenantId,
-          company_id: batch.company_id,
-          bio_asset_item_id: bioAssetSubjectItemId,
-          entry_type: 'MORTALITY',
-          document_no: batch.batch_no,
-          batch_id: id,
-          batch_no: batch.batch_no,
-          posting_date: dto.transaction_date,
-          stage: bioState!.stage,
-          quantity: (-dto.quantity).toString(),
-          cost_amount: (-nbvShare).toString(),
-          cost_amount_each_unit: perUnitNca.toString(),
-          costing_method: bioState!.stage === 'MATURE' ? 'AMORTIZED_COST' : 'COST_ACCUMULATION',
-          nob_id: batch.nob_id,
-          lob_id: batch.lob_id,
-          created_by: userPayload?.userId || null,
-        });
+        if (bioAssetSubjectItemId) {
+          await this.db.insert(schema.bioAssetLedger).values({
+            entry_id: randomUUID(),
+            tenant_id: tenantId,
+            company_id: batch.company_id,
+            bio_asset_item_id: bioAssetSubjectItemId,
+            entry_type: 'MORTALITY',
+            document_no: batch.batch_no,
+            batch_id: id,
+            batch_no: batch.batch_no,
+            posting_date: dto.transaction_date,
+            stage: bioState!.stage,
+            quantity: (-dto.quantity).toString(),
+            cost_amount: (-nbvShare).toString(),
+            cost_amount_each_unit: perUnitNca.toString(),
+            costing_method: bioState!.stage === 'MATURE' ? 'AMORTIZED_COST' : 'COST_ACCUMULATION',
+            nob_id: batch.nob_id,
+            lob_id: batch.lob_id,
+            created_by: userPayload?.userId || null,
+          });
+        }
       } else {
         const unitCost = await this.computeRunningUnitCost(batch);
         rate = unitCost;
@@ -768,24 +784,26 @@ export class BatchService {
           .update(schema.batchBioAssetState)
           .set({ nca_book_value: (Number(bioState!.nca_book_value) + capitalized).toString(), updated_at: toMysqlTimestamp() })
           .where(eq(schema.batchBioAssetState.batch_id, id));
-        await this.db.insert(schema.bioAssetLedger).values({
-          entry_id: randomUUID(),
-          tenant_id: tenantId,
-          company_id: batch.company_id,
-          bio_asset_item_id: bioAssetSubjectItemId,
-          entry_type: 'OVERHEAD_COST',
-          document_no: batch.batch_no,
-          batch_id: id,
-          batch_no: batch.batch_no,
-          posting_date: dto.transaction_date,
-          stage: 'PREMATURE',
-          quantity: dto.quantity.toString(),
-          cost_amount: capitalized.toString(),
-          costing_method: 'COST_ACCUMULATION',
-          nob_id: batch.nob_id,
-          lob_id: batch.lob_id,
-          created_by: userPayload?.userId || null,
-        });
+        if (bioAssetSubjectItemId) {
+          await this.db.insert(schema.bioAssetLedger).values({
+            entry_id: randomUUID(),
+            tenant_id: tenantId,
+            company_id: batch.company_id,
+            bio_asset_item_id: bioAssetSubjectItemId,
+            entry_type: 'OVERHEAD_COST',
+            document_no: batch.batch_no,
+            batch_id: id,
+            batch_no: batch.batch_no,
+            posting_date: dto.transaction_date,
+            stage: 'PREMATURE',
+            quantity: dto.quantity.toString(),
+            cost_amount: capitalized.toString(),
+            costing_method: 'COST_ACCUMULATION',
+            nob_id: batch.nob_id,
+            lob_id: batch.lob_id,
+            created_by: userPayload?.userId || null,
+          });
+        }
       }
     }
     // OBSERVATION: no cost impact, no GL — just a text record (amount stays 0).
@@ -1021,6 +1039,14 @@ export class BatchService {
       const it = itemRows.find((x) => x.item_id === itemId);
       return it ? `${it.item_code} — ${it.item_name}` : null;
     };
+    const itemType = (itemId: string | null) => {
+      if (!itemId) return null;
+      return itemRows.find((x) => x.item_id === itemId)?.item_type ?? null;
+    };
+    const itemCode = (itemId: string | null) => {
+      if (!itemId) return null;
+      return itemRows.find((x) => x.item_id === itemId)?.item_code ?? null;
+    };
 
     const lines = activeLines.map(({ spl, parameter }) => {
       const alreadyEntered = sameDayTx
@@ -1029,6 +1055,8 @@ export class BatchService {
           && (parameter.resource_id ? t.resource_id === parameter.resource_id : true))
         .reduce((sum, t) => sum + Number(t.quantity || 0), 0);
 
+      const stdRate = spl.std_rate ?? parameter.default_qty_per_unit ?? null;
+
       return {
         spl_id: spl.spl_id,
         parameter_id: parameter.parameter_id,
@@ -1036,12 +1064,15 @@ export class BatchService {
         parameter_name: parameter.parameter_name,
         item_id: parameter.item_id,
         item_label: itemLabel(parameter.item_id),
+        item_type: itemType(parameter.item_id),
+        item_code: itemCode(parameter.item_id),
         resource_id: parameter.resource_id,
         uom: spl.uom_override || parameter.default_uom || null,
         occurrence: spl.occurrence,
         period_label: spl.period_label,
         expected_qty: this.computeExpectedQty(spl, parameter, openingQty),
         already_entered_qty: alreadyEntered,
+        std_rate: stdRate ? Number(stdRate) : null,
       };
     });
 

@@ -121,7 +121,37 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       params.set("limit", "200");
       const res = await api.get(`${config.apiBase}?${params.toString()}`);
       const list = unwrap<Row[]>(res);
-      setRows(Array.isArray(list) ? list : []);
+      let finalRows = Array.isArray(list) ? list : [];
+
+      // If in Operational Scope, enforce LOB domain isolation
+      const activeScope = typeof window !== "undefined" ? localStorage.getItem("active_workspace_scope") : "COMPANY";
+      const activeLob = typeof window !== "undefined" ? (localStorage.getItem("active_lob") || "PIGGERY") : "PIGGERY";
+
+      if (activeScope === "OPERATIONAL") {
+        if (activeLob === "PIGGERY") {
+          finalRows = finalRows.filter((r) => {
+            const text = `${r.item_name || ""} ${r.item_code || ""} ${r.breed_name || ""} ${r.breed_code || ""} ${r.shed_name || ""} ${r.shed_code || ""} ${r.formula_name || ""} ${r.disease_name || ""} ${r.parameter_name || ""} ${r.qc_parameter_name || ""}`.toLowerCase();
+            const nonPiggery = [
+              "broiler", "layer", "poultry", "chick", "pullet", "egg", "bird", "duck", "plt-", "plt_",
+              "dairy", "cow", "bovine", "milk", "calf", "heifer", "silage", "tmr", "dry-", "dry_",
+              "fish", "shrimp", "prawn", "fingerling", "paddy", "wheat", "cotton", "crop", "bee", "honey"
+            ];
+            return !nonPiggery.some((kw) => text.includes(kw));
+          });
+        } else if (activeLob === "DAIRY") {
+          finalRows = finalRows.filter((r) => {
+            const text = `${r.item_name || ""} ${r.item_code || ""} ${r.breed_name || ""} ${r.breed_code || ""} ${r.shed_name || ""} ${r.shed_code || ""} ${r.formula_name || ""} ${r.disease_name || ""} ${r.parameter_name || ""} ${r.qc_parameter_name || ""}`.toLowerCase();
+            const nonDairy = [
+              "sow", "pig", "boar", "gilt", "piglet", "swine",
+              "broiler", "layer", "poultry", "chick", "pullet", "egg", "bird", "duck", "plt-", "plt_",
+              "fish", "shrimp", "prawn", "paddy", "wheat", "cotton", "crop", "bee", "honey"
+            ];
+            return !nonDairy.some((kw) => text.includes(kw));
+          });
+        }
+      }
+
+      setRows(finalRows);
     } catch (err: any) {
       setError(err?.message || t("mdFailedToLoad"));
     } finally {
@@ -292,7 +322,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             type="checkbox"
             checked={!!value}
             onChange={(e) => setField(f.key, e.target.checked)}
-            className="h-4 w-4 rounded accent-(--accent)"
+            className="h-4 w-4 rounded accent-[var(--accent)]"
           />
           {tLabel(f.label)}
         </label>
@@ -424,7 +454,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
-              <tr className="border-b border-(--row-border)">
+              <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
                 {columns.map((c) => (
                   <TableHead key={c.key} className="whitespace-nowrap">{tLabel(c.label)}</TableHead>
                 ))}
@@ -467,10 +497,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button onClick={() => openEdit(row)} title={t("edit")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                          <button onClick={() => openEdit(row)} title={t("edit")} className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button onClick={() => setConfirmDelete(row)} title={t("deactivate")} className="rounded-lg p-1.5 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}>
+                          <button onClick={() => setConfirmDelete(row)} title={t("deactivate")} className="rounded-lg p-1.5 transition hover:bg-[var(--danger-muted)]" style={{ color: "var(--danger)" }}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -522,7 +552,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             {visibleFields.map((f) => (
               <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>
-                  {tLabel(f.label)}{f.required && <span className="text-(--danger)"> *</span>}
+                  {tLabel(f.label)}{f.required && <span style={{ color: "var(--danger)" }}> *</span>}
                 </label>
                 {renderField(f)}
                 {f.helpText && <p className="text-[11px]" style={S.muted}>{f.helpText}</p>}

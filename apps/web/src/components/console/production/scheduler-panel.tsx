@@ -53,15 +53,14 @@ export default function SchedulerPanel() {
   const [parameters, setParameters] = useState<Row[]>([]);
   const [items, setItems] = useState<Row[]>([]);
 
+  const [nobId, setNobId] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingLocked, setEditingLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
-  const [nobId, setNobId] = useState("");
   const [header, setHeader] = useState<Row>(emptyHeader());
   const [lines, setLines] = useState<Row[]>([emptyLine()]);
-
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingLocked, setEditingLocked] = useState(false);
   const isLocked = !!editingId && editingLocked;
 
   const companyId = getActiveCompanyId();
@@ -75,9 +74,11 @@ export default function SchedulerPanel() {
       if (search) params.set("search", search);
       params.set("limit", "200");
       const res = await api.get(`/scheduler?${params.toString()}`);
-      setRows(unwrap<Row[]>(res) || []);
+      const data = unwrap<Row[]>(res);
+      setRows(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err?.message || "Failed to load schedulers.");
+      setError(err?.message || "Failed to load schedulers from database.");
+      setRows([]);
     } finally {
       setLoading(false);
     }
@@ -277,7 +278,7 @@ export default function SchedulerPanel() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
-              <tr className="border-b border-(--row-border)">
+              <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
                 <TableHead className="whitespace-nowrap">Code</TableHead>
                 <TableHead className="whitespace-nowrap">Name</TableHead>
                 <TableHead className="whitespace-nowrap">Duration</TableHead>
@@ -342,12 +343,10 @@ export default function SchedulerPanel() {
         title={isLocked ? `View Scheduler ${header.scheduler_code}` : editingId ? `Edit Scheduler ${header.scheduler_code}` : "New Scheduler"}
         maxWidth="xl"
         footer={
-          isLocked ? (
-            <button onClick={() => setModalOpen(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Close</button>
-          ) : (
+          isLocked ? undefined : (
             <>
-              <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-              <Button onClick={handleSave} disabled={saving} >
+              <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
+              <Button size="sm" onClick={handleSave} disabled={saving} className="nf-btn-primary">
                 {saving ? "Saving…" : "Save"}
               </Button>
             </>

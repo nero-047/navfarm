@@ -691,7 +691,6 @@ export default function AnimalPanel() {
                   </Button>
                 )}
               </div>
-              <Button variant="ghost" onClick={() => setViewing(null)}>Close</Button>
             </div>
           }
         >

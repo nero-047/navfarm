@@ -1123,46 +1123,59 @@ button:not(:disabled), select { cursor: pointer; }
   outline-offset: 2px;
 }
 
-input, select, textarea {
+input:not([type='checkbox']):not([type='radio']):not([type='submit']):not([type='button']),
+select,
+textarea {
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
-/* apple.design.md §19. Uses outline rather than box-shadow: Tailwind owns the
-   box-shadow custom-property chain on any element carrying a shadow utility,
-   so a shadow-based ring here is silently discarded and the field ends up with
-   no visible focus state at all. Outline is not composited that way. */
+input:not([type='checkbox']):not([type='radio']):not([type='submit']):not([type='button'])::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+/* Focus styles: soft focus ring, never browser default black ring */
 input:not(.nf-embedded-input):focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
+  outline: none;
   border-color: var(--input-border-focus) !important;
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .nf-embedded-input:focus-visible { outline: none; box-shadow: none; }
 
-/* The two control sizes the application actually uses: a standard form field
-   and a compact filter/toolbar control. These existed as six slightly
-   different `inputCls` constants copied between panels, which is how their
-   radius and focus treatment drifted apart. Defined once here so a native
-   control matches the Input/Select primitives without re-declaring them. */
+/* Control size classes matching Apple design spec */
 .nf-input {
   width: 100%;
-  border-width: 1px;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--input-text);
   border-radius: var(--radius-sm);
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
-  transition: border-color 160ms ease;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .nf-input-sm {
-  border-width: 1px;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--input-text);
   border-radius: var(--radius-sm);
   padding: 0.375rem 0.5rem;
   font-size: 0.75rem;
-  transition: border-color 160ms ease;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .nf-input:focus-visible,
-.nf-input-sm:focus-visible { border-color: var(--input-border-focus); }
+.nf-input-sm:focus-visible {
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
 
 /* Wrapper-free select styling. The <Select> primitive positions its chevron in
    a relative wrapper, which is right for standalone form fields but adds a box
