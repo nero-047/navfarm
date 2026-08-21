@@ -814,6 +814,8 @@ export class BatchService {
         item_id: dto.item_id || null,
         resource_id: dto.resource_id || null,
         quantity: dto.quantity,
+        spl_id: dto.spl_id || null,
+        parameter_id: dto.parameter_id || null,
       });
     }
 
@@ -831,12 +833,18 @@ export class BatchService {
   }
 
   /**
-   * Additive KPI-monitoring layer (Phase 6) — no-ops entirely if the batch
-   * has no scheduler attached. Finds the scheduler_parameter_line covering
-   * today's day-of-batch for a parameter matching this transaction, compares
-   * actual vs. expected, and writes a notification_alert_log row on breach.
-   * Does not touch cost/GL — purely observational.
+   * Timezone-safe date diffing (in UTC calendar days) — returns 1 for start_date itself.
    */
+  private getDayOfBatch(startDateStr: string | Date, targetDateStr: string | Date): number {
+    const s = typeof startDateStr === 'string' ? startDateStr.slice(0, 10) : startDateStr.toISOString().slice(0, 10);
+    const t = typeof targetDateStr === 'string' ? targetDateStr.slice(0, 10) : targetDateStr.toISOString().slice(0, 10);
+    const [sy, sm, sd] = s.split('-').map(Number);
+    const [ty, tm, td] = t.split('-').map(Number);
+    const startMs = Date.UTC(sy, sm - 1, sd);
+    const targetMs = Date.UTC(ty, tm - 1, td);
+    return Math.round((targetMs - startMs) / 86400000) + 1;
+  }
+
   /**
    * Day-range + stage filter shared by evaluateKpi() and getDataEntry() —
    * all scheduler_parameter_line rows (joined to their Parameter) that are
@@ -874,13 +882,26 @@ export class BatchService {
     parameter: typeof schema.parameterMaster.$inferSelect,
     openingQty: number
   ): number {
-    return spl.expected_qty_override
-      ? Number(spl.expected_qty_override)
-      : parameter.qty_method === 'PER_UNIT' && parameter.default_qty_per_unit
-      ? Number(parameter.default_qty_per_unit) * openingQty
-      : parameter.qty_method === 'PER_BATCH' && parameter.default_qty_per_batch
-      ? Number(parameter.default_qty_per_batch)
-      : openingQty; // MANUAL_AT_ENTRY fallback — e.g. mortality as a % of headcount
+    if (spl.expected_qty_override) {
+      return Number(spl.expected_qty_override);
+    }
+    if (parameter.qty_method === 'PER_UNIT' && parameter.default_qty_per_unit) {
+      return Number(parameter.default_qty_per_unit) * openingQty;
+    }
+    if (parameter.qty_method === 'PER_BATCH' && parameter.default_qty_per_batch) {
+      return Number(parameter.default_qty_per_batch);
+    }
+    if (spl.kpi_target_value) {
+      return Number(spl.kpi_target_value);
+    }
+    if (spl.kpi_mode === 'VALUE' && (spl.kpi_min_value !== null || spl.kpi_max_value !== null)) {
+      const min = spl.kpi_min_value !== null ? Number(spl.kpi_min_value) : null;
+      const max = spl.kpi_max_value !== null ? Number(spl.kpi_max_value) : null;
+      if (min !== null && max !== null) return (min + max) / 2;
+      if (min !== null) return min;
+      if (max !== null) return max;
+    }
+    return openingQty; // MANUAL_AT_ENTRY fallback — e.g. mortality as a % of headcount
   }
 
   /**
@@ -911,22 +932,49 @@ export class BatchService {
       item_id: string | null;
       resource_id: string | null;
       quantity: number;
+      spl_id?: string | null;
+      parameter_id?: string | null;
     }
   ) {
     if (!batch.scheduler_id) return;
 
-    const startDate = new Date(batch.start_date);
-    const txDate = new Date(transaction.transaction_date);
-    const dayOfBatch = Math.floor((txDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const dayOfBatch = this.getDayOfBatch(batch.start_date, transaction.transaction_date);
     if (dayOfBatch < 1) return;
 
     const activeLines = await this.loadActiveScheduleLines(batch, dayOfBatch);
-    const match = activeLines.find(({ parameter }) => {
-      if (parameter.parameter_type !== transaction.transaction_type) return false;
-      if (parameter.item_id && parameter.item_id !== transaction.item_id) return false;
-      if (parameter.resource_id && parameter.resource_id !== transaction.resource_id) return false;
-      return true;
-    });
+    if (!activeLines.length) return;
+
+    let match: (typeof activeLines)[0] | undefined;
+
+    // 1. Direct match by spl_id
+    if (transaction.spl_id) {
+      match = activeLines.find((l) => l.spl.spl_id === transaction.spl_id);
+    }
+    // 2. Direct match by parameter_id
+    if (!match && transaction.parameter_id) {
+      match = activeLines.find((l) => l.spl.parameter_id === transaction.parameter_id);
+    }
+    // 3. Match by parameter type and matching item/resource
+    if (!match) {
+      match = activeLines.find(({ parameter }) => {
+        if (parameter.parameter_type !== transaction.transaction_type) return false;
+        if (transaction.item_id && parameter.item_id === transaction.item_id) return true;
+        if (transaction.resource_id && parameter.resource_id === transaction.resource_id) return true;
+        return false;
+      });
+    }
+    // 4. Match by parameter type with no item/resource restriction
+    if (!match) {
+      match = activeLines.find(({ parameter }) => {
+        if (parameter.parameter_type !== transaction.transaction_type) return false;
+        if (!parameter.item_id && !parameter.resource_id && !transaction.item_id && !transaction.resource_id) return true;
+        return false;
+      });
+    }
+    // 5. Fallback match by parameter type
+    if (!match) {
+      match = activeLines.find(({ parameter }) => parameter.parameter_type === transaction.transaction_type);
+    }
 
     if (!match || !match.spl.kpi_enabled || !match.spl.kpi_mode) return;
     const { spl, parameter } = match;
@@ -934,7 +982,21 @@ export class BatchService {
     const openingQty = Number(batch.opening_quantity);
     const expectedQty = this.computeExpectedQty(spl, parameter, openingQty);
 
-    const actual = transaction.quantity;
+    // Compute cumulative same-day quantity for this parameter/item on this date
+    const sameDayTx = await this.db
+      .select()
+      .from(schema.batchTransaction)
+      .where(and(
+        eq(schema.batchTransaction.batch_id, batch.batch_id),
+        eq(schema.batchTransaction.transaction_date, transaction.transaction_date)
+      ));
+    const sameDaySum = sameDayTx
+      .filter((t) => t.transaction_type === parameter.parameter_type
+        && (parameter.item_id ? t.item_id === parameter.item_id : true)
+        && (parameter.resource_id ? t.resource_id === parameter.resource_id : true))
+      .reduce((sum, t) => sum + Number(t.quantity || 0), 0);
+
+    const actual = sameDaySum > 0 ? sameDaySum : transaction.quantity;
     let breached = false;
     let breachDirection: 'below' | 'above' | null = null;
     let deviationPct: number | null = null;
@@ -946,7 +1008,7 @@ export class BatchService {
       const maxQty = spl.kpi_max_pct ? expectedQty * (Number(spl.kpi_max_pct) / 100) : Infinity;
       breached = actual < minQty || actual > maxQty;
       breachDirection = actual < minQty ? 'below' : actual > maxQty ? 'above' : null;
-      deviationPct = (actual / expectedQty - 1) * 100;
+      deviationPct = ((actual - expectedQty) / expectedQty) * 100;
       if (breached && spl.critical_threshold_pct && Math.abs(deviationPct) > Number(spl.critical_threshold_pct)) {
         severity = 'CRITICAL';
       }
@@ -955,6 +1017,14 @@ export class BatchService {
       const maxVal = spl.kpi_max_value !== null ? Number(spl.kpi_max_value) : Infinity;
       breached = actual < minVal || actual > maxVal;
       breachDirection = actual < minVal ? 'below' : actual > maxVal ? 'above' : null;
+      if (expectedQty > 0) {
+        deviationPct = ((actual - expectedQty) / expectedQty) * 100;
+        if (breached && spl.critical_threshold_pct && Math.abs(deviationPct) > Number(spl.critical_threshold_pct)) {
+          severity = 'CRITICAL';
+        }
+      } else if (breached && (actual < minVal * 0.8 || actual > maxVal * 1.2)) {
+        severity = 'CRITICAL';
+      }
     }
 
     if (!breached) return;
@@ -962,8 +1032,37 @@ export class BatchService {
     const deviationAmount = actual - expectedQty;
     const title = `${parameter.parameter_name} ${breachDirection === 'below' ? 'Below' : 'Above'} KPI — Batch ${batch.batch_no}${spl.period_label ? `, ${spl.period_label}` : ''}`;
     const message = spl.kpi_mode === 'PCT'
-      ? `${parameter.parameter_name}: actual ${actual}, expected ${expectedQty.toFixed(4)} (${deviationPct!.toFixed(2)}% deviation). Batch ${batch.batch_no}, Day ${dayOfBatch}.`
+      ? `${parameter.parameter_name}: actual ${actual}, expected ${expectedQty.toFixed(4)} (${deviationPct !== null ? deviationPct.toFixed(2) : '0'}% deviation). Batch ${batch.batch_no}, Day ${dayOfBatch}.`
       : `${parameter.parameter_name}: actual ${actual} outside range [${spl.kpi_min_value ?? '-∞'}, ${spl.kpi_max_value ?? '∞'}]. Batch ${batch.batch_no}, Day ${dayOfBatch}.`;
+
+    // Check if an unread alert already exists for this exact batch and spl
+    const [existingAlert] = await this.db
+      .select()
+      .from(schema.notificationAlertLog)
+      .where(and(
+        eq(schema.notificationAlertLog.batch_id, batch.batch_id),
+        eq(schema.notificationAlertLog.spl_id, spl.spl_id),
+        eq(schema.notificationAlertLog.is_read, false)
+      ))
+      .limit(1);
+
+    if (existingAlert) {
+      await this.db
+        .update(schema.notificationAlertLog)
+        .set({
+          transaction_id: transaction.transaction_id,
+          severity,
+          title,
+          message,
+          actual_value: actual.toString(),
+          expected_value: expectedQty.toString(),
+          deviation_amount: deviationAmount.toString(),
+          deviation_pct: deviationPct !== null ? deviationPct.toFixed(2) : null,
+          created_at: toMysqlTimestamp() as any,
+        })
+        .where(eq(schema.notificationAlertLog.alert_id, existingAlert.alert_id));
+      return;
+    }
 
     await this.db.insert(schema.notificationAlertLog).values({
       alert_id: randomUUID(),
@@ -982,7 +1081,7 @@ export class BatchService {
       expected_value: expectedQty.toString(),
       actual_value: actual.toString(),
       deviation_amount: deviationAmount.toString(),
-      deviation_pct: deviationPct !== null ? deviationPct.toString() : null,
+      deviation_pct: deviationPct !== null ? deviationPct.toFixed(2) : null,
       kpi_min: spl.kpi_mode === 'PCT' ? spl.kpi_min_pct : spl.kpi_min_value,
       kpi_max: spl.kpi_mode === 'PCT' ? spl.kpi_max_pct : spl.kpi_max_value,
     });
@@ -1000,9 +1099,7 @@ export class BatchService {
       throw new BadRequestException('This batch has no scheduler attached — record entries via the generic Transactions form instead.');
     }
 
-    const startDate = new Date(batch.start_date);
-    const date = new Date(dateStr);
-    const dayOfBatch = Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const dayOfBatch = this.getDayOfBatch(batch.start_date, dateStr);
 
     const activeLines = await this.loadActiveScheduleLines(batch, dayOfBatch);
     const openingQty = Number(batch.opening_quantity);

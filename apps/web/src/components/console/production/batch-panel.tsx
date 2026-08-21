@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Search, Loader2, Inbox, Eye, PlayCircle, CheckCircle2, ClipboardCheck, QrCode as QrCodeIcon, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, Inbox, Eye, PlayCircle, CheckCircle2, CheckCheck, ClipboardCheck, QrCode as QrCodeIcon, RefreshCw, AlertTriangle } from "lucide-react";
 import QRCode from "react-qr-code";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
@@ -79,7 +79,7 @@ export default function BatchPanel() {
   const [acting, setActing] = useState(false);
   const [txForm, setTxForm] = useState<Row>(emptyTxForm());
 
-  const [detailTab, setDetailTab] = useState<"overview" | "transactions" | "data-entry" | "curves">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "transactions" | "data-entry" | "curves" | "alerts">("overview");
   const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().slice(0, 10));
   const [dataEntryLoading, setDataEntryLoading] = useState(false);
   const [dataEntryError, setDataEntryError] = useState("");
@@ -353,6 +353,8 @@ export default function BatchPanel() {
         resource_id: line.resource_id || undefined,
         quantity: Number(rawValue),
         uom: line.uom || undefined,
+        spl_id: line.spl_id || undefined,
+        parameter_id: line.parameter_id || undefined,
       });
       await loadDataEntry();
       await refreshViewing();
@@ -899,7 +901,7 @@ export default function BatchPanel() {
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
         title="New Batch"
-        maxWidth="xl"
+        maxWidth="2xl"
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
@@ -926,7 +928,7 @@ export default function BatchPanel() {
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Line of Business <span className="text-(--danger)">*</span></label>
               <select value={header.lob_id} onChange={(e) => setHeader((h) => ({ ...h, lob_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!nobId}>
                 <option value="">{nobId ? "Select…" : "Select Nature of Business first…"}</option>
-                {lobs.map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
+                {lobs.filter((l) => !nobId || l.nob_id === nobId).map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -983,66 +985,75 @@ export default function BatchPanel() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Lines</p>
-            <button onClick={addInputLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
-            </button>
+          <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Input Items / Animals ({inputLines.length})</p>
+              <p className="text-[11px]" style={S.muted}>Opening stock and starting biological inventory assigned to this batch.</p>
+            </div>
+            <Button onClick={addInputLine} type="button" size="sm" variant="outline" className="text-xs">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Input Line
+            </Button>
           </div>
 
-          <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full border-collapse text-left text-xs">
-              <TableHeader>
-                <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Source Batch</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Est. Rate</TableHead>
-                  <TableHead className="h-auto px-3 py-2"></TableHead>
-                </tr>
-              </TableHeader>
-              <TableBody>
-                {inputLines.map((line, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="px-2 py-1.5">
-                      <select value={line.item_id} onChange={(e) => setInputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select Item ({items.length} options)…</option>
-                        {items.map((it, i) => (
-                          <option key={it.item_id} value={it.item_id}>
-                            {i + 1}. {it.item_code} — {it.item_name || it.item_code}
-                          </option>
-                        ))}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5">
-                      <select value={line.source_batch_id} onChange={(e) => setInputLineField(idx, "source_batch_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">None</option>
-                        {batches.filter((b) => b.status === "CLOSED").map((b) => <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>)}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.quantity} onChange={(e) => setInputLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-24">
-                      <select value={line.uom} onChange={(e) => setInputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
-                        {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.rate} onChange={(e) => setInputLineField(idx, "rate", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                    <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeInputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </table>
+          <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <TableHeader>
+                  <tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[220px]">Item</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[160px]">Source Batch (Transfer)</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-28 text-right">Quantity</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-28">UOM</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-32 text-right">Est. Unit Rate</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {inputLines.map((line, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.item_id} onChange={(e) => setInputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select Item ({items.length} options)…</option>
+                          {items.map((it, i) => (
+                            <option key={it.item_id} value={it.item_id}>
+                              {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                            </option>
+                          ))}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.source_batch_id} onChange={(e) => setInputLineField(idx, "source_batch_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">None</option>
+                          {batches.filter((b) => b.status === "CLOSED").map((b) => <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>)}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="0" value={line.quantity} onChange={(e) => setInputLineField(idx, "quantity", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.uom} onChange={(e) => setInputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select…</option>
+                          {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="0.00" value={line.rate} onChange={(e) => setInputLineField(idx, "rate", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5 text-center">
+                        <button onClick={() => removeInputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </table>
+            </div>
           </div>
           <p className="text-[11px]" style={S.muted}>Rate is an estimate only — actual cost is drawn from inventory via FIFO when the batch is activated.</p>
 
           {header.costing_method === "STANDARD" && (
             <>
-              <div className="pt-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Standard Cost Assumptions</p>
+              <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+                <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Standard Cost Assumptions</p>
                 <p className="mt-0.5 text-[11px]" style={S.muted}>Optional — set these to enable Price/Usage/Output/Overhead variance calculation when the batch closes.</p>
               </div>
 
@@ -1069,53 +1080,58 @@ export default function BatchPanel() {
               </div>
 
               <div className="flex items-center justify-between pt-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Consumption Standards</p>
-                <button onClick={addStdConsumptionLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-                  <Plus className="h-3 w-3" /> Add Line
-                </button>
+                <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Consumption Standards ({stdConsumptionLines.length})</p>
+                <Button onClick={addStdConsumptionLine} type="button" size="sm" variant="outline" className="text-xs">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Standard Line
+                </Button>
               </div>
 
-              <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                <table className="w-full border-collapse text-left text-xs">
-                  <TableHeader>
-                    <tr className="border-b border-(--row-border)">
-                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Std Qty/Unit/Day</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Std Rate</TableHead>
-                      <TableHead className="h-auto px-3 py-2"></TableHead>
-                    </tr>
-                  </TableHeader>
-                  <TableBody>
-                    {stdConsumptionLines.map((line, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="px-2 py-1.5">
-                          <select value={line.item_id} onChange={(e) => setStdConsumptionLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                            <option value="">Select Item ({items.length} options)…</option>
-                            {items.map((it, i) => (
-                              <option key={it.item_id} value={it.item_id}>
-                                {i + 1}. {it.item_code} — {it.item_name || it.item_code}
-                              </option>
-                            ))}
-                          </select>
-                        </TableCell>
-                        <TableCell className="px-2 py-1.5 w-32"><input type="number" value={line.std_qty_per_unit_per_day} onChange={(e) => setStdConsumptionLineField(idx, "std_qty_per_unit_per_day", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                        <TableCell className="px-2 py-1.5 w-28">
-                          <input
-                            type="number"
-                            value={line.std_rate}
-                            onChange={(e) => setStdConsumptionLineField(idx, "std_rate", e.target.value)}
-                            placeholder="Item default"
-                            className={inputCls}
-                            style={S.input}
-                          />
-                        </TableCell>
-                        <TableCell className="px-2 py-1.5">
-                          <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </table>
+              <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <TableHeader>
+                      <tr className="border-b border-(--row-border)">
+                        <TableHead className="h-auto px-3 py-2.5 min-w-[220px]">Item</TableHead>
+                        <TableHead className="h-auto px-3 py-2.5 w-36 text-right">Std Qty/Unit/Day</TableHead>
+                        <TableHead className="h-auto px-3 py-2.5 w-32 text-right">Std Rate</TableHead>
+                        <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
+                      </tr>
+                    </TableHeader>
+                    <TableBody>
+                      {stdConsumptionLines.map((line, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="px-2 py-1.5">
+                            <select value={line.item_id} onChange={(e) => setStdConsumptionLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                              <option value="">Select Item ({items.length} options)…</option>
+                              {items.map((it, i) => (
+                                <option key={it.item_id} value={it.item_id}>
+                                  {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                                </option>
+                              ))}
+                            </select>
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5">
+                            <input type="number" step="any" placeholder="0.00" value={line.std_qty_per_unit_per_day} onChange={(e) => setStdConsumptionLineField(idx, "std_qty_per_unit_per_day", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5">
+                            <input
+                              type="number"
+                              step="any"
+                              value={line.std_rate}
+                              onChange={(e) => setStdConsumptionLineField(idx, "std_rate", e.target.value)}
+                              placeholder="Item default"
+                              className={`${inputCls} text-xs text-right font-mono`}
+                              style={S.input}
+                            />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-center">
+                            <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </table>
+                </div>
               </div>
             </>
           )}
@@ -1159,6 +1175,7 @@ export default function BatchPanel() {
                 ["curves", "Performance & Curves"],
                 ["transactions", "Transactions"],
                 ["data-entry", "Data Entry"],
+                ["alerts", `KPI Alerts (${(viewing.alerts || []).length})`],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -1177,6 +1194,27 @@ export default function BatchPanel() {
 
             {detailTab === "overview" && (
             <>
+            {((viewing.alerts || []).filter((a: Row) => !a.is_read).length > 0) && (
+              <div className="flex items-center justify-between rounded-lg border p-3.5" style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}>
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold">
+                      {((viewing.alerts || []).filter((a: Row) => !a.is_read).length)} Unacknowledged KPI Deviation Alert(s)
+                    </p>
+                    <p className="text-[11px] opacity-90">
+                      Recent daily entries for this batch deviated from scheduled benchmark standards.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDetailTab("alerts")}
+                  className="rounded-md border border-current px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80"
+                >
+                  View Alerts →
+                </button>
+              </div>
+            )}
             {viewing.status === "DRAFT" && (
               <Button onClick={handleActivate} disabled={acting} >
                 <PlayCircle className="h-4 w-4" /> {acting ? "Activating…" : "Activate Batch"}
@@ -1560,6 +1598,108 @@ export default function BatchPanel() {
                 />
               </div>
             )}
+
+            {detailTab === "alerts" && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold" style={S.primary}>Batch KPI Deviation Log</p>
+                    <p className="text-[11px]" style={S.sub}>
+                      Historical threshold breaches logged against {viewing.scheduler?.scheduler_code || "the attached scheduler"}.
+                    </p>
+                  </div>
+                  {(viewing.alerts || []).some((a: Row) => !a.is_read) && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.post("/alert/mark-all-read", { companyId, batchId: viewing.batch_id });
+                          await refreshViewing();
+                        } catch {}
+                      }}
+                      className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold"
+                      style={S.surface}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5 text-(--success)" /> Mark All Read
+                    </button>
+                  )}
+                </div>
+
+                {(viewing.alerts || []).length === 0 ? (
+                  <div className="rounded-[var(--radius-sm)] border p-8 text-center text-xs" style={{ ...S.surface, ...S.sub }}>
+                    <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
+                    No KPI deviation alerts logged for this batch.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
+                    <table className="w-full border-collapse text-left text-xs">
+                      <TableHeader>
+                        <tr className="border-b border-(--row-border)">
+                          <TableHead className="h-auto px-3 py-2">Severity</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Alert / Deviation</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Expected</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Actual</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Deviation</TableHead>
+                          <TableHead className="h-auto px-3 py-2">Logged At</TableHead>
+                          <TableHead className="h-auto px-3 py-2 text-right">Action</TableHead>
+                        </tr>
+                      </TableHeader>
+                      <TableBody>
+                        {(viewing.alerts || []).map((alert: Row) => (
+                          <TableRow key={alert.alert_id} style={{ opacity: alert.is_read ? 0.6 : 1 }}>
+                            <TableCell className="px-3 py-2">
+                              <span
+                                className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                                style={
+                                  alert.severity === "CRITICAL"
+                                    ? { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }
+                                    : { color: "var(--warning)", borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)" }
+                                }
+                              >
+                                {alert.severity}
+                              </span>
+                            </TableCell>
+                            <TableCell className="px-3 py-2">
+                              <p className="font-semibold" style={S.primary}>{alert.title}</p>
+                              <p className="text-[11px]" style={S.sub}>{alert.message}</p>
+                            </TableCell>
+                            <TableCell className="px-3 py-2" style={S.primary}>{alert.expected_value ?? "—"}</TableCell>
+                            <TableCell className="px-3 py-2 font-medium" style={S.primary}>{alert.actual_value ?? "—"}</TableCell>
+                            <TableCell className="px-3 py-2">
+                              {alert.deviation_pct != null ? (
+                                <span className="font-semibold" style={{ color: Number(alert.deviation_pct) > 0 ? "var(--danger)" : "var(--warning)" }}>
+                                  {Number(alert.deviation_pct) > 0 ? "+" : ""}{Number(alert.deviation_pct).toFixed(2)}%
+                                </span>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-[11px]" style={S.muted}>
+                              {new Date(alert.created_at).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-right">
+                              {!alert.is_read ? (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await api.post(`/alert/${alert.alert_id}/read`, { companyId });
+                                      await refreshViewing();
+                                    } catch {}
+                                  }}
+                                  className="rounded-md border px-2 py-1 text-[11px] font-semibold"
+                                  style={S.surface}
+                                >
+                                  Mark Read
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-(--success) font-medium">Read</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Dialog>
@@ -1715,7 +1855,7 @@ export default function BatchPanel() {
         open={closeModalOpen}
         onClose={() => !acting && setCloseModalOpen(false)}
         title={`Close Batch ${viewing?.batch_no || ""}`}
-        maxWidth="xl"
+        maxWidth="2xl"
         footer={
           <>
             <button onClick={() => setCloseModalOpen(false)} disabled={acting} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
@@ -1740,73 +1880,90 @@ export default function BatchPanel() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output Lines — split % must sum to 100</p>
-            <button onClick={addOutputLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
-            </button>
+          <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Harvest & Output Lines ({outputLines.length})</p>
+              <p className="text-[11px]" style={S.muted}>Cost split % across main products and by-products must sum to exactly 100%.</p>
+            </div>
+            <Button onClick={addOutputLine} type="button" size="sm" variant="outline" className="text-xs">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Output Line
+            </Button>
           </div>
 
-          <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full border-collapse text-left text-xs">
-              <TableHeader>
-                <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Type</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Split %</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Warehouse</TableHead>
-                  <TableHead className="h-auto px-3 py-2"></TableHead>
-                </tr>
-              </TableHeader>
-              <TableBody>
-                {outputLines.map((line, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="px-2 py-1.5">
-                      <select value={line.item_id} onChange={(e) => setOutputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select Item ({items.length} options)…</option>
-                        {items.map((it, i) => (
-                          <option key={it.item_id} value={it.item_id}>
-                            {i + 1}. {it.item_code} — {it.item_name || it.item_code}
-                          </option>
-                        ))}
-                      </select>
+          <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <TableHeader>
+                  <tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[200px]">Item</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-28">Type</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-24 text-right">Split %</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-24 text-right">Quantity</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-24">UOM</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[150px]">Warehouse</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {outputLines.map((line, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.item_id} onChange={(e) => setOutputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select Item ({items.length} options)…</option>
+                          {items.map((it, i) => (
+                            <option key={it.item_id} value={it.item_id}>
+                              {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                            </option>
+                          ))}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.output_type} onChange={(e) => setOutputLineField(idx, "output_type", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="MAIN">Main</option>
+                          <option value="BY_PRODUCT">By-Product</option>
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="100" value={line.cost_split_pct} onChange={(e) => setOutputLineField(idx, "cost_split_pct", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="0" value={line.quantity} onChange={(e) => setOutputLineField(idx, "quantity", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.uom} onChange={(e) => setOutputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select…</option>
+                          {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.warehouse_id} onChange={(e) => setOutputLineField(idx, "warehouse_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select Warehouse…</option>
+                          {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code} — {w.warehouse_name || w.warehouse_code}</option>)}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5 text-center">
+                        <button onClick={() => removeOutputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <tr className="border-t font-semibold" style={{ borderColor: "var(--border)" }}>
+                    <TableCell colSpan={2} className="px-3 py-2.5" style={S.sub}>Total Cost Allocation Split</TableCell>
+                    <TableCell className="px-3 py-2.5 text-right font-mono font-bold" style={{ color: Math.abs(splitTotal - 100) < 0.01 ? "var(--success)" : "var(--danger)" }}>
+                      {splitTotal.toFixed(2)}%
                     </TableCell>
-                    <TableCell className="px-2 py-1.5 w-24">
-                      <select value={line.output_type} onChange={(e) => setOutputLineField(idx, "output_type", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="MAIN">Main</option>
-                        <option value="BY_PRODUCT">By-Product</option>
-                      </select>
+                    <TableCell colSpan={4} className="px-3 py-2.5 text-xs">
+                      {Math.abs(splitTotal - 100) < 0.01 ? (
+                        <span className="text-(--success) font-semibold">✓ Balanced 100%</span>
+                      ) : (
+                        <span className="text-(--danger) font-semibold">⚠ Must equal 100% (Diff: {(100 - splitTotal).toFixed(2)}%)</span>
+                      )}
                     </TableCell>
-                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.cost_split_pct} onChange={(e) => setOutputLineField(idx, "cost_split_pct", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.quantity} onChange={(e) => setOutputLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-24">
-                      <select value={line.uom} onChange={(e) => setOutputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
-                        {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5">
-                      <select value={line.warehouse_id} onChange={(e) => setOutputLineField(idx, "warehouse_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
-                        {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code}</option>)}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeOutputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <tr>
-                  <TableCell colSpan={2} className="px-3 py-2" style={S.sub}>Split Total</TableCell>
-                  <TableCell className="px-3 py-2" style={{ color: Math.abs(splitTotal - 100) < 0.01 ? "var(--success)" : "var(--danger)" }}>{splitTotal.toFixed(2)}%</TableCell>
-                  <TableCell colSpan={4}></TableCell>
-                </tr>
-              </TableFooter>
-            </table>
+                  </tr>
+                </TableFooter>
+              </table>
+            </div>
           </div>
         </div>
       </Dialog>

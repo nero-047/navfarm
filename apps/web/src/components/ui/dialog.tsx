@@ -15,7 +15,7 @@ interface DialogProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
   className?: string;
 }
 
@@ -24,6 +24,8 @@ const widths = {
   md: 'max-w-xl',
   lg: 'max-w-3xl',
   xl: 'max-w-5xl',
+  '2xl': 'max-w-7xl',
+  full: 'max-w-[96vw]',
 };
 
 export function Dialog({ open, onClose, title, description, children, footer, maxWidth = 'md', className }: DialogProps) {

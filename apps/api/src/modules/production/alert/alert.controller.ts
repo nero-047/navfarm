@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Query, Body, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { AlertService } from './alert.service';
-import { QueryAlertDto, MarkAlertReadDto } from './dto/alert.dto';
+import { QueryAlertDto, MarkAlertReadDto, MarkAllAlertsReadDto } from './dto/alert.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -23,6 +23,15 @@ export class AlertController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.alertService.findAll(query, tenantId);
     return { success: true, message: 'Alerts retrieved successfully.', data: result };
+  }
+
+  @Post('mark-all-read')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'Mark all matching alerts as read/acknowledged' })
+  async markAllRead(@Body() dto: MarkAllAlertsReadDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.alertService.markAllRead(dto, tenantId, req.user);
+    return { success: true, message: 'All matching alerts marked as read.', data: result };
   }
 
   @Post(':id/read')

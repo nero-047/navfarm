@@ -16,6 +16,7 @@ import {
 import { api } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 type Row = Record<string, any>;
 
@@ -323,45 +324,50 @@ export function BreedingPanel() {
       {success && <InlineAlert variant="success">{success}</InlineAlert>}
 
       {/* ── KPI Stat Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <Heart className="w-4 h-4" style={S.accent} /> Active Gestations
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="rounded-[var(--radius-lg)] border p-4 flex flex-col justify-between shadow-sm min-w-0" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1.5" style={S.muted}>
+            <Heart className="w-4 h-4 shrink-0" style={S.accent} />
+            <span className="truncate">Active Gestations</span>
           </div>
           <div className="text-2xl font-bold" style={S.primary}>{activeInseminations}</div>
-          <div className="text-[11px] mt-0.5" style={S.muted}>Sows due to farrow</div>
+          <div className="text-[11px] mt-1 truncate" style={S.muted}>Sows due to farrow</div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <Baby className="w-4 h-4" style={S.accent} /> Total Litters
+        <div className="rounded-[var(--radius-lg)] border p-4 flex flex-col justify-between shadow-sm min-w-0" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1.5" style={S.muted}>
+            <Baby className="w-4 h-4 shrink-0" style={S.accent} />
+            <span className="truncate">Total Litters</span>
           </div>
           <div className="text-2xl font-bold" style={S.primary}>{totalLitters}</div>
-          <div className="text-[11px] mt-0.5" style={S.muted}>Farrowing batches</div>
+          <div className="text-[11px] mt-1 truncate" style={S.muted}>Farrowing batches</div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <Sparkles className="w-4 h-4" style={S.success} /> Piglets Born Live
+        <div className="rounded-[var(--radius-lg)] border p-4 flex flex-col justify-between shadow-sm min-w-0" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1.5" style={S.muted}>
+            <Sparkles className="w-4 h-4 shrink-0" style={S.success} />
+            <span className="truncate">Piglets Born Live</span>
           </div>
           <div className="text-2xl font-bold" style={S.success}>{totalBornLive}</div>
-          <div className="text-[11px] mt-0.5" style={S.muted}>Lifetime live births</div>
+          <div className="text-[11px] mt-1 truncate" style={S.muted}>Lifetime live births</div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <CheckCircle2 className="w-4 h-4" style={S.accent} /> Weaning Survival
+        <div className="rounded-[var(--radius-lg)] border p-4 flex flex-col justify-between shadow-sm min-w-0" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1.5" style={S.muted}>
+            <CheckCircle2 className="w-4 h-4 shrink-0" style={S.accent} />
+            <span className="truncate">Weaning Survival</span>
           </div>
           <div className="text-2xl font-bold" style={S.accent}>{avgSurvivalRate}%</div>
-          <div className="text-[11px] mt-0.5" style={S.muted}>{totalWeaned} weaned piglets</div>
+          <div className="text-[11px] mt-1 truncate" style={S.muted}>{totalWeaned} weaned piglets</div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border p-4" style={S.raised}>
-          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1" style={S.muted}>
-            <FlaskConical className="w-4 h-4" style={S.accent} /> Semen Doses
+        <div className="rounded-[var(--radius-lg)] border p-4 flex flex-col justify-between shadow-sm min-w-0" style={S.raised}>
+          <div className="text-xs font-semibold flex items-center gap-1.5 mb-1.5" style={S.muted}>
+            <FlaskConical className="w-4 h-4 shrink-0" style={S.accent} />
+            <span className="truncate">Semen Doses</span>
           </div>
           <div className="text-2xl font-bold" style={S.primary}>{totalDoses}</div>
-          <div className="text-[11px] mt-0.5" style={S.muted}>Collected from boars</div>
+          <div className="text-[11px] mt-1 truncate" style={S.muted}>Collected from boars</div>
         </div>
       </div>
 
@@ -414,36 +420,36 @@ export function BreedingPanel() {
         <>
           {/* TAB 1: MATING & GESTATION */}
           {subTab === "mating" && (
-            <div className="rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
-              <table className="w-full text-left text-sm border-collapse">
-                <thead className="text-xs uppercase font-semibold border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-                  <tr>
-                    <th className="py-3 px-4">Sow</th>
-                    <th className="py-3 px-4">Type</th>
-                    <th className="py-3 px-4">Mating Date</th>
-                    <th className="py-3 px-4">Preg Check (28d)</th>
-                    <th className="py-3 px-4">Expected Farrowing (114d)</th>
-                    <th className="py-3 px-4">Status / Countdown</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+            <div className="overflow-x-auto rounded-[var(--radius-lg)] border shadow-sm" style={S.surface}>
+              <table className="w-full text-left text-xs border-collapse">
+                <TableHeader>
+                  <tr className="border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
+                    <TableHead className="h-11 px-4 min-w-[170px]">Sow</TableHead>
+                    <TableHead className="h-11 px-4 w-32">Type</TableHead>
+                    <TableHead className="h-11 px-4 w-36 whitespace-nowrap">Mating Date</TableHead>
+                    <TableHead className="h-11 px-4 w-44 whitespace-nowrap">Preg Check (28d)</TableHead>
+                    <TableHead className="h-11 px-4 w-44 whitespace-nowrap">Expected Farrowing (114d)</TableHead>
+                    <TableHead className="h-11 px-4 w-48 whitespace-nowrap">Status / Countdown</TableHead>
+                    <TableHead className="h-11 px-4 text-right w-36 whitespace-nowrap">Actions</TableHead>
                   </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+                </TableHeader>
+                <TableBody>
                   {matings.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center" style={S.muted}>
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-12 text-center" style={S.muted}>
                         No mating records found. Click &quot;Record Mating / AI&quot; to begin.
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     matings.map((m) => (
-                      <tr key={m.breeding_id} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold" style={S.primary}>{m.sow_code}</div>
-                          <div className="text-xs" style={S.sub}>Tag: {m.sow_tag || "--"} (Parity {m.parity_number})</div>
-                        </td>
-                        <td className="py-3.5 px-4">
+                      <TableRow key={m.breeding_id} className="hover:bg-[var(--surface-raised)] transition-colors">
+                        <TableCell className="px-4 py-3.5 align-middle">
+                          <div className="font-semibold text-xs" style={S.primary}>{m.sow_code}</div>
+                          <div className="text-[11px] mt-0.5" style={S.sub}>Tag: {m.sow_tag || "—"} · Parity {m.parity_number}</div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle">
                           <span
-                            className="px-2 py-0.5 rounded text-xs font-semibold border"
+                            className="inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-semibold border"
                             style={{
                               backgroundColor: "var(--surface-raised)",
                               borderColor: "var(--border)",
@@ -452,50 +458,51 @@ export function BreedingPanel() {
                           >
                             {m.mating_type}
                           </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
-                          {m.mating_date}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap font-mono text-xs" style={S.sub}>
+                          <div>{m.mating_date}</div>
                           {m.second_mating_date && (
-                            <span className="block text-[11px]" style={S.muted}>2nd: {m.second_mating_date}</span>
+                            <div className="text-[11px]" style={S.muted}>2nd: {m.second_mating_date}</div>
                           )}
-                        </td>
-                        <td className="py-3.5 px-4">
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap">
                           {m.pregnancy_confirmed === true ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium" style={S.success}>
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full border" style={{ color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" }}>
                               <CheckCircle2 className="w-3.5 h-3.5" /> Confirmed
                             </span>
                           ) : m.pregnancy_confirmed === false ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium" style={S.danger}>
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full border" style={{ color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }}>
                               <XCircle className="w-3.5 h-3.5" /> Failed
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium" style={S.warning}>
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full border" style={{ color: "var(--warning)", borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)" }}>
                               <Clock className="w-3.5 h-3.5" /> Due: {m.preg_check_date}
                             </span>
                           )}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-xs" style={S.primary}>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap font-mono text-xs font-medium" style={S.primary}>
                           {m.expected_farrowing_date}
-                        </td>
-                        <td className="py-3.5 px-4">
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap">
                           {m.days_until_farrowing < 0 ? (
-                            <span className="px-2 py-0.5 rounded text-xs border font-medium" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border font-medium" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-muted)" }}>
                               Past Due / Completed
                             </span>
                           ) : m.days_until_farrowing <= 7 ? (
-                            <span className="px-2 py-0.5 rounded text-xs border font-bold animate-pulse" style={S.warning}>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border font-bold animate-pulse" style={S.warning}>
                               Due in {m.days_until_farrowing} days
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded text-xs border font-medium" style={S.success}>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border font-medium" style={S.success}>
                               Due in {m.days_until_farrowing} days
                             </span>
                           )}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle text-right whitespace-nowrap">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
+                            className="text-xs h-7 px-2.5"
                             onClick={() => {
                               setSelectedMating(m);
                               setShowPregCheckModal(true);
@@ -503,78 +510,81 @@ export function BreedingPanel() {
                           >
                             Update Check
                           </Button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-                </tbody>
+                </TableBody>
               </table>
             </div>
           )}
 
           {/* TAB 2: FARROWING & LITTERS */}
           {subTab === "farrowing" && (
-            <div className="rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
-              <table className="w-full text-left text-sm border-collapse">
-                <thead className="text-xs uppercase font-semibold border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-                  <tr>
-                    <th className="py-3 px-4">Sow</th>
-                    <th className="py-3 px-4">Farrow Date</th>
-                    <th className="py-3 px-4">Live / Total</th>
-                    <th className="py-3 px-4">Stillborn / Mummies</th>
-                    <th className="py-3 px-4">Litter Weight</th>
-                    <th className="py-3 px-4">Weaned / Survival</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+            <div className="overflow-x-auto rounded-[var(--radius-lg)] border shadow-sm" style={S.surface}>
+              <table className="w-full text-left text-xs border-collapse">
+                <TableHeader>
+                  <tr className="border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
+                    <TableHead className="h-11 px-4 min-w-[170px]">Sow</TableHead>
+                    <TableHead className="h-11 px-4 w-36 whitespace-nowrap">Farrow Date</TableHead>
+                    <TableHead className="h-11 px-4 w-36 whitespace-nowrap">Live / Total</TableHead>
+                    <TableHead className="h-11 px-4 w-44 whitespace-nowrap">Stillborn / Mummies</TableHead>
+                    <TableHead className="h-11 px-4 w-36 whitespace-nowrap">Litter Weight</TableHead>
+                    <TableHead className="h-11 px-4 w-44 whitespace-nowrap">Weaned / Survival</TableHead>
+                    <TableHead className="h-11 px-4 text-right w-36 whitespace-nowrap">Actions</TableHead>
                   </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+                </TableHeader>
+                <TableBody>
                   {farrowings.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center" style={S.muted}>
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-12 text-center" style={S.muted}>
                         No farrowing records found. Click &quot;Record Farrowing&quot; to log a litter.
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     farrowings.map((f) => (
-                      <tr key={f.farrow_id} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold" style={S.primary}>{f.sow_code}</div>
-                          <div className="text-xs" style={S.sub}>Tag: {f.sow_tag || "--"} (Parity {f.parity_number})</div>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
+                      <TableRow key={f.farrow_id} className="hover:bg-[var(--surface-raised)] transition-colors">
+                        <TableCell className="px-4 py-3.5 align-middle">
+                          <div className="font-semibold text-xs" style={S.primary}>{f.sow_code}</div>
+                          <div className="text-[11px] mt-0.5" style={S.sub}>Tag: {f.sow_tag || "—"} · Parity {f.parity_number}</div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap font-mono text-xs" style={S.sub}>
                           {f.farrowing_date}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="font-bold" style={S.success}>{f.piglets_born_live}</span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap">
+                          <span className="font-bold text-sm" style={S.success}>{f.piglets_born_live}</span>
                           <span className="text-xs" style={S.muted}> / {f.piglets_born_total}</span>
-                        </td>
-                        <td className="py-3.5 px-4 text-xs">
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap text-xs">
                           <span style={S.danger}>{f.piglets_stillborn} still</span>
                           <span className="mx-1" style={S.muted}>•</span>
                           <span style={S.sub}>{f.piglets_mummified} mum</span>
-                        </td>
-                        <td className="py-3.5 px-4 text-xs font-mono" style={S.sub}>
-                          {f.total_litter_weight_kg ? `${f.total_litter_weight_kg} kg` : "--"}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap text-xs font-mono" style={S.sub}>
+                          <div className="font-medium" style={S.primary}>{f.total_litter_weight_kg ? `${f.total_litter_weight_kg} kg` : "—"}</div>
                           {f.avg_birth_weight_kg && (
-                            <span className="block text-[11px]" style={S.muted}>avg {f.avg_birth_weight_kg} kg</span>
+                            <div className="text-[11px]" style={S.muted}>avg {f.avg_birth_weight_kg} kg</div>
                           )}
-                        </td>
-                        <td className="py-3.5 px-4">
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap">
                           {f.piglets_weaned > 0 ? (
                             <div>
-                              <span className="font-bold" style={S.accent}>{f.piglets_weaned} weaned</span>
+                              <span className="font-bold text-xs" style={S.accent}>{f.piglets_weaned} weaned</span>
                               {f.weaning_survival_rate_pct && (
-                                <span className="text-xs block" style={S.muted}>{f.weaning_survival_rate_pct}% survival</span>
+                                <span className="text-[11px] block" style={S.muted}>{f.weaning_survival_rate_pct}% survival</span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-xs font-medium" style={S.warning}>Lactating (Due {f.weaning_date})</span>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border" style={S.warning}>
+                              Lactating (Due {f.weaning_date})
+                            </span>
                           )}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle text-right whitespace-nowrap">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
+                            className="text-xs h-7 px-2.5"
                             onClick={() => {
                               setSelectedFarrow(f);
                               setShowWeanModal(true);
@@ -582,62 +592,64 @@ export function BreedingPanel() {
                           >
                             Record Weaning
                           </Button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-                </tbody>
+                </TableBody>
               </table>
             </div>
           )}
 
           {/* TAB 3: BOAR SEMEN AI STATION */}
           {subTab === "semen" && (
-            <div className="rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
-              <table className="w-full text-left text-sm border-collapse">
-                <thead className="text-xs uppercase font-semibold border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-                  <tr>
-                    <th className="py-3 px-4">Boar</th>
-                    <th className="py-3 px-4">Collection Date</th>
-                    <th className="py-3 px-4">Doses Collected</th>
-                    <th className="py-3 px-4">Running Cost</th>
-                    <th className="py-3 px-4">Unit Cost / Dose</th>
-                    <th className="py-3 px-4">Internal / Sold</th>
+            <div className="overflow-x-auto rounded-[var(--radius-lg)] border shadow-sm" style={S.surface}>
+              <table className="w-full text-left text-xs border-collapse">
+                <TableHeader>
+                  <tr className="border-b" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
+                    <TableHead className="h-11 px-4 min-w-[170px]">Boar</TableHead>
+                    <TableHead className="h-11 px-4 w-36 whitespace-nowrap">Collection Date</TableHead>
+                    <TableHead className="h-11 px-4 w-36 whitespace-nowrap">Doses Collected</TableHead>
+                    <TableHead className="h-11 px-4 w-36 whitespace-nowrap">Running Cost</TableHead>
+                    <TableHead className="h-11 px-4 w-36 whitespace-nowrap">Unit Cost / Dose</TableHead>
+                    <TableHead className="h-11 px-4 w-44 whitespace-nowrap">Internal / Sold</TableHead>
                   </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+                </TableHeader>
+                <TableBody>
                   {semenBatches.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center" style={S.muted}>
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-12 text-center" style={S.muted}>
                         No semen collection logs found. Click &quot;Log Semen Collection&quot; to begin.
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     semenBatches.map((s) => (
-                      <tr key={s.semen_batch_id} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-3.5 px-4 font-semibold" style={S.primary}>
-                          {s.boar_code}
-                          <span className="block text-xs font-normal" style={S.sub}>Tag: {s.boar_tag || "--"}</span>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
+                      <TableRow key={s.semen_batch_id} className="hover:bg-[var(--surface-raised)] transition-colors">
+                        <TableCell className="px-4 py-3.5 align-middle">
+                          <div className="font-semibold text-xs" style={S.primary}>{s.boar_code}</div>
+                          <div className="text-[11px] mt-0.5" style={S.sub}>Tag: {s.boar_tag || "—"}</div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap font-mono text-xs" style={S.sub}>
                           {s.collection_date}
-                        </td>
-                        <td className="py-3.5 px-4 font-bold" style={S.accent}>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap font-bold text-xs" style={S.accent}>
                           {s.doses_collected} doses
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap font-mono text-xs" style={S.sub}>
                           ₹{Number(s.running_cost_period || 0).toLocaleString()}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-xs font-bold" style={S.success}>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap font-mono text-xs font-bold" style={S.success}>
                           ₹{Number(s.unit_cost_per_dose || 0).toFixed(2)} / dose
-                        </td>
-                        <td className="py-3.5 px-4 text-xs" style={S.sub}>
-                          {s.doses_used_internal || 0} internal • {s.doses_sold || 0} sold
-                        </td>
-                      </tr>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 align-middle whitespace-nowrap text-xs" style={S.sub}>
+                          <span className="font-medium" style={S.primary}>{s.doses_used_internal || 0} internal</span>
+                          <span className="mx-1" style={S.muted}>•</span>
+                          <span className="font-medium" style={S.primary}>{s.doses_sold || 0} sold</span>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-                </tbody>
+                </TableBody>
               </table>
             </div>
           )}

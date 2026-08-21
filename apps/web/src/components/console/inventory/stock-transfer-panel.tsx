@@ -251,7 +251,7 @@ export default function StockTransferPanel() {
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
         title="New Stock Transfer"
-        maxWidth="xl"
+        maxWidth="2xl"
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
@@ -291,50 +291,57 @@ export default function StockTransferPanel() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Lines</p>
-            <button onClick={addLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
-            </button>
+          <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Inter-Warehouse Transfer Lines ({lines.length})</p>
+              <p className="text-[11px]" style={S.muted}>Inventory stock items and quantities being moved between locations.</p>
+            </div>
+            <Button onClick={addLine} type="button" size="sm" variant="outline" className="text-xs">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Transfer Line
+            </Button>
           </div>
 
-          <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full border-collapse text-left text-xs">
-              <TableHeader>
-                <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                  <TableHead className="h-auto px-3 py-2"></TableHead>
-                </tr>
-              </TableHeader>
-              <TableBody>
-                {lines.map((line, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="px-2 py-1.5">
-                      <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select Item ({items.length} options)…</option>
-                        {items.map((it, i) => (
-                          <option key={it.item_id} value={it.item_id}>
-                            {i + 1}. {it.item_code} — {it.item_name}
-                          </option>
-                        ))}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-28">
-                      <select value={line.uom} onChange={(e) => setLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
-                        {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </table>
+          <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <TableHeader>
+                  <tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[240px]">Item</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-36 text-right">Quantity</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-28">UOM</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {lines.map((line, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select Item ({items.length} options)…</option>
+                          {items.map((it, i) => (
+                            <option key={it.item_id} value={it.item_id}>
+                              {i + 1}. {it.item_code} — {it.item_name}
+                            </option>
+                          ))}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="0" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.uom} onChange={(e) => setLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select…</option>
+                          {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5 text-center">
+                        <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </table>
+            </div>
           </div>
         </div>
       </Dialog>

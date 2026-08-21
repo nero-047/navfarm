@@ -1570,6 +1570,162 @@ export async function seedPiggeryData() {
       }
     }
 
+    // 19. Seed Realistic Batch KPI Alerts & Deviation Logs
+    console.log('   - Seeding Batch KPI Alerts & Deviation Logs...');
+    const allBatches = await db.select().from(schema.batchHeader).where(eq(schema.batchHeader.company_id, companyId));
+    const batchMap = new Map(allBatches.map((b) => [b.batch_no, b]));
+
+    const growerBatch = batchMap.get('PIG-BAT-2026-0003');
+    const gestBatch = batchMap.get('PIG-BAT-2026-0001');
+    const farrBatch = batchMap.get('PIG-BAT-2026-0002');
+    const finBatch = batchMap.get('PIG-BAT-2026-0004');
+
+    // Get all scheduler parameter lines for linking
+    const allSpls = await db.select().from(schema.schedulerParameterLine);
+    const splBySchedAndParam = new Map(
+      allSpls.map((spl) => [`${spl.scheduler_id}_${spl.parameter_id}`, spl.spl_id])
+    );
+
+    const growerFeedParamId = parameterMap.get('PARAM-FEED-GROW');
+    const gestFeedParamId = parameterMap.get('PARAM-FEED-GEST');
+    const mortParamId = parameterMap.get('PARAM-MORT-PIG');
+    const tempParamId = parameterMap.get('PARAM-TEMP-PIG');
+    const porkOutputParamId = parameterMap.get('PARAM-PORK-OUTPUT');
+
+    const seedAlerts = [
+      {
+        batch: growerBatch,
+        splId: growerBatch && growerFeedParamId ? splBySchedAndParam.get(`${growerBatch.scheduler_id}_${growerFeedParamId}`) : null,
+        severity: 'CRITICAL',
+        title: 'Grower Feed Intake Above KPI (+28.4% deviation)',
+        message: 'Daily feed consumption of 308.20 kg exceeded the scheduled benchmark standard of 240.00 kg (critical tolerance breach +20.00%).',
+        paramName: 'Grower Feed Consumption',
+        kpiMode: 'PCT',
+        expected: '240.0000',
+        actual: '308.2000',
+        devAmount: '68.2000',
+        devPct: '28.42',
+        kpiMin: '216.0000',
+        kpiMax: '264.0000',
+        isRead: false,
+        readBy: null,
+        readAt: null,
+      },
+      {
+        batch: gestBatch,
+        splId: gestBatch && gestFeedParamId ? splBySchedAndParam.get(`${gestBatch.scheduler_id}_${gestFeedParamId}`) : null,
+        severity: 'WARNING',
+        title: 'Gestation Feed Intake Below Benchmark (-14.0% deviation)',
+        message: 'Daily ration intake of 41.28 kg was logged vs target benchmark 48.00 kg (outside -10.00% benchmark range).',
+        paramName: 'Gestation Feed Intake',
+        kpiMode: 'PCT',
+        expected: '48.0000',
+        actual: '41.2800',
+        devAmount: '-6.7200',
+        devPct: '-14.00',
+        kpiMin: '43.2000',
+        kpiMax: '52.8000',
+        isRead: false,
+        readBy: null,
+        readAt: null,
+      },
+      {
+        batch: farrBatch,
+        splId: farrBatch && mortParamId ? splBySchedAndParam.get(`${farrBatch.scheduler_id}_${mortParamId}`) : null,
+        severity: 'CRITICAL',
+        title: 'Pre-Weaning Piglet Mortality Limit Exceeded',
+        message: 'Acute mortality of 2 piglets exceeded the standard benchmark limit (maximum standard 0 head/day).',
+        paramName: 'Pre-Weaning Piglet Mortality',
+        kpiMode: 'VALUE',
+        expected: '0.0000',
+        actual: '2.0000',
+        devAmount: '2.0000',
+        devPct: '200.00',
+        kpiMin: '0.0000',
+        kpiMax: '0.0000',
+        isRead: false,
+        readBy: null,
+        readAt: null,
+      },
+      {
+        batch: growerBatch,
+        splId: growerBatch && tempParamId ? splBySchedAndParam.get(`${growerBatch.scheduler_id}_${tempParamId}`) : null,
+        severity: 'WARNING',
+        title: 'Shed Temperature Above Benchmark (+28.3% deviation)',
+        message: 'Afternoon environmental sensor recorded 29.5°C against standard maximum threshold of 26.0°C.',
+        paramName: 'Shed Ambient Temperature',
+        kpiMode: 'VALUE',
+        expected: '23.0000',
+        actual: '29.5000',
+        devAmount: '6.5000',
+        devPct: '28.26',
+        kpiMin: '20.0000',
+        kpiMax: '26.0000',
+        isRead: true,
+        readBy: userId,
+        readAt: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 19).replace('T', ' '),
+      },
+      {
+        batch: finBatch,
+        splId: finBatch && porkOutputParamId ? splBySchedAndParam.get(`${finBatch.scheduler_id}_${porkOutputParamId}`) : null,
+        severity: 'WARNING',
+        title: 'Carcass Harvest Yield Below Benchmark (-6.2% deviation)',
+        message: 'Average dressed pork carcass weight was 79.7 kg/head against target 85.0 kg/head.',
+        paramName: 'Dressed Pork Carcass Yield',
+        kpiMode: 'PCT',
+        expected: '85.0000',
+        actual: '79.7000',
+        devAmount: '-5.3000',
+        devPct: '-6.24',
+        kpiMin: '80.7500',
+        kpiMax: '89.2500',
+        isRead: true,
+        readBy: userId,
+        readAt: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 19).replace('T', ' '),
+      },
+    ];
+
+    for (const a of seedAlerts) {
+      if (!a.batch?.batch_id) continue;
+      const [existingAlert] = await db
+        .select()
+        .from(schema.notificationAlertLog)
+        .where(
+          and(
+            eq(schema.notificationAlertLog.company_id, companyId),
+            eq(schema.notificationAlertLog.batch_id, a.batch.batch_id),
+            eq(schema.notificationAlertLog.title, a.title)
+          )
+        )
+        .limit(1);
+
+      if (!existingAlert) {
+        await db.insert(schema.notificationAlertLog).values({
+          alert_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: companyId,
+          lob_id: lobId,
+          batch_id: a.batch.batch_id,
+          spl_id: a.splId || null,
+          alert_type: 'KPI_DEVIATION',
+          severity: a.severity,
+          title: a.title,
+          message: a.message,
+          parameter_name: a.paramName,
+          kpi_mode: a.kpiMode,
+          expected_value: a.expected,
+          actual_value: a.actual,
+          deviation_amount: a.devAmount,
+          deviation_pct: a.devPct,
+          kpi_min: a.kpiMin,
+          kpi_max: a.kpiMax,
+          is_read: a.isRead,
+          read_by: a.readBy,
+          read_at: a.readAt,
+        });
+      }
+    }
+
     console.log('\n✅ Piggery comprehensive master & operational dataset successfully seeded!');
     console.log('===========================================================');
     console.log(`- 6 Cost Centers (Farms, Breeding, Farrowing, Grower, Feedmill, Admin)`);
@@ -1583,7 +1739,8 @@ export async function seedPiggeryData() {
     console.log(`- 5 Finance GL Double-Entry Journal Postings with Cost Centers`);
     console.log(`- 15 Tagged Swine Herd Animals with RFIDs & Book Values`);
     console.log(`- 4 Mating Records, 2 Farrowing Litters & 2 Boar Semen Batches`);
-    console.log(`- 4 Production Batches Linked to Schedulers with 30-Day Multi-Entry Streams\n`);
+    console.log(`- 4 Production Batches Linked to Schedulers with 30-Day Multi-Entry Streams`);
+    console.log(`- 5 KPI Deviation Alert Logs across Gestation, Farrowing, Grower & Finisher Batches\n`);
   } finally {
     await pool.end();
   }

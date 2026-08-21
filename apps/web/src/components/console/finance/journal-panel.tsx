@@ -265,7 +265,7 @@ export default function JournalPanel() {
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
         title="New Journal Entry"
-        maxWidth="xl"
+        maxWidth="2xl"
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
@@ -284,60 +284,79 @@ export default function JournalPanel() {
               <input type="date" value={header.posting_date} onChange={(e) => setHeader((h) => ({ ...h, posting_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Description</label>
-              <input value={header.description} onChange={(e) => setHeader((h) => ({ ...h, description: e.target.value }))} className={inputCls} style={S.input} />
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Journal Description</label>
+              <input value={header.description} onChange={(e) => setHeader((h) => ({ ...h, description: e.target.value }))} placeholder="e.g. Month-end livestock amortization adjustment" className={inputCls} style={S.input} />
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Lines</p>
-            <button onClick={addLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
-            </button>
+          <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Double-Entry Journal Lines ({lines.length})</p>
+              <p className="text-[11px]" style={S.muted}>Debits and credits across general ledger chart of accounts (must balance to zero).</p>
+            </div>
+            <Button onClick={addLine} type="button" size="sm" variant="outline" className="text-xs">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Journal Line
+            </Button>
           </div>
 
-          <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full border-collapse text-left text-xs">
-              <TableHeader>
-                <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">GL Account</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Debit</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Credit</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Description</TableHead>
-                  <TableHead className="h-auto px-3 py-2"></TableHead>
-                </tr>
-              </TableHeader>
-              <TableBody>
-                {lines.map((line, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="px-2 py-1.5">
-                      <select value={line.gl_account_id} onChange={(e) => setLineField(idx, "gl_account_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
-                        {glAccounts.map((a) => <option key={a.gl_account_id} value={a.gl_account_id}>{a.account_code} — {a.account_name}</option>)}
-                      </select>
+          <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <TableHeader>
+                  <tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[240px]">General Ledger Account</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-36 text-right">Debit (₹)</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-36 text-right">Credit (₹)</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[180px]">Line Description</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {lines.map((line, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.gl_account_id} onChange={(e) => setLineField(idx, "gl_account_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select Account ({glAccounts.length} options)…</option>
+                          {glAccounts.map((a) => <option key={a.gl_account_id} value={a.gl_account_id}>{a.account_code} — {a.account_name}</option>)}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="0.00" value={line.debit_amount} onChange={(e) => setLineField(idx, "debit_amount", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="0.00" value={line.credit_amount} onChange={(e) => setLineField(idx, "credit_amount", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input value={line.description} onChange={(e) => setLineField(idx, "description", e.target.value)} placeholder="Line narration" className={`${inputCls} text-xs`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5 text-center">
+                        <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <tr className="border-t font-semibold" style={{ borderColor: "var(--border)" }}>
+                    <TableCell className="px-3 py-2.5 font-bold" style={S.primary}>Total Postings</TableCell>
+                    <TableCell className="px-3 py-2.5 text-right font-mono font-bold text-sm" style={S.primary}>
+                      {lineTotals.debit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
-                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.debit_amount} onChange={(e) => setLineField(idx, "debit_amount", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.credit_amount} onChange={(e) => setLineField(idx, "credit_amount", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                    <TableCell className="px-2 py-1.5"><input value={line.description} onChange={(e) => setLineField(idx, "description", e.target.value)} className={inputCls} style={S.input} /></TableCell>
-                    <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                    <TableCell className="px-3 py-2.5 text-right font-mono font-bold text-sm" style={S.primary}>
+                      {lineTotals.credit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <tr>
-                  <TableCell className="px-3 py-2" style={S.sub}>Total</TableCell>
-                  <TableCell className="px-3 py-2" style={S.primary}>{lineTotals.debit.toFixed(2)}</TableCell>
-                  <TableCell className="px-3 py-2" style={S.primary}>{lineTotals.credit.toFixed(2)}</TableCell>
-                  <TableCell colSpan={2} className="px-3 py-2">
-                    <span className="text-[11px] font-semibold" style={{ color: isBalanced ? "var(--success)" : "var(--danger)" }}>
-                      {isBalanced ? "Balanced" : "Not balanced"}
-                    </span>
-                  </TableCell>
-                </tr>
-              </TableFooter>
-            </table>
+                    <TableCell colSpan={2} className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold" style={{
+                        backgroundColor: isBalanced ? "var(--success-muted)" : "var(--danger-muted)",
+                        color: isBalanced ? "var(--success)" : "var(--danger)",
+                        border: `1px solid ${isBalanced ? "var(--success)" : "var(--danger)"}`
+                      }}>
+                        {isBalanced ? "✓ Balanced (Debit = Credit)" : `⚠ Imbalance: ₹${Math.abs(lineTotals.debit - lineTotals.credit).toFixed(2)}`}
+                      </span>
+                    </TableCell>
+                  </tr>
+                </TableFooter>
+              </table>
+            </div>
           </div>
         </div>
       </Dialog>

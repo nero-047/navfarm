@@ -16,6 +16,7 @@ type Row = Record<string, any>;
 
 const S = {
   surface: { backgroundColor: "var(--surface)", borderColor: "var(--border)" },
+  raised: { backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" },
   primary: { color: "var(--text-primary)" },
   sub: { color: "var(--text-secondary)" },
   muted: { color: "var(--text-muted)" },
@@ -380,7 +381,7 @@ export default function SchedulerPanel() {
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
         title={isLocked ? `View Scheduler ${header.scheduler_code}` : editingId ? `Edit Scheduler ${header.scheduler_code}` : "New Scheduler"}
-        maxWidth="xl"
+        maxWidth="2xl"
         footer={
           isLocked ? (
             <button onClick={() => setModalOpen(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Close</button>
@@ -477,46 +478,86 @@ export default function SchedulerPanel() {
             )}
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Parameter Lines</p>
+          <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>
+                Parameter Lines ({lines.length})
+              </p>
+              <p className="text-[11px]" style={S.muted}>
+                Configure target feed intakes, environmental observations, and KPI alert guardrails per growth period.
+              </p>
+            </div>
             {!isLocked && (
-              <button onClick={addLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-                <Plus className="h-3 w-3" /> Add Line
-              </button>
+              <Button onClick={addLine} type="button" size="sm" variant="outline" className="text-xs">
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Parameter Line
+              </Button>
             )}
           </div>
 
-          <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-            <table className="w-full border-collapse text-left text-xs">
-              <TableHeader>
-                <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Line Type</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Parameter</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Item Name</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Occurrence</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Frequency Start Day</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Frequency End Day</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Label</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Expected Qty (override)</TableHead>
-                  <TableHead className="h-auto px-3 py-2">KPI Mode</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Min</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Max</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Critical %</TableHead>
-                  <TableHead className="h-auto px-3 py-2"></TableHead>
-                </tr>
-              </TableHeader>
-              <TableBody>
-                {lines.map((line, idx) => {
-                  const selectedParam = parameters.find((p) => p.parameter_id === line.parameter_id);
-                  const activeLineType = line.line_type || (selectedParam ? (matchLineType(selectedParam.parameter_type, "DESCRIPTIVE") ? "DESCRIPTIVE" : selectedParam.parameter_type) : "");
-                  const filteredParams = activeLineType
-                    ? parameters.filter((p) => matchLineType(p.parameter_type, activeLineType))
-                    : parameters;
+          <div className="space-y-3.5">
+            {lines.map((line, idx) => {
+              const selectedParam = parameters.find((p) => p.parameter_id === line.parameter_id);
+              const activeLineType =
+                line.line_type ||
+                (selectedParam
+                  ? matchLineType(selectedParam.parameter_type, "DESCRIPTIVE")
+                    ? "DESCRIPTIVE"
+                    : selectedParam.parameter_type
+                  : "");
+              const filteredParams = activeLineType
+                ? parameters.filter((p) => matchLineType(p.parameter_type, activeLineType))
+                : parameters;
 
-                  return (
-                  <TableRow key={idx}>
-                    <TableCell className="px-2 py-1.5 min-w-[170px]">
+              return (
+                <div
+                  key={idx}
+                  className="rounded-[var(--radius-lg)] border p-4 space-y-3.5 transition hover:border-(--accent)/40 shadow-xs"
+                  style={S.surface}
+                >
+                  {/* Line Card Header */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5" style={{ borderColor: "var(--border)" }}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md border px-2.5 py-0.5 text-xs font-bold font-mono" style={S.raised}>
+                        Line #{idx + 1}
+                      </span>
+
+                      {activeLineType && (
+                        <span className="rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider" style={S.raised}>
+                          {activeLineType}
+                        </span>
+                      )}
+
+                      {selectedParam?.item_id && (
+                        <span className="text-xs" style={S.sub}>
+                          Item: <strong style={S.primary}>{itemLabel(selectedParam.item_id)}</strong>
+                        </span>
+                      )}
+
+                      {selectedParam?.default_uom && (
+                        <span className="rounded bg-(--surface-secondary) px-2 py-0.5 text-[10px] font-mono font-medium" style={S.muted}>
+                          Unit: {selectedParam.default_uom}
+                        </span>
+                      )}
+                    </div>
+
+                    {!isLocked && lines.length > 1 && (
+                      <button
+                        onClick={() => removeLine(idx)}
+                        type="button"
+                        className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition hover:bg-(--danger-muted)"
+                        style={{ color: "var(--danger)" }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Remove Line
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Field Section 1: Line Type & Parameter */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                    <div className="sm:col-span-4 flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>
+                        Line Category / Type
+                      </label>
                       <select
                         value={activeLineType}
                         onChange={(e) => {
@@ -526,17 +567,21 @@ export default function SchedulerPanel() {
                             setLineField(idx, "parameter_id", "");
                           }
                         }}
-                        className={`${inputCls} nf-select font-medium`}
+                        className={`${inputCls} nf-select font-medium text-xs`}
                         style={S.input}
                         disabled={isLocked}
                       >
-                        <option value="">All Line Types…</option>
+                        <option value="">All Categories…</option>
                         {LINE_TYPES.map((lt) => (
                           <option key={lt.value} value={lt.value}>{lt.label}</option>
                         ))}
                       </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5 min-w-[200px]">
+                    </div>
+
+                    <div className="sm:col-span-8 flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>
+                        Production Parameter <span className="text-(--danger)">*</span>
+                      </label>
                       <select
                         value={line.parameter_id}
                         onChange={(e) => {
@@ -544,65 +589,236 @@ export default function SchedulerPanel() {
                           setLineField(idx, "parameter_id", pId);
                           const p = parameters.find((param) => param.parameter_id === pId);
                           if (p && !line.line_type) {
-                            setLineField(idx, "line_type", matchLineType(p.parameter_type, "DESCRIPTIVE") ? "DESCRIPTIVE" : p.parameter_type);
+                            setLineField(
+                              idx,
+                              "line_type",
+                              matchLineType(p.parameter_type, "DESCRIPTIVE") ? "DESCRIPTIVE" : p.parameter_type
+                            );
                           }
                         }}
-                        className={`${inputCls} nf-select`}
+                        className={`${inputCls} nf-select text-xs`}
                         style={S.input}
                         disabled={isLocked}
                       >
-                        <option value="">Select Parameter…</option>
+                        <option value="">Select Parameter ({filteredParams.length} available)…</option>
                         {filteredParams.map((p) => (
                           <option key={p.parameter_id} value={p.parameter_id}>
-                            {p.parameter_code} — {p.parameter_name}
+                            {p.parameter_code} — {p.parameter_name} ({p.default_uom || "No UOM"})
                           </option>
                         ))}
                       </select>
-                      {activeLineType && (
-                        <p className="mt-1 text-[10px]" style={S.muted}>
-                          Showing <span className="font-semibold" style={S.sub}>{filteredParams.length}</span> {activeLineType} parameters
-                        </p>
+                    </div>
+                  </div>
+
+                  {/* Field Section 2: Timing, Days & Phase Label */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
+                    <div className="col-span-2 sm:col-span-3 flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>
+                        Occurrence
+                      </label>
+                      <select
+                        value={line.occurrence}
+                        onChange={(e) => setLineField(idx, "occurrence", e.target.value)}
+                        className={`${inputCls} nf-select text-xs`}
+                        style={S.input}
+                        disabled={isLocked}
+                      >
+                        {OCCURRENCES.map((o) => (
+                          <option key={o} value={o}>
+                            {o.charAt(0) + o.slice(1).toLowerCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2 flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>
+                        Start Day
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Day 1"
+                        value={line.period_from}
+                        onChange={(e) => setLineField(idx, "period_from", e.target.value)}
+                        className={`${inputCls} text-xs`}
+                        style={S.input}
+                        disabled={isLocked}
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>
+                        End Day
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Day 30"
+                        value={line.period_to}
+                        onChange={(e) => setLineField(idx, "period_to", e.target.value)}
+                        className={`${inputCls} text-xs`}
+                        style={S.input}
+                        disabled={isLocked}
+                      />
+                    </div>
+
+                    <div className="col-span-2 sm:col-span-5 flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>
+                        Stage / Period Label
+                      </label>
+                      <input
+                        value={line.period_label}
+                        onChange={(e) => setLineField(idx, "period_label", e.target.value)}
+                        placeholder="e.g. Early Nursery, Peak Lactation, Grower Phase"
+                        className={`${inputCls} text-xs`}
+                        style={S.input}
+                        disabled={isLocked}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Field Section 3: Target Benchmark & KPI Tolerance Bounds */}
+                  <div className="rounded-lg border p-3 bg-(--surface-raised)/70 space-y-2.5" style={{ borderColor: "var(--border)" }}>
+                    <div className="flex flex-wrap items-center justify-between gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-(--accent)">
+                        Target Benchmark & KPI Deviation Thresholds
+                      </span>
+                      <span className="text-[10px]" style={S.muted}>
+                        Live deviation alerts are triggered when daily entries breach these bounds.
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>
+                          Expected Qty (Override)
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={line.expected_qty_override}
+                          onChange={(e) => setLineField(idx, "expected_qty_override", e.target.value)}
+                          placeholder={selectedParam?.default_qty_per_unit || "Target value"}
+                          className={`${inputCls} text-xs`}
+                          style={S.input}
+                          disabled={isLocked}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>
+                          KPI Mode
+                        </label>
+                        <select
+                          value={line.kpi_mode}
+                          onChange={(e) => setLineField(idx, "kpi_mode", e.target.value)}
+                          className={`${inputCls} nf-select text-xs font-semibold`}
+                          style={S.input}
+                          disabled={isLocked}
+                        >
+                          <option value="PCT">Percentage (±%)</option>
+                          <option value="VALUE">Absolute Range [Min, Max]</option>
+                        </select>
+                      </div>
+
+                      {line.kpi_mode === "VALUE" ? (
+                        <>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>
+                              Min Value
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={line.kpi_min_value}
+                              onChange={(e) => setLineField(idx, "kpi_min_value", e.target.value)}
+                              placeholder="Min value"
+                              className={`${inputCls} text-xs`}
+                              style={S.input}
+                              disabled={isLocked}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>
+                              Max Value
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={line.kpi_max_value}
+                              onChange={(e) => setLineField(idx, "kpi_max_value", e.target.value)}
+                              placeholder="Max value"
+                              className={`${inputCls} text-xs`}
+                              style={S.input}
+                              disabled={isLocked}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>
+                              Min % Tolerance
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="any"
+                                value={line.kpi_min_pct}
+                                onChange={(e) => setLineField(idx, "kpi_min_pct", e.target.value)}
+                                placeholder="90"
+                                className={`${inputCls} text-xs pr-6`}
+                                style={S.input}
+                                disabled={isLocked}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold" style={S.muted}>%</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>
+                              Max % Tolerance
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="any"
+                                value={line.kpi_max_pct}
+                                onChange={(e) => setLineField(idx, "kpi_max_pct", e.target.value)}
+                                placeholder="110"
+                                className={`${inputCls} text-xs pr-6`}
+                                style={S.input}
+                                disabled={isLocked}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold" style={S.muted}>%</span>
+                            </div>
+                          </div>
+                        </>
                       )}
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5 min-w-[140px] text-[11px]" style={S.sub}>{selectedParam?.item_id ? itemLabel(selectedParam.item_id) : "—"}</TableCell>
-                    <TableCell className="px-2 py-1.5 w-16 text-[11px]" style={S.sub}>{selectedParam?.default_uom || "—"}</TableCell>
-                    <TableCell className="px-2 py-1.5 w-28">
-                      <select value={line.occurrence} onChange={(e) => setLineField(idx, "occurrence", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
-                        {OCCURRENCES.map((o) => <option key={o} value={o}>{o.charAt(0) + o.slice(1).toLowerCase()}</option>)}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.period_from} onChange={(e) => setLineField(idx, "period_from", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.period_to} onChange={(e) => setLineField(idx, "period_to", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-32"><input value={line.period_label} onChange={(e) => setLineField(idx, "period_label", e.target.value)} placeholder="Week 1" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.expected_qty_override} onChange={(e) => setLineField(idx, "expected_qty_override", e.target.value)} placeholder="From param" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                    <TableCell className="px-2 py-1.5 w-24">
-                      <select value={line.kpi_mode} onChange={(e) => setLineField(idx, "kpi_mode", e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={isLocked}>
-                        <option value="PCT">PCT</option>
-                        <option value="VALUE">VALUE</option>
-                      </select>
-                    </TableCell>
-                    {line.kpi_mode === "VALUE" ? (
-                      <>
-                        <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_min_value} onChange={(e) => setLineField(idx, "kpi_min_value", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                        <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_max_value} onChange={(e) => setLineField(idx, "kpi_max_value", e.target.value)} className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                      </>
-                    ) : (
-                      <>
-                        <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_min_pct} onChange={(e) => setLineField(idx, "kpi_min_pct", e.target.value)} placeholder="90" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                        <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.kpi_max_pct} onChange={(e) => setLineField(idx, "kpi_max_pct", e.target.value)} placeholder="110" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                      </>
-                    )}
-                    <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.critical_threshold_pct} onChange={(e) => setLineField(idx, "critical_threshold_pct", e.target.value)} placeholder="20" className={inputCls} style={S.input} disabled={isLocked} /></TableCell>
-                    {!isLocked && (
-                      <TableCell className="px-2 py-1.5">
-                        <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                  );
-                })}
-              </TableBody>
-            </table>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider text-(--danger)">
+                          Critical Breach %
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            value={line.critical_threshold_pct}
+                            onChange={(e) => setLineField(idx, "critical_threshold_pct", e.target.value)}
+                            placeholder="20"
+                            className={`${inputCls} text-xs pr-6 border-(--danger)/40`}
+                            style={S.input}
+                            disabled={isLocked}
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-(--danger)">%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </Dialog>

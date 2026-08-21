@@ -603,7 +603,244 @@ describe('BatchService', () => {
       expect(res.summary.totalMortality).toBe(2);
     });
   });
+
+  describe('evaluateKpi', () => {
+    it('creates a WARNING KPI alert when actual consumption exceeds max percentage threshold', async () => {
+      const batchWithScheduler = {
+        ...activeBatch,
+        batch_no: 'BAT-001',
+        start_date: '2026-08-01',
+        opening_quantity: 100,
+        scheduler_id: 'sched-1',
+      };
+
+      // Mock loadActiveScheduleLines
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([
+                {
+                  spl: {
+                    spl_id: 'spl-1',
+                    scheduler_id: 'sched-1',
+                    period_from: 1,
+                    period_to: 30,
+                    kpi_enabled: true,
+                    kpi_mode: 'PCT',
+                    kpi_min_pct: '90',
+                    kpi_max_pct: '110',
+                    critical_threshold_pct: '25',
+                    expected_qty_override: '100',
+                  },
+                  parameter: {
+                    parameter_id: 'param-1',
+                    parameter_name: 'Feed Intake',
+                    parameter_type: 'CONSUMPTION',
+                    item_id: null,
+                    resource_id: null,
+                    qty_method: 'PER_BATCH',
+                  },
+                },
+              ]),
+            }),
+          }),
+        })
+        // Mock sameDayTx
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([
+              { transaction_type: 'CONSUMPTION', quantity: '115' },
+            ]),
+          }),
+        })
+        // Mock existing alert query
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        });
+
+      let insertedValues: any;
+      mockDbInsert.mockReturnValueOnce({
+        values: jest.fn().mockImplementation((val) => {
+          insertedValues = val;
+          return Promise.resolve({});
+        }),
+      });
+
+      await (service as any).evaluateKpi(batchWithScheduler, {
+        transaction_id: 'tx-1',
+        transaction_date: '2026-08-05',
+        transaction_type: 'CONSUMPTION',
+        item_id: null,
+        resource_id: null,
+        quantity: 115,
+      });
+
+      expect(insertedValues).toBeDefined();
+      expect(insertedValues.alert_type).toBe('KPI_DEVIATION');
+      expect(insertedValues.severity).toBe('WARNING');
+      expect(insertedValues.actual_value).toBe('115');
+      expect(insertedValues.expected_value).toBe('100');
+      expect(insertedValues.deviation_pct).toBe('15.00');
+    });
+
+    it('escalates alert to CRITICAL when percentage deviation exceeds critical_threshold_pct', async () => {
+      const batchWithScheduler = {
+        ...activeBatch,
+        batch_no: 'BAT-001',
+        start_date: '2026-08-01',
+        opening_quantity: 100,
+        scheduler_id: 'sched-1',
+      };
+
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([
+                {
+                  spl: {
+                    spl_id: 'spl-1',
+                    scheduler_id: 'sched-1',
+                    period_from: 1,
+                    period_to: 30,
+                    kpi_enabled: true,
+                    kpi_mode: 'PCT',
+                    kpi_min_pct: '90',
+                    kpi_max_pct: '110',
+                    critical_threshold_pct: '20',
+                    expected_qty_override: '100',
+                  },
+                  parameter: {
+                    parameter_id: 'param-1',
+                    parameter_name: 'Feed Intake',
+                    parameter_type: 'CONSUMPTION',
+                    item_id: null,
+                    resource_id: null,
+                    qty_method: 'PER_BATCH',
+                  },
+                },
+              ]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        });
+
+      let insertedValues: any;
+      mockDbInsert.mockReturnValueOnce({
+        values: jest.fn().mockImplementation((val) => {
+          insertedValues = val;
+          return Promise.resolve({});
+        }),
+      });
+
+      await (service as any).evaluateKpi(batchWithScheduler, {
+        transaction_id: 'tx-2',
+        transaction_date: '2026-08-05',
+        transaction_type: 'CONSUMPTION',
+        item_id: null,
+        resource_id: null,
+        quantity: 135, // 35% deviation > 20% critical threshold
+      });
+
+      expect(insertedValues).toBeDefined();
+      expect(insertedValues.severity).toBe('CRITICAL');
+      expect(insertedValues.deviation_pct).toBe('35.00');
+    });
+
+    it('evaluates VALUE mode temperature range and triggers alert on breach', async () => {
+      const batchWithScheduler = {
+        ...activeBatch,
+        batch_no: 'BAT-001',
+        start_date: '2026-08-01',
+        opening_quantity: 100,
+        scheduler_id: 'sched-1',
+      };
+
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([
+                {
+                  spl: {
+                    spl_id: 'spl-temp',
+                    scheduler_id: 'sched-1',
+                    period_from: 1,
+                    period_to: 30,
+                    kpi_enabled: true,
+                    kpi_mode: 'VALUE',
+                    kpi_min_value: '20',
+                    kpi_max_value: '26',
+                    kpi_target_value: '23',
+                  },
+                  parameter: {
+                    parameter_id: 'param-temp',
+                    parameter_name: 'Shed Temperature',
+                    parameter_type: 'OBSERVATION',
+                    item_id: null,
+                    resource_id: null,
+                    qty_method: 'MANUAL_AT_ENTRY',
+                  },
+                },
+              ]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        });
+
+      let insertedValues: any;
+      mockDbInsert.mockReturnValueOnce({
+        values: jest.fn().mockImplementation((val) => {
+          insertedValues = val;
+          return Promise.resolve({});
+        }),
+      });
+
+      await (service as any).evaluateKpi(batchWithScheduler, {
+        transaction_id: 'tx-3',
+        transaction_date: '2026-08-05',
+        transaction_type: 'OBSERVATION',
+        item_id: null,
+        resource_id: null,
+        quantity: 34, // 34°C exceeds max 26°C
+      });
+
+      expect(insertedValues).toBeDefined();
+      expect(insertedValues.alert_type).toBe('KPI_DEVIATION');
+      expect(insertedValues.actual_value).toBe('34');
+      expect(insertedValues.expected_value).toBe('23');
+      expect(insertedValues.title).toContain('Shed Temperature Above KPI');
+    });
+  });
 });
+
 
 
 

@@ -258,6 +258,16 @@ export class AddBatchTransactionDto {
   @IsOptional()
   remarks?: string;
 
+  @ApiProperty({ description: 'Scheduler Parameter Line UUID (optional — for direct KPI matching)', required: false })
+  @IsUUID()
+  @IsOptional()
+  spl_id?: string;
+
+  @ApiProperty({ description: 'Parameter UUID (optional — for direct KPI matching)', required: false })
+  @IsUUID()
+  @IsOptional()
+  parameter_id?: string;
+
   @ApiProperty({ description: 'Output classification (OUTPUT type only) — set to BY_PRODUCT/WASTE with nrv_rate to remove a by-product mid-batch at Net Realisable Value, distinct from the main product', enum: OUTPUT_TYPES, required: false })
   @IsString()
   @IsOptional()
