@@ -71,10 +71,10 @@ function resolveEndpoint(f: MasterDataField, form: Row): string | null {
   return f.entityEndpoint.replace("{value}", parentVal);
 }
 
-function displayValue(row: Row, key: string): string {
+function displayValue(row: Row, key: string, yesLabel: string, noLabel: string): string {
   const v = row[key];
   if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (typeof v === "boolean") return v ? yesLabel : noLabel;
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
@@ -483,7 +483,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                   return (
                     <TableRow key={row[config.idKey]}>
                       {columns.map((c) => (
-                        <TableCell key={c.key} className="whitespace-nowrap" style={S.primary}>{displayValue(row, c.key)}</TableCell>
+                        <TableCell key={c.key} className="whitespace-nowrap" style={S.primary}>{displayValue(row, c.key, t("mdYes"), t("mdNo"))}</TableCell>
                       ))}
                       <TableCell className="text-right">
                         <span

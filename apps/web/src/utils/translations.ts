@@ -374,6 +374,8 @@ export const translations = {
     mdTenantGlobalCatalog: "Tenant Global Catalog (Templates)",
     mdCompanyRecordsSuffix: "(Company Records)",
     mdPreseedButton: "Pre-Seed from Tenant Catalog",
+    mdYes: "Yes",
+    mdNo: "No",
 
     // Console — Approvals page chrome
     apTitle: "Operational Approvals & Sign-Offs",
@@ -1101,6 +1103,8 @@ export const translations = {
     mdTenantGlobalCatalog: "टेनेंट ग्लोबल कैटलॉग (टेम्प्लेट)",
     mdCompanyRecordsSuffix: "(कंपनी रिकॉर्ड)",
     mdPreseedButton: "टेनेंट कैटलॉग से पूर्व-सीड करें",
+    mdYes: "हाँ",
+    mdNo: "नहीं",
 
     // Console — Approvals page chrome
     apTitle: "परिचालन अनुमोदन एवं साइन-ऑफ़",
@@ -1726,6 +1730,8 @@ export const translations = {
     mdTenantGlobalCatalog: "टेनंट ग्लोबल कॅटलॉग (टेम्प्लेट्स)",
     mdCompanyRecordsSuffix: "(कंपनी नोंदी)",
     mdPreseedButton: "टेनंट कॅटलॉगमधून पूर्व-सीड करा",
+    mdYes: "होय",
+    mdNo: "नाही",
 
     // Console — Approvals page chrome
     apTitle: "ऑपरेशनल मंजुरी आणि साइन-ऑफ",
@@ -2351,6 +2357,8 @@ export const translations = {
     mdTenantGlobalCatalog: "Catálogo Global del Inquilino (Plantillas)",
     mdCompanyRecordsSuffix: "(Registros de la Empresa)",
     mdPreseedButton: "Pre-Sembrar desde el Catálogo del Inquilino",
+    mdYes: "Sí",
+    mdNo: "No",
 
     // Console — Approvals page chrome
     apTitle: "Aprobaciones Operativas y Autorizaciones",
@@ -2976,6 +2984,8 @@ export const translations = {
     mdTenantGlobalCatalog: "Catalogue Global du Locataire (Modèles)",
     mdCompanyRecordsSuffix: "(Registres de l'Entreprise)",
     mdPreseedButton: "Pré-Alimenter depuis le Catalogue du Locataire",
+    mdYes: "Oui",
+    mdNo: "Non",
 
     // Console — Approvals page chrome
     apTitle: "Approbations Opérationnelles et Validations",
@@ -3601,6 +3611,8 @@ export const translations = {
     mdTenantGlobalCatalog: "টেন্যান্ট গ্লোবাল ক্যাটালগ (টেমপ্লেট)",
     mdCompanyRecordsSuffix: "(কোম্পানি রেকর্ড)",
     mdPreseedButton: "টেন্যান্ট ক্যাটালগ থেকে প্রি-সিড করুন",
+    mdYes: "হ্যাঁ",
+    mdNo: "না",
 
     // Console — Approvals page chrome
     apTitle: "অপারেশনাল অনুমোদন ও সাইন-অফ",
@@ -4226,6 +4238,8 @@ export const translations = {
     mdTenantGlobalCatalog: "టెనెంట్ గ్లోబల్ కేటలాగ్ (టెంప్లేట్‌లు)",
     mdCompanyRecordsSuffix: "(కంపెనీ రికార్డులు)",
     mdPreseedButton: "టెనెంట్ కేటలాగ్ నుండి ప్రీ-సీడ్ చేయండి",
+    mdYes: "అవును",
+    mdNo: "కాదు",
 
     // Console — Approvals page chrome
     apTitle: "ఆపరేషనల్ ఆమోదాలు & సైన్-ఆఫ్‌లు",
@@ -4851,6 +4865,8 @@ export const translations = {
     mdTenantGlobalCatalog: "வாடகையாளர் உலகளாவிய பட்டியல் (வார்ப்புருக்கள்)",
     mdCompanyRecordsSuffix: "(நிறுவன பதிவுகள்)",
     mdPreseedButton: "வாடகையாளர் பட்டியலிலிருந்து முன்-விதைக்கவும்",
+    mdYes: "ஆம்",
+    mdNo: "இல்லை",
 
     // Console — Approvals page chrome
     apTitle: "செயல்பாட்டு ஒப்புதல்கள் & கையொப்பங்கள்",
