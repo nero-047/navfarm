@@ -123,6 +123,10 @@ export class RoleService {
       throw new NotFoundException(`Role with ID '${roleId}' not found.`);
     }
 
+    if (role[0].is_system_role) {
+      throw new BadRequestException('System role permissions cannot be changed.');
+    }
+
     return this.db.transaction(async (tx) => {
       // 1. Delete old permission rows
       await tx.delete(schema.rolePermissions).where(eq(schema.rolePermissions.role_id, roleId));
@@ -196,6 +200,10 @@ export class RoleService {
 
     if (!role) {
       throw new NotFoundException(`Role with ID '${roleId}' not found.`);
+    }
+
+    if (role.is_system_role && (data.roleName !== undefined || data.description !== undefined)) {
+      throw new BadRequestException('System roles cannot be renamed or redescribed.');
     }
 
     const updateData: Record<string, any> = {};

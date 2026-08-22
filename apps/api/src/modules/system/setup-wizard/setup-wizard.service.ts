@@ -12,6 +12,7 @@ import { Step3ContactDto } from './dto/step3-contact.dto';
 import { Step7FiscalDto } from './dto/step7-fiscal.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { MasterDataSeedService } from './seed/master-data-seed.service';
+import { seedDefaultCompanyRoles } from '../../core/role/default-role-seed';
 
 @Injectable()
 export class SetupWizardService implements OnModuleInit {
@@ -158,6 +159,20 @@ export class SetupWizardService implements OnModuleInit {
           .from(schema.companyMaster)
           .where(eq(schema.companyMaster.company_id, companyId))
           .limit(1);
+      }
+
+      // Seed the four starter roles the first time this company gets a real
+      // profile. The "existing" branch above frequently claims the tenant's
+      // placeholder company in place rather than inserting a fresh row, so a
+      // create()-only hook (as in CompanyService) would miss most companies
+      // onboarded through this wizard — check roleMaster directly instead.
+      const hasRoles = await tx
+        .select({ role_id: schema.roleMaster.role_id })
+        .from(schema.roleMaster)
+        .where(eq(schema.roleMaster.company_id, company.company_id))
+        .limit(1);
+      if (hasRoles.length === 0) {
+        await seedDefaultCompanyRoles(tx, company.company_id);
       }
 
       try {

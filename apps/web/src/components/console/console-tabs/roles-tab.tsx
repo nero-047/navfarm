@@ -301,15 +301,22 @@ export default function RolesTab({
                     <p className="text-xs mt-1.5 line-clamp-2" style={S.textMuted}>{r.role_description || "Custom operator scopes"}</p>
                   </div>
                   <div className="flex items-center gap-4 pt-2.5 border-t" style={S.border} onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => openEditModal(r)}
-                      className="flex items-center gap-1 text-[11px] cursor-pointer transition-colors font-semibold"
-                      style={S.textSecondary}
-                      onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
-                      onMouseLeave={e => e.currentTarget.style.color = "var(--text-secondary)"}
-                    >
-                      <Edit3 className="w-3 h-3" /> Edit Name
-                    </button>
+                    {!r.is_system_role && (
+                      <button
+                        onClick={() => openEditModal(r)}
+                        className="flex items-center gap-1 text-[11px] cursor-pointer transition-colors font-semibold"
+                        style={S.textSecondary}
+                        onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
+                        onMouseLeave={e => e.currentTarget.style.color = "var(--text-secondary)"}
+                      >
+                        <Edit3 className="w-3 h-3" /> Edit Name
+                      </button>
+                    )}
+                    {r.is_system_role && (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold" style={S.textMuted}>
+                        <ShieldAlert className="w-3 h-3" /> System role — locked
+                      </span>
+                    )}
                     {!r.is_system_role && (
                       <button
                         onClick={() => setDeletingRoleId(r.role_id)}
@@ -338,15 +345,21 @@ export default function RolesTab({
                 </h3>
                 <p className="text-[9px] mt-1 font-mono" style={S.textMuted}>Role ID: {selectedRole.role_id}</p>
               </div>
-              <Button
-                onClick={handleSavePermissions}
-                disabled={savingPerms || loadingPerms}
-                className="flex items-center gap-1.5 self-start py-2 px-4 font-semibold text-xs text-white"
-                style={{ backgroundColor: "var(--accent)" }}
-              >
-                <Save className="w-3.5 h-3.5" />
-                {savingPerms ? "Saving..." : "Save Policies"}
-              </Button>
+              {selectedRole.is_system_role ? (
+                <span className="flex items-center gap-1.5 self-start py-2 px-3 text-[11px] font-semibold rounded-[var(--radius-sm)]" style={{ color: "var(--text-muted)", backgroundColor: "var(--badge-bg)" }}>
+                  <ShieldAlert className="w-3.5 h-3.5" /> System role permissions are fixed
+                </span>
+              ) : (
+                <Button
+                  onClick={handleSavePermissions}
+                  disabled={savingPerms || loadingPerms}
+                  className="flex items-center gap-1.5 self-start py-2 px-4 font-semibold text-xs text-white"
+                  style={{ backgroundColor: "var(--accent)" }}
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {savingPerms ? "Saving..." : "Save Policies"}
+                </Button>
+              )}
             </div>
 
             {loadingPerms ? (
@@ -377,8 +390,9 @@ export default function RolesTab({
                             <input
                               type="checkbox"
                               checked={p[key]}
+                              disabled={selectedRole.is_system_role}
                               onChange={() => handleToggleCheckbox(idx, key)}
-                              className="w-4 h-4 rounded border accent-[var(--accent)] cursor-pointer focus:ring-0 focus:ring-offset-0"
+                              className="w-4 h-4 rounded border accent-[var(--accent)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus:ring-0 focus:ring-offset-0"
                               style={{
                                 backgroundColor: "var(--input-bg)",
                                 borderColor: "var(--input-border)",

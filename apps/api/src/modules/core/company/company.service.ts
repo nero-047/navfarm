@@ -8,6 +8,7 @@ import { MASTER_CONNECTION } from '../../../core/database/database.module';
 import { CreateCompanyDto, UpdateCompanyDto, QueryCompanyDto } from './dto/company.dto';
 import * as crypto from 'crypto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { seedDefaultCompanyRoles } from '../role/default-role-seed';
 
 const toMysqlTimestamp = (date: Date = new Date()) =>
   date.toISOString().slice(0, 19).replace('T', ' ');
@@ -169,30 +170,8 @@ export class CompanyService {
         is_active: true,
       });
 
-      // Create default SUPER_ADMIN role for this company
-      const roleId = crypto.randomUUID();
-      await tx.insert(schema.roleMaster).values({
-        role_id: roleId,
-        company_id: companyId,
-        role_code: 'SUPER_ADMIN',
-        role_name: 'Super Administrator',
-        role_description: 'Full administrative control over all company scopes',
-        is_system_role: true,
-      });
-
-      // Seed all permissions for SUPER_ADMIN
-      await tx.insert(schema.rolePermissions).values({
-        role_id: roleId,
-        module_code: 'ALL',
-        resource: 'ALL',
-        can_view: true,
-        can_create: true,
-        can_edit: true,
-        can_delete: true,
-        can_approve: true,
-        can_export: true,
-        can_print: true,
-      });
+      // Seed the four starter roles (SUPER_ADMIN/MANAGER/ACCOUNTANT/OPERATOR)
+      const { superAdminRoleId: roleId } = await seedDefaultCompanyRoles(tx, companyId);
 
       if (userPayload?.userId) {
         const existingAssignments = await tx
@@ -219,57 +198,6 @@ export class CompanyService {
             .where(eq(schema.userMaster.user_id, userPayload.userId));
         }
       }
-
-      // Create default MANAGER role for this company
-      const managerRoleId = crypto.randomUUID();
-      await tx.insert(schema.roleMaster).values({
-        role_id: managerRoleId,
-        company_id: companyId,
-        role_code: 'MANAGER',
-        role_name: 'Manager',
-        role_description: 'General operational management and supervisor permissions',
-        is_system_role: false,
-      });
-      // Seed permissions for MANAGER
-      await tx.insert(schema.rolePermissions).values([
-        { role_id: managerRoleId, module_code: 'POULTRY', resource: 'BATCH_CONTROL', can_view: true, can_create: true, can_edit: true, can_delete: false, can_approve: true, can_export: true, can_print: true },
-        { role_id: managerRoleId, module_code: 'POULTRY', resource: 'FEED_LOGS', can_view: true, can_create: true, can_edit: true, can_delete: false, can_approve: true, can_export: true, can_print: true },
-        { role_id: managerRoleId, module_code: 'ACCOUNTING', resource: 'LEDGER', can_view: true, can_create: true, can_edit: true, can_delete: false, can_approve: false, can_export: true, can_print: true },
-        { role_id: managerRoleId, module_code: 'FINANCE', resource: 'VALUATION', can_view: true, can_create: true, can_edit: true, can_delete: false, can_approve: false, can_export: true, can_print: true },
-        { role_id: managerRoleId, module_code: 'COMPANY', resource: 'SETTINGS', can_view: true, can_create: false, can_edit: false, can_delete: false, can_approve: false, can_export: false, can_print: false },
-      ]);
-
-      // Create default ACCOUNTANT role for this company
-      const accountantRoleId = crypto.randomUUID();
-      await tx.insert(schema.roleMaster).values({
-        role_id: accountantRoleId,
-        company_id: companyId,
-        role_code: 'ACCOUNTANT',
-        role_name: 'Accountant',
-        role_description: 'Accounting, ledgers, and financial valuation reports',
-        is_system_role: false,
-      });
-      // Seed permissions for ACCOUNTANT
-      await tx.insert(schema.rolePermissions).values([
-        { role_id: accountantRoleId, module_code: 'ACCOUNTING', resource: 'LEDGER', can_view: true, can_create: true, can_edit: true, can_delete: true, can_approve: true, can_export: true, can_print: true },
-        { role_id: accountantRoleId, module_code: 'FINANCE', resource: 'VALUATION', can_view: true, can_create: true, can_edit: true, can_delete: false, can_approve: true, can_export: true, can_print: true },
-      ]);
-
-      // Create default OPERATOR role for this company
-      const operatorRoleId = crypto.randomUUID();
-      await tx.insert(schema.roleMaster).values({
-        role_id: operatorRoleId,
-        company_id: companyId,
-        role_code: 'OPERATOR',
-        role_name: 'Operator',
-        role_description: 'Daily operational tasks and farming log entry submissions',
-        is_system_role: false,
-      });
-      // Seed permissions for OPERATOR
-      await tx.insert(schema.rolePermissions).values([
-        { role_id: operatorRoleId, module_code: 'POULTRY', resource: 'FEED_LOGS', can_view: true, can_create: true, can_edit: false, can_delete: false, can_approve: false, can_export: true, can_print: true },
-        { role_id: operatorRoleId, module_code: 'POULTRY', resource: 'BATCH_CONTROL', can_view: true, can_create: false, can_edit: false, can_delete: false, can_approve: false, can_export: true, can_print: true },
-      ]);
 
       // 1. Create Default Office Address
       await tx.insert(schema.companyAddress).values({
