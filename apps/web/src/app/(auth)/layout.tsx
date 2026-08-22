@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useLanguage } from '@/hooks/useLanguage';
 import { ThemeSelector } from '@/components/ui/theme-selector';
+import { LanguageSelector } from '@/components/ui/language-selector';
 
 const NAVFARM_LOGO_SRC = "https://nav-cdn.pages.dev/images/favicon.png";
 
@@ -10,7 +11,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const { t } = useLanguage();
   return (
     <div className="min-h-screen flex relative">
-      <div className="absolute right-4 top-4 z-20 md:right-6 md:top-6">
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2 md:right-6 md:top-6">
+        <LanguageSelector />
         <ThemeSelector />
       </div>
 
@@ -35,7 +37,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </Link>
 
           <div className="animate-fade-in">
-            <h1 className="nf-text-display text-white mb-4">
+            {/* Global `h1{color:var(--text-primary)}` is unlayered CSS and beats
+                the layered Tailwind `text-white` utility regardless of theme —
+                in light mode --text-primary is near-navy, same family as this
+                panel's --sidebar-bg, making the heading unreadable. An inline
+                style is the one thing guaranteed to win that cascade. */}
+            <h1 className="nf-text-display mb-4" style={{ color: 'var(--text-inverse)' }}>
               {t('authTagline')}
               <br />
               {t('authTaglineLine2')}

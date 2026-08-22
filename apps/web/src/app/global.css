@@ -37,6 +37,7 @@
   --text-secondary: #5f6370;
   --text-muted: #7b7f89;
   --text-disabled: #a7aab1;
+  --text-inverse: #ffffff;
   --accent: #c24332;
   --accent-hover: #a9382a;
   --accent-muted: rgba(194, 67, 50, 0.1);
@@ -1257,6 +1258,7 @@ html[data-theme='dark'] {
   --text-secondary: #a7aab1;
   --text-muted: #9095a0;
   --text-disabled: #5f6370;
+  --text-inverse: #ffffff;
   --accent: #e0785f;
   --accent-hover: #eb937d;
   --accent-muted: rgba(217, 105, 79, 0.18);

@@ -1,141 +1,44 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { PasswordInput } from '@/components/ui/password-input';
-import { AlertCircle } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
-export function SignupForm() {
-  const [name, setName] = useState('');
-  const [tenantName, setTenantName] = useState('');
-  const [tenantCode, setTenantCode] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const { signup } = useAuth();
-  const router = useRouter();
-  const { t } = useLanguage();
+const CONTACT_EMAIL = 'sales@navfarm.com';
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (!tenantName || !tenantCode || !name || !email || !password) {
-      setError(t('authFillAllFields'));
-      return;
-    }
-    if (
-      password.length < 8 ||
-      !/[A-Z]/.test(password) ||
-      !/[0-9]/.test(password) ||
-      !/[^A-Za-z0-9]/.test(password)
-    ) {
-      setError(t('authPasswordRules'));
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const signedInUser = await signup({ tenantName, tenantCode, name, email, password });
-      router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to create workspace');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+/**
+ * NAVFarm workspaces are provisioned by our team, not through open
+ * self-signup — a new tenant needs its farms, business lines, and first
+ * administrator set up together with a real onboarding conversation. This
+ * replaces what used to be a working signup form (still fully functional on
+ * the backend, at POST /tenant/signup) with a direct path to that
+ * conversation instead.
+ */
+export function SignupForm() {
+  const { t } = useLanguage();
 
   return (
     <div>
-      <div className="mb-10">
+      <div className="mb-8">
         <h1 className="text-3xl font-semibold text-(--text-primary) tracking-tight mb-2">
-          {t('authCreateAccount')}
+          {t('authGetStarted')}
         </h1>
-        <p className="text-(--text-secondary) text-[15px]">
-          {t('authCreateAccountSubtitle')}
+        <p className="text-(--text-secondary) text-[15px] leading-relaxed">
+          {t('authGetStartedBody')}
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {error && (
-          <div className="flex items-center gap-2 text-sm text-(--danger) py-1">
-            <AlertCircle size={16} />
-            <span>{error}</span>
-          </div>
-        )}
+      <a
+        href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('NAVFarm workspace — demo & consulting')}`}
+        className="nf-btn-primary w-full flex items-center justify-center gap-2 h-11 rounded-[var(--radius-sm)] text-[15px] font-medium"
+      >
+        <Mail size={16} />
+        {t('authContactUs')}
+      </a>
 
-        <div className="space-y-1.5">
-          <label htmlFor="tenant-name" className="block text-[13px] font-medium text-(--text-primary)">
-            {t('authOrgName')}
-          </label>
-          <Input
-            id="tenant-name"
-            type="text"
-            placeholder="Green Valley Holdings"
-            value={tenantName}
-            onChange={(e) => setTenantName(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="tenant-code" className="block text-[13px] font-medium text-(--text-primary)">
-            {t('authWorkspaceCode')}
-          </label>
-          <Input
-            id="tenant-code"
-            type="text"
-            placeholder="greenvalley"
-            value={tenantCode}
-            onChange={(e) => setTenantCode(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="name" className="block text-[13px] font-medium text-(--text-primary)">
-            {t('authFullName')}
-          </label>
-          <Input
-            id="name"
-            type="text"
-            placeholder="John Doe"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="email" className="block text-[13px] font-medium text-(--text-primary)">
-            {t('authEmail')}
-          </label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="password" className="block text-[13px] font-medium text-(--text-primary)">
-            {t('authPassword')}
-          </label>
-          <PasswordInput
-            id="password"
-            placeholder="8+ chars, uppercase, number, special"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-
-        <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? t('authCreatingAccount') : t('authCreateAccountBtn')}
-        </Button>
-      </form>
+      <p className="mt-4 text-center text-[13px] text-(--text-muted)">
+        {CONTACT_EMAIL}
+      </p>
 
       <p className="mt-8 text-center text-[14px] text-(--text-secondary)">
         {t('authAlreadyHaveAccount')}{' '}
