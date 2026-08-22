@@ -366,6 +366,14 @@ export const translations = {
     dairyCowHerdRegisterDesc: "Individual cattle identification, RFID ear tags, DIM (days in milk), lactation curve, and daily milking yields.",
 
     accessDeniedContactAdmin: "Contact your company administrator if you need access to this section.",
+
+    // Console — Master Data page chrome
+    mdPreseedSuccess: "Company master data pre-seeded successfully from Tenant templates!",
+    mdPreseedFailed: "Failed to pre-seed master data",
+    mdMasterScope: "Master Scope:",
+    mdTenantGlobalCatalog: "Tenant Global Catalog (Templates)",
+    mdCompanyRecordsSuffix: "(Company Records)",
+    mdPreseedButton: "Pre-Seed from Tenant Catalog",
   },
   hi: {
     // Sidebar & Navigation
@@ -677,6 +685,13 @@ export const translations = {
     dairyCowHerdRegisterDesc: "व्यक्तिगत पशु पहचान, RFID कान टैग, DIM (दुग्ध दिवस), स्तनपान वक्र एवं दैनिक दुग्ध उत्पादन।",
 
     accessDeniedContactAdmin: "यदि आपको इस अनुभाग तक पहुंच की आवश्यकता है तो अपने कंपनी प्रशासक से संपर्क करें।",
+
+    mdPreseedSuccess: "कंपनी मास्टर डेटा टेनेंट टेम्प्लेट से सफलतापूर्वक पूर्व-सीड किया गया!",
+    mdPreseedFailed: "मास्टर डेटा पूर्व-सीड करने में विफल",
+    mdMasterScope: "मास्टर स्कोप:",
+    mdTenantGlobalCatalog: "टेनेंट ग्लोबल कैटलॉग (टेम्प्लेट)",
+    mdCompanyRecordsSuffix: "(कंपनी रिकॉर्ड)",
+    mdPreseedButton: "टेनेंट कैटलॉग से पूर्व-सीड करें",
   },
   mr: {
     // Sidebar & Navigation
@@ -886,6 +901,13 @@ export const translations = {
     dairyCowHerdRegisterDesc: "वैयक्तिक गुरे ओळख, RFID कान टॅग, DIM (दूध दिवस), स्तनपान वक्र आणि दैनंदिन दूध उत्पादन.",
 
     accessDeniedContactAdmin: "या विभागात प्रवेश हवा असल्यास तुमच्या कंपनी प्रशासकाशी संपर्क साधा.",
+
+    mdPreseedSuccess: "कंपनी मास्टर डेटा टेनंट टेम्प्लेटमधून यशस्वीरित्या पूर्व-सीड केला!",
+    mdPreseedFailed: "मास्टर डेटा पूर्व-सीड करण्यात अयशस्वी",
+    mdMasterScope: "मास्टर स्कोप:",
+    mdTenantGlobalCatalog: "टेनंट ग्लोबल कॅटलॉग (टेम्प्लेट्स)",
+    mdCompanyRecordsSuffix: "(कंपनी नोंदी)",
+    mdPreseedButton: "टेनंट कॅटलॉगमधून पूर्व-सीड करा",
   },
   es: {
     // Sidebar & Navigation
@@ -1095,6 +1117,13 @@ export const translations = {
     dairyCowHerdRegisterDesc: "Identificación individual de ganado, etiquetas RFID, DEL (días en leche), curva de lactancia y producción diaria de leche.",
 
     accessDeniedContactAdmin: "Contacte a su administrador de empresa si necesita acceso a esta sección.",
+
+    mdPreseedSuccess: "¡Datos maestros de la empresa pre-sembrados exitosamente desde las plantillas del inquilino!",
+    mdPreseedFailed: "Error al pre-sembrar datos maestros",
+    mdMasterScope: "Alcance Maestro:",
+    mdTenantGlobalCatalog: "Catálogo Global del Inquilino (Plantillas)",
+    mdCompanyRecordsSuffix: "(Registros de la Empresa)",
+    mdPreseedButton: "Pre-Sembrar desde el Catálogo del Inquilino",
   },
   fr: {
     // Sidebar & Navigation
@@ -1304,6 +1333,13 @@ export const translations = {
     dairyCowHerdRegisterDesc: "Identification individuelle du bétail, étiquettes RFID, JEL (jours en lait), courbe de lactation et production laitière quotidienne.",
 
     accessDeniedContactAdmin: "Contactez votre administrateur d'entreprise si vous avez besoin d'accéder à cette section.",
+
+    mdPreseedSuccess: "Données de base de l'entreprise pré-alimentées avec succès depuis les modèles du locataire !",
+    mdPreseedFailed: "Échec du pré-alimentation des données de base",
+    mdMasterScope: "Portée Principale :",
+    mdTenantGlobalCatalog: "Catalogue Global du Locataire (Modèles)",
+    mdCompanyRecordsSuffix: "(Registres de l'Entreprise)",
+    mdPreseedButton: "Pré-Alimenter depuis le Catalogue du Locataire",
   },
   bn: {
     // Sidebar & Navigation
@@ -1513,6 +1549,13 @@ export const translations = {
     dairyCowHerdRegisterDesc: "স্বতন্ত্র গবাদি পশু সনাক্তকরণ, RFID কান ট্যাগ, DIM (দুধ দিবস), স্তন্যদান বক্ররেখা ও দৈনিক দুধ উৎপাদন।",
 
     accessDeniedContactAdmin: "এই বিভাগে অ্যাক্সেস প্রয়োজন হলে আপনার কোম্পানি প্রশাসকের সাথে যোগাযোগ করুন।",
+
+    mdPreseedSuccess: "কোম্পানি মাস্টার ডেটা টেন্যান্ট টেমপ্লেট থেকে সফলভাবে প্রি-সিড করা হয়েছে!",
+    mdPreseedFailed: "মাস্টার ডেটা প্রি-সিড করতে ব্যর্থ",
+    mdMasterScope: "মাস্টার স্কোপ:",
+    mdTenantGlobalCatalog: "টেন্যান্ট গ্লোবাল ক্যাটালগ (টেমপ্লেট)",
+    mdCompanyRecordsSuffix: "(কোম্পানি রেকর্ড)",
+    mdPreseedButton: "টেন্যান্ট ক্যাটালগ থেকে প্রি-সিড করুন",
   },
   te: {
     // Sidebar & Navigation
@@ -1722,6 +1765,13 @@ export const translations = {
     dairyCowHerdRegisterDesc: "వ్యక్తిగత పశు గుర్తింపు, RFID చెవి ట్యాగ్‌లు, DIM (పాల రోజులు), పాలివ్వడం వక్రత & రోజువారీ పాల ఉత్పత్తి.",
 
     accessDeniedContactAdmin: "ఈ విభాగానికి యాక్సెస్ అవసరమైతే మీ కంపెనీ నిర్వాహకుడిని సంప్రదించండి.",
+
+    mdPreseedSuccess: "కంపెనీ మాస్టర్ డేటా టెనెంట్ టెంప్లేట్‌ల నుండి విజయవంతంగా ప్రీ-సీడ్ చేయబడింది!",
+    mdPreseedFailed: "మాస్టర్ డేటాను ప్రీ-సీడ్ చేయడంలో విఫలమైంది",
+    mdMasterScope: "మాస్టర్ స్కోప్:",
+    mdTenantGlobalCatalog: "టెనెంట్ గ్లోబల్ కేటలాగ్ (టెంప్లేట్‌లు)",
+    mdCompanyRecordsSuffix: "(కంపెనీ రికార్డులు)",
+    mdPreseedButton: "టెనెంట్ కేటలాగ్ నుండి ప్రీ-సీడ్ చేయండి",
   },
   ta: {
     // Sidebar & Navigation
@@ -1931,5 +1981,12 @@ export const translations = {
     dairyCowHerdRegisterDesc: "தனிப்பட்ட கால்நடை அடையாளம், RFID காது டேக்குகள், DIM (பால் நாட்கள்), பாலூட்டல் வளைவு & தினசரி பால் உற்பத்தி.",
 
     accessDeniedContactAdmin: "இந்தப் பிரிவுக்கு அணுகல் தேவைப்பட்டால் உங்கள் நிறுவன நிர்வாகியைத் தொடர்பு கொள்ளவும்.",
+
+    mdPreseedSuccess: "நிறுவன மாஸ்டர் தரவு வாடகையாளர் வார்ப்புருக்களிலிருந்து வெற்றிகரமாக முன்-விதைக்கப்பட்டது!",
+    mdPreseedFailed: "மாஸ்டர் தரவை முன்-விதைக்க முடியவில்லை",
+    mdMasterScope: "மாஸ்டர் நோக்கம்:",
+    mdTenantGlobalCatalog: "வாடகையாளர் உலகளாவிய பட்டியல் (வார்ப்புருக்கள்)",
+    mdCompanyRecordsSuffix: "(நிறுவன பதிவுகள்)",
+    mdPreseedButton: "வாடகையாளர் பட்டியலிலிருந்து முன்-விதைக்கவும்",
   }
 };

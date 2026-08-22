@@ -1,16 +1,43 @@
 "use client";
 
+import { Globe } from "lucide-react";
 import { useLanguage } from "../../hooks/useLanguage";
+
+// Each language's own name, in its own script — not the English name and
+// not a 2-letter code — so a reader who can't read English can still find
+// their language in the list.
+const NATIVE_NAMES: Record<string, string> = {
+  en: "English",
+  hi: "हिन्दी",
+  mr: "मराठी",
+  es: "Español",
+  fr: "Français",
+  bn: "বাংলা",
+  te: "తెలుగు",
+  ta: "தமிழ்",
+};
 
 export function LanguageSelector() {
   const { language, setLanguage } = useLanguage();
   return (
-    <div style={{ position: "relative", display: "inline-block" }}>
+    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <Globe
+        size={14}
+        style={{
+          position: "absolute",
+          left: "9px",
+          top: "50%",
+          transform: "translateY(-50%)",
+          pointerEvents: "none",
+          color: "var(--text-muted)",
+        }}
+      />
       <select
         value={language}
         onChange={(e) => setLanguage(e.target.value as any)}
+        aria-label="Language"
         style={{
-          padding: "0 24px 0 10px",
+          padding: "0 24px 0 28px",
           borderRadius: "16px",
           border: "1px solid var(--border)",
           backgroundColor: "transparent",
@@ -36,14 +63,11 @@ export function LanguageSelector() {
           b.style.color = "var(--text-secondary)";
         }}
       >
-        <option value="en" style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>EN</option>
-        <option value="hi" style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>HI</option>
-        <option value="mr" style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>MR</option>
-        <option value="es" style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>ES</option>
-        <option value="fr" style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>FR</option>
-        <option value="bn" style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>BN</option>
-        <option value="te" style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>TE</option>
-        <option value="ta" style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>TA</option>
+        {Object.entries(NATIVE_NAMES).map(([code, name]) => (
+          <option key={code} value={code} style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>
+            {name}
+          </option>
+        ))}
       </select>
       <span style={{
         position: "absolute",
