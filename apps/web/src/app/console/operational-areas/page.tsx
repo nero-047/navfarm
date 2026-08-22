@@ -66,7 +66,16 @@ export default function OperationalAreasPage() {
       ]);
 
       if (Array.isArray(areasRes)) setAreas(areasRes as OperationalArea[]);
-      const nobsList = Array.isArray(nobsRes) ? (nobsRes as any[]) : [];
+      // Piggery-only for now — see step8-modules.tsx for the matching
+      // restriction at company onboarding. Remove both once another LOB's
+      // operational workflow is ready.
+      const rawNobs = Array.isArray(nobsRes) ? (nobsRes as any[]) : [];
+      const nobsList = rawNobs
+        .filter((n) => (n.nob_name || n.nob_code || "").toLowerCase().includes("livestock"))
+        .map((n) => ({
+          ...n,
+          lobs: (n.lobs || []).filter((l: any) => (l.lob_name || l.lob_code || "").toLowerCase().includes("piggery")),
+        }));
       setNobs(nobsList);
 
       // Default NOB/LOB if available

@@ -10,7 +10,16 @@ interface Step8ModulesProps {
   initialModules?: string[];
 }
 
+// Piggery-only for now — every other NOB/LOB combination is real backend
+// catalog data (system admin still manages the full list in Master Data),
+// but only Piggery has a built operational workflow end to end. Remove this
+// filter once another LOB is ready to onboard companies against.
+const PIGGERY_ONLY = true;
+const isLivestockNob = (n: any) => (n.nob_name || n.nob_code || "").toLowerCase().includes("livestock");
+const isPiggeryLob = (l: any) => (l.lob_name || l.lob_code || "").toLowerCase().includes("piggery");
+
 export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModules }: Step8ModulesProps) {
+  const visibleNobs = PIGGERY_ONLY ? nobs.filter(isLivestockNob) : nobs;
   const [selectedNobs, setSelectedNobs] = useState<string[]>([]);
   const [selectedLobs, setSelectedLobs] = useState<string[]>([]);
 
@@ -46,7 +55,8 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
       setLobMap(prev => ({ ...prev, [nobId]: list || [] }));
 
       // Auto-select all associated LOBs by default when NOB is selected
-      const lobCodes = (list || []).map((l: any) => l.lob_code);
+      const visibleLobs = PIGGERY_ONLY ? (list || []).filter(isPiggeryLob) : (list || []);
+      const lobCodes = visibleLobs.map((l: any) => l.lob_code);
       setSelectedLobs(prev => {
         const unique = new Set([...prev, ...lobCodes]);
         return Array.from(unique);
@@ -99,7 +109,7 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
         {nobs.length === 0 ? (
           <div className="p-4 bg-(--surface-raised) rounded-[var(--radius-sm)] text-(--text-secondary) text-sm">Loading business modules catalog...</div>
         ) : (
-          nobs.map((n: any) => {
+          visibleNobs.map((n: any) => {
             const isChecked = selectedNobs.includes(n.nob_code);
             return (
               <div
@@ -127,11 +137,11 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
                     <span className="text-[10px] font-semibold text-(--accent) uppercase tracking-wider">Select Active Operations (LOBs):</span>
                     {loadingLobs[n.nob_id] ? (
                       <div className="text-[11px] text-(--text-secondary) animate-pulse py-1">Loading active sub-sectors...</div>
-                    ) : !lobMap[n.nob_id] || lobMap[n.nob_id].length === 0 ? (
+                    ) : !lobMap[n.nob_id] || (PIGGERY_ONLY ? lobMap[n.nob_id].filter(isPiggeryLob) : lobMap[n.nob_id]).length === 0 ? (
                       <div className="text-[11px] text-(--text-secondary) py-1">No sub-sectors available.</div>
                     ) : (
                       <div className="flex flex-col gap-1.5 mt-1">
-                        {lobMap[n.nob_id].map((lob: any) => {
+                        {(PIGGERY_ONLY ? lobMap[n.nob_id].filter(isPiggeryLob) : lobMap[n.nob_id]).map((lob: any) => {
                           const isLobChecked = selectedLobs.includes(lob.lob_code);
                           return (
                             <label
