@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  Loader2, Save, RefreshCw,
+  Loader2, Save,
 } from "lucide-react";
 
 import { api } from "@/services/api-client";
@@ -221,9 +221,6 @@ export default function BulkDailyEntryPanel() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Reload Batches
-          </Button>
           <Button size="sm" onClick={handleBulkSubmit} disabled={saving || rows.length === 0}>
             {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
             Save All Daily Logs

@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import {
-  Loader2, RefreshCw, Building2, AlertTriangle, ShieldCheck,
+  Loader2, Building2, AlertTriangle, ShieldCheck,
   ShieldAlert, CheckCircle2, Users,
 } from "lucide-react";
 
 import { api } from "@/services/api-client";
-import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 
@@ -62,15 +61,9 @@ export default function FacilityOccupancyPanel() {
   return (
     <div className="space-y-6">
       {/* ── Top Header Bar ── */}
-      <div className="flex items-center justify-between rounded-[var(--radius-lg)] border p-4" style={S.surface}>
-        <div>
-          <h3 className="text-base font-semibold" style={S.primary}>Facility & Pen Live Occupancy Tracker</h3>
-          <p className="text-xs" style={S.muted}>Real-time pen headcount, utilization gauges, and biosecurity isolation tracking</p>
-        </div>
-        <Button size="sm" onClick={loadOccupancy} disabled={loading}>
-          {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-          Refresh Occupancy
-        </Button>
+      <div className="rounded-[var(--radius-lg)] border p-4" style={S.surface}>
+        <h3 className="text-base font-semibold" style={S.primary}>Facility & Pen Live Occupancy Tracker</h3>
+        <p className="text-xs" style={S.muted}>Real-time pen headcount, utilization gauges, and biosecurity isolation tracking</p>
       </div>
 
       {error && <InlineAlert variant="danger">{error}</InlineAlert>}

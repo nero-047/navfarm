@@ -356,16 +356,6 @@ export default function DashboardPage() {
               )}
             </>
           )}
-
-          <button
-            onClick={() => user && loadDashboard(user, getStoredTenantId() || "", activeCompanyId, scope)}
-            className="nf-press flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-[var(--surface-raised)]"
-            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-            title="Refresh live telemetry"
-          >
-            <Activity className="h-3.5 w-3.5 text-[var(--accent)]" />
-            <span>Sync</span>
-          </button>
         </div>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  Loader2, RefreshCw, AlertTriangle, CheckCircle2,
+  Loader2, AlertTriangle, CheckCircle2,
   Layers, Calendar,
   Scale, Utensils, Skull,
 } from "lucide-react";
@@ -114,17 +114,12 @@ export default function BatchPerformanceCurvesPanel({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {!batch.has_scheduler && (
-            <Button size="sm" onClick={handleGenerateScheduler} disabled={generating}>
-              {generating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Layers className="mr-1.5 h-3.5 w-3.5" />}
-              Generate Scheduler from Breed Standard
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={loadCurves} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        {!batch.has_scheduler && (
+          <Button size="sm" onClick={handleGenerateScheduler} disabled={generating}>
+            {generating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Layers className="mr-1.5 h-3.5 w-3.5" />}
+            Generate Scheduler from Breed Standard
           </Button>
-        </div>
+        )}
       </div>
 
       {/* ── Summary KPI Cards ── */}
