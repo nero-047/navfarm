@@ -172,8 +172,8 @@ export function BreedingPanel() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.post(
-        `/piggery/breeding/mating/${selectedMating.breeding_id}/pregnancy-check`,
+      await api.patch(
+        `/piggery/breeding/mating/${selectedMating.breeding_id}/preg-check`,
         pregCheckForm
       );
       setSuccess("Pregnancy check updated!");
@@ -219,8 +219,8 @@ export function BreedingPanel() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.post(
-        `/piggery/breeding/farrowing/${selectedFarrow.farrow_id}/wean`,
+      await api.patch(
+        `/piggery/breeding/farrowing/${selectedFarrow.farrow_id}/weaning`,
         {
           ...weanForm,
           piglets_weaned: Number(weanForm.piglets_weaned) || 0,
