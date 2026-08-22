@@ -12,7 +12,6 @@ import { useLanguage } from "../../hooks/useLanguage";
 import { LanguageSelector } from "../../components/ui/language-selector";
 import { AppShell } from "../../components/shell/AppShell";
 import { PROFILE_ITEMS } from "../../components/shell/ProfilePopover";
-import { ThemeIconButton } from "../../components/shell/ThemeIconButton";
 
 const adminNavItems = [
   { label: "Dashboard",   key: "dashboard" as const,   href: "/admin/dashboard", icon: LayoutDashboard },
@@ -71,9 +70,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const headerRight = (
     <>
       <LanguageSelector />
-      <ThemeIconButton />
-      {/* Identity moved into the ProfilePopover that AppShell renders — the
-          name is in the menu's heading rather than duplicated in the header. */}
+      {/* Theme control lives in the ProfilePopover now, not the header.
+          Identity moved there too — the name is in the menu's heading
+          rather than duplicated in the header. */}
     </>
   );
 

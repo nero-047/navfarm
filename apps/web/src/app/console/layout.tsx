@@ -313,10 +313,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       : `${activeLob || "Operational"} Area`;
 
   const headerRight = (
-    <>
-      <span className="hidden shrink-0 sm:inline-flex"><LanguageSelector /></span>
-      <ThemeIconButton />
-    </>
+    <span className="hidden shrink-0 sm:inline-flex"><LanguageSelector /></span>
   );
 
   return (

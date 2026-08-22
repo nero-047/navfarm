@@ -1,14 +1,32 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/hooks/useLanguage';
 import { ThemeSelector } from '@/components/ui/theme-selector';
 import { LanguageSelector } from '@/components/ui/language-selector';
+import { getStoredToken, getStoredUser } from '@/hooks/useAuth';
 
 const NAVFARM_LOGO_SRC = "https://nav-cdn.pages.dev/images/favicon.png";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // A signed-in user landing on /login or /signup (e.g. the back button,
+  // a stale bookmark) should go straight back into the app, not see a
+  // form asking them to sign in to an account they're already in. Scoped
+  // to just these two — /reset-password stays reachable while signed in.
+  useEffect(() => {
+    if (pathname !== '/login' && pathname !== '/signup') return;
+    const user = getStoredUser();
+    if (getStoredToken() && user) {
+      router.replace(user.userType === 'SYSTEM_ADMIN' ? '/admin/dashboard' : '/console/dashboard');
+    }
+  }, [pathname, router]);
+
   return (
     <div className="min-h-screen flex relative">
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2 md:right-6 md:top-6">

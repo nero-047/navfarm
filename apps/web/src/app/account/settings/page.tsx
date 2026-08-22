@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { useRouter } from "next/navigation";
+import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ThemeSelector } from "@/components/ui/theme-selector";
@@ -32,6 +33,8 @@ const CATEGORY_LABEL_KEYS: Record<string, string> = {
 
 export default function SettingsPage() {
   const { t } = useLanguage();
+  const router = useRouter();
+  const close = () => router.back();
   const [prefs, setPrefs] = useState<NotificationPref[]>([]);
   const [prefsSaving, setPrefsSaving] = useState(false);
   const [prefsMsg, setPrefsMsg] = useState("");
@@ -77,9 +80,8 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("settingsPageTitle")} description={t("settingsPageDescription")} sticky={false} />
-
+    <Dialog open onClose={close} title={t("settingsPageTitle")} description={t("settingsPageDescription")} maxWidth="lg">
+      <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>{t("settingsAppearance")}</CardTitle>
@@ -184,6 +186,7 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </Dialog>
   );
 }

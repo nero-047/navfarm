@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { useRouter } from "next/navigation";
+import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,8 @@ interface Profile {
 
 export default function ProfilePage() {
   const { t } = useLanguage();
+  const router = useRouter();
+  const close = () => router.back();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [fullName, setFullName] = useState("");
@@ -87,14 +90,12 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading || !profile) {
-    return <div className="text-sm" style={{ color: "var(--text-secondary)" }}>Loading…</div>;
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("profilePageTitle")} description={t("profilePageDescription")} sticky={false} />
-
+    <Dialog open onClose={close} title={t("profilePageTitle")} description={t("profilePageDescription")} maxWidth="lg">
+      {loading || !profile ? (
+        <div className="text-sm" style={{ color: "var(--text-secondary)" }}>Loading…</div>
+      ) : (
+      <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>{t("profilePersonalInfo")}</CardTitle>
@@ -182,6 +183,8 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+      )}
+    </Dialog>
   );
 }
