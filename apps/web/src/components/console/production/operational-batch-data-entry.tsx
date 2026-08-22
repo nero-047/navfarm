@@ -19,7 +19,8 @@ import {
   FileText,
   Layers,
 } from "lucide-react";
-import PiggeryLifecycleStepper, { DEFAULT_PIGGERY_STAGES } from "../piggery/piggery-lifecycle-stepper";
+import PiggeryLifecycleStepper from "../piggery/piggery-lifecycle-stepper";
+import { resolvePiggeryStageId, computeStageDay } from "../piggery/resolve-piggery-stage";
 import { api } from "@/services/api-client";
 import { API_BASE_URL } from "@/lib/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
@@ -180,41 +181,13 @@ export default function OperationalBatchDataEntry() {
 
   // Helper to map a batch to a specific lifecycle stage
   const resolvePiggeryStage = (b: any) => {
-    const code = (b.current_stage_code || b.stage_code || b.stage_name || "").toUpperCase().trim();
-    if (!code) {
-      return { id: 4, name: "Gestation", day: 42, totalDays: 114 };
-    }
-    if (code === "ST-01" || code.includes("QUARANTINE") || code.includes("QUAR")) {
-      return { id: 1, name: "Quarantine", day: 5, totalDays: 7 };
-    }
-    if (code === "ST-02" || code.includes("GILT_GROWER") || code.includes("GROWER") || code.includes("GILT") || code.includes("REARING")) {
-      return { id: 2, name: "Gilt Grower", day: 45, totalDays: 112 };
-    }
-    if (code === "ST-03" || code.includes("FLUSH_AI") || code.includes("FLUSH") || code.includes("AI") || code.includes("MATING") || code.includes("BREED")) {
-      return { id: 3, name: "Flush / AI", day: 4, totalDays: 7 };
-    }
-    if (code === "ST-04" || code.includes("GESTATION") || code.includes("DRY_SOW") || code.includes("PREGNANT")) {
-      return { id: 4, name: "Gestation", day: 42, totalDays: 114 };
-    }
-    if (code === "ST-05" || code.includes("FARROWING") || code.includes("FARROW")) {
-      return { id: 5, name: "Farrowing", day: 3, totalDays: 7 };
-    }
-    if (code === "ST-06" || code.includes("LACTATION") || code.includes("LACTAT") || code.includes("NURSING") || code.includes("SUCKLING")) {
-      return { id: 6, name: "Lactation", day: 14, totalDays: 28 };
-    }
-    if (code === "ST-07" || code.includes("WEANING") || code.includes("WEAN") || code.includes("NURSERY")) {
-      return { id: 7, name: "Weaning", day: 3, totalDays: 6 };
-    }
-    if (code === "ST-08" || code.includes("NEXT_CYCLE") || code.includes("FINISHER") || code.includes("FINISH") || code.includes("RECOVERY")) {
-      return { id: 8, name: "Next Cycle", day: 10, totalDays: 14 };
-    }
-
-    const matched = DEFAULT_PIGGERY_STAGES.find((s) => s.code.toUpperCase() === code || s.name.toUpperCase() === code || code.includes(s.code.toUpperCase()));
-    if (matched) {
-      return { id: matched.id, name: matched.name, day: 1, totalDays: matched.standardDays };
-    }
-
-    return { id: 4, name: b.current_stage_code || "Gestation", day: 1, totalDays: 114 };
+    const resolved = resolvePiggeryStageId(b.current_stage_code || b.stage_code || b.stage_name);
+    return {
+      id: resolved.id,
+      name: resolved.name,
+      day: computeStageDay(b.start_date, resolved.standardDays),
+      totalDays: resolved.standardDays,
+    };
   };
 
   // Sync activeStageId whenever currentBatch or its stage changes

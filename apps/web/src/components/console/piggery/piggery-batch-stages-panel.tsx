@@ -10,6 +10,7 @@ import {
   Layers,
 } from "lucide-react";
 import { DEFAULT_PIGGERY_STAGES, PiggeryStage } from "./piggery-lifecycle-stepper";
+import { resolvePiggeryStageId } from "./resolve-piggery-stage";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 
@@ -64,11 +65,8 @@ export default function PiggeryBatchStagesPanel() {
     api.get(`/batch?companyId=${companyId}&status=ACTIVE&limit=50`)
       .then((res) => {
         const list: any[] = Array.isArray(res) ? res : (res?.data ?? []);
-        const mapped: BatchLifecycleMeta[] = list.map((b: any, idx: number) => {
-          const matchedStage = DEFAULT_PIGGERY_STAGES.find((s) => 
-            s.code.toUpperCase() === (b.current_stage_code || "").toUpperCase() ||
-            s.name.toLowerCase().includes((b.current_stage_code || "").toLowerCase())
-          );
+        const mapped: BatchLifecycleMeta[] = list.map((b: any) => {
+          const matchedStage = resolvePiggeryStageId(b.current_stage_code);
           return {
             id: b.batch_id,
             code: b.batch_no,
@@ -76,7 +74,7 @@ export default function PiggeryBatchStagesPanel() {
             breed: b.breed_name || b.breed_code || "—",
             type: b.lob_name || "Piggery Batch",
             startDate: b.start_date || "",
-            currentStageId: matchedStage?.id ?? (idx % 8 + 1),
+            currentStageId: matchedStage.id,
             currentStageCode: b.current_stage_code,
           };
         });
