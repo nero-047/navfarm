@@ -282,6 +282,12 @@ export const userMaster = mysqlTable('user_master', {
   designation: varchar('designation', { length: 100 }),
   profile_photo_url: varchar('profile_photo_url', { length: 500 }),
   lang_pref_id: varchar('lang_pref_id', { length: 36 }),
+  // The UI language code (en/hi/mr/es/fr/bn/te/ta) the Settings page's
+  // language selector writes to. Deliberately separate from lang_pref_id
+  // (an FK into language_master, which only has en/hi seeded and is used
+  // for locale/date-format config elsewhere) — the UI switcher needs to
+  // work for all 8 codes regardless of what's seeded in that master table.
+  ui_language: varchar('ui_language', { length: 10 }).default('en'),
   timezone_pref_id: varchar('timezone_pref_id', { length: 100 }),
   last_login_at: timestamp('last_login_at', { mode: 'string' }),
   last_login_ip: varchar('last_login_ip', { length: 50 }),

@@ -302,6 +302,13 @@
       "when": 1787401191553,
       "tag": "0042_perpetual_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "5",
+      "when": 1787404648690,
+      "tag": "0043_slim_crystal",
+      "breakpoints": true
     }
   ]
 }

@@ -626,6 +626,7 @@ export class AuthService {
         userType: user.user_type,
         companyId: user.company_id,
         tenantId: user.tenant_id,
+        uiLanguage: user.ui_language || 'en',
         companies,
         operationalAreas,
         permissions,
@@ -832,6 +833,7 @@ export class AuthService {
         designation: schema.userMaster.designation,
         profilePhotoUrl: schema.userMaster.profile_photo_url,
         langPrefId: schema.userMaster.lang_pref_id,
+        uiLanguage: schema.userMaster.ui_language,
         timezonePrefId: schema.userMaster.timezone_pref_id,
         mfaEnabled: schema.userMaster.mfa_enabled,
         lastLoginAt: schema.userMaster.last_login_at,
@@ -868,6 +870,7 @@ export class AuthService {
         designation: dto.designation ?? existing.designation,
         profile_photo_url: dto.profile_photo_url ?? existing.profile_photo_url,
         lang_pref_id: dto.lang_pref_id ?? existing.lang_pref_id,
+        ui_language: dto.ui_language ?? existing.ui_language,
         timezone_pref_id: dto.timezone_pref_id ?? existing.timezone_pref_id,
       })
       .where(eq(schema.userMaster.user_id, userId));

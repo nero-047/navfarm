@@ -37,4 +37,10 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   timezone_pref_id?: string;
+
+  @ApiProperty({ example: 'hi', description: 'UI language code', required: false })
+  @IsString()
+  @IsOptional()
+  @Length(2, 10)
+  ui_language?: string;
 }

@@ -175,6 +175,11 @@ export function persistAuthSession(session: {
   localStorage.setItem(AUTH_STORAGE.accessToken, session.access_token);
   localStorage.setItem(AUTH_STORAGE.refreshToken, session.refresh_token);
   localStorage.setItem(AUTH_STORAGE.user, JSON.stringify(session.user));
+  const uiLanguage = (session.user as { uiLanguage?: string }).uiLanguage;
+  if (uiLanguage) {
+    localStorage.setItem('navfarm_lang', uiLanguage);
+    window.dispatchEvent(new CustomEvent('navfarm:lang-sync', { detail: uiLanguage }));
+  }
   const tenantId = (session.user as { tenantId?: string }).tenantId;
   if (tenantId) {
     localStorage.setItem(AUTH_STORAGE.tenantId, tenantId);

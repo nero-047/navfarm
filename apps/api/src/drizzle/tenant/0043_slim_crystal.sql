@@ -1,0 +1,1 @@
+ALTER TABLE `user_master` ADD `ui_language` varchar(10) DEFAULT 'en';

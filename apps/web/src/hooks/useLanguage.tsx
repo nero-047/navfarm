@@ -33,28 +33,39 @@ const LanguageContext = createContext<LanguageContextValue>({
   tLabel: (text: string) => text,
 });
 
+const VALID_LANGUAGES: Language[] = ["en", "hi", "mr", "es", "fr", "bn", "te", "ta"];
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLangState] = useState<Language>("en");
 
   useEffect(() => {
     const saved = localStorage.getItem("navfarm_lang") as Language | null;
-    if (
-      saved === "en" ||
-      saved === "hi" ||
-      saved === "mr" ||
-      saved === "es" ||
-      saved === "fr" ||
-      saved === "bn" ||
-      saved === "te" ||
-      saved === "ta"
-    ) {
+    if (saved && VALID_LANGUAGES.includes(saved)) {
       setLangState(saved);
     }
+
+    // persistAuthSession (lib/api-client.ts) fires this right after login,
+    // once the user's saved ui_language is known — login doesn't remount
+    // this provider (client-side navigation), so without this the language
+    // wouldn't switch to the account's preference until a hard reload.
+    const onSync = (e: Event) => {
+      const lang = (e as CustomEvent<string>).detail as Language;
+      if (lang && VALID_LANGUAGES.includes(lang)) setLangState(lang);
+    };
+    window.addEventListener("navfarm:lang-sync", onSync);
+    return () => window.removeEventListener("navfarm:lang-sync", onSync);
   }, []);
 
   const setLanguage = (lang: Language) => {
     setLangState(lang);
     localStorage.setItem("navfarm_lang", lang);
+    // Best-effort: persist to the account so the next login on any device
+    // opens in this language. Silently no-ops when signed out.
+    if (localStorage.getItem("navfarm_access_token")) {
+      import("../lib/api-client").then(({ api }) =>
+        api.patch("/auth/profile", { ui_language: lang }).catch(() => void 0)
+      );
+    }
   };
 
   const t = (key: TranslationKeys, vars?: TranslationVars): string => {
