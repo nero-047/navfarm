@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
+import { useLanguage } from "../../../hooks/useLanguage";
 import { Drawer } from "../../../components/ui/drawer";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -49,6 +50,7 @@ function normalizeUserRoles(u: any) {
 // ── Main Page ────────────────────────────────────────────────────────────────
 export default function UsersPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [user,          setUser]          = useState<NavUser | null>(null);
   const [tenantId,      setTenantId]      = useState("");
   const [users,         setUsers]         = useState<any[]>([]);
@@ -146,7 +148,7 @@ export default function UsersPage() {
     } catch (e: any) {
       const msg = e?.message || "";
       if (!msg.toLowerCase().includes("cannot manage") && !msg.toLowerCase().includes("tenant admin")) {
-        setError(msg || "Failed to load team data.");
+        setError(msg || t("usrLoadFailedDefault"));
       }
     } finally { setLoading(false); }
   };
@@ -154,7 +156,7 @@ export default function UsersPage() {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetCompanyId = user?.userType === "TENANT_ADMIN" ? selectedCompId : activeCompany?.company_id;
-    if (!targetCompanyId || !tenantId) { setError("Please select a company to assign this user to."); return; }
+    if (!targetCompanyId || !tenantId) { setError(t("usrSelectCompanyFirst")); return; }
     setSubmitting(true); setError(""); setSuccess("");
     try {
       const targetComp = companies.find((c) => c.company_id === targetCompanyId);
@@ -164,12 +166,12 @@ export default function UsersPage() {
         company_id: targetCompanyId,
         timezone_pref_id: targetComp?.default_timezone_id || "Asia/Kolkata",
       });
-      setSuccess("User registered successfully.");
+      setSuccess(t("usrRegisteredSuccess"));
       setShowAddForm(false);
       setNewUser({ email: "", password_hash: "", full_name: "", phone: "", user_type: user?.userType === "TENANT_ADMIN" ? "COMPANY_ADMIN" : "STANDARD_USER" });
       const list = await api.get("/auth/users");
       setUsers((Array.isArray(list) ? list : []).map(normalizeUserRoles));
-    } catch (err: any) { setError(err?.message || "Failed to register user."); }
+    } catch (err: any) { setError(err?.message || t("usrRegisterFailedDefault")); }
     finally { setSubmitting(false); }
   };
 
@@ -204,7 +206,7 @@ export default function UsersPage() {
     return value.includes(query.trim().toLowerCase());
   });
 
-  if (loading) return <LoadingState label="Loading team…" />;
+  if (loading) return <LoadingState label={t("usrLoadingTeam")} />;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
@@ -213,11 +215,11 @@ export default function UsersPage() {
           a second label stacked over the H1 is the marketing-page hierarchy
           this phase is meant to remove, not reproduce. */}
       <PageHeader
-        title="Team management"
-        description="Invite people, control workspace access, and assign company roles."
+        title={t("teamManagement")}
+        description={t("usrPageDesc")}
         actions={
           <Button onClick={() => setShowAddForm(!showAddForm)}>
-            <UserPlus className="w-4 h-4" /> Invite User
+            <UserPlus className="w-4 h-4" /> {t("usrInviteUser")}
           </Button>
         }
       />
@@ -229,9 +231,9 @@ export default function UsersPage() {
         style={{ backgroundColor: "var(--border)", borderColor: "var(--border)" }}
       >
         {[
-          { label: "Workspace members", value: displayedUsers.length, detail: "Across the organization" },
-          { label: "Administrators", value: displayedUsers.filter((member) => member.user_type?.includes("ADMIN")).length, detail: "Tenant and company admins" },
-          { label: "Roles assigned", value: displayedUsers.filter((member) => member.roles?.length).length, detail: `${displayedUsers.filter((member) => !member.roles?.length).length} awaiting assignment` },
+          { label: t("usrWorkspaceMembers"), value: displayedUsers.length, detail: t("usrAcrossOrganization") },
+          { label: t("usrAdministrators"), value: displayedUsers.filter((member) => member.user_type?.includes("ADMIN")).length, detail: t("usrTenantCompanyAdmins") },
+          { label: t("usrRolesAssigned"), value: displayedUsers.filter((member) => member.roles?.length).length, detail: t("usrAwaitingAssignment", { n: displayedUsers.filter((member) => !member.roles?.length).length }) },
         ].map((item) => (
           <div key={item.label} className="p-4" style={{ backgroundColor: "var(--surface)" }}>
             <div className="flex items-start justify-between gap-3">
@@ -251,32 +253,32 @@ export default function UsersPage() {
           stay inside the <form> rather than moving to the drawer footer: a
           submit button outside its form would change how this form submits,
           and submit semantics are not this phase's to change. */}
-      <Drawer open={showAddForm} onClose={() => setShowAddForm(false)} title="Invite a team member" description="Create an account and assign it to the appropriate company workspace." size="lg">
+      <Drawer open={showAddForm} onClose={() => setShowAddForm(false)} title={t("usrInviteDrawerTitle")} description={t("usrInviteDrawerDesc")} size="lg">
           <form onSubmit={handleAddUser} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
-              <Label>Full Name</Label>
+              <Label>{t("usrFullName")}</Label>
               <Input required value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
                 placeholder="Jane Smith" />
             </div>
             <div>
-              <Label>Email Address</Label>
+              <Label>{t("usrEmailAddress")}</Label>
               <Input required type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                 placeholder="jane@company.com" />
             </div>
             <div>
-              <Label>Temporary Password</Label>
+              <Label>{t("usrTempPassword")}</Label>
               <Input required type="password" value={newUser.password_hash} onChange={(e) => setNewUser({ ...newUser, password_hash: e.target.value })}
-                placeholder="Min. 8 characters" />
+                placeholder={t("usrMinChars")} />
             </div>
             <div>
-              <Label>Phone</Label>
+              <Label>{t("usrPhone")}</Label>
               <Input value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
                 placeholder="+91 98765 43210" />
             </div>
 
             {isTenantAdmin && (
               <div>
-                <Label>Assign to Company</Label>
+                <Label>{t("usrAssignToCompany")}</Label>
                 <Select value={selectedCompId} onChange={(e) => setSelectedCompId(e.target.value)}>
                   {companies.map((c) => (
                     <option key={c.company_id} value={c.company_id}>{c.company_name}</option>
@@ -286,21 +288,21 @@ export default function UsersPage() {
             )}
 
             <div>
-              <Label>User Type</Label>
+              <Label>{t("usrUserType")}</Label>
               <Select value={newUser.user_type} onChange={(e) => setNewUser({ ...newUser, user_type: e.target.value })}>
-                {isTenantAdmin && <option value="COMPANY_ADMIN">Company Administrator</option>}
-                <option value="OPERATIONAL_ADMIN">Operational Administrator (LOB Manager)</option>
-                <option value="STANDARD_USER">Standard Operator / User</option>
+                {isTenantAdmin && <option value="COMPANY_ADMIN">{t("usrCompanyAdministrator")}</option>}
+                <option value="OPERATIONAL_ADMIN">{t("usrOperationalAdministrator")}</option>
+                <option value="STANDARD_USER">{t("usrStandardOperator")}</option>
               </Select>
             </div>
 
             <div className="sm:col-span-2 flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end" style={S.border}>
               <Button type="submit" disabled={submitting}>
                 {submitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                {submitting ? "Registering…" : "Register User"}
+                {submitting ? t("usrRegistering") : t("usrRegisterUser")}
               </Button>
               <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
             </div>
           </form>
@@ -310,19 +312,19 @@ export default function UsersPage() {
       <div className="overflow-hidden rounded-[var(--radius-md)] border border-(--border) bg-(--surface)">
         <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between" style={S.border}>
           <div>
-            <h2 className="text-[15px] font-semibold" style={S.primary}>Workspace directory</h2>
-            <p className="mt-0.5 text-xs" style={S.muted}>{displayedUsers.length} member{displayedUsers.length !== 1 ? "s" : ""}</p>
+            <h2 className="text-[15px] font-semibold" style={S.primary}>{t("usrWorkspaceDirectory")}</h2>
+            <p className="mt-0.5 text-xs" style={S.muted}>{t("usrMemberCount", { n: displayedUsers.length })}</p>
           </div>
           <label className="flex h-10 w-full items-center gap-2 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-secondary) px-3 text-(--text-muted) transition-colors focus-within:border-(--input-border-focus) focus-within:bg-(--surface) sm:w-72">
             <Search size={14} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search members" className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-(--text-primary) outline-none" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("usrSearchMembers")} className="nf-embedded-input min-w-0 flex-1 border-0 bg-transparent text-xs text-(--text-primary) outline-none" />
           </label>
         </div>
         <div className="overflow-x-auto">
         <table className="w-full min-w-[940px] border-collapse text-sm">
           <TableHeader>
             <tr className="border-b border-(--row-border)">
-              {["#", "Name", "Email", isTenantAdmin ? "Company" : "", "Type", "Assigned Roles", "Actions"]
+              {["#", t("usrColName"), t("usrColEmail"), isTenantAdmin ? t("dashColCompany") : "", t("usrColType"), t("usrColAssignedRoles"), t("actionsColumn")]
                 .filter(Boolean)
                 .map((h) => (
                   <TableHead key={h} className="px-5 tracking-[0.12em]">{h}</TableHead>
@@ -331,7 +333,7 @@ export default function UsersPage() {
           </TableHeader>
           <TableBody>
             {visibleUsers.length === 0 && (
-              <tr><TableCell colSpan={7} className="px-5 text-center py-12" style={S.muted}>No team members found.</TableCell></tr>
+              <tr><TableCell colSpan={7} className="px-5 text-center py-12" style={S.muted}>{t("usrNoTeamMembers")}</TableCell></tr>
             )}
             {visibleUsers.map((u, idx) => (
               <TableRow key={u.user_id}>
@@ -345,7 +347,7 @@ export default function UsersPage() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold" style={S.primary}>{u.full_name}</span>
                         {u._via_assignment && (
-                          <Badge variant="neutral" title="This user manages multiple companies">Multi-co</Badge>
+                          <Badge variant="neutral" title={t("usrMultiCoTitle")}>{t("usrMultiCo")}</Badge>
                         )}
                       </div>
                       {(u.designation || u.department) && (
@@ -384,7 +386,7 @@ export default function UsersPage() {
                       ))}
                     </div>
                   ) : (
-                    <span className="text-xs" style={S.muted}>No roles assigned</span>
+                    <span className="text-xs" style={S.muted}>{t("usrNoRolesAssigned")}</span>
                   )}
                 </TableCell>
 
@@ -395,9 +397,9 @@ export default function UsersPage() {
                       onClick={() => setEditingMember(u)}
                       variant="outline"
                       size="sm"
-                      title="Edit member & assign roles"
+                      title={t("usrEditMemberTitle")}
                     >
-                      <Pencil className="w-3.5 h-3.5" /> Edit
+                      <Pencil className="w-3.5 h-3.5" /> {t("edit")}
                     </Button>
                   ) : (
                     <span
@@ -408,9 +410,9 @@ export default function UsersPage() {
                         borderColor: "var(--border)",
                         cursor: "not-allowed",
                       }}
-                      title={u.user_type === "COMPANY_ADMIN" ? "Cannot edit another Company Admin" : "Insufficient permissions"}
+                      title={u.user_type === "COMPANY_ADMIN" ? t("usrCannotEditCompanyAdmin") : t("usrInsufficientPermissions")}
                     >
-                      <Shield className="w-3 h-3" /> Protected
+                      <Shield className="w-3 h-3" /> {t("usrProtected")}
                     </span>
                   )}
                 </TableCell>
@@ -432,7 +434,7 @@ export default function UsersPage() {
           onClose={() => setEditingMember(null)}
           onSaved={async () => {
             setEditingMember(null);
-            setSuccess("Member updated successfully.");
+            setSuccess(t("usrMemberUpdatedSuccess"));
             const list = await api.get("/auth/users");
             setUsers((Array.isArray(list) ? list : []).map(normalizeUserRoles));
           }}

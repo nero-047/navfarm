@@ -5,6 +5,7 @@ import {
   RefreshCw, AlertCircle, X, Shield, Building2, UserCheck, ChevronDown,
 } from "lucide-react";
 import { api } from "../../services/api-client";
+import { useLanguage } from "../../hooks/useLanguage";
 import { Badge, type BadgeProps } from "../ui/badge";
 
 const S = {
@@ -34,9 +35,10 @@ export function UserTypeBadge({ type }: { type: string }) {
 }
 
 export function ActiveStatusBadge({ isActive }: { isActive: boolean }) {
+  const { t } = useLanguage();
   return (
     <Badge variant={isActive ? "success" : "danger"} dot>
-      {isActive ? "Active" : "Inactive"}
+      {isActive ? t("statusActive") : t("statusInactive")}
     </Badge>
   );
 }
@@ -62,6 +64,7 @@ interface EditModalProps {
 }
 
 export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved, allCompanies, isSelf = false }: EditModalProps) {
+  const { t } = useLanguage();
   const [form, setForm] = useState({
     full_name:   member.full_name   || "",
     phone:       member.phone       || "",
@@ -110,7 +113,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
       const updated = await api.get(`/user-company/${member.user_id}/companies`);
       setCompanyAssignments(Array.isArray(updated) ? updated : []);
     } catch (err: any) {
-      const msg = err?.message || "Failed to assign company.";
+      const msg = err?.message || t("edmAssignCompanyFailedDefault");
       // If table didn't exist, backend creates it — retry once automatically
       if (msg.toLowerCase().includes("doesn't exist") || msg.toLowerCase().includes("internal")) {
         try {
@@ -118,7 +121,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
           const updated = await api.get(`/user-company/${member.user_id}/companies`);
           setCompanyAssignments(Array.isArray(updated) ? updated : []);
         } catch (retryErr: any) {
-          setCompanyAssignError(retryErr?.message || "Failed to assign company.");
+          setCompanyAssignError(retryErr?.message || t("edmAssignCompanyFailedDefault"));
         }
       } else {
         setCompanyAssignError(msg);
@@ -132,7 +135,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
       await api.delete(`/user-company/assign/${assignId}`);
       setCompanyAssignments((prev) => prev.filter((a) => a.assign_id !== assignId));
     } catch (err: any) {
-      setCompanyAssignError(err?.message || "Failed to remove company.");
+      setCompanyAssignError(err?.message || t("edmRemoveCompanyFailedDefault"));
     }
   };
 
@@ -147,7 +150,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
       await api.put(`/user/${member.user_id}`, form);
       onSaved();
     } catch (err: any) {
-      setError(err?.message || "Failed to update member.");
+      setError(err?.message || t("edmUpdateMemberFailedDefault"));
     } finally { setSaving(false); }
   };
 
@@ -161,7 +164,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
       setAssignedRoles(updated.roles || []);
       setSelectedRoleId("");
     } catch (err: any) {
-      setAssignError(err?.message || "Failed to assign role.");
+      setAssignError(err?.message || t("edmAssignRoleFailedDefault"));
     } finally { setAssigning(false); }
   };
 
@@ -171,7 +174,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
       await api.delete(`/role/assign/${assignId}`);
       setAssignedRoles((prev) => prev.filter((r) => r.assign_id !== assignId));
     } catch (err: any) {
-      setAssignError(err?.message || "Failed to remove role.");
+      setAssignError(err?.message || t("edmRemoveRoleFailedDefault"));
     }
   };
 
@@ -206,7 +209,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
         <div className="overflow-y-auto max-h-[70vh]">
           {/* Profile Form */}
           <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>Profile Details</p>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>{t("edmProfileDetails")}</p>
 
             {error && (
               <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ backgroundColor: "var(--danger-muted)", borderColor: "var(--danger)", color: "var(--danger)" }}>
@@ -216,37 +219,37 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Full Name</Label>
+                <Label>{t("usrFullName")}</Label>
                 <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })}
                   required className={inputCls} style={S.input} placeholder="Jane Smith" />
               </div>
               <div>
-                <Label>Phone</Label>
+                <Label>{t("usrPhone")}</Label>
                 <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   className={inputCls} style={S.input} placeholder="+91 98765 43210" />
               </div>
               <div>
-                <Label>Department</Label>
+                <Label>{t("edmDepartment")}</Label>
                 <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}
                   className={inputCls} style={S.input} placeholder="Farm Operations" />
               </div>
               <div>
-                <Label>Designation</Label>
+                <Label>{t("edmDesignation")}</Label>
                 <input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })}
                   className={inputCls} style={S.input} placeholder="Senior Farm Manager" />
               </div>
               <div>
-                <Label>Employee ID</Label>
+                <Label>{t("edmEmployeeId")}</Label>
                 <input value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })}
                   className={inputCls} style={S.input} placeholder="EMP-001" />
               </div>
               {!isTenantAdmin && (
                 <div>
-                  <Label>User Type</Label>
+                  <Label>{t("usrUserType")}</Label>
                   <select value={form.user_type} onChange={(e) => setForm({ ...form, user_type: e.target.value })}
                     className={`${inputCls} nf-select`} style={S.input}>
-                    <option value="STANDARD_USER">Standard User</option>
-                    <option value="COMPANY_ADMIN">Company Admin</option>
+                    <option value="STANDARD_USER">{t("edmStandardUser")}</option>
+                    <option value="COMPANY_ADMIN">{t("edmCompanyAdmin")}</option>
                   </select>
                 </div>
               )}
@@ -261,13 +264,13 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                   className="w-4 h-4 rounded accent-[var(--accent)]"
                 />
-                Account Active
+                {t("edmAccountActive")}
               </label>
               {isSelf ? (
-                <span className="text-[11px]" style={S.muted}>You can&apos;t deactivate your own account.</span>
+                <span className="text-[11px]" style={S.muted}>{t("edmCantDeactivateSelf")}</span>
               ) : !form.is_active && (
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded" style={{ background: "var(--danger-muted)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
-                  Will be deactivated
+                  {t("edmWillBeDeactivated")}
                 </span>
               )}
             </div>
@@ -280,7 +283,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                 style={{ backgroundColor: "var(--accent)" }}
               >
                 {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-                {saving ? "Saving…" : "Save Changes"}
+                {saving ? t("saving") : t("saveChanges")}
               </button>
               <button
                 type="button"
@@ -288,7 +291,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                 className="px-5 py-2.5 text-sm font-medium rounded-lg border"
                 style={{ ...S.raised, ...S.sub, borderColor: "var(--border)" }}
               >
-                Cancel
+                {t("cancel")}
               </button>
             </div>
           </form>
@@ -296,7 +299,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
           {/* Role Assignment Section */}
           {!isTenantAdmin && (
             <div className="px-6 pb-6 space-y-3 border-t" style={{ borderColor: "var(--border)", paddingTop: "1.25rem" }}>
-              <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>Role Assignment</p>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>{t("edmRoleAssignment")}</p>
 
               {assignError && (
                 <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ backgroundColor: "var(--danger-muted)", borderColor: "var(--danger)", color: "var(--danger)" }}>
@@ -327,7 +330,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   ))}
                 </div>
               ) : (
-                <p className="text-xs" style={S.muted}>No roles assigned yet.</p>
+                <p className="text-xs" style={S.muted}>{t("edmNoRolesYet")}</p>
               )}
 
               {/* Assign new role */}
@@ -339,7 +342,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                     className="w-full border rounded-lg px-3 py-2 text-sm appearance-none pr-8 nf-select"
                     style={S.input}
                   >
-                    <option value="">— Select a role to assign —</option>
+                    <option value="">{t("edmSelectRoleToAssign")}</option>
                     {roles.map((r: any) => (
                       <option key={r.role_id} value={r.role_id}>{r.role_name}</option>
                     ))}
@@ -353,14 +356,14 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   style={{ backgroundColor: "var(--accent)" }}
                 >
                   {assigning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
-                  {assigning ? "Assigning…" : "Assign Role"}
+                  {assigning ? t("edmAssigning") : t("edmAssignRole")}
                 </button>
               </div>
 
               {roles.length === 0 && (
                 <p className="text-xs" style={S.muted}>
-                  No roles defined yet.{" "}
-                  <a href="/roles" className="underline" style={S.accent}>Create roles first</a>.
+                  {t("edmNoRolesDefined")}{" "}
+                  <a href="/roles" className="underline" style={S.accent}>{t("edmCreateRolesFirst")}</a>.
                 </p>
               )}
             </div>
@@ -371,7 +374,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
           <div className="px-6 pb-6 space-y-3 border-t" style={{ borderColor: "var(--border)", paddingTop: "1.25rem" }}>
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4" style={S.accent} />
-              <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>Company Access</p>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={S.muted}>{t("edmCompanyAccess")}</p>
             </div>
 
             {companyAssignError && (
@@ -382,7 +385,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
 
             {/* Current assignments */}
             {companyAssignLoading ? (
-              <p className="text-xs" style={S.muted}>Loading…</p>
+              <p className="text-xs" style={S.muted}>{t("loadingEllipsis")}</p>
             ) : companyAssignments.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
                 {companyAssignments.map((a: any) => (
@@ -397,12 +400,12 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   >
                     <Building2 className="w-3 h-3" />
                     {a.company_name}
-                    {a.is_primary && <span className="text-[9px] font-semibold">(Home)</span>}
+                    {a.is_primary && <span className="text-[9px] font-semibold">{t("edmHomeSuffix")}</span>}
                     {!a.is_primary && (
                       <button
                         onClick={() => handleRemoveCompany(a.assign_id)}
                         className="ml-0.5 hover:text-[var(--danger)] transition-colors"
-                        title="Remove from company"
+                        title={t("edmRemoveFromCompany")}
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -411,7 +414,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                 ))}
               </div>
             ) : (
-              <p className="text-xs" style={S.muted}>Only assigned to home company.</p>
+              <p className="text-xs" style={S.muted}>{t("edmOnlyHomeCompany")}</p>
             )}
 
             {/* Add to another company */}
@@ -425,7 +428,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                     style={S.input}
                     disabled={addingCompany}
                   >
-                    <option value="">— Assign to another company —</option>
+                    <option value="">{t("edmAssignToAnotherCompany")}</option>
                     {unassignedCompanies.map((c: any) => (
                       <option key={c.company_id} value={c.company_id}>{c.company_name}</option>
                     ))}

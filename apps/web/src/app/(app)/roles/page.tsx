@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../services/api-client";
 import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, NavUser } from "../../../hooks/useAuth";
+import { useLanguage } from "../../../hooks/useLanguage";
 import RolesTab from "../../../components/console/console-tabs/roles-tab";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { Toast } from "../../../components/ui/toast";
@@ -20,6 +21,7 @@ const S = {
 
 export default function RolesPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [roles,         setRoles]         = useState<any[]>([]);
   const [activeCompany, setActiveCompany] = useState<any>(null);
   const [loading,       setLoading]       = useState(true);
@@ -45,7 +47,7 @@ export default function RolesPage() {
         const rolesList = await api.get(`/role/company/${myCompany.company_id}`);
         setRoles(rolesList);
       }
-    } catch (e: any) { setError(e?.message || "Failed to load roles."); }
+    } catch (e: any) { setError(e?.message || t("roleLoadFailedDefault")); }
     finally { setLoading(false); }
   };
 
@@ -55,19 +57,19 @@ export default function RolesPage() {
       const list = await api.get(`/role/company/${activeCompany.company_id}`);
       setRoles(list);
     } catch {
-      setError("Failed to refresh roles.");
+      setError(t("roleRefreshFailedDefault"));
     }
   };
 
-  if (loading) return <LoadingState label="Loading roles…" />;
+  if (loading) return <LoadingState label={t("roleLoadingRoles")} />;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
       <PageHeader
-        title="Role Permissions"
+        title={t("rolePermissions")}
         description={
           <>
-            RBAC scopes for <span className="font-semibold" style={S.primary}>{activeCompany?.company_name || "—"}</span>
+            {t("roleRbacScopesFor")} <span className="font-semibold" style={S.primary}>{activeCompany?.company_name || "—"}</span>
           </>
         }
       />

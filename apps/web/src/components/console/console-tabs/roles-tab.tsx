@@ -5,6 +5,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ShieldAlert, Plus, Save, RefreshCw, Edit3, Trash2 } from "lucide-react";
 import { api } from "../../../services/api-client";
+import { useLanguage } from "../../../hooks/useLanguage";
 import { Dialog } from "../../ui/dialog";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../ui/table";
 
@@ -91,6 +92,7 @@ export default function RolesTab({
   setActionError,
   setActionSuccess
 }: RolesTabProps) {
+  const { t } = useLanguage();
   const [selectedRole, setSelectedRole] = useState<any>(null);
   const [permissions, setPermissions] = useState<any[]>([]);
   const [loadingPerms, setLoadingPerms] = useState(false);
@@ -177,9 +179,9 @@ export default function RolesTab({
           can_approve: p.can_approve
         }))
       });
-      setActionSuccess("Role permission configurations synced successfully!");
+      setActionSuccess(t("roleSyncSuccess"));
     } catch (err: any) {
-      setActionError(err?.message || "Failed to update role permissions.");
+      setActionError(err?.message || t("roleUpdatePermFailedDefault"));
     } finally {
       setSavingPerms(false);
     }
@@ -193,13 +195,13 @@ export default function RolesTab({
     setActionSuccess("");
     try {
       const created = await api.post("/role/create", { ...newRole, companyId });
-      setActionSuccess("RBAC custom role created successfully!");
+      setActionSuccess(t("roleCreatedSuccess"));
       setIsCreateModalOpen(false);
       setNewRole({ roleCode: "", roleName: "", description: "" });
       await onRefreshRoles();
       handleSelectRole(created);
     } catch (err: any) {
-      setActionError(err?.message || "Failed to register custom role.");
+      setActionError(err?.message || t("roleCreateFailedDefault"));
     } finally {
       setCreatingRole(false);
     }
@@ -221,12 +223,12 @@ export default function RolesTab({
     setActionSuccess("");
     try {
       await api.put(`/role/${editingRole.role_id}`, { roleName: editName, description: editDesc });
-      setActionSuccess("Role updated successfully!");
+      setActionSuccess(t("roleUpdatedSuccess"));
       setIsEditModalOpen(false);
       setEditingRole(null);
       await onRefreshRoles();
     } catch (err: any) {
-      setActionError(err?.message || "Failed to update role.");
+      setActionError(err?.message || t("roleUpdateFailedDefault"));
     } finally {
       setSavingEdit(false);
     }
@@ -239,14 +241,14 @@ export default function RolesTab({
     setActionSuccess("");
     try {
       await api.delete(`/role/${roleId}`);
-      setActionSuccess("Role deleted successfully!");
+      setActionSuccess(t("roleDeletedSuccess"));
       setDeletingRoleId(null);
       if (selectedRole?.role_id === roleId) {
         setSelectedRole(null);
       }
       await onRefreshRoles();
     } catch (err: any) {
-      setActionError(err?.message || "Failed to delete role.");
+      setActionError(err?.message || t("roleDeleteFailedDefault"));
     } finally {
       setDeletingRole(false);
     }
@@ -258,20 +260,20 @@ export default function RolesTab({
       {/* Roles List (Left Sidebar) */}
       <div className="md:col-span-4 flex flex-col gap-4">
         <div className="flex justify-between items-center pb-3 border-b" style={S.border}>
-          <span className="text-[11px] font-semibold uppercase tracking-wider" style={S.textSecondary}>Available Scopes</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider" style={S.textSecondary}>{t("roleAvailableScopes")}</span>
           <button
             onClick={() => setIsCreateModalOpen(true)}
             className="flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg cursor-pointer transition-transform hover:scale-[1.02]"
             style={{ backgroundColor: "var(--accent)" }}
           >
-            <Plus className="w-3.5 h-3.5" /> Create Role
+            <Plus className="w-3.5 h-3.5" /> {t("roleCreateRole")}
           </button>
         </div>
 
         <div className="flex flex-col gap-3">
           {visibleRoles.length === 0 ? (
             <div className="p-8 text-center text-xs border border-dashed rounded-[var(--radius-sm)]" style={{ ...S.surface, ...S.textMuted }}>
-              No custom roles configured yet.
+              {t("roleNoCustomRoles")}
             </div>
           ) : (
             visibleRoles.map((r) => {
@@ -298,7 +300,7 @@ export default function RolesTab({
                         {r.role_code}
                       </span>
                     </div>
-                    <p className="text-xs mt-1.5 line-clamp-2" style={S.textMuted}>{r.role_description || "Custom operator scopes"}</p>
+                    <p className="text-xs mt-1.5 line-clamp-2" style={S.textMuted}>{r.role_description || t("roleCustomOperatorScopes")}</p>
                   </div>
                   <div className="flex items-center gap-4 pt-2.5 border-t" style={S.border} onClick={e => e.stopPropagation()}>
                     {!r.is_system_role && (
@@ -309,12 +311,12 @@ export default function RolesTab({
                         onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
                         onMouseLeave={e => e.currentTarget.style.color = "var(--text-secondary)"}
                       >
-                        <Edit3 className="w-3 h-3" /> Edit Name
+                        <Edit3 className="w-3 h-3" /> {t("roleEditName")}
                       </button>
                     )}
                     {r.is_system_role && (
                       <span className="flex items-center gap-1 text-[11px] font-semibold" style={S.textMuted}>
-                        <ShieldAlert className="w-3 h-3" /> System role — locked
+                        <ShieldAlert className="w-3 h-3" /> {t("roleSystemLocked")}
                       </span>
                     )}
                     {!r.is_system_role && (
@@ -322,7 +324,7 @@ export default function RolesTab({
                         onClick={() => setDeletingRoleId(r.role_id)}
                         className="flex items-center gap-1 text-[11px] cursor-pointer transition-colors font-semibold text-rose-500 hover:text-rose-600"
                       >
-                        <Trash2 className="w-3 h-3" /> Delete
+                        <Trash2 className="w-3 h-3" /> {t("roleDeleteAction")}
                       </button>
                     )}
                   </div>
@@ -341,13 +343,13 @@ export default function RolesTab({
               <div>
                 <h3 className="font-semibold text-sm flex items-center gap-2" style={S.textPrimary}>
                   <ShieldAlert className="w-4 h-4" style={S.accent} />
-                  Access Matrix: {selectedRole.role_name}
+                  {t("roleAccessMatrix", { name: selectedRole.role_name })}
                 </h3>
-                <p className="text-[9px] mt-1 font-mono" style={S.textMuted}>Role ID: {selectedRole.role_id}</p>
+                <p className="text-[9px] mt-1 font-mono" style={S.textMuted}>{t("roleIdLabel", { id: selectedRole.role_id })}</p>
               </div>
               {selectedRole.is_system_role ? (
                 <span className="flex items-center gap-1.5 self-start py-2 px-3 text-[11px] font-semibold rounded-[var(--radius-sm)]" style={{ color: "var(--text-muted)", backgroundColor: "var(--badge-bg)" }}>
-                  <ShieldAlert className="w-3.5 h-3.5" /> System role permissions are fixed
+                  <ShieldAlert className="w-3.5 h-3.5" /> {t("roleSystemPermissionsFixed")}
                 </span>
               ) : (
                 <Button
@@ -357,7 +359,7 @@ export default function RolesTab({
                   style={{ backgroundColor: "var(--accent)" }}
                 >
                   <Save className="w-3.5 h-3.5" />
-                  {savingPerms ? "Saving..." : "Save Policies"}
+                  {savingPerms ? t("saving") : t("roleSavePolicies")}
                 </Button>
               )}
             </div>
@@ -365,16 +367,22 @@ export default function RolesTab({
             {loadingPerms ? (
               <div className="p-16 text-center flex items-center justify-center gap-2.5" style={S.textMuted}>
                 <RefreshCw className="w-4 h-4 animate-spin" style={S.accent} />
-                <span className="text-xs font-medium">Reading permission entries...</span>
+                <span className="text-xs font-medium">{t("roleReadingPermissions")}</span>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-xs">
                   <TableHeader className="bg-transparent">
                     <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
-                      <TableHead className="h-auto px-0 pb-3">Module Resource</TableHead>
-                      {["View", "Create", "Edit", "Delete", "Approve"].map(h => (
-                        <TableHead key={h} className="h-auto px-0 pb-3 text-center w-20">{h}</TableHead>
+                      <TableHead className="h-auto px-0 pb-3">{t("roleColModuleResource")}</TableHead>
+                      {[
+                        { k: "roleColView", label: "View" },
+                        { k: "roleColCreate", label: "Create" },
+                        { k: "roleColEdit", label: "Edit" },
+                        { k: "roleColDelete", label: "Delete" },
+                        { k: "roleColApprove", label: "Approve" },
+                      ].map(({ k, label }) => (
+                        <TableHead key={label} className="h-auto px-0 pb-3 text-center w-20">{t(k as any)}</TableHead>
                       ))}
                     </tr>
                   </TableHeader>
@@ -410,7 +418,7 @@ export default function RolesTab({
         ) : (
           <div className="text-center p-16 rounded-[var(--radius-sm)] border border-dashed flex flex-col items-center justify-center" style={{ ...S.surface, ...S.textMuted }}>
             <ShieldAlert className="w-10 h-10 mb-3 opacity-30 animate-pulse" style={S.accent} />
-            <span className="text-xs font-semibold">Select or create a role to define granular resource policies.</span>
+            <span className="text-xs font-semibold">{t("roleSelectOrCreatePrompt")}</span>
           </div>
         )}
       </div>
@@ -418,25 +426,25 @@ export default function RolesTab({
       <Dialog
         open={isCreateModalOpen}
         onClose={() => !creatingRole && setIsCreateModalOpen(false)}
-        title="Create custom role"
-        description="Define a reusable permission role for this company."
+        title={t("roleModalCreateTitle")}
+        description={t("roleModalCreateDesc")}
         maxWidth="sm"
         footer={
           <>
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
-            <Button type="submit" form="create-role-form" disabled={creatingRole} size="sm" className="nf-btn-primary">{creatingRole ? "Saving..." : "Create"}</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateModalOpen(false)}>{t("cancel")}</Button>
+            <Button type="submit" form="create-role-form" disabled={creatingRole} size="sm" className="nf-btn-primary">{creatingRole ? t("saving") : t("create")}</Button>
           </>
         }
       >
         <form id="create-role-form" onSubmit={handleCreateRoleSubmit} className="flex flex-col gap-4 pt-1">
-          <Field label="Role Code" htmlFor="create-role-code" required>
-            <Input id="create-role-code" placeholder="e.g. FARM_SUPERVISOR" value={newRole.roleCode} onChange={(e) => setNewRole({ ...newRole, roleCode: e.target.value.toUpperCase() })} required />
+          <Field label={t("roleFieldRoleCode")} htmlFor="create-role-code" required>
+            <Input id="create-role-code" placeholder={t("rolePhRoleCode")} value={newRole.roleCode} onChange={(e) => setNewRole({ ...newRole, roleCode: e.target.value.toUpperCase() })} required />
           </Field>
-          <Field label="Role Name" htmlFor="create-role-name" required>
-            <Input id="create-role-name" placeholder="Farm Supervisor" value={newRole.roleName} onChange={(e) => setNewRole({ ...newRole, roleName: e.target.value })} required />
+          <Field label={t("roleFieldRoleName")} htmlFor="create-role-name" required>
+            <Input id="create-role-name" placeholder={t("rolePhRoleName")} value={newRole.roleName} onChange={(e) => setNewRole({ ...newRole, roleName: e.target.value })} required />
           </Field>
-          <Field label="Description" htmlFor="create-role-description">
-            <Input id="create-role-description" placeholder="Manages coops and biological feeds" value={newRole.description} onChange={(e) => setNewRole({ ...newRole, description: e.target.value })} />
+          <Field label={t("roleFieldDescription")} htmlFor="create-role-description">
+            <Input id="create-role-description" placeholder={t("rolePhDescription")} value={newRole.description} onChange={(e) => setNewRole({ ...newRole, description: e.target.value })} />
           </Field>
         </form>
       </Dialog>
@@ -444,24 +452,24 @@ export default function RolesTab({
       <Dialog
         open={isEditModalOpen && Boolean(editingRole)}
         onClose={() => !savingEdit && setIsEditModalOpen(false)}
-        title="Edit role"
-        description={editingRole ? `Update ${editingRole.role_code}.` : undefined}
+        title={t("roleModalEditTitle")}
+        description={editingRole ? t("roleModalEditDesc", { code: editingRole.role_code }) : undefined}
         maxWidth="sm"
         footer={
           <>
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-            <Button type="submit" form="edit-role-form" disabled={savingEdit} size="sm" className="nf-btn-primary">{savingEdit ? "Saving..." : "Save Changes"}</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsEditModalOpen(false)}>{t("cancel")}</Button>
+            <Button type="submit" form="edit-role-form" disabled={savingEdit} size="sm" className="nf-btn-primary">{savingEdit ? t("saving") : t("saveChanges")}</Button>
           </>
         }
       >
         {editingRole && (
           <form id="edit-role-form" onSubmit={handleEditSubmit} className="flex flex-col gap-4 pt-1">
-            <div className="text-[10px] font-mono" style={S.textMuted}>Role Code: {editingRole.role_code}</div>
-            <Field label="Role Name" htmlFor="edit-role-name" required>
-              <Input id="edit-role-name" placeholder="Farm Supervisor" value={editName} onChange={(e) => setEditName(e.target.value)} required />
+            <div className="text-[10px] font-mono" style={S.textMuted}>{t("roleCodeLabel", { code: editingRole.role_code })}</div>
+            <Field label={t("roleFieldRoleName")} htmlFor="edit-role-name" required>
+              <Input id="edit-role-name" placeholder={t("rolePhRoleName")} value={editName} onChange={(e) => setEditName(e.target.value)} required />
             </Field>
-            <Field label="Description" htmlFor="edit-role-description">
-              <Input id="edit-role-description" placeholder="Role description" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+            <Field label={t("roleFieldDescription")} htmlFor="edit-role-description">
+              <Input id="edit-role-description" placeholder={t("rolePhDescriptionEdit")} value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
             </Field>
           </form>
         )}
@@ -470,20 +478,20 @@ export default function RolesTab({
       <Dialog
         open={Boolean(deletingRoleId)}
         onClose={() => !deletingRole && setDeletingRoleId(null)}
-        title="Delete role"
-        description="This action cannot be undone."
+        title={t("roleModalDeleteTitle")}
+        description={t("roleModalDeleteDesc")}
         maxWidth="sm"
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setDeletingRoleId(null)}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setDeletingRoleId(null)}>{t("cancel")}</Button>
             <Button variant="destructive" size="sm" onClick={() => deletingRoleId && handleDeleteRole(deletingRoleId)} disabled={deletingRole}>
-              {deletingRole ? "Deleting..." : "Delete"}
+              {deletingRole ? t("roleDeleting") : t("roleDeleteAction")}
             </Button>
           </>
         }
       >
         <div className="text-xs leading-relaxed pt-1" style={S.textSecondary}>
-          Are you sure you want to delete this role? This action cannot be undone. Any permissions tied to this role will also be removed.
+          {t("roleDeleteConfirmBody")}
         </div>
       </Dialog>
     </div>
