@@ -6,6 +6,10 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["run", "dev:web"],
       "port": 3001
+    },
+    {
+      "name": "api",
+      "url": "http://localhost:2877"
     }
   ]
 }

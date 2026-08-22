@@ -5,9 +5,9 @@ import { drizzle } from 'drizzle-orm/mysql2';
 import * as masterSchema from './master-schema';
 import { ConnectionManagerService } from './connection-manager.service';
 import { UserDirectoryService } from './user-directory.service';
+import { MASTER_CONNECTION, PG_CONNECTION } from './database.tokens';
 
-export const MASTER_CONNECTION = 'MASTER_CONNECTION';
-export const PG_CONNECTION = MASTER_CONNECTION; // Backwards compatibility alias
+export { MASTER_CONNECTION, PG_CONNECTION };
 
 @Global()
 @Module({

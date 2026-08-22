@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq } from 'drizzle-orm';
-import { MASTER_CONNECTION } from './database.module';
+import { MASTER_CONNECTION } from './database.tokens';
 import * as masterSchema from './master-schema';
 
 const toMysqlTimestamp = (date: Date = new Date()) =>
