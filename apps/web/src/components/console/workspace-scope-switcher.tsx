@@ -201,6 +201,46 @@ export default function WorkspaceScopeSwitcher({
   const isTenantAdmin = user?.userType === "TENANT_ADMIN";
   const isCompanyAdmin = user?.userType === "COMPANY_ADMIN" || isTenantAdmin;
 
+  // A switcher only makes sense when there's something to switch to. A
+  // STANDARD_USER assigned to exactly one area, or a COMPANY_ADMIN of
+  // exactly one company with no other areas, has no real choice — showing
+  // an interactive dropdown there implies capability that isn't there.
+  const canSwitch = isTenantAdmin || (isCompanyAdmin && companies.length > 1) || operationalAreas.length > 1;
+
+  const identityBlock = (
+    <>
+      <div className="flex items-center justify-between gap-1 mb-1">
+        <span className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white/50">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "var(--sidebar-active-accent)" }} />
+          {scopeBadge}
+        </span>
+        {canSwitch && (
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-white/40 transition-transform duration-200 group-hover:text-white/80 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        )}
+      </div>
+      <p className="text-xs font-semibold text-white truncate tracking-tight">
+        {primaryTitle}
+      </p>
+      <p className="text-[10px] text-white/40 truncate mt-0.5">
+        {secondarySubtitle}
+      </p>
+    </>
+  );
+
+  if (!canSwitch) {
+    // Same identity display, no switch affordance — no button semantics,
+    // no hover/focus state, no chevron: there's nothing to click into.
+    return (
+      <div className="w-full rounded-[var(--radius-sm)] border border-white/10 bg-white/[0.05] p-2.5">
+        {identityBlock}
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full" ref={dropdownRef}>
       {/* Switcher Button Trigger */}
@@ -209,31 +249,7 @@ export default function WorkspaceScopeSwitcher({
         className="w-full text-left transition-all duration-150 rounded-[var(--radius-sm)] border border-white/10 bg-white/[0.05] hover:bg-white/[0.08] p-2.5 group focus:outline-none focus:ring-1 focus:ring-white/20"
         aria-label="Switch Workspace Scope"
       >
-        <div className="flex items-center justify-between gap-1 mb-1">
-          <span className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white/50">
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                currentScope === "TENANT"
-                  ? "bg-purple-400"
-                  : currentScope === "COMPANY"
-                  ? "bg-blue-400"
-                  : "bg-emerald-400"
-              }`}
-            />
-            {scopeBadge}
-          </span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 text-white/40 transition-transform duration-200 group-hover:text-white/80 ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
-        </div>
-        <p className="text-xs font-semibold text-white truncate tracking-tight">
-          {primaryTitle}
-        </p>
-        <p className="text-[10px] text-white/40 truncate mt-0.5">
-          {secondarySubtitle}
-        </p>
+        {identityBlock}
       </button>
 
       {/* Dropdown Popup */}

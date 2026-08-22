@@ -1251,9 +1251,9 @@ html[data-theme='dark'] {
   --surface-raised: #2e3039;
   --surface-secondary: #22242d;
   --surface-overlay: rgba(39, 41, 50, 0.9);
-  --border: #383a46;
-  --border-subtle: rgba(56, 58, 70, 0.6);
-  --border-strong: #4a4c58;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.14);
   --text-primary: #f5f5f6;
   --text-secondary: #a7aab1;
   --text-muted: #9095a0;
@@ -1282,12 +1282,12 @@ html[data-theme='dark'] {
   --input-bg: #24262f;
   --input-text: #f5f5f6;
   --input-placeholder: #7b7f89;
-  --input-border: #3a3c48;
+  --input-border: rgba(255, 255, 255, 0.1);
   --input-border-focus: #d9694f;
   --card-bg: #24262f;
-  --card-border: #383a46;
+  --card-border: rgba(255, 255, 255, 0.09);
   --row-hover: rgba(255, 255, 255, 0.035);
-  --row-border: #33353f;
+  --row-border: rgba(255, 255, 255, 0.08);
   --badge-bg: rgba(255, 255, 255, 0.06);
   --shadow-sm: none;
   --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
