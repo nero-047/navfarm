@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle, Activity } from "lucide-react";
 import { useCompaniesPageData } from "@/components/console/companies/use-companies-page-data";
 import CompanyTab from "@/components/console/console-tabs/company-tab";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState, ErrorState } from "@/components/ui/states";
@@ -14,30 +15,31 @@ const S = {
   muted:   { color: "var(--text-muted)" },
 };
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, t }: { status: string; t: (key: any) => string }) {
   const ok = status === "COMPLETED";
   return (
     <Badge variant={ok ? "success" : "warning"}>
       {ok ? <CheckCircle className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
-      {ok ? "Complete" : "Pending"}
+      {ok ? t("coStatusComplete") : t("coStatusPending")}
     </Badge>
   );
 }
 
 export default function CompanySettingsPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const params = useParams<{ companyId: string }>();
   const { user, tenantId, companies, currencies, loading, error, reload } = useCompaniesPageData();
 
-  if (loading) return <LoadingState label="Loading companies…" />;
+  if (loading) return <LoadingState label={t("coLoadingCompanies")} />;
 
   const targetCompany = companies.find((c: any) => c.company_id === params.companyId);
 
   if (!targetCompany) {
     return (
       <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
-        <PageHeader title="Company not found" sticky={false} />
-        <ErrorState message="This company doesn't exist or you don't have access to it." />
+        <PageHeader title={t("coNotFoundTitle")} sticky={false} />
+        <ErrorState message={t("coNotFoundDesc")} />
       </div>
     );
   }
@@ -45,8 +47,8 @@ export default function CompanySettingsPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-4 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
       <PageHeader
-        title="Company settings"
-        description={user?.userType === "TENANT_ADMIN" ? `Operating in context of ${targetCompany.company_name}` : undefined}
+        title={t("coSettingsTitle")}
+        description={user?.userType === "TENANT_ADMIN" ? t("coOperatingInContext", { name: targetCompany.company_name }) : undefined}
         actions={
           user?.userType === "TENANT_ADMIN" ? (
             <Button
@@ -54,10 +56,10 @@ export default function CompanySettingsPage() {
               variant="outline"
               size="sm"
               onClick={() => router.push("/companies")}
-              aria-label="Back to All Companies"
+              aria-label={t("coBackToAllCompanies")}
             >
               <ArrowLeft className="w-4 h-4 mr-1.5" />
-              Back to All Companies
+              {t("coBackToAllCompanies")}
             </Button>
           ) : undefined
         }
@@ -72,11 +74,11 @@ export default function CompanySettingsPage() {
           <div className="text-base font-semibold" style={S.primary}>{targetCompany.company_name}</div>
           <div className="text-xs flex items-center gap-3 mt-0.5" style={S.muted}>
             <span className="font-mono">{targetCompany.company_code}</span>
-            {targetCompany.registration_no && <span>Reg: {targetCompany.registration_no}</span>}
+            {targetCompany.registration_no && <span>{t("coRegLabel")} {targetCompany.registration_no}</span>}
             {targetCompany.country_id && <span>{targetCompany.country_id}</span>}
           </div>
         </div>
-        <StatusBadge status={targetCompany.onboarding_status} />
+        <StatusBadge status={targetCompany.onboarding_status} t={t} />
       </div>
 
       {error && <ErrorState message={error} />}
