@@ -197,20 +197,38 @@ export default function MortalityHealthPanel() {
     setMortalityDialogOpen(false);
   };
 
-  const handleSaveTreatment = () => {
+  const handleSaveTreatment = async () => {
     if (!newTreatment.ear_tag || !newTreatment.medicine_name) return;
+    const batchObj = batches.find((b) => b.no === newTreatment.batch_no) || batches[0];
+    const dosage = newTreatment.dosage || "Standard therapeutic dose";
+    const route = newTreatment.route || "IM";
+    const vet = newTreatment.veterinarian || "Dr. Sharma";
+    const diagnosis = newTreatment.diagnosis || "General Clinical Observation";
+
+    if (batchObj) {
+      try {
+        await api.post(`/batch/${batchObj.id}/transaction`, {
+          transaction_date: newTreatment.treatment_date || new Date().toISOString().slice(0, 10),
+          transaction_type: "CONSUMPTION",
+          quantity: 1,
+          uom: "DOSES",
+          remarks: `${newTreatment.medicine_name} — ${diagnosis} (${dosage}, ${route}, vet: ${vet}, withdrawal ${newTreatment.withdrawal_days || 0}d)`,
+        });
+      } catch { void 0; }
+    }
+
     const rec: TreatmentRecord = {
       id: `t-${Date.now()}`,
       treatment_date: newTreatment.treatment_date || new Date().toISOString().slice(0, 10),
       ear_tag: newTreatment.ear_tag,
       batch_no: newTreatment.batch_no || (batches[0]?.no ?? "BATCH-01"),
-      diagnosis: newTreatment.diagnosis || "General Clinical Observation",
+      diagnosis,
       medicine_name: newTreatment.medicine_name,
-      dosage: newTreatment.dosage || "Standard therapeutic dose",
-      route: newTreatment.route || "IM",
+      dosage,
+      route,
       withdrawal_days: Number(newTreatment.withdrawal_days) || 0,
       status: (newTreatment.status as any) || "ACTIVE",
-      veterinarian: newTreatment.veterinarian || "Dr. Sharma",
+      veterinarian: vet,
     };
     setTreatmentList([rec, ...treatmentList]);
     setTreatmentDialogOpen(false);
