@@ -1874,7 +1874,27 @@ export const batchTransaction = mysqlTable('batch_transaction', {
   amount: decimal('amount', { precision: 18, scale: 4 }),
   remarks: varchar('remarks', { length: 500 }),
   ledger_id: varchar('ledger_id', { length: 36 }).references(() => inventoryLedger.ledger_id, { onDelete: 'restrict' }),
+  // Structured fields for OVERHEAD (labour) and OBSERVATION (weight/BCS) rows —
+  // previously only encoded as free text in `remarks`, unqueryable.
+  persons: int('persons'),
+  hours: decimal('hours', { precision: 8, scale: 2 }),
+  adg: decimal('adg', { precision: 10, scale: 4 }),
+  bcs_score: decimal('bcs_score', { precision: 4, scale: 2 }),
   created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+// Batch daily-log attachments (inspection photos, documents) — stored on
+// local/system disk under UPLOADS_DIR, served from /uploads (see main.ts).
+export const batchAttachment = mysqlTable('batch_attachment', {
+  attachment_id: varchar('attachment_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  log_date: date('log_date', { mode: 'string' }).notNull(),
+  file_name: varchar('file_name', { length: 255 }).notNull(),
+  file_url: varchar('file_url', { length: 500 }).notNull(),
+  mime_type: varchar('mime_type', { length: 100 }),
+  attachment_type: varchar('attachment_type', { length: 20 }).default('IMAGE').notNull(),
+  uploaded_by: varchar('uploaded_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
 });
 

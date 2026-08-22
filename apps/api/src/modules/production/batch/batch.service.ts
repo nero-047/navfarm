@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, isNull, count, inArray, SQL } from 'drizzle-orm';
+import { eq, and, like, isNull, count, inArray, desc, SQL } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { unlink } from 'fs/promises';
+import { resolve } from 'path';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import {
@@ -280,6 +282,10 @@ export class BatchService {
         rate: schema.batchTransaction.rate,
         amount: schema.batchTransaction.amount,
         remarks: schema.batchTransaction.remarks,
+        persons: schema.batchTransaction.persons,
+        hours: schema.batchTransaction.hours,
+        adg: schema.batchTransaction.adg,
+        bcs_score: schema.batchTransaction.bcs_score,
         item_name: schema.itemMaster.item_name,
         item_code: schema.itemMaster.item_code,
       })
@@ -287,6 +293,11 @@ export class BatchService {
       .leftJoin(schema.itemMaster, eq(schema.batchTransaction.item_id, schema.itemMaster.item_id))
       .where(eq(schema.batchTransaction.batch_id, id));
     const outputLines = await this.db.select().from(schema.batchOutputLine).where(eq(schema.batchOutputLine.batch_id, id));
+    const attachments = await this.db
+      .select()
+      .from(schema.batchAttachment)
+      .where(eq(schema.batchAttachment.batch_id, id))
+      .orderBy(desc(schema.batchAttachment.created_at));
 
     const [standard] = await this.db.select().from(schema.batchStandard).where(eq(schema.batchStandard.batch_id, id)).limit(1);
     const standardConsumptionLines = standard
@@ -310,6 +321,7 @@ export class BatchService {
       input_lines: inputLines,
       transactions,
       output_lines: outputLines,
+      attachments,
       standard: standard ? { ...standard, consumption_lines: standardConsumptionLines } : null,
       variances,
       bio_asset_state: bioAssetState || null,
@@ -894,6 +906,10 @@ export class BatchService {
       amount: amount.toString(),
       remarks: dto.remarks || null,
       ledger_id: ledgerId,
+      persons: dto.persons ?? null,
+      hours: dto.hours?.toString() ?? null,
+      adg: dto.adg?.toString() ?? null,
+      bcs_score: dto.bcs_score?.toString() ?? null,
       created_by: userPayload?.userId || null,
     });
 
@@ -2317,6 +2333,60 @@ export class BatchService {
       },
       curves,
     };
+  }
+
+  async addAttachment(
+    batchId: string,
+    file: { filename: string; originalname: string; mimetype: string },
+    logDate: string,
+    attachmentType: string | undefined,
+    userId: string | undefined,
+  ) {
+    await this.findOne(batchId); // 404s if the batch doesn't exist
+    const attachmentId = randomUUID();
+    await this.db.insert(schema.batchAttachment).values({
+      attachment_id: attachmentId,
+      batch_id: batchId,
+      log_date: logDate,
+      file_name: file.originalname,
+      file_url: `/uploads/${file.filename}`,
+      mime_type: file.mimetype,
+      attachment_type: attachmentType || 'IMAGE',
+      uploaded_by: userId || null,
+    });
+    const [saved] = await this.db
+      .select()
+      .from(schema.batchAttachment)
+      .where(eq(schema.batchAttachment.attachment_id, attachmentId))
+      .limit(1);
+    return saved;
+  }
+
+  async listAttachments(batchId: string, date?: string) {
+    const conditions = [eq(schema.batchAttachment.batch_id, batchId)];
+    if (date) conditions.push(eq(schema.batchAttachment.log_date, date));
+    return this.db
+      .select()
+      .from(schema.batchAttachment)
+      .where(and(...conditions))
+      .orderBy(desc(schema.batchAttachment.created_at));
+  }
+
+  async deleteAttachment(batchId: string, attachmentId: string) {
+    const [attachment] = await this.db
+      .select()
+      .from(schema.batchAttachment)
+      .where(and(eq(schema.batchAttachment.attachment_id, attachmentId), eq(schema.batchAttachment.batch_id, batchId)))
+      .limit(1);
+    if (!attachment) {
+      throw new NotFoundException(`Attachment '${attachmentId}' not found on this batch.`);
+    }
+    await this.db.delete(schema.batchAttachment).where(eq(schema.batchAttachment.attachment_id, attachmentId));
+    const uploadsDir = resolve(process.env.UPLOADS_DIR || 'apps/api/uploads');
+    await unlink(resolve(uploadsDir, attachment.file_url.replace(/^\/uploads\//, ''))).catch(() => {
+      // File already gone / not on disk — the DB row is still the source of truth for the delete.
+    });
+    return { success: true };
   }
 }
 

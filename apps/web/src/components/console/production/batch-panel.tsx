@@ -1405,17 +1405,19 @@ export default function BatchPanel() {
                     <TableHead className="h-auto px-3 py-2">Item</TableHead>
                     <TableHead className="h-auto px-3 py-2">Qty</TableHead>
                     <TableHead className="h-auto px-3 py-2">Amount</TableHead>
+                    <TableHead className="h-auto px-3 py-2">Remarks</TableHead>
                   </tr></TableHeader>
                   <TableBody>
                     {(viewing.transactions || []).length === 0 ? (
-                      <tr><TableCell colSpan={5} className="py-6 text-center" style={S.sub}>No transactions yet.</TableCell></tr>
+                      <tr><TableCell colSpan={6} className="py-6 text-center" style={S.sub}>No transactions yet.</TableCell></tr>
                     ) : (viewing.transactions || []).map((t: Row) => (
                       <TableRow key={t.transaction_id}>
                         <TableCell className="px-3 py-2" style={S.primary}>{t.transaction_date}</TableCell>
                         <TableCell className="px-3 py-2" style={S.sub}>{t.transaction_type}</TableCell>
                         <TableCell className="px-3 py-2" style={S.primary}>{t.item_id ? itemLabel(t.item_id) : "—"}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{t.quantity ?? "—"}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.primary}>{t.quantity != null ? `${t.quantity} ${t.uom || ""}`.trim() : "—"}</TableCell>
                         <TableCell className="px-3 py-2 font-semibold" style={Number(t.amount) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{t.amount}</TableCell>
+                        <TableCell className="px-3 py-2 max-w-[220px] truncate" style={S.sub} title={t.remarks || ""}>{t.remarks || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

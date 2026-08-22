@@ -1,5 +1,8 @@
-import { Controller, Get, Post, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Delete, Param, Body, Query, Req, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, resolve } from 'node:path';
 import { BatchService } from './batch.service';
 import {
   CreateBatchDto,
@@ -189,6 +192,76 @@ export class BatchController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.batchService.getBatchPerformanceCurves(id, tenantId);
     return { success: true, message: 'Performance curves retrieved successfully.', data: result };
+  }
+
+  @Post(':id/attachment')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Upload an inspection photo/document for a daily batch log entry — stored on local/system disk' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        log_date: { type: 'string', example: '2026-08-22' },
+        attachment_type: { type: 'string', example: 'IMAGE' },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: resolve(process.env.UPLOADS_DIR || 'apps/api/uploads'),
+        filename: (_req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `batch-attachment-${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+      fileFilter: (_req, file, cb) => {
+        const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'application/pdf']);
+        if (!allowed.has(file.mimetype)) {
+          return cb(new BadRequestException('Only PNG, JPG, WebP, HEIC images or PDF documents are allowed.'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadAttachment(
+    @Param('id') id: string,
+    @UploadedFile() file: any,
+    @Body('log_date') logDate: string,
+    @Body('attachment_type') attachmentType: string,
+    @Req() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file was uploaded.');
+    }
+    if (!logDate) {
+      throw new BadRequestException('log_date is required.');
+    }
+    const result = await this.batchService.addAttachment(id, file, logDate, attachmentType, req.user?.userId);
+    return { success: true, message: 'Attachment uploaded successfully.', data: result };
+  }
+
+  @Get(':id/attachment')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'List inspection photos/documents attached to a batch, optionally filtered by log date' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async listAttachments(@Param('id') id: string, @Query('date') date?: string) {
+    const result = await this.batchService.listAttachments(id, date);
+    return { success: true, message: 'Attachments retrieved successfully.', data: result };
+  }
+
+  @Delete(':id/attachment/:attachmentId')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Delete a batch attachment' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiParam({ name: 'attachmentId', description: 'Attachment UUID' })
+  async deleteAttachment(@Param('id') id: string, @Param('attachmentId') attachmentId: string) {
+    const result = await this.batchService.deleteAttachment(id, attachmentId);
+    return { success: true, message: 'Attachment deleted successfully.', data: result };
   }
 }
 

@@ -288,6 +288,13 @@
       "when": 1787393411373,
       "tag": "0040_salty_zuras",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1787396391946,
+      "tag": "0041_stale_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

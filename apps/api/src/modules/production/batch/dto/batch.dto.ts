@@ -268,6 +268,26 @@ export class AddBatchTransactionDto {
   @IsNumber()
   @IsOptional()
   nrv_rate?: number;
+
+  @ApiProperty({ description: 'Number of persons (OVERHEAD/labour rows only)', required: false })
+  @IsInt()
+  @IsOptional()
+  persons?: number;
+
+  @ApiProperty({ description: 'Hours worked per person (OVERHEAD/labour rows only)', required: false })
+  @IsNumber()
+  @IsOptional()
+  hours?: number;
+
+  @ApiProperty({ description: 'Average daily gain in kg/day (OBSERVATION/weight-sample rows only)', required: false })
+  @IsNumber()
+  @IsOptional()
+  adg?: number;
+
+  @ApiProperty({ description: 'Body condition score, 1-5 (OBSERVATION/weight-sample rows only)', required: false })
+  @IsNumber()
+  @IsOptional()
+  bcs_score?: number;
 }
 
 export class BatchOutputLineInput {

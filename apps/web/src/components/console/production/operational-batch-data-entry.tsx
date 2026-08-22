@@ -21,9 +21,15 @@ import {
 } from "lucide-react";
 import PiggeryLifecycleStepper, { DEFAULT_PIGGERY_STAGES } from "../piggery/piggery-lifecycle-stepper";
 import { api } from "@/services/api-client";
+import { API_BASE_URL } from "@/lib/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+
+// file_url from the API is server-relative (e.g. "/uploads/xyz.jpg") — resolve
+// it against the API's own origin, not the web app's, since uploads are served
+// from apps/api's /uploads static route.
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
 
 interface FeedItem {
   id: string;
@@ -69,6 +75,15 @@ interface OverheadItem {
   remarks: string;
 }
 
+interface BatchAttachment {
+  attachment_id: string;
+  file_name: string;
+  file_url: string;
+  mime_type: string | null;
+  attachment_type: string;
+  created_at: string;
+}
+
 interface BatchMeta {
   id: string;
   code: string;
@@ -99,7 +114,6 @@ export default function OperationalBatchDataEntry() {
 
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [compareWith, setCompareWith] = useState("Previous Day");
 
   const currentBatch = useMemo(
     () => batches.find((b) => b.id === selectedBatchId) || batches[0],
@@ -118,7 +132,9 @@ export default function OperationalBatchDataEntry() {
   const [bcsScore, setBcsScore] = useState("");
   const [weightNotes, setWeightNotes] = useState("");
   const [generalNotes, setGeneralNotes] = useState("");
-  const [attachments, setAttachments] = useState<Array<{ name: string; type: string; date: string }>>([]);
+  const [attachments, setAttachments] = useState<BatchAttachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState("");
 
   // Modals for Adding Items
   const [addFeedModalOpen, setAddFeedModalOpen] = useState(false);
@@ -154,7 +170,6 @@ export default function OperationalBatchDataEntry() {
   const [newOverheadRemarks, setNewOverheadRemarks] = useState("");
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [newAttachmentName, setNewAttachmentName] = useState("");
   const [newAttachmentType, setNewAttachmentType] = useState("IMAGE");
 
   const [saving, setSaving] = useState(false);
@@ -398,6 +413,18 @@ export default function OperationalBatchDataEntry() {
     loadBatchDailyData();
   }, [selectedBatchId, selectedDate]);
 
+  const loadAttachments = () => {
+    if (!selectedBatchId) return;
+    api
+      .get(`/batch/${selectedBatchId}/attachment?date=${selectedDate}`)
+      .then((res: any) => setAttachments(res?.data ?? res ?? []))
+      .catch(() => setAttachments([]));
+  };
+
+  useEffect(() => {
+    loadAttachments();
+  }, [selectedBatchId, selectedDate]);
+
   // Calculated Dynamic Metrics
   const totalFeedConsumed = feedRows.reduce((sum, r) => sum + Number(r.consumed || 0), 0);
   const totalFeedCost = feedRows.reduce((sum, r) => sum + Number(r.consumed || 0) * (r.rate || 35), 0);
@@ -626,6 +653,8 @@ export default function OperationalBatchDataEntry() {
             quantity: totalHrs,
             rate: Number(l.rate || 0),
             uom: "HRS",
+            persons: Number(l.persons || 0) || undefined,
+            hours: Number(l.hours || 0) || undefined,
             remarks: `Labour: ${l.resource} (${l.persons} persons × ${l.hours} hrs @ ₹${l.rate}/hr)`,
           });
         }
@@ -638,6 +667,8 @@ export default function OperationalBatchDataEntry() {
           transaction_type: "OBSERVATION",
           quantity: avgWeight,
           uom: "KG",
+          adg: weightGain || undefined,
+          bcs_score: bcsScore ? Number(bcsScore) || undefined : undefined,
           remarks: `Weight Sample: ${avgWeight} kg (ADG: +${weightGain} kg/day, BCS: ${bcsScore || "3.0"})${weightNotes ? ` — ${weightNotes}` : ""}`,
         });
       }
@@ -678,14 +709,27 @@ export default function OperationalBatchDataEntry() {
     }
   };
 
-  const handleAddAttachment = () => {
-    if (!newAttachmentName) return;
-    setAttachments([
-      ...attachments,
-      { name: newAttachmentName, type: newAttachmentType, date: "Just now" },
-    ]);
-    setUploadModalOpen(false);
-    setNewAttachmentName("");
+  const handleAddAttachment = async () => {
+    if (!uploadingFile || !currentBatch) return;
+    setUploadError("");
+    const formData = new FormData();
+    formData.append("file", uploadingFile);
+    formData.append("log_date", selectedDate);
+    formData.append("attachment_type", newAttachmentType);
+    try {
+      await api.post(`/batch/${currentBatch.id}/attachment`, formData);
+      setUploadModalOpen(false);
+      setUploadingFile(null);
+      loadAttachments();
+    } catch (err: any) {
+      setUploadError(err?.message || "Failed to upload attachment.");
+    }
+  };
+
+  const handleRemoveAttachment = async (attachmentId: string) => {
+    if (!currentBatch) return;
+    await api.delete(`/batch/${currentBatch.id}/attachment/${attachmentId}`).catch(() => void 0);
+    loadAttachments();
   };
 
   if (batchesLoading) {
@@ -838,21 +882,6 @@ export default function OperationalBatchDataEntry() {
             />
           </div>
 
-          <div>
-            <label className="block text-[10px] uppercase font-bold text-[var(--text-muted)] mb-1">
-              Compare With
-            </label>
-            <select
-              value={compareWith}
-              onChange={(e) => setCompareWith(e.target.value)}
-              className="rounded border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] focus:outline-none"
-            >
-              <option>Previous Day</option>
-              <option>Standard Breed Target</option>
-              <option>Stage Day 1 Baseline</option>
-            </select>
-          </div>
-
           <div className="flex items-center gap-2.5 bg-[var(--surface-raised)] border border-[var(--border)] px-3 py-1.5 rounded text-xs">
             <CloudSun className="w-4 h-4 text-amber-400" />
             <div>
@@ -905,10 +934,10 @@ export default function OperationalBatchDataEntry() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
-                <Wheat className="w-3.5 h-3.5 text-emerald-500" />
+                <Wheat className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                 <span>1. Feed Consumption & Nutrition</span>
               </h3>
-              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-xs font-bold text-[var(--text-primary)]">
                 Total: {totalFeedConsumed.toFixed(1)} KG (₹ {totalFeedCost.toFixed(2)})
               </span>
             </div>
@@ -921,7 +950,7 @@ export default function OperationalBatchDataEntry() {
                     <th className="pb-1.5 font-bold">UOM</th>
                     <th className="pb-1.5 font-bold text-right">Opening</th>
                     <th className="pb-1.5 font-bold text-right">Issued</th>
-                    <th className="pb-1.5 font-bold text-right text-emerald-600">Consumed</th>
+                    <th className="pb-1.5 font-bold text-right text-[var(--text-primary)]">Consumed</th>
                     <th className="pb-1.5 font-bold text-right">Wastage</th>
                     <th className="pb-1.5 font-bold text-right">Closing</th>
                     <th className="pb-1.5 font-bold text-right">Action</th>
@@ -989,10 +1018,10 @@ export default function OperationalBatchDataEntry() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
-                <Pill className="w-3.5 h-3.5 text-blue-500" />
+                <Pill className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                 <span>2. Medicine & Clinical Treatment</span>
               </h3>
-              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+              <span className="text-xs font-bold text-[var(--text-primary)]">
                 Total: ₹ {totalMedicineCost.toLocaleString("en-IN")}
               </span>
             </div>
@@ -1004,7 +1033,7 @@ export default function OperationalBatchDataEntry() {
                     <th className="pb-1.5 font-bold">Medicine / Vaccine</th>
                     <th className="pb-1.5 font-bold">UOM</th>
                     <th className="pb-1.5 font-bold text-right">Issued</th>
-                    <th className="pb-1.5 font-bold text-right text-blue-500">Consumed</th>
+                    <th className="pb-1.5 font-bold text-right text-[var(--text-primary)]">Consumed</th>
                     <th className="pb-1.5 font-bold text-right">Cost (₹)</th>
                     <th className="pb-1.5 font-bold text-right">Action</th>
                   </tr>
@@ -1054,7 +1083,7 @@ export default function OperationalBatchDataEntry() {
 
           <button
             onClick={() => setAddMedModalOpen(true)}
-            className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-blue-500 hover:underline"
+            className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
             <Plus className="w-3 h-3" /> Add Clinical Medication
           </button>
@@ -1063,7 +1092,7 @@ export default function OperationalBatchDataEntry() {
         {/* 3. Weight & Body Condition */}
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-2xs">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-3 flex items-center gap-1.5">
-            <Scale className="w-3.5 h-3.5 text-amber-500" />
+            <Scale className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
             <span>3. Weight & Body Condition Score (BCS)</span>
           </h3>
           <div className="grid grid-cols-3 gap-3">
@@ -1088,7 +1117,7 @@ export default function OperationalBatchDataEntry() {
                 step="0.01"
                 value={weightGain}
                 onChange={(e) => setWeightGain(Number(e.target.value))}
-                className="w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] p-2 text-xs font-bold text-emerald-500 font-mono"
+                className="w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] p-2 text-xs font-bold text-[var(--text-primary)] font-mono"
               />
             </div>
             <div>
@@ -1119,7 +1148,7 @@ export default function OperationalBatchDataEntry() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                <AlertTriangle className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                 <span>4. Mortality & Incident Log</span>
               </h3>
               <span className={totalMortality > 0 ? "text-xs font-bold text-rose-500 font-mono" : "text-xs font-bold text-emerald-500 font-mono"}>
@@ -1165,7 +1194,7 @@ export default function OperationalBatchDataEntry() {
 
           <button
             onClick={() => setAddMortalityModalOpen(true)}
-            className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:underline"
+            className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
             <Plus className="w-3 h-3" /> Add Mortality Cause
           </button>
@@ -1176,10 +1205,10 @@ export default function OperationalBatchDataEntry() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-indigo-500" />
+                <Users className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                 <span>5. Labour & Direct Farm Hours</span>
               </h3>
-              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+              <span className="text-xs font-bold text-[var(--text-primary)] font-mono">
                 ₹ {totalLabourCost.toFixed(2)} ({totalLabourHours} hrs)
               </span>
             </div>
@@ -1215,7 +1244,7 @@ export default function OperationalBatchDataEntry() {
 
           <button
             onClick={() => setAddLabourModalOpen(true)}
-            className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-indigo-500 hover:underline"
+            className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
             <Plus className="w-3 h-3" /> Add Labour Resource
           </button>
@@ -1226,10 +1255,10 @@ export default function OperationalBatchDataEntry() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
-                <DollarSign className="w-3.5 h-3.5 text-cyan-500" />
+                <DollarSign className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                 <span>6. Overheads & Utilities</span>
               </h3>
-              <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 font-mono">
+              <span className="text-xs font-bold text-[var(--text-primary)] font-mono">
                 Total: ₹ {totalOverheads.toFixed(2)}
               </span>
             </div>
@@ -1263,7 +1292,7 @@ export default function OperationalBatchDataEntry() {
 
           <button
             onClick={() => setAddOverheadModalOpen(true)}
-            className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-cyan-500 hover:underline"
+            className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
             <Plus className="w-3 h-3" /> Add Overhead Expense
           </button>
@@ -1272,7 +1301,7 @@ export default function OperationalBatchDataEntry() {
         {/* 7. Notes & Observations */}
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-2xs">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-3 flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-amber-500" />
+            <FileText className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
             <span>7. Daily Notes & Supervisor Observations</span>
           </h3>
           <textarea
@@ -1287,13 +1316,13 @@ export default function OperationalBatchDataEntry() {
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-2xs">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-teal-500" />
+              <Camera className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
               <span>8. Inspection Media & Photos</span>
             </h3>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setUploadModalOpen(true)}
+              onClick={() => { setUploadError(""); setUploadingFile(null); setUploadModalOpen(true); }}
               className="h-6 text-[10px] px-2 gap-1 font-medium"
             >
               <Plus className="w-3 h-3" /> Upload Media
@@ -1301,15 +1330,37 @@ export default function OperationalBatchDataEntry() {
           </div>
 
           <div className="space-y-2">
-            {attachments.map((att, idx) => (
-              <div key={idx} className="p-2 rounded bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex items-center justify-between">
-                <span className="font-medium text-[var(--text-primary)] flex items-center gap-1.5">
-                  <Camera className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                  {att.name}
-                </span>
-                <span className="text-[10px] font-mono text-[var(--text-muted)]">{att.date}</span>
-              </div>
-            ))}
+            {attachments.length === 0 ? (
+              <p className="py-3 text-center text-xs text-[var(--text-muted)] italic">
+                No inspection media attached for this date. Click '+ Upload Media' to attach a photo or document.
+              </p>
+            ) : (
+              attachments.map((att) => (
+                <div key={att.attachment_id} className="p-2 rounded bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex items-center justify-between gap-2">
+                  <a
+                    href={`${API_ORIGIN}${att.file_url}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-[var(--text-primary)] flex items-center gap-1.5 hover:underline truncate"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
+                    <span className="truncate">{att.file_name}</span>
+                  </a>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                      {new Date(att.created_at).toLocaleDateString()}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveAttachment(att.attachment_id)}
+                      className="text-[var(--text-muted)] hover:text-rose-500 p-1"
+                      title="Remove attachment"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -1684,10 +1735,10 @@ export default function OperationalBatchDataEntry() {
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => setUploadModalOpen(false)}>
+              <Button variant="outline" size="sm" onClick={() => { setUploadModalOpen(false); setUploadingFile(null); setUploadError(""); }}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleAddAttachment} className="nf-btn-primary">
+              <Button size="sm" onClick={handleAddAttachment} disabled={!uploadingFile} className="nf-btn-primary">
                 Attach to Daily Log
               </Button>
             </>
@@ -1695,12 +1746,11 @@ export default function OperationalBatchDataEntry() {
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">File Name / Label</label>
+              <label className="font-semibold block mb-1">File *</label>
               <input
-                type="text"
-                value={newAttachmentName}
-                onChange={(e) => setNewAttachmentName(e.target.value)}
-                placeholder="e.g. Gestation_Pen_B_Morning_Feeder.jpg"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/heic,application/pdf"
+                onChange={(e) => setUploadingFile(e.target.files?.[0] || null)}
                 className="nf-input w-full"
               />
             </div>
@@ -1712,11 +1762,14 @@ export default function OperationalBatchDataEntry() {
                 onChange={(e) => setNewAttachmentType(e.target.value)}
                 className="nf-input w-full"
               >
-                <option value="IMAGE">Site Inspection Image (.JPG, .PNG)</option>
-                <option value="PDF">Veterinary Lab Report / Prescription (.PDF)</option>
-                <option value="NOTE">Voice / Sensor Log (.TXT, .JSON)</option>
+                <option value="IMAGE">Site Inspection Image (JPG, PNG, WebP, HEIC)</option>
+                <option value="PDF">Veterinary Lab Report / Prescription (PDF)</option>
               </select>
             </div>
+
+            {uploadError && (
+              <p className="text-rose-500 font-medium">{uploadError}</p>
+            )}
           </div>
         </Dialog>
       )}
