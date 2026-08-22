@@ -67,38 +67,118 @@ export function getStoredTenantId(): string | null {
 export function getActiveWorkspaceScope(): WorkspaceScope {
   if (typeof window === "undefined") return "COMPANY";
   const user = getStoredUser();
-  const stored = localStorage.getItem("active_workspace_scope") as WorkspaceScope;
-  if (stored) return stored;
+  if (!user) return "COMPANY";
 
-  if (user?.userType === "TENANT_ADMIN") return "TENANT";
-  if (user?.userType === "OPERATIONAL_ADMIN") return "OPERATIONAL";
+  const stored = localStorage.getItem("active_workspace_scope") as WorkspaceScope;
+
+  // Strict role enforcement
+  if (user.userType === "TENANT_ADMIN") {
+    return stored || "TENANT";
+  }
+
+  if (user.userType === "COMPANY_ADMIN") {
+    // Company admins can never enter TENANT scope
+    if (stored === "OPERATIONAL") return "OPERATIONAL";
+    return "COMPANY";
+  }
+
+  if (user.userType === "OPERATIONAL_ADMIN" || user.userType === "STANDARD_USER") {
+    return "OPERATIONAL";
+  }
+
   return "COMPANY";
 }
 
 export function setActiveWorkspaceScope(scope: WorkspaceScope): void {
   if (typeof window === "undefined") return;
+  const user = getStoredUser();
+
+  // Prevent non-tenant admins from setting TENANT scope
+  if (user && user.userType !== "TENANT_ADMIN" && scope === "TENANT") {
+    scope = "COMPANY";
+  }
+
   localStorage.setItem("active_workspace_scope", scope);
 }
 
 /** The company the user is currently "working as" in this browser session */
 export function getActiveCompanyId(): string | null {
   if (typeof window === "undefined") return null;
-  return (
+  const user = getStoredUser();
+  if (!user) return null;
+
+  const stored =
     localStorage.getItem("active_company_id") ||
     localStorage.getItem("company_id") ||
-    null
-  );
+    null;
+
+  // Tenant admin can work across all companies
+  if (user.userType === "TENANT_ADMIN") {
+    return stored || user.companyId || (user.companies && user.companies[0]?.company_id) || null;
+  }
+
+  // Strictly enforce user's assigned company boundary
+  const allowedCompanyIds = new Set([
+    user.companyId,
+    user.company_id,
+    ...(user.companies || []).map((c) => c.company_id),
+  ].filter(Boolean));
+
+  if (stored && allowedCompanyIds.has(stored)) {
+    return stored;
+  }
+
+  const defaultCompId = user.companyId || user.company_id || (user.companies && user.companies[0]?.company_id) || null;
+  if (defaultCompId) {
+    localStorage.setItem("active_company_id", defaultCompId);
+  }
+  return defaultCompId;
 }
 
 export function setActiveCompanyId(companyId: string): void {
   if (typeof window === "undefined") return;
+  const user = getStoredUser();
+
+  // Guard: non-tenant admin cannot switch to unassigned companies
+  if (user && user.userType !== "TENANT_ADMIN") {
+    const allowedCompanyIds = new Set([
+      user.companyId,
+      user.company_id,
+      ...(user.companies || []).map((c) => c.company_id),
+    ].filter(Boolean));
+
+    if (!allowedCompanyIds.has(companyId)) {
+      console.warn(`Access denied: User ${user.email} is not authorized for company ${companyId}`);
+      return;
+    }
+  }
+
   localStorage.setItem("active_company_id", companyId);
 }
 
 /** The active operational area the user is currently inspecting/operating */
 export function getActiveOperationalAreaId(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("active_operational_area_id") || null;
+  const user = getStoredUser();
+  if (!user) return null;
+
+  const stored = localStorage.getItem("active_operational_area_id") || null;
+
+  if (user.userType === "TENANT_ADMIN") {
+    return stored;
+  }
+
+  const allowedAreaIds = new Set([
+    user.operationalAreaId,
+    user.operational_area_id,
+    ...(user.operationalAreas || []).map((a) => a.area_id),
+  ].filter(Boolean));
+
+  if (stored && (allowedAreaIds.size === 0 || allowedAreaIds.has(stored))) {
+    return stored;
+  }
+
+  return user.operationalAreaId || user.operational_area_id || (user.operationalAreas && user.operationalAreas[0]?.area_id) || null;
 }
 
 export function setActiveOperationalAreaId(areaId: string | null): void {

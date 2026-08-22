@@ -1,7 +1,5 @@
 import './global.css';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { ThemeProvider } from '@/hooks/useTheme';
-import { LanguageProvider } from '@/hooks/useLanguage';
+import { Providers } from '@/components/providers';
 
 export const metadata = {
   title: 'NAVFarm',
@@ -21,20 +19,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" type="image/png" href="https://nav-cdn.pages.dev/images/favicon.png" />
-        <link rel="apple-touch-icon" href="https://nav-cdn.pages.dev/images/favicon.png" />
         <script
+          id="theme-script"
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var p=localStorage.getItem("navfarm_theme");var t=(p==="light"||p==="dark")?p:(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}})();`,
           }}
         />
       </head>
       <body>
-        <ThemeProvider>
-          <LanguageProvider>
-            <AuthProvider>{children}</AuthProvider>
-          </LanguageProvider>
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

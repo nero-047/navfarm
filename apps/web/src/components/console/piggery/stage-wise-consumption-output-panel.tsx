@@ -56,6 +56,14 @@ interface StageProfile {
     wastage: number;
     cost: number;
   }[];
+  labourData: {
+    resource: string;
+    date: string;
+    hours: number;
+    rate: number;
+    cost: number;
+    remarks: string;
+  }[];
   overheadData: {
     item: string;
     basis: string;
@@ -69,6 +77,17 @@ interface StageProfile {
     reason: string;
     pen: string;
     vetAction: string;
+  }[];
+  weightLogs: {
+    date: string;
+    avgWeightKg: number;
+    remarks: string;
+  }[];
+  observationLogs: {
+    date: string;
+    type: string;
+    value: string;
+    notes: string;
   }[];
   transferLogs: {
     date: string;
@@ -114,14 +133,19 @@ export default function StageWiseConsumptionOutputPanel() {
       avgAgeDays: 30,
       feedData: [],
       medData: [],
+      labourData: [],
       overheadData: [],
       mortalityLogs: [],
+      weightLogs: [],
+      observationLogs: [],
       transferLogs: [],
       outputHead: 0,
     };
   }, [currentBatch, selectedStageId]);
 
-  const [activeTab, setActiveTab] = useState<"feed" | "medicine" | "overheads" | "mortality" | "transfers" | "summary">("feed");
+  const [activeTab, setActiveTab] = useState<
+    "feed" | "medicine" | "labour" | "overheads" | "mortality" | "weight" | "observations" | "transfers" | "summary"
+  >("feed");
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
 
@@ -159,44 +183,187 @@ export default function StageWiseConsumptionOutputPanel() {
               const details = detailsRes?.data ?? detailsRes ?? b;
               const txs: any[] = details.transactions || [];
               
-              const feedTxs = txs.filter((t: any) => t.transaction_type === "CONSUMPTION");
+              // Helper to detect medicine transactions vs feed
+              const isMedicine = (t: any) => {
+                if (t.item_type === "MEDICINE" || t.item_category_code === "MEDICINE") return true;
+                const uom = (t.uom || "").toUpperCase();
+                if (["ML", "DOSES", "VIAL", "BOTTLE", "TAB", "AMPOULE", "SYRINGE", "MG"].includes(uom)) return true;
+                const text = `${t.item_name || ""} ${t.item_code || ""} ${t.remarks || ""}`.toLowerCase();
+                return (
+                  text.includes("med") ||
+                  text.includes("vaccin") ||
+                  text.includes("deworm") ||
+                  text.includes("iron") ||
+                  text.includes("antibiotic") ||
+                  text.includes("dextran") ||
+                  text.includes("ivermectin") ||
+                  text.includes("vitamin") ||
+                  text.includes("electrolyt") ||
+                  text.includes("inject") ||
+                  text.includes("dose") ||
+                  text.includes("treatment") ||
+                  text.includes("clinical") ||
+                  text.includes("parvovirus") ||
+                  text.includes("circovirus") ||
+                  text.includes("amoxicillin") ||
+                  text.includes("oxytetracycline")
+                );
+              };
+
+              const feedTxs = txs.filter((t: any) => t.transaction_type === "CONSUMPTION" && !isMedicine(t));
+              const medTxs = txs.filter((t: any) => t.transaction_type === "CONSUMPTION" && isMedicine(t));
               const overheadTxs = txs.filter((t: any) => t.transaction_type === "OVERHEAD");
               const mortalityTxs = txs.filter((t: any) => t.transaction_type === "MORTALITY");
 
-              const feedData = feedTxs.map((t: any) => ({
-                item: t.item_name || t.item_code || "Feed Ration",
-                uom: t.uom || "KG",
-                opening: 0,
-                issued: Number(t.quantity || 0),
-                consumed: Number(t.quantity || 0),
-                wastage: 0,
-                rate: Number(t.rate || 35.0),
-              }));
+              // Aggregate feed consumption by formula / item name
+              const feedMap = new Map<string, {
+                item: string;
+                uom: string;
+                opening: number;
+                issued: number;
+                consumed: number;
+                wastage: number;
+                rate: number;
+              }>();
 
-              const overheadData = overheadTxs.map((t: any) => ({
-                item: t.remarks || "Operational Overhead",
-                basis: "Units",
-                rate: Number(t.rate || t.amount || 0),
-                qty: Number(t.quantity || 1),
-                cost: Math.abs(Number(t.amount || 0)),
-              }));
+              feedTxs.forEach((t: any) => {
+                // Key by remarks first (which holds the exact user input from Batch Data Entry), then item_name
+                const itemName = t.remarks || t.item_name || t.item_code || "Standard Feed Ration";
+                const qty = Number(t.quantity || 0);
+                const rate = Number(t.rate || 35.0);
+                const uom = t.uom || "KG";
+
+                if (feedMap.has(itemName)) {
+                  const existing = feedMap.get(itemName)!;
+                  existing.issued += qty;
+                  existing.consumed += qty;
+                } else {
+                  feedMap.set(itemName, {
+                    item: itemName,
+                    uom,
+                    opening: 0,
+                    issued: qty,
+                    consumed: qty,
+                    wastage: 0,
+                    rate,
+                  });
+                }
+              });
+
+              const feedData = Array.from(feedMap.values());
+
+              // Map medical and vaccine consumption
+              const medMap = new Map<string, {
+                item: string;
+                uom: string;
+                issued: number;
+                consumed: number;
+                wastage: number;
+                cost: number;
+              }>();
+
+              medTxs.forEach((t: any) => {
+                // Key by remarks first (which holds the exact user input from Batch Data Entry), then item_name
+                const itemName = t.remarks || t.item_name || t.item_code || "Clinical Medication";
+                const qty = Number(t.quantity || 0);
+                const rate = Number(t.rate || 20.0);
+                // amount is stored negative in DB — always use Math.abs with null-coalescing
+                const cost = Math.abs(Number(t.amount ?? (qty * rate)));
+                const uom = t.uom || "ML";
+
+                if (medMap.has(itemName)) {
+                  const existing = medMap.get(itemName)!;
+                  existing.issued += qty;
+                  existing.consumed += qty;
+                  existing.cost += cost;
+                } else {
+                  medMap.set(itemName, {
+                    item: itemName,
+                    uom,
+                    issued: qty,
+                    consumed: qty,
+                    wastage: 0,
+                    cost,
+                  });
+                }
+              });
+
+              const medData = Array.from(medMap.values());
+
+              const labourTxs = overheadTxs.filter((t: any) =>
+                (t.remarks || "").toLowerCase().includes("labour") || t.uom === "HRS"
+              );
+              const generalOverheadTxs = overheadTxs.filter((t: any) =>
+                !((t.remarks || "").toLowerCase().includes("labour") || t.uom === "HRS")
+              );
+
+              const labourData = labourTxs.map((t: any) => {
+                const qty = Number(t.quantity ?? 1);
+                const rate = Number(t.rate ?? 0);
+                const cost = Math.abs(Number(t.amount ?? (qty * rate)));
+                return {
+                  resource: t.remarks || "Farm Operations Labour",
+                  date: t.transaction_date || "",
+                  hours: qty,
+                  rate,
+                  cost,
+                  remarks: t.remarks || "Daily Farm Operations",
+                };
+              });
+
+              const overheadData = generalOverheadTxs.map((t: any) => {
+                const qty = Number(t.quantity ?? 1);
+                const rate = Number(t.rate ?? 0);
+                // amount is stored as negative in DB — use null-coalescing (not ||) to handle negatives
+                const cost = Math.abs(Number(t.amount ?? (qty * rate)));
+                return {
+                  item: t.remarks || "Operational Overhead",
+                  basis: t.uom || "Units",
+                  rate,
+                  qty,
+                  cost,
+                };
+              });
 
               const mortalityLogs = mortalityTxs.map((t: any) => ({
                 date: t.transaction_date || "",
                 count: Number(t.quantity || 1),
                 reason: t.remarks || "Mortality Recorded",
                 pen: "Main Shed",
-                vetAction: "Recorded in transaction log",
+                vetAction: "Recorded in clinical register",
               }));
 
-              const totalMortality = mortalityLogs.reduce((sum: number, m: any) => sum + m.count, 0);
-              const opening = Number(b.opening_quantity) || 100;
-              const closing = Number(b.closing_quantity) ?? (opening - totalMortality);
+              const weightTxs = txs.filter((t: any) =>
+                t.transaction_type === "WEIGHT_ENTRY" ||
+                (t.transaction_type === "OBSERVATION" &&
+                  ((t.remarks || "").toLowerCase().includes("weight") || t.uom === "KG"))
+              );
+              const weightLogs = weightTxs.map((t: any) => ({
+                date: t.transaction_date || "",
+                avgWeightKg: Number(t.quantity || 0),
+                remarks: t.remarks || "Body Weight Sampling Recorded",
+              }));
+
+              const obsTxs = txs.filter((t: any) =>
+                t.transaction_type === "OBSERVATION" &&
+                !((t.remarks || "").toLowerCase().includes("weight") && t.uom === "KG")
+              );
+              const observationLogs = obsTxs.map((t: any) => ({
+                date: t.transaction_date || "",
+                type: t.uom === "°C" ? "Temperature" : t.uom === "L" ? "Water Intake" : t.uom === "%" ? "Humidity" : "Daily Observation",
+                value: `${t.quantity ?? ""} ${t.uom || ""}`.trim(),
+                notes: t.remarks || "Observation Logged",
+              }));
+
+              const opening = Number(b.opening_quantity) || 20;
+              const recordedMortality = mortalityLogs.reduce((sum: number, m: any) => sum + m.count, 0);
+              const closing = Number(b.closing_quantity) ?? (opening - recordedMortality);
+              const totalMortality = Math.max(0, opening - closing);
 
               const stageProfile: StageProfile = {
                 id: `st-${b.batch_id}`,
                 code: b.current_stage_code || "ACTIVE",
-                name: `${b.current_stage_code || "Production"} Stage`,
+                name: `${(b.current_stage_code || "Production").replace(/_/g, " ")} Stage`,
                 startDate: b.start_date || new Date().toISOString().slice(0, 10),
                 endDate: b.expected_end_date || new Date().toISOString().slice(0, 10),
                 standardDays: 60,
@@ -205,9 +372,12 @@ export default function StageWiseConsumptionOutputPanel() {
                 mortality: totalMortality,
                 avgAgeDays: 45,
                 feedData,
-                medData: [],
+                medData,
+                labourData,
                 overheadData,
                 mortalityLogs,
+                weightLogs,
+                observationLogs,
                 transferLogs: [],
                 outputHead: closing,
               };
@@ -217,7 +387,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 code: b.batch_no,
                 name: b.remarks || b.batch_no,
                 breed: b.breed_name || b.breed_code || "Large White",
-                batchType: b.lob_name || "Production Batch",
+                batchType: b.lob_name || "Piggery Production Batch",
                 startCount: opening,
                 stages: [stageProfile],
               };
@@ -227,8 +397,8 @@ export default function StageWiseConsumptionOutputPanel() {
                 code: b.batch_no,
                 name: b.remarks || b.batch_no,
                 breed: b.breed_name || b.breed_code || "Large White",
-                batchType: b.lob_name || "Production Batch",
-                startCount: Number(b.opening_quantity) || 100,
+                batchType: b.lob_name || "Piggery Production Batch",
+                startCount: Number(b.opening_quantity) || 20,
                 stages: [],
               };
             }
@@ -264,11 +434,15 @@ export default function StageWiseConsumptionOutputPanel() {
     () => currentStage.medData.reduce((sum, m) => sum + m.cost, 0),
     [currentStage]
   );
+  const totalLabourCost = useMemo(
+    () => (currentStage.labourData || []).reduce((sum, l) => sum + l.cost, 0),
+    [currentStage]
+  );
   const totalOverheadCost = useMemo(
     () => currentStage.overheadData.reduce((sum, o) => sum + o.cost, 0),
     [currentStage]
   );
-  const totalStageWipCost = totalFeedCost + totalMedCost + totalOverheadCost;
+  const totalStageWipCost = totalFeedCost + totalMedCost + totalLabourCost + totalOverheadCost;
 
   const durationDays = currentStage.standardDays;
   const avgAnimals = (currentStage.startAnimals + currentStage.endAnimals) / 2;
@@ -541,10 +715,13 @@ export default function StageWiseConsumptionOutputPanel() {
       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-2xs">
         <div className="flex items-center gap-1 border-b border-[var(--border)] bg-[var(--surface-raised)] px-4 pt-2 text-xs font-semibold overflow-x-auto">
           {[
-            { key: "feed", label: "Feed Consumption" },
-            { key: "medicine", label: "Medicine Consumption" },
-            { key: "overheads", label: "Overheads & Labour" },
-            { key: "mortality", label: `Mortality Logs (${currentStage.mortalityLogs.length})` },
+            { key: "feed", label: `Feed Consumption (${currentStage.feedData.length})` },
+            { key: "medicine", label: `Medicine & Clinical (${currentStage.medData.length})` },
+            { key: "labour", label: `Labour & Manpower (${currentStage.labourData?.length || 0})` },
+            { key: "overheads", label: `Overheads & Utilities (${currentStage.overheadData.length})` },
+            { key: "mortality", label: `Mortality Incidents (${currentStage.mortalityLogs.length})` },
+            { key: "weight", label: `Weight & Growth (${currentStage.weightLogs?.length || 0})` },
+            { key: "observations", label: `Notes & Logs (${currentStage.observationLogs?.length || 0})` },
             { key: "transfers", label: `Transfer Out / Sales (${currentStage.transferLogs.length})` },
             { key: "summary", label: "IAS 41 Costing & WIP Summary" },
           ].map((tab) => (
@@ -651,7 +828,55 @@ export default function StageWiseConsumptionOutputPanel() {
             </div>
           )}
 
-          {/* TAB 3: OVERHEADS & LABOUR */}
+          {/* TAB 3: LABOUR & MANPOWER */}
+          {activeTab === "labour" && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                    <th className="pb-2 font-bold">#</th>
+                    <th className="pb-2 font-bold">Date</th>
+                    <th className="pb-2 font-bold">Labour Resource / Activity</th>
+                    <th className="pb-2 font-bold text-right">Hours Logged</th>
+                    <th className="pb-2 font-bold text-right">Hourly Rate (₹)</th>
+                    <th className="pb-2 font-bold text-right">Total Cost (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {(currentStage.labourData || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-xs text-[var(--text-muted)]">
+                        No direct farm labour hours logged yet. Add labour records via Daily Batch Entry.
+                      </td>
+                    </tr>
+                  ) : (
+                    (currentStage.labourData || []).map((l, index) => (
+                      <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
+                        <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
+                        <td className="py-2.5 font-mono text-[var(--text-secondary)]">{l.date || "—"}</td>
+                        <td className="py-2.5 font-semibold text-[var(--text-primary)]">{l.resource}</td>
+                        <td className="py-2.5 text-right font-mono font-bold">{l.hours} hrs</td>
+                        <td className="py-2.5 text-right font-mono">₹ {l.rate.toFixed(2)}</td>
+                        <td className="py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">
+                          ₹ {l.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
+                    <td colSpan={5} className="py-2.5 px-2">Total Stage Labour Cost</td>
+                    <td className="py-2.5 text-right font-mono text-[var(--accent)]">
+                      ₹ {totalLabourCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {/* TAB 4: OVERHEADS & UTILITIES */}
           {activeTab === "overheads" && (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
@@ -666,20 +891,28 @@ export default function StageWiseConsumptionOutputPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {currentStage.overheadData.map((o, index) => (
-                    <tr key={o.item} className="hover:bg-[var(--surface-raised)] transition-colors">
-                      <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
-                      <td className="py-2.5 font-semibold text-[var(--text-primary)]">{o.item}</td>
-                      <td className="py-2.5 text-[var(--text-secondary)]">{o.basis}</td>
-                      <td className="py-2.5 text-right font-mono">₹ {o.rate.toFixed(2)}</td>
-                      <td className="py-2.5 text-right font-mono font-bold">{o.qty}</td>
-                      <td className="py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {o.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                  {currentStage.overheadData.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-xs text-[var(--text-muted)]">
+                        No general overhead allocations logged for this stage.
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    currentStage.overheadData.map((o, index) => (
+                      <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
+                        <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
+                        <td className="py-2.5 font-semibold text-[var(--text-primary)]">{o.item}</td>
+                        <td className="py-2.5 text-[var(--text-secondary)]">{o.basis}</td>
+                        <td className="py-2.5 text-right font-mono">₹ {o.rate.toFixed(2)}</td>
+                        <td className="py-2.5 text-right font-mono font-bold">{o.qty}</td>
+                        <td className="py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {o.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
-                    <td colSpan={5} className="py-2.5 px-2">Total Stage Overheads & Labour Allocation</td>
+                    <td colSpan={5} className="py-2.5 px-2">Total Stage Overheads Allocation</td>
                     <td className="py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalOverheadCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tfoot>
@@ -687,7 +920,7 @@ export default function StageWiseConsumptionOutputPanel() {
             </div>
           )}
 
-          {/* TAB 4: MORTALITY */}
+          {/* TAB 5: MORTALITY */}
           {activeTab === "mortality" && (
             <div className="space-y-3">
               {currentStage.mortalityLogs.length === 0 ? (
@@ -719,7 +952,73 @@ export default function StageWiseConsumptionOutputPanel() {
             </div>
           )}
 
-          {/* TAB 5: TRANSFERS OUT & SALES */}
+          {/* TAB 6: WEIGHT & GROWTH SAMPLING */}
+          {activeTab === "weight" && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                    <th className="pb-2 font-bold">#</th>
+                    <th className="pb-2 font-bold">Sampling Date</th>
+                    <th className="pb-2 font-bold text-right">Average Body Weight (KG)</th>
+                    <th className="pb-2 font-bold">Sampling Remarks & Body Condition</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {(currentStage.weightLogs || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-xs text-[var(--text-muted)]">
+                        No weight sampling records logged yet. Enter herd weights via Daily Batch Entry.
+                      </td>
+                    </tr>
+                  ) : (
+                    (currentStage.weightLogs || []).map((w, index) => (
+                      <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
+                        <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
+                        <td className="py-2.5 font-mono text-[var(--text-secondary)]">{w.date || "—"}</td>
+                        <td className="py-2.5 text-right font-mono font-bold text-emerald-500">
+                          {w.avgWeightKg > 0 ? `${w.avgWeightKg.toFixed(2)} KG` : "—"}
+                        </td>
+                        <td className="py-2.5 text-[var(--text-primary)]">{w.remarks}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* TAB 7: NOTES & OBSERVATIONS */}
+          {activeTab === "observations" && (
+            <div className="space-y-3">
+              {(currentStage.observationLogs || []).length === 0 ? (
+                <div className="p-6 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-raised)] rounded-[var(--radius-sm)]">
+                  No supervisor observations or environmental logs recorded for this stage yet.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(currentStage.observationLogs || []).map((obs, idx) => (
+                    <div key={idx} className="p-3.5 rounded-[var(--radius-sm)] bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[var(--accent)]">{obs.type}</span>
+                          {obs.value && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
+                              {obs.value}
+                            </span>
+                          )}
+                          <span className="text-[var(--text-muted)] font-mono text-[11px]">({obs.date})</span>
+                        </div>
+                        <p className="mt-1 font-semibold text-[var(--text-primary)]">{obs.notes}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 8: TRANSFERS OUT & SALES */}
           {activeTab === "transfers" && (
             <div className="space-y-3">
               {currentStage.transferLogs.length === 0 ? (
@@ -761,7 +1060,7 @@ export default function StageWiseConsumptionOutputPanel() {
             </div>
           )}
 
-          {/* TAB 6: IAS 41 SUMMARY */}
+          {/* TAB 9: IAS 41 SUMMARY */}
           {activeTab === "summary" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="p-4 rounded-[var(--radius-md)] bg-[var(--surface-raised)] border border-[var(--border)] space-y-3">
@@ -779,7 +1078,11 @@ export default function StageWiseConsumptionOutputPanel() {
                     <span className="font-mono font-bold">₹ {totalMedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalMedCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Direct Overheads & Labor:</span>
+                    <span className="text-[var(--text-secondary)]">Direct Farm Labour:</span>
+                    <span className="font-mono font-bold">₹ {totalLabourCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalLabourCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">Direct Overheads & Utilities:</span>
                     <span className="font-mono font-bold">₹ {totalOverheadCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalOverheadCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="border-t pt-2 flex justify-between font-bold text-sm" style={{ borderColor: "var(--border)" }}>

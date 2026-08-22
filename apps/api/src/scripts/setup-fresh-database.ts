@@ -66,11 +66,11 @@ async function runFreshSetup() {
   runStep('Step 4: Syncing Locales, Timezones & Countries', 'sync-locale-master.ts');
   runStep('Step 5: Seeding Reference Masters (UOMs, Species, Breeds, Stages, Items)', 'seed-system-master-data.ts');
 
-  // 4. PROVISION DEV TENANT & COMPANY DEVCO
-  runStep('Step 6: Provisioning Dev Tenant (devco) & Company (DEVCO)', 'seed-dev-tenant.ts');
+  // 4. PROVISION APEX TENANT & 2 COMPANIES (APEXBREED & HIGHLAND)
+  runStep('Step 6: Provisioning Tenant (apexagri) & 2 Companies (APEXBREED & HIGHLAND)', 'seed-dev-tenant.ts');
 
-  // 5. SEED COMPLETE PIGGERY DATASET (ANIMALS, REPRODUCTION, BATCHES, TRANSACTIONS)
-  runStep('Step 7: Seeding Complete Piggery Dataset (Herd Animals, Breeding, Farrowing, Batches)', 'seed-piggery-complete-data.ts');
+  // 5. SEED COMPLETE PIGGERY DATASET FOR BOTH COMPANIES
+  runStep('Step 7: Seeding Complete Piggery Dataset (Herd Animals, Breeding, Schedulers, Batches)', 'seed-piggery-complete-data.ts');
 
   // 6. PROVISION DEMO TENANT
   runStep('Step 8: Provisioning Demo Tenant (demo)', 'seed-demo-tenant.ts');
@@ -78,20 +78,32 @@ async function runFreshSetup() {
   console.log('\n================================================================');
   console.log('🎉 ALL DATABASES MIGRATED & DATA LINKED TOGETHER SUCCESSFULLY!');
   console.log('================================================================');
-  console.log('Ready-to-Use Login Credentials:');
+  console.log('Ready-to-Use Login Credentials (Password: 12345678):');
   console.log('');
-  console.log('  1. Dev Company Admin (Full Piggery Data):');
-  console.log('     URL:      http://localhost:3000/login?tenant=devco');
-  console.log('     Email:    admin@devco.local');
-  console.log('     Password: DevAdmin@12345');
+  console.log('  1. Tenant Super Admin (Access to Both Companies & Areas):');
+  console.log('     URL:      http://localhost:3001/login?tenant=apexagri');
+  console.log('     Email:    admin@apexagri.local');
+  console.log('     Name:     Rajesh Varma (Group CEO)');
+  console.log('     Password: 12345678');
   console.log('');
-  console.log('  2. Dev Tenant Admin:');
-  console.log('     Email:    tenantadmin@devco.local');
-  console.log('     Password: DevTenant@12345');
+  console.log('  2. Company 1 Admin (Apex Swine Genetics & Breeding):');
+  console.log('     URL:      http://localhost:3001/login?tenant=apexagri');
+  console.log('     Email:    arjun.sharma@apexagri.local');
+  console.log('     Name:     Dr. Arjun Sharma (Director - Genetics & Breeding)');
+  console.log('     Area:     APEX-BREED-01 (Apex Nucleus Breeding & Gestation Unit)');
+  console.log('     Password: 12345678');
   console.log('');
-  console.log('  3. Platform Super Admin:');
+  console.log('  3. Company 2 Admin (Highland Commercial Porkers & Processing):');
+  console.log('     URL:      http://localhost:3001/login?tenant=apexagri');
+  console.log('     Email:    vikram.singh@highlandpork.local');
+  console.log('     Name:     Vikram Singh (Operations Director)');
+  console.log('     Area:     HIGH-GROW-01 (Highland Grow-Finish Commercial Complex)');
+  console.log('     Password: 12345678');
+  console.log('');
+  console.log('  4. Platform Super Administrator:');
+  console.log('     URL:      http://localhost:3001/login  (or /admin)');
   console.log('     Email:    admin@navfarm.local');
-  console.log('     Password: SystemAdmin@12345');
+  console.log('     Password: 12345678');
   console.log('================================================================\n');
 }
 

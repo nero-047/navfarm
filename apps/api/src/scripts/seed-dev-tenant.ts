@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import * as bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
 import * as mysql from 'mysql2/promise';
@@ -339,139 +339,215 @@ async function seedDevTenant() {
       const defaultLangId = masterLangs.find((l) => l.is_system_default)?.lang_id || masterLangs[0]?.lang_id;
       const defaultCurrId = masterCurrs.find((c) => c.is_system_default)?.currency_id || masterCurrs[0]?.currency_id;
 
-      // Company: created directly past the onboarding wizard — same end state
-      // as if all 9 steps + complete() had been called through the API.
-      await tenantDb
-        .insert(tenant.companyMaster)
-        .values({
-          company_id: COMPANY_ID,
-          tenant_id: tenantId,
-          company_code: companyCode,
-          company_name: companyName,
-          company_display_name: companyName,
-          company_type: 'Pvt Ltd',
-          industry_type: 'Poultry Farming',
-          base_currency_id: defaultCurrId,
-          default_language_id: defaultLangId,
-          default_timezone_id: 'Asia/Kolkata',
-          country_id: 'IND',
-          financial_year_start: 4,
-          onboarding_status: 'COMPLETED',
-          is_active: true,
-        })
-        .onDuplicateKeyUpdate({
-          set: {
-            company_code: companyCode,
-            company_name: companyName,
-            company_display_name: companyName,
+      const COMPANY_1_ID = '00000000-0000-0000-0000-000000000000';
+      const COMPANY_2_ID = '00000000-0000-0000-0000-000000000001';
+
+      const companyConfigs = [
+        {
+          id: COMPANY_1_ID,
+          code: 'APEXBREED',
+          name: 'Apex Swine Genetics & Breeding Pvt Ltd',
+          industry: 'Swine Breeding & Genetics',
+          farmCode: 'FARM-APEX-01',
+          farmName: 'Apex Nucleus Breeding Farm',
+          shedCode: 'SHED-GEST-01',
+          shedName: 'Breeding & Gestation Complex',
+        },
+        {
+          id: COMPANY_2_ID,
+          code: 'HIGHLAND',
+          name: 'Highland Commercial Porkers & Processing Pvt Ltd',
+          industry: 'Commercial Swine Farming',
+          farmCode: 'FARM-HIGH-01',
+          farmName: 'Highland Commercial Swine Complex',
+          shedCode: 'SHED-GROW-01',
+          shedName: 'Commercial Weaner Nursery Barn',
+        },
+      ];
+
+      for (const cc of companyConfigs) {
+        await tenantDb
+          .insert(tenant.companyMaster)
+          .values({
+            company_id: cc.id,
+            tenant_id: tenantId,
+            company_code: cc.code,
+            company_name: cc.name,
+            company_display_name: cc.name,
+            company_type: 'Pvt Ltd',
+            industry_type: cc.industry,
+            base_currency_id: defaultCurrId,
+            default_language_id: defaultLangId,
+            default_timezone_id: 'Asia/Kolkata',
+            country_id: 'IND',
+            financial_year_start: 4,
             onboarding_status: 'COMPLETED',
             is_active: true,
-          },
-        });
+          })
+          .onDuplicateKeyUpdate({
+            set: {
+              company_code: cc.code,
+              company_name: cc.name,
+              company_display_name: cc.name,
+              onboarding_status: 'COMPLETED',
+              is_active: true,
+            },
+          });
 
-      const tenantAdminHash = await bcrypt.hash(tenantAdminPassword, 10);
-      await tenantDb
-        .insert(tenant.userMaster)
-        .values({
-          user_id: randomUUID(),
-          company_id: COMPANY_ID,
+        // Starter chart of accounts + GL mappings + warehouse for each company
+        const [existingGl] = await tenantDb.select().from(tenant.glAccountMaster).where(eq(tenant.glAccountMaster.company_id, cc.id)).limit(1);
+        if (!existingGl) {
+          const accountIdByCode = new Map<string, string>();
+          for (const account of STARTER_GL_ACCOUNTS) {
+            const glAccountId = randomUUID();
+            accountIdByCode.set(account.account_code, glAccountId);
+            await tenantDb.insert(tenant.glAccountMaster).values({
+              gl_account_id: glAccountId,
+              tenant_id: tenantId,
+              company_id: cc.id,
+              account_code: account.account_code,
+              account_name: account.account_name,
+              account_type: account.account_type,
+            });
+          }
+          for (const mapping of STARTER_GL_MAPPINGS) {
+            const debitAccountId = accountIdByCode.get(mapping.debit_account_code);
+            const creditAccountId = accountIdByCode.get(mapping.credit_account_code);
+            if (!debitAccountId || !creditAccountId) continue;
+            await tenantDb.insert(tenant.glMappingMaster).values({
+              mapping_id: randomUUID(),
+              tenant_id: tenantId,
+              company_id: cc.id,
+              transaction_type: mapping.transaction_type,
+              debit_gl_account_id: debitAccountId,
+              credit_gl_account_id: creditAccountId,
+            });
+          }
+        }
+
+        const [existingWarehouse] = await tenantDb.select().from(tenant.warehouseMaster).where(eq(tenant.warehouseMaster.company_id, cc.id)).limit(1);
+        if (!existingWarehouse) {
+          await tenantDb.insert(tenant.warehouseMaster).values({
+            warehouse_id: randomUUID(),
+            tenant_id: tenantId,
+            company_id: cc.id,
+            warehouse_code: `WH-${cc.code}-MAIN`,
+            warehouse_name: `${cc.name} Central Warehouse`,
+            warehouse_type: STARTER_WAREHOUSE.warehouse_type,
+          });
+        }
+
+        const [existingFarm] = await tenantDb.select().from(tenant.farmMaster).where(eq(tenant.farmMaster.company_id, cc.id)).limit(1);
+        let farmId = existingFarm?.farm_id;
+        if (!existingFarm) {
+          farmId = randomUUID();
+          await tenantDb.insert(tenant.farmMaster).values({
+            farm_id: farmId,
+            tenant_id: tenantId,
+            company_id: cc.id,
+            farm_code: cc.farmCode,
+            farm_name: cc.farmName,
+            farm_type: 'LIVESTOCK',
+          });
+        }
+        const [existingShed] = await tenantDb.select().from(tenant.shedMaster).where(eq(tenant.shedMaster.company_id, cc.id)).limit(1);
+        if (!existingShed && farmId) {
+          await tenantDb.insert(tenant.shedMaster).values({
+            shed_id: randomUUID(),
+            tenant_id: tenantId,
+            company_id: cc.id,
+            farm_id: farmId,
+            shed_code: cc.shedCode,
+            shed_name: cc.shedName,
+            shed_type: 'GENERAL',
+          });
+        }
+      }
+
+      // Users: Tenant Admin, Company 1 Admin, Company 2 Admin
+      const commonPasswordHash = await bcrypt.hash('12345678', 10);
+      const tenantAdminUserId = randomUUID();
+      const comp1AdminUserId = randomUUID();
+      const comp2AdminUserId = randomUUID();
+
+      // 1. Tenant Admin (Rajesh Varma)
+      let [existingTenantAdmin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'admin@apexagri.local')).limit(1);
+      const tAdminId = existingTenantAdmin?.user_id || tenantAdminUserId;
+      if (!existingTenantAdmin) {
+        await tenantDb.insert(tenant.userMaster).values({
+          user_id: tAdminId,
+          company_id: COMPANY_1_ID,
           tenant_id: tenantId,
-          full_name: tenantAdminName,
-          email: tenantAdminEmail,
-          password_hash: tenantAdminHash,
+          full_name: 'Rajesh Varma',
+          email: 'admin@apexagri.local',
+          password_hash: commonPasswordHash,
           user_type: 'TENANT_ADMIN',
           timezone_pref_id: 'Asia/Kolkata',
           is_active: true,
-        })
-        .onDuplicateKeyUpdate({ set: { password_hash: tenantAdminHash, user_type: 'TENANT_ADMIN', is_active: true, failed_login_count: 0, locked_until: null } });
+        });
+      } else {
+        await tenantDb.update(tenant.userMaster).set({ password_hash: commonPasswordHash, is_active: true }).where(eq(tenant.userMaster.user_id, tAdminId));
+      }
 
-      const companyAdminHash = await bcrypt.hash(companyAdminPassword, 10);
-      await tenantDb
-        .insert(tenant.userMaster)
-        .values({
-          user_id: randomUUID(),
-          company_id: COMPANY_ID,
+      // 2. Company 1 Admin (Dr. Arjun Sharma)
+      let [existingComp1Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'arjun.sharma@apexagri.local')).limit(1);
+      const c1AdminId = existingComp1Admin?.user_id || comp1AdminUserId;
+      if (!existingComp1Admin) {
+        await tenantDb.insert(tenant.userMaster).values({
+          user_id: c1AdminId,
+          company_id: COMPANY_1_ID,
           tenant_id: tenantId,
-          full_name: companyAdminName,
-          email: companyAdminEmail,
-          password_hash: companyAdminHash,
+          full_name: 'Dr. Arjun Sharma',
+          email: 'arjun.sharma@apexagri.local',
+          password_hash: commonPasswordHash,
           user_type: 'COMPANY_ADMIN',
           timezone_pref_id: 'Asia/Kolkata',
           is_active: true,
-        })
-        .onDuplicateKeyUpdate({ set: { password_hash: companyAdminHash, user_type: 'COMPANY_ADMIN', is_active: true, failed_login_count: 0, locked_until: null } });
+        });
+      } else {
+        await tenantDb.update(tenant.userMaster).set({ password_hash: commonPasswordHash, is_active: true }).where(eq(tenant.userMaster.user_id, c1AdminId));
+      }
 
-      // Starter chart of accounts + GL mappings + warehouse (same seed data
-      // WS3's auto-seed-on-wizard-completion uses) — idempotent by design.
-      const [existingGl] = await tenantDb.select().from(tenant.glAccountMaster).where(eq(tenant.glAccountMaster.company_id, COMPANY_ID)).limit(1);
-      if (!existingGl) {
-        const accountIdByCode = new Map<string, string>();
-        for (const account of STARTER_GL_ACCOUNTS) {
-          const glAccountId = randomUUID();
-          accountIdByCode.set(account.account_code, glAccountId);
-          await tenantDb.insert(tenant.glAccountMaster).values({
-            gl_account_id: glAccountId,
-            tenant_id: tenantId,
-            company_id: COMPANY_ID,
-            account_code: account.account_code,
-            account_name: account.account_name,
-            account_type: account.account_type,
+      // 3. Company 2 Admin (Vikram Singh)
+      let [existingComp2Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'vikram.singh@highlandpork.local')).limit(1);
+      const c2AdminId = existingComp2Admin?.user_id || comp2AdminUserId;
+      if (!existingComp2Admin) {
+        await tenantDb.insert(tenant.userMaster).values({
+          user_id: c2AdminId,
+          company_id: COMPANY_2_ID,
+          tenant_id: tenantId,
+          full_name: 'Vikram Singh',
+          email: 'vikram.singh@highlandpork.local',
+          password_hash: commonPasswordHash,
+          user_type: 'COMPANY_ADMIN',
+          timezone_pref_id: 'Asia/Kolkata',
+          is_active: true,
+        });
+      } else {
+        await tenantDb.update(tenant.userMaster).set({ password_hash: commonPasswordHash, is_active: true }).where(eq(tenant.userMaster.user_id, c2AdminId));
+      }
+
+      // Assign User Company Access
+      const userCompanyMap = [
+        { userId: tAdminId, companyId: COMPANY_1_ID, primary: true },
+        { userId: tAdminId, companyId: COMPANY_2_ID, primary: false },
+        { userId: c1AdminId, companyId: COMPANY_1_ID, primary: true },
+        { userId: c2AdminId, companyId: COMPANY_2_ID, primary: true },
+      ];
+      for (const uc of userCompanyMap) {
+        let [existingUCA] = await tenantDb.select().from(tenant.userCompanyAssignments)
+          .where(and(eq(tenant.userCompanyAssignments.user_id, uc.userId), eq(tenant.userCompanyAssignments.company_id, uc.companyId)))
+          .limit(1);
+        if (!existingUCA) {
+          await tenantDb.insert(tenant.userCompanyAssignments).values({
+            assign_id: randomUUID(),
+            user_id: uc.userId,
+            company_id: uc.companyId,
+            is_primary: uc.primary,
+            is_active: true,
+            assigned_by: tAdminId,
           });
         }
-        for (const mapping of STARTER_GL_MAPPINGS) {
-          const debitAccountId = accountIdByCode.get(mapping.debit_account_code);
-          const creditAccountId = accountIdByCode.get(mapping.credit_account_code);
-          if (!debitAccountId || !creditAccountId) continue;
-          await tenantDb.insert(tenant.glMappingMaster).values({
-            mapping_id: randomUUID(),
-            tenant_id: tenantId,
-            company_id: COMPANY_ID,
-            transaction_type: mapping.transaction_type,
-            debit_gl_account_id: debitAccountId,
-            credit_gl_account_id: creditAccountId,
-          });
-        }
-      }
-
-      const [existingWarehouse] = await tenantDb.select().from(tenant.warehouseMaster).where(eq(tenant.warehouseMaster.company_id, COMPANY_ID)).limit(1);
-      if (!existingWarehouse) {
-        await tenantDb.insert(tenant.warehouseMaster).values({
-          warehouse_id: randomUUID(),
-          tenant_id: tenantId,
-          company_id: COMPANY_ID,
-          warehouse_code: STARTER_WAREHOUSE.warehouse_code,
-          warehouse_name: STARTER_WAREHOUSE.warehouse_name,
-          warehouse_type: STARTER_WAREHOUSE.warehouse_type,
-        });
-      }
-
-      // One generic farm + shed (NOB/LOB left null — applies everywhere) so
-      // there's somewhere to attach a batch immediately. Deliberately not
-      // vertical-specific: no default breeds/items are seeded here.
-      const [existingFarm] = await tenantDb.select().from(tenant.farmMaster).where(eq(tenant.farmMaster.company_id, COMPANY_ID)).limit(1);
-      let farmId = existingFarm?.farm_id;
-      if (!existingFarm) {
-        farmId = randomUUID();
-        await tenantDb.insert(tenant.farmMaster).values({
-          farm_id: farmId,
-          tenant_id: tenantId,
-          company_id: COMPANY_ID,
-          farm_code: 'FARM-MAIN',
-          farm_name: 'Main Farm',
-          farm_type: 'GENERAL',
-        });
-      }
-      const [existingShed] = await tenantDb.select().from(tenant.shedMaster).where(eq(tenant.shedMaster.company_id, COMPANY_ID)).limit(1);
-      if (!existingShed && farmId) {
-        await tenantDb.insert(tenant.shedMaster).values({
-          shed_id: randomUUID(),
-          tenant_id: tenantId,
-          company_id: COMPANY_ID,
-          farm_id: farmId,
-          shed_code: 'SHED-MAIN',
-          shed_name: 'Main Shed',
-          shed_type: 'GENERAL',
-        });
       }
     } catch (err) {
       if (!existingTenant) {

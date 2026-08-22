@@ -122,6 +122,33 @@ export default function MortalityHealthPanel() {
                     disposal_method: "Incineration / Bio-Disposal",
                     recorded_by: "Farm Attending Officer",
                   });
+                } else if (
+                  t.transaction_type === "CONSUMPTION" &&
+                  (t.uom === "ML" ||
+                    t.uom === "DOSES" ||
+                    (t.remarks && (
+                      t.remarks.toLowerCase().includes("vaccine") ||
+                      t.remarks.toLowerCase().includes("pcv2") ||
+                      t.remarks.toLowerCase().includes("dewormer") ||
+                      t.remarks.toLowerCase().includes("iron") ||
+                      t.remarks.toLowerCase().includes("antibiotic") ||
+                      t.remarks.toLowerCase().includes("dextran") ||
+                      t.remarks.toLowerCase().includes("ivermectin")
+                    )))
+                ) {
+                  treatments.push({
+                    id: t.transaction_id || `t-${Date.now()}`,
+                    treatment_date: t.transaction_date || "",
+                    ear_tag: "Batch Herd Cohort",
+                    batch_no: b.batch_no,
+                    diagnosis: t.remarks || "Clinical Protocol Administration",
+                    medicine_name: t.item_name || t.item_code || t.remarks || "Clinical Medication",
+                    dosage: `${t.quantity} ${t.uom || "ML"}`,
+                    route: "Intramuscular (IM) / Oral",
+                    withdrawal_days: 14,
+                    status: "ACTIVE",
+                    veterinarian: "Attending Veterinarian",
+                  });
                 }
               });
             } catch {}

@@ -29,6 +29,7 @@ interface OperationalAreaItem {
   area_code: string;
   area_name: string;
   company_id: string;
+  company_name?: string;
   lob_id: string;
   nob_id: string;
   lob_code?: string;
@@ -68,13 +69,45 @@ export default function WorkspaceScopeSwitcher({
 
     // Fetch companies and operational areas
     const tenantId = localStorage.getItem("tenant_id") || storedUser?.tenantId;
+    const isTenantAdminUser = storedUser?.userType === "TENANT_ADMIN";
+
     if (tenantId) {
       api.get(`/company/tenant/${tenantId}`).then((res: any) => {
-        if (Array.isArray(res)) setCompanies(res);
-      }).catch(() => {});
+        if (Array.isArray(res)) {
+          if (isTenantAdminUser) {
+            setCompanies(res);
+          } else {
+            // Strict Company Admin / User boundary: Only allow assigned companies
+            const userAllowedCompanyIds = new Set([
+              storedUser?.companyId,
+              ...(storedUser?.companies || []).map((c: any) => c.company_id),
+            ].filter(Boolean));
+            setCompanies(res.filter((c: any) => userAllowedCompanyIds.has(c.company_id)));
+          }
+        }
+      }).catch(() => {
+        if (!isTenantAdminUser && storedUser?.companies) {
+          setCompanies(storedUser.companies);
+        }
+      });
 
       api.get(`/operational-area${compId ? `?company_id=${compId}` : ""}`).then((res: any) => {
-        if (Array.isArray(res)) setOperationalAreas(res);
+        if (Array.isArray(res)) {
+          if (isTenantAdminUser) {
+            setOperationalAreas(res);
+          } else {
+            // Strict Area boundary: only show areas belonging to the user's assigned company or user.operationalAreas
+            const userAllowedCompanyIds = new Set([
+              storedUser?.companyId,
+              ...(storedUser?.companies || []).map((c: any) => c.company_id),
+            ].filter(Boolean));
+            const userAllowedAreaIds = new Set((storedUser?.operationalAreas || []).map((a: any) => a.area_id));
+
+            setOperationalAreas(res.filter((a: any) => 
+              userAllowedAreaIds.has(a.area_id) || userAllowedCompanyIds.has(a.company_id)
+            ));
+          }
+        }
       }).catch(() => {
         // Fallback default operational areas if fresh
         if (storedUser?.operationalAreas && storedUser.operationalAreas.length > 0) {
@@ -360,7 +393,7 @@ export default function WorkspaceScopeSwitcher({
                         <div className="flex-1 min-w-0">
                           <p className="truncate font-medium">{area.area_name}</p>
                           <p className="text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>
-                            {isPig ? "Piggery Unit" : isDairy ? "Dairy Unit" : lobLabel} · {area.area_code}
+                            {area.company_name ? `${area.company_name} · ` : ""}{isPig ? "Piggery" : isDairy ? "Dairy" : lobLabel} · {area.area_code}
                           </p>
                         </div>
                         {isSelected && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />}

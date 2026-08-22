@@ -29,6 +29,7 @@ import {
   getActiveCompanyId,
   setActiveCompanyId,
   getActiveWorkspaceScope,
+  setActiveWorkspaceScope,
   getActiveLob,
   NavUser,
 } from "../../hooks/useAuth";
@@ -74,6 +75,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     const storedActiveId = getActiveCompanyId();
     const homeId = storedUser.companyId || (storedUser as any).company_id;
     const initialActiveId = storedActiveId || homeId || null;
+
+    // Strict role scope check on load:
+    const activeScope = getActiveWorkspaceScope();
+    if (storedUser.userType !== "TENANT_ADMIN" && activeScope === "TENANT") {
+      setActiveWorkspaceScope("COMPANY");
+    }
 
     if (initialActiveId && initialActiveId !== homeId) {
       const patched = { ...storedUser, companyId: initialActiveId, company_id: initialActiveId };

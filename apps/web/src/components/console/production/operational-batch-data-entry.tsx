@@ -554,9 +554,9 @@ export default function OperationalBatchDataEntry() {
       entries: [
         {
           batch_id: currentBatch.id,
-          feed_item_id: activeFeedItem?.item_id || undefined,
-          feed_qty: totalFeedConsumed > 0 ? totalFeedConsumed : undefined,
-          mortality_count: totalMortality > 0 ? totalMortality : undefined,
+          // Only pass summary feed/mortality if no granular rows are being posted
+          feed_qty: (!activeFeedItem && totalFeedConsumed > 0) ? totalFeedConsumed : undefined,
+          mortality_count: (mortalityRows.length === 0 && totalMortality > 0) ? totalMortality : undefined,
           water_qty: currentHeadCount > 0 ? currentHeadCount * 15 : undefined,
           temperature: 22.5,
           remarks: generalNotes || undefined,
@@ -567,21 +567,93 @@ export default function OperationalBatchDataEntry() {
     try {
       await api.post("/batch/bulk-daily-entry", payload);
 
-      // Post granular transactions for medicines administered
-      for (const med of medicineRows) {
-        if (Number(med.consumed) > 0 && med.item_id) {
-          await api.post(`/batch/${currentBatch.id}/transaction`, {
+      // Post individual feed consumption transactions (one per feed formula row)
+      // so they appear in Feed Management with proper item names
+      for (const feed of feedRows) {
+        if (Number(feed.consumed) > 0) {
+          const txPayload: any = {
             transaction_date: selectedDate,
             transaction_type: "CONSUMPTION",
-            item_id: med.item_id,
-            quantity: Number(med.consumed),
-            uom: med.uom || "ML",
-            remarks: med.item || "Clinical medication",
-          }).catch(() => { });
+            quantity: Number(feed.consumed),
+            rate: feed.rate || 0,
+            uom: feed.uom || "KG",
+            remarks: feed.item || "Feed Ration",
+          };
+          if (feed.item_id) txPayload.item_id = feed.item_id;
+          await api.post(`/batch/${currentBatch.id}/transaction`, txPayload);
         }
       }
 
-      // Post overhead allocations
+      // Post granular transactions for medicines administered
+      for (const med of medicineRows) {
+        if (Number(med.consumed) > 0) {
+          const rate = (med.cost && Number(med.consumed) > 0)
+            ? Math.round((Number(med.cost) / Number(med.consumed)) * 100) / 100
+            : 0;
+          const txPayload: any = {
+            transaction_date: selectedDate,
+            transaction_type: "CONSUMPTION",
+            quantity: Number(med.consumed),
+            rate,
+            uom: med.uom || "ML",
+            remarks: med.item || "Clinical medication",
+          };
+          if (med.item_id) txPayload.item_id = med.item_id;
+          await api.post(`/batch/${currentBatch.id}/transaction`, txPayload);
+        }
+      }
+
+      // Post granular transactions for mortality with specific causes
+      for (const mort of mortalityRows) {
+        if (Number(mort.count) > 0) {
+          await api.post(`/batch/${currentBatch.id}/transaction`, {
+            transaction_date: selectedDate,
+            transaction_type: "MORTALITY",
+            quantity: Number(mort.count),
+            uom: "HEAD",
+            remarks: `${mort.reason}${mort.remarks ? ` — ${mort.remarks}` : ""}`,
+          });
+        }
+      }
+
+      // Post labour hours
+      for (const l of labourRows) {
+        const totalHrs = Number(l.persons || 1) * Number(l.hours || 0);
+        if (totalHrs > 0) {
+          await api.post(`/batch/${currentBatch.id}/transaction`, {
+            transaction_date: selectedDate,
+            transaction_type: "OVERHEAD",
+            quantity: totalHrs,
+            rate: Number(l.rate || 0),
+            uom: "HRS",
+            remarks: `Labour: ${l.resource} (${l.persons} persons × ${l.hours} hrs @ ₹${l.rate}/hr)`,
+          });
+        }
+      }
+
+      // Post weight and body condition sampling
+      if (avgWeight > 0) {
+        await api.post(`/batch/${currentBatch.id}/transaction`, {
+          transaction_date: selectedDate,
+          transaction_type: "OBSERVATION",
+          quantity: avgWeight,
+          uom: "KG",
+          remarks: `Weight Sample: ${avgWeight} kg (ADG: +${weightGain} kg/day, BCS: ${bcsScore || "3.0"})${weightNotes ? ` — ${weightNotes}` : ""}`,
+        });
+      }
+
+      // Post supervisor daily observations & notes
+      if (generalNotes && generalNotes.trim() !== "") {
+        await api.post(`/batch/${currentBatch.id}/transaction`, {
+          transaction_date: selectedDate,
+          transaction_type: "OBSERVATION",
+          quantity: 1,
+          uom: "LOG",
+          remarks: `Daily Observation: ${generalNotes}`,
+        });
+      }
+
+      // Post overhead allocations — do NOT send 'amount' field (not in DTO)
       for (const ov of overheadRows) {
         if (Number(ov.amount) > 0) {
           await api.post(`/batch/${currentBatch.id}/transaction`, {
@@ -589,9 +661,9 @@ export default function OperationalBatchDataEntry() {
             transaction_type: "OVERHEAD",
             quantity: 1,
             rate: Number(ov.amount),
-            amount: Number(ov.amount),
+            uom: "UNIT",
             remarks: ov.type || "Operational Overhead",
-          }).catch(() => { });
+          });
         }
       }
 

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, isNull, count, inArray } from 'drizzle-orm';
+import { eq, and, like, isNull, count, inArray, SQL } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -33,6 +33,12 @@ const toDays = (value: number, calcUnit: string): number => {
   return value;
 };
 
+export interface UserContext {
+  userId?: string;
+  email?: string;
+  [key: string]: unknown;
+}
+
 @Injectable()
 
 export class BatchService {
@@ -63,7 +69,7 @@ export class BatchService {
     return this.numberSeriesService.generateNext('BATCH', tenantId, companyId, executor);
   }
 
-  async create(dto: CreateBatchDto, tenantId: string, userPayload?: any) {
+  async create(dto: CreateBatchDto, tenantId: string, userPayload?: UserContext) {
     const [lob] = await this.db
       .select()
       .from(schema.lobMaster)
@@ -188,7 +194,7 @@ export class BatchService {
    * lob_master.batch_copy_allowed — matches the spec's "annual batch copy"
    * (year-end: COPY batch for next season, scheduler + location auto-copied).
    */
-  async renew(id: string, dto: RenewBatchDto, tenantId: string, userPayload?: any) {
+  async renew(id: string, dto: RenewBatchDto, tenantId: string, userPayload?: UserContext) {
     const source = await this.findOne(id);
     this.assertStatus(source, 'CLOSED');
 
@@ -219,7 +225,7 @@ export class BatchService {
               // by create() itself, the same way a fresh batch would.
               std_output_cost_per_unit: source.standard.std_output_cost_per_unit ? Number(source.standard.std_output_cost_per_unit) : undefined,
               std_overhead_rate_per_unit: source.standard.std_overhead_rate_per_unit ? Number(source.standard.std_overhead_rate_per_unit) : undefined,
-              consumption_lines: (source.standard.consumption_lines || []).map((l: any) => ({
+              consumption_lines: (source.standard.consumption_lines || []).map((l: { item_id: string; std_qty_per_unit_per_day: string | number; std_rate?: string | number | null }) => ({
                 item_id: l.item_id,
                 std_qty_per_unit_per_day: Number(l.std_qty_per_unit_per_day),
                 std_rate: l.std_rate ? Number(l.std_rate) : undefined,
@@ -262,8 +268,23 @@ export class BatchService {
 
     const inputLines = await this.db.select().from(schema.batchInputLine).where(eq(schema.batchInputLine.batch_id, id));
     const transactions = await this.db
-      .select()
+      .select({
+        transaction_id: schema.batchTransaction.transaction_id,
+        batch_id: schema.batchTransaction.batch_id,
+        transaction_date: schema.batchTransaction.transaction_date,
+        transaction_type: schema.batchTransaction.transaction_type,
+        item_id: schema.batchTransaction.item_id,
+        resource_id: schema.batchTransaction.resource_id,
+        quantity: schema.batchTransaction.quantity,
+        uom: schema.batchTransaction.uom,
+        rate: schema.batchTransaction.rate,
+        amount: schema.batchTransaction.amount,
+        remarks: schema.batchTransaction.remarks,
+        item_name: schema.itemMaster.item_name,
+        item_code: schema.itemMaster.item_code,
+      })
       .from(schema.batchTransaction)
+      .leftJoin(schema.itemMaster, eq(schema.batchTransaction.item_id, schema.itemMaster.item_id))
       .where(eq(schema.batchTransaction.batch_id, id));
     const outputLines = await this.db.select().from(schema.batchOutputLine).where(eq(schema.batchOutputLine.batch_id, id));
 
@@ -307,7 +328,7 @@ export class BatchService {
    * rows against the batch's CURRENT stage so thresholds can differ pre- vs.
    * post-transfer.
    */
-  async transferStage(id: string, dto: TransferStageDto, tenantId: string, userPayload?: any) {
+  async transferStage(id: string, dto: TransferStageDto, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
 
@@ -365,7 +386,7 @@ export class BatchService {
   }
 
   async findAll(query: QueryBatchDto, tenantId: string) {
-    const conditions: any[] = [eq(schema.batchHeader.tenant_id, tenantId), isNull(schema.batchHeader.deleted_at)];
+    const conditions: SQL[] = [eq(schema.batchHeader.tenant_id, tenantId), isNull(schema.batchHeader.deleted_at)];
 
     if (query.companyId) conditions.push(eq(schema.batchHeader.company_id, query.companyId));
     if (query.status) conditions.push(eq(schema.batchHeader.status, query.status));
@@ -390,7 +411,7 @@ export class BatchService {
   }
 
   /** DRAFT → ACTIVE: consumes each input line from inventory via FIFO, mirrors to GL. */
-  async activate(id: string, tenantId: string, userPayload?: any) {
+  async activate(id: string, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'DRAFT');
 
@@ -500,7 +521,7 @@ export class BatchService {
     return opening > 0 ? (inputTotal + consumptionTotal) / opening : 0;
   }
 
-  async addTransaction(id: string, dto: AddBatchTransactionDto, tenantId: string, userPayload?: any) {
+  async addTransaction(id: string, dto: AddBatchTransactionDto, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
 
@@ -521,6 +542,7 @@ export class BatchService {
         [bioState] = await this.db.select().from(schema.batchBioAssetState).where(eq(schema.batchBioAssetState.state_id, stateId)).limit(1);
       }
     }
+    const bio = bioState;
 
     let bioAssetSubjectItemId = dto.item_id || batch.input_lines?.[0]?.item_id;
     if (!bioAssetSubjectItemId && isBioAsset) {
@@ -543,11 +565,54 @@ export class BatchService {
     let rate: number | null = dto.rate ?? null;
 
     if (dto.transaction_type === 'CONSUMPTION') {
+      if (!dto.item_id) {
+        const isMed =
+          (dto.remarks || '').toLowerCase().includes('med') ||
+          (dto.remarks || '').toLowerCase().includes('vaccin') ||
+          (dto.remarks || '').toLowerCase().includes('antibiotic') ||
+          (dto.remarks || '').toLowerCase().includes('deworm') ||
+          (dto.remarks || '').toLowerCase().includes('dextran') ||
+          (dto.remarks || '').toLowerCase().includes('ivermectin') ||
+          dto.uom === 'ML' ||
+          dto.uom === 'DOSES' ||
+          dto.uom === 'VIAL';
+
+        const [matchedItem] = await this.db
+          .select({ item_id: schema.itemMaster.item_id })
+          .from(schema.itemMaster)
+          .where(
+            and(
+              eq(schema.itemMaster.tenant_id, tenantId),
+              eq(schema.itemMaster.is_active, true),
+              isMed ? eq(schema.itemMaster.item_type, 'MEDICINE') : eq(schema.itemMaster.item_type, 'FEED')
+            )
+          )
+          .limit(1);
+
+        if (matchedItem) {
+          dto.item_id = matchedItem.item_id;
+        } else {
+          const [anyItem] = await this.db
+            .select({ item_id: schema.itemMaster.item_id })
+            .from(schema.itemMaster)
+            .where(
+              and(
+                eq(schema.itemMaster.tenant_id, tenantId),
+                eq(schema.itemMaster.is_active, true)
+              )
+            )
+            .limit(1);
+          if (anyItem) {
+            dto.item_id = anyItem.item_id;
+          }
+        }
+      }
+
       if (!dto.item_id || !dto.quantity || !dto.uom) {
         throw new BadRequestException('CONSUMPTION transactions require item_id, quantity and uom.');
       }
       const bioTransactionType = isBioAsset
-        ? (bioState!.stage === 'PREMATURE' ? 'BIO_CONSUMPTION_PREMATURE' : 'BIO_CONSUMPTION_MATURE')
+        ? (bio?.stage === 'PREMATURE' ? 'BIO_CONSUMPTION_PREMATURE' : 'BIO_CONSUMPTION_MATURE')
         : 'BATCH_CONSUMPTION';
       const ledgerEntry = await this.ledgerService.writeNegativeEntry({
         tenantId,
@@ -571,11 +636,11 @@ export class BatchService {
       // Premature-stage cost capitalizes into the NCA; mature-stage cost is
       // just expensed (already handled by the GL mapping above) — the
       // biological asset's carrying value only moves in the PREMATURE case.
-      if (isBioAsset && bioState!.stage === 'PREMATURE') {
+      if (isBioAsset && bio?.stage === 'PREMATURE') {
         const capitalized = Math.abs(amount);
         await this.db
           .update(schema.batchBioAssetState)
-          .set({ nca_book_value: (Number(bioState!.nca_book_value) + capitalized).toString(), updated_at: toMysqlTimestamp() })
+          .set({ nca_book_value: (Number(bio.nca_book_value) + capitalized).toString(), updated_at: toMysqlTimestamp() })
           .where(eq(schema.batchBioAssetState.batch_id, id));
         await this.db.insert(schema.bioAssetLedger).values({
           entry_id: randomUUID(),
@@ -601,19 +666,10 @@ export class BatchService {
       if (!dto.item_id || !dto.quantity || !dto.uom) {
         throw new BadRequestException('OUTPUT transactions require item_id, quantity and uom.');
       }
-      if (isBioAsset && bioState!.stage !== 'MATURE') {
+      if (isBioAsset && bio?.stage !== 'MATURE') {
         throw new BadRequestException('OUTPUT can only be recorded once the bio-asset batch has matured.');
       }
 
-      // Mid-batch by-product/waste removal at Net Realisable Value — the
-      // spec's "candling loss" pattern: the item leaves WIP at what it
-      // actually cost to produce, enters inventory at what it's actually
-      // worth (NRV), and the difference posts as an impairment loss.
-      // close()'s totalCost pool never sees this quantity — it's relieved
-      // here, the same way MORTALITY is already relieved the moment it's
-      // recorded. Only meaningful for non-bio-asset batches; bio-asset
-      // by-products would need a different NCA-relief treatment, out of scope
-      // here, so this path is simply not offered for them.
       const isByProductRemoval = !isBioAsset && (dto.output_type === 'BY_PRODUCT' || dto.output_type === 'WASTE') && dto.nrv_rate != null;
 
       const ledgerEntry = await this.ledgerService.writePositiveEntry({
@@ -636,8 +692,8 @@ export class BatchService {
       rate = Number(ledgerEntry.rate);
       amount = Number(ledgerEntry.amount); // positive
 
-      if (isBioAsset) {
-        const newNca = Math.max(0, Number(bioState!.nca_book_value) - amount);
+      if (isBioAsset && bio) {
+        const newNca = Math.max(0, Number(bio.nca_book_value) - amount);
         await this.db
           .update(schema.batchBioAssetState)
           .set({ nca_book_value: newNca.toString(), updated_at: toMysqlTimestamp() })
@@ -645,7 +701,7 @@ export class BatchService {
       }
 
       if (isByProductRemoval) {
-        const nrvRate = dto.nrv_rate!;
+        const nrvRate = Number(dto.nrv_rate || 0);
         const atCostRate = await this.computeRunningUnitCost(batch);
         const atCostValue = atCostRate * dto.quantity;
         const nrvValue = nrvRate * dto.quantity;
@@ -672,7 +728,7 @@ export class BatchService {
           line_id: randomUUID(),
           batch_id: id,
           item_id: dto.item_id,
-          output_type: dto.output_type!,
+          output_type: dto.output_type || 'BY_PRODUCT',
           cost_split_pct: '0',
           quantity: dto.quantity.toString(),
           uom: dto.uom,
@@ -684,19 +740,22 @@ export class BatchService {
       if (!dto.quantity) {
         throw new BadRequestException('MORTALITY transactions require quantity.');
       }
-      if (isBioAsset) {
-        const currentQty = Number(bioState!.current_quantity);
+      if (isBioAsset && bio) {
+        const currentQty =
+          Number(bio.current_quantity) > 0
+            ? Number(bio.current_quantity)
+            : Number(batch.closing_quantity) || Number(batch.opening_quantity) || 0;
         if (dto.quantity > currentQty) {
           throw new BadRequestException(`Cannot record mortality of ${dto.quantity} — only ${currentQty} remain in the herd.`);
         }
-        const perUnitNca = currentQty > 0 ? Number(bioState!.nca_book_value) / currentQty : 0;
+        const perUnitNca = currentQty > 0 ? Number(bio.nca_book_value) / currentQty : 0;
         const nbvShare = perUnitNca * dto.quantity;
         rate = perUnitNca;
         amount = -nbvShare;
         await this.glPostingService.postBatchCostEntry({
           tenantId,
           companyId: batch.company_id,
-          transactionType: bioState!.stage === 'PREMATURE' ? 'BIO_MORTALITY_PREMATURE' : 'BIO_MORTALITY_MATURE',
+          transactionType: bio.stage === 'PREMATURE' ? 'BIO_MORTALITY_PREMATURE' : 'BIO_MORTALITY_MATURE',
           amount: nbvShare,
           documentNo: batch.batch_no,
           documentLineId: transactionId,
@@ -710,11 +769,18 @@ export class BatchService {
         await this.db
           .update(schema.batchBioAssetState)
           .set({
-            current_quantity: (currentQty - dto.quantity).toString(),
-            nca_book_value: Math.max(0, Number(bioState!.nca_book_value) - nbvShare).toString(),
+            current_quantity: Math.max(0, currentQty - dto.quantity).toString(),
+            nca_book_value: Math.max(0, Number(bio.nca_book_value) - nbvShare).toString(),
             updated_at: toMysqlTimestamp(),
           })
           .where(eq(schema.batchBioAssetState.batch_id, id));
+        await this.db
+          .update(schema.batchHeader)
+          .set({
+            closing_quantity: Math.max(0, (Number(batch.closing_quantity) || currentQty) - dto.quantity).toString(),
+            updated_at: toMysqlTimestamp(),
+          })
+          .where(eq(schema.batchHeader.batch_id, id));
         if (bioAssetSubjectItemId) {
           await this.db.insert(schema.bioAssetLedger).values({
             entry_id: randomUUID(),
@@ -726,11 +792,11 @@ export class BatchService {
             batch_id: id,
             batch_no: batch.batch_no,
             posting_date: dto.transaction_date,
-            stage: bioState!.stage,
+            stage: bio.stage,
             quantity: (-dto.quantity).toString(),
             cost_amount: (-nbvShare).toString(),
             cost_amount_each_unit: perUnitNca.toString(),
-            costing_method: bioState!.stage === 'MATURE' ? 'AMORTIZED_COST' : 'COST_ACCUMULATION',
+            costing_method: bio.stage === 'MATURE' ? 'AMORTIZED_COST' : 'COST_ACCUMULATION',
             nob_id: batch.nob_id,
             lob_id: batch.lob_id,
             created_by: userPayload?.userId || null,
@@ -754,14 +820,21 @@ export class BatchService {
           stageId: batch.stage_id || undefined,
           userId: userPayload?.userId,
         });
+        await this.db
+          .update(schema.batchHeader)
+          .set({
+            closing_quantity: Math.max(0, (Number(batch.closing_quantity) || Number(batch.opening_quantity) || 0) - dto.quantity).toString(),
+            updated_at: toMysqlTimestamp(),
+          })
+          .where(eq(schema.batchHeader.batch_id, id));
       }
     } else if (dto.transaction_type === 'OVERHEAD') {
-      if (!dto.quantity || !dto.rate) {
+      if (!dto.quantity || dto.rate === undefined || dto.rate === null) {
         throw new BadRequestException('OVERHEAD transactions require quantity and rate.');
       }
       amount = -(dto.quantity * dto.rate);
       const bioTransactionType = isBioAsset
-        ? (bioState!.stage === 'PREMATURE' ? 'BIO_OVERHEAD_PREMATURE' : 'BIO_OVERHEAD_MATURE')
+        ? (bio?.stage === 'PREMATURE' ? 'BIO_OVERHEAD_PREMATURE' : 'BIO_OVERHEAD_MATURE')
         : 'OVERHEAD';
       await this.glPostingService.postBatchCostEntry({
         tenantId,
@@ -778,11 +851,11 @@ export class BatchService {
         userId: userPayload?.userId,
       });
 
-      if (isBioAsset && bioState!.stage === 'PREMATURE') {
+      if (isBioAsset && bio?.stage === 'PREMATURE') {
         const capitalized = Math.abs(amount);
         await this.db
           .update(schema.batchBioAssetState)
-          .set({ nca_book_value: (Number(bioState!.nca_book_value) + capitalized).toString(), updated_at: toMysqlTimestamp() })
+          .set({ nca_book_value: (Number(bio.nca_book_value) + capitalized).toString(), updated_at: toMysqlTimestamp() })
           .where(eq(schema.batchBioAssetState.batch_id, id));
         if (bioAssetSubjectItemId) {
           await this.db.insert(schema.bioAssetLedger).values({
@@ -980,7 +1053,7 @@ export class BatchService {
     const deviationAmount = actual - expectedQty;
     const title = `${parameter.parameter_name} ${breachDirection === 'below' ? 'Below' : 'Above'} KPI — Batch ${batch.batch_no}${spl.period_label ? `, ${spl.period_label}` : ''}`;
     const message = spl.kpi_mode === 'PCT'
-      ? `${parameter.parameter_name}: actual ${actual}, expected ${expectedQty.toFixed(4)} (${deviationPct!.toFixed(2)}% deviation). Batch ${batch.batch_no}, Day ${dayOfBatch}.`
+      ? `${parameter.parameter_name}: actual ${actual}, expected ${expectedQty.toFixed(4)} (${(deviationPct ?? 0).toFixed(2)}% deviation). Batch ${batch.batch_no}, Day ${dayOfBatch}.`
       : `${parameter.parameter_name}: actual ${actual} outside range [${spl.kpi_min_value ?? '-∞'}, ${spl.kpi_max_value ?? '∞'}]. Batch ${batch.batch_no}, Day ${dayOfBatch}.`;
 
     await this.db.insert(schema.notificationAlertLog).values({
@@ -1079,7 +1152,7 @@ export class BatchService {
     return { date: dateStr, day_of_batch: dayOfBatch, lines };
   }
 
-  async close(id: string, dto: CloseBatchDto, tenantId: string, userPayload?: any) {
+  async close(id: string, dto: CloseBatchDto, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
     if (batch.costing_method === 'BIO_ASSET') {
@@ -1188,7 +1261,7 @@ export class BatchService {
         closing_quantity: closingQuantity.toString(),
         total_cost: totalCost.toString(),
         unit_cost: unitCost.toString(),
-        closed_at: toMysqlTimestamp() as any,
+        closed_at: toMysqlTimestamp(),
         closed_by: userPayload?.userId || null,
         updated_by: userPayload?.userId || null,
         updated_at: toMysqlTimestamp(),
@@ -1305,11 +1378,11 @@ export class BatchService {
     lines: Array<{ variance_type: string; item_id: string | null; std_value: number; actual_value: number; variance_amount: number }>,
     actualEndDate: string,
     tenantId: string,
-    userPayload?: any
+    userPayload?: UserContext
   ) {
     for (const line of lines) {
       const isFavorable = line.variance_amount < 0;
-      const journal: any = await this.glPostingService.postBatchCostEntry({
+      const journal = await this.glPostingService.postBatchCostEntry({
         tenantId,
         companyId: batch.company_id,
         transactionType: `${line.variance_type}_VARIANCE`,
@@ -1323,8 +1396,8 @@ export class BatchService {
         userId: userPayload?.userId,
         reverseDirection: isFavorable,
       });
-      const drLine = journal.lines?.find((l: any) => Number(l.debit_amount) > 0);
-      const crLine = journal.lines?.find((l: any) => Number(l.credit_amount) > 0);
+      const drLine = journal.lines?.find((l: { debit_amount?: string | number | null }) => Number(l.debit_amount) > 0);
+      const crLine = journal.lines?.find((l: { credit_amount?: string | number | null }) => Number(l.credit_amount) > 0);
 
       await this.db.insert(schema.batchCostVariance).values({
         variance_id: randomUUID(),
@@ -1355,7 +1428,7 @@ export class BatchService {
   }
 
   /** PREMATURE → MATURE: reclassifies the NCA and sets up the amortization schedule. */
-  async matureBioAsset(id: string, dto: MatureBioAssetDto, tenantId: string, userPayload?: any) {
+  async matureBioAsset(id: string, dto: MatureBioAssetDto, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
     this.assertBioAsset(batch, 'Maturity transition');
@@ -1445,7 +1518,7 @@ export class BatchService {
   }
 
   /** Mature only. One run per calendar month — posts Dr Amort Expense / Cr Accum Amort and reduces the NCA. */
-  async amortizeBioAsset(id: string, dto: AmortizeBioAssetDto, tenantId: string, userPayload?: any) {
+  async amortizeBioAsset(id: string, dto: AmortizeBioAssetDto, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
     this.assertBioAsset(batch, 'Amortization');
@@ -1512,7 +1585,7 @@ export class BatchService {
   }
 
   /** Revalues the herd to a new fair value per unit — gain posts normally, loss reverses (mirrors Phase 7's variance direction). */
-  async recordFairValue(id: string, dto: RecordFairValueDto, tenantId: string, userPayload?: any) {
+  async recordFairValue(id: string, dto: RecordFairValueDto, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
     this.assertBioAsset(batch, 'Fair value adjustment');
@@ -1574,7 +1647,7 @@ export class BatchService {
   }
 
   /** Exits animals from the herd via harvest (NBV becomes the resulting inventory item's cost) or sale (proceeds vs. NBV = gain/loss). Auto-closes the batch once the herd is fully disposed. */
-  async disposeBioAsset(id: string, dto: DisposeBioAssetDto, tenantId: string, userPayload?: any) {
+  async disposeBioAsset(id: string, dto: DisposeBioAssetDto, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
     this.assertBioAsset(batch, 'Disposal');
@@ -1671,7 +1744,7 @@ export class BatchService {
           closing_quantity: '0.0000',
           total_cost: newNca.toString(),
           unit_cost: '0.000000',
-          closed_at: toMysqlTimestamp() as any,
+          closed_at: toMysqlTimestamp(),
           closed_by: userPayload?.userId || null,
           updated_by: userPayload?.userId || null,
           updated_at: toMysqlTimestamp(),
@@ -1693,14 +1766,14 @@ export class BatchService {
     return this.findOne(id);
   }
 
-  async remove(id: string, tenantId: string, userPayload?: any) {
+  async remove(id: string, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'DRAFT');
     const deletedTime = toMysqlTimestamp();
 
     await this.db
       .update(schema.batchHeader)
-      .set({ status: 'CANCELLED', deleted_at: deletedTime as any, updated_by: userPayload?.userId || null })
+      .set({ status: 'CANCELLED', deleted_at: deletedTime, updated_by: userPayload?.userId || null })
       .where(eq(schema.batchHeader.batch_id, id));
 
     await this.auditService.log({
@@ -1717,12 +1790,12 @@ export class BatchService {
     return { success: true, message: `Batch '${batch.batch_no}' has been cancelled.` };
   }
 
-  async bulkAddDailyTransactions(dto: BulkDailyEntryDto, tenantId: string, userPayload?: any) {
+  async bulkAddDailyTransactions(dto: BulkDailyEntryDto, tenantId: string, userPayload?: UserContext) {
     let successCount = 0;
     const errors: Array<{ batch_id: string; error: string }> = [];
 
     // Cache active feed items for fallback resolution
-    let feedItems: any[] = [];
+    let feedItems: Array<typeof schema.itemMaster.$inferSelect> = [];
     try {
       const q = this.db?.select?.();
       if (q?.from) {
@@ -1736,7 +1809,7 @@ export class BatchService {
 
     for (const row of dto.entries) {
       try {
-        let batch: any;
+        let batch: Awaited<ReturnType<BatchService['findOne']>> | { batch_id: string; opening_quantity: number; current_stage_code?: string; closing_quantity?: string | null; remarks?: string | null; breed_id?: string | null };
         try {
           batch = await this.findOne(row.batch_id);
         } catch {
@@ -1810,7 +1883,7 @@ export class BatchService {
         }
 
         // 4. Shed temperature observation
-        if (row.temperature != null && (row.temperature as any) !== '') {
+        if (row.temperature != null && String(row.temperature).trim() !== '') {
           await this.addTransaction(
             row.batch_id,
             {
@@ -1825,10 +1898,10 @@ export class BatchService {
           );
           successCount++;
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         errors.push({
           batch_id: row.batch_id,
-          error: err?.message || 'Transaction recording failed',
+          error: err instanceof Error ? err.message : 'Transaction recording failed',
         });
       }
     }
@@ -1851,7 +1924,7 @@ export class BatchService {
    * Auto-generates a concrete scheduler_master and scheduler_parameter_line records
    * for a batch from its breed's breed_lifecycle_stages, then links and locks it.
    */
-  async generateSchedulerForBatch(batchId: string, tenantId: string, userPayload?: any) {
+  async generateSchedulerForBatch(batchId: string, tenantId: string, userPayload?: UserContext) {
     const batch = await this.findOne(batchId);
 
     if (!batch.breed_id) {
@@ -2064,8 +2137,11 @@ export class BatchService {
   /**
    * Returns day-by-day standard breed performance curves vs actual recorded data for a batch.
    */
-  async getBatchPerformanceCurves(batchId: string, tenantId: string) {
+  async getBatchPerformanceCurves(batchId: string, tenantId?: string) {
     const batch = await this.findOne(batchId);
+    if (tenantId && batch.tenant_id && batch.tenant_id !== tenantId) {
+      throw new NotFoundException(`Batch ${batchId} not found for current tenant`);
+    }
     const startDate = new Date(batch.start_date);
     const today = new Date();
     const batchAgeDays = Math.max(1, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
@@ -2133,7 +2209,7 @@ export class BatchService {
 
     // Build timeline curves (day 1 to min(batchAgeDays + 7, 180))
     const totalDaysToProject = Math.min(Math.max(batchAgeDays + 7, 30), 180);
-    const curves: any[] = [];
+    const curves: Array<Record<string, unknown>> = [];
 
     let cumStdFeed = 0;
     let cumActFeed = 0;
@@ -2197,6 +2273,7 @@ export class BatchService {
         actTotalDailyFeed: day <= batchAgeDays ? Math.round(actDailyFeed * 100) / 100 : null,
         cumStdFeed: Math.round(cumStdFeed * 100) / 100,
         cumActFeed: day <= batchAgeDays ? Math.round(cumActFeed * 100) / 100 : null,
+        cumStdMort: Math.round(cumStdMort * 100) / 100,
         stdTargetWeight: stdTargetWeight > 0 ? stdTargetWeight : null,
         actWeight: day <= batchAgeDays && dayActualWeight[day] ? dayActualWeight[day] : null,
         actDailyMort: day <= batchAgeDays ? actDailyMort : null,

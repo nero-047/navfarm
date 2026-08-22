@@ -82,6 +82,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const nextUser = normalizeUser(response.user);
     persistAuthSession({ ...response, user: nextUser });
+
+    // Initialize workspace scope strictly by role
+    if (typeof window !== 'undefined') {
+      if (nextUser.userType === 'TENANT_ADMIN') {
+        localStorage.setItem('active_workspace_scope', 'TENANT');
+        if (nextUser.companies && nextUser.companies.length > 0) {
+          localStorage.setItem('active_company_id', nextUser.companies[0].company_id);
+        }
+      } else if (nextUser.userType === 'COMPANY_ADMIN') {
+        localStorage.setItem('active_workspace_scope', 'COMPANY');
+        const compId = nextUser.companyId || (nextUser.companies && nextUser.companies[0]?.company_id);
+        if (compId) localStorage.setItem('active_company_id', compId);
+        localStorage.removeItem('active_operational_area_id');
+      } else {
+        localStorage.setItem('active_workspace_scope', 'OPERATIONAL');
+        const compId = nextUser.companyId || (nextUser.companies && nextUser.companies[0]?.company_id);
+        if (compId) localStorage.setItem('active_company_id', compId);
+        const areaId = (nextUser as any).operationalAreaId || (nextUser as any).operationalAreas?.[0]?.area_id;
+        if (areaId) localStorage.setItem('active_operational_area_id', areaId);
+      }
+    }
+
     setUser(nextUser);
     return nextUser;
   }, []);
