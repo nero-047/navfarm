@@ -89,10 +89,6 @@ function isHrefActive(
     for (const [key, val] of targetParams.entries()) {
       const currentVal = searchParams ? searchParams.get(key) : null;
       if (currentVal !== val) {
-        // If currentVal is null/empty and targetPath is /console/production and key is tab and val is default tab (daily-operational-entry)
-        if (!currentVal && targetPath === "/console/production" && key === "tab" && val === "daily-operational-entry") {
-          continue;
-        }
         return false;
       }
     }
