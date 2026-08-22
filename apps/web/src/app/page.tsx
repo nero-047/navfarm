@@ -14,7 +14,7 @@ export default function Index() {
     }
     try {
       const user = JSON.parse(raw);
-      router.replace(user.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
+      router.replace(user.userType === 'SYSTEM_ADMIN' ? '/admin' : '/dashboard');
     } catch {
       router.replace('/login');
     }

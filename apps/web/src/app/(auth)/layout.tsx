@@ -23,7 +23,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     if (pathname !== '/login' && pathname !== '/signup') return;
     const user = getStoredUser();
     if (getStoredToken() && user) {
-      router.replace(user.userType === 'SYSTEM_ADMIN' ? '/admin/dashboard' : '/console/dashboard');
+      router.replace(user.userType === 'SYSTEM_ADMIN' ? '/admin/dashboard' : '/dashboard');
     }
   }, [pathname, router]);
 

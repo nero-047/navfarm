@@ -35,7 +35,7 @@ export function LoginForm() {
       clearAuthSession();
       setTenantCompanyMode(false);
       const signedInUser = await login(email, password);
-      router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
+      router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/dashboard');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to sign in');
     } finally {

@@ -32,7 +32,7 @@ export default function AdminLayout({ children, modal }: { children: React.React
     const token = getStoredToken();
     const storedUser = getStoredUser();
     if (!token || !storedUser) { router.replace("/"); return; }
-    if (storedUser.userType !== "SYSTEM_ADMIN") { router.replace("/console/dashboard"); return; }
+    if (storedUser.userType !== "SYSTEM_ADMIN") { router.replace("/dashboard"); return; }
     setUser(storedUser);
     setReady(true);
   }, [router]);

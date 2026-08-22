@@ -42,7 +42,7 @@ export function ActiveStatusBadge({ isActive }: { isActive: boolean }) {
 }
 
 // ── Edit Member Modal ────────────────────────────────────────────────────────
-// Shared between Team Management (/console/users) and the Companies page's
+// Shared between Team Management (/users) and the Companies page's
 // "Company operators" panel — one place to view/edit a user's profile,
 // toggle Account Active, assign/remove their role, and manage which
 // companies they can access, instead of each screen building its own
@@ -360,7 +360,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
               {roles.length === 0 && (
                 <p className="text-xs" style={S.muted}>
                   No roles defined yet.{" "}
-                  <a href="/console/roles" className="underline" style={S.accent}>Create roles first</a>.
+                  <a href="/roles" className="underline" style={S.accent}>Create roles first</a>.
                 </p>
               )}
             </div>

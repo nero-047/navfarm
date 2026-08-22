@@ -11,7 +11,7 @@ export default function AdminRootPage() {
     const token = getStoredToken();
     const user = getStoredUser();
     if (!token || !user) { router.replace("/"); return; }
-    if (user.userType !== "SYSTEM_ADMIN") { router.replace("/console/dashboard"); return; }
+    if (user.userType !== "SYSTEM_ADMIN") { router.replace("/dashboard"); return; }
     router.replace("/admin/dashboard");
   }, [router]);
 

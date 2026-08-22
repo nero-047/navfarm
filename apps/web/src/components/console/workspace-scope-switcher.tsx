@@ -132,7 +132,7 @@ export default function WorkspaceScopeSwitcher({
     setActiveOperationalAreaId(null);
     setCurrentScope("TENANT");
     setIsOpen(false);
-    window.location.href = "/console/dashboard";
+    window.location.href = "/dashboard";
   };
 
   const handleSelectCompany = (companyId: string) => {
@@ -145,7 +145,7 @@ export default function WorkspaceScopeSwitcher({
     updateStoredUser({ companyId, company_id: companyId });
 
     setIsOpen(false);
-    window.location.href = "/console/dashboard";
+    window.location.href = "/dashboard";
   };
 
   const handleSelectOperationalArea = (area: OperationalAreaItem) => {
@@ -173,7 +173,7 @@ export default function WorkspaceScopeSwitcher({
     });
 
     setIsOpen(false);
-    window.location.href = "/console/dashboard";
+    window.location.href = "/dashboard";
   };
 
   const activeCompanyObj = companies.find((c) => c.company_id === activeCompId) ||
@@ -354,7 +354,7 @@ export default function WorkspaceScopeSwitcher({
                 <span>Operational Farm Areas</span>
                 {isCompanyAdmin && (
                   <a
-                    href="/console/operational-areas"
+                    href="/operational-areas"
                     onClick={() => setIsOpen(false)}
                     className="text-[10px] hover:underline flex items-center gap-0.5"
                     style={{ color: "var(--accent)" }}
