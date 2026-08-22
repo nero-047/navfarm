@@ -194,7 +194,7 @@ export default function WorkspaceScopeSwitcher({
     secondarySubtitle = "Subsidiary & Commercial Operations";
   } else if (currentScope === "OPERATIONAL") {
     scopeBadge = `AREA · ${activeLobCode}`;
-    primaryTitle = activeAreaObj?.area_name || `${activeLobCode} Operational Unit`;
+    primaryTitle = activeAreaObj?.area_name || `${activeLobCode} Operational Area`;
     secondarySubtitle = `${activeCompanyObj?.company_name || "Company"} Farm Operations`;
   }
 

@@ -164,7 +164,7 @@ export default function OperationalAreasPage() {
     <div className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-7 text-(--text-primary)">
       <PageHeader
         title="Operational Areas"
-        description="Lines of Business (LOB) operational units under this company — farm sites, breeding units, and crop sectors."
+        description="Operational areas under this company — farm sites, breeding units, and crop sectors, grouped by line of business (LOB)."
       />
 
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -182,7 +182,7 @@ export default function OperationalAreasPage() {
       {/* ── Operational Areas Cards Grid ── */}
       {loading ? (
         <div className="p-8 text-center text-xs text-(--text-muted) flex items-center justify-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin text-(--accent)" /> Loading operational units…
+          <RefreshCw className="w-4 h-4 animate-spin text-(--accent)" /> Loading operational areas…
         </div>
       ) : areas.length === 0 ? (
         <div className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-10 text-center">
