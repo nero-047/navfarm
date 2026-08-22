@@ -746,16 +746,16 @@ export default function StageWiseConsumptionOutputPanel() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="pb-2 font-bold">#</th>
-                    <th className="pb-2 font-bold">Feed Item & Formula</th>
-                    <th className="pb-2 font-bold">UOM</th>
-                    <th className="pb-2 font-bold text-right">Opening Stock</th>
-                    <th className="pb-2 font-bold text-right">Issued</th>
-                    <th className="pb-2 font-bold text-right">Consumed</th>
-                    <th className="pb-2 font-bold text-right">Wastage</th>
-                    <th className="pb-2 font-bold text-right">Closing Stock</th>
-                    <th className="pb-2 font-bold text-right">Std Rate (₹)</th>
-                    <th className="pb-2 font-bold text-right">Total Cost (₹)</th>
+                    <th className="px-3 pb-2 font-bold">#</th>
+                    <th className="px-3 pb-2 font-bold">Feed Item & Formula</th>
+                    <th className="px-3 pb-2 font-bold">UOM</th>
+                    <th className="px-3 pb-2 font-bold text-right">Opening Stock</th>
+                    <th className="px-3 pb-2 font-bold text-right">Issued</th>
+                    <th className="px-3 pb-2 font-bold text-right">Consumed</th>
+                    <th className="px-3 pb-2 font-bold text-right">Wastage</th>
+                    <th className="px-3 pb-2 font-bold text-right">Closing Stock</th>
+                    <th className="px-3 pb-2 font-bold text-right">Std Rate (₹)</th>
+                    <th className="px-3 pb-2 font-bold text-right">Total Cost (₹)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -764,16 +764,16 @@ export default function StageWiseConsumptionOutputPanel() {
                     const cost = f.consumed * f.rate;
                     return (
                       <tr key={f.item} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
-                        <td className="py-2.5 font-semibold text-[var(--text-primary)]">{f.item}</td>
-                        <td className="py-2.5 text-[var(--text-secondary)] font-mono">{f.uom}</td>
-                        <td className="py-2.5 text-right font-mono">{f.opening.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono">{f.issued.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono font-bold text-emerald-500">{f.consumed.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono text-[var(--text-muted)]">{f.wastage.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono">{closing.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono">₹ {f.rate.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
+                        <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{f.item}</td>
+                        <td className="px-3 py-2.5 text-[var(--text-secondary)] font-mono">{f.uom}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{f.opening.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{f.issued.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-500">{f.consumed.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-[var(--text-muted)]">{f.wastage.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{closing.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">₹ {f.rate.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                       </tr>
                     );
                   })}
@@ -781,9 +781,9 @@ export default function StageWiseConsumptionOutputPanel() {
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
                     <td colSpan={5} className="py-2.5 px-2">Stage Feed Totals</td>
-                    <td className="py-2.5 text-right text-emerald-500 font-mono">{totalFeedKg.toFixed(2)} KG</td>
+                    <td className="px-3 py-2.5 text-right text-emerald-500 font-mono">{totalFeedKg.toFixed(2)} KG</td>
                     <td colSpan={3} className="py-2.5"></td>
-                    <td className="py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalFeedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalFeedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -796,32 +796,32 @@ export default function StageWiseConsumptionOutputPanel() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="pb-2 font-bold">#</th>
-                    <th className="pb-2 font-bold">Medicine / Vaccine Item</th>
-                    <th className="pb-2 font-bold">UOM</th>
-                    <th className="pb-2 font-bold text-right">Issued</th>
-                    <th className="pb-2 font-bold text-right">Consumed</th>
-                    <th className="pb-2 font-bold text-right">Wastage</th>
-                    <th className="pb-2 font-bold text-right">Total Cost (₹)</th>
+                    <th className="px-3 pb-2 font-bold">#</th>
+                    <th className="px-3 pb-2 font-bold">Medicine / Vaccine Item</th>
+                    <th className="px-3 pb-2 font-bold">UOM</th>
+                    <th className="px-3 pb-2 font-bold text-right">Issued</th>
+                    <th className="px-3 pb-2 font-bold text-right">Consumed</th>
+                    <th className="px-3 pb-2 font-bold text-right">Wastage</th>
+                    <th className="px-3 pb-2 font-bold text-right">Total Cost (₹)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {currentStage.medData.map((m, index) => (
                     <tr key={m.item} className="hover:bg-[var(--surface-raised)] transition-colors">
-                      <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
-                      <td className="py-2.5 font-semibold text-[var(--text-primary)]">{m.item}</td>
-                      <td className="py-2.5 text-[var(--text-secondary)] font-mono">{m.uom}</td>
-                      <td className="py-2.5 text-right font-mono">{m.issued}</td>
-                      <td className="py-2.5 text-right font-mono font-bold text-blue-500">{m.consumed}</td>
-                      <td className="py-2.5 text-right font-mono text-[var(--text-muted)]">{m.wastage}</td>
-                      <td className="py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {m.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
+                      <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{m.item}</td>
+                      <td className="px-3 py-2.5 text-[var(--text-secondary)] font-mono">{m.uom}</td>
+                      <td className="px-3 py-2.5 text-right font-mono">{m.issued}</td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-blue-500">{m.consumed}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-[var(--text-muted)]">{m.wastage}</td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {m.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
                     <td colSpan={6} className="py-2.5 px-2">Stage Clinical & Vaccine Total</td>
-                    <td className="py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalMedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalMedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -834,12 +834,12 @@ export default function StageWiseConsumptionOutputPanel() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="pb-2 font-bold">#</th>
-                    <th className="pb-2 font-bold">Date</th>
-                    <th className="pb-2 font-bold">Labour Resource / Activity</th>
-                    <th className="pb-2 font-bold text-right">Hours Logged</th>
-                    <th className="pb-2 font-bold text-right">Hourly Rate (₹)</th>
-                    <th className="pb-2 font-bold text-right">Total Cost (₹)</th>
+                    <th className="px-3 pb-2 font-bold">#</th>
+                    <th className="px-3 pb-2 font-bold">Date</th>
+                    <th className="px-3 pb-2 font-bold">Labour Resource / Activity</th>
+                    <th className="px-3 pb-2 font-bold text-right">Hours Logged</th>
+                    <th className="px-3 pb-2 font-bold text-right">Hourly Rate (₹)</th>
+                    <th className="px-3 pb-2 font-bold text-right">Total Cost (₹)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -852,12 +852,12 @@ export default function StageWiseConsumptionOutputPanel() {
                   ) : (
                     (currentStage.labourData || []).map((l, index) => (
                       <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
-                        <td className="py-2.5 font-mono text-[var(--text-secondary)]">{l.date || "—"}</td>
-                        <td className="py-2.5 font-semibold text-[var(--text-primary)]">{l.resource}</td>
-                        <td className="py-2.5 text-right font-mono font-bold">{l.hours} hrs</td>
-                        <td className="py-2.5 text-right font-mono">₹ {l.rate.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">
+                        <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
+                        <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{l.date || "—"}</td>
+                        <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{l.resource}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold">{l.hours} hrs</td>
+                        <td className="px-3 py-2.5 text-right font-mono">₹ {l.rate.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">
                           ₹ {l.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </td>
                       </tr>
@@ -867,7 +867,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
                     <td colSpan={5} className="py-2.5 px-2">Total Stage Labour Cost</td>
-                    <td className="py-2.5 text-right font-mono text-[var(--accent)]">
+                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">
                       ₹ {totalLabourCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
@@ -882,12 +882,12 @@ export default function StageWiseConsumptionOutputPanel() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="pb-2 font-bold">#</th>
-                    <th className="pb-2 font-bold">Overhead / Activity Description</th>
-                    <th className="pb-2 font-bold">Allocation Basis</th>
-                    <th className="pb-2 font-bold text-right">Standard Rate (₹)</th>
-                    <th className="pb-2 font-bold text-right">Applied Qty</th>
-                    <th className="pb-2 font-bold text-right">Allocated Cost (₹)</th>
+                    <th className="px-3 pb-2 font-bold">#</th>
+                    <th className="px-3 pb-2 font-bold">Overhead / Activity Description</th>
+                    <th className="px-3 pb-2 font-bold">Allocation Basis</th>
+                    <th className="px-3 pb-2 font-bold text-right">Standard Rate (₹)</th>
+                    <th className="px-3 pb-2 font-bold text-right">Applied Qty</th>
+                    <th className="px-3 pb-2 font-bold text-right">Allocated Cost (₹)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -900,12 +900,12 @@ export default function StageWiseConsumptionOutputPanel() {
                   ) : (
                     currentStage.overheadData.map((o, index) => (
                       <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
-                        <td className="py-2.5 font-semibold text-[var(--text-primary)]">{o.item}</td>
-                        <td className="py-2.5 text-[var(--text-secondary)]">{o.basis}</td>
-                        <td className="py-2.5 text-right font-mono">₹ {o.rate.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono font-bold">{o.qty}</td>
-                        <td className="py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {o.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
+                        <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{o.item}</td>
+                        <td className="px-3 py-2.5 text-[var(--text-secondary)]">{o.basis}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">₹ {o.rate.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold">{o.qty}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {o.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                       </tr>
                     ))
                   )}
@@ -913,7 +913,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
                     <td colSpan={5} className="py-2.5 px-2">Total Stage Overheads Allocation</td>
-                    <td className="py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalOverheadCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalOverheadCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -958,10 +958,10 @@ export default function StageWiseConsumptionOutputPanel() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="pb-2 font-bold">#</th>
-                    <th className="pb-2 font-bold">Sampling Date</th>
-                    <th className="pb-2 font-bold text-right">Average Body Weight (KG)</th>
-                    <th className="pb-2 font-bold">Sampling Remarks & Body Condition</th>
+                    <th className="px-3 pb-2 font-bold">#</th>
+                    <th className="px-3 pb-2 font-bold">Sampling Date</th>
+                    <th className="px-3 pb-2 font-bold text-right">Average Body Weight (KG)</th>
+                    <th className="px-3 pb-2 font-bold">Sampling Remarks & Body Condition</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -974,12 +974,12 @@ export default function StageWiseConsumptionOutputPanel() {
                   ) : (
                     (currentStage.weightLogs || []).map((w, index) => (
                       <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-2.5 text-[var(--text-muted)]">{index + 1}</td>
-                        <td className="py-2.5 font-mono text-[var(--text-secondary)]">{w.date || "—"}</td>
-                        <td className="py-2.5 text-right font-mono font-bold text-emerald-500">
+                        <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
+                        <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{w.date || "—"}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-500">
                           {w.avgWeightKg > 0 ? `${w.avgWeightKg.toFixed(2)} KG` : "—"}
                         </td>
-                        <td className="py-2.5 text-[var(--text-primary)]">{w.remarks}</td>
+                        <td className="px-3 py-2.5 text-[var(--text-primary)]">{w.remarks}</td>
                       </tr>
                     ))
                   )}
@@ -1030,23 +1030,23 @@ export default function StageWiseConsumptionOutputPanel() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                        <th className="pb-2 font-bold">Transfer Date</th>
-                        <th className="pb-2 font-bold">Destination Pen / Stage</th>
-                        <th className="pb-2 font-bold text-right">Head Count</th>
-                        <th className="pb-2 font-bold text-right">Avg Weight (KG)</th>
-                        <th className="pb-2 font-bold text-right">Capitalized WIP (₹)</th>
-                        <th className="pb-2 font-bold">Status</th>
+                        <th className="px-3 pb-2 font-bold">Transfer Date</th>
+                        <th className="px-3 pb-2 font-bold">Destination Pen / Stage</th>
+                        <th className="px-3 pb-2 font-bold text-right">Head Count</th>
+                        <th className="px-3 pb-2 font-bold text-right">Avg Weight (KG)</th>
+                        <th className="px-3 pb-2 font-bold text-right">Capitalized WIP (₹)</th>
+                        <th className="px-3 pb-2 font-bold">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
                       {currentStage.transferLogs.map((t, idx) => (
                         <tr key={idx} className="hover:bg-[var(--surface-raised)]">
-                          <td className="py-2.5 font-mono text-[var(--text-secondary)]">{t.date}</td>
-                          <td className="py-2.5 font-semibold text-[var(--text-primary)]">{t.destination}</td>
-                          <td className="py-2.5 text-right font-mono font-bold">{t.headCount} Head</td>
-                          <td className="py-2.5 text-right font-mono">{t.avgWeightKg} kg</td>
-                          <td className="py-2.5 text-right font-mono font-bold text-emerald-500">₹ {t.wipValue.toLocaleString("en-IN")}</td>
-                          <td className="py-2.5">
+                          <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{t.date}</td>
+                          <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{t.destination}</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-bold">{t.headCount} Head</td>
+                          <td className="px-3 py-2.5 text-right font-mono">{t.avgWeightKg} kg</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-500">₹ {t.wipValue.toLocaleString("en-IN")}</td>
+                          <td className="px-3 py-2.5">
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                               {t.status}
                             </span>

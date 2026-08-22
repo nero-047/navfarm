@@ -275,25 +275,25 @@ export default function DairyDailyOperationsEntry() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b text-[11px] font-semibold uppercase text-[var(--text-secondary)]" style={{ borderColor: "var(--border)" }}>
-                    <th className="pb-2">Feed / Ration Item</th>
-                    <th className="pb-2">UOM</th>
-                    <th className="pb-2 text-right">Opening</th>
-                    <th className="pb-2 text-right">Issued</th>
-                    <th className="pb-2 text-right">Consumed</th>
-                    <th className="pb-2 text-right">Wastage</th>
-                    <th className="pb-2 text-right">Closing</th>
+                    <th className="px-3 pb-2">Feed / Ration Item</th>
+                    <th className="px-3 pb-2">UOM</th>
+                    <th className="px-3 pb-2 text-right">Opening</th>
+                    <th className="px-3 pb-2 text-right">Issued</th>
+                    <th className="px-3 pb-2 text-right">Consumed</th>
+                    <th className="px-3 pb-2 text-right">Wastage</th>
+                    <th className="px-3 pb-2 text-right">Closing</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
                   {feedRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="py-2.5 font-semibold">{row.name}</td>
-                      <td className="py-2.5 font-mono text-[var(--text-secondary)]">{row.uom}</td>
-                      <td className="py-2.5 text-right font-mono">{row.opening.toLocaleString()}</td>
-                      <td className="py-2.5 text-right font-mono font-bold text-[var(--accent)]">{row.issued.toLocaleString()}</td>
-                      <td className="py-2.5 text-right font-mono font-bold text-emerald-600">{row.consumed.toLocaleString()}</td>
-                      <td className="py-2.5 text-right font-mono text-red-500">{row.wastage}</td>
-                      <td className="py-2.5 text-right font-mono">{row.closing.toLocaleString()}</td>
+                      <td className="px-3 py-2.5 font-semibold">{row.name}</td>
+                      <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{row.uom}</td>
+                      <td className="px-3 py-2.5 text-right font-mono">{row.opening.toLocaleString()}</td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--accent)]">{row.issued.toLocaleString()}</td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-600">{row.consumed.toLocaleString()}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-red-500">{row.wastage}</td>
+                      <td className="px-3 py-2.5 text-right font-mono">{row.closing.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -30,9 +30,9 @@
   --surface-raised: #ffffff;
   --surface-secondary: #f2f3f5;
   --surface-overlay: rgba(255, 255, 255, 0.88);
-  --border: rgba(46, 49, 63, 0.12);
-  --border-subtle: rgba(46, 49, 63, 0.08);
-  --border-strong: rgba(46, 49, 63, 0.18);
+  --border: rgba(46, 49, 63, 0.08);
+  --border-subtle: rgba(46, 49, 63, 0.05);
+  --border-strong: rgba(46, 49, 63, 0.14);
   --text-primary: #2e313f;
   --text-secondary: #5f6370;
   --text-muted: #7b7f89;
@@ -60,12 +60,12 @@
   --input-bg: #ffffff;
   --input-text: #2e313f;
   --input-placeholder: #7b7f89;
-  --input-border: rgba(46, 49, 63, 0.18);
+  --input-border: rgba(46, 49, 63, 0.13);
   --input-border-focus: #c24332;
   --card-bg: #ffffff;
-  --card-border: rgba(46, 49, 63, 0.1);
+  --card-border: rgba(46, 49, 63, 0.07);
   --row-hover: rgba(46, 49, 63, 0.035);
-  --row-border: #ececed;
+  --row-border: rgba(46, 49, 63, 0.06);
   --badge-bg: rgba(46, 49, 63, 0.06);
 
   /* Radius scale — apple.design.md §10. Structural surfaces stay 0,
@@ -1150,32 +1150,40 @@ textarea:focus-visible {
 
 .nf-embedded-input:focus-visible { outline: none; box-shadow: none; }
 
-/* Control size classes matching Apple design spec */
-.nf-input {
-  width: 100%;
-  border: 1px solid var(--input-border);
-  background-color: var(--input-bg);
-  color: var(--input-text);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  outline: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
-}
-.nf-input-sm {
-  border: 1px solid var(--input-border);
-  background-color: var(--input-bg);
-  color: var(--input-text);
-  border-radius: var(--radius-sm);
-  padding: 0.375rem 0.5rem;
-  font-size: 0.75rem;
-  outline: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
-}
-.nf-input:focus-visible,
-.nf-input-sm:focus-visible {
-  border-color: var(--input-border-focus);
-  box-shadow: 0 0 0 3px var(--focus-ring);
+/* Control size classes matching Apple design spec.
+   Wrapped in @layer components: Tailwind utilities always win over ANY
+   unlayered CSS regardless of source order or specificity, so a plain
+   (unlayered) rule here would silently defeat a caller's `pl-8`/`pr-10`
+   icon-clearance override — text/placeholder would render underneath the
+   icon. Layering these lets per-instance utility overrides work as
+   intended while keeping the shared default padding for every other caller. */
+@layer components {
+  .nf-input {
+    width: 100%;
+    border: 1px solid var(--input-border);
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .nf-input-sm {
+    border: 1px solid var(--input-border);
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-radius: var(--radius-sm);
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .nf-input:focus-visible,
+  .nf-input-sm:focus-visible {
+    border-color: var(--input-border-focus);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+  }
 }
 
 /* Wrapper-free select styling. The <Select> primitive positions its chevron in

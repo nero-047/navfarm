@@ -389,13 +389,13 @@ export default function DashboardPage() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b text-[11px] font-semibold uppercase" style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-                    <th className="pb-2.5">Company Legal Entity</th>
-                    <th className="pb-2.5">Nature of Business</th>
-                    <th className="pb-2.5">Operating Units</th>
-                    <th className="pb-2.5 text-right">Batches</th>
-                    <th className="pb-2.5 text-right">Population</th>
-                    <th className="pb-2.5 text-right">Status</th>
-                    <th className="pb-2.5 text-right">Action</th>
+                    <th className="px-3 pb-2.5">Company Legal Entity</th>
+                    <th className="px-3 pb-2.5">Nature of Business</th>
+                    <th className="px-3 pb-2.5">Operating Units</th>
+                    <th className="px-3 pb-2.5 text-right">Batches</th>
+                    <th className="px-3 pb-2.5 text-right">Population</th>
+                    <th className="px-3 pb-2.5 text-right">Status</th>
+                    <th className="px-3 pb-2.5 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
@@ -409,14 +409,14 @@ export default function DashboardPage() {
 
                     return (
                       <tr key={comp.company_id} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-3 font-semibold" style={{ color: "var(--text-primary)" }}>
+                        <td className="px-3 py-3 font-semibold" style={{ color: "var(--text-primary)" }}>
                           <div className="flex items-center gap-2">
                             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--accent)" }} />
                             <span>{comp.company_name}</span>
                           </div>
                         </td>
-                        <td className="py-3" style={{ color: "var(--text-secondary)" }}>{comp.nob_name || "Livestock Farming"}</td>
-                        <td className="py-3">
+                        <td className="px-3 py-3" style={{ color: "var(--text-secondary)" }}>{comp.nob_name || "Livestock Farming"}</td>
+                        <td className="px-3 py-3">
                           <div className="flex gap-1.5 flex-wrap">
                             {compAreas.length > 0 ? (
                               compAreas.map((a) => (
@@ -429,14 +429,14 @@ export default function DashboardPage() {
                             )}
                           </div>
                         </td>
-                        <td className="py-3 text-right font-mono font-semibold">{compBatches.length}</td>
-                        <td className="py-3 text-right font-mono font-semibold">{compHeadcount} Head</td>
-                        <td className="py-3 text-right">
+                        <td className="px-3 py-3 text-right font-mono font-semibold">{compBatches.length}</td>
+                        <td className="px-3 py-3 text-right font-mono font-semibold">{compHeadcount} Head</td>
+                        <td className="px-3 py-3 text-right">
                           <span className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[10px] font-medium border" style={{ backgroundColor: "var(--success-muted)", borderColor: "var(--success)", color: "var(--success)" }}>
                             Active
                           </span>
                         </td>
-                        <td className="py-3 text-right">
+                        <td className="px-3 py-3 text-right">
                           <button
                             onClick={() => handleEnterCompany(comp)}
                             className="nf-press rounded-[var(--radius-pill)] px-2.5 py-1 text-[11px] font-semibold text-white transition-opacity hover:opacity-90"

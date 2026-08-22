@@ -113,25 +113,25 @@ export default function SettingsPage() {
               <table className="w-full text-left text-[13px]">
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    <th className="py-2 font-medium" style={{ color: "var(--text-muted)" }}></th>
-                    <th className="py-2 text-center font-medium" style={{ color: "var(--text-muted)" }}>{t("settingsEmail")}</th>
-                    <th className="py-2 text-center font-medium" style={{ color: "var(--text-muted)" }}>{t("settingsInApp")}</th>
+                    <th className="px-3 py-2 font-medium" style={{ color: "var(--text-muted)" }}></th>
+                    <th className="px-3 py-2 text-center font-medium" style={{ color: "var(--text-muted)" }}>{t("settingsEmail")}</th>
+                    <th className="px-3 py-2 text-center font-medium" style={{ color: "var(--text-muted)" }}>{t("settingsInApp")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {prefs.map((p) => (
                     <tr key={p.category} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                      <td className="py-2" style={{ color: "var(--text-primary)" }}>
+                      <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
                         {t(CATEGORY_LABEL_KEYS[p.category] as any) || p.category}
                       </td>
-                      <td className="py-2 text-center">
+                      <td className="px-3 py-2 text-center">
                         <input
                           type="checkbox"
                           checked={p.emailEnabled}
                           onChange={() => togglePref(p.category, "emailEnabled")}
                         />
                       </td>
-                      <td className="py-2 text-center">
+                      <td className="px-3 py-2 text-center">
                         <input
                           type="checkbox"
                           checked={p.inAppEnabled}

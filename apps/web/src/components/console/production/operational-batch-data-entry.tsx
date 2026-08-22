@@ -919,14 +919,14 @@ export default function OperationalBatchDataEntry() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="pb-1.5 font-bold">Feed Item</th>
-                    <th className="pb-1.5 font-bold">UOM</th>
-                    <th className="pb-1.5 font-bold text-right">Opening</th>
-                    <th className="pb-1.5 font-bold text-right">Issued</th>
-                    <th className="pb-1.5 font-bold text-right text-[var(--text-primary)]">Consumed</th>
-                    <th className="pb-1.5 font-bold text-right">Wastage</th>
-                    <th className="pb-1.5 font-bold text-right">Closing</th>
-                    <th className="pb-1.5 font-bold text-right">Action</th>
+                    <th className="px-3 pb-1.5 font-bold">Feed Item</th>
+                    <th className="px-3 pb-1.5 font-bold">UOM</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">Opening</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">Issued</th>
+                    <th className="px-3 pb-1.5 font-bold text-right text-[var(--text-primary)]">Consumed</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">Wastage</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">Closing</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -941,11 +941,11 @@ export default function OperationalBatchDataEntry() {
                       const closingQty = r.opening + r.issued - r.consumed - r.wastage;
                       return (
                         <tr key={r.id} className="hover:bg-[var(--surface-raised)] transition-colors">
-                          <td className="py-2 font-medium text-[var(--text-primary)]">{r.item}</td>
-                          <td className="py-2 text-[var(--text-secondary)] font-mono">{r.uom}</td>
-                          <td className="py-2 text-right font-mono">{r.opening}</td>
-                          <td className="py-2 text-right font-mono">{r.issued}</td>
-                          <td className="py-2 text-right font-mono">
+                          <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{r.item}</td>
+                          <td className="px-3 py-2 text-[var(--text-secondary)] font-mono">{r.uom}</td>
+                          <td className="px-3 py-2 text-right font-mono">{r.opening}</td>
+                          <td className="px-3 py-2 text-right font-mono">{r.issued}</td>
+                          <td className="px-3 py-2 text-right font-mono">
                             <input
                               type="number"
                               step="0.1"
@@ -958,9 +958,9 @@ export default function OperationalBatchDataEntry() {
                               className="w-16 rounded border border-[var(--border)] bg-[var(--surface-raised)] px-1.5 py-0.5 text-right text-xs font-bold text-[var(--text-primary)]"
                             />
                           </td>
-                          <td className="py-2 text-right font-mono text-[var(--text-muted)]">{r.wastage}</td>
-                          <td className="py-2 text-right font-mono font-semibold">{closingQty.toFixed(1)}</td>
-                          <td className="py-2 text-right">
+                          <td className="px-3 py-2 text-right font-mono text-[var(--text-muted)]">{r.wastage}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold">{closingQty.toFixed(1)}</td>
+                          <td className="px-3 py-2 text-right">
                             <button
                               onClick={() => handleRemoveFeed(r.id)}
                               className="text-[var(--text-muted)] hover:text-rose-500 p-1 transition-colors"
@@ -1003,12 +1003,12 @@ export default function OperationalBatchDataEntry() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="pb-1.5 font-bold">Medicine / Vaccine</th>
-                    <th className="pb-1.5 font-bold">UOM</th>
-                    <th className="pb-1.5 font-bold text-right">Issued</th>
-                    <th className="pb-1.5 font-bold text-right text-[var(--text-primary)]">Consumed</th>
-                    <th className="pb-1.5 font-bold text-right">Cost (₹)</th>
-                    <th className="pb-1.5 font-bold text-right">Action</th>
+                    <th className="px-3 pb-1.5 font-bold">Medicine / Vaccine</th>
+                    <th className="px-3 pb-1.5 font-bold">UOM</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">Issued</th>
+                    <th className="px-3 pb-1.5 font-bold text-right text-[var(--text-primary)]">Consumed</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">Cost (₹)</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -1021,10 +1021,10 @@ export default function OperationalBatchDataEntry() {
                   ) : (
                     medicineRows.map((r, i) => (
                       <tr key={r.id} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="py-2 font-medium text-[var(--text-primary)]">{r.item}</td>
-                        <td className="py-2 text-[var(--text-secondary)] font-mono">{r.uom}</td>
-                        <td className="py-2 text-right font-mono">{r.issued}</td>
-                        <td className="py-2 text-right font-mono">
+                        <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{r.item}</td>
+                        <td className="px-3 py-2 text-[var(--text-secondary)] font-mono">{r.uom}</td>
+                        <td className="px-3 py-2 text-right font-mono">{r.issued}</td>
+                        <td className="px-3 py-2 text-right font-mono">
                           <input
                             type="number"
                             value={r.consumed}
@@ -1036,8 +1036,8 @@ export default function OperationalBatchDataEntry() {
                             className="w-16 rounded border border-[var(--border)] bg-[var(--surface-raised)] px-1.5 py-0.5 text-right text-xs font-bold text-[var(--text-primary)]"
                           />
                         </td>
-                        <td className="py-2 text-right font-mono font-bold">₹ {r.cost}</td>
-                        <td className="py-2 text-right">
+                        <td className="px-3 py-2 text-right font-mono font-bold">₹ {r.cost}</td>
+                        <td className="px-3 py-2 text-right">
                           <button
                             onClick={() => handleRemoveMed(r.id)}
                             className="text-[var(--text-muted)] hover:text-rose-500 p-1 transition-colors"
