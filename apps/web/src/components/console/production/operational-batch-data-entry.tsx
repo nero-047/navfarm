@@ -26,6 +26,7 @@ import { API_BASE_URL } from "@/lib/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // file_url from the API is server-relative (e.g. "/uploads/xyz.jpg") — resolve
 // it against the API's own origin, not the web app's, since uploads are served
@@ -106,6 +107,7 @@ interface BatchMeta {
 // No static batch data — all data is fetched live from the database.
 
 export default function OperationalBatchDataEntry() {
+  const { t } = useLanguage();
   // ── Live data state ──
   const [batches, setBatches] = useState<BatchMeta[]>([]);
   const [batchesLoading, setBatchesLoading] = useState(true);
@@ -742,7 +744,7 @@ export default function OperationalBatchDataEntry() {
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  Active Production Batch:
+                  {t("activeProductionBatch")}
                 </span>
                 <select
                   value={selectedBatchId}
@@ -767,29 +769,29 @@ export default function OperationalBatchDataEntry() {
                     borderColor: "rgba(47, 125, 91, 0.2)",
                   }}
                 >
-                  Live Active
+                  {t("liveActive")}
                 </span>
               </div>
 
               <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
                 <div>
-                  <span className="text-[var(--text-muted)]">Breed: </span>
+                  <span className="text-[var(--text-muted)]">{t("bdeBreed")} </span>
                   <span className="font-semibold text-[var(--text-primary)]">{currentBatch?.breed || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-[var(--text-muted)]">Type: </span>
+                  <span className="text-[var(--text-muted)]">{t("bdeType")} </span>
                   <span className="font-semibold text-[var(--text-primary)]">{currentBatch?.type || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-[var(--text-muted)]">Start Date: </span>
+                  <span className="text-[var(--text-muted)]">{t("bdeStartDate")} </span>
                   <span className="font-semibold text-[var(--text-primary)]">{currentBatch?.startDate || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-[var(--text-muted)]">Current Stage: </span>
+                  <span className="text-[var(--text-muted)]">{t("bdeCurrentStage")} </span>
                   <span className="font-semibold text-[var(--accent)]">{currentBatch?.currentStage || "—"}</span>
                   {currentBatch?.stageTotalDays ? (
                     <span className="text-[11px] text-[var(--text-muted)] ml-1">
-                      (Day {currentBatch.stageDay} of {currentBatch.stageTotalDays})
+                      {t("bdeDayOf", { day: currentBatch.stageDay, total: currentBatch.stageTotalDays })}
                     </span>
                   ) : null}
                 </div>
@@ -800,19 +802,19 @@ export default function OperationalBatchDataEntry() {
           {/* Animal Summary KPI Strip */}
           <div className="flex items-center gap-3 bg-[var(--surface-raised)] p-3 rounded-[var(--radius-md)] border border-[var(--border)]">
             <div className="text-center px-3 border-r border-[var(--border)]">
-              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Assigned</p>
+              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeAssigned")}</p>
               <p className="text-base font-bold text-[var(--text-primary)]">{currentBatch?.assignedCount ?? 0}</p>
             </div>
             <div className="text-center px-3 border-r border-[var(--border)]">
-              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Current</p>
+              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeCurrent")}</p>
               <p className="text-base font-bold" style={{ color: "var(--success)" }}>{currentHeadCount}</p>
             </div>
             <div className="text-center px-3 border-r border-[var(--border)]">
-              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Mortality</p>
+              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeMortality")}</p>
               <p className="text-base font-bold" style={{ color: "var(--danger)" }}>{totalMortality}</p>
             </div>
             <div className="text-center px-3">
-              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Transferred</p>
+              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeTransferred")}</p>
               <p className="text-base font-bold text-[var(--text-primary)]">{currentBatch?.transferredCount ?? 0}</p>
             </div>
           </div>
@@ -845,7 +847,7 @@ export default function OperationalBatchDataEntry() {
         <div className="flex items-center gap-4 flex-wrap">
           <div>
             <label className="block text-[10px] uppercase font-bold text-[var(--text-muted)] mb-1">
-              Log Entry Date
+              {t("logEntryDate")}
             </label>
             <input
               type="date"
@@ -858,7 +860,7 @@ export default function OperationalBatchDataEntry() {
           <div className="flex items-center gap-2.5 bg-[var(--surface-raised)] border border-[var(--border)] px-3 py-1.5 rounded text-xs">
             <CloudSun className="w-4 h-4 text-amber-400" />
             <div>
-              <span className="text-[10px] text-[var(--text-muted)]">Barn Climate: </span>
+              <span className="text-[10px] text-[var(--text-muted)]">{t("barnClimate")} </span>
               <span className="font-semibold text-[var(--text-primary)]">22.4 °C</span> · 58% Humidity · 0.15 m/s Airflow
             </div>
           </div>
@@ -871,7 +873,7 @@ export default function OperationalBatchDataEntry() {
             onClick={handleCopyPreviousDay}
             className="text-xs h-8 gap-1.5 font-medium"
           >
-            <Copy className="w-3.5 h-3.5" /> Copy Previous Day
+            <Copy className="w-3.5 h-3.5" /> {t("copyPreviousDay")}
           </Button>
 
           <Button
@@ -881,7 +883,7 @@ export default function OperationalBatchDataEntry() {
             className="nf-btn-primary text-xs h-8 gap-1.5 font-semibold"
           >
             {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            {saving ? "Saving Logs…" : "Save Daily Batch Entry"}
+            {saving ? t("savingLogs") : t("saveDailyBatchEntry")}
           </Button>
         </div>
       </div>
@@ -908,10 +910,10 @@ export default function OperationalBatchDataEntry() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
                 <Wheat className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                <span>1. Feed Consumption & Nutrition</span>
+                <span>{t("feedConsumptionNutrition")}</span>
               </h3>
               <span className="text-xs font-bold text-[var(--text-primary)]">
-                Total: {totalFeedConsumed.toFixed(1)} KG (₹ {totalFeedCost.toFixed(2)})
+                {t("bdeTotal")} {totalFeedConsumed.toFixed(1)} KG (₹ {totalFeedCost.toFixed(2)})
               </span>
             </div>
 
@@ -919,14 +921,14 @@ export default function OperationalBatchDataEntry() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="px-3 pb-1.5 font-bold">Feed Item</th>
-                    <th className="px-3 pb-1.5 font-bold">UOM</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">Opening</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">Issued</th>
-                    <th className="px-3 pb-1.5 font-bold text-right text-[var(--text-primary)]">Consumed</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">Wastage</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">Closing</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">Action</th>
+                    <th className="px-3 pb-1.5 font-bold">{t("colFeedItem")}</th>
+                    <th className="px-3 pb-1.5 font-bold">{t("colUom")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">{t("colOpening")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">{t("colIssued")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right text-[var(--text-primary)]">{t("colConsumed")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">{t("colWastage")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">{t("colClosing")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">{t("colAction")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -992,10 +994,10 @@ export default function OperationalBatchDataEntry() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
                 <Pill className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                <span>2. Medicine & Clinical Treatment</span>
+                <span>{t("medicineClinicalTreatment")}</span>
               </h3>
               <span className="text-xs font-bold text-[var(--text-primary)]">
-                Total: ₹ {totalMedicineCost.toLocaleString("en-IN")}
+                {t("bdeTotal")} ₹ {totalMedicineCost.toLocaleString("en-IN")}
               </span>
             </div>
 
@@ -1003,19 +1005,19 @@ export default function OperationalBatchDataEntry() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    <th className="px-3 pb-1.5 font-bold">Medicine / Vaccine</th>
-                    <th className="px-3 pb-1.5 font-bold">UOM</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">Issued</th>
-                    <th className="px-3 pb-1.5 font-bold text-right text-[var(--text-primary)]">Consumed</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">Cost (₹)</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">Action</th>
+                    <th className="px-3 pb-1.5 font-bold">{t("colMedicineVaccine")}</th>
+                    <th className="px-3 pb-1.5 font-bold">{t("colUom")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">{t("colIssued")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right text-[var(--text-primary)]">{t("colConsumed")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">{t("colCost")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right">{t("colAction")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {medicineRows.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-4 text-center text-xs text-[var(--text-muted)] italic">
-                        {dataEntryLoading ? "Loading clinical schedule from database..." : "No scheduled medications for today. Click '+ Add Clinical Medication' if administered."}
+                        {dataEntryLoading ? "Loading clinical schedule from database..." : t("noScheduledMedications")}
                       </td>
                     </tr>
                   ) : (
@@ -1364,7 +1366,7 @@ export default function OperationalBatchDataEntry() {
               className="nf-btn-primary text-xs h-9 px-4 gap-2 font-semibold"
             >
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {saving ? "Posting Daily WIP…" : "Save Daily Batch Entry"}
+              {saving ? t("postingDailyWip") : t("saveDailyBatchEntry")}
             </Button>
           </div>
         </div>

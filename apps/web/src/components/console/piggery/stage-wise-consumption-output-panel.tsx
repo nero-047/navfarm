@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   RotateCcw,
   Download,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useLanguage } from "@/hooks/useLanguage";
 
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
@@ -100,7 +102,14 @@ interface StageProfile {
   outputHead: number;
 }
 
+const TAB_KEYS = ["feed", "medicine", "labour", "overheads", "mortality", "weight", "observations", "transfers", "summary"] as const;
+type TabKey = (typeof TAB_KEYS)[number];
+
 export default function StageWiseConsumptionOutputPanel() {
+  const { t } = useLanguage();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [batches, setBatches] = useState<BatchProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
@@ -143,9 +152,13 @@ export default function StageWiseConsumptionOutputPanel() {
     };
   }, [currentBatch, selectedStageId]);
 
-  const [activeTab, setActiveTab] = useState<
-    "feed" | "medicine" | "labour" | "overheads" | "mortality" | "weight" | "observations" | "transfers" | "summary"
-  >("feed");
+  const sectionParam = searchParams.get("section");
+  const activeTab: TabKey = (TAB_KEYS as readonly string[]).includes(sectionParam || "") ? (sectionParam as TabKey) : "feed";
+  const setActiveTab = (tab: TabKey) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("section", tab);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
 
@@ -553,7 +566,7 @@ export default function StageWiseConsumptionOutputPanel() {
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 flex flex-wrap items-center justify-between gap-4 shadow-2xs">
         <div className="flex items-center gap-4 flex-wrap">
           <div>
-            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Batch</span>
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">{t("swBatch")}</span>
             <select
               value={selectedBatchId}
               onChange={(e) => handleBatchChange(e.target.value)}
@@ -568,7 +581,7 @@ export default function StageWiseConsumptionOutputPanel() {
           </div>
 
           <div>
-            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Stage</span>
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">{t("swStage")}</span>
             <select
               value={selectedStageId}
               onChange={(e) => handleStageChange(e.target.value)}
@@ -583,7 +596,7 @@ export default function StageWiseConsumptionOutputPanel() {
           </div>
 
           <div>
-            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Date Range</span>
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">{t("swDateRange")}</span>
             <div className="flex items-center gap-1.5 text-xs">
               <input
                 type="date"
@@ -609,7 +622,7 @@ export default function StageWiseConsumptionOutputPanel() {
             onClick={() => setLogModalOpen(true)}
             className="text-xs h-8 gap-1.5 font-medium"
           >
-            <Plus className="h-3.5 w-3.5" /> Log Consumption
+            <Plus className="h-3.5 w-3.5" /> {t("swLogConsumption")}
           </Button>
 
           <Button
@@ -620,7 +633,7 @@ export default function StageWiseConsumptionOutputPanel() {
             style={{ backgroundColor: "var(--accent)" }}
           >
             <RotateCcw className={`h-3.5 w-3.5 ${recalculating ? "animate-spin" : ""}`} />
-            {recalculating ? "Recalculating…" : "Recalculate"}
+            {recalculating ? "Recalculating…" : t("swRecalculate")}
           </Button>
 
           <Button
@@ -629,7 +642,7 @@ export default function StageWiseConsumptionOutputPanel() {
             onClick={handleExportCSV}
             className="text-xs h-8 gap-1.5 font-medium"
           >
-            <Download className="h-3.5 w-3.5" /> Export
+            <Download className="h-3.5 w-3.5" /> {t("swExport")}
           </Button>
         </div>
       </div>
@@ -647,21 +660,21 @@ export default function StageWiseConsumptionOutputPanel() {
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Animals Start</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swAnimalsStart")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{currentStage.startAnimals}</p>
         </div>
         <div
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Animals End</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swAnimalsEnd")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{currentStage.endAnimals}</p>
         </div>
         <div
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Avg Age</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swAvgAge")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>
             {currentStage.avgAgeDays} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>d</span>
           </p>
@@ -670,7 +683,7 @@ export default function StageWiseConsumptionOutputPanel() {
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Duration</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swDuration")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>
             {durationDays} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>d</span>
           </p>
@@ -679,7 +692,7 @@ export default function StageWiseConsumptionOutputPanel() {
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Feed Consumed</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swFeedConsumed")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>
             {totalFeedKg.toLocaleString("en-IN", { minimumFractionDigits: 1 })} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>KG</span>
           </p>
@@ -688,7 +701,7 @@ export default function StageWiseConsumptionOutputPanel() {
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Med Cost</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swMedCost")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>
             ₹ {totalMedCost.toLocaleString("en-IN")}
           </p>
@@ -697,7 +710,7 @@ export default function StageWiseConsumptionOutputPanel() {
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Mortality</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("bdeMortality")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: currentStage.mortality > 0 ? "var(--danger)" : "var(--text-primary)" }}>
             {currentStage.mortality} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>({mortalityPct}%)</span>
           </p>
@@ -706,8 +719,8 @@ export default function StageWiseConsumptionOutputPanel() {
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Stage Output</p>
-          <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{currentStage.outputHead} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>Head</span></p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swStageOutput")}</p>
+          <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{currentStage.outputHead} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>{t("head")}</span></p>
         </div>
       </div>
 
@@ -715,15 +728,15 @@ export default function StageWiseConsumptionOutputPanel() {
       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-2xs">
         <div className="flex items-center gap-1 border-b border-[var(--border)] bg-[var(--surface-raised)] px-4 pt-2 text-xs font-semibold overflow-x-auto">
           {[
-            { key: "feed", label: `Feed Consumption (${currentStage.feedData.length})` },
-            { key: "medicine", label: `Medicine & Clinical (${currentStage.medData.length})` },
-            { key: "labour", label: `Labour & Manpower (${currentStage.labourData?.length || 0})` },
-            { key: "overheads", label: `Overheads & Utilities (${currentStage.overheadData.length})` },
-            { key: "mortality", label: `Mortality Incidents (${currentStage.mortalityLogs.length})` },
-            { key: "weight", label: `Weight & Growth (${currentStage.weightLogs?.length || 0})` },
-            { key: "observations", label: `Notes & Logs (${currentStage.observationLogs?.length || 0})` },
-            { key: "transfers", label: `Transfer Out / Sales (${currentStage.transferLogs.length})` },
-            { key: "summary", label: "IAS 41 Costing & WIP Summary" },
+            { key: "feed", label: t("swTabFeedConsumption", { n: currentStage.feedData.length }) },
+            { key: "medicine", label: t("swTabMedicineClinical", { n: currentStage.medData.length }) },
+            { key: "labour", label: t("swTabLabourManpower", { n: currentStage.labourData?.length || 0 }) },
+            { key: "overheads", label: t("swTabOverheadsUtilities", { n: currentStage.overheadData.length }) },
+            { key: "mortality", label: t("swTabMortalityIncidents", { n: currentStage.mortalityLogs.length }) },
+            { key: "weight", label: t("swTabWeightGrowth", { n: currentStage.weightLogs?.length || 0 }) },
+            { key: "observations", label: t("swTabNotesLogs", { n: currentStage.observationLogs?.length || 0 }) },
+            { key: "transfers", label: t("swTabTransfers", { n: currentStage.transferLogs.length }) },
+            { key: "summary", label: t("swTabSummary") },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -747,15 +760,15 @@ export default function StageWiseConsumptionOutputPanel() {
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                     <th className="px-3 pb-2 font-bold">#</th>
-                    <th className="px-3 pb-2 font-bold">Feed Item & Formula</th>
-                    <th className="px-3 pb-2 font-bold">UOM</th>
-                    <th className="px-3 pb-2 font-bold text-right">Opening Stock</th>
-                    <th className="px-3 pb-2 font-bold text-right">Issued</th>
-                    <th className="px-3 pb-2 font-bold text-right">Consumed</th>
-                    <th className="px-3 pb-2 font-bold text-right">Wastage</th>
-                    <th className="px-3 pb-2 font-bold text-right">Closing Stock</th>
-                    <th className="px-3 pb-2 font-bold text-right">Std Rate (₹)</th>
-                    <th className="px-3 pb-2 font-bold text-right">Total Cost (₹)</th>
+                    <th className="px-3 pb-2 font-bold">{t("swFeedItemFormula")}</th>
+                    <th className="px-3 pb-2 font-bold">{t("colUom")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swOpeningStock")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("colIssued")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("colConsumed")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("colWastage")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swClosingStock")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swStdRate")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swTotalCost")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -797,12 +810,12 @@ export default function StageWiseConsumptionOutputPanel() {
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                     <th className="px-3 pb-2 font-bold">#</th>
-                    <th className="px-3 pb-2 font-bold">Medicine / Vaccine Item</th>
-                    <th className="px-3 pb-2 font-bold">UOM</th>
-                    <th className="px-3 pb-2 font-bold text-right">Issued</th>
-                    <th className="px-3 pb-2 font-bold text-right">Consumed</th>
-                    <th className="px-3 pb-2 font-bold text-right">Wastage</th>
-                    <th className="px-3 pb-2 font-bold text-right">Total Cost (₹)</th>
+                    <th className="px-3 pb-2 font-bold">{t("swMedicineVaccineItem")}</th>
+                    <th className="px-3 pb-2 font-bold">{t("colUom")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("colIssued")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("colConsumed")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("colWastage")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swTotalCost")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -820,7 +833,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
-                    <td colSpan={6} className="py-2.5 px-2">Stage Clinical & Vaccine Total</td>
+                    <td colSpan={6} className="py-2.5 px-2">{t("swStageClinicalVaccineTotal")}</td>
                     <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalMedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tfoot>
