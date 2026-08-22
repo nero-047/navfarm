@@ -1,35 +1,19 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { api, clearAuthSession, persistAuthSession } from '@/lib/api-client';
 import {
-  AUTH_STORAGE,
-  api,
-  clearAuthSession,
-  persistAuthSession,
-} from '@/lib/api-client';
-
-export interface UserCompany {
-  company_id: string;
-  company_name: string;
-  is_primary: boolean;
-}
-
-export interface User {
-  userId: string;
-  fullName: string;
-  name: string;
-  email: string;
-  userType: string;
-  companyId: string;
-  tenantId: string;
-  companies: UserCompany[];
-  permissions: unknown[];
-}
+  NavUser,
+  getStoredUser,
+  setActiveWorkspaceScope,
+  setActiveCompanyId,
+  setActiveOperationalAreaId,
+} from '@/hooks/useAuth';
 
 interface AuthResponse {
   access_token: string;
   refresh_token: string;
-  user: Omit<User, 'name'> & { name?: string };
+  user: NavUser;
   mfa_required?: boolean;
 }
 
@@ -42,32 +26,22 @@ interface SignupInput {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: NavUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  signup: (input: SignupInput) => Promise<User>;
+  login: (email: string, password: string) => Promise<NavUser>;
+  signup: (input: SignupInput) => Promise<NavUser>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function normalizeUser(user: AuthResponse['user']): User {
-  return {
-    ...user,
-    name: user.fullName || user.name || user.email,
-    companies: user.companies || [],
-    permissions: user.permissions || [],
-  };
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<NavUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(AUTH_STORAGE.user);
-      if (stored) setUser(normalizeUser(JSON.parse(stored)));
+      setUser(getStoredUser());
     } catch {
       clearAuthSession();
     } finally {
@@ -80,28 +54,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!response.access_token || response.mfa_required) {
       throw new Error('MFA verification is required for this account.');
     }
-    const nextUser = normalizeUser(response.user);
+    const nextUser = response.user;
     persistAuthSession({ ...response, user: nextUser });
 
-    // Initialize workspace scope strictly by role
-    if (typeof window !== 'undefined') {
-      if (nextUser.userType === 'TENANT_ADMIN') {
-        localStorage.setItem('active_workspace_scope', 'TENANT');
-        if (nextUser.companies && nextUser.companies.length > 0) {
-          localStorage.setItem('active_company_id', nextUser.companies[0].company_id);
-        }
-      } else if (nextUser.userType === 'COMPANY_ADMIN') {
-        localStorage.setItem('active_workspace_scope', 'COMPANY');
-        const compId = nextUser.companyId || (nextUser.companies && nextUser.companies[0]?.company_id);
-        if (compId) localStorage.setItem('active_company_id', compId);
-        localStorage.removeItem('active_operational_area_id');
-      } else {
-        localStorage.setItem('active_workspace_scope', 'OPERATIONAL');
-        const compId = nextUser.companyId || (nextUser.companies && nextUser.companies[0]?.company_id);
-        if (compId) localStorage.setItem('active_company_id', compId);
-        const areaId = (nextUser as any).operationalAreaId || (nextUser as any).operationalAreas?.[0]?.area_id;
-        if (areaId) localStorage.setItem('active_operational_area_id', areaId);
-      }
+    // Initialize workspace scope strictly by role — delegates to the single
+    // scope-setter implementation shared with every other scope-changing UI.
+    setActiveWorkspaceScope(
+      nextUser.userType === 'TENANT_ADMIN'
+        ? 'TENANT'
+        : nextUser.userType === 'COMPANY_ADMIN'
+          ? 'COMPANY'
+          : 'OPERATIONAL',
+    );
+    const compId = nextUser.companyId || nextUser.company_id || nextUser.companies?.[0]?.company_id;
+    if (compId) setActiveCompanyId(compId);
+    if (nextUser.userType === 'COMPANY_ADMIN' || nextUser.userType === 'TENANT_ADMIN') {
+      setActiveOperationalAreaId(null);
+    } else {
+      const areaId = nextUser.operationalAreaId || nextUser.operational_area_id || nextUser.operationalAreas?.[0]?.area_id;
+      if (areaId) setActiveOperationalAreaId(areaId);
     }
 
     setUser(nextUser);

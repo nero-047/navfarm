@@ -74,9 +74,14 @@ export default function DashboardPage() {
   const loadDashboard = async (storedUser: NavUser, tenantId: string, compId: string, currentScope: WorkspaceScope = getActiveWorkspaceScope()) => {
     setLoading(true);
     try {
+      // The tenant record and the full cross-tenant company list are only
+      // ever rendered in TENANT scope — for COMPANY/OPERATIONAL scope the
+      // active company's name/id is already in storedUser.companies, so
+      // skip both tenant-wide calls instead of syncing data nothing reads.
+      const isTenantScope = currentScope === "TENANT";
       const [tenant, compRes, areasRes, batchRes, animalRes] = await Promise.all([
-        api.get(`/tenant/${tenantId}`).catch(() => null),
-        api.get(`/company/tenant/${tenantId}`).catch(() => []),
+        isTenantScope ? api.get(`/tenant/${tenantId}`).catch(() => null) : Promise.resolve(null),
+        isTenantScope ? api.get(`/company/tenant/${tenantId}`).catch(() => []) : Promise.resolve(storedUser.companies || []),
         api.get(`/operational-area${compId && currentScope !== "TENANT" ? `?company_id=${compId}` : ""}`).catch(() => []),
         api.get(`/batch${compId && currentScope !== "TENANT" ? `?companyId=${compId}` : ""}&limit=100`).catch(() => []),
         api.get(`/animal${compId && currentScope !== "TENANT" ? `?companyId=${compId}` : ""}&limit=500`).catch(() => []),

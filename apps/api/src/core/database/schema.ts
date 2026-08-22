@@ -341,6 +341,21 @@ export const userCompanyAssignments = mysqlTable('user_company_assignments', {
   uniqueIndex('uq_user_company').on(table.user_id, table.company_id),
 ]);
 
+// Server-side refresh-token sessions, so logout and revocation actually
+// invalidate something instead of relying on the client to discard its
+// tokens. Access tokens stay stateless (short-lived, 15m) — only the
+// longer-lived refresh token is tracked, and only its hash is stored.
+export const userSession = mysqlTable('user_session', {
+  session_id: varchar('session_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  user_id: varchar('user_id', { length: 36 }).notNull().references(() => userMaster.user_id, { onDelete: 'cascade' }),
+  refresh_token_hash: varchar('refresh_token_hash', { length: 64 }).notNull(),
+  issued_at: timestamp('issued_at', { mode: 'string' }).defaultNow().notNull(),
+  expires_at: timestamp('expires_at', { mode: 'string' }).notNull(),
+  revoked_at: timestamp('revoked_at', { mode: 'string' }),
+}, (table) => [
+  uniqueIndex('uq_session_token_hash').on(table.refresh_token_hash),
+]);
+
 // ==========================================
 // 6. SETUP WIZARD & NOTIFICATIONS
 // ==========================================

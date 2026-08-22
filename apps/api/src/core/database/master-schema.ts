@@ -222,6 +222,17 @@ export const auditLog = mysqlTable('audit_log', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull()
 });
 
+// Central email -> tenant lookup so login resolves the owning tenant in one
+// query instead of connecting to every tenant database in turn. Kept in sync
+// at user-creation time and lazily self-healed on login if a row is missing
+// (e.g. for users created before this index existed).
+export const userAuthIndex = mysqlTable('user_auth_index', {
+  email: varchar('email', { length: 255 }).primaryKey(),
+  user_id: varchar('user_id', { length: 36 }).notNull(),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull().references(() => tenantMaster.tenant_id, { onDelete: 'cascade' }),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
 export const planMasterRelations = relations(planMaster, ({ many }) => ({
   tenants: many(tenantMaster),
   subscriptions: many(tenantSubscription)

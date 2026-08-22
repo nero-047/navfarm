@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateUserDto, UpdateUserDto, QueryUserDto } from './dto/user.dto';
+import { UserDirectoryService } from '../../../core/database/user-directory.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -13,7 +14,10 @@ const toMysqlTimestamp = (date: Date = new Date()) => {
 
 @Injectable()
 export class UserService {
-  constructor(private readonly cls: ClsService) {}
+  constructor(
+    private readonly cls: ClsService,
+    private readonly userDirectory: UserDirectoryService,
+  ) {}
 
   private get db(): MySql2Database<typeof schema> {
     const tenantDb = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
@@ -60,6 +64,10 @@ export class UserService {
         assigned_by: userId,
       });
     });
+
+    this.userDirectory.index(dto.email, userId, dto.tenant_id).catch((err) =>
+      console.error('Failed to update user auth index:', err),
+    );
 
     return this.findById(userId);
   }

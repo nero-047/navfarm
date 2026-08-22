@@ -7,7 +7,7 @@ import {
   Settings, ArrowLeft, Activity, Plus,
 } from "lucide-react";
 import { api } from "../../../services/api-client";
-import { getStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser } from "../../../hooks/useAuth";
+import { getStoredUser, updateStoredUser, getStoredToken, getStoredTenantId, getActiveCompanyId, setActiveCompanyId, isTenantCompanyMode, setTenantCompanyMode, NavUser } from "../../../hooks/useAuth";
 import CompanyTab from "../../../components/console/console-tabs/company-tab";
 import { Drawer } from "../../../components/ui/drawer";
 import { Button } from "../../../components/ui/button";
@@ -97,11 +97,8 @@ export default function CompaniesPage() {
 
   const handleBackToTenant = () => {
     const homeCompanyId = user?.companies?.find((c) => c.is_primary)?.company_id || user?.companies?.[0]?.company_id || (user as any)?.companyId;
-    const currentUser = getStoredUser();
-    if (currentUser && homeCompanyId) {
-      const patched = { ...currentUser, companyId: homeCompanyId, company_id: homeCompanyId };
-      localStorage.setItem("user", JSON.stringify(patched));
-      localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
+    if (homeCompanyId) {
+      updateStoredUser({ companyId: homeCompanyId, company_id: homeCompanyId });
       setActiveCompanyId(homeCompanyId);
     }
     setTenantCompanyMode(false);
@@ -319,16 +316,7 @@ export default function CompaniesPage() {
                     ) : (
                       <Button
                         onClick={() => {
-                          const currentUser = getStoredUser();
-                          if (currentUser) {
-                            const patched = {
-                              ...currentUser,
-                              companyId: co.company_id,
-                              company_id: co.company_id,
-                            };
-                            localStorage.setItem("user", JSON.stringify(patched));
-                            localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
-                          }
+                          updateStoredUser({ companyId: co.company_id, company_id: co.company_id });
                           setActiveCompanyId(co.company_id);
                           window.location.reload();
                         }}

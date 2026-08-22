@@ -56,6 +56,15 @@ export class AuthController {
     return this.authService.refreshToken(dto.refresh_token);
   }
 
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Revoke the given refresh token, ending the session server-side' })
+  async logout(@Body() dto: RefreshDto) {
+    await this.authService.logout(dto.refresh_token);
+    return { success: true };
+  }
+
   @Post('mfa/verify')
   @ApiOperation({ summary: 'Verify 6-digit MFA TOTP code to complete login' })
   @ApiResponse({ status: HttpStatus.OK, description: 'MFA verified and tokens returned.' })

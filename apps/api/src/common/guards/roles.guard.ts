@@ -22,6 +22,18 @@ export class RolesGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+
+    if (!user) {
+      throw new ForbiddenException('User session context missing.');
+    }
+
+    // Scope enforcement runs for every request this guard sees, independent of
+    // @RequirePermission — the client-supplied active-company/area headers are
+    // otherwise never validated against what the user is actually assigned to.
+    await this.enforceScope(request, user);
+
     const requiredPermission = this.reflector.getAllAndOverride<RequiredPermission>(
       REQUIRE_PERMISSION_KEY,
       [context.getHandler(), context.getClass()],
@@ -29,13 +41,6 @@ export class RolesGuard implements CanActivate {
 
     if (!requiredPermission) {
       return true;
-    }
-
-    const request = context.switchToHttp().getRequest();
-    const user = request.user;
-
-    if (!user) {
-      throw new ForbiddenException('User session context missing.');
     }
 
     if (user.userType === 'SYSTEM_ADMIN' || user.userType === 'COMPANY_ADMIN' || user.userType === 'TENANT_ADMIN') {
@@ -91,5 +96,60 @@ export class RolesGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  /**
+   * Validates the x-active-company-id / x-active-operational-area-id headers
+   * against what the user is actually assigned to. Client-supplied headers
+   * are otherwise trusted at face value by every downstream handler.
+   */
+  private async enforceScope(request: any, user: any): Promise<void> {
+    if (user.userType === 'SYSTEM_ADMIN') return;
+
+    const activeCompanyId = request.headers['x-active-company-id'] as string | undefined;
+    if (activeCompanyId) {
+      if (user.userType === 'TENANT_ADMIN') {
+        const [company] = await this.db
+          .select({ tenant_id: schema.companyMaster.tenant_id })
+          .from(schema.companyMaster)
+          .where(eq(schema.companyMaster.company_id, activeCompanyId))
+          .limit(1);
+        if (!company || company.tenant_id !== user.tenantId) {
+          throw new ForbiddenException('Not authorized for this company.');
+        }
+      } else if (activeCompanyId !== user.companyId) {
+        const [assignment] = await this.db
+          .select({ id: schema.userCompanyAssignments.assign_id })
+          .from(schema.userCompanyAssignments)
+          .where(
+            and(
+              eq(schema.userCompanyAssignments.user_id, user.userId),
+              eq(schema.userCompanyAssignments.company_id, activeCompanyId),
+              eq(schema.userCompanyAssignments.is_active, true),
+            ),
+          )
+          .limit(1);
+        if (!assignment) {
+          throw new ForbiddenException('Not authorized for this company.');
+        }
+      }
+    }
+
+    const activeAreaId = request.headers['x-active-operational-area-id'] as string | undefined;
+    if (activeAreaId && user.userType !== 'TENANT_ADMIN' && user.userType !== 'COMPANY_ADMIN') {
+      const [assignment] = await this.db
+        .select({ id: schema.userOperationalAreaAssignment.assignment_id })
+        .from(schema.userOperationalAreaAssignment)
+        .where(
+          and(
+            eq(schema.userOperationalAreaAssignment.user_id, user.userId),
+            eq(schema.userOperationalAreaAssignment.area_id, activeAreaId),
+          ),
+        )
+        .limit(1);
+      if (!assignment) {
+        throw new ForbiddenException('Not authorized for this operational area.');
+      }
+    }
   }
 }

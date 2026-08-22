@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getStoredUser, NavUser, getActiveCompanyId, setActiveCompanyId } from "@/hooks/useAuth";
+import { getStoredUser, NavUser, getActiveCompanyId, setActiveCompanyId, getStoredTenantId } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { MASTER_DATA_CONFIGS, MASTER_DATA_GROUPS, getConfig } from "@/modules/master-data/configs";
 import MasterDataTable from "@/modules/master-data/MasterDataTable";
@@ -38,7 +38,7 @@ export default function MasterDataPage() {
     setSelectedCompanyId(activeComp);
 
     // Fetch company list for Tenant Admin company inspection
-    const tenantId = localStorage.getItem("tenant_id") || stored.tenantId;
+    const tenantId = getStoredTenantId() || stored.tenantId;
     if (tenantId) {
       api.get(`/company/tenant/${tenantId}`).then((res: any) => {
         if (Array.isArray(res)) setCompanies(res);

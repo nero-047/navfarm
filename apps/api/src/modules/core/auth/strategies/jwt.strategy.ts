@@ -22,6 +22,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    if (payload.type === 'refresh') {
+      throw new UnauthorizedException('A refresh token cannot be used to access this resource.');
+    }
+
     const db = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
     if (!db) {
       throw new UnauthorizedException('Tenant database connection context not established.');

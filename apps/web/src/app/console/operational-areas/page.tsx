@@ -10,6 +10,7 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   getStoredUser,
+  updateStoredUser,
   getActiveCompanyId,
   setActiveOperationalAreaId,
   setActiveWorkspaceScope,
@@ -140,16 +141,10 @@ export default function OperationalAreasPage() {
     else if (lobName.includes("POULTRY") || area.area_name.toLowerCase().includes("poultry")) normalized = "POULTRY";
     setActiveLob(normalized);
 
-    // Patch stored user
-    if (user) {
-      const patched = {
-        ...user,
-        operationalAreaId: area.area_id,
-        operational_area_id: area.area_id,
-      };
-      localStorage.setItem("user", JSON.stringify(patched));
-      localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
-    }
+    updateStoredUser({
+      operationalAreaId: area.area_id,
+      operational_area_id: area.area_id,
+    });
 
     window.location.href = "/console/production";
   };

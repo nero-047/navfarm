@@ -8,6 +8,23 @@ export const AUTH_STORAGE = {
   tenantId: 'navfarm_tenant_id',
 } as const;
 
+// A cookie, not localStorage, because middleware.ts runs server-side and
+// can't read localStorage — this only signals "a session exists" so the
+// edge can redirect unauthenticated requests before any protected UI is
+// served. It carries no token material; real auth/authorization is still
+// enforced by the API on every request.
+const SESSION_COOKIE = 'navfarm_session';
+
+function setSessionCookie() {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${SESSION_COOKIE}=1; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+}
+
+function clearSessionCookie() {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -42,18 +59,41 @@ function errorMessage(payload: unknown, fallback: string): string {
   return typeof candidate === 'string' ? candidate : fallback;
 }
 
+// Single canonical list of every localStorage key a session touches.
+const SESSION_KEYS = [
+  AUTH_STORAGE.user,
+  AUTH_STORAGE.accessToken,
+  AUTH_STORAGE.refreshToken,
+  AUTH_STORAGE.tenantId,
+  'active_company_id',
+  'active_workspace_scope',
+  'active_operational_area_id',
+  'active_lob',
+  'tenant_company_mode',
+] as const;
+
 function clearSession() {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(AUTH_STORAGE.user);
-  localStorage.removeItem(AUTH_STORAGE.accessToken);
-  localStorage.removeItem(AUTH_STORAGE.refreshToken);
-  localStorage.removeItem(AUTH_STORAGE.tenantId);
-  localStorage.removeItem('user');
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('tenant_id');
-  localStorage.removeItem('active_company_id');
-  localStorage.removeItem('tenant_company_mode');
+
+  // Best-effort server-side revocation so the refresh token can't mint new
+  // access tokens after logout — fire-and-forget, since callers of
+  // clearAuthSession() expect it to clear local state synchronously.
+  const token = localStorage.getItem(AUTH_STORAGE.accessToken);
+  const refreshToken = localStorage.getItem(AUTH_STORAGE.refreshToken);
+  const tenantId = localStorage.getItem(AUTH_STORAGE.tenantId);
+  if (token && refreshToken) {
+    const headers = new Headers({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` });
+    if (tenantId) headers.set('x-tenant-id', tenantId);
+    fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      keepalive: true,
+    }).catch(() => void 0);
+  }
+
+  for (const key of SESSION_KEYS) localStorage.removeItem(key);
+  clearSessionCookie();
 }
 
 let refreshPromise: Promise<string> | null = null;
@@ -97,6 +137,8 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   if (tenantId) headers.set('x-tenant-id', tenantId);
   const activeCompanyId = stored('active_company_id');
   if (activeCompanyId) headers.set('x-active-company-id', activeCompanyId);
+  const activeAreaId = stored('active_operational_area_id');
+  if (activeAreaId) headers.set('x-active-operational-area-id', activeAreaId);
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -133,21 +175,15 @@ export function persistAuthSession(session: {
   localStorage.setItem(AUTH_STORAGE.accessToken, session.access_token);
   localStorage.setItem(AUTH_STORAGE.refreshToken, session.refresh_token);
   localStorage.setItem(AUTH_STORAGE.user, JSON.stringify(session.user));
-  // Keep the upstream admin/console storage names during the migration.
-  localStorage.setItem('access_token', session.access_token);
-  localStorage.setItem('refresh_token', session.refresh_token);
-  localStorage.setItem('user', JSON.stringify(session.user));
   const tenantId = (session.user as { tenantId?: string }).tenantId;
-  const companyId = (session.user as { companyId?: string; company_id?: string }).companyId ??
-    (session.user as { company_id?: string }).company_id;
-  if (companyId) localStorage.setItem('active_company_id', companyId);
   if (tenantId) {
     localStorage.setItem(AUTH_STORAGE.tenantId, tenantId);
-    localStorage.setItem('tenant_id', tenantId);
   } else {
     localStorage.removeItem(AUTH_STORAGE.tenantId);
-    localStorage.removeItem('tenant_id');
   }
+  // Active company/operational-area/workspace-scope are initialized by the
+  // caller (AuthContext.login) via the setters in hooks/useAuth, once — not here.
+  setSessionCookie();
 }
 
 export function clearAuthSession() {

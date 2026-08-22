@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import {
   getStoredUser,
+  getStoredTenantId,
+  updateStoredUser,
   getActiveWorkspaceScope,
   setActiveWorkspaceScope,
   getActiveCompanyId,
@@ -68,7 +70,7 @@ export default function WorkspaceScopeSwitcher({
     setActiveLobCode(lob);
 
     // Fetch companies and operational areas
-    const tenantId = localStorage.getItem("tenant_id") || storedUser?.tenantId;
+    const tenantId = getStoredTenantId() || storedUser?.tenantId;
     const isTenantAdminUser = storedUser?.userType === "TENANT_ADMIN";
 
     if (tenantId) {
@@ -93,19 +95,19 @@ export default function WorkspaceScopeSwitcher({
 
       api.get(`/operational-area${compId ? `?company_id=${compId}` : ""}`).then((res: any) => {
         if (Array.isArray(res)) {
-          if (isTenantAdminUser) {
-            setOperationalAreas(res);
-          } else {
-            // Strict Area boundary: only show areas belonging to the user's assigned company or user.operationalAreas
+          if (isTenantAdminUser || storedUser?.userType === "COMPANY_ADMIN") {
+            // Tenant/company admins operate across every area in their allowed companies.
             const userAllowedCompanyIds = new Set([
               storedUser?.companyId,
               ...(storedUser?.companies || []).map((c: any) => c.company_id),
             ].filter(Boolean));
+            setOperationalAreas(
+              isTenantAdminUser ? res : res.filter((a: any) => userAllowedCompanyIds.has(a.company_id)),
+            );
+          } else {
+            // Operational admins / standard users: only areas they're explicitly assigned to.
             const userAllowedAreaIds = new Set((storedUser?.operationalAreas || []).map((a: any) => a.area_id));
-
-            setOperationalAreas(res.filter((a: any) => 
-              userAllowedAreaIds.has(a.area_id) || userAllowedCompanyIds.has(a.company_id)
-            ));
+            setOperationalAreas(res.filter((a: any) => userAllowedAreaIds.has(a.area_id)));
           }
         }
       }).catch(() => {
@@ -140,12 +142,7 @@ export default function WorkspaceScopeSwitcher({
     setCurrentScope("COMPANY");
     setActiveCompId(companyId);
 
-    // Patch user
-    if (user) {
-      const patched = { ...user, companyId, company_id: companyId };
-      localStorage.setItem("user", JSON.stringify(patched));
-      localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
-    }
+    updateStoredUser({ companyId, company_id: companyId });
 
     setIsOpen(false);
     window.location.href = "/console/dashboard";
@@ -168,18 +165,12 @@ export default function WorkspaceScopeSwitcher({
     setActiveAreaId(area.area_id);
     setActiveLobCode(normalizedLob);
 
-    // Patch user
-    if (user) {
-      const patched = {
-        ...user,
-        companyId: area.company_id,
-        company_id: area.company_id,
-        operationalAreaId: area.area_id,
-        operational_area_id: area.area_id,
-      };
-      localStorage.setItem("user", JSON.stringify(patched));
-      localStorage.setItem("navfarm_auth_user", JSON.stringify(patched));
-    }
+    updateStoredUser({
+      companyId: area.company_id,
+      company_id: area.company_id,
+      operationalAreaId: area.area_id,
+      operational_area_id: area.area_id,
+    });
 
     setIsOpen(false);
     window.location.href = "/console/dashboard";

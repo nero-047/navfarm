@@ -4,6 +4,7 @@ import * as mysql from 'mysql2/promise';
 import { drizzle } from 'drizzle-orm/mysql2';
 import * as masterSchema from './master-schema';
 import { ConnectionManagerService } from './connection-manager.service';
+import { UserDirectoryService } from './user-directory.service';
 
 export const MASTER_CONNECTION = 'MASTER_CONNECTION';
 export const PG_CONNECTION = MASTER_CONNECTION; // Backwards compatibility alias
@@ -12,6 +13,7 @@ export const PG_CONNECTION = MASTER_CONNECTION; // Backwards compatibility alias
 @Module({
   providers: [
     ConnectionManagerService,
+    UserDirectoryService,
     {
       provide: MASTER_CONNECTION,
       useFactory: (config: ConfigService) => {
@@ -38,6 +40,6 @@ export const PG_CONNECTION = MASTER_CONNECTION; // Backwards compatibility alias
       inject: [ConfigService],
     },
   ],
-  exports: [MASTER_CONNECTION, ConnectionManagerService],
+  exports: [MASTER_CONNECTION, ConnectionManagerService, UserDirectoryService],
 })
 export class DatabaseModule {}

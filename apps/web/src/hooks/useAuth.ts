@@ -53,6 +53,16 @@ export function getStoredUser(): NavUser | null {
   }
 }
 
+/** Merge a patch into the stored user and persist it under the single auth-user key. */
+export function updateStoredUser(patch: Partial<NavUser>): NavUser | null {
+  if (typeof window === "undefined") return null;
+  const current = getStoredUser();
+  if (!current) return null;
+  const patched = { ...current, ...patch };
+  localStorage.setItem(AUTH_STORAGE.user, JSON.stringify(patched));
+  return patched;
+}
+
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(AUTH_STORAGE.accessToken);
@@ -207,18 +217,9 @@ export function setTenantCompanyMode(on: boolean): void {
   setActiveWorkspaceScope(on ? "COMPANY" : "TENANT");
 }
 
+/** Clears the full session. The removal list lives in one place: clearAuthSession(). */
 export function clearSession() {
-  if (typeof window === "undefined") return;
   clearAuthSession();
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("user");
-  localStorage.removeItem("tenant_id");
-  localStorage.removeItem("active_company_id");
-  localStorage.removeItem("active_workspace_scope");
-  localStorage.removeItem("active_operational_area_id");
-  localStorage.removeItem("active_lob");
-  localStorage.removeItem("tenant_company_mode");
 }
 
 export function hasPermission(

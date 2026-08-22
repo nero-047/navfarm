@@ -60,6 +60,7 @@ export class TenantService {
 
     // 4. Provision tenant connection and run migrations
     let tenantDb;
+    let adminId: string;
     try {
       tenantDb = await this.connectionManager.getTenantConnection({
         tenant_id: tenantId,
@@ -306,7 +307,7 @@ export class TenantService {
       });
 
       // Seed initial Tenant Administrator account
-      const adminId = randomUUID();
+      adminId = randomUUID();
       const bcrypt = await import('bcryptjs');
       const passwordHash = await bcrypt.hash(dto.admin_password, 10);
       await tenantDb.insert(schema.userMaster).values({
@@ -369,6 +370,15 @@ export class TenantService {
           .from(masterSchema.tenantMaster)
           .where(eq(masterSchema.tenantMaster.tenant_id, tenantId))
           .limit(1);
+
+        // Central email -> tenant index used by login (see UserDirectoryService).
+        // Inserted in the same transaction as tenantMaster since it FK-references it.
+        await tx
+          .insert(masterSchema.userAuthIndex)
+          .values({ email: dto.admin_email.toLowerCase(), user_id: adminId, tenant_id: tenantId })
+          .onDuplicateKeyUpdate({
+            set: { user_id: adminId, tenant_id: tenantId },
+          });
 
         // Write Audit Log on control plane
         await this.auditService.log(

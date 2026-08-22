@@ -25,6 +25,8 @@ import {
 import {
   getStoredUser,
   getStoredToken,
+  getStoredTenantId,
+  updateStoredUser,
   clearSession,
   getActiveCompanyId,
   setActiveCompanyId,
@@ -68,7 +70,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     const token = getStoredToken();
     const storedUser = getStoredUser();
-    const tenantId = localStorage.getItem("tenant_id");
+    const tenantId = getStoredTenantId();
     if (!token || !storedUser) { router.replace("/"); return; }
     if (storedUser.userType === "SYSTEM_ADMIN") { router.replace("/admin/tenants"); return; }
 
@@ -83,9 +85,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     }
 
     if (initialActiveId && initialActiveId !== homeId) {
-      const patched = { ...storedUser, companyId: initialActiveId, company_id: initialActiveId };
-      localStorage.setItem("user", JSON.stringify(patched));
-      setUser(patched);
+      const patched = updateStoredUser({ companyId: initialActiveId, company_id: initialActiveId });
+      setUser(patched || storedUser);
     } else {
       setUser(storedUser);
     }
@@ -99,7 +100,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       initialActiveId && initialActiveId !== homeId
         ? { ...storedUser, companyId: initialActiveId, company_id: initialActiveId }
         : storedUser,
-      tenantId || ""
+      tenantId ?? ""
     );
   }, [router]);
 
@@ -170,7 +171,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   };
 
   const reloadConsole = async () => {
-    const tenantId = localStorage.getItem("tenant_id") || "";
+    const tenantId = getStoredTenantId() ?? "";
     const storedUser = getStoredUser();
     if (!storedUser) return;
     setCheckingOnboard(true);
@@ -215,7 +216,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           setActiveWizardStep={setActiveWizardStep}
           activeCompany={activeCompany}
           setActiveCompany={setActiveCompany}
-          tenantId={localStorage.getItem("tenant_id") || ""}
+          tenantId={getStoredTenantId() ?? ""}
           languages={languages}
           currencies={currencies}
           timezones={timezones}

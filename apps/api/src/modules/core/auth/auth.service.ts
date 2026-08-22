@@ -14,6 +14,7 @@ import { VerifyMfaDto } from './dto/verify-mfa.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { ConnectionManagerService } from '../../../core/database/connection-manager.service';
 import { EncryptionService } from '../../system/encryption/encryption.service';
+import { UserDirectoryService } from '../../../core/database/user-directory.service';
 import * as nodemailer from 'nodemailer';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
@@ -30,6 +31,7 @@ export class AuthService {
     private readonly auditLogService: AuditLogService,
     private readonly connectionManager: ConnectionManagerService,
     private readonly encryptionService: EncryptionService,
+    private readonly userDirectory: UserDirectoryService,
   ) { }
 
   private get db(): MySql2Database<typeof schema> {
@@ -245,6 +247,10 @@ export class AuthService {
       };
     });
 
+    this.userDirectory.index(result.email, result.user_id, dto.tenant_id).catch((err) =>
+      console.error('Failed to update user auth index:', err),
+    );
+
     // Send the welcome invitation email with temporary login credentials asynchronously
     const roleName = dto.user_type === 'TENANT_ADMIN' ? 'Tenant Administrator' :
                      dto.user_type === 'COMPANY_ADMIN' ? 'Company Administrator' : 'Standard Operator / User';
@@ -265,30 +271,70 @@ export class AuthService {
     let targetDb: any = null;
     let resolvedTenantId: string | null = null;
     let matchedTenant: any = null;
+    const email = dto.email.toLowerCase();
 
-    // Search globally across all tenants in master registry (including inactive/suspended ones)
-    const tenants = await this.masterDb
-      .select()
-      .from(masterSchema.tenantMaster);
-
-    for (const t of tenants) {
-      try {
-        const tenantDbConnection = await this.connectionManager.getTenantConnection(t);
-        const [userRecord] = await tenantDbConnection
-          .select()
-          .from(schema.userMaster)
-          .where(eq(schema.userMaster.email, dto.email.toLowerCase()))
-          .limit(1);
-
-        if (userRecord) {
-          user = userRecord;
-          targetDb = tenantDbConnection;
-          resolvedTenantId = t.tenant_id;
-          matchedTenant = t;
-          break;
+    // Fast path: resolve the owning tenant from the central index in one
+    // query instead of connecting to every tenant database.
+    const indexedTenantId = await this.userDirectory.lookupTenantId(email);
+    if (indexedTenantId) {
+      const [indexedTenant] = await this.masterDb
+        .select()
+        .from(masterSchema.tenantMaster)
+        .where(eq(masterSchema.tenantMaster.tenant_id, indexedTenantId))
+        .limit(1);
+      if (indexedTenant) {
+        try {
+          const tenantDbConnection = await this.connectionManager.getTenantConnection(indexedTenant);
+          const [userRecord] = await tenantDbConnection
+            .select()
+            .from(schema.userMaster)
+            .where(eq(schema.userMaster.email, email))
+            .limit(1);
+          if (userRecord) {
+            user = userRecord;
+            targetDb = tenantDbConnection;
+            resolvedTenantId = indexedTenant.tenant_id;
+            matchedTenant = indexedTenant;
+          }
+        } catch (err) {
+          console.error(`Error loading indexed tenant database ${indexedTenant.tenant_name}:`, err);
         }
-      } catch (err) {
-        console.error(`Error searching user in tenant database ${t.tenant_name}:`, err);
+      }
+    }
+
+    // Fallback: the index was empty or stale (e.g. a user created before this
+    // index existed) — scan every tenant, then self-heal the index so this
+    // user resolves in one query next time.
+    if (!user) {
+      const tenants = await this.masterDb
+        .select()
+        .from(masterSchema.tenantMaster);
+
+      for (const t of tenants) {
+        try {
+          const tenantDbConnection = await this.connectionManager.getTenantConnection(t);
+          const [userRecord] = await tenantDbConnection
+            .select()
+            .from(schema.userMaster)
+            .where(eq(schema.userMaster.email, email))
+            .limit(1);
+
+          if (userRecord) {
+            user = userRecord;
+            targetDb = tenantDbConnection;
+            resolvedTenantId = t.tenant_id;
+            matchedTenant = t;
+            break;
+          }
+        } catch (err) {
+          console.error(`Error searching user in tenant database ${t.tenant_name}:`, err);
+        }
+      }
+
+      if (user) {
+        this.userDirectory.index(email, user.user_id, resolvedTenantId!).catch((err) =>
+          console.error('Failed to self-heal user auth index:', err),
+        );
       }
     }
 
@@ -318,7 +364,7 @@ export class AuthService {
     }
 
     // Check if the tenant workspace is suspended
-    const tenantToCheck = matchedTenant || tenants.find(t => t.tenant_id === resolvedTenantId);
+    const tenantToCheck = matchedTenant;
     if (tenantToCheck && !tenantToCheck.is_active) {
       throw new ForbiddenException('Your tenant workspace is suspended or inactive. Please contact system support.');
     }
@@ -555,9 +601,21 @@ export class AuthService {
       operationalAreas,
     };
 
+    const REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60;
+    const accessToken = this.jwtService.sign({ ...payload, type: 'access' }, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign({ ...payload, type: 'refresh' }, { expiresIn: REFRESH_TTL_SECONDS });
+
+    const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    const expiresAt = new Date(Date.now() + REFRESH_TTL_SECONDS * 1000);
+    await this.db.insert(schema.userSession).values({
+      user_id: user.user_id,
+      refresh_token_hash: refreshTokenHash,
+      expires_at: toMysqlTimestamp(expiresAt),
+    });
+
     return {
-      access_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
-      refresh_token: this.jwtService.sign(payload, { expiresIn: '7d' }),
+      access_token: accessToken,
+      refresh_token: refreshToken,
       user: {
         userId: user.user_id,
         fullName: user.full_name,
@@ -575,9 +633,23 @@ export class AuthService {
   async refreshToken(refreshToken: string) {
     try {
       const payload = this.jwtService.verify(refreshToken);
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid or expired refresh token.');
+      }
       const db = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
       if (!db) {
         throw new UnauthorizedException('Tenant database connection context not established.');
+      }
+
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+      const [session] = await db
+        .select()
+        .from(schema.userSession)
+        .where(eq(schema.userSession.refresh_token_hash, tokenHash))
+        .limit(1);
+
+      if (!session || session.revoked_at || new Date(session.expires_at) < new Date()) {
+        throw new UnauthorizedException('Invalid or expired refresh token.');
       }
 
       const [user] = await db
@@ -590,11 +662,29 @@ export class AuthService {
         throw new UnauthorizedException('User account is inactive or not found.');
       }
 
+      // Rotate: the presented refresh token is single-use — revoke it before
+      // issuing the next pair so a stolen-then-replayed token is caught.
+      await db
+        .update(schema.userSession)
+        .set({ revoked_at: toMysqlTimestamp() })
+        .where(eq(schema.userSession.session_id, session.session_id));
+
       return await this.generateTokens(user);
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
       throw new UnauthorizedException('Invalid or expired refresh token.');
     }
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    const db = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
+    if (!db || !refreshToken) return;
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    await db
+      .update(schema.userSession)
+      .set({ revoked_at: toMysqlTimestamp() })
+      .where(eq(schema.userSession.refresh_token_hash, tokenHash))
+      .catch((err) => console.error('Failed to revoke session on logout:', err));
   }
 
   private generateBase32Secret(): string {
