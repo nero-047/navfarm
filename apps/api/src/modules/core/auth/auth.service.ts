@@ -11,6 +11,9 @@ import { MASTER_CONNECTION } from '../../../core/database/database.module';
 import { RegisterAdminDto } from './dto/register-admin.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { ConnectionManagerService } from '../../../core/database/connection-manager.service';
 import { EncryptionService } from '../../system/encryption/encryption.service';
@@ -821,9 +824,18 @@ export class AuthService {
         userId: schema.userMaster.user_id,
         fullName: schema.userMaster.full_name,
         email: schema.userMaster.email,
+        phone: schema.userMaster.phone,
         userType: schema.userMaster.user_type,
         companyId: schema.userMaster.company_id,
         tenantId: schema.userMaster.tenant_id,
+        department: schema.userMaster.department,
+        designation: schema.userMaster.designation,
+        profilePhotoUrl: schema.userMaster.profile_photo_url,
+        langPrefId: schema.userMaster.lang_pref_id,
+        timezonePrefId: schema.userMaster.timezone_pref_id,
+        mfaEnabled: schema.userMaster.mfa_enabled,
+        lastLoginAt: schema.userMaster.last_login_at,
+        createdAt: schema.userMaster.created_at,
       })
       .from(schema.userMaster)
       .where(eq(schema.userMaster.user_id, userId))
@@ -839,6 +851,112 @@ export class AuthService {
       ...user,
       permissions,
     };
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const [existing] = await this.db.select().from(schema.userMaster).where(eq(schema.userMaster.user_id, userId)).limit(1);
+    if (!existing) {
+      throw new NotFoundException('User profile not found.');
+    }
+
+    await this.db
+      .update(schema.userMaster)
+      .set({
+        full_name: dto.full_name ?? existing.full_name,
+        phone: dto.phone ?? existing.phone,
+        department: dto.department ?? existing.department,
+        designation: dto.designation ?? existing.designation,
+        profile_photo_url: dto.profile_photo_url ?? existing.profile_photo_url,
+        lang_pref_id: dto.lang_pref_id ?? existing.lang_pref_id,
+        timezone_pref_id: dto.timezone_pref_id ?? existing.timezone_pref_id,
+      })
+      .where(eq(schema.userMaster.user_id, userId));
+
+    return this.getProfile(userId);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const [user] = await this.db.select().from(schema.userMaster).where(eq(schema.userMaster.user_id, userId)).limit(1);
+    if (!user) {
+      throw new NotFoundException('User profile not found.');
+    }
+    const isValid = await bcrypt.compare(dto.current_password, user.password_hash);
+    if (!isValid) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+    const newHash = await bcrypt.hash(dto.new_password, 10);
+    await this.db.update(schema.userMaster).set({ password_hash: newHash }).where(eq(schema.userMaster.user_id, userId));
+    return { success: true };
+  }
+
+  async listSessions(userId: string) {
+    const rows = await this.db
+      .select({
+        sessionId: schema.userSession.session_id,
+        issuedAt: schema.userSession.issued_at,
+        expiresAt: schema.userSession.expires_at,
+        revokedAt: schema.userSession.revoked_at,
+      })
+      .from(schema.userSession)
+      .where(eq(schema.userSession.user_id, userId));
+    const now = new Date();
+    return rows
+      .filter((s) => !s.revokedAt && new Date(s.expiresAt) > now)
+      .sort((a, b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
+  }
+
+  async revokeSession(userId: string, sessionId: string) {
+    const [session] = await this.db
+      .select()
+      .from(schema.userSession)
+      .where(and(eq(schema.userSession.session_id, sessionId), eq(schema.userSession.user_id, userId)))
+      .limit(1);
+    if (!session) {
+      throw new NotFoundException('Session not found.');
+    }
+    await this.db
+      .update(schema.userSession)
+      .set({ revoked_at: toMysqlTimestamp() })
+      .where(eq(schema.userSession.session_id, sessionId));
+    return { success: true };
+  }
+
+  private static readonly NOTIFICATION_CATEGORIES = [
+    'APPROVALS',
+    'MORTALITY_ALERTS',
+    'KPI_ALERTS',
+    'INVENTORY_ALERTS',
+    'SYSTEM',
+  ] as const;
+
+  async getNotificationPreferences(userId: string) {
+    const rows = await this.db.select().from(schema.userNotificationPref).where(eq(schema.userNotificationPref.user_id, userId));
+    const byCategory = new Map(rows.map((r) => [r.category, r]));
+    return AuthService.NOTIFICATION_CATEGORIES.map((category) => {
+      const existing = byCategory.get(category);
+      return {
+        category,
+        emailEnabled: existing?.email_enabled ?? true,
+        inAppEnabled: existing?.in_app_enabled ?? true,
+      };
+    });
+  }
+
+  async updateNotificationPreferences(userId: string, dto: UpdateNotificationPreferencesDto) {
+    for (const pref of dto.preferences) {
+      await this.db
+        .insert(schema.userNotificationPref)
+        .values({
+          user_id: userId,
+          category: pref.category,
+          email_enabled: pref.email_enabled,
+          in_app_enabled: pref.in_app_enabled,
+        })
+        .onDuplicateKeyUpdate({
+          set: { email_enabled: pref.email_enabled, in_app_enabled: pref.in_app_enabled, updated_at: toMysqlTimestamp() },
+        });
+    }
+    return this.getNotificationPreferences(userId);
   }
 
   private async sendInvitationEmail(

@@ -1,10 +1,13 @@
-import { Controller, Post, Get, Body, UseGuards, Request, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, Request, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterAdminDto } from './dto/register-admin.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 
 @ApiTags('Authentication')
@@ -79,5 +82,53 @@ export class AuthController {
   @ApiOperation({ summary: 'Generate and retrieve TOTP secret and QR code URI' })
   async generateMfaQr(@Request() req) {
     return this.authService.generateMfaQr(req.user.userId, req.user.email);
+  }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update the current user\'s profile fields' })
+  async updateProfile(@Request() req, @Body() dto: UpdateProfileDto) {
+    return this.authService.updateProfile(req.user.userId, dto);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change the current user\'s password' })
+  async changePassword(@Request() req, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.userId, dto);
+  }
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List the current user\'s active (non-revoked, non-expired) sessions' })
+  async listSessions(@Request() req) {
+    return this.authService.listSessions(req.user.userId);
+  }
+
+  @Delete('sessions/:sessionId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Revoke one of the current user\'s sessions' })
+  async revokeSession(@Request() req, @Param('sessionId') sessionId: string) {
+    return this.authService.revokeSession(req.user.userId, sessionId);
+  }
+
+  @Get('notification-preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the current user\'s per-category notification channel preferences' })
+  async getNotificationPreferences(@Request() req) {
+    return this.authService.getNotificationPreferences(req.user.userId);
+  }
+
+  @Patch('notification-preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update the current user\'s notification channel preferences' })
+  async updateNotificationPreferences(@Request() req, @Body() dto: UpdateNotificationPreferencesDto) {
+    return this.authService.updateNotificationPreferences(req.user.userId, dto);
   }
 }

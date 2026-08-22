@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Popover } from "../ui/popover";
 import { Menu, MenuItem, MenuSeparator, PopoverHeading } from "../ui/menu";
+import { ThemeSelector } from "../ui/theme-selector";
+import { useLanguage } from "../../hooks/useLanguage";
 
 /**
  * The account menu.
@@ -27,13 +29,11 @@ export interface ProfileMenuItem {
 
 /**
  * The account entries every shell route shows, in order, as translation keys.
- *
- * None of them carries an `href` yet: the application has no account,
- * preferences or settings route, and Phase 2 does not add routes. They are
- * therefore rendered as unavailable rather than as controls that do nothing.
- * When those screens land, giving the item an `href` is the only change needed.
+ * Appearance (theme) is no longer one of these — it's rendered inline in the
+ * popover itself, below, so it's reachable in one click instead of a
+ * separate page.
  */
-export const PROFILE_ITEMS = ["account", "preferences", "settings"] as const;
+export const PROFILE_ITEMS = ["account", "settings"] as const;
 
 export interface ProfilePopoverProps {
   initials: string;
@@ -57,6 +57,7 @@ export function ProfilePopover({
   triggerLabel,
 }: ProfilePopoverProps) {
   const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
 
   return (
     <Popover
@@ -76,6 +77,13 @@ export function ProfilePopover({
       )}
     >
       <PopoverHeading title={name || triggerLabel} subtitle={email} />
+      <div className="flex items-center justify-between px-3 py-2">
+        <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
+          {t("themeLabel")}
+        </span>
+        <ThemeSelector />
+      </div>
+      <MenuSeparator />
       <Menu label={triggerLabel}>
         {items.map((item) => (
           // No destination yet means no promise: the entry stays visible and

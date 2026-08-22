@@ -356,6 +356,20 @@ export const userSession = mysqlTable('user_session', {
   uniqueIndex('uq_session_token_hash').on(table.refresh_token_hash),
 ]);
 
+// Per-user, per-category notification channel preferences (Settings page).
+// Distinct from notification_config, which holds a company's SMTP/SMS/push
+// provider configuration, not any individual's opt-in/opt-out choices.
+export const userNotificationPref = mysqlTable('user_notification_pref', {
+  pref_id: varchar('pref_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  user_id: varchar('user_id', { length: 36 }).notNull().references(() => userMaster.user_id, { onDelete: 'cascade' }),
+  category: varchar('category', { length: 50 }).notNull(),
+  email_enabled: boolean('email_enabled').default(true).notNull(),
+  in_app_enabled: boolean('in_app_enabled').default(true).notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('uq_user_notif_category').on(table.user_id, table.category),
+]);
+
 // ==========================================
 // 6. SETUP WIZARD & NOTIFICATIONS
 // ==========================================

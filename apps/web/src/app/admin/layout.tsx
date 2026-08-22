@@ -90,7 +90,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       userEmail={user.email}
       onLogout={handleLogout}
       signOutLabel={t("signOut")}
-      profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key) }))}
+      profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key), href: key === "account" ? "/account/profile" : "/account/settings" }))}
       profileMenuLabel={t("accountMenu")}
       breadcrumbRoot="Admin"
       breadcrumbCurrent={breadcrumbLabel}
