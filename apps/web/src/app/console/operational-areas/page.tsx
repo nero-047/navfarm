@@ -12,6 +12,7 @@ import {
   getStoredUser,
   updateStoredUser,
   getActiveCompanyId,
+  setActiveCompanyId,
   setActiveOperationalAreaId,
   setActiveWorkspaceScope,
   setActiveLob,
@@ -141,6 +142,7 @@ export default function OperationalAreasPage() {
   };
 
   const handleEnterArea = (area: OperationalArea) => {
+    setActiveCompanyId(area.company_id);
     setActiveOperationalAreaId(area.area_id);
     setActiveWorkspaceScope("OPERATIONAL");
 
