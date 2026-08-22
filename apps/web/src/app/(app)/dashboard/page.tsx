@@ -444,7 +444,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/finance")}
+              onClick={() => router.push("/finance/journal")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -663,7 +663,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/finance")}
+              onClick={() => router.push("/finance/journal")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -1078,7 +1078,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/inventory")}
+                onClick={() => router.push("/inventory/balance")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
