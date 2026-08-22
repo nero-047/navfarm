@@ -45,7 +45,7 @@ import { ContextNavProvider } from "../../components/shell/ContextNav";
 import { PROFILE_ITEMS } from "../../components/shell/ProfilePopover";
 import { ThemeIconButton } from "../../components/shell/ThemeIconButton";
 
-export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
+export default function ConsoleLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useLanguage();
@@ -253,14 +253,14 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     ];
   } else if (activeScope === "COMPANY") {
     navItems = [
-      { label: "Company Dashboard",  href: "/console/dashboard",      icon: LayoutDashboard },
-      { label: "Operational Areas",  href: "/console/operational-areas", icon: Layers },
+      { label: t("companyDashboard"), href: "/console/dashboard",      icon: LayoutDashboard },
+      { label: t("operationalAreas"), href: "/console/operational-areas", icon: Layers },
       { label: t("company"),         href: "/console/companies",      icon: Building2 },
       { label: t("masterData"),      href: "/console/master-data",    icon: Database },
       { label: t("inventory"),       href: "/console/inventory",      icon: Boxes },
       { label: t("finance"),         href: "/console/finance",        icon: Landmark },
-      { label: "Production",         href: "/console/production",     icon: Wheat },
-      { label: "Herd Register",      href: "/console/piggery",        icon: Pill },
+      { label: t("production"),      href: "/console/production",     icon: Wheat },
+      { label: t("animalHerdRegister"), href: "/console/piggery",     icon: Pill },
       { label: t("teamManagement"),  href: "/console/users",          icon: Users },
       { label: t("rolePermissions"), href: "/console/roles",          icon: ShieldAlert },
       { label: t("notifications"),   href: "/console/notifications",  icon: Bell },
@@ -268,26 +268,26 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   } else {
     // OPERATIONAL Area Scope (e.g. Piggery / Dairy / Poultry)
     navItems = [
-      { label: `${activeLob || "Farm"} Dashboard`, href: "/console/dashboard", icon: LayoutDashboard },
+      { label: t("lobDashboard", { lob: activeLob || "Farm" }), href: "/console/dashboard", icon: LayoutDashboard },
       {
-        label: "Batch Management",
+        label: t("batchManagement"),
         href: "/console/production",
         icon: Layers,
         children: [
-          { label: "Batch List", href: "/console/production?tab=batches" },
-          { label: "Batch Stages", href: "/console/production?tab=batch-stages" },
-          { label: "Animal Assignment", href: "/console/production?tab=batch-animal-assignment" },
-          { label: "Batch Data Entry", href: "/console/production?tab=daily-operational-entry" },
+          { label: t("batchList"), href: "/console/production?tab=batches" },
+          { label: t("batchStages"), href: "/console/production?tab=batch-stages" },
+          { label: t("animalAssignment"), href: "/console/production?tab=batch-animal-assignment" },
+          { label: t("batchDataEntry"), href: "/console/production?tab=daily-operational-entry" },
         ],
       },
-      { label: "Scheduler", href: "/console/production?tab=schedulers", icon: CalendarClock },
-      { label: "Feed Management", href: "/console/production?tab=stage-consumption", icon: Wheat },
-      { label: activeLob === "DAIRY" ? "Dairy Cow Register" : "Animal & Herd Register", href: "/console/piggery", icon: Pill },
-      { label: "Inventory & Stock", href: "/console/inventory", icon: Boxes },
-      { label: "Mortality & Health", href: "/console/production?tab=daily-entry", icon: HeartPulse },
-      { label: "Finance & Costing", href: "/console/finance", icon: Landmark },
+      { label: t("scheduler"), href: "/console/production?tab=schedulers", icon: CalendarClock },
+      { label: t("feedManagement"), href: "/console/production?tab=stage-consumption", icon: Wheat },
+      { label: activeLob === "DAIRY" ? t("dairyCowRegister") : t("animalHerdRegister"), href: "/console/piggery", icon: Pill },
+      { label: t("inventoryStock"), href: "/console/inventory", icon: Boxes },
+      { label: t("mortalityHealth"), href: "/console/production?tab=daily-entry", icon: HeartPulse },
+      { label: t("financeCosting"), href: "/console/finance", icon: Landmark },
       { label: t("masterData"), href: "/console/master-data", icon: Database },
-      { label: "Approvals", href: "/console/approvals", icon: CheckSquare },
+      { label: t("approvals"), href: "/console/approvals", icon: CheckSquare },
       { label: t("settings"), href: "/console/area-settings", icon: Settings },
     ];
   }
@@ -322,30 +322,33 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     // The provider is the seam: routes register an index, the shell renders it.
     // Routes that register nothing stay full-width, which is every route
     // outside Master Data, Inventory, Finance and Production.
-    <ContextNavProvider>
-      {(contextNav) => (
-        <AppShell
-          brandHref="/console/dashboard"
-          brandSubtitle="Management console"
-          sidebarSummary={sidebarSummary}
-          navSectionLabel="Organization"
-          navItems={navItems}
-          pathname={pathname}
-          userInitials={initials}
-          userName={user.fullName}
-          userEmail={user.email}
-          onLogout={handleLogout}
-          signOutLabel={t("signOut")}
-          profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key), href: key === "account" ? "/account/profile" : "/account/settings" }))}
-          profileMenuLabel={t("accountMenu")}
-          breadcrumbRoot="Console"
-          breadcrumbCurrent={breadcrumbLabel}
-          headerRight={headerRight}
-          contextNav={contextNav}
-        >
-          {children}
-        </AppShell>
-      )}
-    </ContextNavProvider>
+    <>
+      <ContextNavProvider>
+        {(contextNav) => (
+          <AppShell
+            brandHref="/console/dashboard"
+            brandSubtitle="Management console"
+            sidebarSummary={sidebarSummary}
+            navSectionLabel="Organization"
+            navItems={navItems}
+            pathname={pathname}
+            userInitials={initials}
+            userName={user.fullName}
+            userEmail={user.email}
+            onLogout={handleLogout}
+            signOutLabel={t("signOut")}
+            profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key), href: key === "account" ? "/account/profile" : "/account/settings" }))}
+            profileMenuLabel={t("accountMenu")}
+            breadcrumbRoot="Console"
+            breadcrumbCurrent={breadcrumbLabel}
+            headerRight={headerRight}
+            contextNav={contextNav}
+          >
+            {children}
+          </AppShell>
+        )}
+      </ContextNavProvider>
+      {modal}
+    </>
   );
 }

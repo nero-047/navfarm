@@ -21,7 +21,7 @@ const adminNavItems = [
   { label: "Audit Logs",  key: "auditLogs" as const,   href: "/admin/audit",   icon: History   },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useLanguage();
@@ -77,25 +77,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-    <AppShell
-      brandHref="/admin/dashboard"
-      brandSubtitle="Platform administration"
-      sidebarSummary={sidebarSummary}
-      navSectionLabel={t("admin")}
-      navItems={adminNavItems.map((i) => ({ label: t(i.key), href: i.href, icon: i.icon }))}
-      pathname={pathname}
-      userInitials={initials}
-      userName={user.fullName}
-      userEmail={user.email}
-      onLogout={handleLogout}
-      signOutLabel={t("signOut")}
-      profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key), href: key === "account" ? "/account/profile" : "/account/settings" }))}
-      profileMenuLabel={t("accountMenu")}
-      breadcrumbRoot="Admin"
-      breadcrumbCurrent={breadcrumbLabel}
-      headerRight={headerRight}
-    >
-      {children}
-    </AppShell>
+    <>
+      <AppShell
+        brandHref="/admin/dashboard"
+        brandSubtitle="Platform administration"
+        sidebarSummary={sidebarSummary}
+        navSectionLabel={t("admin")}
+        navItems={adminNavItems.map((i) => ({ label: t(i.key), href: i.href, icon: i.icon }))}
+        pathname={pathname}
+        userInitials={initials}
+        userName={user.fullName}
+        userEmail={user.email}
+        onLogout={handleLogout}
+        signOutLabel={t("signOut")}
+        profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key), href: key === "account" ? "/account/profile" : "/account/settings" }))}
+        profileMenuLabel={t("accountMenu")}
+        breadcrumbRoot="Admin"
+        breadcrumbCurrent={breadcrumbLabel}
+        headerRight={headerRight}
+      >
+        {children}
+      </AppShell>
+      {modal}
+    </>
   );
 }
