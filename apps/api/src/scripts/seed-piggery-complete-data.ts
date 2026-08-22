@@ -10,7 +10,7 @@ const user = process.env.DATABASE_USERNAME || 'root';
 const password = process.env.DATABASE_PASSWORD || '';
 const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
 const isPiggeryIsolated = masterDatabase.startsWith('piggery_');
-const tenantCode = process.env.DEV_TENANT_CODE || 'apexagri';
+const tenantCode = process.env.DEV_TENANT_CODE || 'devco';
 const dbName = isPiggeryIsolated ? `piggery_tenant_${tenantCode}` : `tenant_${tenantCode}`;
 
 export async function seedPiggeryData() {

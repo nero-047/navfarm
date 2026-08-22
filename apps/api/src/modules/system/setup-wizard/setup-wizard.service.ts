@@ -45,6 +45,11 @@ export class SetupWizardService implements OnModuleInit {
   }
 
   async saveStep1Profile(dto: Step1ProfileDto) {
+    // The DTO's @Transform('' -> undefined) normalizes blank optional fields
+    // for varchar columns, which tolerate ''. incorporation_date is a strict
+    // SQL `date` column though — '' fails with ER_TRUNCATED_WRONG_VALUE, so
+    // it needs an explicit null fallback rather than relying on that transform.
+    const incorporationDate = dto.incorporation_date ? dto.incorporation_date : null;
     const existing = dto.company_id
       ? await this.db
           .select()
@@ -77,7 +82,7 @@ export class SetupWizardService implements OnModuleInit {
             registration_no: dto.registration_no,
             tax_id: dto.tax_id,
             tax_regime: dto.tax_regime || 'STANDARD',
-            incorporation_date: dto.incorporation_date,
+            incorporation_date: incorporationDate,
             website: dto.website,
             email_domain: dto.email_domain,
             support_email: dto.support_email,
@@ -133,7 +138,7 @@ export class SetupWizardService implements OnModuleInit {
             registration_no: dto.registration_no,
             tax_id: dto.tax_id,
             tax_regime: dto.tax_regime || 'STANDARD',
-            incorporation_date: dto.incorporation_date,
+            incorporation_date: incorporationDate,
             website: dto.website,
             email_domain: dto.email_domain,
             support_email: dto.support_email,

@@ -60,6 +60,25 @@ export class BatchService {
     return tenantDb;
   }
 
+  // bio_asset_ledger.bio_asset_item_id is NOT NULL. A BIO_ASSET batch created
+  // without input lines (e.g. a breeding/herd batch seeded directly from
+  // animal assignments) has no item_id to fall back to — resolving it here
+  // instead of defaulting to '' avoids an FK-constraint crash on every
+  // bio-asset lifecycle write (mature/amortize/fair-value/dispose).
+  private async resolveBioAssetItemId(batch: { input_lines?: Array<{ item_id: string }> }, tenantId: string): Promise<string> {
+    const fromInputLines = batch.input_lines?.[0]?.item_id;
+    if (fromInputLines) return fromInputLines;
+    const [fallbackItem] = await this.db
+      .select({ item_id: schema.itemMaster.item_id })
+      .from(schema.itemMaster)
+      .where(and(eq(schema.itemMaster.tenant_id, tenantId), eq(schema.itemMaster.is_active, true)))
+      .limit(1);
+    if (!fallbackItem) {
+      throw new BadRequestException('No active items configured for this tenant — a bio-asset ledger entry requires at least one item in Master Data.');
+    }
+    return fallbackItem.item_id;
+  }
+
   // `executor` defaults to `this.db` but must be passed the active transaction
   // when called from inside one (see `create()`) — `.for('update')` locks the
   // counted rows so a second concurrent call blocks until the first commits its
@@ -1505,7 +1524,7 @@ export class BatchService {
       entry_id: randomUUID(),
       tenant_id: tenantId,
       company_id: batch.company_id,
-      bio_asset_item_id: batch.input_lines?.[0]?.item_id || '',
+      bio_asset_item_id: await this.resolveBioAssetItemId(batch, tenantId),
       entry_type: 'TRANSFORMATION',
       document_no: batch.batch_no,
       batch_id: id,
@@ -1582,7 +1601,7 @@ export class BatchService {
       entry_id: randomUUID(),
       tenant_id: tenantId,
       company_id: batch.company_id,
-      bio_asset_item_id: batch.input_lines?.[0]?.item_id || '',
+      bio_asset_item_id: await this.resolveBioAssetItemId(batch, tenantId),
       entry_type: 'AMORTIZATION',
       document_no: batch.batch_no,
       batch_id: id,
@@ -1643,7 +1662,7 @@ export class BatchService {
       entry_id: randomUUID(),
       tenant_id: tenantId,
       company_id: batch.company_id,
-      bio_asset_item_id: batch.input_lines?.[0]?.item_id || '',
+      bio_asset_item_id: await this.resolveBioAssetItemId(batch, tenantId),
       entry_type: 'FAIR_VALUE_ADJMT',
       document_no: batch.batch_no,
       batch_id: id,
@@ -1734,7 +1753,7 @@ export class BatchService {
       entry_id: randomUUID(),
       tenant_id: tenantId,
       company_id: batch.company_id,
-      bio_asset_item_id: batch.input_lines?.[0]?.item_id || '',
+      bio_asset_item_id: await this.resolveBioAssetItemId(batch, tenantId),
       entry_type: 'TRANSFORMATION',
       document_no: batch.batch_no,
       batch_id: id,
