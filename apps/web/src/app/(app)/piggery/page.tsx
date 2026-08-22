@@ -60,7 +60,7 @@ export default function PiggeryPage() {
       activeKey,
       onSelect: (key) => {
         setActiveKey(key);
-        router.replace(`/console/piggery?tab=${key}`);
+        router.replace(`/piggery?tab=${key}`);
       },
     };
   }, [ready, mayView, activeKey, activeLob, router]);

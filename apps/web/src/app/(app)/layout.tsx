@@ -244,51 +244,51 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
 
   if (activeScope === "TENANT") {
     navItems = [
-      { label: t("dashboard"),       href: "/console/dashboard",      icon: LayoutDashboard },
-      { label: t("companies"),       href: "/console/companies",      icon: Building2 },
-      { label: t("masterData"),      href: "/console/master-data",    icon: Database },
-      { label: t("teamManagement"),  href: "/console/users",          icon: Users },
-      { label: t("auditLedger"),     href: "/console/audit",          icon: History },
-      { label: t("notifications"),   href: "/console/notifications",  icon: Bell },
+      { label: t("dashboard"),       href: "/dashboard",      icon: LayoutDashboard },
+      { label: t("companies"),       href: "/companies",      icon: Building2 },
+      { label: t("masterData"),      href: "/master-data",    icon: Database },
+      { label: t("teamManagement"),  href: "/users",          icon: Users },
+      { label: t("auditLedger"),     href: "/audit",          icon: History },
+      { label: t("notifications"),   href: "/notifications",  icon: Bell },
     ];
   } else if (activeScope === "COMPANY") {
     navItems = [
-      { label: t("companyDashboard"), href: "/console/dashboard",      icon: LayoutDashboard },
-      { label: t("operationalAreas"), href: "/console/operational-areas", icon: Layers },
-      { label: t("company"),         href: "/console/companies",      icon: Building2 },
-      { label: t("masterData"),      href: "/console/master-data",    icon: Database },
-      { label: t("inventory"),       href: "/console/inventory",      icon: Boxes },
-      { label: t("finance"),         href: "/console/finance",        icon: Landmark },
-      { label: t("production"),      href: "/console/production",     icon: Wheat },
-      { label: t("animalHerdRegister"), href: "/console/piggery",     icon: Pill },
-      { label: t("teamManagement"),  href: "/console/users",          icon: Users },
-      { label: t("rolePermissions"), href: "/console/roles",          icon: ShieldAlert },
-      { label: t("notifications"),   href: "/console/notifications",  icon: Bell },
+      { label: t("companyDashboard"), href: "/dashboard",      icon: LayoutDashboard },
+      { label: t("operationalAreas"), href: "/operational-areas", icon: Layers },
+      { label: t("company"),         href: "/companies",      icon: Building2 },
+      { label: t("masterData"),      href: "/master-data",    icon: Database },
+      { label: t("inventory"),       href: "/inventory",      icon: Boxes },
+      { label: t("finance"),         href: "/finance",        icon: Landmark },
+      { label: t("production"),      href: "/production",     icon: Wheat },
+      { label: t("animalHerdRegister"), href: "/piggery",     icon: Pill },
+      { label: t("teamManagement"),  href: "/users",          icon: Users },
+      { label: t("rolePermissions"), href: "/roles",          icon: ShieldAlert },
+      { label: t("notifications"),   href: "/notifications",  icon: Bell },
     ];
   } else {
     // OPERATIONAL Area Scope (e.g. Piggery / Dairy / Poultry)
     navItems = [
-      { label: t("lobDashboard", { lob: activeLob || "Farm" }), href: "/console/dashboard", icon: LayoutDashboard },
+      { label: t("lobDashboard", { lob: activeLob || "Farm" }), href: "/dashboard", icon: LayoutDashboard },
       {
         label: t("batchManagement"),
-        href: "/console/production",
+        href: "/production/batches",
         icon: Layers,
         children: [
-          { label: t("batchList"), href: "/console/production?tab=batches" },
-          { label: t("batchStages"), href: "/console/production?tab=batch-stages" },
-          { label: t("animalAssignment"), href: "/console/production?tab=batch-animal-assignment" },
-          { label: t("batchDataEntry"), href: "/console/production?tab=daily-operational-entry" },
+          { label: t("batchList"), href: "/production/batches" },
+          { label: t("batchStages"), href: "/production/batches/stages" },
+          { label: t("animalAssignment"), href: "/production/batches/animal-assignment" },
+          { label: t("batchDataEntry"), href: "/production/batches/daily-entry" },
         ],
       },
-      { label: t("scheduler"), href: "/console/production?tab=schedulers", icon: CalendarClock },
-      { label: t("feedManagement"), href: "/console/production?tab=stage-consumption", icon: Wheat },
-      { label: activeLob === "DAIRY" ? t("dairyCowRegister") : t("animalHerdRegister"), href: "/console/piggery", icon: Pill },
-      { label: t("inventoryStock"), href: "/console/inventory", icon: Boxes },
-      { label: t("mortalityHealth"), href: "/console/production?tab=daily-entry", icon: HeartPulse },
-      { label: t("financeCosting"), href: "/console/finance", icon: Landmark },
-      { label: t("masterData"), href: "/console/master-data", icon: Database },
-      { label: t("approvals"), href: "/console/approvals", icon: CheckSquare },
-      { label: t("settings"), href: "/console/area-settings", icon: Settings },
+      { label: t("scheduler"), href: "/production/scheduler", icon: CalendarClock },
+      { label: t("feedManagement"), href: "/production/feed-management", icon: Wheat },
+      { label: activeLob === "DAIRY" ? t("dairyCowRegister") : t("animalHerdRegister"), href: "/piggery", icon: Pill },
+      { label: t("inventoryStock"), href: "/inventory", icon: Boxes },
+      { label: t("mortalityHealth"), href: "/production/mortality-health", icon: HeartPulse },
+      { label: t("financeCosting"), href: "/finance", icon: Landmark },
+      { label: t("masterData"), href: "/master-data", icon: Database },
+      { label: t("approvals"), href: "/approvals", icon: CheckSquare },
+      { label: t("settings"), href: "/area-settings", icon: Settings },
     ];
   }
 
@@ -326,7 +326,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
       <ContextNavProvider>
         {(contextNav) => (
           <AppShell
-            brandHref="/console/dashboard"
+            brandHref="/dashboard"
             brandSubtitle="Management console"
             sidebarSummary={sidebarSummary}
             navSectionLabel="Organization"
@@ -339,7 +339,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
             signOutLabel={t("signOut")}
             profileItems={PROFILE_ITEMS.map((key) => ({ label: t(key), href: key === "account" ? "/account/profile" : "/account/settings" }))}
             profileMenuLabel={t("accountMenu")}
-            breadcrumbRoot="Console"
+            breadcrumbRoot="NAVFarm"
             breadcrumbCurrent={breadcrumbLabel}
             headerRight={headerRight}
             contextNav={contextNav}

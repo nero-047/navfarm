@@ -61,7 +61,7 @@ export default function InventoryPage() {
       activeKey,
       onSelect: (key) => {
         setActiveKey(key);
-        router.replace(`/console/inventory?tab=${key}`);
+        router.replace(`/inventory?tab=${key}`);
       },
     };
   }, [ready, mayViewInventory, activeKey, router]);

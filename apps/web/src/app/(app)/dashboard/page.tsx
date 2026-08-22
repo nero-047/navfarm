@@ -177,7 +177,7 @@ export default function DashboardPage() {
     setActiveWorkspaceScope("OPERATIONAL");
     const lobResolved = area.lob_code?.includes("DAIRY") || area.area_name?.toLowerCase().includes("dairy") ? "DAIRY" : "PIGGERY";
     setActiveLob(lobResolved);
-    window.location.href = "/console/dashboard";
+    window.location.href = "/dashboard";
   };
 
   // Switch to a company
@@ -185,7 +185,7 @@ export default function DashboardPage() {
     setActiveCompanyId(comp.company_id);
     setActiveOperationalAreaId(null);
     setActiveWorkspaceScope("COMPANY");
-    window.location.href = "/console/dashboard";
+    window.location.href = "/dashboard";
   };
 
   // ── TENANT scope: apply the Company + LOB filters to what's rendered ──
@@ -377,7 +377,7 @@ export default function DashboardPage() {
           {/* 4 Group KPI Stat Strips */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div
-              onClick={() => router.push("/console/companies")}
+              onClick={() => router.push("/companies")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -398,7 +398,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/console/piggery")}
+              onClick={() => router.push("/piggery")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -421,7 +421,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/console/production?tab=batches")}
+              onClick={() => router.push("/production/batches")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -444,7 +444,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/console/finance")}
+              onClick={() => router.push("/finance")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -506,7 +506,7 @@ export default function DashboardPage() {
                   Comparative overview across companies and operational areas.
                 </p>
               </div>
-              <Link href="/console/companies" className="text-xs font-semibold hover:underline flex items-center gap-1" style={{ color: "var(--accent)" }}>
+              <Link href="/companies" className="text-xs font-semibold hover:underline flex items-center gap-1" style={{ color: "var(--accent)" }}>
                 View All Companies <ChevronRight className="h-3 w-3" />
               </Link>
             </div>
@@ -596,7 +596,7 @@ export default function DashboardPage() {
           {/* 4 Company KPI Stat Strips */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div
-              onClick={() => router.push("/console/operational-areas")}
+              onClick={() => router.push("/operational-areas")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -617,7 +617,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/console/piggery")}
+              onClick={() => router.push("/piggery")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -640,7 +640,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/console/production?tab=batches")}
+              onClick={() => router.push("/production/batches")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -663,7 +663,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/console/finance")}
+              onClick={() => router.push("/finance")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -755,7 +755,7 @@ export default function DashboardPage() {
                   Farm sites and business units for {activeCompany?.company_name}.
                 </p>
               </div>
-              <Link href="/console/operational-areas" className="text-xs font-semibold hover:underline flex items-center gap-1" style={{ color: "var(--accent)" }}>
+              <Link href="/operational-areas" className="text-xs font-semibold hover:underline flex items-center gap-1" style={{ color: "var(--accent)" }}>
                 Manage Areas <ChevronRight className="h-3 w-3" />
               </Link>
             </div>
@@ -835,7 +835,7 @@ export default function DashboardPage() {
             {/* 4 Piggery Operational Stat Strips */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div
-                onClick={() => router.push("/console/piggery")}
+                onClick={() => router.push("/piggery")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -856,7 +856,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/console/production?tab=batches")}
+                onClick={() => router.push("/production/batches")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -878,7 +878,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/console/production?tab=stage-consumption")}
+                onClick={() => router.push("/production/feed-management")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -899,7 +899,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/console/piggery")}
+                onClick={() => router.push("/piggery")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -944,7 +944,7 @@ export default function DashboardPage() {
                   <div className="rounded-[var(--radius-md)] border p-5" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-sm font-semibold">Active Sow Batch Lifecycle: {activeBatch?.batch_no || "PIG-BATCH-001"}</h3>
-                      <Link href="/console/production?tab=daily-operational-entry" className="text-xs font-semibold hover:underline" style={{ color: "var(--accent)" }}>
+                      <Link href="/production/batches/daily-entry" className="text-xs font-semibold hover:underline" style={{ color: "var(--accent)" }}>
                         Open Batch Entry →
                       </Link>
                     </div>
@@ -971,7 +971,7 @@ export default function DashboardPage() {
                   <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
                   <div className="space-y-2">
                     <button
-                      onClick={() => router.push("/console/production?tab=daily-operational-entry")}
+                      onClick={() => router.push("/production/batches/daily-entry")}
                       className="nf-press flex w-full items-center justify-between rounded-[var(--radius-sm)] border p-2.5 text-xs font-semibold hover:bg-[var(--surface-raised)]"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -979,7 +979,7 @@ export default function DashboardPage() {
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => router.push("/console/piggery")}
+                      onClick={() => router.push("/piggery")}
                       className="nf-press flex w-full items-center justify-between rounded-[var(--radius-sm)] border p-2.5 text-xs font-semibold hover:bg-[var(--surface-raised)]"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -1015,7 +1015,7 @@ export default function DashboardPage() {
             {/* 4 Dairy Operational Stat Strips */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div
-                onClick={() => router.push("/console/piggery")}
+                onClick={() => router.push("/piggery")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -1036,7 +1036,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/console/production?tab=daily-operational-entry")}
+                onClick={() => router.push("/production/batches/daily-entry")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -1057,7 +1057,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/console/production?tab=stage-consumption")}
+                onClick={() => router.push("/production/feed-management")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -1078,7 +1078,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/console/inventory")}
+                onClick={() => router.push("/inventory")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -1145,7 +1145,7 @@ export default function DashboardPage() {
                   <h3 className="text-sm font-semibold mb-3">Dairy Quick Actions</h3>
                   <div className="space-y-2">
                     <button
-                      onClick={() => router.push("/console/production?tab=daily-operational-entry")}
+                      onClick={() => router.push("/production/batches/daily-entry")}
                       className="nf-press flex w-full items-center justify-between rounded-[var(--radius-sm)] border p-2.5 text-xs font-semibold hover:bg-[var(--surface-raised)]"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -1153,7 +1153,7 @@ export default function DashboardPage() {
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => router.push("/console/piggery")}
+                      onClick={() => router.push("/piggery")}
                       className="nf-press flex w-full items-center justify-between rounded-[var(--radius-sm)] border p-2.5 text-xs font-semibold hover:bg-[var(--surface-raised)]"
                       style={{ borderColor: "var(--border)" }}
                     >

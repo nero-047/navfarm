@@ -57,7 +57,7 @@ export default function FinancePage() {
       activeKey,
       onSelect: (key) => {
         setActiveKey(key);
-        router.replace(`/console/finance?tab=${key}`);
+        router.replace(`/finance?tab=${key}`);
       },
     };
   }, [ready, mayViewFinance, activeKey, t, router]);

@@ -157,7 +157,7 @@ export default function OperationalAreasPage() {
       operational_area_id: area.area_id,
     });
 
-    window.location.href = "/console/production";
+    window.location.href = "/production/batches/daily-entry";
   };
 
   return (

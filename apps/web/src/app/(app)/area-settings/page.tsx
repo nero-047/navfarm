@@ -427,7 +427,7 @@ export default function AreaSettingsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push("/console/master-data")}
+              onClick={() => router.push("/master-data")}
               className="w-full text-xs font-medium mt-1"
             >
               Open Master Data Catalog →
