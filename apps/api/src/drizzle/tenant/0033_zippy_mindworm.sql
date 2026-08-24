@@ -10,7 +10,7 @@ CREATE TABLE `animal_medication_log` (
 	`administered_by` varchar(200),
 	`notes` text,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `animal_medication_log_log_id` PRIMARY KEY(`log_id`)
 );
 --> statement-breakpoint

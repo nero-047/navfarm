@@ -10,7 +10,7 @@ CREATE TABLE `audit_log` (
 	`new_values` json,
 	`ip_address` varchar(50),
 	`user_agent` text,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `audit_log_audit_id` PRIMARY KEY(`audit_id`)
 );
 --> statement-breakpoint
@@ -94,7 +94,7 @@ CREATE TABLE `plan_master` (
 	`storage_limit_gb` decimal(8,2) NOT NULL DEFAULT '5.00',
 	`feature_flags` json NOT NULL,
 	`is_active` boolean NOT NULL DEFAULT true,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `plan_master_plan_id` PRIMARY KEY(`plan_id`)
 );
 --> statement-breakpoint
@@ -131,7 +131,7 @@ CREATE TABLE `tenant_master` (
 	`is_trial` boolean NOT NULL DEFAULT false,
 	`trial_end_date` date,
 	`is_active` boolean NOT NULL DEFAULT true,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`db_host` varchar(100) NOT NULL DEFAULT 'localhost',
 	`db_port` int NOT NULL DEFAULT 3306,
 	`db_name` varchar(100) NOT NULL,

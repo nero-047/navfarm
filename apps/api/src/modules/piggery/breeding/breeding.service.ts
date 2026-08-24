@@ -21,7 +21,7 @@ function addDaysToDate(dateStr: string, days: number): string {
 
 @Injectable()
 export class BreedingService {
-  constructor(private readonly cls: ClsService) {}
+  constructor(private readonly cls: ClsService) { }
 
   private get db(): MySql2Database<typeof schema> {
     const tenantDb = this.cls.get<MySql2Database<typeof schema>>('tenantDb');

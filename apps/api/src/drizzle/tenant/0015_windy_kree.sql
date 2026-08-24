@@ -16,8 +16,8 @@ CREATE TABLE `journal_header` (
 	`posted_by` varchar(36),
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	CONSTRAINT `journal_header_journal_id` PRIMARY KEY(`journal_id`)
 );

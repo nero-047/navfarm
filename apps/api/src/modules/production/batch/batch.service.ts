@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, isNull, count, inArray } from 'drizzle-orm';
+import { eq, and, like, isNull, count, inArray, lte, gte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -16,6 +16,7 @@ import {
   RenewBatchDto,
   TransferStageDto,
   BulkDailyEntryDto,
+  SingleBatchDailyEntryDto,
 } from './dto/batch.dto';
 
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
@@ -42,7 +43,7 @@ export class BatchService {
     private readonly ledgerService: InventoryLedgerService,
     private readonly glPostingService: GlPostingService,
     private readonly numberSeriesService: NumberSeriesService,
-  ) {}
+  ) { }
 
   private get db(): MySql2Database<typeof schema> {
     const tenantDb = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
@@ -214,17 +215,17 @@ export class BatchService {
         input_lines: dto.input_lines,
         standard: source.standard
           ? {
-              // std_output_quantity is deliberately NOT carried forward — it's
-              // re-derived from the new opening_quantity × breed mortality%
-              // by create() itself, the same way a fresh batch would.
-              std_output_cost_per_unit: source.standard.std_output_cost_per_unit ? Number(source.standard.std_output_cost_per_unit) : undefined,
-              std_overhead_rate_per_unit: source.standard.std_overhead_rate_per_unit ? Number(source.standard.std_overhead_rate_per_unit) : undefined,
-              consumption_lines: (source.standard.consumption_lines || []).map((l: any) => ({
-                item_id: l.item_id,
-                std_qty_per_unit_per_day: Number(l.std_qty_per_unit_per_day),
-                std_rate: l.std_rate ? Number(l.std_rate) : undefined,
-              })),
-            }
+            // std_output_quantity is deliberately NOT carried forward — it's
+            // re-derived from the new opening_quantity × breed mortality%
+            // by create() itself, the same way a fresh batch would.
+            std_output_cost_per_unit: source.standard.std_output_cost_per_unit ? Number(source.standard.std_output_cost_per_unit) : undefined,
+            std_overhead_rate_per_unit: source.standard.std_overhead_rate_per_unit ? Number(source.standard.std_overhead_rate_per_unit) : undefined,
+            consumption_lines: (source.standard.consumption_lines || []).map((l: any) => ({
+              item_id: l.item_id,
+              std_qty_per_unit_per_day: Number(l.std_qty_per_unit_per_day),
+              std_rate: l.std_rate ? Number(l.std_rate) : undefined,
+            })),
+          }
           : undefined,
       },
       tenantId,
@@ -281,6 +282,11 @@ export class BatchService {
     const [scheduler] = batch.scheduler_id
       ? await this.db.select().from(schema.schedulerMaster).where(eq(schema.schedulerMaster.scheduler_id, batch.scheduler_id)).limit(1)
       : [];
+    const stageSchedulers = await this.db
+      .select()
+      .from(schema.schedulerMaster)
+      .where(and(eq(schema.schedulerMaster.batch_id, id), eq(schema.schedulerMaster.is_active, true)))
+      .orderBy(schema.schedulerMaster.stage_code);
     const alerts = await this.db.select().from(schema.notificationAlertLog).where(eq(schema.notificationAlertLog.batch_id, id));
     const stageLog = await this.db.select().from(schema.batchStageLog).where(eq(schema.batchStageLog.batch_id, id));
 
@@ -294,6 +300,7 @@ export class BatchService {
       bio_asset_state: bioAssetState || null,
       bio_asset_entries: bioAssetEntries,
       scheduler: scheduler || null,
+      stage_schedulers: stageSchedulers,
       alerts,
       stage_log: stageLog,
     };
@@ -312,11 +319,13 @@ export class BatchService {
     this.assertStatus(batch, 'ACTIVE');
 
     // Opportunistic link to stage_master: if this LOB has a seeded stage matching
-    // the given code, record it alongside current_stage_code. If not (LOB has no
-    // Stage Master data, or the code is hand-typed/custom), stage_id just stays
-    // null — current_stage_code remains fully authoritative either way.
+    // the given code, record it alongside current_stage_code.
     const [matchedStage] = await this.db
-      .select({ stage_id: schema.stageMaster.stage_id })
+      .select({
+        stage_id: schema.stageMaster.stage_id,
+        stage_code: schema.stageMaster.stage_code,
+        stage_name: schema.stageMaster.stage_name,
+      })
       .from(schema.stageMaster)
       .where(
         and(
@@ -328,12 +337,52 @@ export class BatchService {
       )
       .limit(1);
 
+    // Look for matching stage scheduler for this batch
+    const targetStageCode = dto.to_stage_code.toUpperCase();
+    const stageSchedulers = await this.db
+      .select()
+      .from(schema.schedulerMaster)
+      .where(
+        and(
+          eq(schema.schedulerMaster.batch_id, id),
+          eq(schema.schedulerMaster.tenant_id, tenantId),
+          eq(schema.schedulerMaster.is_active, true)
+        )
+      );
+
+    let activeSchedulerId = batch.scheduler_id;
+    const destScheduler = stageSchedulers.find(
+      (s) =>
+        (matchedStage?.stage_id && s.stage_id === matchedStage.stage_id) ||
+        (s.stage_code && s.stage_code.toUpperCase() === targetStageCode) ||
+        (s.scheduler_code && s.scheduler_code.toUpperCase().includes(targetStageCode))
+    );
+
+    if (destScheduler) {
+      activeSchedulerId = destScheduler.scheduler_id;
+      // Mark old active schedulers as COMPLETED, and target as ACTIVE
+      for (const s of stageSchedulers) {
+        if (s.scheduler_id === destScheduler.scheduler_id) {
+          await this.db
+            .update(schema.schedulerMaster)
+            .set({ scheduler_status: 'ACTIVE', updated_at: toMysqlTimestamp() })
+            .where(eq(schema.schedulerMaster.scheduler_id, s.scheduler_id));
+        } else if (s.scheduler_status === 'ACTIVE') {
+          await this.db
+            .update(schema.schedulerMaster)
+            .set({ scheduler_status: 'COMPLETED', updated_at: toMysqlTimestamp() })
+            .where(eq(schema.schedulerMaster.scheduler_id, s.scheduler_id));
+        }
+      }
+    }
+
     await this.db
       .update(schema.batchHeader)
       .set({
         current_stage_code: dto.to_stage_code,
         stage_id: matchedStage?.stage_id || null,
         sub_location_id: dto.to_location_id || null,
+        scheduler_id: activeSchedulerId,
         updated_by: userPayload?.userId || null,
         updated_at: toMysqlTimestamp(),
       })
@@ -357,8 +406,8 @@ export class BatchService {
       action: 'TRANSFER_STAGE',
       entityName: 'batch_header',
       entityId: id,
-      oldValues: { current_stage_code: batch.current_stage_code, sub_location_id: batch.sub_location_id },
-      newValues: { current_stage_code: dto.to_stage_code, sub_location_id: dto.to_location_id },
+      oldValues: { current_stage_code: batch.current_stage_code, sub_location_id: batch.sub_location_id, scheduler_id: batch.scheduler_id },
+      newValues: { current_stage_code: dto.to_stage_code, sub_location_id: dto.to_location_id, scheduler_id: activeSchedulerId },
     });
 
     return this.findOne(id);
@@ -882,26 +931,31 @@ export class BatchService {
     parameter: typeof schema.parameterMaster.$inferSelect,
     openingQty: number
   ): number {
-    if (spl.expected_qty_override) {
-      return Number(spl.expected_qty_override);
+    const rawQty = spl.expected_qty_override
+      ? Number(spl.expected_qty_override)
+      : parameter.default_qty_per_unit
+        ? Number(parameter.default_qty_per_unit)
+        : parameter.default_qty_per_batch
+          ? Number(parameter.default_qty_per_batch)
+          : spl.kpi_target_value
+            ? Number(spl.kpi_target_value)
+            : 0;
+
+    if (parameter.parameter_type === 'CONSUMPTION') {
+      if (parameter.qty_method === 'PER_BATCH') {
+        return rawQty;
+      }
+      return rawQty * openingQty;
     }
-    if (parameter.qty_method === 'PER_UNIT' && parameter.default_qty_per_unit) {
-      return Number(parameter.default_qty_per_unit) * openingQty;
+
+    if (parameter.parameter_type === 'OUTPUT') {
+      if (parameter.qty_method === 'PER_UNIT') {
+        return rawQty * openingQty;
+      }
+      return rawQty;
     }
-    if (parameter.qty_method === 'PER_BATCH' && parameter.default_qty_per_batch) {
-      return Number(parameter.default_qty_per_batch);
-    }
-    if (spl.kpi_target_value) {
-      return Number(spl.kpi_target_value);
-    }
-    if (spl.kpi_mode === 'VALUE' && (spl.kpi_min_value !== null || spl.kpi_max_value !== null)) {
-      const min = spl.kpi_min_value !== null ? Number(spl.kpi_min_value) : null;
-      const max = spl.kpi_max_value !== null ? Number(spl.kpi_max_value) : null;
-      if (min !== null && max !== null) return (min + max) / 2;
-      if (min !== null) return min;
-      if (max !== null) return max;
-    }
-    return openingQty; // MANUAL_AT_ENTRY fallback — e.g. mortality as a % of headcount
+
+    return rawQty;
   }
 
   /**
@@ -1089,9 +1143,8 @@ export class BatchService {
 
   /**
    * Drives the batch "Data Entry" screen: every scheduler_parameter_line
-   * that's due on the given date, with its expected quantity and whatever's
-   * already been recorded that day — so the UI can show a guided checklist
-   * instead of a blank generic transaction form.
+   * that's due on the given date, with its expected quantity, enriched category,
+   * daily breed standards and whatever's already been recorded that day.
    */
   async getDataEntry(id: string, dateStr: string) {
     const batch = await this.findOne(id);
@@ -1113,11 +1166,37 @@ export class BatchService {
     const itemRows = itemIds.length
       ? await this.db.select().from(schema.itemMaster).where(inArray(schema.itemMaster.item_id, itemIds))
       : [];
+    const itemMap = new Map(itemRows.map((x) => [x.item_id, x]));
+
     const itemLabel = (itemId: string | null) => {
       if (!itemId) return null;
-      const it = itemRows.find((x) => x.item_id === itemId);
+      const it = itemMap.get(itemId);
       return it ? `${it.item_code} — ${it.item_name}` : null;
     };
+
+    let dailyStandards: any = null;
+    if (batch.breed_id) {
+      const [std] = await this.db
+        .select()
+        .from(schema.breedLifecycleStages)
+        .where(
+          and(
+            eq(schema.breedLifecycleStages.breed_id, batch.breed_id),
+            lte(schema.breedLifecycleStages.period_from, dayOfBatch),
+            gte(schema.breedLifecycleStages.period_to, dayOfBatch)
+          )
+        )
+        .limit(1);
+      if (std) {
+        dailyStandards = {
+          std_body_weight_kg: std.std_body_weight_kg ? Number(std.std_body_weight_kg) : null,
+          std_adg_gpd: std.std_adg_gpd ? Number(std.std_adg_gpd) : null,
+          feed_qty_per_head_per_day_kg: std.feed_qty_per_head_per_day_kg ? Number(std.feed_qty_per_head_per_day_kg) : null,
+          std_fcr: std.std_fcr ? Number(std.std_fcr) : null,
+          std_mortality_rate_pct: std.std_mortality_rate_pct ? Number(std.std_mortality_rate_pct) : null,
+        };
+      }
+    }
 
     const lines = activeLines.map(({ spl, parameter }) => {
       const alreadyEntered = sameDayTx
@@ -1126,23 +1205,598 @@ export class BatchService {
           && (parameter.resource_id ? t.resource_id === parameter.resource_id : true))
         .reduce((sum, t) => sum + Number(t.quantity || 0), 0);
 
+      const it = parameter.item_id ? itemMap.get(parameter.item_id) : null;
+      let category = 'GENERAL';
+      const pType = parameter.parameter_type;
+      const pName = (parameter.parameter_name || '').toUpperCase();
+      if (pType === 'CONSUMPTION') {
+        if (pName.includes('FEED') || pName.includes('STARTER') || pName.includes('GROWER') || pName.includes('FINISHER') || pName.includes('CREEP') || pName.includes('GESTATION') || pName.includes('LACTATION')) {
+          category = 'FEED';
+        } else if (pName.includes('VACCINE') || pName.includes('VACCINATION')) {
+          category = 'VACCINE';
+        } else if (pName.includes('MEDICINE') || pName.includes('ANTIBIOTIC') || pName.includes('DEWORM')) {
+          category = 'MEDICINE';
+        } else {
+          category = 'FEED';
+        }
+      } else if (pType === 'OBSERVATION') {
+        if (pName.includes('WEIGHT') || pName.includes('ADG')) {
+          category = 'WEIGHT';
+        } else if (pName.includes('PREGNANCY') || pName.includes('SCAN') || pName.includes('HEAT')) {
+          category = 'SCAN';
+        } else {
+          category = 'OBSERVATION';
+        }
+      } else if (pType === 'MORTALITY') {
+        category = 'MORTALITY';
+      } else if (pType === 'OVERHEAD') {
+        category = 'OVERHEAD';
+      } else if (pType === 'OUTPUT') {
+        category = 'OUTPUT';
+      } else if (pType === 'RESOURCE') {
+        category = 'RESOURCE';
+      } else if (pType === 'TRANSFER') {
+        category = 'TRANSFER';
+      }
+
       return {
         spl_id: spl.spl_id,
         parameter_id: parameter.parameter_id,
         parameter_type: parameter.parameter_type,
-        parameter_name: parameter.parameter_name,
-        item_id: parameter.item_id,
-        item_label: itemLabel(parameter.item_id),
-        resource_id: parameter.resource_id,
-        uom: spl.uom_override || parameter.default_uom || null,
+        line_type: spl.line_type || parameter.parameter_type,
+        parameter_name: spl.parameter_name || parameter.parameter_name,
+        category,
+        item_id: spl.item_id || parameter.item_id,
+        item_code: it?.item_code || null,
+        item_name: spl.item_description || it?.item_name || null,
+        item_label: itemLabel(spl.item_id || parameter.item_id),
+        standard_cost: it?.standard_cost ? Number(it.standard_cost) : (spl.estimated_cost ? Number(spl.estimated_cost) : null),
+        estimated_cost: spl.estimated_cost ? Number(spl.estimated_cost) : null,
+        resource_id: spl.resource_id || parameter.resource_id,
+        resource_name: spl.resource_name || null,
+        uom: spl.uom_override || spl.uom || parameter.default_uom || 'KG',
         occurrence: spl.occurrence,
         period_label: spl.period_label,
+        withdrawal_days: spl.withdrawal_days,
+        transfer_qty_basis: spl.transfer_qty_basis,
+        auto_triggers_stage: spl.auto_triggers_stage,
+        to_batch_id: spl.to_batch_id,
+        to_location_id: spl.to_location_id,
         expected_qty: this.computeExpectedQty(spl, parameter, openingQty),
         already_entered_qty: alreadyEntered,
+        kpi_enabled: spl.kpi_enabled,
+        kpi_target_value: spl.kpi_target_value ? Number(spl.kpi_target_value) : null,
+        kpi_min_pct: spl.kpi_min_pct ? Number(spl.kpi_min_pct) : null,
+        kpi_max_pct: spl.kpi_max_pct ? Number(spl.kpi_max_pct) : null,
+        kpi_min_value: spl.kpi_min_value ? Number(spl.kpi_min_value) : null,
+        kpi_max_value: spl.kpi_max_value ? Number(spl.kpi_max_value) : null,
+        critical_threshold_pct: spl.critical_threshold_pct ? Number(spl.critical_threshold_pct) : null,
       };
     });
 
-    return { date: dateStr, day_of_batch: dayOfBatch, lines };
+    let draft = null;
+    try {
+      const [draftRow] = await this.db
+        .select()
+        .from(schema.batchDailyEntryDraft)
+        .where(
+          and(
+            eq(schema.batchDailyEntryDraft.batch_id, id),
+            eq(schema.batchDailyEntryDraft.entry_date, dateStr)
+          )
+        )
+        .limit(1);
+      if (draftRow) {
+        draft = draftRow.payload;
+      }
+    } catch {}
+
+    return {
+      date: dateStr,
+      day_of_batch: dayOfBatch,
+      daily_standards: dailyStandards,
+      lines,
+      same_day_transactions: sameDayTx,
+      draft,
+      bio_asset_state: batch.bio_asset_state || null,
+    };
+  }
+
+  /**
+   * Unified Daily Operations Entry: records multi-block operational logs
+   * (feed consumption, medicine, mortality, weight, checkpoints, overheads)
+   * in an integrated workflow.
+   */
+  async postDailyEntry(id: string, dto: SingleBatchDailyEntryDto, tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(id);
+    this.assertStatus(batch, 'ACTIVE');
+
+    // Helper to resolve a valid item_id
+    const resolveItemId = async (itemId?: string, parameterId?: string): Promise<string | null> => {
+      if (itemId) {
+        const [found] = await this.db.select({ id: schema.itemMaster.item_id }).from(schema.itemMaster).where(eq(schema.itemMaster.item_id, itemId)).limit(1);
+        if (found) return found.id;
+      }
+      if (parameterId) {
+        const [param] = await this.db.select({ item_id: schema.parameterMaster.item_id }).from(schema.parameterMaster).where(eq(schema.parameterMaster.parameter_id, parameterId)).limit(1);
+        if (param?.item_id) return param.item_id;
+      }
+      return null;
+    };
+
+    // 1. Process Feed Lines
+    if (dto.feed_lines && dto.feed_lines.length > 0) {
+      for (const line of dto.feed_lines) {
+        if (!line.quantity || Number(line.quantity) <= 0) continue;
+        const validItemId = await resolveItemId(line.item_id, line.parameter_id);
+        if (validItemId) {
+          await this.addTransaction(
+            id,
+            {
+              transaction_date: dto.date,
+              transaction_type: 'CONSUMPTION',
+              item_id: validItemId,
+              quantity: Number(line.quantity),
+              uom: line.uom || 'KG',
+              rate: line.rate ? Number(line.rate) : undefined,
+              remarks: line.lot_no ? `Lot: ${line.lot_no}` : undefined,
+              spl_id: line.spl_id,
+              parameter_id: line.parameter_id,
+            },
+            tenantId,
+            userPayload
+          );
+        } else {
+          // Record as OBSERVATION log so operational data is safely preserved
+          await this.addTransaction(
+            id,
+            {
+              transaction_date: dto.date,
+              transaction_type: 'OBSERVATION',
+              quantity: Number(line.quantity),
+              uom: line.uom || 'KG',
+              remarks: `Feed Consumption: ${line.quantity} ${line.uom || 'KG'}${line.lot_no ? ` (Lot: ${line.lot_no})` : ''}`,
+            },
+            tenantId,
+            userPayload
+          );
+        }
+      }
+    }
+
+    // 2. Process Medicine Lines
+    if (dto.medicine_lines && dto.medicine_lines.length > 0) {
+      for (const line of dto.medicine_lines) {
+        if (!line.quantity || Number(line.quantity) <= 0) continue;
+        const validItemId = await resolveItemId(line.item_id, line.parameter_id);
+        const remarksList = [line.lot_no ? `Lot: ${line.lot_no}` : '', line.remarks || ''].filter(Boolean);
+        if (validItemId) {
+          await this.addTransaction(
+            id,
+            {
+              transaction_date: dto.date,
+              transaction_type: 'CONSUMPTION',
+              item_id: validItemId,
+              quantity: Number(line.quantity),
+              uom: line.uom || 'DOSES',
+              rate: line.rate ? Number(line.rate) : undefined,
+              remarks: remarksList.length > 0 ? remarksList.join(' - ') : undefined,
+              spl_id: line.spl_id,
+              parameter_id: line.parameter_id,
+            },
+            tenantId,
+            userPayload
+          );
+        } else {
+          await this.addTransaction(
+            id,
+            {
+              transaction_date: dto.date,
+              transaction_type: 'OBSERVATION',
+              quantity: Number(line.quantity),
+              uom: line.uom || 'DOSES',
+              remarks: `Medicine/Vaccine administration: ${line.quantity} ${line.uom || 'DOSES'}${remarksList.length > 0 ? ` (${remarksList.join(' - ')})` : ''}`,
+            },
+            tenantId,
+            userPayload
+          );
+        }
+      }
+    }
+
+    // 3. Process Weight Observation
+    if (dto.weight && dto.weight.avg_weight && Number(dto.weight.avg_weight) > 0) {
+      const notes = [
+        `Avg Weight: ${dto.weight.avg_weight} kg`,
+        dto.weight.daily_gain_gpd ? `ADG: ${dto.weight.daily_gain_gpd} g/d` : '',
+        dto.weight.bcs_score ? `BCS: ${dto.weight.bcs_score}` : '',
+        dto.weight.head_count ? `Headcount: ${dto.weight.head_count}` : '',
+        dto.weight.remarks || '',
+      ].filter(Boolean).join(' | ');
+
+      await this.addTransaction(
+        id,
+        {
+          transaction_date: dto.date,
+          transaction_type: 'OBSERVATION',
+          quantity: Number(dto.weight.avg_weight),
+          uom: 'KG',
+          remarks: notes,
+        },
+        tenantId,
+        userPayload
+      );
+    }
+
+    // 4. Process Mortality Lines
+    if (dto.mortality_lines && dto.mortality_lines.length > 0) {
+      for (const mort of dto.mortality_lines) {
+        if (!mort.quantity || Number(mort.quantity) <= 0) continue;
+        const notes = [mort.reason ? `Reason: ${mort.reason}` : '', mort.remarks || ''].filter(Boolean).join(' - ');
+        await this.addTransaction(
+          id,
+          {
+            transaction_date: dto.date,
+            transaction_type: 'MORTALITY',
+            quantity: Number(mort.quantity),
+            remarks: notes || undefined,
+            spl_id: mort.spl_id,
+          },
+          tenantId,
+          userPayload
+        );
+      }
+    }
+
+    // 5. Process Checkpoint Decision
+    if (dto.checkpoint_decision && dto.checkpoint_decision.decision) {
+      const dec = dto.checkpoint_decision;
+      const notes = `Checkpoint [${dec.checkpoint_type || 'SCAN'}]: ${dec.decision} (Confirmed: ${dec.confirmed_count || 0}, Repeat: ${dec.repeat_count || 0}, Failed: ${dec.failed_count || 0})${dec.remarks ? ` — ${dec.remarks}` : ''}`;
+      await this.addTransaction(
+        id,
+        {
+          transaction_date: dto.date,
+          transaction_type: 'OBSERVATION',
+          remarks: notes,
+        },
+        tenantId,
+        userPayload
+      );
+    }
+
+    // 6. Process Overheads
+    if (dto.overhead_lines && dto.overhead_lines.length > 0) {
+      for (const ovh of dto.overhead_lines) {
+        if (!ovh.quantity || Number(ovh.quantity) <= 0) continue;
+        const rate = Number(ovh.rate || 0);
+        if (rate > 0) {
+          await this.addTransaction(
+            id,
+            {
+              transaction_date: dto.date,
+              transaction_type: 'OVERHEAD',
+              resource_id: ovh.resource_id,
+              parameter_id: ovh.parameter_id,
+              quantity: Number(ovh.quantity),
+              rate,
+              uom: ovh.uom || 'UNITS',
+              remarks: ovh.resource_name || undefined,
+            },
+            tenantId,
+            userPayload
+          );
+        } else {
+          await this.addTransaction(
+            id,
+            {
+              transaction_date: dto.date,
+              transaction_type: 'OBSERVATION',
+              quantity: Number(ovh.quantity),
+              uom: ovh.uom || 'UNITS',
+              remarks: `Overhead log: ${ovh.resource_name || 'Barn Overhead'} (${ovh.quantity} ${ovh.uom || 'UNITS'})`,
+            },
+            tenantId,
+            userPayload
+          );
+        }
+      }
+    }
+
+    // 7. Process Output Harvest Lines (Live Born Piglets, Weaned Piglets, Market Porkers)
+    if (dto.output_lines && dto.output_lines.length > 0) {
+      for (const line of dto.output_lines) {
+        if (!line.quantity || Number(line.quantity) <= 0) continue;
+        const validItemId = await resolveItemId(line.item_id, line.parameter_id);
+        const notes = [
+          line.output_type ? `Type: ${line.output_type}` : '',
+          line.avg_weight ? `Avg Weight: ${line.avg_weight} kg` : '',
+          line.remarks || '',
+        ].filter(Boolean).join(' - ');
+
+        await this.addTransaction(
+          id,
+          {
+            transaction_date: dto.date,
+            transaction_type: 'OUTPUT',
+            item_id: validItemId || undefined,
+            quantity: Number(line.quantity),
+            uom: line.uom || 'HEAD',
+            rate: line.rate ? Number(line.rate) : undefined,
+            remarks: notes || (validItemId ? undefined : `Output yield: ${line.item_name || 'Produced items'} (${line.quantity} ${line.uom || 'HEAD'})`),
+            spl_id: line.spl_id,
+            parameter_id: line.parameter_id,
+            output_type: line.output_type || 'MAIN',
+          },
+          tenantId,
+          userPayload
+        );
+      }
+    }
+
+    // 8. Process Resource / Labour Lines
+    if (dto.resource_lines && dto.resource_lines.length > 0) {
+      for (const res of dto.resource_lines) {
+        if (!res.quantity || Number(res.quantity) <= 0) continue;
+        await this.addTransaction(
+          id,
+          {
+            transaction_date: dto.date,
+            transaction_type: 'OVERHEAD',
+            resource_id: res.resource_id,
+            parameter_id: res.parameter_id,
+            quantity: Number(res.quantity),
+            rate: res.rate ? Number(res.rate) : undefined,
+            uom: res.uom || 'HOURS',
+            remarks: res.resource_name || res.remarks || 'Labour & Attendant Care',
+            spl_id: res.spl_id,
+          },
+          tenantId,
+          userPayload
+        );
+      }
+    }
+
+    // 9. Process Stage Batch Transfer
+    if (dto.transfer && dto.transfer.head_count && Number(dto.transfer.head_count) > 0) {
+      await this.addTransaction(
+        id,
+        {
+          transaction_date: dto.date,
+          transaction_type: 'TRANSFER',
+          quantity: Number(dto.transfer.head_count),
+          uom: 'HEAD',
+          remarks: `Stage Transfer: ${dto.transfer.head_count} head${dto.transfer.to_stage_code ? ` to ${dto.transfer.to_stage_code}` : ''}${dto.transfer.remarks ? ` — ${dto.transfer.remarks}` : ''}`,
+        },
+        tenantId,
+        userPayload
+      );
+
+      if (dto.transfer.auto_triggers_stage && dto.transfer.to_stage_code) {
+        await this.transferStage(
+          id,
+          {
+            to_stage_code: dto.transfer.to_stage_code,
+            to_location_id: dto.transfer.to_location_id,
+            remarks: dto.transfer.remarks || `Auto-triggered via daily data entry transfer on ${dto.date}`,
+          },
+          tenantId,
+          userPayload
+        );
+      }
+    }
+
+    // Auto-discard any draft for this date upon successful posting
+    try {
+      await this.deleteDailyEntryDraft(id, dto.date);
+    } catch {}
+
+    return this.findOne(id);
+  }
+
+  /**
+   * Save / update a draft daily entry sheet without committing ledger or inventory movements
+   */
+  async saveDailyEntryDraft(batchId: string, payload: any, tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(batchId);
+    const dateStr = payload.date || new Date().toISOString().slice(0, 10);
+    const existing = await this.db
+      .select()
+      .from(schema.batchDailyEntryDraft)
+      .where(
+        and(
+          eq(schema.batchDailyEntryDraft.batch_id, batchId),
+          eq(schema.batchDailyEntryDraft.entry_date, dateStr)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      await this.db
+        .update(schema.batchDailyEntryDraft)
+        .set({
+          payload,
+          updated_at: new Date().toISOString(),
+          created_by: userPayload?.userId || undefined,
+        })
+        .where(eq(schema.batchDailyEntryDraft.draft_id, existing[0].draft_id));
+      return { draft_id: existing[0].draft_id, message: 'Draft updated successfully.' };
+    } else {
+      const draftId = randomUUID();
+      await this.db.insert(schema.batchDailyEntryDraft).values({
+        draft_id: draftId,
+        tenant_id: tenantId,
+        company_id: batch.company_id,
+        batch_id: batchId,
+        entry_date: dateStr,
+        payload,
+        created_by: userPayload?.userId || null,
+      });
+      return { draft_id: draftId, message: 'Draft saved successfully.' };
+    }
+  }
+
+  /**
+   * Retrieve a saved draft daily entry sheet
+   */
+  async getDailyEntryDraft(batchId: string, dateStr: string) {
+    const [draftRow] = await this.db
+      .select()
+      .from(schema.batchDailyEntryDraft)
+      .where(
+        and(
+          eq(schema.batchDailyEntryDraft.batch_id, batchId),
+          eq(schema.batchDailyEntryDraft.entry_date, dateStr)
+        )
+      )
+      .limit(1);
+
+    return draftRow ? { exists: true, draft: draftRow.payload } : { exists: false, draft: null };
+  }
+
+  /**
+   * Delete / discard a saved draft daily entry sheet
+   */
+  async deleteDailyEntryDraft(batchId: string, dateStr: string) {
+    await this.db
+      .delete(schema.batchDailyEntryDraft)
+      .where(
+        and(
+          eq(schema.batchDailyEntryDraft.batch_id, batchId),
+          eq(schema.batchDailyEntryDraft.entry_date, dateStr)
+        )
+      );
+    return { success: true, message: 'Draft discarded successfully.' };
+  }
+
+  /**
+   * Assign individual registered animals to a batch
+   */
+  async assignAnimalsToBatch(batchId: string, animalIds: string[], tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(batchId);
+    if (!animalIds || animalIds.length === 0) {
+      throw new BadRequestException('No animal IDs provided for assignment.');
+    }
+
+    for (const animalId of animalIds) {
+      await this.db
+        .update(schema.animalRegister)
+        .set({
+          current_batch_id: batchId,
+          current_stage_id: batch.stage_id || null,
+          current_location_id: batch.location_id || batch.shed_id || null,
+          updated_by: userPayload?.userId || null,
+        })
+        .where(
+          and(
+            eq(schema.animalRegister.animal_id, animalId),
+            eq(schema.animalRegister.tenant_id, tenantId)
+          )
+        );
+    }
+
+    // Refresh batch current_quantity
+    const assignedCount = await this.db
+      .select()
+      .from(schema.animalRegister)
+      .where(
+        and(
+          eq(schema.animalRegister.current_batch_id, batchId),
+          eq(schema.animalRegister.is_active, true)
+        )
+      );
+
+    if (assignedCount.length > 0) {
+      await this.db
+        .update(schema.batchHeader)
+        .set({ current_quantity: String(assignedCount.length) } as any)
+        .where(eq(schema.batchHeader.batch_id, batchId));
+    }
+
+    return { assigned: animalIds.length, total_assigned: assignedCount.length };
+  }
+
+  /**
+   * Unassign animals from a batch
+   */
+  async unassignAnimalsFromBatch(batchId: string, animalIds: string[], tenantId: string, userPayload?: any) {
+    if (!animalIds || animalIds.length === 0) {
+      throw new BadRequestException('No animal IDs provided for unassignment.');
+    }
+
+    for (const animalId of animalIds) {
+      await this.db
+        .update(schema.animalRegister)
+        .set({
+          current_batch_id: null,
+          updated_by: userPayload?.userId || null,
+        })
+        .where(
+          and(
+            eq(schema.animalRegister.animal_id, animalId),
+            eq(schema.animalRegister.tenant_id, tenantId)
+          )
+        );
+    }
+
+    return { unassigned: animalIds.length };
+  }
+
+  /**
+   * Bulk register and assign animals via list of ear/RFID tags
+   */
+  async bulkRegisterAnimalsToBatch(
+    batchId: string,
+    dto: { tags: string[]; breed_id?: string; animal_type?: string; gender?: string },
+    tenantId: string,
+    userPayload?: any
+  ) {
+    const batch = await this.findOne(batchId);
+    const tags = (dto.tags || []).map((t) => t.trim()).filter(Boolean);
+    if (tags.length === 0) {
+      throw new BadRequestException('No ear tags or RFID tags provided.');
+    }
+
+    const breedId = dto.breed_id || batch.breed_id;
+    const animalType = dto.animal_type || (batch.costing_method === 'BIO_ASSET' ? 'SOW' : 'PORKER');
+    const gender = dto.gender || (animalType === 'SOW' ? 'F' : 'M');
+
+    // Get default item
+    const [defItem] = await this.db.select({ item_id: schema.itemMaster.item_id }).from(schema.itemMaster).limit(1);
+
+    const createdAnimals: string[] = [];
+    for (let i = 0; i < tags.length; i++) {
+      const tag = tags[i];
+      const anmId = randomUUID();
+      const code = `PIG-${Date.now().toString().slice(-4)}-${String(i + 1).padStart(3, '0')}`;
+      await this.db.insert(schema.animalRegister).values({
+        animal_id: anmId,
+        tenant_id: tenantId,
+        company_id: batch.company_id,
+        nob_id: batch.nob_id || '50000000-5000-5000-5000-000000000002',
+        lob_id: batch.lob_id,
+        animal_code: code,
+        animal_type: animalType,
+        breed_id: breedId,
+        gender: gender,
+        dob: '2025-06-01',
+        entry_type: 'BORN_ON_FARM',
+        entry_date: batch.start_date,
+        item_id: defItem?.item_id || randomUUID(),
+        ear_tag: tag.startsWith('ET-') ? tag : `ET-${tag}`,
+        rfid_tag: tag.startsWith('982') ? tag : `98200041${Date.now().toString().slice(-4)}${String(i + 1).padStart(3, '0')}`,
+        acquisition_cost: '25000.00',
+        total_opening_asset_value: '25000.00',
+        current_bio_asset_value: '25000.00',
+        current_stage_id: batch.stage_id || null,
+        current_batch_id: batchId,
+        status: 'ACTIVE',
+        is_active: true,
+        created_by: userPayload?.userId || null,
+      });
+      createdAnimals.push(anmId);
+    }
+
+    return { registered_count: createdAnimals.length, animal_ids: createdAnimals };
   }
 
   async close(id: string, dto: CloseBatchDto, tenantId: string, userPayload?: any) {
@@ -1960,17 +2614,17 @@ export class BatchService {
   }
 
   /**
-   * Auto-generates a concrete scheduler_master and scheduler_parameter_line records
-   * for a batch from its breed's breed_lifecycle_stages, then links and locks it.
+   * Multi-Stage Schedulers Engine: Auto-generates dedicated scheduler_master records
+   * and parameter lines for each lifecycle stage of the batch from breed standards & Stage Master.
    */
   async generateSchedulerForBatch(batchId: string, tenantId: string, userPayload?: any) {
     const batch = await this.findOne(batchId);
 
     if (!batch.breed_id) {
-      throw new BadRequestException('Batch must have a breed assigned to auto-generate a scheduler from breed lifecycle standards.');
+      throw new BadRequestException('Batch must have a breed assigned to auto-generate schedulers from breed lifecycle standards.');
     }
 
-    // 1. Fetch breed lifecycle stages
+    // 1. Fetch breed lifecycle stages and stage master records for this LOB
     const lifecycleRows = await this.db
       .select({
         lifecycle: schema.breedLifecycleStages,
@@ -1987,8 +2641,50 @@ export class BatchService {
       )
       .orderBy(schema.breedLifecycleStages.period_from);
 
-    if (lifecycleRows.length === 0) {
-      throw new BadRequestException(`No breed lifecycle standards found for breed '${batch.breed?.breed_name || batch.breed_id}'.`);
+    const stagesToGenerate: Array<{
+      stage_id: string;
+      stage_code: string;
+      stage_name: string;
+      duration_days: number;
+      lifecycle?: typeof schema.breedLifecycleStages.$inferSelect;
+    }> = [];
+
+    if (lifecycleRows.length > 0) {
+      for (const row of lifecycleRows) {
+        const pDays = toDays(row.lifecycle.period_to - row.lifecycle.period_from + 1, row.lifecycle.calc_unit);
+        stagesToGenerate.push({
+          stage_id: row.stage.stage_id,
+          stage_code: row.stage.stage_code,
+          stage_name: row.stage.stage_name,
+          duration_days: Math.max(1, pDays || row.stage.typical_duration_days || 30),
+          lifecycle: row.lifecycle,
+        });
+      }
+    } else {
+      const lobStages = await this.db
+        .select()
+        .from(schema.stageMaster)
+        .where(
+          and(
+            eq(schema.stageMaster.lob_id, batch.lob_id),
+            eq(schema.stageMaster.is_active, true),
+            isNull(schema.stageMaster.deleted_at)
+          )
+        )
+        .orderBy(schema.stageMaster.stage_sequence);
+
+      for (const stg of lobStages) {
+        stagesToGenerate.push({
+          stage_id: stg.stage_id,
+          stage_code: stg.stage_code,
+          stage_name: stg.stage_name,
+          duration_days: stg.typical_duration_days || 30,
+        });
+      }
+    }
+
+    if (stagesToGenerate.length === 0) {
+      throw new BadRequestException(`No lifecycle stages or stage master standards found for breed '${batch.breed_id}'.`);
     }
 
     // 2. Fetch existing or create fallback parameter_master records
@@ -2043,134 +2739,773 @@ export class BatchService {
     };
 
     const feedParam = await findOrCreateParam('FEED_STD', 'Daily Feed Consumption', 'CONSUMPTION', 'KG');
-    const mortParam = await findOrCreateParam('MORT_STD', 'Standard Mortality', 'MORTALITY', 'HEAD');
-    const weightParam = await findOrCreateParam('WEIGHT_STD', 'Body Weight Target', 'OUTPUT', 'KG');
+    const dewormParam = await findOrCreateParam('DEWORM_STD', 'Deworming Protocol', 'CONSUMPTION', 'DOSES');
+    const pcv2Param = await findOrCreateParam('PCV2_STD', 'PCV2 Vaccination Protocol', 'CONSUMPTION', 'DOSES');
+    const ironParam = await findOrCreateParam('IRON_STD', 'Iron Dextran 200mg Injection', 'CONSUMPTION', 'DOSES');
+    const mortParam = await findOrCreateParam('MORT_STD', 'Daily Mortality Count', 'DESCRIPTIVE', 'HEAD');
+    const headParam = await findOrCreateParam('HEAD_STD', 'Head Count Verification', 'DESCRIPTIVE', 'HEAD');
+    const weightParam = await findOrCreateParam('WEIGHT_STD', 'Average Body Weight Target', 'DESCRIPTIVE', 'KG');
+    const adgParam = await findOrCreateParam('ADG_STD', 'Average Daily Gain (ADG)', 'DESCRIPTIVE', 'G/DAY');
+    const bcsParam = await findOrCreateParam('BCS_STD', 'Body Condition Score (BCS 1-5)', 'DESCRIPTIVE', 'SCORE');
+    const scanParam = await findOrCreateParam('PREG_SCAN', 'Pregnancy Confirmation Ultrasound Scan', 'DESCRIPTIVE', 'CHECK');
+    const tempParam = await findOrCreateParam('TEMP_STD', 'Barn Ambient Temperature', 'DESCRIPTIVE', 'CELSIUS');
+    const waterParam = await findOrCreateParam('WATER_STD', 'Water Meter Reading', 'DESCRIPTIVE', 'LITRE');
+    const electOverhead = await findOrCreateParam('OH_ELEC', 'Barn Electricity & Ventilation', 'OVERHEAD', 'MONTH');
+    const waterOverhead = await findOrCreateParam('OH_WATER', 'Barn Water Supply & Misting', 'OVERHEAD', 'MONTH');
+    const stockmanLabour = await findOrCreateParam('RES_STOCKMAN', 'Stockman Attendant Care', 'RESOURCE', 'HOURS');
+    const vetLabour = await findOrCreateParam('RES_VET', 'Veterinary Health Inspection', 'RESOURCE', 'HOURS');
+    const weanTransferParam = await findOrCreateParam('TRANS_WEAN', 'Transfer Weaned Piglets to Nursery Batch', 'TRANSFER', 'HEAD');
+    const gestTransferParam = await findOrCreateParam('TRANS_FARR', 'Transfer Sows to Farrowing Crate', 'TRANSFER', 'HEAD');
 
-    // 3. Create scheduler_master
-    const schedulerId = randomUUID();
-    const schedulerCode = `SCHED-${batch.batch_no}`;
-    const totalDays = lifecycleRows.reduce((max, r) => {
-      const pTo = toDays(r.lifecycle.period_to, r.lifecycle.calc_unit);
-      return Math.max(max, pTo);
-    }, 180);
+    const animalCount = Number(batch.current_quantity ?? batch.opening_quantity ?? 30);
+    const currentStageCode = (batch.current_stage_code || 'DRY_SOW_GESTATION').toUpperCase();
 
-    // If an existing scheduler with this code exists, append short timestamp
-    const [existingSched] = await this.db
-      .select()
-      .from(schema.schedulerMaster)
-      .where(and(eq(schema.schedulerMaster.tenant_id, tenantId), eq(schema.schedulerMaster.scheduler_code, schedulerCode)))
-      .limit(1);
+    let activeStageSchedulerId: string | null = null;
 
-    const finalSchedCode = existingSched ? `${schedulerCode}-${Date.now().toString().slice(-4)}` : schedulerCode;
+    // 3. Iterate each stage and create a dedicated scheduler_master & parameter lines
+    for (const stageItem of stagesToGenerate) {
+      const stageCode = stageItem.stage_code.toUpperCase();
+      const schedulerCode = `SCHED-${batch.batch_no}-${stageCode}`;
+      const isCurrentStage = currentStageCode === stageCode || (!batch.current_stage_code && stageCode === 'DRY_SOW_GESTATION');
 
-    await this.db.insert(schema.schedulerMaster).values({
-      scheduler_id: schedulerId,
-      tenant_id: tenantId,
-      company_id: batch.company_id,
-      nob_id: batch.nob_id,
-      lob_id: batch.lob_id,
-      scheduler_code: finalSchedCode,
-      scheduler_name: `Scheduler for Batch ${batch.batch_no} (${batch.breed?.breed_name || 'Breed Standards'})`,
-      duration_value: totalDays,
-      duration_unit: 'DAY',
-      breed_id: batch.breed_id,
-      batch_start_from: 'Batch Start Date',
-      is_locked: true,
-      description: `Auto-generated from breed lifecycle standards for ${batch.breed?.breed_name || 'breed'}.`,
-      created_by: userPayload?.userId || null,
-    });
+      // Check if scheduler for this stage already exists
+      const [existingSched] = await this.db
+        .select()
+        .from(schema.schedulerMaster)
+        .where(
+          and(
+            eq(schema.schedulerMaster.tenant_id, tenantId),
+            eq(schema.schedulerMaster.batch_id, batchId),
+            eq(schema.schedulerMaster.stage_code, stageCode)
+          )
+        )
+        .limit(1);
 
-    // 4. Create scheduler_parameter_line rows
-    let periodNo = 1;
-    for (const { lifecycle, stage } of lifecycleRows) {
-      const periodFrom = toDays(lifecycle.period_from, lifecycle.calc_unit);
-      const periodTo = toDays(lifecycle.period_to, lifecycle.calc_unit);
+      const schedulerId = existingSched?.scheduler_id || randomUUID();
+      const schedStatus = isCurrentStage ? 'ACTIVE' : 'PENDING';
 
-      // Feed line
-      if (lifecycle.feed_qty_per_head_per_day_kg) {
-        await this.db.insert(schema.schedulerParameterLine).values({
-          spl_id: randomUUID(),
+      if (existingSched) {
+        await this.db
+          .update(schema.schedulerMaster)
+          .set({
+            stage_id: stageItem.stage_id,
+            stage_name: stageItem.stage_name,
+            duration_value: stageItem.duration_days,
+            animal_count: animalCount.toString(),
+            scheduler_status: schedStatus,
+            updated_at: toMysqlTimestamp(),
+          })
+          .where(eq(schema.schedulerMaster.scheduler_id, schedulerId));
+
+        // Delete old parameter lines to repopulate clean standards
+        await this.db
+          .delete(schema.schedulerParameterLine)
+          .where(eq(schema.schedulerParameterLine.scheduler_id, schedulerId));
+      } else {
+        await this.db.insert(schema.schedulerMaster).values({
           scheduler_id: schedulerId,
-          parameter_id: feedParam.parameter_id,
-          period_no: periodNo++,
-          period_from: periodFrom,
-          period_to: periodTo,
-          period_label: `${stage.stage_name} Feed`,
-          stage_code: stage.stage_code,
-          expected_qty_override: lifecycle.feed_qty_per_head_per_day_kg.toString(),
-          uom_override: 'KG',
-          kpi_enabled: true,
-          kpi_mode: 'VALUE',
-          kpi_target_value: lifecycle.feed_qty_per_head_per_day_kg.toString(),
-          kpi_min_pct: '15.00',
-          kpi_max_pct: '15.00',
-          critical_threshold_pct: '25.00',
-          notify_in_app: true,
-          notes: `Standard feed intake: ${lifecycle.feed_qty_per_head_per_day_kg} kg/head/day`,
+          tenant_id: tenantId,
+          company_id: batch.company_id,
+          nob_id: batch.nob_id,
+          lob_id: batch.lob_id,
+          batch_id: batchId,
+          stage_id: stageItem.stage_id,
+          stage_code: stageCode,
+          stage_name: stageItem.stage_name,
+          scheduler_code: schedulerCode,
+          scheduler_name: `${stageItem.stage_name} Scheduler - Batch ${batch.batch_no}`,
+          scheduler_status: schedStatus,
+          duration_value: stageItem.duration_days,
+          duration_unit: 'DAY',
+          breed_id: batch.breed_id,
+          animal_count: animalCount.toString(),
+          auto_generated: true,
+          is_locked: false,
+          description: `Stage-specific scheduler for ${stageItem.stage_name} with tailored feeding, health, and transfer rules.`,
+          created_by: userPayload?.userId || null,
         });
       }
 
-      // Mortality line
-      if (lifecycle.std_mortality_rate_pct) {
+      if (isCurrentStage) {
+        activeStageSchedulerId = schedulerId;
+      }
+
+      // Determine stage-specific daily feed intake
+      let feedQtyPerHead = 2.5; // default gestation feed
+      if (stageCode.includes('LACTATION') || stageCode.includes('NURSING')) {
+        feedQtyPerHead = 6.5;
+      } else if (stageCode.includes('FLUSH') || stageCode.includes('SERVICE')) {
+        feedQtyPerHead = 3.5;
+      } else if (stageCode.includes('GILT') || stageCode.includes('DEV')) {
+        feedQtyPerHead = 2.2;
+      } else if (stageCode.includes('NURSERY') || stageCode.includes('WEANER')) {
+        feedQtyPerHead = 0.8;
+      } else if (stageCode.includes('GROWER')) {
+        feedQtyPerHead = 2.0;
+      } else if (stageCode.includes('FINISHER')) {
+        feedQtyPerHead = 3.2;
+      } else if (stageCode.includes('BOAR')) {
+        feedQtyPerHead = 3.0;
+      }
+
+      if (stageItem.lifecycle?.feed_qty_per_head_per_day_kg) {
+        feedQtyPerHead = Number(stageItem.lifecycle.feed_qty_per_head_per_day_kg);
+      }
+
+      const totalDailyFeed = feedQtyPerHead * animalCount;
+      const morningFeedQty = Number((totalDailyFeed * 0.5).toFixed(2));
+      const eveningFeedQty = Number((totalDailyFeed * 0.5).toFixed(2));
+
+      let lineSeq = 1;
+
+      // --- 1. CONSUMPTION: Morning Feed ---
+      await this.db.insert(schema.schedulerParameterLine).values({
+        spl_id: randomUUID(),
+        scheduler_id: schedulerId,
+        parameter_id: feedParam.parameter_id,
+        line_seq: lineSeq++,
+        line_type: 'CONSUMPTION',
+        parameter_name: `${stageItem.stage_name} Morning Feed (${(feedQtyPerHead / 2).toFixed(2)} kg/head)`,
+        period_no: 1,
+        period_from: 1,
+        period_to: stageItem.duration_days,
+        period_label: 'Morning Feed Ration',
+        occurrence: 'DAILY',
+        stage_id: stageItem.stage_id,
+        stage_code: stageCode,
+        start_day: 1,
+        end_day: stageItem.duration_days,
+        standard_qty: morningFeedQty.toString(),
+        expected_qty_override: morningFeedQty.toString(),
+        qty_basis: 'TOTAL_BATCH',
+        uom: 'KG',
+        uom_override: 'KG',
+        kpi_enabled: true,
+        kpi_mode: 'VALUE',
+        kpi_target_value: morningFeedQty.toString(),
+        kpi_min_pct: '10.00',
+        kpi_max_pct: '10.00',
+        critical_threshold_pct: '20.00',
+        lot_required: true,
+        notify_in_app: true,
+        notes: `50% morning ration for ${animalCount} animals at ${feedQtyPerHead} kg/head/day standard.`,
+      });
+
+      // --- 1. CONSUMPTION: Evening Feed ---
+      await this.db.insert(schema.schedulerParameterLine).values({
+        spl_id: randomUUID(),
+        scheduler_id: schedulerId,
+        parameter_id: feedParam.parameter_id,
+        line_seq: lineSeq++,
+        line_type: 'CONSUMPTION',
+        parameter_name: `${stageItem.stage_name} Evening Feed (${(feedQtyPerHead / 2).toFixed(2)} kg/head)`,
+        period_no: 2,
+        period_from: 1,
+        period_to: stageItem.duration_days,
+        period_label: 'Evening Feed Ration',
+        occurrence: 'DAILY',
+        stage_id: stageItem.stage_id,
+        stage_code: stageCode,
+        start_day: 1,
+        end_day: stageItem.duration_days,
+        standard_qty: eveningFeedQty.toString(),
+        expected_qty_override: eveningFeedQty.toString(),
+        qty_basis: 'TOTAL_BATCH',
+        uom: 'KG',
+        uom_override: 'KG',
+        kpi_enabled: true,
+        kpi_mode: 'VALUE',
+        kpi_target_value: eveningFeedQty.toString(),
+        kpi_min_pct: '10.00',
+        kpi_max_pct: '10.00',
+        critical_threshold_pct: '20.00',
+        lot_required: true,
+        notify_in_app: true,
+        notes: `50% evening ration for ${animalCount} animals at ${feedQtyPerHead} kg/head/day standard.`,
+      });
+
+      // --- 1. CONSUMPTION: Custom Vaccination / Medication Protocols ---
+      if (stageCode.includes('GESTATION') || stageCode.includes('DRY_SOW')) {
+        const dewormSplId = randomUUID();
         await this.db.insert(schema.schedulerParameterLine).values({
-          spl_id: randomUUID(),
+          spl_id: dewormSplId,
           scheduler_id: schedulerId,
-          parameter_id: mortParam.parameter_id,
-          period_no: periodNo++,
-          period_from: periodFrom,
-          period_to: periodTo,
-          period_label: `${stage.stage_name} Mortality`,
-          stage_code: stage.stage_code,
-          kpi_enabled: true,
-          kpi_mode: 'VALUE',
-          kpi_target_value: lifecycle.std_mortality_rate_pct.toString(),
-          critical_threshold_pct: '50.00',
-          notify_in_app: true,
-          notes: `Expected max mortality: ${lifecycle.std_mortality_rate_pct}%`,
+          parameter_id: dewormParam.parameter_id,
+          line_seq: lineSeq++,
+          line_type: 'CONSUMPTION',
+          parameter_name: 'Fenbendazole Broad-Spectrum Deworming (Sow)',
+          period_no: 3,
+          period_from: 1,
+          period_to: 1,
+          period_label: 'Day 1 Entry Deworming',
+          occurrence: 'CUSTOM',
+          stage_id: stageItem.stage_id,
+          stage_code: stageCode,
+          start_day: 1,
+          end_day: 1,
+          standard_qty: animalCount.toString(),
+          expected_qty_override: animalCount.toString(),
+          qty_basis: 'TOTAL_BATCH',
+          uom: 'DOSES',
+          uom_override: 'DOSES',
+          lot_required: true,
+          withdrawal_days: 14,
+          notes: 'Routine entry deworming for dry sows (1 dose per sow).',
+        });
+        await this.db.insert(schema.schedulerLineCustomDays).values({
+          custom_day_id: randomUUID(),
+          spl_id: dewormSplId,
+          day_number: 1,
+          day_label: 'Day 1 Entry Deworming',
+        });
+
+        const pcv2SplId = randomUUID();
+        await this.db.insert(schema.schedulerParameterLine).values({
+          spl_id: pcv2SplId,
+          scheduler_id: schedulerId,
+          parameter_id: pcv2Param.parameter_id,
+          line_seq: lineSeq++,
+          line_type: 'CONSUMPTION',
+          parameter_name: 'PCV2 & Parvovirus Sow Booster Vaccine',
+          period_no: 4,
+          period_from: 21,
+          period_to: 21,
+          period_label: 'Day 21 Sow Booster',
+          occurrence: 'CUSTOM',
+          stage_id: stageItem.stage_id,
+          stage_code: stageCode,
+          start_day: 21,
+          end_day: 21,
+          standard_qty: animalCount.toString(),
+          expected_qty_override: animalCount.toString(),
+          qty_basis: 'TOTAL_BATCH',
+          uom: 'DOSES',
+          uom_override: 'DOSES',
+          lot_required: true,
+          withdrawal_days: 21,
+          notes: 'Administer PCV2 booster on Day 21 post-mating.',
+        });
+        await this.db.insert(schema.schedulerLineCustomDays).values({
+          custom_day_id: randomUUID(),
+          spl_id: pcv2SplId,
+          day_number: 21,
+          day_label: 'Day 21 PCV2 Booster',
+        });
+      } else if (stageCode.includes('LACTATION') || stageCode.includes('FARROWING')) {
+        const ironSplId = randomUUID();
+        const estPiglets = animalCount * 11;
+        await this.db.insert(schema.schedulerParameterLine).values({
+          spl_id: ironSplId,
+          scheduler_id: schedulerId,
+          parameter_id: ironParam.parameter_id,
+          line_seq: lineSeq++,
+          line_type: 'CONSUMPTION',
+          parameter_name: 'Piglet Iron Dextran 200mg Injection (Day 3)',
+          period_no: 3,
+          period_from: 3,
+          period_to: 3,
+          period_label: 'Day 3 Piglet Iron Injection',
+          occurrence: 'CUSTOM',
+          stage_id: stageItem.stage_id,
+          stage_code: stageCode,
+          start_day: 3,
+          end_day: 3,
+          standard_qty: estPiglets.toString(),
+          expected_qty_override: estPiglets.toString(),
+          qty_basis: 'TOTAL_BATCH',
+          uom: 'DOSES',
+          uom_override: 'DOSES',
+          lot_required: true,
+          notes: 'Prevents nutritional piglet anemia (200mg intramuscular).',
+        });
+        await this.db.insert(schema.schedulerLineCustomDays).values({
+          custom_day_id: randomUUID(),
+          spl_id: ironSplId,
+          day_number: 3,
+          day_label: 'Day 3 Iron Dextran Injection',
         });
       }
 
-      // Weight target line
-      const targetWeight = lifecycle.std_body_weight_kg ?? lifecycle.std_output_qty;
-      if (targetWeight) {
+      // --- 2. DESCRIPTIVE: Head Count ---
+      await this.db.insert(schema.schedulerParameterLine).values({
+        spl_id: randomUUID(),
+        scheduler_id: schedulerId,
+        parameter_id: headParam.parameter_id,
+        line_seq: lineSeq++,
+        line_type: 'DESCRIPTIVE',
+        parameter_name: 'Morning & Evening Head Count',
+        period_no: 5,
+        period_from: 1,
+        period_to: stageItem.duration_days,
+        period_label: 'Daily Head Count Check',
+        occurrence: 'DAILY',
+        stage_id: stageItem.stage_id,
+        stage_code: stageCode,
+        start_day: 1,
+        end_day: stageItem.duration_days,
+        uom: 'HEAD',
+        uom_override: 'HEAD',
+        kpi_enabled: true,
+        kpi_mode: 'VALUE',
+        kpi_target_value: animalCount.toString(),
+        critical_threshold_pct: '5.00',
+        notify_in_app: true,
+        notes: `Verify ${animalCount} head present during morning and evening rounds.`,
+      });
+
+      // --- 2. DESCRIPTIVE: Daily Mortality ---
+      const stdMortPct = stageItem.lifecycle?.std_mortality_rate_pct ? Number(stageItem.lifecycle.std_mortality_rate_pct) : 0.05;
+      await this.db.insert(schema.schedulerParameterLine).values({
+        spl_id: randomUUID(),
+        scheduler_id: schedulerId,
+        parameter_id: mortParam.parameter_id,
+        line_seq: lineSeq++,
+        line_type: 'DESCRIPTIVE',
+        parameter_name: 'Daily Mortality & Morbidity Log',
+        period_no: 6,
+        period_from: 1,
+        period_to: stageItem.duration_days,
+        period_label: 'Mortality Tracking',
+        occurrence: 'DAILY',
+        stage_id: stageItem.stage_id,
+        stage_code: stageCode,
+        start_day: 1,
+        end_day: stageItem.duration_days,
+        uom: 'HEAD',
+        uom_override: 'HEAD',
+        kpi_enabled: true,
+        kpi_mode: 'VALUE',
+        kpi_target_value: '0',
+        critical_threshold_pct: '50.00',
+        notify_in_app: true,
+        notes: `Expected mortality rate <= ${stdMortPct}%`,
+      });
+
+      // --- 2. DESCRIPTIVE: Body Weight & ADG ---
+      const stdWeight = stageItem.lifecycle?.std_body_weight_kg ? Number(stageItem.lifecycle.std_body_weight_kg) : 220;
+      await this.db.insert(schema.schedulerParameterLine).values({
+        spl_id: randomUUID(),
+        scheduler_id: schedulerId,
+        parameter_id: weightParam.parameter_id,
+        line_seq: lineSeq++,
+        line_type: 'DESCRIPTIVE',
+        parameter_name: 'Weekly Body Weight Sample Check',
+        period_no: 7,
+        period_from: 1,
+        period_to: stageItem.duration_days,
+        period_label: 'Weight Verification',
+        occurrence: 'WEEKLY',
+        stage_id: stageItem.stage_id,
+        stage_code: stageCode,
+        start_day: 7,
+        end_day: stageItem.duration_days,
+        uom: 'KG',
+        uom_override: 'KG',
+        kpi_enabled: false,
+        kpi_target_value: stdWeight.toString(),
+        notes: `Target average weight: ${stdWeight} kg`,
+      });
+
+      // --- 2. DESCRIPTIVE: Gestation Pregnancy Scan Checkpoint ---
+      if (stageCode.includes('GESTATION') || stageCode.includes('DRY_SOW')) {
+        const scanSplId = randomUUID();
+        await this.db.insert(schema.schedulerParameterLine).values({
+          spl_id: scanSplId,
+          scheduler_id: schedulerId,
+          parameter_id: scanParam.parameter_id,
+          line_seq: lineSeq++,
+          line_type: 'DESCRIPTIVE',
+          parameter_name: 'Ultrasound Pregnancy Confirmation Scan (Day 28)',
+          period_no: 8,
+          period_from: 28,
+          period_to: 28,
+          period_label: '28-Day Pregnancy Diagnosis Checkpoint',
+          occurrence: 'ONCE',
+          stage_id: stageItem.stage_id,
+          stage_code: stageCode,
+          start_day: 28,
+          end_day: 28,
+          kpi_metric: 'PREGNANCY_CONFIRMED',
+          uom: 'CHECK',
+          uom_override: 'CHECK',
+          is_mandatory: true,
+          notes: 'Real-time ultrasound scan between Day 28–35. Negative sows flag re-service.',
+        });
+        await this.db.insert(schema.schedulerLineCustomDays).values({
+          custom_day_id: randomUUID(),
+          spl_id: scanSplId,
+          day_number: 28,
+          day_label: 'Day 28 Ultrasound Pregnancy Scan',
+        });
+      }
+
+      // --- 3. OVERHEAD: Barn Electricity & Utilities ---
+      await this.db.insert(schema.schedulerParameterLine).values({
+        spl_id: randomUUID(),
+        scheduler_id: schedulerId,
+        parameter_id: electOverhead.parameter_id,
+        line_seq: lineSeq++,
+        line_type: 'OVERHEAD',
+        parameter_name: 'Barn Electricity, Ventilation & Heat Lamps',
+        period_no: 9,
+        period_from: 1,
+        period_to: stageItem.duration_days,
+        period_label: 'Utility Allocation',
+        occurrence: 'DAILY',
+        stage_id: stageItem.stage_id,
+        stage_code: stageCode,
+        overhead_category: 'ELECTRICITY',
+        estimated_cost: '85.00',
+        notes: 'Barn automated climate and lighting control.',
+      });
+
+      // --- 4. RESOURCE: Stockman Labour ---
+      await this.db.insert(schema.schedulerParameterLine).values({
+        spl_id: randomUUID(),
+        scheduler_id: schedulerId,
+        parameter_id: stockmanLabour.parameter_id,
+        line_seq: lineSeq++,
+        line_type: 'RESOURCE',
+        parameter_name: 'Daily Attendant & Feeding Rounds',
+        period_no: 10,
+        period_from: 1,
+        period_to: stageItem.duration_days,
+        period_label: 'Labour Hours',
+        occurrence: 'DAILY',
+        stage_id: stageItem.stage_id,
+        stage_code: stageCode,
+        standard_qty: '2.50',
+        uom: 'HOURS',
+        uom_override: 'HOURS',
+        notes: '2.5 staff hours per day allocated to shed monitoring and feeder management.',
+      });
+
+      // --- 5. TRANSFER: Weaning Transfer Rules ---
+      if (stageCode.includes('WEANING') || stageCode.includes('LACTATION')) {
         await this.db.insert(schema.schedulerParameterLine).values({
           spl_id: randomUUID(),
           scheduler_id: schedulerId,
-          parameter_id: weightParam.parameter_id,
-          period_no: periodNo++,
-          period_from: periodFrom,
-          period_to: periodTo,
-          period_label: `${stage.stage_name} Target Weight`,
-          stage_code: stage.stage_code,
-          expected_qty_override: targetWeight.toString(),
-          uom_override: 'KG',
-          kpi_enabled: false,
-          notes: `Target body weight: ${targetWeight} kg`,
+          parameter_id: weanTransferParam.parameter_id,
+          line_seq: lineSeq++,
+          line_type: 'TRANSFER',
+          parameter_name: 'Transfer Weaned Piglets to Nursery / CB Grower Batch',
+          period_no: 11,
+          period_from: 28,
+          period_to: 28,
+          period_label: 'Weaning Day Batch Transfer',
+          occurrence: 'ONCE',
+          stage_id: stageItem.stage_id,
+          stage_code: stageCode,
+          start_day: 28,
+          end_day: 28,
+          transfer_qty_basis: 'HEAD_COUNT',
+          capture_transfer_weight: true,
+          auto_triggers_stage: true,
+          notes: 'Auto-creates or transfers downstream piglets into Nursery/CB Grower batch.',
         });
       }
     }
 
-    // 5. Update batch with new scheduler_id
-    await this.db
-      .update(schema.batchHeader)
-      .set({
-        scheduler_id: schedulerId,
-        updated_by: userPayload?.userId || null,
-        updated_at: toMysqlTimestamp(),
-      })
-      .where(eq(schema.batchHeader.batch_id, batchId));
+    // 4. Update batchHeader to point to active scheduler
+    if (activeStageSchedulerId) {
+      await this.db
+        .update(schema.batchHeader)
+        .set({
+          scheduler_id: activeStageSchedulerId,
+          updated_by: userPayload?.userId || null,
+          updated_at: toMysqlTimestamp(),
+        })
+        .where(eq(schema.batchHeader.batch_id, batchId));
+    }
 
     await this.auditService.log({
       tenantId,
       companyId: batch.company_id,
       userId: userPayload?.userId,
-      action: 'GENERATE_SCHEDULER',
+      action: 'GENERATE_STAGE_SCHEDULERS',
       entityName: 'batch_header',
       entityId: batchId,
-      newValues: { scheduler_id: schedulerId, scheduler_code: finalSchedCode },
+      newValues: { stagesGenerated: stagesToGenerate.length, active_scheduler_id: activeStageSchedulerId },
     });
 
     return this.findOne(batchId);
+  }
+
+  /**
+   * Returns all stage schedulers for a batch with stage metadata, parameter lines,
+   * custom days, and structured categorized parameter groups.
+   */
+  async getBatchSchedulers(batchId: string, tenantId: string) {
+    const batch = await this.findOne(batchId);
+
+    // Fetch all schedulers for this batch
+    let schedulers = await this.db
+      .select({
+        scheduler: schema.schedulerMaster,
+        stage: schema.stageMaster,
+      })
+      .from(schema.schedulerMaster)
+      .leftJoin(schema.stageMaster, eq(schema.schedulerMaster.stage_id, schema.stageMaster.stage_id))
+      .where(
+        and(
+          eq(schema.schedulerMaster.batch_id, batchId),
+          eq(schema.schedulerMaster.tenant_id, tenantId),
+          eq(schema.schedulerMaster.is_active, true)
+        )
+      )
+      .orderBy(schema.schedulerMaster.stage_code);
+
+    // If none exist yet, auto-generate them
+    if (schedulers.length === 0 && batch.breed_id) {
+      try {
+        await this.generateSchedulerForBatch(batchId, tenantId);
+        schedulers = await this.db
+          .select({
+            scheduler: schema.schedulerMaster,
+            stage: schema.stageMaster,
+          })
+          .from(schema.schedulerMaster)
+          .leftJoin(schema.stageMaster, eq(schema.schedulerMaster.stage_id, schema.stageMaster.stage_id))
+          .where(
+            and(
+              eq(schema.schedulerMaster.batch_id, batchId),
+              eq(schema.schedulerMaster.tenant_id, tenantId),
+              eq(schema.schedulerMaster.is_active, true)
+            )
+          )
+          .orderBy(schema.schedulerMaster.stage_code);
+      } catch (err) {
+        console.warn('Auto-generation of stage schedulers skipped:', err);
+      }
+    }
+
+    const schedulerIds = schedulers.map((s) => s.scheduler.scheduler_id);
+    const allLines = schedulerIds.length
+      ? await this.db
+          .select({
+            spl: schema.schedulerParameterLine,
+            param: schema.parameterMaster,
+            item: schema.itemMaster,
+            resource: schema.resourceMaster,
+          })
+          .from(schema.schedulerParameterLine)
+          .innerJoin(schema.parameterMaster, eq(schema.schedulerParameterLine.parameter_id, schema.parameterMaster.parameter_id))
+          .leftJoin(schema.itemMaster, eq(schema.parameterMaster.item_id, schema.itemMaster.item_id))
+          .leftJoin(schema.resourceMaster, eq(schema.parameterMaster.resource_id, schema.resourceMaster.resource_id))
+          .where(inArray(schema.schedulerParameterLine.scheduler_id, schedulerIds))
+          .orderBy(schema.schedulerParameterLine.line_seq)
+      : [];
+
+    const splIds = allLines.map((l) => l.spl.spl_id);
+    const allCustomDays = splIds.length
+      ? await this.db
+          .select()
+          .from(schema.schedulerLineCustomDays)
+          .where(inArray(schema.schedulerLineCustomDays.spl_id, splIds))
+          .orderBy(schema.schedulerLineCustomDays.day_number)
+      : [];
+
+    const customDaysBySpl = new Map<string, typeof allCustomDays>();
+    for (const cd of allCustomDays) {
+      const list = customDaysBySpl.get(cd.spl_id) || [];
+      list.push(cd);
+      customDaysBySpl.set(cd.spl_id, list);
+    }
+
+    const currentStageCode = (batch.current_stage_code || 'DRY_SOW_GESTATION').toUpperCase();
+
+    return schedulers.map(({ scheduler, stage }) => {
+      const schedLines = allLines.filter((l) => l.spl.scheduler_id === scheduler.scheduler_id);
+      const isCurrent = (scheduler.stage_code || '').toUpperCase() === currentStageCode || batch.scheduler_id === scheduler.scheduler_id;
+
+      const enrichedLines = schedLines.map(({ spl, param, item, resource }) => ({
+        spl_id: spl.spl_id,
+        scheduler_id: spl.scheduler_id,
+        parameter_id: spl.parameter_id,
+        parameter_name: spl.parameter_name || param.parameter_name,
+        parameter_code: param.parameter_code,
+        line_type: spl.line_type || param.parameter_type || 'CONSUMPTION',
+        line_seq: spl.line_seq,
+        period_no: spl.period_no,
+        period_from: spl.period_from,
+        period_to: spl.period_to,
+        period_label: spl.period_label,
+        occurrence: spl.occurrence || 'DAILY',
+        stage_code: spl.stage_code,
+        start_day: spl.start_day,
+        end_day: spl.end_day,
+        is_mandatory: spl.is_mandatory,
+        standard_qty: spl.standard_qty ? Number(spl.standard_qty) : null,
+        expected_qty_override: spl.expected_qty_override ? Number(spl.expected_qty_override) : null,
+        qty_basis: spl.qty_basis || 'TOTAL_BATCH',
+        uom: spl.uom_override || spl.uom || param.default_uom || 'KG',
+        lot_required: spl.lot_required,
+        withdrawal_days: spl.withdrawal_days || (item as any)?.withdrawal_days || null,
+        kpi_enabled: spl.kpi_enabled,
+        kpi_target_value: spl.kpi_target_value ? Number(spl.kpi_target_value) : null,
+        kpi_min_pct: spl.kpi_min_pct ? Number(spl.kpi_min_pct) : null,
+        kpi_max_pct: spl.kpi_max_pct ? Number(spl.kpi_max_pct) : null,
+        critical_threshold_pct: spl.critical_threshold_pct ? Number(spl.critical_threshold_pct) : null,
+        overhead_category: spl.overhead_category,
+        estimated_cost: spl.estimated_cost ? Number(spl.estimated_cost) : null,
+        item_id: item?.item_id || null,
+        item_code: item?.item_code || null,
+        item_name: item?.item_name || null,
+        resource_id: resource?.resource_id || null,
+        resource_name: resource?.resource_name || null,
+        transfer_qty_basis: spl.transfer_qty_basis,
+        capture_transfer_weight: spl.capture_transfer_weight,
+        auto_triggers_stage: spl.auto_triggers_stage,
+        notes: spl.notes,
+        custom_days: customDaysBySpl.get(spl.spl_id) || [],
+      }));
+
+      // Categorized blocks for UI
+      const feedLines = enrichedLines.filter(
+        (l) => l.line_type === 'CONSUMPTION' && (l.parameter_name.toLowerCase().includes('feed') || l.parameter_name.toLowerCase().includes('ration'))
+      );
+      const healthLines = enrichedLines.filter(
+        (l) =>
+          l.line_type === 'CONSUMPTION' &&
+          (l.parameter_name.toLowerCase().includes('deworm') ||
+            l.parameter_name.toLowerCase().includes('vaccine') ||
+            l.parameter_name.toLowerCase().includes('injection') ||
+            l.occurrence === 'CUSTOM' ||
+            l.custom_days.length > 0)
+      );
+      const kpiLines = enrichedLines.filter(
+        (l) => l.line_type === 'DESCRIPTIVE' || l.line_type === 'MORTALITY' || l.parameter_name.toLowerCase().includes('head count')
+      );
+      const overheadLines = enrichedLines.filter((l) => l.line_type === 'OVERHEAD');
+      const resourceLines = enrichedLines.filter((l) => l.line_type === 'RESOURCE');
+      const transferLines = enrichedLines.filter((l) => l.line_type === 'TRANSFER' || l.line_type === 'OUTPUT');
+
+      return {
+        scheduler_id: scheduler.scheduler_id,
+        scheduler_code: scheduler.scheduler_code,
+        scheduler_name: scheduler.scheduler_name,
+        scheduler_status: isCurrent ? 'ACTIVE' : scheduler.scheduler_status || 'PENDING',
+        is_current_stage: isCurrent,
+        duration_value: scheduler.duration_value,
+        duration_unit: scheduler.duration_unit || 'DAY',
+        animal_count: scheduler.animal_count ? Number(scheduler.animal_count) : animalCount,
+        stage_id: scheduler.stage_id || stage?.stage_id || null,
+        stage_code: scheduler.stage_code || stage?.stage_code || 'STAGE',
+        stage_name: scheduler.stage_name || stage?.stage_name || scheduler.scheduler_name,
+        stage_category: stage?.stage_category || 'PRODUCTIVE',
+        min_days_before_move: stage?.min_days_before_move || 0,
+        transition_trigger: stage?.transition_trigger || 'MANUAL',
+        next_stage_id: stage?.next_stage_id || null,
+        total_parameters_count: enrichedLines.length,
+        description: scheduler.description,
+        lines: enrichedLines,
+        categorized: {
+          feed: feedLines,
+          health: healthLines,
+          kpis: kpiLines,
+          overheads: overheadLines,
+          resources: resourceLines,
+          transfers: transferLines,
+        },
+      };
+    });
+  }
+
+  /**
+   * Fetches single stage scheduler details.
+   */
+  async getBatchStageScheduler(batchId: string, schedulerId: string, tenantId: string) {
+    const all = await this.getBatchSchedulers(batchId, tenantId);
+    const found = all.find((s) => s.scheduler_id === schedulerId);
+    if (!found) {
+      throw new NotFoundException(`Stage scheduler '${schedulerId}' not found for batch '${batchId}'.`);
+    }
+    return found;
+  }
+
+  /**
+   * Updates standard parameters and custom days for a stage scheduler.
+   */
+  async updateBatchSchedulerLines(
+    batchId: string,
+    schedulerId: string,
+    dto: UpdateBatchSchedulerLinesDto,
+    tenantId: string,
+    userPayload?: any
+  ) {
+    const [scheduler] = await this.db
+      .select()
+      .from(schema.schedulerMaster)
+      .where(
+        and(
+          eq(schema.schedulerMaster.scheduler_id, schedulerId),
+          eq(schema.schedulerMaster.batch_id, batchId),
+          eq(schema.schedulerMaster.tenant_id, tenantId)
+        )
+      )
+      .limit(1);
+
+    if (!scheduler) {
+      throw new NotFoundException(`Stage scheduler '${schedulerId}' not found.`);
+    }
+
+    if (dto.duration_value !== undefined || dto.animal_count !== undefined || dto.notes !== undefined) {
+      await this.db
+        .update(schema.schedulerMaster)
+        .set({
+          duration_value: dto.duration_value !== undefined ? dto.duration_value : scheduler.duration_value,
+          animal_count: dto.animal_count !== undefined ? dto.animal_count.toString() : scheduler.animal_count,
+          description: dto.notes !== undefined ? dto.notes : scheduler.description,
+          updated_at: toMysqlTimestamp(),
+        })
+        .where(eq(schema.schedulerMaster.scheduler_id, schedulerId));
+    }
+
+    if (dto.lines && dto.lines.length > 0) {
+      for (const lineDto of dto.lines) {
+        if (lineDto.spl_id) {
+          await this.db
+            .update(schema.schedulerParameterLine)
+            .set({
+              expected_qty_override: lineDto.expected_qty_override !== undefined ? lineDto.expected_qty_override.toString() : undefined,
+              uom_override: lineDto.uom_override || undefined,
+              kpi_target_value: lineDto.kpi_target_value !== undefined ? lineDto.kpi_target_value.toString() : undefined,
+              kpi_min_pct: lineDto.kpi_min_pct !== undefined ? lineDto.kpi_min_pct.toString() : undefined,
+              kpi_max_pct: lineDto.kpi_max_pct !== undefined ? lineDto.kpi_max_pct.toString() : undefined,
+              critical_threshold_pct: lineDto.critical_threshold_pct !== undefined ? lineDto.critical_threshold_pct.toString() : undefined,
+              notes: lineDto.notes || undefined,
+            })
+            .where(eq(schema.schedulerParameterLine.spl_id, lineDto.spl_id));
+
+          if (lineDto.custom_days && Array.isArray(lineDto.custom_days)) {
+            await this.db
+              .delete(schema.schedulerLineCustomDays)
+              .where(eq(schema.schedulerLineCustomDays.spl_id, lineDto.spl_id));
+
+            for (const cd of lineDto.custom_days) {
+              await this.db.insert(schema.schedulerLineCustomDays).values({
+                custom_day_id: randomUUID(),
+                spl_id: lineDto.spl_id,
+                day_number: cd.day_number,
+                day_label: cd.day_label || null,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    await this.auditService.log({
+      tenantId,
+      companyId: scheduler.company_id,
+      userId: userPayload?.userId,
+      action: 'UPDATE_STAGE_SCHEDULER',
+      entityName: 'scheduler_master',
+      entityId: schedulerId,
+      newValues: { linesUpdated: dto.lines?.length || 0 },
+    });
+
+    return this.getBatchStageScheduler(batchId, schedulerId, tenantId);
   }
 
   /**
@@ -2210,10 +3545,10 @@ export class BatchService {
     // Also fetch breed lifecycle stages for reference
     const lifecycleStandards = batch.breed_id
       ? await this.db
-          .select()
-          .from(schema.breedLifecycleStages)
-          .where(and(eq(schema.breedLifecycleStages.breed_id, batch.breed_id), eq(schema.breedLifecycleStages.is_active, true)))
-          .orderBy(schema.breedLifecycleStages.period_from)
+        .select()
+        .from(schema.breedLifecycleStages)
+        .where(and(eq(schema.breedLifecycleStages.breed_id, batch.breed_id), eq(schema.breedLifecycleStages.is_active, true)))
+        .orderBy(schema.breedLifecycleStages.period_from)
       : [];
 
     let breedName: string | null = null;

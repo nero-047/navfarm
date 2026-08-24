@@ -12,8 +12,8 @@ CREATE TABLE `goods_issue` (
 	`posted_by` varchar(36),
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	CONSTRAINT `goods_issue_issue_id` PRIMARY KEY(`issue_id`)
 );
@@ -43,8 +43,8 @@ CREATE TABLE `stock_adjustment` (
 	`posted_by` varchar(36),
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	CONSTRAINT `stock_adjustment_adjustment_id` PRIMARY KEY(`adjustment_id`)
 );
@@ -75,8 +75,8 @@ CREATE TABLE `stock_transfer` (
 	`posted_by` varchar(36),
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	CONSTRAINT `stock_transfer_transfer_id` PRIMARY KEY(`transfer_id`)
 );

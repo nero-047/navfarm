@@ -25,7 +25,7 @@ import {
 @UseGuards(JwtAuthGuard)
 @Controller('piggery/breeding')
 export class BreedingController {
-  constructor(private readonly breedingService: BreedingService) {}
+  constructor(private readonly breedingService: BreedingService) { }
 
   // ==========================================
   // MATING & INSEMINATION

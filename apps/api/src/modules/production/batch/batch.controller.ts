@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { BatchService } from './batch.service';
 import {
@@ -13,6 +13,8 @@ import {
   RenewBatchDto,
   TransferStageDto,
   BulkDailyEntryDto,
+  SingleBatchDailyEntryDto,
+  UpdateBatchSchedulerLinesDto,
 } from './dto/batch.dto';
 
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -24,7 +26,7 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('batch')
 export class BatchController {
-  constructor(private readonly batchService: BatchService) {}
+  constructor(private readonly batchService: BatchService) { }
 
   @Post()
   @RequirePermission('PRODUCTION', 'BATCH', 'create')
@@ -89,6 +91,82 @@ export class BatchController {
   async getDataEntry(@Param('id') id: string, @Query('date') date: string) {
     const result = await this.batchService.getDataEntry(id, date || new Date().toISOString().slice(0, 10));
     return { success: true, message: 'Scheduled data-entry lines retrieved.', data: result };
+  }
+
+  @Post(':id/daily-entry')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Record complete daily operations entry (feed, medicine, mortality, weight, checkpoints, overheads) in a single atomic transaction' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async postDailyEntry(@Param('id') id: string, @Body() dto: SingleBatchDailyEntryDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    if (dto.is_draft) {
+      const draftResult = await this.batchService.saveDailyEntryDraft(id, dto, tenantId, req.user);
+      return { success: true, message: 'Daily operational draft saved successfully.', data: draftResult };
+    }
+    const result = await this.batchService.postDailyEntry(id, dto, tenantId, req.user);
+    return { success: true, message: 'Daily operational log posted successfully.', data: result };
+  }
+
+  @Post(':id/daily-entry/draft')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Save draft daily entry without posting to ledger or inventory' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async saveDailyEntryDraft(@Param('id') id: string, @Body() payload: any, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.saveDailyEntryDraft(id, payload, tenantId, req.user);
+    return { success: true, message: 'Draft saved successfully.', data: result };
+  }
+
+  @Get(':id/daily-entry/draft')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'Get saved draft daily entry for a given date' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async getDailyEntryDraft(@Param('id') id: string, @Query('date') date: string) {
+    const result = await this.batchService.getDailyEntryDraft(id, date || new Date().toISOString().slice(0, 10));
+    return { success: true, message: 'Draft retrieved.', data: result };
+  }
+
+  @Delete(':id/daily-entry/draft')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Discard saved draft daily entry for a given date' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async deleteDailyEntryDraft(@Param('id') id: string, @Query('date') date: string) {
+    const result = await this.batchService.deleteDailyEntryDraft(id, date || new Date().toISOString().slice(0, 10));
+    return { success: true, message: 'Draft discarded.', data: result };
+  }
+
+  @Post(':id/assign-animals')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Assign registered animals to this batch' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async assignAnimals(@Param('id') id: string, @Body() body: { animal_ids: string[] }, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.assignAnimalsToBatch(id, body.animal_ids, tenantId, req.user);
+    return { success: true, message: 'Animals assigned to batch successfully.', data: result };
+  }
+
+  @Post(':id/unassign-animals')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Unassign animals from this batch' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async unassignAnimals(@Param('id') id: string, @Body() body: { animal_ids: string[] }, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.unassignAnimalsFromBatch(id, body.animal_ids, tenantId, req.user);
+    return { success: true, message: 'Animals unassigned from batch.', data: result };
+  }
+
+  @Post(':id/bulk-register-animals')
+  @RequirePermission('PRODUCTION', 'BATCH', 'create')
+  @ApiOperation({ summary: 'Bulk register animals and attach them to this batch' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async bulkRegisterAnimals(
+    @Param('id') id: string,
+    @Body() dto: { tags: string[]; breed_id?: string; animal_type?: string; gender?: string },
+    @Req() req: any
+  ) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.bulkRegisterAnimalsToBatch(id, dto, tenantId, req.user);
+    return { success: true, message: 'Animals registered and assigned successfully.', data: result };
   }
 
   @Post(':id/transaction')
@@ -173,12 +251,63 @@ export class BatchController {
 
   @Post(':id/generate-scheduler')
   @RequirePermission('PRODUCTION', 'BATCH', 'edit')
-  @ApiOperation({ summary: 'Auto-generate a concrete scheduler and daily target curves from breed lifecycle standards' })
+  @ApiOperation({ summary: 'Auto-generate concrete multi-stage schedulers and daily target curves from breed lifecycle standards' })
   @ApiParam({ name: 'id', description: 'Batch UUID' })
   async generateScheduler(@Param('id') id: string, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.batchService.generateSchedulerForBatch(id, tenantId, req.user);
-    return { success: true, message: 'Batch scheduler auto-generated from breed standards.', data: result };
+    return { success: true, message: 'Batch stage schedulers auto-generated from breed standards.', data: result };
+  }
+
+  @Post(':id/generate-stage-schedulers')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Auto-generate dedicated stage schedulers for all lifecycle stages' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async generateStageSchedulers(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.generateSchedulerForBatch(id, tenantId, req.user);
+    return { success: true, message: 'Batch stage schedulers generated successfully.', data: result };
+  }
+
+  @Get(':id/schedulers')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'List all stage schedulers with lines, stage info, custom days, and structured categorized parameter groups' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async getBatchSchedulers(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.getBatchSchedulers(id, tenantId);
+    return { success: true, message: 'Batch stage schedulers retrieved successfully.', data: result };
+  }
+
+  @Get(':id/schedulers/:schedulerId')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'Fetch a single stage scheduler details with parameter lines' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiParam({ name: 'schedulerId', description: 'Scheduler UUID' })
+  async getBatchStageScheduler(
+    @Param('id') id: string,
+    @Param('schedulerId') schedulerId: string,
+    @Req() req: any
+  ) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.getBatchStageScheduler(id, schedulerId, tenantId);
+    return { success: true, message: 'Stage scheduler details retrieved.', data: result };
+  }
+
+  @Put(':id/schedulers/:schedulerId/lines')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Update standard parameters, tolerances, and custom days for a stage scheduler' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiParam({ name: 'schedulerId', description: 'Scheduler UUID' })
+  async updateBatchSchedulerLines(
+    @Param('id') id: string,
+    @Param('schedulerId') schedulerId: string,
+    @Body() dto: UpdateBatchSchedulerLinesDto,
+    @Req() req: any
+  ) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.updateBatchSchedulerLines(id, schedulerId, dto, tenantId, req.user);
+    return { success: true, message: 'Stage scheduler parameters updated successfully.', data: result };
   }
 
   @Get(':id/performance-curves')

@@ -1835,6 +1835,18 @@ export const batchStageLog = mysqlTable('batch_stage_log', {
   remarks: text('remarks'),
 });
 
+export const batchDailyEntryDraft = mysqlTable('batch_daily_entry_draft', {
+  draft_id: varchar('draft_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  entry_date: varchar('entry_date', { length: 10 }).notNull(),
+  payload: json('payload').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
 export const batchHeaderRelations = relations(batchHeader, ({ one, many }) => ({
   company: one(companyMaster, { fields: [batchHeader.company_id], references: [companyMaster.company_id] }),
   lob: one(lobMaster, { fields: [batchHeader.lob_id], references: [lobMaster.lob_id] }),
@@ -1842,6 +1854,7 @@ export const batchHeaderRelations = relations(batchHeader, ({ one, many }) => ({
   inputLines: many(batchInputLine),
   transactions: many(batchTransaction),
   outputLines: many(batchOutputLine),
+  drafts: many(batchDailyEntryDraft),
 }));
 
 export const batchInputLineRelations = relations(batchInputLine, ({ one }) => ({
@@ -1971,10 +1984,22 @@ export const schedulerMaster = mysqlTable('scheduler_master', {
   company_id: varchar('company_id', { length: 36 }),
   nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  batch_id: varchar('batch_id', { length: 36 }),
+  stage_id: varchar('stage_id', { length: 36 }),
+  stage_code: varchar('stage_code', { length: 50 }),
+  stage_name: varchar('stage_name', { length: 100 }),
   scheduler_code: varchar('scheduler_code', { length: 50 }).notNull(),
   scheduler_name: varchar('scheduler_name', { length: 200 }).notNull(),
+  scheduler_status: varchar('scheduler_status', { length: 20 }).default('DRAFT'), // DRAFT, ACTIVE, COMPLETED, PENDING, CANCELLED
+  location_id: varchar('location_id', { length: 36 }),
+  data_entry_level: varchar('data_entry_level', { length: 10 }).default('SHED'),
   duration_value: int('duration_value').notNull(),
   duration_unit: varchar('duration_unit', { length: 10 }).notNull(), // DAY, WEEK, MONTH
+  effective_from: varchar('effective_from', { length: 50 }),
+  effective_to: varchar('effective_to', { length: 50 }),
+  actual_end_date: varchar('actual_end_date', { length: 50 }),
+  animal_count: decimal('animal_count', { precision: 14, scale: 4 }),
+  auto_generated: boolean('auto_generated').default(true),
   breed_id: varchar('breed_id', { length: 36 }).references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
   is_locked: boolean('is_locked').default(false).notNull(),
   // Informational label only (e.g. "Start Date") — day-of-batch math always
@@ -1991,16 +2016,48 @@ export const schedulerParameterLine = mysqlTable('scheduler_parameter_line', {
   spl_id: varchar('spl_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   scheduler_id: varchar('scheduler_id', { length: 36 }).notNull(),
   parameter_id: varchar('parameter_id', { length: 36 }).notNull(),
+  line_seq: int('line_seq'),
+  line_type: varchar('line_type', { length: 20 }), // CONSUMPTION, OUTPUT, DESCRIPTIVE, OVERHEAD, RESOURCE, TRANSFER
+  parameter_name: varchar('parameter_name', { length: 200 }),
   period_no: int('period_no').notNull(),
   period_from: int('period_from').notNull(),
   period_to: int('period_to').notNull(),
   period_label: varchar('period_label', { length: 50 }),
-  occurrence: varchar('occurrence', { length: 10 }), // DAILY, WEEKLY, MONTHLY
-  // When set, this KPI line only applies once the batch has transferred into
-  // this stage (batch_header.current_stage_code) — lets a scheduler define
-  // different thresholds pre- vs. post-transfer (e.g. setter vs. hatcher
-  // temperature ranges). Null = applies regardless of stage (today's behavior).
+  occurrence: varchar('occurrence', { length: 20 }), // DAILY, WEEKLY, MONTHLY, ONCE, CUSTOM
+  stage_id: varchar('stage_id', { length: 36 }),
   stage_code: varchar('stage_code', { length: 50 }),
+  start_day: int('start_day'),
+  end_day: int('end_day'),
+  day_of_week: int('day_of_week'),
+  custom_days: json('custom_days'),
+  is_mandatory: boolean('is_mandatory').default(false).notNull(),
+  source: varchar('source', { length: 20 }).default('AUTO'),
+  lifecycle_ref_id: varchar('lifecycle_ref_id', { length: 36 }),
+  nob_id: varchar('nob_id', { length: 36 }),
+  lob_id: varchar('lob_id', { length: 36 }),
+  item_id: varchar('item_id', { length: 36 }),
+  item_description: varchar('item_description', { length: 200 }),
+  uom: varchar('uom', { length: 20 }),
+  standard_qty: decimal('standard_qty', { precision: 18, scale: 6 }),
+  qty_basis: varchar('qty_basis', { length: 20 }).default('PER_HEAD'), // PER_HEAD, TOTAL_BATCH
+  allow_qty_edit: boolean('allow_qty_edit').default(true),
+  lot_required: boolean('lot_required').default(false),
+  withdrawal_days: int('withdrawal_days'),
+  creates_inventory: boolean('creates_inventory').default(false),
+  output_lot_auto: boolean('output_lot_auto').default(true),
+  output_basis: varchar('output_basis', { length: 20 }).default('PER_BATCH'),
+  kpi_metric: varchar('kpi_metric', { length: 50 }),
+  kpi_uom: varchar('kpi_uom', { length: 20 }),
+  std_value: decimal('std_value', { precision: 18, scale: 4 }),
+  lower_alert_limit: decimal('lower_alert_limit', { precision: 18, scale: 4 }),
+  upper_alert_limit: decimal('upper_alert_limit', { precision: 18, scale: 4 }),
+  alert_severity: varchar('alert_severity', { length: 10 }).default('WARNING'),
+  capture_per: varchar('capture_per', { length: 20 }).default('AVERAGE'),
+  overhead_category: varchar('overhead_category', { length: 30 }),
+  gl_account: varchar('gl_account', { length: 20 }),
+  estimated_cost: decimal('estimated_cost', { precision: 18, scale: 4 }),
+  resource_id: varchar('resource_id', { length: 36 }),
+  resource_name: varchar('resource_name', { length: 200 }),
   expected_qty_override: decimal('expected_qty_override', { precision: 18, scale: 8 }),
   uom_override: varchar('uom_override', { length: 20 }),
   kpi_enabled: boolean('kpi_enabled').default(true).notNull(),
@@ -2034,6 +2091,21 @@ export const schedulerParameterLine = mysqlTable('scheduler_parameter_line', {
     foreignColumns: [parameterMaster.parameter_id],
     name: 'spl_parameter_id_fk'
   }).onDelete('restrict'),
+}));
+
+export const schedulerLineCustomDays = mysqlTable('scheduler_line_custom_days', {
+  custom_day_id: varchar('custom_day_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  spl_id: varchar('spl_id', { length: 36 }).notNull(),
+  day_number: int('day_number').notNull(),
+  day_label: varchar('day_label', { length: 100 }),
+  is_active: boolean('is_active').default(true).notNull(),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  splFk: foreignKey({
+    columns: [table.spl_id],
+    foreignColumns: [schedulerParameterLine.spl_id],
+    name: 'slcd_spl_id_fk'
+  }).onDelete('cascade'),
 }));
 
 export const notificationAlertLog = mysqlTable('notification_alert_log', {
@@ -2079,13 +2151,20 @@ export const parameterMasterRelations = relations(parameterMaster, ({ one }) => 
 }));
 
 export const schedulerMasterRelations = relations(schedulerMaster, ({ one, many }) => ({
+  batch: one(batchHeader, { fields: [schedulerMaster.batch_id], references: [batchHeader.batch_id] }),
+  stage: one(stageMaster, { fields: [schedulerMaster.stage_id], references: [stageMaster.stage_id] }),
   breed: one(breedMaster, { fields: [schedulerMaster.breed_id], references: [breedMaster.breed_id] }),
   parameterLines: many(schedulerParameterLine),
 }));
 
-export const schedulerParameterLineRelations = relations(schedulerParameterLine, ({ one }) => ({
+export const schedulerParameterLineRelations = relations(schedulerParameterLine, ({ one, many }) => ({
   scheduler: one(schedulerMaster, { fields: [schedulerParameterLine.scheduler_id], references: [schedulerMaster.scheduler_id] }),
   parameter: one(parameterMaster, { fields: [schedulerParameterLine.parameter_id], references: [parameterMaster.parameter_id] }),
+  customDays: many(schedulerLineCustomDays),
+}));
+
+export const schedulerLineCustomDaysRelations = relations(schedulerLineCustomDays, ({ one }) => ({
+  parameterLine: one(schedulerParameterLine, { fields: [schedulerLineCustomDays.spl_id], references: [schedulerParameterLine.spl_id] }),
 }));
 
 export const notificationAlertLogRelations = relations(notificationAlertLog, ({ one }) => ({

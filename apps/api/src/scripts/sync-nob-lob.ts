@@ -18,9 +18,11 @@ const port = Number(process.env.DATABASE_PORT || 3306);
 const user = process.env.DATABASE_USERNAME || 'root';
 const password = process.env.DATABASE_PASSWORD || '';
 const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
+const isRemoteOrTidb = port === 4000 || host.includes('tidbcloud') || process.env.DATABASE_SSL === 'true';
+const ssl = isRemoteOrTidb ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined;
 
 async function run() {
-  const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase });
+  const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase, ssl });
   const masterDb = drizzle(masterPool, { schema: master, mode: 'default' });
 
   try {
@@ -36,6 +38,7 @@ async function run() {
         user: t.db_user || user,
         password: t.db_password || password,
         database: t.db_name,
+        ssl,
       });
       const tenantDb = drizzle(tenantPool, { schema: tenant, mode: 'default' });
 

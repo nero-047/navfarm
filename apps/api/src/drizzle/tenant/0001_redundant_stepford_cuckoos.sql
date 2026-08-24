@@ -6,7 +6,7 @@ CREATE TABLE `notification_log` (
 	`message` text NOT NULL,
 	`status` varchar(20) NOT NULL DEFAULT 'PENDING',
 	`error_message` text,
-	`sent_at` timestamp NOT NULL DEFAULT (now()),
+	`sent_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `notification_log_log_id` PRIMARY KEY(`log_id`)
 );
 --> statement-breakpoint
@@ -17,7 +17,7 @@ CREATE TABLE `user_company_assignments` (
 	`is_primary` boolean NOT NULL DEFAULT false,
 	`is_active` boolean NOT NULL DEFAULT true,
 	`assigned_by` varchar(36) NOT NULL,
-	`assigned_at` timestamp NOT NULL DEFAULT (now()),
+	`assigned_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `user_company_assignments_assign_id` PRIMARY KEY(`assign_id`)
 );
 --> statement-breakpoint

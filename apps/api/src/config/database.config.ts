@@ -6,4 +6,10 @@ export default registerAs('database', () => ({
   username: process.env.DATABASE_USERNAME || 'root',
   password: process.env.DATABASE_PASSWORD || '',
   database: process.env.DATABASE_NAME || 'navfarm_db',
+  ssl:
+    process.env.DATABASE_SSL === 'true' ||
+    process.env.DATABASE_PORT === '4000' ||
+    (process.env.DATABASE_HOST || '').includes('tidbcloud')
+      ? { minVersion: 'TLSv1.2', rejectUnauthorized: true }
+      : undefined,
 }));

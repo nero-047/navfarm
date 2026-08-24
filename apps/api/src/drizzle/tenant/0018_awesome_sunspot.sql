@@ -8,7 +8,7 @@ CREATE TABLE `batch_bio_asset_state` (
 	`productive_life_months` int,
 	`monthly_amortization_rate` decimal(18,6),
 	`matured_at` date,
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `batch_bio_asset_state_state_id` PRIMARY KEY(`state_id`),
 	CONSTRAINT `batch_bio_asset_state_batch_id_unique` UNIQUE(`batch_id`)
 );

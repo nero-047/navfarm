@@ -21,7 +21,7 @@ CREATE TABLE `notification_alert_log` (
 	`is_read` boolean NOT NULL DEFAULT false,
 	`read_by` varchar(36),
 	`read_at` timestamp,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `notification_alert_log_alert_id` PRIMARY KEY(`alert_id`)
 );
 --> statement-breakpoint
@@ -44,7 +44,7 @@ CREATE TABLE `parameter_master` (
 	`is_mandatory` boolean NOT NULL DEFAULT false,
 	`is_active` boolean NOT NULL DEFAULT true,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `parameter_master_parameter_id` PRIMARY KEY(`parameter_id`)
 );
 --> statement-breakpoint
@@ -63,8 +63,8 @@ CREATE TABLE `scheduler_master` (
 	`description` text,
 	`is_active` boolean NOT NULL DEFAULT true,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `scheduler_master_scheduler_id` PRIMARY KEY(`scheduler_id`)
 );
 --> statement-breakpoint

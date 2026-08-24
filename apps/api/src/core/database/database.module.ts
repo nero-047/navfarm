@@ -20,7 +20,8 @@ export const PG_CONNECTION = MASTER_CONNECTION; // Backwards compatibility alias
         const user = config.get<string>('database.username');
         const database = config.get<string>('database.database') || 'navfarm_master';
         
-        console.log(`[Master Database] Connecting to ${user}@${host}:${port}/${database}`);
+        const ssl = config.get('database.ssl');
+        console.log(`[Master Database] Connecting to ${user}@${host}:${port}/${database} (SSL: ${ssl ? 'enabled' : 'disabled'})`);
 
         const pool = mysql.createPool({
           host,
@@ -28,6 +29,7 @@ export const PG_CONNECTION = MASTER_CONNECTION; // Backwards compatibility alias
           user,
           password: config.get<string>('database.password'),
           database,
+          ssl: ssl || undefined,
           waitForConnections: true,
           connectionLimit: 10,
           queueLimit: 0,

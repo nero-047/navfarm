@@ -17,8 +17,8 @@ CREATE TABLE `customer_master` (
 	`status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `customer_master_customer_id` PRIMARY KEY(`customer_id`)
@@ -41,8 +41,8 @@ CREATE TABLE `farm_master` (
 	`status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `farm_master_farm_id` PRIMARY KEY(`farm_id`)
@@ -59,8 +59,8 @@ CREATE TABLE `item_category_master` (
 	`status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `item_category_master_category_id` PRIMARY KEY(`category_id`)
@@ -79,8 +79,8 @@ CREATE TABLE `resource_maintenance_log` (
 	`status` varchar(20) NOT NULL DEFAULT 'COMPLETED',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `resource_maintenance_log_log_id` PRIMARY KEY(`log_id`)
@@ -100,8 +100,8 @@ CREATE TABLE `resource_master` (
 	`status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `resource_master_resource_id` PRIMARY KEY(`resource_id`)
@@ -120,8 +120,8 @@ CREATE TABLE `shed_master` (
 	`status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `shed_master_shed_id` PRIMARY KEY(`shed_id`)
@@ -137,8 +137,8 @@ CREATE TABLE `species_master` (
 	`is_active` boolean NOT NULL DEFAULT true,
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	CONSTRAINT `species_master_species_id` PRIMARY KEY(`species_id`)
 );
@@ -162,8 +162,8 @@ CREATE TABLE `supplier_master` (
 	`status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `supplier_master_supplier_id` PRIMARY KEY(`supplier_id`)
@@ -181,8 +181,8 @@ CREATE TABLE `warehouse_master` (
 	`status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `warehouse_master_warehouse_id` PRIMARY KEY(`warehouse_id`)
@@ -197,8 +197,8 @@ ALTER TABLE `breed_master` ADD `species_id` varchar(36);--> statement-breakpoint
 ALTER TABLE `breed_master` ADD `status` varchar(20) DEFAULT 'ACTIVE' NOT NULL;--> statement-breakpoint
 ALTER TABLE `breed_master` ADD `created_by` varchar(36);--> statement-breakpoint
 ALTER TABLE `breed_master` ADD `updated_by` varchar(36);--> statement-breakpoint
-ALTER TABLE `breed_master` ADD `created_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
-ALTER TABLE `breed_master` ADD `updated_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
+ALTER TABLE `breed_master` ADD `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
+ALTER TABLE `breed_master` ADD `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
 ALTER TABLE `breed_master` ADD `deleted_at` timestamp;--> statement-breakpoint
 ALTER TABLE `company_master` ADD `updated_by` varchar(36);--> statement-breakpoint
 ALTER TABLE `company_master` ADD `deleted_at` timestamp;--> statement-breakpoint
@@ -206,8 +206,8 @@ ALTER TABLE `item_attribute_master` ADD `company_id` varchar(36);--> statement-b
 ALTER TABLE `item_attribute_master` ADD `status` varchar(20) DEFAULT 'ACTIVE' NOT NULL;--> statement-breakpoint
 ALTER TABLE `item_attribute_master` ADD `created_by` varchar(36);--> statement-breakpoint
 ALTER TABLE `item_attribute_master` ADD `updated_by` varchar(36);--> statement-breakpoint
-ALTER TABLE `item_attribute_master` ADD `created_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
-ALTER TABLE `item_attribute_master` ADD `updated_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
+ALTER TABLE `item_attribute_master` ADD `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
+ALTER TABLE `item_attribute_master` ADD `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
 ALTER TABLE `item_attribute_master` ADD `deleted_at` timestamp;--> statement-breakpoint
 ALTER TABLE `item_master` ADD `company_id` varchar(36);--> statement-breakpoint
 ALTER TABLE `item_master` ADD `category_id` varchar(36);--> statement-breakpoint
@@ -219,22 +219,22 @@ ALTER TABLE `location_master` ADD `warehouse_id` varchar(36);--> statement-break
 ALTER TABLE `location_master` ADD `status` varchar(20) DEFAULT 'ACTIVE' NOT NULL;--> statement-breakpoint
 ALTER TABLE `location_master` ADD `created_by` varchar(36);--> statement-breakpoint
 ALTER TABLE `location_master` ADD `updated_by` varchar(36);--> statement-breakpoint
-ALTER TABLE `location_master` ADD `created_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
-ALTER TABLE `location_master` ADD `updated_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
+ALTER TABLE `location_master` ADD `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
+ALTER TABLE `location_master` ADD `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
 ALTER TABLE `location_master` ADD `deleted_at` timestamp;--> statement-breakpoint
 ALTER TABLE `uom_conversion_master` ADD `company_id` varchar(36);--> statement-breakpoint
 ALTER TABLE `uom_conversion_master` ADD `status` varchar(20) DEFAULT 'ACTIVE' NOT NULL;--> statement-breakpoint
 ALTER TABLE `uom_conversion_master` ADD `created_by` varchar(36);--> statement-breakpoint
 ALTER TABLE `uom_conversion_master` ADD `updated_by` varchar(36);--> statement-breakpoint
-ALTER TABLE `uom_conversion_master` ADD `created_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
-ALTER TABLE `uom_conversion_master` ADD `updated_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
+ALTER TABLE `uom_conversion_master` ADD `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
+ALTER TABLE `uom_conversion_master` ADD `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
 ALTER TABLE `uom_conversion_master` ADD `deleted_at` timestamp;--> statement-breakpoint
 ALTER TABLE `uom_master` ADD `company_id` varchar(36);--> statement-breakpoint
 ALTER TABLE `uom_master` ADD `status` varchar(20) DEFAULT 'ACTIVE' NOT NULL;--> statement-breakpoint
 ALTER TABLE `uom_master` ADD `created_by` varchar(36);--> statement-breakpoint
 ALTER TABLE `uom_master` ADD `updated_by` varchar(36);--> statement-breakpoint
-ALTER TABLE `uom_master` ADD `created_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
-ALTER TABLE `uom_master` ADD `updated_at` timestamp DEFAULT (now()) NOT NULL;--> statement-breakpoint
+ALTER TABLE `uom_master` ADD `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
+ALTER TABLE `uom_master` ADD `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
 ALTER TABLE `uom_master` ADD `deleted_at` timestamp;--> statement-breakpoint
 ALTER TABLE `customer_master` ADD CONSTRAINT `customer_master_company_id_company_master_company_id_fk` FOREIGN KEY (`company_id`) REFERENCES `company_master`(`company_id`) ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `farm_master` ADD CONSTRAINT `farm_master_company_id_company_master_company_id_fk` FOREIGN KEY (`company_id`) REFERENCES `company_master`(`company_id`) ON DELETE restrict ON UPDATE no action;--> statement-breakpoint

@@ -19,7 +19,7 @@ CREATE TABLE `bio_asset_ledger` (
 	`nob_id` varchar(36),
 	`lob_id` varchar(36),
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `bio_asset_ledger_entry_id` PRIMARY KEY(`entry_id`)
 );
 --> statement-breakpoint
@@ -38,8 +38,8 @@ CREATE TABLE `goods_receipt` (
 	`posted_by` varchar(36),
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	CONSTRAINT `goods_receipt_receipt_id` PRIMARY KEY(`receipt_id`)
 );
@@ -71,7 +71,7 @@ CREATE TABLE `inventory_application` (
 	`applied_cost_amount` decimal(18,4) NOT NULL,
 	`application_date` date NOT NULL,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `inventory_application_application_id` PRIMARY KEY(`application_id`)
 );
 --> statement-breakpoint
@@ -106,7 +106,7 @@ CREATE TABLE `inventory_ledger` (
 	`lob_id` varchar(36),
 	`category_id` varchar(36),
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `inventory_ledger_ledger_id` PRIMARY KEY(`ledger_id`)
 );
 --> statement-breakpoint

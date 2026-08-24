@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Search, Loader2, Inbox, Eye, PlayCircle, CheckCircle2, CheckCheck, ClipboardCheck, QrCode as QrCodeIcon, RefreshCw, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, Eye, ChevronLeft, Inbox } from "lucide-react";
 import QRCode from "react-qr-code";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import BatchPerformanceCurvesPanel from "@/components/console/production/batch-performance-curves-panel";
+import { BatchDetailsHub } from "@/components/console/production/batch-details/batch-details-hub";
 
 const PAGE_SIZE = 25;
 
@@ -34,13 +34,10 @@ function unwrap<T = any>(res: any): T {
 
 const emptyInputLine = () => ({ item_id: "", source_batch_id: "", quantity: "", uom: "", rate: "" });
 const emptyOutputLine = () => ({ item_id: "", output_type: "MAIN", cost_split_pct: "100", quantity: "", uom: "", warehouse_id: "" });
-const emptyTxForm = () => ({ transaction_date: new Date().toISOString().slice(0, 10), transaction_type: "CONSUMPTION", item_id: "", resource_id: "", quantity: "", uom: "", rate: "", remarks: "", output_type: "", nrv_rate: "" });
 const emptyStdConsumptionLine = () => ({ item_id: "", std_qty_per_unit_per_day: "", std_rate: "" });
 
 const STATUS_STYLE: Record<string, any> = {
   DRAFT: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" },
-  // A running batch is the healthy steady state, not an alert — brand red
-  // here made every in-flight batch read as a problem.
   ACTIVE: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
   CLOSED: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-secondary)" },
   CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" },
@@ -62,7 +59,6 @@ export default function BatchPanel() {
   const [items, setItems] = useState<Row[]>([]);
   const [uoms, setUoms] = useState<Row[]>([]);
   const [warehouses, setWarehouses] = useState<Row[]>([]);
-  const [resources, setResources] = useState<Row[]>([]);
   const [batches, setBatches] = useState<Row[]>([]);
   const [schedulers, setSchedulers] = useState<Row[]>([]);
 
@@ -77,15 +73,6 @@ export default function BatchPanel() {
 
   const [viewing, setViewing] = useState<Row | null>(null);
   const [acting, setActing] = useState(false);
-  const [txForm, setTxForm] = useState<Row>(emptyTxForm());
-
-  const [detailTab, setDetailTab] = useState<"overview" | "transactions" | "data-entry" | "curves" | "alerts">("overview");
-  const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().slice(0, 10));
-  const [dataEntryLoading, setDataEntryLoading] = useState(false);
-  const [dataEntryError, setDataEntryError] = useState("");
-  const [dataEntryLines, setDataEntryLines] = useState<Row[]>([]);
-  const [dataEntryValues, setDataEntryValues] = useState<Record<string, string>>({});
-  const [dataEntrySavingId, setDataEntrySavingId] = useState<string | null>(null);
 
   const [closeModalOpen, setCloseModalOpen] = useState(false);
   const [closeError, setCloseError] = useState("");
@@ -195,7 +182,6 @@ export default function BatchPanel() {
     api.get(`/breed?${qs}`).then((r) => setBreeds(unwrap<Row[]>(r) || [])).catch(() => setBreeds([]));
     api.get(`/shed?${qs}`).then((r) => setSheds(unwrap<Row[]>(r) || [])).catch(() => setSheds([]));
     api.get(`/item?${qs}`).then((r) => setItems(unwrap<Row[]>(r) || [])).catch(() => setItems([]));
-    api.get(`/resource?${qs}`).then((r) => setResources(unwrap<Row[]>(r) || [])).catch(() => setResources([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNobId, activeLobId]);
 
@@ -206,8 +192,7 @@ export default function BatchPanel() {
     params.set("lobId", header.lob_id);
     params.set("limit", "200");
     api.get(`/scheduler?${params.toString()}`).then((r) => setSchedulers(unwrap<Row[]>(r) || [])).catch(() => setSchedulers([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [header.lob_id]);
+  }, [companyId, header.lob_id]);
 
   const openCreate = () => {
     setNobId("");
@@ -297,12 +282,6 @@ export default function BatchPanel() {
     try {
       const res = await api.get(`/batch/${row.batch_id}`);
       setViewing(unwrap<Row>(res));
-      setTxForm(emptyTxForm());
-      setDetailTab("overview");
-      setDataEntryDate(new Date().toISOString().slice(0, 10));
-      setDataEntryLines([]);
-      setDataEntryValues({});
-      setDataEntryError("");
     } catch (err: any) {
       setError(err?.message || "Failed to load batch details.");
     }
@@ -314,57 +293,6 @@ export default function BatchPanel() {
     setViewing(unwrap<Row>(res));
   };
 
-  const loadDataEntry = async () => {
-    if (!viewing) return;
-    setDataEntryLoading(true);
-    setDataEntryError("");
-    try {
-      const res = await api.get(`/batch/${viewing.batch_id}/data-entry?date=${dataEntryDate}`);
-      const data = unwrap<Row>(res);
-      const dueLines = data.lines || [];
-      setDataEntryLines(dueLines);
-      setDataEntryValues(
-        Object.fromEntries(dueLines.map((l: Row) => [l.spl_id, l.already_entered_qty ? String(l.already_entered_qty) : ""]))
-      );
-    } catch (err: any) {
-      setDataEntryError(err?.message || "Failed to load scheduled data-entry lines.");
-      setDataEntryLines([]);
-    } finally {
-      setDataEntryLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (viewing && detailTab === "data-entry") loadDataEntry();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewing?.batch_id, detailTab, dataEntryDate]);
-
-  const handleDataEntrySave = async (line: Row) => {
-    if (!viewing) return;
-    const rawValue = dataEntryValues[line.spl_id];
-    if (rawValue === undefined || rawValue === "") return;
-    setDataEntrySavingId(line.spl_id);
-    setDataEntryError("");
-    try {
-      await api.post(`/batch/${viewing.batch_id}/transaction`, {
-        transaction_date: dataEntryDate,
-        transaction_type: line.parameter_type,
-        item_id: line.item_id || undefined,
-        resource_id: line.resource_id || undefined,
-        quantity: Number(rawValue),
-        uom: line.uom || undefined,
-        spl_id: line.spl_id || undefined,
-        parameter_id: line.parameter_id || undefined,
-      });
-      await loadDataEntry();
-      await refreshViewing();
-    } catch (err: any) {
-      setDataEntryError(err?.message || "Failed to record entry.");
-    } finally {
-      setDataEntrySavingId(null);
-    }
-  };
-
   const handleActivate = async () => {
     if (!viewing) return;
     setActing(true);
@@ -374,47 +302,6 @@ export default function BatchPanel() {
       load();
     } catch (err: any) {
       setError(err?.message || "Failed to activate batch.");
-    } finally {
-      setActing(false);
-    }
-  };
-
-  const handleAddTransaction = async () => {
-    if (!viewing) return;
-    setActing(true);
-    setError("");
-    try {
-      if (!txForm.transaction_date) throw new Error("Transaction date is required.");
-      const payload: Row = {
-        transaction_date: txForm.transaction_date,
-        transaction_type: txForm.transaction_type,
-        remarks: txForm.remarks || undefined,
-      };
-      if (["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type)) {
-        if (!txForm.item_id || !txForm.quantity || !txForm.uom) throw new Error("Item, quantity and UOM are required for this transaction type.");
-        payload.item_id = txForm.item_id;
-        payload.quantity = Number(txForm.quantity);
-        payload.uom = txForm.uom;
-        if (txForm.rate) payload.rate = Number(txForm.rate);
-        if (txForm.transaction_type === "OUTPUT" && txForm.output_type) {
-          if (!txForm.nrv_rate) throw new Error("Net Realisable Value rate is required when removing a by-product/waste mid-batch.");
-          payload.output_type = txForm.output_type;
-          payload.nrv_rate = Number(txForm.nrv_rate);
-        }
-      } else if (txForm.transaction_type === "MORTALITY") {
-        if (!txForm.quantity) throw new Error("Quantity is required for mortality.");
-        payload.quantity = Number(txForm.quantity);
-      } else if (txForm.transaction_type === "OVERHEAD") {
-        if (!txForm.quantity || !txForm.rate) throw new Error("Quantity and rate are required for overhead.");
-        payload.quantity = Number(txForm.quantity);
-        payload.rate = Number(txForm.rate);
-        if (txForm.resource_id) payload.resource_id = txForm.resource_id;
-      }
-      await api.post(`/batch/${viewing.batch_id}/transaction`, payload);
-      setTxForm(emptyTxForm());
-      await refreshViewing();
-    } catch (err: any) {
-      setError(err?.message || "Failed to record transaction.");
     } finally {
       setActing(false);
     }
@@ -536,10 +423,6 @@ export default function BatchPanel() {
   const itemLabel = (id: string) => {
     const it = items.find((i) => i.item_id === id);
     return it ? `${it.item_code} — ${it.item_name}` : "—";
-  };
-  const batchLabel = (id: string) => {
-    const b = batches.find((x) => x.batch_id === id);
-    return b ? b.batch_no : "—";
   };
 
   // This LOB may require a passing QC record before a pack can be generated
@@ -819,891 +702,8 @@ export default function BatchPanel() {
     }
   };
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold" style={S.primary}>Batches</h2>
-          <p className="mt-0.5 text-xs" style={S.sub}>Batch lifecycle: input placement, daily consumption/mortality/output, and closing to finished inventory.</p>
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="nf-input-sm nf-select" style={S.input}>
-            <option value="">All statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="ACTIVE">Active</option>
-            <option value="CLOSED">Closed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="nf-input-sm pl-8" style={S.input} />
-          </div>
-          <Button onClick={openCreate} >
-            <Plus className="h-3.5 w-3.5" /> New Batch
-          </Button>
-        </div>
-      </div>
-
-      {error && (
-        <InlineAlert>{error}</InlineAlert>
-      )}
-
-      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm">
-            <TableHeader>
-              <tr className="border-b border-(--row-border)">
-                <TableHead className="whitespace-nowrap">Batch No.</TableHead>
-                <TableHead className="whitespace-nowrap">Start Date</TableHead>
-                <TableHead className="whitespace-nowrap">Method</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Opening Qty</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Unit Cost</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </tr>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
-              ) : rows.length === 0 ? (
-                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No batches yet.</TableCell></tr>
-              ) : (
-                pagedRows.map((row) => (
-                  <TableRow key={row.batch_id}>
-                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.batch_no}</TableCell>
-                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.start_date}</TableCell>
-                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.costing_method}</TableCell>
-                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.opening_quantity} {row.uom}</TableCell>
-                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.unit_cost ?? "—"}</TableCell>
-                    <TableCell className="text-right">
-                      <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[row.status] || STATUS_STYLE.DRAFT}>{row.status}</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
-                        <Eye className="h-3.5 w-3.5" />
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </table>
-        </div>
-        {!loading && rows.length > 0 && (
-          <div className="border-t px-2" style={{ borderColor: "var(--border)" }}>
-            <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
-          </div>
-        )}
-      </div>
-
-      {/* Create modal */}
-      <Dialog
-        open={modalOpen}
-        onClose={() => !saving && setModalOpen(false)}
-        title="New Batch"
-        maxWidth="2xl"
-        footer={
-          <>
-            <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
-            <Button onClick={handleSave} disabled={saving} >
-              {saving ? "Saving…" : "Save Draft"}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          {formError && (
-            <InlineAlert>{formError}</InlineAlert>
-          )}
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Nature of Business <span className="text-(--danger)">*</span></label>
-              <select value={nobId} onChange={(e) => { setNobId(e.target.value); setHeader((h) => ({ ...h, lob_id: "" })); }} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
-                {nobs.map((n) => <option key={n.nob_id} value={n.nob_id}>{n.nob_code} — {n.nob_name}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Line of Business <span className="text-(--danger)">*</span></label>
-              <select value={header.lob_id} onChange={(e) => setHeader((h) => ({ ...h, lob_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!nobId}>
-                <option value="">{nobId ? "Select…" : "Select Nature of Business first…"}</option>
-                {lobs.filter((l) => !nobId || l.nob_id === nobId).map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Costing Method <span className="text-(--danger)">*</span></label>
-              <select value={header.costing_method} onChange={(e) => setHeader((h) => ({ ...h, costing_method: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="STANDARD">Standard</option>
-                <option value="FIFO">FIFO</option>
-                <option value="BIO_ASSET">Bio-Asset (IAS41)</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Breed</label>
-              <select value={header.breed_id} onChange={(e) => setHeader((h) => ({ ...h, breed_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
-                {breeds.map((b) => <option key={b.breed_id} value={b.breed_id}>{b.breed_code} — {b.breed_name}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Scheduler (KPI monitoring)</label>
-              <select value={header.scheduler_id} onChange={(e) => setHeader((h) => ({ ...h, scheduler_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!header.lob_id}>
-                <option value="">{header.lob_id ? "None" : "Select Line of Business first…"}</option>
-                {schedulers.map((s) => <option key={s.scheduler_id} value={s.scheduler_id}>{s.scheduler_code} — {s.scheduler_name}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Shed</label>
-              <select value={header.shed_id} onChange={(e) => setHeader((h) => ({ ...h, shed_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
-                {sheds.map((s) => <option key={s.shed_id} value={s.shed_id}>{s.shed_code} — {s.shed_name}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Start Date <span className="text-(--danger)">*</span></label>
-              <input type="date" value={header.start_date} onChange={(e) => setHeader((h) => ({ ...h, start_date: e.target.value }))} className={inputCls} style={S.input} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Expected End Date</label>
-              <input type="date" value={header.expected_end_date} onChange={(e) => setHeader((h) => ({ ...h, expected_end_date: e.target.value }))} className={inputCls} style={S.input} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Opening Quantity <span className="text-(--danger)">*</span></label>
-              <input type="number" value={header.opening_quantity} onChange={(e) => setHeader((h) => ({ ...h, opening_quantity: e.target.value }))} placeholder="5000" className={inputCls} style={S.input} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>UOM <span className="text-(--danger)">*</span></label>
-              <select value={header.uom} onChange={(e) => setHeader((h) => ({ ...h, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
-                {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
-              <input value={header.remarks} onChange={(e) => setHeader((h) => ({ ...h, remarks: e.target.value }))} className={inputCls} style={S.input} />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Input Items / Animals ({inputLines.length})</p>
-              <p className="text-[11px]" style={S.muted}>Opening stock and starting biological inventory assigned to this batch.</p>
-            </div>
-            <Button onClick={addInputLine} type="button" size="sm" variant="outline" className="text-xs">
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add Input Line
-            </Button>
-          </div>
-
-          <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-xs">
-                <TableHeader>
-                  <tr className="border-b border-(--row-border)">
-                    <TableHead className="h-auto px-3 py-2.5 min-w-[220px]">Item</TableHead>
-                    <TableHead className="h-auto px-3 py-2.5 min-w-[160px]">Source Batch (Transfer)</TableHead>
-                    <TableHead className="h-auto px-3 py-2.5 w-28 text-right">Quantity</TableHead>
-                    <TableHead className="h-auto px-3 py-2.5 w-28">UOM</TableHead>
-                    <TableHead className="h-auto px-3 py-2.5 w-32 text-right">Est. Unit Rate</TableHead>
-                    <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
-                  </tr>
-                </TableHeader>
-                <TableBody>
-                  {inputLines.map((line, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="px-2 py-1.5">
-                        <select value={line.item_id} onChange={(e) => setInputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
-                          <option value="">Select Item ({items.length} options)…</option>
-                          {items.map((it, i) => (
-                            <option key={it.item_id} value={it.item_id}>
-                              {i + 1}. {it.item_code} — {it.item_name || it.item_code}
-                            </option>
-                          ))}
-                        </select>
-                      </TableCell>
-                      <TableCell className="px-2 py-1.5">
-                        <select value={line.source_batch_id} onChange={(e) => setInputLineField(idx, "source_batch_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
-                          <option value="">None</option>
-                          {batches.filter((b) => b.status === "CLOSED").map((b) => <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>)}
-                        </select>
-                      </TableCell>
-                      <TableCell className="px-2 py-1.5">
-                        <input type="number" step="any" placeholder="0" value={line.quantity} onChange={(e) => setInputLineField(idx, "quantity", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
-                      </TableCell>
-                      <TableCell className="px-2 py-1.5">
-                        <select value={line.uom} onChange={(e) => setInputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
-                          <option value="">Select…</option>
-                          {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
-                        </select>
-                      </TableCell>
-                      <TableCell className="px-2 py-1.5">
-                        <input type="number" step="any" placeholder="0.00" value={line.rate} onChange={(e) => setInputLineField(idx, "rate", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
-                      </TableCell>
-                      <TableCell className="px-2 py-1.5 text-center">
-                        <button onClick={() => removeInputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </table>
-            </div>
-          </div>
-          <p className="text-[11px]" style={S.muted}>Rate is an estimate only — actual cost is drawn from inventory via FIFO when the batch is activated.</p>
-
-          {header.costing_method === "STANDARD" && (
-            <>
-              <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Standard Cost Assumptions</p>
-                <p className="mt-0.5 text-[11px]" style={S.muted}>Optional — set these to enable Price/Usage/Output/Overhead variance calculation when the batch closes.</p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Output Qty</label>
-                  <input
-                    type="number"
-                    value={stdForm.std_output_quantity}
-                    onChange={(e) => setStdForm((f: Row) => ({ ...f, std_output_quantity: e.target.value }))}
-                    placeholder={header.breed_id ? "Auto from breed mortality" : "Defaults to opening qty"}
-                    className={inputCls}
-                    style={S.input}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Output Cost/Unit</label>
-                  <input type="number" value={stdForm.std_output_cost_per_unit} onChange={(e) => setStdForm((f: Row) => ({ ...f, std_output_cost_per_unit: e.target.value }))} className={inputCls} style={S.input} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Overhead Rate/Unit</label>
-                  <input type="number" value={stdForm.std_overhead_rate_per_unit} onChange={(e) => setStdForm((f: Row) => ({ ...f, std_overhead_rate_per_unit: e.target.value }))} className={inputCls} style={S.input} />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Consumption Standards ({stdConsumptionLines.length})</p>
-                <Button onClick={addStdConsumptionLine} type="button" size="sm" variant="outline" className="text-xs">
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Standard Line
-                </Button>
-              </div>
-
-              <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader>
-                      <tr className="border-b border-(--row-border)">
-                        <TableHead className="h-auto px-3 py-2.5 min-w-[220px]">Item</TableHead>
-                        <TableHead className="h-auto px-3 py-2.5 w-36 text-right">Std Qty/Unit/Day</TableHead>
-                        <TableHead className="h-auto px-3 py-2.5 w-32 text-right">Std Rate</TableHead>
-                        <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
-                      </tr>
-                    </TableHeader>
-                    <TableBody>
-                      {stdConsumptionLines.map((line, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="px-2 py-1.5">
-                            <select value={line.item_id} onChange={(e) => setStdConsumptionLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
-                              <option value="">Select Item ({items.length} options)…</option>
-                              {items.map((it, i) => (
-                                <option key={it.item_id} value={it.item_id}>
-                                  {i + 1}. {it.item_code} — {it.item_name || it.item_code}
-                                </option>
-                              ))}
-                            </select>
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5">
-                            <input type="number" step="any" placeholder="0.00" value={line.std_qty_per_unit_per_day} onChange={(e) => setStdConsumptionLineField(idx, "std_qty_per_unit_per_day", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5">
-                            <input
-                              type="number"
-                              step="any"
-                              value={line.std_rate}
-                              onChange={(e) => setStdConsumptionLineField(idx, "std_rate", e.target.value)}
-                              placeholder="Item default"
-                              className={`${inputCls} text-xs text-right font-mono`}
-                              style={S.input}
-                            />
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 text-center">
-                            <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </Dialog>
-
-      {/* Detail / lifecycle modal */}
-      <Dialog
-        open={!!viewing}
-        onClose={() => setViewing(null)}
-        title={viewing ? `Batch ${viewing.batch_no}` : ""}
-        maxWidth="xl"
-        footer={<button onClick={() => setViewing(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Close</button>}
-      >
-        {viewing && (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Status</p><span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[viewing.status] || STATUS_STYLE.DRAFT}>{viewing.status}</span></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Method</p><p style={S.primary}>{viewing.costing_method}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Opening Qty</p><p style={S.primary}>{viewing.opening_quantity} {viewing.uom}</p></div>
-              {viewing.total_cost && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Total Cost / Unit</p><p style={S.primary}>{viewing.total_cost} / {viewing.unit_cost}</p></div>}
-              {viewing.current_stage_code && (
-                <div>
-                  <p className="font-semibold uppercase tracking-wider" style={S.muted}>Stage</p>
-                  <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
-                    {viewing.current_stage_code}
-                  </span>
-                </div>
-              )}
-              {viewing.scheduler && (
-                <div>
-                  <p className="font-semibold uppercase tracking-wider" style={S.muted}>Scheduler</p>
-                  <p style={S.primary}>{viewing.scheduler.scheduler_code}{(viewing.alerts || []).length > 0 ? ` — ${viewing.alerts.length} alert(s)` : ""}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1.5 border-b" style={{ borderColor: "var(--border)" }}>
-              {([
-                ["overview", "Overview"],
-                ["curves", "Performance & Curves"],
-                ["transactions", "Transactions"],
-                ["data-entry", "Data Entry"],
-                ["alerts", `KPI Alerts (${(viewing.alerts || []).length})`],
-              ] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setDetailTab(key)}
-                  className="rounded-t-lg px-3 py-2 text-xs font-semibold transition"
-                  style={
-                    detailTab === key
-                      ? { color: "var(--accent)", borderBottom: "2px solid var(--accent)" }
-                      : { color: "var(--text-secondary)", borderBottom: "2px solid transparent" }
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {detailTab === "overview" && (
-            <>
-            {((viewing.alerts || []).filter((a: Row) => !a.is_read).length > 0) && (
-              <div className="flex items-center justify-between rounded-lg border p-3.5" style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}>
-                <div className="flex items-center gap-2.5">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold">
-                      {((viewing.alerts || []).filter((a: Row) => !a.is_read).length)} Unacknowledged KPI Deviation Alert(s)
-                    </p>
-                    <p className="text-[11px] opacity-90">
-                      Recent daily entries for this batch deviated from scheduled benchmark standards.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setDetailTab("alerts")}
-                  className="rounded-md border border-current px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80"
-                >
-                  View Alerts →
-                </button>
-              </div>
-            )}
-            {viewing.status === "DRAFT" && (
-              <Button onClick={handleActivate} disabled={acting} >
-                <PlayCircle className="h-4 w-4" /> {acting ? "Activating…" : "Activate Batch"}
-              </Button>
-            )}
-
-            {viewing.status === "ACTIVE" && (
-              <button onClick={openTransferStage} className="flex items-center justify-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold self-start" style={S.surface}>
-                <RefreshCw className="h-4 w-4" /> Transfer Stage
-              </button>
-            )}
-
-            {(viewing.stage_log || []).length > 0 && (
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Stage History</p>
-                <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                  <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader><tr className="border-b border-(--row-border)">
-                      <TableHead className="h-auto px-3 py-2">From</TableHead>
-                      <TableHead className="h-auto px-3 py-2">To</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Transferred At</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Remarks</TableHead>
-                    </tr></TableHeader>
-                    <TableBody>
-                      {(viewing.stage_log || []).map((s: Row) => (
-                        <TableRow key={s.log_id}>
-                          <TableCell className="px-3 py-2" style={S.sub}>{s.from_stage_code || "—"}</TableCell>
-                          <TableCell className="px-3 py-2 font-semibold" style={S.primary}>{s.to_stage_code}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.sub}>{s.transferred_at}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.sub}>{s.remarks || "—"}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Lines</p>
-              <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                <table className="w-full border-collapse text-left text-xs">
-                  <TableHeader><tr className="border-b border-(--row-border)">
-                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Source Batch</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Rate</TableHead>
-                  </tr></TableHeader>
-                  <TableBody>
-                    {(viewing.input_lines || []).map((l: Row) => (
-                      <TableRow key={l.line_id}>
-                        <TableCell className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.sub}>{l.source_batch_id ? batchLabel(l.source_batch_id) : "—"}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{l.rate ?? "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </table>
-              </div>
-            </div>
-
-            {viewing.costing_method === "BIO_ASSET" && viewing.bio_asset_state && (
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Bio-Asset State</p>
-                <div className="rounded-[var(--radius-sm)] border p-3" style={S.surface}>
-                  <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-                    <div>
-                      <p className="font-semibold uppercase tracking-wider" style={S.muted}>Stage</p>
-                      <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={viewing.bio_asset_state.stage === "MATURE" ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" } : { color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
-                        {viewing.bio_asset_state.stage}
-                      </span>
-                    </div>
-                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Current Qty</p><p style={S.primary}>{viewing.bio_asset_state.current_quantity}</p></div>
-                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>NCA Book Value</p><p style={S.primary}>{viewing.bio_asset_state.nca_book_value}</p></div>
-                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Monthly Amort. Rate / Unit</p><p style={S.primary}>{viewing.bio_asset_state.monthly_amortization_rate ?? "—"}</p></div>
-                  </div>
-                  {viewing.status === "ACTIVE" && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {viewing.bio_asset_state.stage === "PREMATURE" && (
-                        <button onClick={() => openBioAction("mature")} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: "var(--accent)" }}>Mature Herd</button>
-                      )}
-                      {viewing.bio_asset_state.stage === "MATURE" && (
-                        <>
-                          <button onClick={() => openBioAction("amortize")} className="rounded-lg border px-3 py-1.5 text-xs font-semibold" style={S.surface}>Run Amortization</button>
-                          <button onClick={() => openBioAction("fair-value")} className="rounded-lg border px-3 py-1.5 text-xs font-semibold" style={S.surface}>Record Fair Value</button>
-                        </>
-                      )}
-                      {Number(viewing.bio_asset_state.current_quantity) > 0 && (
-                        <button onClick={() => openBioAction("dispose")} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: "var(--success)" }}>Dispose</button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            </>
-            )}
-
-            {detailTab === "data-entry" && (
-              <div className="flex flex-col gap-3">
-                {!viewing.scheduler_id ? (
-                  <InlineAlert variant="info">This batch has no scheduler attached — record entries via the Transactions tab instead.</InlineAlert>
-                ) : viewing.status !== "ACTIVE" ? (
-                  <InlineAlert variant="info">Data Entry is only available while the batch is ACTIVE.</InlineAlert>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Date</label>
-                      <input type="date" value={dataEntryDate} onChange={(e) => setDataEntryDate(e.target.value)} className={inputCls + " w-auto"} style={S.input} />
-                      {dataEntryLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" style={S.accent} />}
-                    </div>
-
-                    {dataEntryError && <InlineAlert>{dataEntryError}</InlineAlert>}
-
-                    <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                      <table className="w-full border-collapse text-left text-xs">
-                        <TableHeader><tr className="border-b border-(--row-border)">
-                          <TableHead className="h-auto px-3 py-2">Parameter Type</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Data Entry Type</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                          <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Occurrence</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Expected</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Actual</TableHead>
-                          <TableHead className="h-auto px-3 py-2"></TableHead>
-                        </tr></TableHeader>
-                        <TableBody>
-                          {!dataEntryLoading && dataEntryLines.length === 0 ? (
-                            <tr><TableCell colSpan={8} className="py-6 text-center" style={S.sub}>No parameters scheduled for this date.</TableCell></tr>
-                          ) : dataEntryLines.map((line) => (
-                            <TableRow key={line.spl_id}>
-                              <TableCell className="px-3 py-2" style={S.sub}>{line.parameter_type}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.primary}>{line.parameter_name}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.sub}>{line.item_label || "—"}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.sub}>{line.uom || "—"}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.sub}>{line.occurrence ? line.occurrence.charAt(0) + line.occurrence.slice(1).toLowerCase() : "—"}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.primary}>{Number(line.expected_qty).toLocaleString(undefined, { maximumFractionDigits: 4 })}</TableCell>
-                              <TableCell className="px-2 py-1.5 w-28">
-                                <input
-                                  type="number"
-                                  value={dataEntryValues[line.spl_id] ?? ""}
-                                  onChange={(e) => setDataEntryValues((v) => ({ ...v, [line.spl_id]: e.target.value }))}
-                                  className={inputCls}
-                                  style={S.input}
-                                />
-                              </TableCell>
-                              <TableCell className="px-2 py-1.5">
-                                <button
-                                  onClick={() => handleDataEntrySave(line)}
-                                  disabled={dataEntrySavingId === line.spl_id || !dataEntryValues[line.spl_id]}
-                                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                                  style={{ backgroundColor: "var(--accent)" }}
-                                >
-                                  {dataEntrySavingId === line.spl_id ? "Saving…" : "Save"}
-                                </button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </table>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {detailTab === "transactions" && (
-            <>
-            {viewing.status === "ACTIVE" && (
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Add Transaction</p>
-                <div className="grid grid-cols-2 gap-2 rounded-[var(--radius-sm)] border p-3 sm:grid-cols-3" style={S.surface}>
-                  <select value={txForm.transaction_type} onChange={(e) => setTxForm((f: Row) => ({ ...f, transaction_type: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                    {["CONSUMPTION", "MORTALITY", "OUTPUT", "OVERHEAD", "OBSERVATION"].map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <input type="date" value={txForm.transaction_date} onChange={(e) => setTxForm((f: Row) => ({ ...f, transaction_date: e.target.value }))} className={inputCls} style={S.input} />
-                  {["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type) && (
-                    <select value={txForm.item_id} onChange={(e) => setTxForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Select Item ({items.length} options)…</option>
-                      {items.map((it, i) => (
-                        <option key={it.item_id} value={it.item_id}>
-                          {i + 1}. {it.item_code} — {it.item_name || it.item_code}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {txForm.transaction_type === "OVERHEAD" && (
-                    <select value={txForm.resource_id} onChange={(e) => setTxForm((f: Row) => ({ ...f, resource_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Resource…</option>
-                      {resources.map((r) => <option key={r.resource_id} value={r.resource_id}>{r.resource_code}</option>)}
-                    </select>
-                  )}
-                  {["CONSUMPTION", "MORTALITY", "OUTPUT", "OVERHEAD"].includes(txForm.transaction_type) && (
-                    <input type="number" placeholder="Qty" value={txForm.quantity} onChange={(e) => setTxForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
-                  )}
-                  {["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type) && (
-                    <select value={txForm.uom} onChange={(e) => setTxForm((f: Row) => ({ ...f, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">UOM…</option>
-                      {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
-                    </select>
-                  )}
-                  {["OUTPUT", "OVERHEAD"].includes(txForm.transaction_type) && (
-                    <input type="number" placeholder="Rate" value={txForm.rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, rate: e.target.value }))} className={inputCls} style={S.input} />
-                  )}
-                  {txForm.transaction_type === "OUTPUT" && (
-                    <select value={txForm.output_type} onChange={(e) => setTxForm((f: Row) => ({ ...f, output_type: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Main product (at close)</option>
-                      <option value="BY_PRODUCT">Remove now — By-product (at NRV)</option>
-                      <option value="WASTE">Remove now — Waste (at NRV)</option>
-                    </select>
-                  )}
-                  {txForm.transaction_type === "OUTPUT" && txForm.output_type && (
-                    <input type="number" placeholder="NRV Rate / Unit" value={txForm.nrv_rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, nrv_rate: e.target.value }))} className={inputCls} style={S.input} />
-                  )}
-                  <input placeholder="Remarks" value={txForm.remarks} onChange={(e) => setTxForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls + " sm:col-span-3"} style={S.input} />
-                  <Button onClick={handleAddTransaction} disabled={acting} >
-                    {acting ? "Saving…" : "Add Transaction"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Transaction Log</p>
-              <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                <table className="w-full border-collapse text-left text-xs">
-                  <TableHeader><tr className="border-b border-(--row-border)">
-                    <TableHead className="h-auto px-3 py-2">Date</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Type</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Amount</TableHead>
-                  </tr></TableHeader>
-                  <TableBody>
-                    {(viewing.transactions || []).length === 0 ? (
-                      <tr><TableCell colSpan={5} className="py-6 text-center" style={S.sub}>No transactions yet.</TableCell></tr>
-                    ) : (viewing.transactions || []).map((t: Row) => (
-                      <TableRow key={t.transaction_id}>
-                        <TableCell className="px-3 py-2" style={S.primary}>{t.transaction_date}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.sub}>{t.transaction_type}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{t.item_id ? itemLabel(t.item_id) : "—"}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{t.quantity ?? "—"}</TableCell>
-                        <TableCell className="px-3 py-2 font-semibold" style={Number(t.amount) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{t.amount}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </table>
-              </div>
-            </div>
-            </>
-            )}
-
-            {detailTab === "overview" && (
-            <>
-            {viewing.costing_method === "BIO_ASSET" && (viewing.bio_asset_entries || []).length > 0 && (
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Bio-Asset Ledger</p>
-                <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                  <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader><tr className="border-b border-(--row-border)">
-                      <TableHead className="h-auto px-3 py-2">Date</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Entry Type</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Stage</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Cost Amount</TableHead>
-                    </tr></TableHeader>
-                    <TableBody>
-                      {(viewing.bio_asset_entries || []).map((e: Row) => (
-                        <TableRow key={e.entry_id}>
-                          <TableCell className="px-3 py-2" style={S.primary}>{e.posting_date}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.sub}>{e.entry_type}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.primary}>{itemLabel(e.bio_asset_item_id)}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.sub}>{e.stage ?? "—"}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.primary}>{e.quantity ?? "—"}</TableCell>
-                          <TableCell className="px-3 py-2 font-semibold" style={Number(e.cost_amount) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{e.cost_amount}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {viewing.status === "ACTIVE" && viewing.costing_method !== "BIO_ASSET" && (
-              <button onClick={openClose} className="flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white self-start" style={{ backgroundColor: "var(--success)" }}>
-                <CheckCircle2 className="h-4 w-4" /> Close Batch
-              </button>
-            )}
-
-            {viewing.status === "CLOSED" && (viewing.output_lines || []).length > 0 && (
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output Lines</p>
-                <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                  <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader><tr className="border-b border-(--row-border)">
-                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Type</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Split %</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Cost / Unit Cost</TableHead>
-                      <TableHead className="h-auto px-3 py-2 text-right">QC / Pack</TableHead>
-                    </tr></TableHeader>
-                    <TableBody>
-                      {(viewing.output_lines || []).map((l: Row) => (
-                        <TableRow key={l.line_id}>
-                          <TableCell className="px-3 py-2" style={S.primary}>{itemLabel(l.item_id)}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.sub}>{l.output_type}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.primary}>{l.cost_split_pct}%</TableCell>
-                          <TableCell className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.primary}>{l.computed_cost} / {l.unit_cost}</TableCell>
-                          <TableCell className="px-3 py-2 text-right">
-                            <div className="flex justify-end gap-1">
-                              <button onClick={() => openRecordQc(l)} title="Record QC" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
-                                <ClipboardCheck className="h-3.5 w-3.5" />
-                              </button>
-                              <button onClick={() => openGeneratePack(l)} title="Generate Pack" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
-                                <QrCodeIcon className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {viewing.status === "CLOSED" && (viewing.variances || []).length > 0 && (
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Cost Variance</p>
-                <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                  <table className="w-full border-collapse text-left text-xs">
-                    <TableHeader><tr className="border-b border-(--row-border)">
-                      <TableHead className="h-auto px-3 py-2">Type</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Std Value</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Actual Value</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Variance</TableHead>
-                      <TableHead className="h-auto px-3 py-2"></TableHead>
-                    </tr></TableHeader>
-                    <TableBody>
-                      {(viewing.variances || []).map((v: Row) => (
-                        <TableRow key={v.variance_id}>
-                          <TableCell className="px-3 py-2" style={S.primary}>{v.variance_type}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.sub}>{v.item_id ? itemLabel(v.item_id) : "—"}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.primary}>{Number(v.std_value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</TableCell>
-                          <TableCell className="px-3 py-2" style={S.primary}>{Number(v.actual_value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</TableCell>
-                          <TableCell className="px-3 py-2 font-semibold" style={v.is_favorable ? { color: "var(--success)" } : { color: "var(--danger)" }}>{v.variance_amount}</TableCell>
-                          <TableCell className="px-3 py-2">
-                            <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={v.is_favorable ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" } : { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" }}>
-                              {v.is_favorable ? "FAV" : "UNFAV"}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {viewing.status === "CLOSED" && renewAllowed && (
-              <button onClick={openRenew} className="flex items-center justify-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold self-start" style={S.surface}>
-                <RefreshCw className="h-4 w-4" /> Renew Batch — Start Next Cycle
-              </button>
-            )}
-            </>
-            )}
-
-            {detailTab === "curves" && (
-              <div className="py-2">
-                <BatchPerformanceCurvesPanel
-                  batchId={viewing.batch_id}
-                  onSchedulerGenerated={() => {
-                    load();
-                    api.get(`/batch/${viewing.batch_id}`).then((r) => setViewing(unwrap<Row>(r)));
-                  }}
-                />
-              </div>
-            )}
-
-            {detailTab === "alerts" && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold" style={S.primary}>Batch KPI Deviation Log</p>
-                    <p className="text-[11px]" style={S.sub}>
-                      Historical threshold breaches logged against {viewing.scheduler?.scheduler_code || "the attached scheduler"}.
-                    </p>
-                  </div>
-                  {(viewing.alerts || []).some((a: Row) => !a.is_read) && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          await api.post("/alert/mark-all-read", { companyId, batchId: viewing.batch_id });
-                          await refreshViewing();
-                        } catch {}
-                      }}
-                      className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold"
-                      style={S.surface}
-                    >
-                      <CheckCheck className="h-3.5 w-3.5 text-(--success)" /> Mark All Read
-                    </button>
-                  )}
-                </div>
-
-                {(viewing.alerts || []).length === 0 ? (
-                  <div className="rounded-[var(--radius-sm)] border p-8 text-center text-xs" style={{ ...S.surface, ...S.sub }}>
-                    <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
-                    No KPI deviation alerts logged for this batch.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                    <table className="w-full border-collapse text-left text-xs">
-                      <TableHeader>
-                        <tr className="border-b border-(--row-border)">
-                          <TableHead className="h-auto px-3 py-2">Severity</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Alert / Deviation</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Expected</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Actual</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Deviation</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Logged At</TableHead>
-                          <TableHead className="h-auto px-3 py-2 text-right">Action</TableHead>
-                        </tr>
-                      </TableHeader>
-                      <TableBody>
-                        {(viewing.alerts || []).map((alert: Row) => (
-                          <TableRow key={alert.alert_id} style={{ opacity: alert.is_read ? 0.6 : 1 }}>
-                            <TableCell className="px-3 py-2">
-                              <span
-                                className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                                style={
-                                  alert.severity === "CRITICAL"
-                                    ? { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }
-                                    : { color: "var(--warning)", borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)" }
-                                }
-                              >
-                                {alert.severity}
-                              </span>
-                            </TableCell>
-                            <TableCell className="px-3 py-2">
-                              <p className="font-semibold" style={S.primary}>{alert.title}</p>
-                              <p className="text-[11px]" style={S.sub}>{alert.message}</p>
-                            </TableCell>
-                            <TableCell className="px-3 py-2" style={S.primary}>{alert.expected_value ?? "—"}</TableCell>
-                            <TableCell className="px-3 py-2 font-medium" style={S.primary}>{alert.actual_value ?? "—"}</TableCell>
-                            <TableCell className="px-3 py-2">
-                              {alert.deviation_pct != null ? (
-                                <span className="font-semibold" style={{ color: Number(alert.deviation_pct) > 0 ? "var(--danger)" : "var(--warning)" }}>
-                                  {Number(alert.deviation_pct) > 0 ? "+" : ""}{Number(alert.deviation_pct).toFixed(2)}%
-                                </span>
-                              ) : "—"}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-[11px]" style={S.muted}>
-                              {new Date(alert.created_at).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right">
-                              {!alert.is_read ? (
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      await api.post(`/alert/${alert.alert_id}/read`, { companyId });
-                                      await refreshViewing();
-                                    } catch {}
-                                  }}
-                                  className="rounded-md border px-2 py-1 text-[11px] font-semibold"
-                                  style={S.surface}
-                                >
-                                  Mark Read
-                                </button>
-                              ) : (
-                                <span className="text-[10px] text-(--success) font-medium">Read</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </Dialog>
-
+  const renderActionModals = () => (
+    <>
       {/* Transfer stage modal */}
       <Dialog
         open={stageModalOpen}
@@ -2307,6 +1307,366 @@ export default function BatchPanel() {
           )}
         </div>
       </Dialog>
+    </>
+  );
+
+  if (viewing) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setViewing(null)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border hover:bg-(--surface-raised) transition shadow-xs"
+            style={S.surface}
+          >
+            <ChevronLeft className="h-4 w-4" /> Back to batches list
+          </button>
+        </div>
+
+        <BatchDetailsHub
+          batch={viewing}
+          items={items}
+          batches={rows}
+          onRefreshBatch={refreshViewing}
+          onTransferStage={openTransferStage}
+          onMatureBio={() => openBioAction("mature")}
+          onAmortizeBio={() => openBioAction("amortize")}
+          onFairValueBio={() => openBioAction("fair-value")}
+          onDisposeBio={() => openBioAction("dispose")}
+          onCloseBatch={openClose}
+          onActivateBatch={handleActivate}
+          onRecordQc={openRecordQc}
+          onGeneratePack={openGeneratePack}
+          onRenewBatch={renewAllowed ? openRenew : undefined}
+        />
+
+        {renderActionModals()}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold" style={S.primary}>Batches</h2>
+          <p className="mt-0.5 text-xs" style={S.sub}>Batch lifecycle: input placement, daily consumption/mortality/output, and closing to finished inventory.</p>
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="nf-input-sm nf-select" style={S.input}>
+            <option value="">All statuses</option>
+            <option value="DRAFT">Draft</option>
+            <option value="ACTIVE">Active</option>
+            <option value="CLOSED">Closed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="nf-input-sm pl-8" style={S.input} />
+          </div>
+          <Button onClick={openCreate} >
+            <Plus className="h-3.5 w-3.5" /> New Batch
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <InlineAlert>{error}</InlineAlert>
+      )}
+
+      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm">
+            <TableHeader>
+              <tr className="border-b border-(--row-border)">
+                <TableHead className="whitespace-nowrap">Batch No.</TableHead>
+                <TableHead className="whitespace-nowrap">Start Date</TableHead>
+                <TableHead className="whitespace-nowrap">Method</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Opening Qty</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Unit Cost</TableHead>
+                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </tr>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
+              ) : rows.length === 0 ? (
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No batches yet.</TableCell></tr>
+              ) : (
+                pagedRows.map((row) => (
+                  <TableRow key={row.batch_id}>
+                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.batch_no}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.primary}>{row.start_date}</TableCell>
+                    <TableCell className="whitespace-nowrap" style={S.sub}>{row.costing_method}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.opening_quantity} {row.uom}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.unit_cost ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[row.status] || STATUS_STYLE.DRAFT}>{row.status}</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </table>
+        </div>
+        {!loading && rows.length > 0 && (
+          <div className="border-t px-2" style={{ borderColor: "var(--border)" }}>
+            <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          </div>
+        )}
+      </div>
+
+      {/* Create modal */}
+      <Dialog
+        open={modalOpen}
+        onClose={() => !saving && setModalOpen(false)}
+        title="New Batch"
+        maxWidth="2xl"
+        footer={
+          <>
+            <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>Cancel</button>
+            <Button onClick={handleSave} disabled={saving} >
+              {saving ? "Saving…" : "Save Draft"}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {formError && (
+            <InlineAlert>{formError}</InlineAlert>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Nature of Business <span className="text-(--danger)">*</span></label>
+              <select value={nobId} onChange={(e) => { setNobId(e.target.value); setHeader((h) => ({ ...h, lob_id: "" })); }} className={`${inputCls} nf-select`} style={S.input}>
+                <option value="">Select…</option>
+                {nobs.map((n) => <option key={n.nob_id} value={n.nob_id}>{n.nob_code} — {n.nob_name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Line of Business <span className="text-(--danger)">*</span></label>
+              <select value={header.lob_id} onChange={(e) => setHeader((h) => ({ ...h, lob_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!nobId}>
+                <option value="">{nobId ? "Select…" : "Select Nature of Business first…"}</option>
+                {lobs.filter((l) => !nobId || l.nob_id === nobId).map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Costing Method <span className="text-(--danger)">*</span></label>
+              <select value={header.costing_method} onChange={(e) => setHeader((h) => ({ ...h, costing_method: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
+                <option value="STANDARD">Standard</option>
+                <option value="FIFO">FIFO</option>
+                <option value="BIO_ASSET">Bio-Asset (IAS41)</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Breed</label>
+              <select value={header.breed_id} onChange={(e) => setHeader((h) => ({ ...h, breed_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
+                <option value="">Select…</option>
+                {breeds.map((b) => <option key={b.breed_id} value={b.breed_id}>{b.breed_code} — {b.breed_name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Scheduler (KPI monitoring)</label>
+              <select value={header.scheduler_id} onChange={(e) => setHeader((h) => ({ ...h, scheduler_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!header.lob_id}>
+                <option value="">{header.lob_id ? "None" : "Select Line of Business first…"}</option>
+                {schedulers.map((s) => <option key={s.scheduler_id} value={s.scheduler_id}>{s.scheduler_code} — {s.scheduler_name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Shed</label>
+              <select value={header.shed_id} onChange={(e) => setHeader((h) => ({ ...h, shed_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
+                <option value="">Select…</option>
+                {sheds.map((s) => <option key={s.shed_id} value={s.shed_id}>{s.shed_code} — {s.shed_name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Start Date <span className="text-(--danger)">*</span></label>
+              <input type="date" value={header.start_date} onChange={(e) => setHeader((h) => ({ ...h, start_date: e.target.value }))} className={inputCls} style={S.input} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Expected End Date</label>
+              <input type="date" value={header.expected_end_date} onChange={(e) => setHeader((h) => ({ ...h, expected_end_date: e.target.value }))} className={inputCls} style={S.input} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Opening Quantity <span className="text-(--danger)">*</span></label>
+              <input type="number" value={header.opening_quantity} onChange={(e) => setHeader((h) => ({ ...h, opening_quantity: e.target.value }))} placeholder="5000" className={inputCls} style={S.input} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>UOM <span className="text-(--danger)">*</span></label>
+              <select value={header.uom} onChange={(e) => setHeader((h) => ({ ...h, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
+                <option value="">Select…</option>
+                {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+              <input value={header.remarks} onChange={(e) => setHeader((h) => ({ ...h, remarks: e.target.value }))} className={inputCls} style={S.input} />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Input Items / Animals ({inputLines.length})</p>
+              <p className="text-[11px]" style={S.muted}>Opening stock and starting biological inventory assigned to this batch.</p>
+            </div>
+            <Button onClick={addInputLine} type="button" size="sm" variant="outline" className="text-xs">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Input Line
+            </Button>
+          </div>
+
+          <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <TableHeader>
+                  <tr className="border-b border-(--row-border)">
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[220px]">Item</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 min-w-[160px]">Source Batch (Transfer)</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-28 text-right">Quantity</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-28">UOM</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-32 text-right">Est. Unit Rate</TableHead>
+                    <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {inputLines.map((line, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.item_id} onChange={(e) => setInputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select Item ({items.length} options)…</option>
+                          {items.map((it, i) => (
+                            <option key={it.item_id} value={it.item_id}>
+                              {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                            </option>
+                          ))}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.source_batch_id} onChange={(e) => setInputLineField(idx, "source_batch_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">None</option>
+                          {batches.filter((b) => b.status === "CLOSED").map((b) => <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>)}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="0" value={line.quantity} onChange={(e) => setInputLineField(idx, "quantity", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <select value={line.uom} onChange={(e) => setInputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                          <option value="">Select…</option>
+                          {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+                        </select>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5">
+                        <input type="number" step="any" placeholder="0.00" value={line.rate} onChange={(e) => setInputLineField(idx, "rate", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5 text-center">
+                        <button onClick={() => removeInputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </table>
+            </div>
+          </div>
+          <p className="text-[11px]" style={S.muted}>Rate is an estimate only — actual cost is drawn from inventory via FIFO when the batch is activated.</p>
+
+          {header.costing_method === "STANDARD" && (
+            <>
+              <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+                <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Standard Cost Assumptions</p>
+                <p className="mt-0.5 text-[11px]" style={S.muted}>Optional — set these to enable Price/Usage/Output/Overhead variance calculation when the batch closes.</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Output Qty</label>
+                  <input
+                    type="number"
+                    value={stdForm.std_output_quantity}
+                    onChange={(e) => setStdForm((f: Row) => ({ ...f, std_output_quantity: e.target.value }))}
+                    placeholder={header.breed_id ? "Auto from breed mortality" : "Defaults to opening qty"}
+                    className={inputCls}
+                    style={S.input}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Output Cost/Unit</label>
+                  <input type="number" value={stdForm.std_output_cost_per_unit} onChange={(e) => setStdForm((f: Row) => ({ ...f, std_output_cost_per_unit: e.target.value }))} className={inputCls} style={S.input} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Overhead Rate/Unit</label>
+                  <input type="number" value={stdForm.std_overhead_rate_per_unit} onChange={(e) => setStdForm((f: Row) => ({ ...f, std_overhead_rate_per_unit: e.target.value }))} className={inputCls} style={S.input} />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-xs font-bold uppercase tracking-wider" style={S.primary}>Consumption Standards ({stdConsumptionLines.length})</p>
+                <Button onClick={addStdConsumptionLine} type="button" size="sm" variant="outline" className="text-xs">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Standard Line
+                </Button>
+              </div>
+
+              <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <TableHeader>
+                      <tr className="border-b border-(--row-border)">
+                        <TableHead className="h-auto px-3 py-2.5 min-w-[220px]">Item</TableHead>
+                        <TableHead className="h-auto px-3 py-2.5 w-36 text-right">Std Qty/Unit/Day</TableHead>
+                        <TableHead className="h-auto px-3 py-2.5 w-32 text-right">Std Rate</TableHead>
+                        <TableHead className="h-auto px-3 py-2.5 w-12 text-center"></TableHead>
+                      </tr>
+                    </TableHeader>
+                    <TableBody>
+                      {stdConsumptionLines.map((line, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="px-2 py-1.5">
+                            <select value={line.item_id} onChange={(e) => setStdConsumptionLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select text-xs`} style={S.input}>
+                              <option value="">Select Item ({items.length} options)…</option>
+                              {items.map((it, i) => (
+                                <option key={it.item_id} value={it.item_id}>
+                                  {i + 1}. {it.item_code} — {it.item_name || it.item_code}
+                                </option>
+                              ))}
+                            </select>
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5">
+                            <input type="number" step="any" placeholder="0.00" value={line.std_qty_per_unit_per_day} onChange={(e) => setStdConsumptionLineField(idx, "std_qty_per_unit_per_day", e.target.value)} className={`${inputCls} text-xs text-right font-mono`} style={S.input} />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5">
+                            <input
+                              type="number"
+                              step="any"
+                              value={line.std_rate}
+                              onChange={(e) => setStdConsumptionLineField(idx, "std_rate", e.target.value)}
+                              placeholder="Item default"
+                              className={`${inputCls} text-xs text-right font-mono`}
+                              style={S.input}
+                            />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-center">
+                            <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </Dialog>
+
+      
+      {renderActionModals()}
     </div>
   );
 }

@@ -43,8 +43,8 @@ CREATE TABLE `animal_register` (
 	`is_active` boolean NOT NULL DEFAULT true,
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `animal_register_animal_id` PRIMARY KEY(`animal_id`),
 	CONSTRAINT `uq_animal_register_tenant_code` UNIQUE(`tenant_id`,`animal_code`),
 	CONSTRAINT `uq_animal_register_tenant_rfid` UNIQUE(`tenant_id`,`rfid_tag`)

@@ -26,7 +26,7 @@ CREATE TABLE `breed_lifecycle_stages` (
 	`notes` text,
 	`is_active` boolean NOT NULL DEFAULT true,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `breed_lifecycle_stages_lifecycle_id` PRIMARY KEY(`lifecycle_id`)
 );
 --> statement-breakpoint

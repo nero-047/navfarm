@@ -21,12 +21,18 @@ export class ConnectionManagerService implements OnModuleDestroy {
       return this.tenantConnections.get(cacheKey)!;
     }
 
+    const isRemoteOrTidb =
+      tenant.db_port === 4000 ||
+      (tenant.db_host && tenant.db_host.includes('tidbcloud')) ||
+      process.env.DATABASE_SSL === 'true';
+
     const pool = mysql.createPool({
       host: tenant.db_host,
       port: tenant.db_port,
       user: tenant.db_user,
       password: tenant.db_password || '',
       database: tenant.db_name,
+      ssl: isRemoteOrTidb ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined,
       connectionLimit: 10,
       waitForConnections: true,
       queueLimit: 0,

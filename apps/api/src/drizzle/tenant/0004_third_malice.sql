@@ -11,8 +11,8 @@ CREATE TABLE `disease_master` (
 	`status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
 	`created_by` varchar(36),
 	`updated_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`deleted_at` timestamp,
 	`extension_config` json,
 	CONSTRAINT `disease_master_disease_id` PRIMARY KEY(`disease_id`)

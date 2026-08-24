@@ -13,6 +13,7 @@ import {
   ValidateNested,
   ArrayMinSize,
   IsIn,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -526,5 +527,161 @@ export class BulkDailyEntryDto {
   @ValidateNested({ each: true })
   @Type(() => BulkDailyEntryRowDto)
   entries: BulkDailyEntryRowDto[];
+}
+
+export class SingleBatchDailyEntryDto {
+  @ApiProperty({ description: 'Daily log date', example: '2026-08-21' })
+  @IsDateString()
+  @IsNotEmpty()
+  date: string;
+
+  @ApiProperty({ description: 'Whether this entry is saved as draft', required: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  is_draft?: boolean;
+
+  @ApiProperty({ description: 'Feed consumption lines', required: false })
+  @IsArray()
+  @IsOptional()
+  feed_lines?: Array<{
+    item_id: string;
+    quantity: number;
+    uom?: string;
+    rate?: number;
+    lot_no?: string;
+    spl_id?: string;
+    parameter_id?: string;
+  }>;
+
+  @ApiProperty({ description: 'Medicine and vaccine lines', required: false })
+  @IsArray()
+  @IsOptional()
+  medicine_lines?: Array<{
+    item_id: string;
+    quantity: number;
+    uom?: string;
+    rate?: number;
+    lot_no?: string;
+    spl_id?: string;
+    parameter_id?: string;
+    remarks?: string;
+  }>;
+
+  @ApiProperty({ description: 'Weight & condition observations', required: false })
+  @IsOptional()
+  weight?: {
+    avg_weight?: number;
+    daily_gain_gpd?: number;
+    bcs_score?: number;
+    head_count?: number;
+    remarks?: string;
+  };
+
+  @ApiProperty({ description: 'Mortality entries', required: false })
+  @IsArray()
+  @IsOptional()
+  mortality_lines?: Array<{
+    quantity: number;
+    reason?: string;
+    disease_id?: string;
+    remarks?: string;
+    spl_id?: string;
+  }>;
+
+  @ApiProperty({ description: 'Milestone / Pregnancy scan decision', required: false })
+  @IsOptional()
+  checkpoint_decision?: {
+    checkpoint_type?: string;
+    decision?: string;
+    confirmed_count?: number;
+    repeat_count?: number;
+    failed_count?: number;
+    remarks?: string;
+  };
+
+  @ApiProperty({ description: 'Batch transfer', required: false })
+  @IsOptional()
+  transfer?: {
+    to_batch_id?: string;
+    to_location_id?: string;
+    head_count?: number;
+    avg_weight?: number;
+    auto_triggers_stage?: boolean;
+    to_stage_code?: string;
+    remarks?: string;
+  };
+
+  @ApiProperty({ description: 'Output harvest lines (piglets, carcasses)', required: false })
+  @IsArray()
+  @IsOptional()
+  output_lines?: Array<{
+    item_id?: string;
+    parameter_id?: string;
+    spl_id?: string;
+    item_name?: string;
+    quantity: number;
+    uom?: string;
+    avg_weight?: number;
+    output_type?: string;
+    warehouse_id?: string;
+    rate?: number;
+    remarks?: string;
+  }>;
+
+  @ApiProperty({ description: 'Resource / labour attendance lines', required: false })
+  @IsArray()
+  @IsOptional()
+  resource_lines?: Array<{
+    resource_id?: string;
+    parameter_id?: string;
+    spl_id?: string;
+    resource_name?: string;
+    quantity: number;
+    uom?: string;
+    rate?: number;
+    remarks?: string;
+  }>;
+
+  @ApiProperty({ description: 'General day notes', required: false })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+}
+
+export class UpdateBatchSchedulerLinesDto {
+  @ApiProperty({ description: 'Scheduler duration value in days', required: false })
+  @IsOptional()
+  duration_value?: number;
+
+  @ApiProperty({ description: 'Scheduler animal count', required: false })
+  @IsOptional()
+  animal_count?: number;
+
+  @ApiProperty({ description: 'Notes or stage instructions', required: false })
+  @IsOptional()
+  notes?: string;
+
+  @ApiProperty({ description: 'Parameter lines to update or upsert', required: false })
+  @IsArray()
+  @IsOptional()
+  lines?: Array<{
+    spl_id?: string;
+    parameter_id?: string;
+    parameter_name?: string;
+    line_type?: string;
+    item_id?: string;
+    expected_qty_override?: number | string;
+    uom_override?: string;
+    occurrence?: string;
+    start_day?: number;
+    end_day?: number;
+    kpi_enabled?: boolean;
+    kpi_target_value?: number | string;
+    kpi_min_pct?: number | string;
+    kpi_max_pct?: number | string;
+    critical_threshold_pct?: number | string;
+    notes?: string;
+    custom_days?: Array<{ day_number: number; day_label?: string }>;
+  }>;
 }
 

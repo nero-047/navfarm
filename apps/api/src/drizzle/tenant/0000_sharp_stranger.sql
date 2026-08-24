@@ -10,7 +10,7 @@ CREATE TABLE `audit_log` (
 	`new_values` json,
 	`ip_address` varchar(50),
 	`user_agent` text,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `audit_log_audit_id` PRIMARY KEY(`audit_id`)
 );
 --> statement-breakpoint
@@ -109,7 +109,7 @@ CREATE TABLE `company_language_config` (
 	`is_default` boolean NOT NULL DEFAULT false,
 	`is_enabled` boolean NOT NULL DEFAULT true,
 	`set_by` varchar(36),
-	`set_at` timestamp NOT NULL DEFAULT (now()),
+	`set_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `company_language_config_config_id` PRIMARY KEY(`config_id`)
 );
 --> statement-breakpoint
@@ -141,9 +141,9 @@ CREATE TABLE `company_master` (
 	`max_farm_locations` int NOT NULL DEFAULT 1,
 	`onboarding_status` varchar(20) NOT NULL DEFAULT 'PENDING',
 	`is_active` boolean NOT NULL DEFAULT true,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`created_by` varchar(36),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`extension_config` json,
 	CONSTRAINT `company_master_company_id` PRIMARY KEY(`company_id`)
 );
@@ -180,7 +180,7 @@ CREATE TABLE `exchange_rate` (
 	`rate` decimal(18,6) NOT NULL,
 	`rate_date` date NOT NULL,
 	`rate_source` varchar(30) NOT NULL DEFAULT 'MANUAL',
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `exchange_rate_rate_id` PRIMARY KEY(`rate_id`)
 );
 --> statement-breakpoint
@@ -240,8 +240,8 @@ CREATE TABLE `item_master` (
 	`is_active` boolean NOT NULL DEFAULT true,
 	`extension_config` json,
 	`created_by` varchar(36) NOT NULL,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `item_master_item_id` PRIMARY KEY(`item_id`)
 );
 --> statement-breakpoint
@@ -273,7 +273,7 @@ CREATE TABLE `language_translations` (
 	`is_html` boolean NOT NULL DEFAULT false,
 	`is_auto_translated` boolean NOT NULL DEFAULT false,
 	`verified_by` varchar(36),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `language_translations_trans_id` PRIMARY KEY(`trans_id`)
 );
 --> statement-breakpoint
@@ -462,7 +462,7 @@ CREATE TABLE `user_language_pref` (
 	`date_format_override` varchar(30),
 	`number_format_override` varchar(20),
 	`is_active` boolean NOT NULL DEFAULT true,
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `user_language_pref_pref_id` PRIMARY KEY(`pref_id`)
 );
 --> statement-breakpoint
@@ -491,7 +491,7 @@ CREATE TABLE `user_master` (
 	`failed_login_count` int NOT NULL DEFAULT 0,
 	`locked_until` timestamp,
 	`is_active` boolean NOT NULL DEFAULT true,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`invited_by` varchar(36),
 	`deleted_at` timestamp,
 	`deleted_by` varchar(36),
@@ -504,7 +504,7 @@ CREATE TABLE `user_role_assignment` (
 	`user_id` varchar(36) NOT NULL,
 	`role_id` varchar(36) NOT NULL,
 	`assigned_by` varchar(36) NOT NULL,
-	`assigned_at` timestamp NOT NULL DEFAULT (now()),
+	`assigned_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`expires_at` timestamp,
 	`is_active` boolean NOT NULL DEFAULT true,
 	CONSTRAINT `user_role_assignment_assign_id` PRIMARY KEY(`assign_id`)

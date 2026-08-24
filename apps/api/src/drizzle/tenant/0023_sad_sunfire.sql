@@ -5,7 +5,7 @@ CREATE TABLE `batch_stage_log` (
 	`to_stage_code` varchar(50) NOT NULL,
 	`from_location_id` varchar(36),
 	`to_location_id` varchar(36),
-	`transferred_at` timestamp NOT NULL DEFAULT (now()),
+	`transferred_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`transferred_by` varchar(36),
 	`remarks` text,
 	CONSTRAINT `batch_stage_log_log_id` PRIMARY KEY(`log_id`)

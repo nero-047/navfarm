@@ -17,7 +17,7 @@ CREATE TABLE `qc_batch_detail` (
 	`disposition` varchar(30) NOT NULL,
 	`qc_notes` text,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `qc_batch_detail_qc_id` PRIMARY KEY(`qc_id`)
 );
 --> statement-breakpoint
@@ -49,7 +49,7 @@ CREATE TABLE `qc_parameter_master` (
 	`is_mandatory` boolean NOT NULL DEFAULT true,
 	`is_active` boolean NOT NULL DEFAULT true,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `qc_parameter_master_param_id` PRIMARY KEY(`param_id`)
 );
 --> statement-breakpoint
@@ -73,7 +73,7 @@ CREATE TABLE `qr_code_master` (
 	`origin_batch_chain` json,
 	`breed` varchar(100),
 	`qr_data` json NOT NULL,
-	`generated_at` timestamp NOT NULL DEFAULT (now()),
+	`generated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`generated_by` varchar(36),
 	`is_voided` boolean NOT NULL DEFAULT false,
 	CONSTRAINT `qr_code_master_qr_id` PRIMARY KEY(`qr_id`)

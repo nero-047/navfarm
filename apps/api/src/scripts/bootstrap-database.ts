@@ -22,6 +22,9 @@ const systemDatabase = process.env.SYSTEM_TENANT_DATABASE || 'tenant_system';
 const adminEmail = process.env.SYSTEM_ADMIN_EMAIL || 'admin@navfarm.local';
 const adminPassword = process.env.SYSTEM_ADMIN_PASSWORD;
 
+const isRemoteOrTidb = port === 4000 || host.includes('tidbcloud') || process.env.DATABASE_SSL === 'true';
+const ssl = isRemoteOrTidb ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined;
+
 function assertDatabaseName(value: string): string {
   if (!/^[A-Za-z0-9_]+$/.test(value)) {
     throw new Error(`Unsafe database name: ${value}`);
@@ -37,7 +40,7 @@ async function bootstrap() {
   assertDatabaseName(masterDatabase);
   assertDatabaseName(systemDatabase);
 
-  const server = await mysql.createConnection({ host, port, user, password });
+  const server = await mysql.createConnection({ host, port, user, password, ssl });
   await server.query(`CREATE DATABASE IF NOT EXISTS \`${masterDatabase}\``);
   await server.query(`CREATE DATABASE IF NOT EXISTS \`${systemDatabase}\``);
   await server.end();
@@ -48,6 +51,7 @@ async function bootstrap() {
     user,
     password,
     database: masterDatabase,
+    ssl,
   });
   const tenantPool = mysql.createPool({
     host,
@@ -55,6 +59,7 @@ async function bootstrap() {
     user,
     password,
     database: systemDatabase,
+    ssl,
   });
   const masterDb = drizzle(masterPool, { schema: master, mode: 'default' });
   const tenantDb = drizzle(tenantPool, { schema: tenant, mode: 'default' });

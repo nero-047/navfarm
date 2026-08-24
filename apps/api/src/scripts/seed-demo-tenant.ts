@@ -195,7 +195,10 @@ async function seedCompany(
 }
 
 async function seedDemoTenant() {
-  const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase });
+  const isRemoteOrTidb = port === 4000 || host.includes('tidbcloud') || process.env.DATABASE_SSL === 'true';
+  const ssl = isRemoteOrTidb ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined;
+
+  const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase, ssl });
   const masterDb = drizzle(masterPool, { schema: master, mode: 'default' });
 
   try {
@@ -210,11 +213,11 @@ async function seedDemoTenant() {
     const dbName = assertDatabaseName(existingTenant?.db_name || `${defaultPrefix}${tenantCode}`);
     const tenantId = existingTenant?.tenant_id || randomUUID();
 
-    const server = await mysql.createConnection({ host, port, user, password });
+    const server = await mysql.createConnection({ host, port, user, password, ssl });
     await server.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
     await server.end();
 
-    const tenantPool = mysql.createPool({ host, port, user, password, database: dbName });
+    const tenantPool = mysql.createPool({ host, port, user, password, database: dbName, ssl });
     const tenantDb = drizzle(tenantPool, { schema: tenant, mode: 'default' });
 
     const results: Array<{ companyId: string; adminEmail: string; adminPassword: string; name: string }> = [];

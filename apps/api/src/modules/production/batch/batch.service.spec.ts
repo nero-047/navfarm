@@ -94,21 +94,28 @@ describe('BatchService', () => {
         .mockResolvedValueOnce(activeBatch as any) // initial load
         .mockResolvedValueOnce({ ...activeBatch, current_stage_code: 'QUARANTINE', stage_id: 'stage-quarantine' } as any); // final return
 
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([{ stage_id: 'stage-quarantine' }]),
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ stage_id: 'stage-quarantine' }]),
+            }),
           }),
-        }),
-      });
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ scheduler_id: 'sched-quarantine', stage_code: 'QUARANTINE' }]),
+          }),
+        });
       mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
       mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
 
       const result = await service.transferStage('batch-1', { to_stage_code: 'QUARANTINE' }, 'tenant-123', { userId: 'user-1' });
 
       expect(mockDbUpdate).toHaveBeenCalled();
-      const setArg = (mockDbUpdate.mock.results[0].value.set as jest.Mock).mock.calls[0][0];
-      expect(setArg.stage_id).toBe('stage-quarantine');
+      const setCalls = (mockDbUpdate.mock.results[0].value.set as jest.Mock).mock.calls.map((c: any) => c[0]);
+      const batchHeaderSet = setCalls.find((arg: any) => arg && 'current_stage_code' in arg);
+      expect(batchHeaderSet?.stage_id).toBe('stage-quarantine');
       expect(result.stage_id).toBe('stage-quarantine');
     });
 
@@ -117,20 +124,27 @@ describe('BatchService', () => {
         .mockResolvedValueOnce(activeBatch as any)
         .mockResolvedValueOnce({ ...activeBatch, current_stage_code: 'CUSTOM_STAGE', stage_id: null } as any);
 
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([]), // no matching stage_master row
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]), // no matching stage_master row
+            }),
           }),
-        }),
-      });
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        });
       mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
       mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
 
       const result = await service.transferStage('batch-1', { to_stage_code: 'CUSTOM_STAGE' }, 'tenant-123', { userId: 'user-1' });
 
-      const setArg = (mockDbUpdate.mock.results[0].value.set as jest.Mock).mock.calls[0][0];
-      expect(setArg.stage_id).toBeNull();
+      const setCalls = (mockDbUpdate.mock.results[0].value.set as jest.Mock).mock.calls.map((c: any) => c[0]);
+      const batchHeaderSet = setCalls.find((arg: any) => arg && 'current_stage_code' in arg);
+      expect(batchHeaderSet?.stage_id).toBeNull();
       expect(result.stage_id).toBeNull();
     });
 

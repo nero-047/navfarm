@@ -21,8 +21,8 @@ CREATE TABLE `breeding_record` (
 	`parity_number` int NOT NULL,
 	`notes` text,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `breeding_record_breeding_id` PRIMARY KEY(`breeding_id`)
 );--> statement-breakpoint
 
@@ -50,8 +50,8 @@ CREATE TABLE `farrowing_record` (
 	`parity_number` int NOT NULL,
 	`notes` text,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `farrowing_record_farrow_id` PRIMARY KEY(`farrow_id`)
 );--> statement-breakpoint
 
@@ -77,8 +77,8 @@ CREATE TABLE `semen_batch` (
 	`inventory_posted` boolean NOT NULL DEFAULT false,
 	`notes` text,
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `semen_batch_semen_batch_id` PRIMARY KEY(`semen_batch_id`)
 );--> statement-breakpoint
 

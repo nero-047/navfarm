@@ -12,10 +12,12 @@ const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
 const isPiggeryIsolated = masterDatabase.startsWith('piggery_');
 const tenantCode = process.env.DEV_TENANT_CODE || 'devco';
 const dbName = isPiggeryIsolated ? `piggery_tenant_${tenantCode}` : `tenant_${tenantCode}`;
+const isRemoteOrTidb = port === 4000 || host.includes('tidbcloud') || process.env.DATABASE_SSL === 'true';
+const ssl = isRemoteOrTidb ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined;
 
 export async function seedPiggeryData() {
   console.log(`Starting comprehensive piggery master & operational data seed into ${dbName}...`);
-  const pool = mysql.createPool({ host, port, user, password, database: dbName });
+  const pool = mysql.createPool({ host, port, user, password, database: dbName, ssl });
   const db = drizzle(pool, { schema, mode: 'default' });
 
   try {

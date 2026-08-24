@@ -10,7 +10,7 @@ CREATE TABLE `batch_cost_variance` (
 	`dr_gl_account_id` varchar(36),
 	`cr_gl_account_id` varchar(36),
 	`journal_id` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `batch_cost_variance_variance_id` PRIMARY KEY(`variance_id`)
 );
 --> statement-breakpoint
@@ -21,7 +21,7 @@ CREATE TABLE `batch_standard` (
 	`std_output_cost_per_unit` decimal(18,6),
 	`std_overhead_rate_per_unit` decimal(18,6),
 	`created_by` varchar(36),
-	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT `batch_standard_standard_id` PRIMARY KEY(`standard_id`),
 	CONSTRAINT `batch_standard_batch_id_unique` UNIQUE(`batch_id`)
 );

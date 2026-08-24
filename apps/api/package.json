@@ -181,6 +181,13 @@
           "cwd": "apps/api",
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/setup-fresh-database.ts"
         }
+      },
+      "db-fresh": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/setup-fresh-database.ts"
+        }
       }
     }
   },

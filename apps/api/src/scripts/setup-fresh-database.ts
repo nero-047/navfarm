@@ -10,6 +10,9 @@ const isPiggeryIsolated = masterDatabase.startsWith('piggery_');
 const tenantPrefix = isPiggeryIsolated ? 'piggery_tenant_' : 'tenant_';
 const systemDatabase = process.env.SYSTEM_TENANT_DATABASE || (isPiggeryIsolated ? 'piggery_tenant_system' : 'tenant_system');
 
+const isRemoteOrTidb = port === 4000 || host.includes('tidbcloud') || process.env.DATABASE_SSL === 'true';
+const ssl = isRemoteOrTidb ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined;
+
 function assertDbName(value: string): string {
   if (!/^[A-Za-z0-9_]+$/.test(value)) {
     throw new Error(`Unsafe database name: ${value}`);
@@ -38,15 +41,16 @@ async function runFreshSetup() {
   console.log(`Master Database:    ${masterDatabase}`);
   console.log(`System Database:    ${systemDatabase}`);
   console.log(`Tenant DB Prefix:   ${tenantPrefix}*`);
+  console.log(`SSL Mode:           ${ssl ? 'TLSv1.2 Enabled' : 'Disabled'}`);
   console.log('----------------------------------------------------------------');
 
   // 1. DROP ALL LINKED DATABASES
   console.log('🧹 Step 1: Dropping all linked databases...');
-  const server = await mysql.createConnection({ host, port, user, password });
+  const server = await mysql.createConnection({ host, port, user, password, ssl });
   try {
     const [dbRows] = await server.query<mysql.RowDataPacket[]>('SHOW DATABASES');
-    const targetDbs = (dbRows as Array<{ Database: string }>)
-      .map((r) => r.Database)
+    const targetDbs = (dbRows as Array<any>)
+      .map((r) => r.Database || Object.values(r)[0])
       .filter((d) => d === masterDatabase || d === systemDatabase || d.startsWith(tenantPrefix));
 
     for (const dbName of targetDbs) {
@@ -68,9 +72,12 @@ async function runFreshSetup() {
 
   // 4. PROVISION DEV TENANT & COMPANY DEVCO
   runStep('Step 6: Provisioning Dev Tenant (devco) & Company (DEVCO)', 'seed-dev-tenant.ts');
+  runStep('Step 6b: Applying Schedulers Schema Extensions', 'migrate-scheduler-tables.js');
+  runStep('Step 6c: Applying Draft Table Schema Extensions', 'migrate-draft-table.js');
 
   // 5. SEED COMPLETE PIGGERY DATASET (ANIMALS, REPRODUCTION, BATCHES, TRANSACTIONS)
   runStep('Step 7: Seeding Complete Piggery Dataset (Herd Animals, Breeding, Farrowing, Batches)', 'seed-piggery-complete-data.ts');
+  runStep('Step 7b: Applying Clean Multi-Stage Schedulers, Batches & 15-Day Data', 'reset-and-seed-piggery-data.js');
 
   // 6. PROVISION DEMO TENANT
   runStep('Step 8: Provisioning Demo Tenant (demo)', 'seed-demo-tenant.ts');
