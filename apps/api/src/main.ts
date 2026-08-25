@@ -51,20 +51,18 @@ async function bootstrap() {
 
   // Enable CORS for frontend integration
   app.enableCors({
-    origin: (origin, callback) => {
-      // Requests without an Origin header are not browser cross-origin requests.
-      if (
-        !origin ||
-        corsOrigins?.includes(origin) ||
-        (isDevelopment && isLoopbackOrigin(origin))
-      ) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error(`Origin ${origin} is not allowed by CORS`), false);
-    },
+    origin: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'x-tenant-id',
+      'x-company-id',
+      'Origin',
+      'X-Requested-With',
+    ],
   });
 
   // Configure Swagger documentation
