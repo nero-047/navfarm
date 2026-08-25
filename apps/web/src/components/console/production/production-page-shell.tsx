@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, hasPermission, NavUser, getActiveLob } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKeys } from "@/utils/translations";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConsolePage } from "@/components/ui/console-page";
 import { ShieldAlert } from "lucide-react";
 
 /**
@@ -42,38 +45,42 @@ export function useProductionPageState() {
 }
 
 export function ProductionPageShell({
-  title,
+  titleKey,
   children,
 }: {
-  title: string;
+  /** Translation key, not a literal — every Production route used to pass an
+      English string, so these titles stayed English in every other language. */
+  titleKey: TranslationKeys;
   children: (activeLob: string) => React.ReactNode;
 }) {
   const { ready, activeLob, mayView } = useProductionPageState();
+  const { t, tLob } = useLanguage();
+  const title = t(titleKey);
 
   if (!ready) return null;
 
   if (!mayView) {
     return (
-      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
+      <ConsolePage size="narrow">
         <PageHeader title={title} sticky={false} />
         <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border p-5" style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}>
           <ShieldAlert className="h-5 w-5 shrink-0" />
           <div>
-            <p className="text-sm font-semibold">You don&apos;t have access to Production</p>
-            <p className="mt-1 text-xs">Contact your company administrator if you need access to this section.</p>
+            <p className="text-sm font-semibold">{t("ppsAccessDeniedTitle")}</p>
+            <p className="mt-1 text-xs">{t("ppsAccessDeniedDesc")}</p>
           </div>
         </div>
-      </div>
+      </ConsolePage>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 lg:px-7 lg:pb-7">
+    <ConsolePage>
       <PageHeader
         title={title}
-        description={`${activeLob} Operational Area — Lifecycle tracking, batch feed & health logs, and cost-allocated closing.`}
+        description={t("ppsPageDescription", { lob: tLob(activeLob) })}
       />
       {children(activeLob)}
-    </div>
+    </ConsolePage>
   );
 }

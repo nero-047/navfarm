@@ -322,7 +322,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             type="checkbox"
             checked={!!value}
             onChange={(e) => setField(f.key, e.target.checked)}
-            className="h-4 w-4 rounded accent-[var(--accent)]"
+            className="h-4 w-4 rounded-[var(--radius-xs)] accent-[var(--accent)]"
           />
           {tLabel(f.label)}
         </label>
@@ -551,7 +551,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {visibleFields.map((f) => (
               <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>
+                <label className="nf-text-label" style={S.sub}>
                   {tLabel(f.label)}{f.required && <span style={{ color: "var(--danger)" }}> *</span>}
                 </label>
                 {renderField(f)}

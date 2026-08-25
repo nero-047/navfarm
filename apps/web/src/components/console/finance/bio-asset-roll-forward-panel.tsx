@@ -8,7 +8,9 @@ import {
 import { api } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
+import { StatRow, StatCard } from "@/components/ui/stat-row";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Row = Record<string, any>;
 
@@ -35,6 +37,7 @@ function formatCurrency(val?: number | string | null) {
 }
 
 export default function BioAssetRollForwardPanel() {
+  const { t } = useLanguage();
   const companyId = getActiveCompanyId();
 
   const currentYear = new Date().getFullYear();
@@ -55,7 +58,7 @@ export default function BioAssetRollForwardPanel() {
       );
       setData(unwrap<Row>(res));
     } catch (err: any) {
-      setError(err?.message || "Failed to load Biological Asset Roll-Forward statement.");
+      setError(err?.message || t("barfLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -68,24 +71,24 @@ export default function BioAssetRollForwardPanel() {
   const exportCsv = () => {
     if (!data) return;
     const lines = [
-      ["IAS 41 Biological Asset Roll-Forward Statement"],
-      [`Period: ${dateFrom} to ${dateTo}`],
+      [t("barfCsvTitle")],
+      [t("barfCsvPeriod", { dateFrom, dateTo })],
       [],
-      ["Movement Line", "Amount (INR)"],
-      ["Opening Carrying Value", data.openingCarryingValue],
-      ["Additions — Acquisitions / Purchases", data.movements.acquisitions],
-      ["Additions — Growth Capitalization (Feed/Meds/Overhead)", data.movements.growthCapitalization],
-      ["Deductions — Amortization (Mature Breeding Stock)", data.movements.amortization],
-      ["Fair Value Adjustments (P&L)", data.movements.fairValueAdjustments],
-      ["Transfers — Harvest / Slaughter to Inventory", data.movements.harvestTransfers],
-      ["Deductions — Disposals / Mortalities", data.movements.disposals],
-      ["Net Period Movements", data.movements.netMovement],
-      ["Closing Carrying Net Book Value (NBV)", data.closingCarryingValue],
+      [t("barfCsvMovementLine"), t("barfCsvAmountInr")],
+      [t("barfOpeningCarryingValue"), data.openingCarryingValue],
+      [t("barfCsvAcquisitions"), data.movements.acquisitions],
+      [t("barfCsvGrowthCapitalization"), data.movements.growthCapitalization],
+      [t("barfCsvAmortization"), data.movements.amortization],
+      [t("barfCsvFairValueAdjustments"), data.movements.fairValueAdjustments],
+      [t("barfCsvHarvestTransfers"), data.movements.harvestTransfers],
+      [t("barfCsvDisposals"), data.movements.disposals],
+      [t("barfNetPeriodMovements"), data.movements.netMovement],
+      [t("barfClosingCarryingValue"), data.closingCarryingValue],
       [],
-      ["General Ledger (GL) Reconciliation"],
-      ["Total GL Balance (Accounts 1050 & 1060)", data.glReconciliation.totalGlBalance],
-      ["GL Variance", data.glReconciliation.variance],
-      ["Reconciled Status", data.glReconciliation.isReconciled ? "RECONCILED" : "VARIANCE DETECTED"],
+      [t("barfCsvGlReconciliation")],
+      [t("barfCsvTotalGlBalance"), data.glReconciliation.totalGlBalance],
+      [t("barfCsvGlVariance"), data.glReconciliation.variance],
+      [t("barfCsvReconciledStatus"), data.glReconciliation.isReconciled ? t("barfCsvReconciled") : t("barfCsvVarianceDetected")],
     ];
 
     const csvContent = "data:text/csv;charset=utf-8," + lines.map((e) => e.join(",")).join("\n");
@@ -104,8 +107,8 @@ export default function BioAssetRollForwardPanel() {
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-lg)] border p-4" style={S.surface}>
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={S.muted}>
-              From Date
+            <label className="nf-text-label block mb-1" style={S.muted}>
+              {t("barfFromDate")}
             </label>
             <input
               type="date"
@@ -115,8 +118,8 @@ export default function BioAssetRollForwardPanel() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={S.muted}>
-              To Date
+            <label className="nf-text-label block mb-1" style={S.muted}>
+              {t("barfToDate")}
             </label>
             <input
               type="date"
@@ -128,14 +131,14 @@ export default function BioAssetRollForwardPanel() {
           <div className="flex items-end self-end">
             <Button size="sm" onClick={loadStatement} disabled={loading}>
               {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-              Generate Statement
+              {t("barfGenerateStatement")}
             </Button>
           </div>
         </div>
 
         {data && (
           <Button variant="outline" size="sm" onClick={exportCsv}>
-            <Download className="mr-1.5 h-3.5 w-3.5" /> Export CSV
+            <Download className="mr-1.5 h-3.5 w-3.5" /> {t("barfExportCsv")}
           </Button>
         )}
       </div>
@@ -145,68 +148,49 @@ export default function BioAssetRollForwardPanel() {
       {loading && (
         <div className="py-16 text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin" style={S.accent} />
-          <p className="mt-3 text-sm" style={S.sub}>Calculating IAS 41 Biological Asset Roll-Forward…</p>
+          <p className="mt-3 text-sm" style={S.sub}>{t("barfCalculating")}</p>
         </div>
       )}
 
       {!loading && data && (
         <div className="space-y-6">
           {/* ── Top Executive KPI Cards ── */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Opening Carrying Value</p>
-              <p className="mt-1.5 text-2xl font-bold" style={S.primary}>
-                {formatCurrency(data.openingCarryingValue)}
-              </p>
-              <p className="mt-1 text-[11px]" style={S.sub}>As of {dateFrom}</p>
-            </div>
-
-            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Net Period Movement</p>
-              <p className="mt-1.5 text-2xl font-bold" style={Number(data.movements.netMovement) >= 0 ? S.primary : S.danger}>
-                {formatCurrency(data.movements.netMovement)}
-              </p>
-              <p className="mt-1 text-[11px]" style={S.sub}>{data.transactionCount} transaction(s) recorded</p>
-            </div>
-
-            <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Closing Carrying Value</p>
-              <p className="mt-1.5 text-2xl font-bold" style={S.primary}>
-                {formatCurrency(data.closingCarryingValue)}
-              </p>
-              <p className="mt-1 text-[11px]" style={S.sub}>As of {dateTo}</p>
-            </div>
-
-            <div
-              className="rounded-[var(--radius-lg)] border p-4 shadow-sm"
-              style={data.glReconciliation.isReconciled ? S.success : S.warning}
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide">GL Reconciliation</p>
-                {data.glReconciliation.isReconciled ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4" />
-                )}
-              </div>
-              <p className="mt-1.5 text-2xl font-bold">
-                {data.glReconciliation.isReconciled ? "Reconciled" : formatCurrency(data.glReconciliation.variance)}
-              </p>
-              <p className="mt-1 text-[11px]">
-                GL Net: {formatCurrency(data.glReconciliation.totalGlBalance)}
-              </p>
-            </div>
-          </div>
+          <StatRow>
+            <StatCard
+              label={t("barfOpeningCarryingValue")}
+              value={formatCurrency(data.openingCarryingValue)}
+              sub={t("barfAsOf", { date: dateFrom })}
+            />
+            <StatCard
+              label={t("barfNetPeriodMovement")}
+              tone={Number(data.movements.netMovement) >= 0 ? "default" : "danger"}
+              value={formatCurrency(data.movements.netMovement)}
+              sub={t("barfTransactionsRecorded", { count: data.transactionCount })}
+            />
+            <StatCard
+              label={t("barfClosingCarryingValue")}
+              value={formatCurrency(data.closingCarryingValue)}
+              sub={t("barfAsOf", { date: dateTo })}
+            />
+            <StatCard
+              icon={data.glReconciliation.isReconciled ? CheckCircle2 : AlertTriangle}
+              tone={data.glReconciliation.isReconciled ? "success" : "warning"}
+              emphasis
+              label={t("barfGlReconciliation")}
+              value={data.glReconciliation.isReconciled ? t("barfReconciled") : formatCurrency(data.glReconciliation.variance)}
+              sub={t("barfGlNet", { amount: formatCurrency(data.glReconciliation.totalGlBalance) })}
+            />
+          </StatRow>
 
           {/* ── Main Roll-Forward Statement Table ── */}
           <div className="overflow-hidden rounded-[var(--radius-lg)] border shadow-sm" style={S.surface}>
             <div className="border-b px-5 py-4 flex items-center justify-between" style={S.raised}>
               <div>
-                <h3 className="text-base font-semibold" style={S.primary}>IAS 41 Biological Asset Roll-Forward</h3>
-                <p className="text-xs" style={S.muted}>Reconciliation of carrying amounts from beginning to end of period</p>
+                <h3 className="text-base font-semibold" style={S.primary}>{t("barfStatementTitle")}</h3>
+                <p className="text-xs" style={S.muted}>{t("barfStatementSubtitle")}</p>
               </div>
               <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold" style={S.surface}>
-                <Layers className="h-3 w-3" style={S.accent} /> Standard: IAS 41 Agriculture
+                <Layers className="h-3 w-3" style={S.accent} /> {t("barfStandardLabel")}
               </span>
             </div>
 
@@ -215,7 +199,7 @@ export default function BioAssetRollForwardPanel() {
                 {/* 1. Opening Carrying Value */}
                 <tr style={S.surface}>
                   <td className="px-5 py-3 font-semibold" style={S.primary}>
-                    1. Opening Carrying Amount (Pre-mature + Mature)
+                    {t("barfOpeningCarryingAmount")}
                   </td>
                   <td className="px-5 py-3 text-right font-mono font-bold" style={S.primary}>
                     {formatCurrency(data.openingCarryingValue)}
@@ -225,12 +209,12 @@ export default function BioAssetRollForwardPanel() {
                 {/* 2. Additions */}
                 <tr style={S.raised}>
                   <td colSpan={2} className="px-5 py-2 text-xs font-semibold uppercase tracking-wider" style={S.muted}>
-                    Period Additions & Capitalization
+                    {t("barfPeriodAdditions")}
                   </td>
                 </tr>
                 <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
-                    + Acquisitions / Livestock Purchases (PO / GRN)
+                    {t("barfAcquisitionsLine")}
                   </td>
                   <td className="px-5 py-2.5 text-right font-mono" style={S.primary}>
                     {formatCurrency(data.movements.acquisitions)}
@@ -238,7 +222,7 @@ export default function BioAssetRollForwardPanel() {
                 </tr>
                 <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
-                    + Growth Capitalization (Feed, Medicine, Overhead on Pre-mature stock)
+                    {t("barfGrowthCapitalizationLine")}
                   </td>
                   <td className="px-5 py-2.5 text-right font-mono" style={S.primary}>
                     {formatCurrency(data.movements.growthCapitalization)}
@@ -248,12 +232,12 @@ export default function BioAssetRollForwardPanel() {
                 {/* 3. Deductions & Adjustments */}
                 <tr style={S.raised}>
                   <td colSpan={2} className="px-5 py-2 text-xs font-semibold uppercase tracking-wider" style={S.muted}>
-                    Period Reductions, Amortization & Fair Value
+                    {t("barfPeriodReductions")}
                   </td>
                 </tr>
                 <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
-                    − Amortization of Mature Breeding Assets
+                    {t("barfAmortizationLine")}
                   </td>
                   <td className="px-5 py-2.5 text-right font-mono" style={data.movements.amortization < 0 ? S.danger : S.primary}>
                     {formatCurrency(data.movements.amortization)}
@@ -261,7 +245,7 @@ export default function BioAssetRollForwardPanel() {
                 </tr>
                 <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
-                    ± Fair Value Adjustments (Revaluations recognized in P&L)
+                    {t("barfFairValueAdjustmentsLine")}
                   </td>
                   <td className="px-5 py-2.5 text-right font-mono" style={data.movements.fairValueAdjustments < 0 ? S.danger : S.primary}>
                     {formatCurrency(data.movements.fairValueAdjustments)}
@@ -269,7 +253,7 @@ export default function BioAssetRollForwardPanel() {
                 </tr>
                 <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
-                    − Harvest / Slaughter Transfers to Meat/Carcass Inventory
+                    {t("barfHarvestTransfersLine")}
                   </td>
                   <td className="px-5 py-2.5 text-right font-mono" style={data.movements.harvestTransfers < 0 ? S.danger : S.primary}>
                     {formatCurrency(data.movements.harvestTransfers)}
@@ -277,7 +261,7 @@ export default function BioAssetRollForwardPanel() {
                 </tr>
                 <tr className="hover:bg-[var(--row-hover)] transition-colors">
                   <td className="px-8 py-2.5" style={S.sub}>
-                    − Disposals, Sales & Mortality Write-Offs
+                    {t("barfDisposalsLine")}
                   </td>
                   <td className="px-5 py-2.5 text-right font-mono" style={data.movements.disposals < 0 ? S.danger : S.primary}>
                     {formatCurrency(data.movements.disposals)}
@@ -287,7 +271,7 @@ export default function BioAssetRollForwardPanel() {
                 {/* 4. Total Movements Subtotal */}
                 <tr style={S.raised}>
                   <td className="px-5 py-3 font-semibold" style={S.primary}>
-                    Total Net Period Movements
+                    {t("barfNetPeriodMovements")}
                   </td>
                   <td className="px-5 py-3 text-right font-mono font-bold" style={S.primary}>
                     {formatCurrency(data.movements.netMovement)}
@@ -297,7 +281,7 @@ export default function BioAssetRollForwardPanel() {
                 {/* 5. Closing Carrying Value */}
                 <tr className="border-t-2" style={{ ...S.raised, borderTopColor: "var(--border)" }}>
                   <td className="px-5 py-4 text-base font-bold" style={S.primary}>
-                    Closing Carrying Net Book Value (NBV)
+                    {t("barfClosingCarryingNbv")}
                   </td>
                   <td className="px-5 py-4 text-right font-mono text-lg font-bold" style={S.primary}>
                     {formatCurrency(data.closingCarryingValue)}
@@ -312,17 +296,17 @@ export default function BioAssetRollForwardPanel() {
             <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.surface}>
               <div className="flex items-center gap-2 mb-3">
                 <Layers className="h-4 w-4" style={S.accent} />
-                <h4 className="text-sm font-semibold" style={S.primary}>Asset Tracking Breakdown</h4>
+                <h4 className="text-sm font-semibold" style={S.primary}>{t("barfAssetTrackingBreakdown")}</h4>
               </div>
               <div className="space-y-2 text-sm divide-y divide-[var(--row-border)]">
                 <div className="flex justify-between py-1.5">
-                  <span style={S.sub}>Batch / Cohort Biological Assets</span>
+                  <span style={S.sub}>{t("barfBatchCohortAssets")}</span>
                   <span className="font-mono font-medium" style={S.primary}>
                     {formatCurrency(data.assetTypeBreakdown.batchCarryingValue)}
                   </span>
                 </div>
                 <div className="flex justify-between py-1.5">
-                  <span style={S.sub}>Individual Tagged Animals (Animal Register)</span>
+                  <span style={S.sub}>{t("barfIndividualTaggedAnimals")}</span>
                   <span className="font-mono font-medium" style={S.primary}>
                     {formatCurrency(data.assetTypeBreakdown.animalCarryingValue)}
                   </span>
@@ -333,7 +317,7 @@ export default function BioAssetRollForwardPanel() {
             <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.surface}>
               <div className="flex items-center gap-2 mb-3">
                 <ArrowRight className="h-4 w-4" style={S.accent} />
-                <h4 className="text-sm font-semibold" style={S.primary}>General Ledger Accounts</h4>
+                <h4 className="text-sm font-semibold" style={S.primary}>{t("barfGeneralLedgerAccounts")}</h4>
               </div>
               <div className="space-y-2 text-sm divide-y divide-[var(--row-border)]">
                 {data.glReconciliation.glAccounts.map((a: Row) => (
@@ -345,7 +329,7 @@ export default function BioAssetRollForwardPanel() {
                   </div>
                 ))}
                 {data.glReconciliation.glAccounts.length === 0 && (
-                  <p className="text-xs py-2" style={S.muted}>No biological asset GL postings recorded.</p>
+                  <p className="text-xs py-2" style={S.muted}>{t("barfNoGlPostings")}</p>
                 )}
               </div>
             </div>

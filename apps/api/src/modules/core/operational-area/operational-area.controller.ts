@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { OperationalAreaService } from './operational-area.service';
-import { CreateOperationalAreaDto, UpdateOperationalAreaDto, AssignUserToAreaDto } from './dto/operational-area.dto';
+import { CreateOperationalAreaDto, UpdateOperationalAreaDto, AssignUserToAreaDto, UpdateAreaSettingsDto, AssignAreaStaffDto } from './dto/operational-area.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -58,5 +58,35 @@ export class OperationalAreaController {
   @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'create')
   async preseedCompany(@Param('companyId') companyId: string) {
     return this.areaService.preseedCompanyMasterDataFromTenant(companyId);
+  }
+
+  @Get(':id/settings')
+  @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'view')
+  async getSettings(@Param('id') id: string) {
+    return this.areaService.getSettings(id);
+  }
+
+  @Put(':id/settings')
+  @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'edit')
+  async updateSettings(@Param('id') id: string, @Body() dto: UpdateAreaSettingsDto, @Req() req: any) {
+    return this.areaService.updateSettings(id, dto, req.user?.sub);
+  }
+
+  @Get(':id/staff')
+  @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'view')
+  async listStaff(@Param('id') id: string) {
+    return this.areaService.listStaff(id);
+  }
+
+  @Post(':id/staff')
+  @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'edit')
+  async addStaff(@Param('id') id: string, @Body() dto: AssignAreaStaffDto) {
+    return this.areaService.addStaff(id, dto);
+  }
+
+  @Delete(':id/staff/:userId')
+  @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'edit')
+  async removeStaff(@Param('id') id: string, @Param('userId') userId: string) {
+    return this.areaService.removeStaff(id, userId);
   }
 }

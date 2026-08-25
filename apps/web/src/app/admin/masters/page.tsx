@@ -475,7 +475,7 @@ export default function AdminMastersPage() {
                     <div className="text-xs font-semibold" style={S.primary}>{curr.iso_code}</div>
                     <div className="text-[10px] mt-0.5 truncate" style={S.muted}>{curr.currency_name}</div>
                     {curr.is_system_default && (
-                      <span className="mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded"
+                      <span className="mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded-[var(--radius-xs)]"
                         style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)" }}>Default</span>
                     )}
                   </div>
@@ -546,7 +546,7 @@ export default function AdminMastersPage() {
                         <TableCell className="font-semibold" style={S.primary}>{lang.lang_name_english}</TableCell>
                         <TableCell style={S.sub}>{lang.lang_name_native}</TableCell>
                         <TableCell>
-                          <span className="text-[11px] font-semibold border rounded px-2 py-0.5"
+                          <span className="text-[11px] font-semibold border rounded-[var(--radius-xs)] px-2 py-0.5"
                             style={S.raised}>{lang.script}</span>
                         </TableCell>
                         <TableCell>
@@ -617,7 +617,7 @@ export default function AdminMastersPage() {
                     <div className="text-xs font-mono" style={S.accent}>{tz.tz_code}</div>
                     <div className="text-[10px] mt-0.5 truncate" style={S.muted}>{tz.tz_name}</div>
                     {tz.is_dst && (
-                      <span className="mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded"
+                      <span className="mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded-[var(--radius-xs)]"
                         style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)" }}>Observes DST</span>
                     )}
                   </div>

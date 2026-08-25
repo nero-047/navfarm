@@ -64,6 +64,11 @@ export class HerdAnalyticsQueryDto {
   @IsUUID()
   @IsNotEmpty()
   companyId: string;
+
+  @ApiPropertyOptional({ description: 'Restrict analytics to animals currently in this one batch' })
+  @IsOptional()
+  @IsUUID()
+  batchId?: string;
 }
 
 export class BatchCostVarianceQueryDto {

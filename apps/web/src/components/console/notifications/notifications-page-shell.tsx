@@ -10,6 +10,7 @@ import { getStoredToken, getStoredUser, getStoredTenantId, type NavUser } from "
 import { useLanguage } from "@/hooks/useLanguage";
 import { Dialog } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConsolePage } from "@/components/ui/console-page";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const inputCls = "nf-input";
@@ -181,7 +182,7 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
   }`;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+    <ConsolePage>
       <PageHeader
         title={t("ntTitle")}
         description={
@@ -368,7 +369,7 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
             <Bell className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
             <h2 className="nf-text-label-strong" style={{ color: "var(--text-primary)" }}>{t("ntOutboundLogs")}</h2>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-[var(--radius-xs)]" style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
             {logs.length} {t("ntLogEntries")}
           </span>
         </div>
@@ -413,7 +414,7 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
                         )}
                       </TableCell>
                       <TableCell className="p-4 text-center">
-                        <span className={`text-[9px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${
+                        <span className={`text-[9px] font-semibold border px-2 py-0.5 rounded-[var(--radius-xs)] inline-flex items-center gap-1 ${
                           isSuccess
                             ? "bg-(--success-muted) text-(--success) border-(--success)"
                             : "bg-(--danger-muted) text-(--danger) border-(--danger)"
@@ -429,6 +430,6 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
           </table>
         </div>
       </div>
-    </div>
+    </ConsolePage>
   );
 }

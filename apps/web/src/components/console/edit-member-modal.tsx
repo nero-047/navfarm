@@ -21,7 +21,7 @@ const S = {
 const inputCls = "nf-input";
 
 export function Label({ children }: { children: React.ReactNode }) {
-  return <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{children}</label>;
+  return <label className="nf-text-label mb-1 block" style={S.sub}>{children}</label>;
 }
 
 export function UserTypeBadge({ type }: { type: string }) {
@@ -262,14 +262,14 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                   checked={isSelf ? true : form.is_active}
                   disabled={isSelf}
                   onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                  className="w-4 h-4 rounded accent-[var(--accent)]"
+                  className="w-4 h-4 rounded-[var(--radius-xs)] accent-[var(--accent)]"
                 />
                 {t("edmAccountActive")}
               </label>
               {isSelf ? (
                 <span className="text-[11px]" style={S.muted}>{t("edmCantDeactivateSelf")}</span>
               ) : !form.is_active && (
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded" style={{ background: "var(--danger-muted)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-[var(--radius-xs)]" style={{ background: "var(--danger-muted)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
                   {t("edmWillBeDeactivated")}
                 </span>
               )}

@@ -9,6 +9,7 @@ import type { MasterDataConfig } from "@/modules/master-data/types";
 import MasterDataTable from "@/modules/master-data/MasterDataTable";
 import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConsolePage } from "@/components/ui/console-page";
 import { ShieldAlert, Download, Building2, RefreshCw } from "lucide-react";
 import { api } from "@/services/api-client";
 
@@ -98,7 +99,7 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
 
   if (!mayView) {
     return (
-      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
+      <ConsolePage size="narrow">
         <PageHeader title={t("masterData")} sticky={false} />
         <div
           className="flex items-center gap-3 rounded-[var(--radius-md)] border p-5"
@@ -110,14 +111,14 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
             <p className="mt-1 text-xs" style={S.sub}>{t("masterDataAccessDeniedDesc", { type: user.userType.replace(/_/g, " ").toLowerCase() })}</p>
           </div>
         </div>
-      </div>
+      </ConsolePage>
     );
   }
 
   const activeConfig: MasterDataConfig = getConfig(activeKey) || MASTER_DATA_CONFIGS[0];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 lg:px-7 lg:pb-7">
+    <ConsolePage>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <PageHeader
           title={tLabel(activeConfig.label)}
@@ -163,7 +164,7 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
 
       {preseedMsg && (
         <div
-          className="mb-4 p-3 rounded-[var(--radius-sm)] border text-xs font-semibold"
+          className="p-3 rounded-[var(--radius-sm)] border text-xs font-semibold"
           style={{
             backgroundColor: "var(--success-muted)",
             borderColor: "rgba(47, 125, 91, 0.3)",
@@ -175,6 +176,6 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
       )}
 
       <MasterDataTable key={`${activeConfig.key}-${selectedCompanyId}`} config={activeConfig} />
-    </div>
+    </ConsolePage>
   );
 }

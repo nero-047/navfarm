@@ -152,7 +152,7 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
                                 type="checkbox"
                                 checked={isLobChecked}
                                 onChange={() => handleLobToggle(lob.lob_code)}
-                                className="w-4 h-4 rounded border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent) focus:ring-offset-0 focus:ring-0 cursor-pointer"
+                                className="w-4 h-4 rounded-[var(--radius-xs)] border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent) focus:ring-offset-0 focus:ring-0 cursor-pointer"
                               />
                               <div className="flex flex-col">
                                 <span className="font-semibold text-(--text-primary)">{lob.lob_name}</span>

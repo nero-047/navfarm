@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKeys } from "@/utils/translations";
+import { StatusBadge } from "@/components/ui/status-badge";
 import RfidScannerModal from "@/components/console/piggery/rfid-scanner-modal";
 import AnimalStageTransitionModal from "@/components/console/piggery/animal-stage-transition-modal";
 import {
@@ -39,38 +42,56 @@ const S = {
 
 const inputCls = "nf-input";
 
-const STATUS_STYLE: Record<string, any> = {
-  ACTIVE:      { color: "var(--success)",        borderColor: "var(--success)",        backgroundColor: "var(--success-muted)" },
-  QUARANTINE:  { color: "var(--warning)",        borderColor: "var(--warning)",        backgroundColor: "var(--warning-muted)" },
-  SICK:        { color: "var(--danger)",         borderColor: "var(--danger)",         backgroundColor: "var(--danger-muted)" },
-  PREGNANT:    { color: "var(--accent)",         borderColor: "var(--accent)",         backgroundColor: "var(--surface-raised)" },
-  LACTATING:   { color: "var(--accent)",         borderColor: "var(--accent)",         backgroundColor: "var(--surface-raised)" },
-  DRY:         { color: "var(--text-secondary)", borderColor: "var(--border)",         backgroundColor: "var(--surface-raised)" },
-  CULLED:      { color: "var(--text-secondary)", borderColor: "var(--border)",         backgroundColor: "var(--surface-secondary)" },
-  DEAD:        { color: "var(--text-muted)",     borderColor: "var(--border)",         backgroundColor: "var(--surface-secondary)" },
-  SOLD:        { color: "var(--text-muted)",     borderColor: "var(--border)",         backgroundColor: "var(--surface-secondary)" },
-  SLAUGHTERED: { color: "var(--text-muted)",     borderColor: "var(--border)",         backgroundColor: "var(--surface-secondary)" },
+const STATUS_LABEL_KEY: Record<string, TranslationKeys> = {
+  ACTIVE: "anpStatusActive",
+  QUARANTINE: "anpStatusQuarantine",
+  SICK: "anpStatusSick",
+  PREGNANT: "anpStatusPregnant",
+  LACTATING: "anpStatusLactating",
+  DRY: "anpStatusDry",
+  CULLED: "anpStatusCulled",
+  DEAD: "anpStatusDead",
+  SOLD: "anpStatusSold",
+  SLAUGHTERED: "anpStatusSlaughtered",
 };
 
 const ANIMAL_TYPES = ["SOW", "BOAR", "GILT", "PIGLET", "COMMERCIAL_PIG"];
-const GENDERS      = [{ value: "F", label: "Female" }, { value: "M", label: "Male" }];
-const ENTRY_TYPES  = ["PURCHASED_IMPORTED", "PURCHASED_LOCAL", "BORN_ON_FARM", "TRANSFERRED_IN"];
+const ANIMAL_TYPE_LABEL_KEY: Record<string, TranslationKeys> = {
+  SOW: "anpTypeSow",
+  BOAR: "anpTypeBoar",
+  GILT: "anpTypeGilt",
+  PIGLET: "anpTypePiglet",
+  COMMERCIAL_PIG: "anpTypeCommercialPig",
+};
+
+const GENDERS = [{ value: "F", label: "Female" }, { value: "M", label: "Male" }];
+
+const ENTRY_TYPES = ["PURCHASED_IMPORTED", "PURCHASED_LOCAL", "BORN_ON_FARM", "TRANSFERRED_IN"];
+const ENTRY_TYPE_LABEL_KEY: Record<string, TranslationKeys> = {
+  PURCHASED_IMPORTED: "anpEntryPurchasedImported",
+  PURCHASED_LOCAL: "anpEntryPurchasedLocal",
+  BORN_ON_FARM: "anpEntryBornOnFarm",
+  TRANSFERRED_IN: "anpEntryTransferredIn",
+};
+
 const DISPOSAL_TYPES = ["SOLD", "SLAUGHTERED", "DIED", "TRANSFERRED"] as const;
+const DISPOSAL_TYPE_LABEL_KEY: Record<string, TranslationKeys> = {
+  SOLD: "anpDisposalSold",
+  SLAUGHTERED: "anpDisposalSlaughtered",
+  DIED: "anpDisposalDied",
+  TRANSFERRED: "anpDisposalTransferred",
+};
+
+const LEDGER_ENTRY_TYPE_LABEL_KEY: Record<string, TranslationKeys> = {
+  ACQUISITION: "anpLedgerAcquisition",
+  AMORTIZATION: "anpLedgerAmortization",
+  TRANSFORMATION: "anpLedgerTransformation",
+  DISPOSAL: "anpLedgerDisposal",
+};
 
 function formatDate(d?: string | null) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-function Badge({ label, style }: { label: string; style: any }) {
-  return (
-    <span
-      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-      style={style}
-    >
-      {label.replace(/_/g, " ")}
-    </span>
-  );
 }
 
 // ── Withdrawal warning banner ─────────────────────────────────────────────────
@@ -78,7 +99,7 @@ function Badge({ label, style }: { label: string; style: any }) {
 //   "Cannot slaughter — withdrawal period not elapsed for: Ivermectin (3 day(s) remaining, last dose 2026-08-15); Oxytetracycline (1 day(s) remaining, last dose 2026-08-18)"
 // We parse and render that as structured rows rather than a raw toast.
 
-function WithdrawalWarning({ message }: { message: string }) {
+function WithdrawalWarning({ message, t }: { message: string; t: (key: TranslationKeys, vars?: any) => string }) {
   // Strip the prefix up to the colon after "for:", then split on ";"
   const afterColon = message.replace(/^Cannot slaughter[^:]*:\s*/, "");
   const items = afterColon.split(";").map((s) => s.trim()).filter(Boolean);
@@ -91,7 +112,7 @@ function WithdrawalWarning({ message }: { message: string }) {
       <div className="flex items-start gap-2">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold">Cannot slaughter — withdrawal period not elapsed</p>
+          <p className="text-sm font-semibold">{t("anpCannotSlaughterHeading")}</p>
           {items.length > 0 && (
             <ul className="mt-2 space-y-1">
               {items.map((item, i) => (
@@ -111,7 +132,15 @@ function WithdrawalWarning({ message }: { message: string }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AnimalPanel() {
+  const { t } = useLanguage();
   const companyId = getActiveCompanyId();
+
+  const genderLabel = (g?: string) => (g === "F" ? t("anpGenderFemale") : g === "M" ? t("anpGenderMale") : g || "");
+  const statusLabel = (s?: string) => (s && STATUS_LABEL_KEY[s] ? t(STATUS_LABEL_KEY[s]) : (s || "").replace(/_/g, " "));
+  const animalTypeLabel = (v?: string) => (v && ANIMAL_TYPE_LABEL_KEY[v] ? t(ANIMAL_TYPE_LABEL_KEY[v]) : (v || "").replace(/_/g, " "));
+  const entryTypeLabel = (v?: string) => (v && ENTRY_TYPE_LABEL_KEY[v] ? t(ENTRY_TYPE_LABEL_KEY[v]) : (v || "").replace(/_/g, " "));
+  const disposalTypeLabel = (v?: string) => (v && DISPOSAL_TYPE_LABEL_KEY[v] ? t(DISPOSAL_TYPE_LABEL_KEY[v]) : (v || ""));
+  const ledgerEntryTypeLabel = (v?: string) => (v && LEDGER_ENTRY_TYPE_LABEL_KEY[v] ? t(LEDGER_ENTRY_TYPE_LABEL_KEY[v]) : (v || "").replace(/_/g, " "));
 
   // ── List state ──────────────────────────────────────────────────────────────
   const [rows, setRows]         = useState<Row[]>([]);
@@ -127,6 +156,12 @@ export default function AnimalPanel() {
   const [nobs, setNobs]       = useState<Row[]>([]);
   const [lobs, setLobs]       = useState<Row[]>([]);
   const [breeds, setBreeds]   = useState<Row[]>([]);
+  // `breeds` above is LOB-scoped and only populated inside the Register-Animal
+  // form, so the list table could never resolve a name from it — the raw
+  // breed_id UUID leaked into the Breed column. This is the table's own
+  // company-wide lookup, loaded once on mount.
+  const [breedLookup, setBreedLookup] = useState<Record<string, string>>({});
+  const breedName = (id?: string | null) => (id && breedLookup[id]) || id || "—";
   const [items, setItems]     = useState<Row[]>([]);
   const [medItems, setMedItems] = useState<Row[]>([]); // MEDICINE + VACCINE filtered
   const [uoms, setUoms]       = useState<Row[]>([]);
@@ -201,7 +236,7 @@ export default function AnimalPanel() {
       setRows(unwrap<Row[]>(res) || []);
       setPage(1);
     } catch (err: any) {
-      setError(err?.message || "Failed to load animals.");
+      setError(err?.message || t("anpErrLoadAnimals"));
     } finally {
       setLoading(false);
     }
@@ -231,6 +266,19 @@ export default function AnimalPanel() {
     api.get(`/setup/wizard/lobs/${createNobId}`).then((r) => setLobs(unwrap<Row[]>(r) || [])).catch(() => setLobs([]));
   }, [createNobId]);
 
+  // Company-wide breed names for the list table (see breedLookup above).
+  useEffect(() => {
+    const qs = new URLSearchParams();
+    if (companyId) qs.set("companyId", companyId);
+    qs.set("limit", "500");
+    api.get(`/breed?${qs.toString()}`)
+      .then((r) => {
+        const list = unwrap<Row[]>(r) || [];
+        setBreedLookup(Object.fromEntries(list.map((b) => [b.breed_id, b.breed_name])));
+      })
+      .catch(() => setBreedLookup({}));
+  }, [companyId]);
+
   // Breeds depend on LOB
   useEffect(() => {
     if (!createForm.lob_id) { setBreeds([]); return; }
@@ -250,7 +298,7 @@ export default function AnimalPanel() {
       const res = await api.get(`/animal/${animalId}/medications`);
       setMedLogs(unwrap<Row[]>(res) || []);
     } catch (err: any) {
-      setMedError(err?.message || "Failed to load medication log.");
+      setMedError(err?.message || t("anpErrLoadMedications"));
     } finally {
       setMedLoading(false);
     }
@@ -264,7 +312,7 @@ export default function AnimalPanel() {
       const res = await api.get(`/animal/${animalId}/bio-asset-ledger`);
       setLedgerEntries(unwrap<Row[]>(res) || []);
     } catch (err: any) {
-      setLedgerError(err?.message || "Failed to load bio-asset ledger entries.");
+      setLedgerError(err?.message || t("anpErrLoadLedger"));
     } finally {
       setLedgerLoading(false);
     }
@@ -291,15 +339,15 @@ export default function AnimalPanel() {
     setCreateSaving(true);
     setCreateError("");
     try {
-      if (!createNobId) throw new Error("Nature of Business is required.");
-      if (!createForm.lob_id) throw new Error("Line of Business is required.");
-      if (!createForm.animal_type) throw new Error("Animal type is required.");
-      if (!createForm.gender) throw new Error("Gender is required.");
-      if (!createForm.entry_type) throw new Error("Entry type is required.");
-      if (!createForm.entry_date) throw new Error("Entry date is required.");
-      if (!createForm.breed_id) throw new Error("Breed is required.");
-      if (!createForm.item_id) throw new Error("Item (living asset) is required.");
-      if (!createForm.acquisition_cost) throw new Error("Acquisition cost is required.");
+      if (!createNobId) throw new Error(t("anpErrNobRequired"));
+      if (!createForm.lob_id) throw new Error(t("anpErrLobRequired"));
+      if (!createForm.animal_type) throw new Error(t("anpErrAnimalTypeRequired"));
+      if (!createForm.gender) throw new Error(t("anpErrGenderRequired"));
+      if (!createForm.entry_type) throw new Error(t("anpErrEntryTypeRequired"));
+      if (!createForm.entry_date) throw new Error(t("anpErrEntryDateRequired"));
+      if (!createForm.breed_id) throw new Error(t("anpErrBreedRequired"));
+      if (!createForm.item_id) throw new Error(t("anpErrItemRequired"));
+      if (!createForm.acquisition_cost) throw new Error(t("anpErrAcquisitionCostRequired"));
 
       await api.post("/animal", {
         company_id: companyId,
@@ -323,7 +371,7 @@ export default function AnimalPanel() {
       setCreateOpen(false);
       load();
     } catch (err: any) {
-      setCreateError(err?.message || "Failed to register animal.");
+      setCreateError(err?.message || t("anpErrRegisterAnimal"));
     } finally {
       setCreateSaving(false);
     }
@@ -334,8 +382,8 @@ export default function AnimalPanel() {
     setDoseSaving(true);
     setDoseError("");
     try {
-      if (!doseForm.item_id) throw new Error("Select a medicine or vaccine.");
-      if (!doseForm.administered_date) throw new Error("Date of administration is required.");
+      if (!doseForm.item_id) throw new Error(t("anpErrSelectMedicine"));
+      if (!doseForm.administered_date) throw new Error(t("anpErrAdministeredDateRequired"));
       await api.post(`/animal/${viewing.animal_id}/medications`, {
         item_id: doseForm.item_id,
         administered_date: doseForm.administered_date,
@@ -348,7 +396,7 @@ export default function AnimalPanel() {
       setDoseForm({ item_id: "", administered_date: new Date().toISOString().slice(0, 10), dose_qty: "", uom: "", administered_by: "", notes: "" });
       loadMedLogs(viewing.animal_id);
     } catch (err: any) {
-      setDoseError(err?.message || "Failed to log dose.");
+      setDoseError(err?.message || t("anpErrLogDose"));
     } finally {
       setDoseSaving(false);
     }
@@ -360,8 +408,8 @@ export default function AnimalPanel() {
     setDisposeError("");
     setDisposeIsWithdrawal(false);
     try {
-      if (!disposeForm.disposal_type) throw new Error("Disposal type is required.");
-      if (!disposeForm.disposal_date) throw new Error("Date is required.");
+      if (!disposeForm.disposal_type) throw new Error(t("anpErrDisposalTypeRequired"));
+      if (!disposeForm.disposal_date) throw new Error(t("anpErrDisposalDateRequired"));
       await api.patch(`/animal/${viewing.animal_id}/dispose`, {
         disposal_type: disposeForm.disposal_type,
         disposal_date: disposeForm.disposal_date,
@@ -372,7 +420,7 @@ export default function AnimalPanel() {
       setViewing(null);
       load();
     } catch (err: any) {
-      const msg: string = err?.message || "Failed to dispose animal.";
+      const msg: string = err?.message || t("anpErrDisposeAnimal");
       // Withdrawal-period errors have a specific prefix — surface them structured
       if (msg.includes("Cannot slaughter")) {
         setDisposeIsWithdrawal(true);
@@ -397,7 +445,7 @@ export default function AnimalPanel() {
             id="animal-search"
             className={inputCls}
             style={{ paddingLeft: "2rem" }}
-            placeholder="Search code, RFID, ear tag…"
+            placeholder={t("anpSearchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -410,9 +458,9 @@ export default function AnimalPanel() {
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
-          <option value="">All statuses</option>
-          {Object.keys(STATUS_STYLE).map((s) => (
-            <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+          <option value="">{t("anpAllStatuses")}</option>
+          {Object.keys(STATUS_LABEL_KEY).map((s) => (
+            <option key={s} value={s}>{statusLabel(s)}</option>
           ))}
         </select>
 
@@ -421,13 +469,13 @@ export default function AnimalPanel() {
             type="checkbox"
             checked={includeDisposed}
             onChange={(e) => setIncludeDisposed(e.target.checked)}
-            className="rounded"
+            className="rounded-[var(--radius-xs)]"
           />
-          Include disposed
+          {t("anpIncludeDisposed")}
         </label>
 
         <Button variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
-          <Scan className="mr-1.5 h-3.5 w-3.5" /> RFID Fast Scanner
+          <Scan className="mr-1.5 h-3.5 w-3.5" /> {t("anpRfidFastScanner")}
         </Button>
 
         <Button id="animal-create-btn" size="sm" onClick={() => {
@@ -436,7 +484,7 @@ export default function AnimalPanel() {
           setCreateError("");
           setCreateOpen(true);
         }}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" /> Register Animal
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> {t("anpRegisterAnimal")}
         </Button>
       </div>
 
@@ -447,13 +495,13 @@ export default function AnimalPanel() {
         <table className="w-full text-sm">
           <TableHeader>
             <TableRow>
-              <TableHead>Code</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Gender</TableHead>
-              <TableHead>Breed</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Entry Date</TableHead>
-              <TableHead>Ear Tag</TableHead>
+              <TableHead>{t("anpColCode")}</TableHead>
+              <TableHead>{t("anpColType")}</TableHead>
+              <TableHead>{t("anpColGender")}</TableHead>
+              <TableHead>{t("anpColBreed")}</TableHead>
+              <TableHead>{t("anpColStatus")}</TableHead>
+              <TableHead>{t("anpColEntryDate")}</TableHead>
+              <TableHead>{t("anpColEarTag")}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -469,25 +517,25 @@ export default function AnimalPanel() {
               <TableRow>
                 <TableCell colSpan={8} className="py-16 text-center">
                   <Inbox className="mx-auto h-8 w-8 mb-3" style={S.muted} />
-                  <p className="text-sm" style={S.sub}>No animals found.</p>
+                  <p className="text-sm" style={S.sub}>{t("anpNoAnimalsFound")}</p>
                 </TableCell>
               </TableRow>
             )}
             {!loading && pagedRows.map((row) => (
               <TableRow key={row.animal_id} className="cursor-pointer hover:bg-[var(--surface-raised)]" onClick={() => openView(row)}>
                 <TableCell className="font-mono text-xs font-semibold" style={S.accent}>{row.animal_code}</TableCell>
-                <TableCell style={S.sub}>{row.animal_type?.replace(/_/g, " ")}</TableCell>
-                <TableCell style={S.sub}>{row.gender === "F" ? "Female" : row.gender === "M" ? "Male" : row.gender}</TableCell>
-                <TableCell style={S.sub}>{row.breed_id || "—"}</TableCell>
+                <TableCell style={S.sub}>{animalTypeLabel(row.animal_type)}</TableCell>
+                <TableCell style={S.sub}>{genderLabel(row.gender)}</TableCell>
+                <TableCell style={S.sub}>{breedName(row.breed_id)}</TableCell>
                 <TableCell>
-                  <Badge label={row.status || "ACTIVE"} style={STATUS_STYLE[row.status] || STATUS_STYLE.ACTIVE} />
+                  <StatusBadge status={row.status || "ACTIVE"} label={statusLabel(row.status || "ACTIVE")} />
                 </TableCell>
                 <TableCell style={S.muted}>{formatDate(row.entry_date)}</TableCell>
                 <TableCell style={S.muted}>{row.ear_tag || "—"}</TableCell>
                 <TableCell>
                   <button
-                    aria-label="View animal"
-                    className="p-1 rounded hover:bg-[var(--surface-secondary)]"
+                    aria-label={t("anpViewAnimal")}
+                    className="p-1 rounded-[var(--radius-xs)] hover:bg-[var(--surface-secondary)]"
                     style={S.muted}
                     onClick={(e) => { e.stopPropagation(); openView(row); }}
                   >
@@ -515,14 +563,14 @@ export default function AnimalPanel() {
       <Dialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Register Animal"
-        description="Auto-generates an animal code from the ANIMAL_PIGGERY number series."
+        title={t("anpRegisterAnimal")}
+        description={t("anpRegisterAnimalDesc")}
         maxWidth="lg"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setCreateOpen(false)} disabled={createSaving}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setCreateOpen(false)} disabled={createSaving}>{t("anpCancel")}</Button>
             <Button id="animal-create-save-btn" onClick={handleCreate} disabled={createSaving}>
-              {createSaving ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Saving…</> : "Register"}
+              {createSaving ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t("anpSaving")}</> : t("anpRegister")}
             </Button>
           </>
         }
@@ -532,111 +580,111 @@ export default function AnimalPanel() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* NOB */}
           <div>
-            <label className="nf-label" htmlFor="ca-nob">Nature of Business *</label>
+            <label className="nf-label" htmlFor="ca-nob">{t("anpNatureOfBusiness")}</label>
             <select id="ca-nob" className={inputCls} value={createNobId} onChange={(e) => { setCreateNobId(e.target.value); setCreateForm((f) => ({ ...f, lob_id: "" })); }}>
-              <option value="">— select —</option>
+              <option value="">{t("anpSelectPlaceholder")}</option>
               {nobs.map((n) => <option key={n.nob_id} value={n.nob_id}>{n.nob_name}</option>)}
             </select>
           </div>
 
           {/* LOB */}
           <div>
-            <label className="nf-label" htmlFor="ca-lob">Line of Business *</label>
+            <label className="nf-label" htmlFor="ca-lob">{t("anpLineOfBusiness")}</label>
             <select id="ca-lob" className={inputCls} value={createForm.lob_id} onChange={(e) => setCreateForm((f) => ({ ...f, lob_id: e.target.value }))}>
-              <option value="">— select NOB first —</option>
+              <option value="">{t("anpSelectNobFirst")}</option>
               {lobs.map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_name}</option>)}
             </select>
           </div>
 
           {/* Animal type */}
           <div>
-            <label className="nf-label" htmlFor="ca-type">Animal Type *</label>
+            <label className="nf-label" htmlFor="ca-type">{t("anpAnimalType")}</label>
             <select id="ca-type" className={inputCls} value={createForm.animal_type} onChange={(e) => setCreateForm((f) => ({ ...f, animal_type: e.target.value }))}>
-              <option value="">— select —</option>
-              {ANIMAL_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+              <option value="">{t("anpSelectPlaceholder")}</option>
+              {ANIMAL_TYPES.map((tp) => <option key={tp} value={tp}>{animalTypeLabel(tp)}</option>)}
             </select>
           </div>
 
           {/* Gender */}
           <div>
-            <label className="nf-label" htmlFor="ca-gender">Gender *</label>
+            <label className="nf-label" htmlFor="ca-gender">{t("anpGender")}</label>
             <select id="ca-gender" className={inputCls} value={createForm.gender} onChange={(e) => setCreateForm((f) => ({ ...f, gender: e.target.value }))}>
-              <option value="">— select —</option>
-              {GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              <option value="">{t("anpSelectPlaceholder")}</option>
+              {GENDERS.map((g) => <option key={g.value} value={g.value}>{genderLabel(g.value)}</option>)}
             </select>
           </div>
 
           {/* Entry type */}
           <div>
-            <label className="nf-label" htmlFor="ca-entry-type">Entry Type *</label>
+            <label className="nf-label" htmlFor="ca-entry-type">{t("anpEntryType")}</label>
             <select id="ca-entry-type" className={inputCls} value={createForm.entry_type} onChange={(e) => setCreateForm((f) => ({ ...f, entry_type: e.target.value }))}>
-              <option value="">— select —</option>
-              {ENTRY_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+              <option value="">{t("anpSelectPlaceholder")}</option>
+              {ENTRY_TYPES.map((tp) => <option key={tp} value={tp}>{entryTypeLabel(tp)}</option>)}
             </select>
           </div>
 
           {/* Entry date */}
           <div>
-            <label className="nf-label" htmlFor="ca-entry-date">Entry Date *</label>
+            <label className="nf-label" htmlFor="ca-entry-date">{t("anpEntryDate")}</label>
             <input id="ca-entry-date" type="date" className={inputCls} value={createForm.entry_date} onChange={(e) => setCreateForm((f) => ({ ...f, entry_date: e.target.value }))} />
           </div>
 
           {/* Breed */}
           <div>
-            <label className="nf-label" htmlFor="ca-breed">Breed *</label>
+            <label className="nf-label" htmlFor="ca-breed">{t("anpBreed")}</label>
             <select id="ca-breed" className={inputCls} value={createForm.breed_id} onChange={(e) => setCreateForm((f) => ({ ...f, breed_id: e.target.value }))}>
-              <option value="">— select LOB first —</option>
+              <option value="">{t("anpSelectLobFirst")}</option>
               {breeds.map((b) => <option key={b.breed_id} value={b.breed_id}>{b.breed_name}</option>)}
             </select>
           </div>
 
           {/* Item (living asset) */}
           <div>
-            <label className="nf-label" htmlFor="ca-item">Item (living asset catalogue) *</label>
+            <label className="nf-label" htmlFor="ca-item">{t("anpItemLivingAsset")}</label>
             <select id="ca-item" className={inputCls} value={createForm.item_id} onChange={(e) => setCreateForm((f) => ({ ...f, item_id: e.target.value }))}>
-              <option value="">— select —</option>
+              <option value="">{t("anpSelectPlaceholder")}</option>
               {items.filter((i) => i.item_type === "LIVING_ASSET" || !i.item_type).map((i) => <option key={i.item_id} value={i.item_id}>{i.item_name}</option>)}
             </select>
           </div>
 
           {/* Acquisition cost */}
           <div>
-            <label className="nf-label" htmlFor="ca-cost">Acquisition Cost *</label>
+            <label className="nf-label" htmlFor="ca-cost">{t("anpAcquisitionCost")}</label>
             <input id="ca-cost" type="number" min="0" step="0.01" className={inputCls} placeholder="0.00" value={createForm.acquisition_cost} onChange={(e) => setCreateForm((f) => ({ ...f, acquisition_cost: e.target.value }))} />
           </div>
 
           {/* DOB */}
           <div>
-            <label className="nf-label" htmlFor="ca-dob">Date of Birth</label>
+            <label className="nf-label" htmlFor="ca-dob">{t("anpDateOfBirth")}</label>
             <input id="ca-dob" type="date" className={inputCls} value={createForm.dob} onChange={(e) => setCreateForm((f) => ({ ...f, dob: e.target.value }))} />
           </div>
 
           {/* Ear tag */}
           <div>
-            <label className="nf-label" htmlFor="ca-ear-tag">Ear Tag</label>
-            <input id="ca-ear-tag" type="text" className={inputCls} placeholder="Visual tag number" value={createForm.ear_tag} onChange={(e) => setCreateForm((f) => ({ ...f, ear_tag: e.target.value }))} />
+            <label className="nf-label" htmlFor="ca-ear-tag">{t("anpEarTag")}</label>
+            <input id="ca-ear-tag" type="text" className={inputCls} placeholder={t("anpEarTagPlaceholder")} value={createForm.ear_tag} onChange={(e) => setCreateForm((f) => ({ ...f, ear_tag: e.target.value }))} />
           </div>
 
           {/* RFID */}
           <div>
-            <label className="nf-label" htmlFor="ca-rfid">RFID Tag</label>
-            <input id="ca-rfid" type="text" className={inputCls} placeholder="RFID scan number (unique)" value={createForm.rfid_tag} onChange={(e) => setCreateForm((f) => ({ ...f, rfid_tag: e.target.value }))} />
+            <label className="nf-label" htmlFor="ca-rfid">{t("anpRfidTag")}</label>
+            <input id="ca-rfid" type="text" className={inputCls} placeholder={t("anpRfidTagPlaceholder")} value={createForm.rfid_tag} onChange={(e) => setCreateForm((f) => ({ ...f, rfid_tag: e.target.value }))} />
           </div>
 
           {/* Source receipt — shown when PURCHASED */}
           {["PURCHASED_IMPORTED", "PURCHASED_LOCAL"].includes(createForm.entry_type) && (
             <div>
-              <label className="nf-label" htmlFor="ca-receipt">Source Receipt ID *</label>
-              <input id="ca-receipt" type="text" className={inputCls} placeholder="Goods Receipt UUID" value={createForm.source_receipt_id} onChange={(e) => setCreateForm((f) => ({ ...f, source_receipt_id: e.target.value }))} />
+              <label className="nf-label" htmlFor="ca-receipt">{t("anpSourceReceiptId")}</label>
+              <input id="ca-receipt" type="text" className={inputCls} placeholder={t("anpSourceReceiptPlaceholder")} value={createForm.source_receipt_id} onChange={(e) => setCreateForm((f) => ({ ...f, source_receipt_id: e.target.value }))} />
             </div>
           )}
 
           {/* Source batch — shown when BORN_ON_FARM */}
           {createForm.entry_type === "BORN_ON_FARM" && (
             <div>
-              <label className="nf-label" htmlFor="ca-batch">Source Batch *</label>
+              <label className="nf-label" htmlFor="ca-batch">{t("anpSourceBatch")}</label>
               <select id="ca-batch" className={inputCls} value={createForm.source_batch_id} onChange={(e) => setCreateForm((f) => ({ ...f, source_batch_id: e.target.value }))}>
-                <option value="">— select batch —</option>
+                <option value="">{t("anpSelectBatch")}</option>
                 {batches.map((b) => <option key={b.batch_id} value={b.batch_id}>{b.batch_no || b.batch_id}</option>)}
               </select>
             </div>
@@ -644,7 +692,7 @@ export default function AnimalPanel() {
 
           {/* Notes — full width */}
           <div className="sm:col-span-2">
-            <label className="nf-label" htmlFor="ca-notes">Notes</label>
+            <label className="nf-label" htmlFor="ca-notes">{t("anpNotes")}</label>
             <textarea id="ca-notes" className={inputCls} rows={2} value={createForm.notes} onChange={(e) => setCreateForm((f) => ({ ...f, notes: e.target.value }))} />
           </div>
         </div>
@@ -655,8 +703,8 @@ export default function AnimalPanel() {
         <Dialog
           open={!!viewing}
           onClose={() => setViewing(null)}
-          title={`Animal: ${viewing.animal_code}`}
-          description={`${viewing.animal_type?.replace(/_/g, " ")} · ${viewing.gender === "F" ? "Female" : viewing.gender === "M" ? "Male" : viewing.gender}`}
+          title={t("anpAnimalDetailTitle", { code: viewing.animal_code })}
+          description={`${animalTypeLabel(viewing.animal_type)} · ${genderLabel(viewing.gender)}`}
           maxWidth="xl"
           footer={
             <div className="flex w-full items-center justify-between">
@@ -674,7 +722,7 @@ export default function AnimalPanel() {
                   }}
                 >
                   <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                  {viewing.is_active ? "Dispose" : "Disposed"}
+                  {viewing.is_active ? t("anpDispose") : t("anpDisposed")}
                 </Button>
 
                 {viewing.is_active && (
@@ -687,7 +735,7 @@ export default function AnimalPanel() {
                     }}
                   >
                     <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
-                    Transfer Stage / Pen
+                    {t("anpTransferStagePen")}
                   </Button>
                 )}
               </div>
@@ -706,7 +754,7 @@ export default function AnimalPanel() {
                   ? { backgroundColor: "var(--surface)", color: "var(--text-primary)", boxShadow: "var(--shadow-sm)" }
                   : { color: "var(--text-secondary)" }}
               >
-                {tab === "overview" ? "Overview" : tab === "medications" ? "Medication Log" : "Valuation & Ledger"}
+                {tab === "overview" ? t("anpTabOverview") : tab === "medications" ? t("anpTabMedicationLog") : t("anpTabValuationLedger")}
               </button>
             ))}
           </div>
@@ -715,21 +763,21 @@ export default function AnimalPanel() {
           {detailTab === "overview" && (
             <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm sm:grid-cols-3">
               {[
-                ["Animal Code", viewing.animal_code],
-                ["Type", viewing.animal_type?.replace(/_/g, " ")],
-                ["Gender", viewing.gender === "F" ? "Female" : viewing.gender === "M" ? "Male" : viewing.gender],
-                ["Status", viewing.status],
-                ["Entry Type", viewing.entry_type?.replace(/_/g, " ")],
-                ["Entry Date", formatDate(viewing.entry_date)],
-                ["Date of Birth", formatDate(viewing.dob)],
-                ["Ear Tag", viewing.ear_tag || "—"],
-                ["RFID Tag", viewing.rfid_tag || "—"],
-                ["Acquisition Cost", viewing.acquisition_cost ? `₹${Number(viewing.acquisition_cost).toLocaleString("en-IN")}` : "—"],
-                ["Book Value", viewing.book_value ? `₹${Number(viewing.book_value).toLocaleString("en-IN")}` : "—"],
-                ["Disposal Date", viewing.is_active ? "—" : formatDate(viewing.disposal_date)],
-                ["Disposal Type", viewing.disposal_type || "—"],
-                ["Disposal Value", viewing.disposal_value ? `₹${Number(viewing.disposal_value).toLocaleString("en-IN")}` : "—"],
-                ["Gain / Loss on Disposal", viewing.gain_loss_on_disposal ? `₹${Number(viewing.gain_loss_on_disposal).toLocaleString("en-IN")}` : "—"],
+                [t("anpFieldAnimalCode"), viewing.animal_code],
+                [t("anpFieldType"), animalTypeLabel(viewing.animal_type)],
+                [t("anpFieldGender"), genderLabel(viewing.gender)],
+                [t("anpFieldStatus"), statusLabel(viewing.status)],
+                [t("anpFieldEntryType"), entryTypeLabel(viewing.entry_type)],
+                [t("anpFieldEntryDate"), formatDate(viewing.entry_date)],
+                [t("anpFieldDateOfBirth"), formatDate(viewing.dob)],
+                [t("anpFieldEarTag"), viewing.ear_tag || "—"],
+                [t("anpFieldRfidTag"), viewing.rfid_tag || "—"],
+                [t("anpFieldAcquisitionCost"), viewing.acquisition_cost ? `₹${Number(viewing.acquisition_cost).toLocaleString("en-IN")}` : "—"],
+                [t("anpFieldBookValue"), viewing.book_value ? `₹${Number(viewing.book_value).toLocaleString("en-IN")}` : "—"],
+                [t("anpFieldDisposalDate"), viewing.is_active ? "—" : formatDate(viewing.disposal_date)],
+                [t("anpFieldDisposalType"), viewing.disposal_type ? disposalTypeLabel(viewing.disposal_type) : "—"],
+                [t("anpFieldDisposalValue"), viewing.disposal_value ? `₹${Number(viewing.disposal_value).toLocaleString("en-IN")}` : "—"],
+                [t("anpFieldGainLossOnDisposal"), viewing.gain_loss_on_disposal ? `₹${Number(viewing.gain_loss_on_disposal).toLocaleString("en-IN")}` : "—"],
               ].map(([label, val]) => (
                 <div key={label as string}>
                   <p className="text-xs uppercase tracking-wide" style={S.muted}>{label as string}</p>
@@ -738,7 +786,7 @@ export default function AnimalPanel() {
               ))}
               {viewing.notes && (
                 <div className="col-span-2 sm:col-span-3">
-                  <p className="text-xs uppercase tracking-wide" style={S.muted}>Notes</p>
+                  <p className="text-xs uppercase tracking-wide" style={S.muted}>{t("anpNotes")}</p>
                   <p className="mt-0.5 text-sm" style={S.sub}>{viewing.notes}</p>
                 </div>
               )}
@@ -749,7 +797,7 @@ export default function AnimalPanel() {
           {detailTab === "medications" && (
             <div>
               <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm font-semibold" style={S.primary}>Medication history</p>
+                <p className="text-sm font-semibold" style={S.primary}>{t("anpMedicationHistory")}</p>
                 {viewing.is_active && (
                   <Button
                     id="animal-log-dose-btn"
@@ -760,7 +808,7 @@ export default function AnimalPanel() {
                       setDoseOpen(true);
                     }}
                   >
-                    <Pill className="mr-1.5 h-3.5 w-3.5" /> Log Dose
+                    <Pill className="mr-1.5 h-3.5 w-3.5" /> {t("anpLogDose")}
                   </Button>
                 )}
               </div>
@@ -774,18 +822,18 @@ export default function AnimalPanel() {
               ) : medLogs.length === 0 ? (
                 <div className="py-12 text-center">
                   <Pill className="mx-auto h-7 w-7 mb-2" style={S.muted} />
-                  <p className="text-sm" style={S.sub}>No doses recorded yet.</p>
+                  <p className="text-sm" style={S.sub}>{t("anpNoDosesRecorded")}</p>
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
                   <table className="w-full text-sm">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead>Qty</TableHead>
-                        <TableHead>Administered By</TableHead>
-                        <TableHead>Notes</TableHead>
+                        <TableHead>{t("anpColDate")}</TableHead>
+                        <TableHead>{t("anpColItem")}</TableHead>
+                        <TableHead>{t("anpColQty")}</TableHead>
+                        <TableHead>{t("anpColAdministeredBy")}</TableHead>
+                        <TableHead>{t("anpColNotes")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -815,25 +863,25 @@ export default function AnimalPanel() {
               {/* Valuation KPIs */}
               <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>Net Book Value (NBV)</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>{t("anpKpiNbv")}</p>
                   <p className="mt-1 text-lg font-bold" style={S.primary}>
                     ₹{viewing.book_value ? Number(viewing.book_value).toLocaleString("en-IN") : viewing.acquisition_cost ? Number(viewing.acquisition_cost).toLocaleString("en-IN") : "0"}
                   </p>
                 </div>
                 <div className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>Opening Asset Value</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>{t("anpKpiOpeningAssetValue")}</p>
                   <p className="mt-1 text-lg font-bold" style={S.primary}>
                     ₹{viewing.total_opening_asset_value ? Number(viewing.total_opening_asset_value).toLocaleString("en-IN") : viewing.acquisition_cost ? Number(viewing.acquisition_cost).toLocaleString("en-IN") : "0"}
                   </p>
                 </div>
                 <div className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>Total Amortized</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>{t("anpKpiTotalAmortized")}</p>
                   <p className="mt-1 text-lg font-bold" style={S.primary}>
                     ₹{viewing.total_amortised ? Number(viewing.total_amortised).toLocaleString("en-IN") : "0"}
                   </p>
                 </div>
                 <div className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>Monthly Amortization</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>{t("anpKpiMonthlyAmortization")}</p>
                   <p className="mt-1 text-lg font-bold" style={S.primary}>
                     {viewing.amortisation_monthly ? `₹${Number(viewing.amortisation_monthly).toLocaleString("en-IN")}` : "—"}
                   </p>
@@ -841,8 +889,8 @@ export default function AnimalPanel() {
               </div>
 
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-semibold" style={S.primary}>IAS 41 Biological Asset Ledger</p>
-                <span className="text-xs" style={S.muted}>{ledgerEntries.length} transaction(s)</span>
+                <p className="text-sm font-semibold" style={S.primary}>{t("anpIas41Ledger")}</p>
+                <span className="text-xs" style={S.muted}>{t("anpTransactionCount", { count: ledgerEntries.length })}</span>
               </div>
 
               {ledgerError && <div className="mb-4"><InlineAlert variant="danger">{ledgerError}</InlineAlert></div>}
@@ -853,19 +901,19 @@ export default function AnimalPanel() {
                 </div>
               ) : ledgerEntries.length === 0 ? (
                 <div className="py-12 text-center">
-                  <p className="text-sm" style={S.sub}>No biological asset ledger entries found.</p>
+                  <p className="text-sm" style={S.sub}>{t("anpNoLedgerEntries")}</p>
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
                   <table className="w-full text-sm">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Posting Date</TableHead>
-                        <TableHead>Entry Type</TableHead>
-                        <TableHead>Doc No</TableHead>
-                        <TableHead>Headcount</TableHead>
-                        <TableHead className="text-right">Cost Amount</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>{t("anpColPostingDate")}</TableHead>
+                        <TableHead>{t("anpColEntryType")}</TableHead>
+                        <TableHead>{t("anpColDocNo")}</TableHead>
+                        <TableHead>{t("anpColHeadcount")}</TableHead>
+                        <TableHead className="text-right">{t("anpColCostAmount")}</TableHead>
+                        <TableHead>{t("anpColStatus")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -873,17 +921,9 @@ export default function AnimalPanel() {
                         <TableRow key={entry.entry_id}>
                           <TableCell style={S.sub}>{formatDate(entry.posting_date)}</TableCell>
                           <TableCell>
-                            <Badge
-                              label={entry.entry_type}
-                              style={
-                                entry.entry_type === "ACQUISITION"
-                                  ? { color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--surface-raised)" }
-                                  : entry.entry_type === "AMORTIZATION"
-                                  ? { color: "var(--warning)", borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)" }
-                                  : entry.entry_type === "TRANSFORMATION" || entry.entry_type === "DISPOSAL"
-                                  ? { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }
-                                  : { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }
-                              }
+                            <StatusBadge
+                              status={entry.entry_type}
+                              label={ledgerEntryTypeLabel(entry.entry_type)}
                             />
                           </TableCell>
                           <TableCell style={S.primary} className="font-mono text-xs">{entry.document_no || "—"}</TableCell>
@@ -891,7 +931,7 @@ export default function AnimalPanel() {
                           <TableCell className="text-right font-medium" style={Number(entry.cost_amount) < 0 ? S.danger : S.primary}>
                             ₹{Number(entry.cost_amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                           </TableCell>
-                          <TableCell style={S.muted}>{entry.status || "ACTIVE"}</TableCell>
+                          <TableCell style={S.muted}>{entry.status ? statusLabel(entry.status) : t("anpStatusActive")}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -908,14 +948,14 @@ export default function AnimalPanel() {
       <Dialog
         open={doseOpen}
         onClose={() => setDoseOpen(false)}
-        title="Log Medication / Vaccine Dose"
-        description="Records an administration event and updates the withdrawal-period timer for slaughter eligibility."
+        title={t("anpLogDoseTitle")}
+        description={t("anpLogDoseDesc")}
         maxWidth="sm"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setDoseOpen(false)} disabled={doseSaving}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setDoseOpen(false)} disabled={doseSaving}>{t("anpCancel")}</Button>
             <Button id="animal-dose-save-btn" onClick={handleLogDose} disabled={doseSaving}>
-              {doseSaving ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Saving…</> : "Log Dose"}
+              {doseSaving ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t("anpSaving")}</> : t("anpLogDose")}
             </Button>
           </>
         }
@@ -924,32 +964,32 @@ export default function AnimalPanel() {
 
         <div className="space-y-4">
           <div>
-            <label className="nf-label" htmlFor="dose-item">Medicine / Vaccine *</label>
+            <label className="nf-label" htmlFor="dose-item">{t("anpMedicineVaccine")}</label>
             <select id="dose-item" className={inputCls} value={doseForm.item_id} onChange={(e) => setDoseForm((f) => ({ ...f, item_id: e.target.value }))}>
-              <option value="">— select —</option>
+              <option value="">{t("anpSelectPlaceholder")}</option>
               {medItems.map((i) => (
                 <option key={i.item_id} value={i.item_id}>
-                  {i.item_name}{i.withdrawal_days != null ? ` (${i.withdrawal_days}d withdrawal)` : ""}
+                  {i.item_name}{i.withdrawal_days != null ? t("anpWithdrawalDaysSuffix", { days: i.withdrawal_days }) : ""}
                 </option>
               ))}
             </select>
             {medItems.length === 0 && (
-              <p className="mt-1 text-xs" style={S.muted}>No MEDICINE or VACCINE items found. Add them in Master Data → Items first.</p>
+              <p className="mt-1 text-xs" style={S.muted}>{t("anpNoMedItemsHint")}</p>
             )}
           </div>
 
           <div>
-            <label className="nf-label" htmlFor="dose-date">Date Administered *</label>
+            <label className="nf-label" htmlFor="dose-date">{t("anpDateAdministered")}</label>
             <input id="dose-date" type="date" className={inputCls} value={doseForm.administered_date} onChange={(e) => setDoseForm((f) => ({ ...f, administered_date: e.target.value }))} />
           </div>
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="nf-label" htmlFor="dose-qty">Quantity</label>
-              <input id="dose-qty" type="number" min="0" step="0.001" className={inputCls} placeholder="e.g. 2.5" value={doseForm.dose_qty} onChange={(e) => setDoseForm((f) => ({ ...f, dose_qty: e.target.value }))} />
+              <label className="nf-label" htmlFor="dose-qty">{t("anpQuantity")}</label>
+              <input id="dose-qty" type="number" min="0" step="0.001" className={inputCls} placeholder={t("anpQuantityPlaceholder")} value={doseForm.dose_qty} onChange={(e) => setDoseForm((f) => ({ ...f, dose_qty: e.target.value }))} />
             </div>
             <div className="w-28">
-              <label className="nf-label" htmlFor="dose-uom">UOM</label>
+              <label className="nf-label" htmlFor="dose-uom">{t("anpUom")}</label>
               <select id="dose-uom" className={inputCls} value={doseForm.uom} onChange={(e) => setDoseForm((f) => ({ ...f, uom: e.target.value }))}>
                 <option value="">—</option>
                 {uoms.map((u) => <option key={u.uom_id || u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
@@ -958,12 +998,12 @@ export default function AnimalPanel() {
           </div>
 
           <div>
-            <label className="nf-label" htmlFor="dose-by">Administered By</label>
-            <input id="dose-by" type="text" className={inputCls} placeholder="Vet / handler name (free text)" value={doseForm.administered_by} onChange={(e) => setDoseForm((f) => ({ ...f, administered_by: e.target.value }))} />
+            <label className="nf-label" htmlFor="dose-by">{t("anpAdministeredBy")}</label>
+            <input id="dose-by" type="text" className={inputCls} placeholder={t("anpAdministeredByPlaceholder")} value={doseForm.administered_by} onChange={(e) => setDoseForm((f) => ({ ...f, administered_by: e.target.value }))} />
           </div>
 
           <div>
-            <label className="nf-label" htmlFor="dose-notes">Notes</label>
+            <label className="nf-label" htmlFor="dose-notes">{t("anpNotes")}</label>
             <textarea id="dose-notes" className={inputCls} rows={2} value={doseForm.notes} onChange={(e) => setDoseForm((f) => ({ ...f, notes: e.target.value }))} />
           </div>
         </div>
@@ -973,21 +1013,21 @@ export default function AnimalPanel() {
       <Dialog
         open={disposeOpen}
         onClose={() => setDisposeOpen(false)}
-        title={`Dispose Animal${viewing ? ` — ${viewing.animal_code}` : ""}`}
-        description="This is a permanent exit from the register. The animal record is kept for audit."
+        title={viewing ? t("anpDisposeAnimalTitleWithCode", { code: viewing.animal_code }) : t("anpDisposeAnimalTitle")}
+        description={t("anpDisposeAnimalDesc")}
         maxWidth="sm"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setDisposeOpen(false)} disabled={disposeSaving}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setDisposeOpen(false)} disabled={disposeSaving}>{t("anpCancel")}</Button>
             <Button id="animal-dispose-confirm-btn" variant="destructive" onClick={handleDispose} disabled={disposeSaving}>
-              {disposeSaving ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Saving…</> : "Confirm Disposal"}
+              {disposeSaving ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t("anpSaving")}</> : t("anpConfirmDisposal")}
             </Button>
           </>
         }
       >
         {/* Structured withdrawal warning — shown instead of generic error when it's that specific error */}
         {disposeError && disposeIsWithdrawal
-          ? <WithdrawalWarning message={disposeError} />
+          ? <WithdrawalWarning message={disposeError} t={t} />
           : disposeError
             ? <div className="mb-4"><InlineAlert variant="danger">{disposeError}</InlineAlert></div>
             : null
@@ -998,31 +1038,31 @@ export default function AnimalPanel() {
           <div className="mb-4 rounded-[var(--radius-md)] border p-3 text-xs" style={S.warning}>
             <div className="flex items-start gap-2">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>Slaughter is blocked if any medicine withdrawal period has not elapsed. Check the Medication Log tab to confirm clearance before proceeding.</span>
+              <span>{t("anpSlaughterWithdrawalHint")}</span>
             </div>
           </div>
         )}
 
         <div className="space-y-4 mt-1">
           <div>
-            <label className="nf-label" htmlFor="dispose-type">Disposal Type *</label>
+            <label className="nf-label" htmlFor="dispose-type">{t("anpDisposalType")}</label>
             <select id="dispose-type" className={inputCls} value={disposeForm.disposal_type} onChange={(e) => { setDisposeForm((f) => ({ ...f, disposal_type: e.target.value })); setDisposeError(""); setDisposeIsWithdrawal(false); }}>
-              {DISPOSAL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {DISPOSAL_TYPES.map((tp) => <option key={tp} value={tp}>{disposalTypeLabel(tp)}</option>)}
             </select>
           </div>
 
           <div>
-            <label className="nf-label" htmlFor="dispose-date">Date *</label>
+            <label className="nf-label" htmlFor="dispose-date">{t("anpDate")}</label>
             <input id="dispose-date" type="date" className={inputCls} value={disposeForm.disposal_date} onChange={(e) => setDisposeForm((f) => ({ ...f, disposal_date: e.target.value }))} />
           </div>
 
           <div>
-            <label className="nf-label" htmlFor="dispose-value">Disposal Value (sale/salvage)</label>
+            <label className="nf-label" htmlFor="dispose-value">{t("anpDisposalValue")}</label>
             <input id="dispose-value" type="number" min="0" step="0.01" className={inputCls} placeholder="0.00" value={disposeForm.disposal_value} onChange={(e) => setDisposeForm((f) => ({ ...f, disposal_value: e.target.value }))} />
           </div>
 
           <div>
-            <label className="nf-label" htmlFor="dispose-notes">Notes</label>
+            <label className="nf-label" htmlFor="dispose-notes">{t("anpNotes")}</label>
             <textarea id="dispose-notes" className={inputCls} rows={2} value={disposeForm.notes} onChange={(e) => setDisposeForm((f) => ({ ...f, notes: e.target.value }))} />
           </div>
         </div>

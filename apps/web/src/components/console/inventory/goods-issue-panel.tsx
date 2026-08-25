@@ -9,6 +9,8 @@ import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const PAGE_SIZE = 25;
 
@@ -32,13 +34,8 @@ function unwrap<T = any>(res: any): T {
 
 const emptyLine = () => ({ item_id: "", quantity: "", uom: "" });
 
-const STATUS_STYLE: Record<string, any> = {
-  DRAFT: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" },
-  POSTED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
-  CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" },
-};
-
 export default function GoodsIssuePanel() {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,7 +72,7 @@ export default function GoodsIssuePanel() {
       const res = await api.get(`/goods-issue?${params.toString()}`);
       setRows(unwrap<Row[]>(res) || []);
     } catch (err: any) {
-      setError(err?.message || "Failed to load goods issues.");
+      setError(err?.message || t("gipFailedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -119,12 +116,12 @@ export default function GoodsIssuePanel() {
     setSaving(true);
     setFormError("");
     try {
-      if (!header.warehouse_id) throw new Error("Warehouse is required.");
-      if (!header.posting_date) throw new Error("Posting date is required.");
+      if (!header.warehouse_id) throw new Error(t("gipWarehouseRequired"));
+      if (!header.posting_date) throw new Error(t("gipPostingDateRequired"));
       const cleanLines = lines
         .filter((l) => l.item_id && l.quantity && l.uom)
         .map((l) => ({ item_id: l.item_id, quantity: Number(l.quantity), uom: l.uom }));
-      if (cleanLines.length === 0) throw new Error("Add at least one line with item, quantity and UOM.");
+      if (cleanLines.length === 0) throw new Error(t("gipAddAtLeastOneLine"));
 
       await api.post("/goods-issue", {
         company_id: companyId,
@@ -137,7 +134,7 @@ export default function GoodsIssuePanel() {
       setModalOpen(false);
       load();
     } catch (err: any) {
-      setFormError(err?.message || "Failed to save goods issue.");
+      setFormError(err?.message || t("gipFailedToSave"));
     } finally {
       setSaving(false);
     }
@@ -148,7 +145,7 @@ export default function GoodsIssuePanel() {
       const res = await api.get(`/goods-issue/${row.issue_id}`);
       setViewing(unwrap<Row>(res));
     } catch (err: any) {
-      setError(err?.message || "Failed to load goods issue details.");
+      setError(err?.message || t("gipFailedToLoadDetails"));
     }
   };
 
@@ -160,7 +157,7 @@ export default function GoodsIssuePanel() {
       setViewing(unwrap<Row>(res));
       load();
     } catch (err: any) {
-      setError(err?.message || "Failed to post goods issue.");
+      setError(err?.message || t("gipFailedToPost"));
     } finally {
       setPosting(false);
     }
@@ -176,22 +173,22 @@ export default function GoodsIssuePanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold" style={S.primary}>Goods Issue</h2>
-          <p className="mt-0.5 text-xs" style={S.sub}>Record stock consumption. Cost is drawn automatically via FIFO from existing inventory layers.</p>
+          <h2 className="text-lg font-semibold" style={S.primary}>{t("gipTitle")}</h2>
+          <p className="mt-0.5 text-xs" style={S.sub}>{t("gipSubtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none nf-select" style={S.input}>
-            <option value="">All statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="POSTED">Posted</option>
-            <option value="CANCELLED">Cancelled</option>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="nf-input-sm px-2" style={S.input}>
+            <option value="">{t("gipAllStatuses")}</option>
+            <option value="DRAFT">{t("gipStatusDraft")}</option>
+            <option value="POSTED">{t("gipStatusPosted")}</option>
+            <option value="CANCELLED">{t("gipStatusCancelled")}</option>
           </select>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none" style={S.input} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("gipSearchPlaceholder")} className="nf-input-sm pl-8 pr-3" style={S.input} />
           </div>
-          <Button onClick={openCreate} >
-            <Plus className="h-3.5 w-3.5" /> New Issue
+          <Button size="sm" onClick={openCreate} >
+            <Plus className="h-3.5 w-3.5" /> {t("gipNewIssue")}
           </Button>
         </div>
       </div>
@@ -205,18 +202,18 @@ export default function GoodsIssuePanel() {
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
               <tr className="border-b border-(--row-border)">
-                <TableHead className="whitespace-nowrap">Issue No.</TableHead>
-                <TableHead className="whitespace-nowrap">Posting Date</TableHead>
-                <TableHead className="whitespace-nowrap">Warehouse</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="whitespace-nowrap">{t("gipIssueNo")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("gipPostingDate")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("gipWarehouse")}</TableHead>
+                <TableHead className="text-right">{t("gipStatus")}</TableHead>
+                <TableHead className="text-right">{t("gipActions")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
+                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("gipLoading")}</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No goods issues yet.</TableCell></tr>
+                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("gipNoGoodsIssues")}</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
                   <TableRow key={row.issue_id}>
@@ -224,10 +221,10 @@ export default function GoodsIssuePanel() {
                     <TableCell className="whitespace-nowrap" style={S.primary}>{row.posting_date}</TableCell>
                     <TableCell className="whitespace-nowrap" style={S.primary}>{warehouseLabel(row.warehouse_id)}</TableCell>
                     <TableCell className="text-right">
-                      <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[row.status] || STATUS_STYLE.DRAFT}>{row.status}</span>
+                      <StatusBadge status={row.status} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                      <button onClick={() => openView(row)} title={t("gipView")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
                     </TableCell>
@@ -248,13 +245,13 @@ export default function GoodsIssuePanel() {
       <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title="New Goods Issue"
+        title={t("gipNewGoodsIssue")}
         maxWidth="xl"
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>{t("gipCancel")}</Button>
             <Button size="sm" onClick={handleSave} disabled={saving} className="nf-btn-primary">
-              {saving ? "Saving…" : "Save Draft"}
+              {saving ? t("gipSaving") : t("gipSaveDraft")}
             </Button>
           </>
         }
@@ -266,33 +263,33 @@ export default function GoodsIssuePanel() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Warehouse <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("gipWarehouse")} <span className="text-(--danger)">*</span></label>
               <select value={header.warehouse_id} onChange={(e) => setHeader((h) => ({ ...h, warehouse_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("gipSelectEllipsis")}</option>
                 {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code} — {w.warehouse_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("gipPostingDate")} <span className="text-(--danger)">*</span></label>
               <input type="date" value={header.posting_date} onChange={(e) => setHeader((h) => ({ ...h, posting_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Cost Center</label>
+              <label className="nf-text-label" style={S.sub}>{t("gipCostCenter")}</label>
               <select value={header.cost_center_id} onChange={(e) => setHeader((h) => ({ ...h, cost_center_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("gipSelectEllipsis")}</option>
                 {costCenters.map((c) => <option key={c.cost_center_id} value={c.cost_center_id}>{c.cost_center_code} — {c.cost_center_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+              <label className="nf-text-label" style={S.sub}>{t("gipRemarks")}</label>
               <input value={header.remarks} onChange={(e) => setHeader((h) => ({ ...h, remarks: e.target.value }))} className={inputCls} style={S.input} />
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Lines</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("gipLines")}</p>
             <button onClick={addLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
+              <Plus className="h-3 w-3" /> {t("gipAddLine")}
             </button>
           </div>
 
@@ -300,9 +297,9 @@ export default function GoodsIssuePanel() {
             <table className="w-full border-collapse text-left text-xs">
               <TableHeader>
                 <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("gipItem")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("gipQty")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("gipUom")}</TableHead>
                   <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
               </TableHeader>
@@ -311,7 +308,7 @@ export default function GoodsIssuePanel() {
                   <TableRow key={idx}>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select Item ({items.length} options)…</option>
+                        <option value="">{t("gipSelectItemOptions", { count: items.length })}</option>
                         {items.map((it, i) => (
                           <option key={it.item_id} value={it.item_id}>
                             {i + 1}. {it.item_code} — {it.item_name}
@@ -322,12 +319,12 @@ export default function GoodsIssuePanel() {
                     <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5 w-28">
                       <select value={line.uom} onChange={(e) => setLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
+                        <option value="">{t("gipSelectEllipsis")}</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeLine(idx)} type="button" className="rounded-[var(--radius-xs)] p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -341,14 +338,14 @@ export default function GoodsIssuePanel() {
       <Dialog
         open={!!viewing}
         onClose={() => setViewing(null)}
-        title={viewing ? `Goods Issue ${viewing.issue_no}` : ""}
+        title={viewing ? t("gipGoodsIssueTitle", { issueNo: viewing.issue_no }) : ""}
         maxWidth="xl"
         footer={
           viewing?.status === "DRAFT" ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => setViewing(null)}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={() => setViewing(null)}>{t("gipCancel")}</Button>
               <Button size="sm" onClick={handlePost} disabled={posting} className="flex items-center gap-1.5 nf-btn-primary">
-                <CheckCircle2 className="h-4 w-4" /> {posting ? "Posting…" : "Post"}
+                <CheckCircle2 className="h-4 w-4" /> {posting ? t("gipPosting") : t("gipPost")}
               </Button>
             </>
           ) : undefined
@@ -357,19 +354,19 @@ export default function GoodsIssuePanel() {
         {viewing && (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Status</p><span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[viewing.status] || STATUS_STYLE.DRAFT}>{viewing.status}</span></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Posting Date</p><p style={S.primary}>{viewing.posting_date}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Warehouse</p><p style={S.primary}>{warehouseLabel(viewing.warehouse_id)}</p></div>
-              {viewing.posted_at && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Posted At</p><p style={S.primary}>{viewing.posted_at}</p></div>}
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("gipStatus")}</p><StatusBadge status={viewing.status} className="mt-1" /></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("gipPostingDate")}</p><p style={S.primary}>{viewing.posting_date}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("gipWarehouse")}</p><p style={S.primary}>{warehouseLabel(viewing.warehouse_id)}</p></div>
+              {viewing.posted_at && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("gipPostedAt")}</p><p style={S.primary}>{viewing.posted_at}</p></div>}
             </div>
 
             <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
               <table className="w-full border-collapse text-left text-xs">
                 <TableHeader>
                   <tr className="border-b border-(--row-border)">
-                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                    <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("gipItem")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("gipQty")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("gipUom")}</TableHead>
                   </tr>
                 </TableHeader>
                 <TableBody>

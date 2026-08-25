@@ -16,6 +16,7 @@ import { Dialog } from "@/components/ui/dialog";
 
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface BatchLifecycleMeta {
   id: string;
@@ -29,6 +30,7 @@ interface BatchLifecycleMeta {
 }
 
 export default function PiggeryBatchStagesPanel() {
+  const { t } = useLanguage();
   const [batches, setBatches] = useState<BatchLifecycleMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
@@ -110,7 +112,7 @@ export default function PiggeryBatchStagesPanel() {
     if (!currentBatch) return;
     const nextId = currentStageId + 1;
     if (nextId > stages.length) {
-      setToastMsg(`✓ Batch ${currentBatch.code} has reached the final lifecycle stage.`);
+      setToastMsg(`✓ ${t("pbsFinalStageReachedMsg", { code: currentBatch.code })}`);
       setTimeout(() => setToastMsg(""), 3500);
       return;
     }
@@ -137,7 +139,7 @@ export default function PiggeryBatchStagesPanel() {
 
     setStages(updated);
     setCurrentStageId(nextId);
-    setToastMsg(`✓ Batch transitioned in Database to Stage ${nextId}: ${nextStage.name}`);
+    setToastMsg(`✓ ${t("pbsBatchTransitionedMsg", { stageId: nextId, stageName: nextStage.name })}`);
     setTimeout(() => setToastMsg(""), 4000);
   };
 
@@ -148,7 +150,7 @@ export default function PiggeryBatchStagesPanel() {
     setStages(updated);
     setEditModalOpen(false);
     setEditingStage(null);
-    setToastMsg(`✓ Updated duration for ${editingStage.name} to ${days} days.`);
+    setToastMsg(`✓ ${t("pbsUpdatedDurationMsg", { name: editingStage.name, days })}`);
     setTimeout(() => setToastMsg(""), 3500);
   };
 
@@ -170,17 +172,17 @@ export default function PiggeryBatchStagesPanel() {
     setAddModalOpen(false);
     setNewStageName("");
     setNewStageCode("");
-    setToastMsg(`✓ Added custom stage: ${newStageName} (${days} days)`);
+    setToastMsg(`✓ ${t("pbsAddedCustomStageMsg", { name: newStageName, days })}`);
     setTimeout(() => setToastMsg(""), 3500);
   };
 
-  const currentStageName = stages.find((s) => s.id === currentStageId)?.name || "Active Stage";
+  const currentStageName = stages.find((s) => s.id === currentStageId)?.name || t("pbsActiveStage");
   const totalStandardDays = stages.reduce((sum, s) => sum + s.standardDays, 0);
 
   if (loading) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
-        <p className="text-sm font-medium text-[var(--text-muted)]">Loading batch lifecycles from database...</p>
+        <p className="text-sm font-medium text-[var(--text-muted)]">{t("pbsLoadingBatchLifecycles")}</p>
       </div>
     );
   }
@@ -192,12 +194,12 @@ export default function PiggeryBatchStagesPanel() {
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-              Production Batch:
+              {t("pbsProductionBatchLabel")}
             </span>
             <select
               value={selectedBatchId}
               onChange={(e) => setSelectedBatchId(e.target.value)}
-              className="max-w-[240px] sm:max-w-[320px] truncate rounded border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
+              className="max-w-[240px] sm:max-w-[320px] truncate rounded-[var(--radius-xs)] border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
             >
               {batches.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -213,15 +215,15 @@ export default function PiggeryBatchStagesPanel() {
                 borderColor: "rgba(47, 125, 91, 0.2)",
               }}
             >
-              Active Lifecycle
+              {t("pbsActiveLifecycle")}
             </span>
           </div>
 
           <p className="text-xs text-[var(--text-muted)] mt-1.5">
-            Breed: <strong className="text-[var(--text-primary)]">{currentBatch?.breed || "—"}</strong> · 
-            Type: <strong className="text-[var(--text-primary)]">{currentBatch?.type || "—"}</strong> · 
-            Start Date: <strong className="text-[var(--text-primary)]">{currentBatch?.startDate || "—"}</strong> · 
-            Current Stage: <strong className="text-[var(--accent)]">{currentStageName}</strong>
+            {t("pbsBreedLabel")}: <strong className="text-[var(--text-primary)]">{currentBatch?.breed || "—"}</strong> ·
+            {t("pbsTypeLabel")}: <strong className="text-[var(--text-primary)]">{currentBatch?.type || "—"}</strong> ·
+            {t("pbsStartDateLabel")}: <strong className="text-[var(--text-primary)]">{currentBatch?.startDate || "—"}</strong> ·
+            {t("pbsCurrentStageLabel")}: <strong className="text-[var(--accent)]">{currentStageName}</strong>
           </p>
         </div>
 
@@ -232,7 +234,7 @@ export default function PiggeryBatchStagesPanel() {
             onClick={handleAdvanceStage}
             className="text-xs h-8 gap-1.5 font-medium"
           >
-            <ArrowRight className="w-3.5 h-3.5" /> Advance Stage
+            <ArrowRight className="w-3.5 h-3.5" /> {t("pbsAdvanceStage")}
           </Button>
 
           <Button
@@ -240,7 +242,7 @@ export default function PiggeryBatchStagesPanel() {
             onClick={() => setAddModalOpen(true)}
             className="nf-btn-primary text-xs h-8 gap-1.5 font-semibold"
           >
-            <Plus className="w-3.5 h-3.5" /> Add Stage
+            <Plus className="w-3.5 h-3.5" /> {t("pbsAddStage")}
           </Button>
         </div>
       </div>
@@ -256,10 +258,10 @@ export default function PiggeryBatchStagesPanel() {
       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-2xs">
         <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-raised)] flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[var(--accent)]" /> Stage Sequence & Timeline Configuration
+            <Layers className="w-4 h-4 text-[var(--accent)]" /> {t("pbsStageSequenceTitle")}
           </h3>
           <span className="text-xs text-[var(--text-muted)] font-mono">
-            Total Stages: {stages.length} ({totalStandardDays} Standard Days)
+            {t("pbsTotalStagesMsg", { count: stages.length, days: totalStandardDays })}
           </span>
         </div>
 
@@ -267,15 +269,15 @@ export default function PiggeryBatchStagesPanel() {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--surface-raised)]/50 text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                <th className="px-4 py-2.5 font-bold">Seq.</th>
-                <th className="px-4 py-2.5 font-bold">Stage Code</th>
-                <th className="px-4 py-2.5 font-bold">Stage Name</th>
-                <th className="px-4 py-2.5 font-bold">Stage Type</th>
-                <th className="px-4 py-2.5 font-bold text-right">Standard Days</th>
-                <th className="px-4 py-2.5 font-bold text-right">Day From</th>
-                <th className="px-4 py-2.5 font-bold text-right">Day To</th>
-                <th className="px-4 py-2.5 font-bold">Status</th>
-                <th className="px-4 py-2.5 font-bold text-right">Actions</th>
+                <th className="px-4 py-2.5 font-bold">{t("pbsSeqHeader")}</th>
+                <th className="px-4 py-2.5 font-bold">{t("pbsStageCodeHeader")}</th>
+                <th className="px-4 py-2.5 font-bold">{t("pbsStageNameHeader")}</th>
+                <th className="px-4 py-2.5 font-bold">{t("pbsStageTypeHeader")}</th>
+                <th className="px-4 py-2.5 font-bold text-right">{t("pbsStandardDaysHeader")}</th>
+                <th className="px-4 py-2.5 font-bold text-right">{t("pbsDayFromHeader")}</th>
+                <th className="px-4 py-2.5 font-bold text-right">{t("pbsDayToHeader")}</th>
+                <th className="px-4 py-2.5 font-bold">{t("pbsStatusHeader")}</th>
+                <th className="px-4 py-2.5 font-bold text-right">{t("pbsActionsHeader")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
@@ -304,7 +306,7 @@ export default function PiggeryBatchStagesPanel() {
                       >
                         {stage.status === "COMPLETED" && <CheckCircle2 className="w-3 h-3" />}
                         {stage.status === "CURRENT" && <Clock className="w-3 h-3 animate-spin" />}
-                        {stage.status === "COMPLETED" ? "Completed" : stage.status === "CURRENT" ? "In Progress" : "Upcoming"}
+                        {stage.status === "COMPLETED" ? t("pbsStatusCompleted") : stage.status === "CURRENT" ? t("pbsStatusInProgress") : t("pbsStatusUpcoming")}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -318,7 +320,7 @@ export default function PiggeryBatchStagesPanel() {
                         }}
                         className="h-6 text-[10px] px-2 text-[var(--text-muted)] hover:text-[var(--accent)]"
                       >
-                        <Edit2 className="w-3 h-3 mr-1" /> Edit
+                        <Edit2 className="w-3 h-3 mr-1" /> {t("pbsEdit")}
                       </Button>
                     </td>
                   </tr>
@@ -331,7 +333,7 @@ export default function PiggeryBatchStagesPanel() {
         <div className="p-3.5 bg-[var(--surface-raised)] border-t border-[var(--border)]">
           <p className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-            Note: Stage durations are standard baselines. Actual production dates and KPI telemetry accumulate from Batch Start Date ({currentBatch.startDate}).
+            {t("pbsFooterNote", { startDate: currentBatch?.startDate || "—" })}
           </p>
         </div>
       </div>
@@ -341,22 +343,22 @@ export default function PiggeryBatchStagesPanel() {
         <Dialog
           open={editModalOpen}
           onClose={() => setEditModalOpen(false)}
-          title={`Edit Timeline: ${editingStage.name}`}
+          title={t("pbsEditTimelineTitle", { name: editingStage.name })}
           maxWidth="sm"
           footer={
             <>
               <Button variant="outline" size="sm" onClick={() => setEditModalOpen(false)}>
-                Cancel
+                {t("pbsCancel")}
               </Button>
               <Button size="sm" onClick={handleSaveEditStage} className="nf-btn-primary">
-                Save Duration
+                {t("pbsSaveDuration")}
               </Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">Standard Duration (Days)</label>
+              <label className="font-semibold block mb-1">{t("pbsStandardDurationDaysLabel")}</label>
               <input
                 type="number"
                 value={editDays}
@@ -373,44 +375,44 @@ export default function PiggeryBatchStagesPanel() {
         <Dialog
           open={addModalOpen}
           onClose={() => setAddModalOpen(false)}
-          title="Add Custom Lifecycle Stage"
+          title={t("pbsAddCustomStageTitle")}
           maxWidth="sm"
           footer={
             <>
               <Button variant="outline" size="sm" onClick={() => setAddModalOpen(false)}>
-                Cancel
+                {t("pbsCancel")}
               </Button>
               <Button size="sm" onClick={handleAddCustomStage} className="nf-btn-primary">
-                Insert Stage
+                {t("pbsInsertStage")}
               </Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">Stage Code *</label>
+              <label className="font-semibold block mb-1">{t("pbsStageCodeRequiredLabel")}</label>
               <input
                 type="text"
                 value={newStageCode}
                 onChange={(e) => setNewStageCode(e.target.value)}
-                placeholder="e.g. ST-09"
+                placeholder={t("pbsStageCodePlaceholder")}
                 className="nf-input w-full font-mono font-bold"
               />
             </div>
 
             <div>
-              <label className="font-semibold block mb-1">Stage Name *</label>
+              <label className="font-semibold block mb-1">{t("pbsStageNameRequiredLabel")}</label>
               <input
                 type="text"
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
-                placeholder="e.g. Post-Weaning Conditioning"
+                placeholder={t("pbsStageNamePlaceholder")}
                 className="nf-input w-full"
               />
             </div>
 
             <div>
-              <label className="font-semibold block mb-1">Standard Duration (Days)</label>
+              <label className="font-semibold block mb-1">{t("pbsStandardDurationDaysLabel")}</label>
               <input
                 type="number"
                 value={newStageDays}

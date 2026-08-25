@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Search, Loader2, Inbox, Eye, CheckCircle2, ArrowRight } from "lucide-react";
 import { api } from "@/services/api-client";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 const PAGE_SIZE = 25;
 
@@ -32,13 +34,13 @@ function unwrap<T = any>(res: any): T {
 
 const emptyLine = () => ({ item_id: "", quantity: "", uom: "" });
 
-const STATUS_STYLE: Record<string, any> = {
-  DRAFT: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" },
-  POSTED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
-  CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" },
-};
-
 export default function StockTransferPanel() {
+  const { t } = useLanguage();
+  const STATUS_LABEL: Record<string, string> = {
+    DRAFT: t("stpStatusDraft"),
+    POSTED: t("stpStatusPosted"),
+    CANCELLED: t("stpStatusCancelled"),
+  };
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,7 +76,7 @@ export default function StockTransferPanel() {
       const res = await api.get(`/stock-transfer?${params.toString()}`);
       setRows(unwrap<Row[]>(res) || []);
     } catch (err: any) {
-      setError(err?.message || "Failed to load stock transfers.");
+      setError(err?.message || t("stpFailedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -117,14 +119,14 @@ export default function StockTransferPanel() {
     setSaving(true);
     setFormError("");
     try {
-      if (!header.from_warehouse_id) throw new Error("Source warehouse is required.");
-      if (!header.to_warehouse_id) throw new Error("Destination warehouse is required.");
-      if (header.from_warehouse_id === header.to_warehouse_id) throw new Error("Source and destination warehouse must be different.");
-      if (!header.posting_date) throw new Error("Posting date is required.");
+      if (!header.from_warehouse_id) throw new Error(t("stpSourceWarehouseRequired"));
+      if (!header.to_warehouse_id) throw new Error(t("stpDestinationWarehouseRequired"));
+      if (header.from_warehouse_id === header.to_warehouse_id) throw new Error(t("stpSourceDestMustDiffer"));
+      if (!header.posting_date) throw new Error(t("stpPostingDateRequired"));
       const cleanLines = lines
         .filter((l) => l.item_id && l.quantity && l.uom)
         .map((l) => ({ item_id: l.item_id, quantity: Number(l.quantity), uom: l.uom }));
-      if (cleanLines.length === 0) throw new Error("Add at least one line with item, quantity and UOM.");
+      if (cleanLines.length === 0) throw new Error(t("stpAddAtLeastOneLine"));
 
       await api.post("/stock-transfer", {
         company_id: companyId,
@@ -137,7 +139,7 @@ export default function StockTransferPanel() {
       setModalOpen(false);
       load();
     } catch (err: any) {
-      setFormError(err?.message || "Failed to save stock transfer.");
+      setFormError(err?.message || t("stpFailedToSave"));
     } finally {
       setSaving(false);
     }
@@ -148,7 +150,7 @@ export default function StockTransferPanel() {
       const res = await api.get(`/stock-transfer/${row.transfer_id}`);
       setViewing(unwrap<Row>(res));
     } catch (err: any) {
-      setError(err?.message || "Failed to load stock transfer details.");
+      setError(err?.message || t("stpFailedToLoadDetails"));
     }
   };
 
@@ -160,7 +162,7 @@ export default function StockTransferPanel() {
       setViewing(unwrap<Row>(res));
       load();
     } catch (err: any) {
-      setError(err?.message || "Failed to post stock transfer.");
+      setError(err?.message || t("stpFailedToPost"));
     } finally {
       setPosting(false);
     }
@@ -176,22 +178,22 @@ export default function StockTransferPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold" style={S.primary}>Stock Transfer</h2>
-          <p className="mt-0.5 text-xs" style={S.sub}>Move stock between warehouses. Cost carries forward from FIFO layers at the source.</p>
+          <h2 className="text-lg font-semibold" style={S.primary}>{t("stpTitle")}</h2>
+          <p className="mt-0.5 text-xs" style={S.sub}>{t("stpSubtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none nf-select" style={S.input}>
-            <option value="">All statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="POSTED">Posted</option>
-            <option value="CANCELLED">Cancelled</option>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="nf-input-sm px-2" style={S.input}>
+            <option value="">{t("stpAllStatuses")}</option>
+            <option value="DRAFT">{t("stpStatusDraft")}</option>
+            <option value="POSTED">{t("stpStatusPosted")}</option>
+            <option value="CANCELLED">{t("stpStatusCancelled")}</option>
           </select>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none" style={S.input} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("stpSearchPlaceholder")} className="nf-input-sm pl-8 pr-3" style={S.input} />
           </div>
-          <Button onClick={openCreate} >
-            <Plus className="h-3.5 w-3.5" /> New Transfer
+          <Button size="sm" onClick={openCreate} >
+            <Plus className="h-3.5 w-3.5" /> {t("stpNewTransfer")}
           </Button>
         </div>
       </div>
@@ -205,18 +207,18 @@ export default function StockTransferPanel() {
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
               <tr className="border-b border-(--row-border)">
-                <TableHead className="whitespace-nowrap">Transfer No.</TableHead>
-                <TableHead className="whitespace-nowrap">Posting Date</TableHead>
-                <TableHead className="whitespace-nowrap">Route</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="whitespace-nowrap">{t("stpColTransferNo")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("stpColPostingDate")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("stpColRoute")}</TableHead>
+                <TableHead className="text-right">{t("stpColStatus")}</TableHead>
+                <TableHead className="text-right">{t("stpColActions")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
+                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("stpLoading")}</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No stock transfers yet.</TableCell></tr>
+                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("stpNoTransfersYet")}</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
                   <TableRow key={row.transfer_id}>
@@ -226,10 +228,10 @@ export default function StockTransferPanel() {
                       <span className="inline-flex items-center gap-1.5">{warehouseLabel(row.from_warehouse_id)} <ArrowRight className="h-3 w-3" style={S.muted} /> {warehouseLabel(row.to_warehouse_id)}</span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[row.status] || STATUS_STYLE.DRAFT}>{row.status}</span>
+                      <StatusBadge status={row.status} label={STATUS_LABEL[row.status] || row.status} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                      <button onClick={() => openView(row)} title={t("stpView")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
                     </TableCell>
@@ -250,13 +252,13 @@ export default function StockTransferPanel() {
       <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title="New Stock Transfer"
+        title={t("stpNewStockTransfer")}
         maxWidth="xl"
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>{t("stpCancel")}</Button>
             <Button size="sm" onClick={handleSave} disabled={saving} className="nf-btn-primary">
-              {saving ? "Saving…" : "Save Draft"}
+              {saving ? t("stpSaving") : t("stpSaveDraft")}
             </Button>
           </>
         }
@@ -268,33 +270,33 @@ export default function StockTransferPanel() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>From Warehouse <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("stpFromWarehouse")} <span className="text-(--danger)">*</span></label>
               <select value={header.from_warehouse_id} onChange={(e) => setHeader((h) => ({ ...h, from_warehouse_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("stpSelectEllipsis")}</option>
                 {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code} — {w.warehouse_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>To Warehouse <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("stpToWarehouse")} <span className="text-(--danger)">*</span></label>
               <select value={header.to_warehouse_id} onChange={(e) => setHeader((h) => ({ ...h, to_warehouse_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("stpSelectEllipsis")}</option>
                 {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code} — {w.warehouse_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("stpPostingDate")} <span className="text-(--danger)">*</span></label>
               <input type="date" value={header.posting_date} onChange={(e) => setHeader((h) => ({ ...h, posting_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+              <label className="nf-text-label" style={S.sub}>{t("stpRemarks")}</label>
               <input value={header.remarks} onChange={(e) => setHeader((h) => ({ ...h, remarks: e.target.value }))} className={inputCls} style={S.input} />
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Lines</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("stpLines")}</p>
             <button onClick={addLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
+              <Plus className="h-3 w-3" /> {t("stpAddLine")}
             </button>
           </div>
 
@@ -302,9 +304,9 @@ export default function StockTransferPanel() {
             <table className="w-full border-collapse text-left text-xs">
               <TableHeader>
                 <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("stpColItem")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("stpColQty")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("stpColUom")}</TableHead>
                   <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
               </TableHeader>
@@ -313,7 +315,7 @@ export default function StockTransferPanel() {
                   <TableRow key={idx}>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select Item ({items.length} options)…</option>
+                        <option value="">{t("stpSelectItemOptions", { count: items.length })}</option>
                         {items.map((it, i) => (
                           <option key={it.item_id} value={it.item_id}>
                             {i + 1}. {it.item_code} — {it.item_name}
@@ -324,12 +326,12 @@ export default function StockTransferPanel() {
                     <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5 w-28">
                       <select value={line.uom} onChange={(e) => setLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
+                        <option value="">{t("stpSelectEllipsis")}</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeLine(idx)} type="button" className="rounded-[var(--radius-xs)] p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -343,14 +345,14 @@ export default function StockTransferPanel() {
       <Dialog
         open={!!viewing}
         onClose={() => setViewing(null)}
-        title={viewing ? `Stock Transfer ${viewing.transfer_no}` : ""}
+        title={viewing ? t("stpTransferTitle", { transferNo: viewing.transfer_no }) : ""}
         maxWidth="xl"
         footer={
           viewing?.status === "DRAFT" ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => setViewing(null)}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={() => setViewing(null)}>{t("stpCancel")}</Button>
               <Button size="sm" onClick={handlePost} disabled={posting} className="flex items-center gap-1.5 nf-btn-primary">
-                <CheckCircle2 className="h-4 w-4" /> {posting ? "Posting…" : "Post"}
+                <CheckCircle2 className="h-4 w-4" /> {posting ? t("stpPosting") : t("stpPost")}
               </Button>
             </>
           ) : undefined
@@ -359,19 +361,19 @@ export default function StockTransferPanel() {
         {viewing && (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Status</p><span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[viewing.status] || STATUS_STYLE.DRAFT}>{viewing.status}</span></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Posting Date</p><p style={S.primary}>{viewing.posting_date}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Route</p><p style={S.primary}>{warehouseLabel(viewing.from_warehouse_id)} → {warehouseLabel(viewing.to_warehouse_id)}</p></div>
-              {viewing.posted_at && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Posted At</p><p style={S.primary}>{viewing.posted_at}</p></div>}
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("stpStatus")}</p><StatusBadge status={viewing.status} label={STATUS_LABEL[viewing.status] || viewing.status} className="mt-1" /></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("stpPostingDate")}</p><p style={S.primary}>{viewing.posting_date}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("stpRoute")}</p><p style={S.primary}>{warehouseLabel(viewing.from_warehouse_id)} → {warehouseLabel(viewing.to_warehouse_id)}</p></div>
+              {viewing.posted_at && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("stpPostedAt")}</p><p style={S.primary}>{viewing.posted_at}</p></div>}
             </div>
 
             <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
               <table className="w-full border-collapse text-left text-xs">
                 <TableHeader>
                   <tr className="border-b border-(--row-border)">
-                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                    <TableHead className="h-auto px-3 py-2">UOM</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("stpColItem")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("stpColQty")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("stpColUom")}</TableHead>
                   </tr>
                 </TableHeader>
                 <TableBody>

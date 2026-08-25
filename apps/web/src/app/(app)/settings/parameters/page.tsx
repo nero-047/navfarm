@@ -5,7 +5,7 @@ import ParameterPanel from "@/components/console/production/parameter-panel";
 
 export default function ProductionParametersPage() {
   return (
-    <ProductionPageShell title="Parameters">
+    <ProductionPageShell titleKey="navParameters">
       {() => <ParameterPanel />}
     </ProductionPageShell>
   );

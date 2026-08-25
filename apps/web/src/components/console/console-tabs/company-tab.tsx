@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Field } from "@/components/ui/field";
@@ -622,7 +623,7 @@ export default function CompanyTab({
                     <TableRow key={comp.company_id}>
                       <TableCell className="p-4 text-center font-mono" style={{ color: "var(--text-secondary)" }}>{idx + 1}</TableCell>
                       <TableCell className="p-4">
-                        <span className="font-mono text-(--text-primary) bg-(--surface-raised) px-2 py-1 rounded border border-(--border) font-semibold">{comp.company_code}</span>
+                        <span className="font-mono text-(--text-primary) bg-(--surface-raised) px-2 py-1 rounded-[var(--radius-xs)] border border-(--border) font-semibold">{comp.company_code}</span>
                       </TableCell>
                       <TableCell className="p-4">
                         <div className="flex flex-col gap-0.5">
@@ -638,7 +639,7 @@ export default function CompanyTab({
                         </div>
                       </TableCell>
                       <TableCell className="p-4 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                        <span className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-semibold ${
                           comp.onboarding_status === 'COMPLETED' ? 'bg-(--success-muted) text-(--success) border border-(--success)' : 'bg-(--warning-muted) text-(--warning) border border-(--warning)'
                         }`}>
                           {comp.onboarding_status || 'PENDING'}
@@ -703,7 +704,7 @@ export default function CompanyTab({
                   />
                 </Field>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Classification</label>
+                  <label className="nf-text-label text-(--text-secondary)">Classification</label>
                   <Select
                     value={createForm.company_type}
                     onChange={(e) => setCreateForm({ ...createForm, company_type: e.target.value })}
@@ -758,7 +759,7 @@ export default function CompanyTab({
                   />
                 </Field>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Brand Hex Accent Color</label>
+                  <label className="nf-text-label text-(--text-secondary)">Brand Hex Accent Color</label>
                   <div className="flex gap-2 items-center">
                     <input
                       type="color"
@@ -833,7 +834,7 @@ export default function CompanyTab({
               <div>
                 <h3 className="text-sm font-semibold text-(--text-primary)">ERP setup configuration</h3>
                 {targetCompany && (
-                  <span className="text-[9px] text-(--text-secondary) font-mono font-semibold bg-(--surface-raised) px-1.5 py-0.5 rounded border border-(--border) mt-1 block w-fit">{targetCompany.company_id}</span>
+                  <span className="text-[9px] text-(--text-secondary) font-mono font-semibold bg-(--surface-raised) px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-(--border) mt-1 block w-fit">{targetCompany.company_id}</span>
                 )}
               </div>
 
@@ -979,65 +980,65 @@ export default function CompanyTab({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Company Code</span>
+                            <span className="nf-text-label text-(--text-secondary)">Company Code</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-1 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
                               {setupDetails?.company?.company_code || targetCompany?.company_code}
                             </span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Legal Entity Name</span>
+                            <span className="nf-text-label text-(--text-secondary)">Legal Entity Name</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_name || targetCompany?.company_name}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Display / Brand Name</span>
+                            <span className="nf-text-label text-(--text-secondary)">Display / Brand Name</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_display_name || targetCompany?.company_display_name || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Business Classification</span>
+                            <span className="nf-text-label text-(--text-secondary)">Business Classification</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_type || targetCompany?.company_type || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Primary Industry</span>
+                            <span className="nf-text-label text-(--text-secondary)">Primary Industry</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.industry_type || targetCompany?.industry_type || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Tax Registration ID (GSTIN / TIN)</span>
+                            <span className="nf-text-label text-(--text-secondary)">Tax Registration ID (GSTIN / TIN)</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-1 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
                               {setupDetails?.company?.tax_id || targetCompany?.tax_id || "—"}
                             </span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Tax Regime Scheme</span>
+                            <span className="nf-text-label text-(--text-secondary)">Tax Regime Scheme</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.tax_regime || "STANDARD"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Corporate Registration No (CIN)</span>
+                            <span className="nf-text-label text-(--text-secondary)">Corporate Registration No (CIN)</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-1.5 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
                               {setupDetails?.company?.registration_no || targetCompany?.registration_no || "—"}
                             </span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Incorporation Date</span>
+                            <span className="nf-text-label text-(--text-secondary)">Incorporation Date</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.incorporation_date || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Official Website</span>
+                            <span className="nf-text-label text-(--text-secondary)">Official Website</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.website || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Auto-Verify Email Domain</span>
+                            <span className="nf-text-label text-(--text-secondary)">Auto-Verify Email Domain</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.email_domain || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Support Email</span>
+                            <span className="nf-text-label text-(--text-secondary)">Support Email</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.support_email || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Primary Phone / Landline</span>
+                            <span className="nf-text-label text-(--text-secondary)">Primary Phone / Landline</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.phone_primary || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Primary Accent Color</span>
+                            <span className="nf-text-label text-(--text-secondary)">Primary Accent Color</span>
                             <div className="flex items-center gap-2 mt-2">
                               <div className="w-5 h-5 rounded-lg border border-(--border)" style={{ backgroundColor: setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79" }} />
                               <span className="text-xs font-mono text-(--text-secondary) uppercase">{setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79"}</span>
@@ -1101,7 +1102,7 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Classification</label>
+                            <label className="nf-text-label text-(--text-secondary)">Classification</label>
                             <Select
                               value={profileForm.company_type}
                               onChange={(e) => setProfileForm({ ...profileForm, company_type: e.target.value })}
@@ -1130,7 +1131,7 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Tax Regime</label>
+                            <label className="nf-text-label text-(--text-secondary)">Tax Regime</label>
                             <Select
                               value={profileForm.tax_regime}
                               onChange={(e) => setProfileForm({ ...profileForm, tax_regime: e.target.value })}
@@ -1189,7 +1190,7 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Brand Hex Accent Color</label>
+                            <label className="nf-text-label text-(--text-secondary)">Brand Hex Accent Color</label>
                             <div className="flex gap-2 items-center">
                               <input
                                 type="color"
@@ -1218,39 +1219,39 @@ export default function CompanyTab({
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Address Label / Tag</span>
+                          <span className="nf-text-label text-(--text-secondary)">Address Label / Tag</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.address_label || "Primary HQ"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Address Type</span>
+                          <span className="nf-text-label text-(--text-secondary)">Address Type</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.address_type || "HQ"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Address Line 1</span>
+                          <span className="nf-text-label text-(--text-secondary)">Address Line 1</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.line1 || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Address Line 2</span>
+                          <span className="nf-text-label text-(--text-secondary)">Address Line 2</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.line2 || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">City</span>
+                          <span className="nf-text-label text-(--text-secondary)">City</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.city || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">State / Province</span>
+                          <span className="nf-text-label text-(--text-secondary)">State / Province</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.state_id || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Country Code</span>
+                          <span className="nf-text-label text-(--text-secondary)">Country Code</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.address?.country_id || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Pincode / Postal Code</span>
+                          <span className="nf-text-label text-(--text-secondary)">Pincode / Postal Code</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.address?.pincode || "—"}</span>
                         </div>
                         <div className="flex flex-col sm:col-span-2">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">GPS Coordinates</span>
+                          <span className="nf-text-label text-(--text-secondary)">GPS Coordinates</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">
                             {setupDetails?.address?.gps_latitude && setupDetails?.address?.gps_longitude
                               ? `${setupDetails.address.gps_latitude}, ${setupDetails.address.gps_longitude}`
@@ -1270,7 +1271,7 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Address Type</label>
+                            <label className="nf-text-label text-(--text-secondary)">Address Type</label>
                             <Select
                               value={addressForm.address_type}
                               onChange={(e) => setAddressForm({ ...addressForm, address_type: e.target.value })}
@@ -1359,33 +1360,33 @@ export default function CompanyTab({
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Contact Person Name</span>
+                          <span className="nf-text-label text-(--text-secondary)">Contact Person Name</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.contact?.full_name || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Designation</span>
+                          <span className="nf-text-label text-(--text-secondary)">Designation</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.contact?.designation || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Primary Phone</span>
+                          <span className="nf-text-label text-(--text-secondary)">Primary Phone</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.phone_primary || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Secondary Phone</span>
+                          <span className="nf-text-label text-(--text-secondary)">Secondary Phone</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.phone_secondary || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Primary Email</span>
+                          <span className="nf-text-label text-(--text-secondary)">Primary Email</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.email || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Alerts & System Emails</span>
+                          <span className="nf-text-label text-(--text-secondary)">Alerts & System Emails</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {setupDetails?.contact?.receives_alerts ? "Active - Receives ERP threshold notifications" : "Disabled"}
                           </span>
                         </div>
                         <div className="flex flex-col sm:col-span-2">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Executive Reports Emails</span>
+                          <span className="nf-text-label text-(--text-secondary)">Executive Reports Emails</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {setupDetails?.contact?.receives_reports ? "Active - Receives periodic executive summary reports" : "Disabled"}
                           </span>
@@ -1440,7 +1441,7 @@ export default function CompanyTab({
                                 type="checkbox"
                                 checked={contactForm.receives_alerts}
                                 onChange={(e) => setContactForm({ ...contactForm, receives_alerts: e.target.checked })}
-                                className="w-4 h-4 rounded border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
+                                className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
                               />
                               <span className="text-(--text-secondary) font-medium">Receive system threshold alerts</span>
                             </label>
@@ -1449,7 +1450,7 @@ export default function CompanyTab({
                                 type="checkbox"
                                 checked={contactForm.receives_reports}
                                 onChange={(e) => setContactForm({ ...contactForm, receives_reports: e.target.checked })}
-                                className="w-4 h-4 rounded border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
+                                className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
                               />
                               <span className="text-(--text-secondary) font-medium">Receive periodic executive reports</span>
                             </label>
@@ -1468,23 +1469,23 @@ export default function CompanyTab({
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Default Language</span>
+                          <span className="nf-text-label text-(--text-secondary)">Default Language</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {languages.find(l => l.lang_id === setupDetails?.company?.default_language_id)?.lang_name || setupDetails?.company?.default_language_id || "—"}
                           </span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Base Currency</span>
+                          <span className="nf-text-label text-(--text-secondary)">Base Currency</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {currencies.find(c => c.currency_id === setupDetails?.company?.base_currency_id)?.currency_name || setupDetails?.company?.base_currency_id || "—"}
                           </span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Default Timezone</span>
+                          <span className="nf-text-label text-(--text-secondary)">Default Timezone</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.default_timezone_id || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Country Locale Code</span>
+                          <span className="nf-text-label text-(--text-secondary)">Country Locale Code</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.country_id || "—"}</span>
                         </div>
                       </div>
@@ -1492,7 +1493,7 @@ export default function CompanyTab({
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Default Language</label>
+                            <label className="nf-text-label text-(--text-secondary)">Default Language</label>
                             <Select
                               value={localizationForm.default_language_id}
                               onChange={(e) => setLocalizationForm({ ...localizationForm, default_language_id: e.target.value })}
@@ -1504,7 +1505,7 @@ export default function CompanyTab({
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Base Currency</label>
+                            <label className="nf-text-label text-(--text-secondary)">Base Currency</label>
                             <Select
                               value={localizationForm.base_currency_id}
                               onChange={(e) => setLocalizationForm({ ...localizationForm, base_currency_id: e.target.value })}
@@ -1544,47 +1545,47 @@ export default function CompanyTab({
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Fiscal Year Format</span>
+                          <span className="nf-text-label text-(--text-secondary)">Fiscal Year Format</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.fiscal_year_format || "FY APR-MAR"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Fiscal Start Month & Day</span>
+                          <span className="nf-text-label text-(--text-secondary)">Fiscal Start Month & Day</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {setupDetails?.fiscal?.fiscal_start_month ? `Month ${setupDetails.fiscal.fiscal_start_month}` : "Month 4 (April)"} (Day {setupDetails?.fiscal?.fiscal_start_day || 1} to Day {setupDetails?.fiscal?.fiscal_end_day || 31})
                           </span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Current Fiscal Year</span>
+                          <span className="nf-text-label text-(--text-secondary)">Current Fiscal Year</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.current_fiscal_year || "2026-27"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Period Type</span>
+                          <span className="nf-text-label text-(--text-secondary)">Period Type</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.period_type || "MONTHLY"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Accounting Standard</span>
+                          <span className="nf-text-label text-(--text-secondary)">Accounting Standard</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.accounting_standard || "Local GAAP"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Asset Depreciation Model</span>
+                          <span className="nf-text-label text-(--text-secondary)">Asset Depreciation Model</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.depreciation_method || "SLM (Straight Line)"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Inventory Costing Model</span>
+                          <span className="nf-text-label text-(--text-secondary)">Inventory Costing Model</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.inventory_valuation || "FIFO"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">GST / Tax Filing Frequency</span>
+                          <span className="nf-text-label text-(--text-secondary)">GST / Tax Filing Frequency</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.gst_filing_frequency || "MONTHLY"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Statutory Tax Audit</span>
+                          <span className="nf-text-label text-(--text-secondary)">Statutory Tax Audit</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {setupDetails?.fiscal?.tax_audit_applicable ? "Mandatory Tax Audit Applicable" : "Not Applicable"}
                           </span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Decimal Precision</span>
+                          <span className="nf-text-label text-(--text-secondary)">Decimal Precision</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.decimal_places ?? 2} Decimal Places</span>
                         </div>
                       </div>
@@ -1592,7 +1593,7 @@ export default function CompanyTab({
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Fiscal Start Month</label>
+                            <label className="nf-text-label text-(--text-secondary)">Fiscal Start Month</label>
                             <Select
                               value={fiscalForm.fiscal_start_month}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, fiscal_start_month: parseInt(e.target.value) })}
@@ -1611,7 +1612,7 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Accounting Periodicity</label>
+                            <label className="nf-text-label text-(--text-secondary)">Accounting Periodicity</label>
                             <Select
                               value={fiscalForm.period_type}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, period_type: e.target.value })}
@@ -1621,7 +1622,7 @@ export default function CompanyTab({
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Accounting Standard</label>
+                            <label className="nf-text-label text-(--text-secondary)">Accounting Standard</label>
                             <Select
                               value={fiscalForm.accounting_standard}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, accounting_standard: e.target.value })}
@@ -1632,7 +1633,7 @@ export default function CompanyTab({
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Asset Depreciation Model</label>
+                            <label className="nf-text-label text-(--text-secondary)">Asset Depreciation Model</label>
                             <Select
                               value={fiscalForm.depreciation_method}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, depreciation_method: e.target.value })}
@@ -1643,7 +1644,7 @@ export default function CompanyTab({
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Inventory Costing Method</label>
+                            <label className="nf-text-label text-(--text-secondary)">Inventory Costing Method</label>
                             <Select
                               value={fiscalForm.inventory_valuation}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, inventory_valuation: e.target.value })}
@@ -1654,7 +1655,7 @@ export default function CompanyTab({
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">GST / Tax Filing Frequency</label>
+                            <label className="nf-text-label text-(--text-secondary)">GST / Tax Filing Frequency</label>
                             <Select
                               value={fiscalForm.gst_filing_frequency}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, gst_filing_frequency: e.target.value })}
@@ -1664,7 +1665,7 @@ export default function CompanyTab({
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Decimal Precision</label>
+                            <label className="nf-text-label text-(--text-secondary)">Decimal Precision</label>
                             <Select
                               value={fiscalForm.decimal_places}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, decimal_places: parseInt(e.target.value) })}
@@ -1680,7 +1681,7 @@ export default function CompanyTab({
                                 type="checkbox"
                                 checked={fiscalForm.tax_audit_applicable}
                                 onChange={(e) => setFiscalForm({ ...fiscalForm, tax_audit_applicable: e.target.checked })}
-                                className="w-4 h-4 rounded border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
+                                className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
                               />
                               <span className="text-(--text-secondary) font-medium">Mandatory Statutory Tax Audit Applicable</span>
                             </label>
@@ -1698,7 +1699,7 @@ export default function CompanyTab({
                   {settingsTab === "modules" && (
                     !isEditing ? (
                       <div className="flex flex-col gap-4">
-                        <span className="text-[10px] text-(--text-secondary) font-semibold uppercase tracking-wider">Activated Sectors & LOB Verticals</span>
+                        <span className="nf-text-label text-(--text-secondary)">Activated Sectors & LOB Verticals</span>
                         {modulesForm.length === 0 ? (
                           <div className="text-xs text-(--text-secondary) bg-(--surface-raised) p-4 rounded-[var(--radius-sm)] border border-(--border)">No business modules enabled. Click Edit above to select sectors.</div>
                         ) : (
@@ -1714,7 +1715,7 @@ export default function CompanyTab({
                                 <div key={n.nob_id} className="p-4 rounded-[var(--radius-sm)] bg-(--surface-raised) border border-(--border) flex flex-col gap-2">
                                   <div className="flex items-center gap-2 border-b border-(--border) pb-2">
                                     <span className="font-semibold text-xs text-(--text-primary)">{n.nob_name}</span>
-                                    <span className="text-[9px] bg-(--accent)/10 text-(--accent) font-semibold border border-(--accent)/20 px-1.5 py-0.5 rounded font-mono uppercase shrink-0">Active</span>
+                                    <span className="text-[9px] bg-(--accent)/10 text-(--accent) font-semibold border border-(--accent)/20 px-1.5 py-0.5 rounded-[var(--radius-xs)] font-mono uppercase shrink-0">Active</span>
                                   </div>
                                   <div className="flex flex-col gap-1 mt-1">
                                     <span className="text-[9px] font-semibold text-(--accent) uppercase tracking-wider">Active Operations (LOBs):</span>
@@ -1723,7 +1724,7 @@ export default function CompanyTab({
                                     ) : (
                                       <div className="flex flex-wrap gap-1.5 mt-1">
                                         {activeLobs.map(lob => (
-                                          <span key={lob.lob_id} className="text-[10px] text-(--text-secondary) bg-(--surface-raised) px-2 py-0.5 rounded border border-(--border)">{lob.lob_name}</span>
+                                          <span key={lob.lob_id} className="text-[10px] text-(--text-secondary) bg-(--surface-raised) px-2 py-0.5 rounded-[var(--radius-xs)] border border-(--border)">{lob.lob_name}</span>
                                         ))}
                                       </div>
                                     )}
@@ -1782,7 +1783,7 @@ export default function CompanyTab({
                                                 type="checkbox"
                                                 checked={isLobChecked}
                                                 onChange={() => handleLobToggle(lob.lob_code)}
-                                                className="w-4 h-4 rounded border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent) focus:ring-offset-0 focus:ring-0 cursor-pointer"
+                                                className="w-4 h-4 rounded-[var(--radius-xs)] border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent) focus:ring-offset-0 focus:ring-0 cursor-pointer"
                                               />
                                               <div className="flex flex-col">
                                                 <span className="font-semibold text-(--text-primary)">{lob.lob_name}</span>
@@ -1819,7 +1820,7 @@ export default function CompanyTab({
               <div className="text-xs text-(--text-secondary) flex flex-col gap-4">
                 <div className="flex justify-between items-center py-2 border-b border-(--border)">
                   <span className="text-(--text-secondary) font-medium">Base Currency</span>
-                  <span className="text-(--text-primary) font-semibold font-mono bg-(--surface-raised) px-2 py-0.5 rounded border border-(--border)">
+                  <span className="text-(--text-primary) font-semibold font-mono bg-(--surface-raised) px-2 py-0.5 rounded-[var(--radius-xs)] border border-(--border)">
                     {currencies.find(c => c.currency_id === targetCompany?.base_currency_id)?.currency_name || "INR"}
                   </span>
                 </div>
@@ -1829,13 +1830,13 @@ export default function CompanyTab({
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-(--border)">
                   <span className="text-(--text-secondary) font-medium">Operating Country</span>
-                  <span className="text-(--text-primary) font-semibold font-mono bg-(--surface-raised) px-2 py-0.5 rounded border border-(--border)">
+                  <span className="text-(--text-primary) font-semibold font-mono bg-(--surface-raised) px-2 py-0.5 rounded-[var(--radius-xs)] border border-(--border)">
                     {targetCompany?.country_id || "IND"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-(--text-secondary) font-medium">Onboarding Status</span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                  <span className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-semibold ${
                     targetCompany?.onboarding_status === 'COMPLETED' ? 'bg-(--success-muted) text-(--success) border border-(--success)' : 'bg-(--warning-muted) text-(--warning) border border-(--warning)'
                   }`}>
                     {targetCompany?.onboarding_status || 'PENDING'}
@@ -1884,9 +1885,7 @@ export default function CompanyTab({
                         <ActiveStatusBadge isActive={u.is_active !== false} />
                         {u.roles && u.roles.length > 0 ? (
                           u.roles.map((r: any) => (
-                            <span key={r.role_id} className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ borderColor: "var(--accent)", color: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
-                              {r.role_name}
-                            </span>
+                            <Badge key={r.role_id} variant="accent">{r.role_name}</Badge>
                           ))
                         ) : (
                           <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>No role assigned</span>

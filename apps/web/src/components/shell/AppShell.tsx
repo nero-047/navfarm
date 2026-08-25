@@ -83,6 +83,20 @@ function isHrefActive(
     return false;
   }
 
+  // A parent path also "contains" its siblings' paths: on
+  // /production/batches/daily-entry both Batch List (/production/batches) and
+  // Data Entry matched, so two items highlighted at once. Only the most
+  // specific nav entry wins — if some other entry is a longer match for where
+  // we actually are, this broader one is not the active item.
+  if (!isPathExact) {
+    const hasDeeperMatch = allNavHrefs.some((otherHref) => {
+      const otherPath = otherHref.split("?")[0];
+      if (otherPath === targetPath || otherPath.length <= targetPath.length) return false;
+      return currentPath === otherPath || currentPath.startsWith(otherPath + "/");
+    });
+    if (hasDeeperMatch) return false;
+  }
+
   // If target has query parameters (e.g. ?tab=schedulers)
   if (targetQuery) {
     const targetParams = new URLSearchParams(targetQuery);

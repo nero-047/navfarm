@@ -51,7 +51,7 @@ export default function AdminAuditPage() {
     else if (act.includes("UPDATE") || act.includes("EDIT") || act.includes("ASSIGN")) { bg = "#FFFBEB"; color = "#B45309"; border = "#FDE68A"; }
     else if (act.includes("DELETE") || act.includes("REMOVE") || act.includes("REVOKE")) { bg = "#FEF2F2"; color = "#B91C1C"; border = "#FECACA"; }
     return (
-      <span className="text-[11px] font-semibold uppercase font-mono px-2 py-0.5 rounded border"
+      <span className="text-[11px] font-semibold uppercase font-mono px-2 py-0.5 rounded-[var(--radius-xs)] border"
         style={{ backgroundColor: bg, color, borderColor: border }}>{action}</span>
     );
   };

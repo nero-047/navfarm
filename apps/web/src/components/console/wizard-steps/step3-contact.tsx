@@ -103,7 +103,7 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
             id="receives_reports"
             checked={formData.receives_reports}
             onChange={(e) => setFormData({ ...formData, receives_reports: e.target.checked })}
-            className="w-4 h-4 rounded border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent)"
+            className="w-4 h-4 rounded-[var(--radius-xs)] border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent)"
           />
           <label htmlFor="receives_reports" className="text-xs text-(--text-secondary) font-medium cursor-pointer">
             Receive periodic executive report emails (weekly P&L, batch metrics)

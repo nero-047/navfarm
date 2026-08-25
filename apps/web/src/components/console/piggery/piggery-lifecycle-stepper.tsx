@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Check, Clock } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface PiggeryStage {
   id: number;
@@ -34,6 +35,7 @@ export default function PiggeryLifecycleStepper({
   currentStageId?: number;
   onSelectStage?: (stage: PiggeryStage) => void;
 }) {
+  const { t } = useLanguage();
   const currentIdx = stages.findIndex((s) => s.id === currentStageId);
   const activeIndex = currentIdx >= 0 ? currentIdx : 0;
   const progressPercent = stages.length > 1 ? (activeIndex / (stages.length - 1)) * 100 : 0;
@@ -104,14 +106,14 @@ export default function PiggeryLifecycleStepper({
                   <div className="h-5 mt-1.5 flex items-center justify-center">
                     {isCurrent ? (
                       <span className="px-2 py-0.5 rounded-full bg-[var(--accent)] text-white text-[9px] font-bold uppercase tracking-wider shadow-2xs animate-pulse">
-                        Current
+                        {t("plsCurrent")}
                       </span>
                     ) : isCompleted ? (
                       <span className="px-1.5 py-0.5 rounded-full bg-[var(--success-muted)] text-[var(--success)] border border-[var(--success)]/20 text-[9px] font-semibold">
-                        Done
+                        {t("plsDone")}
                       </span>
                     ) : (
-                      <span className="text-[9px] text-[var(--text-muted)]">Upcoming</span>
+                      <span className="text-[9px] text-[var(--text-muted)]">{t("plsUpcoming")}</span>
                     )}
                   </div>
                 </div>

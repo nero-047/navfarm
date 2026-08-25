@@ -6,6 +6,7 @@ import { getStoredUser, hasPermission, NavUser } from "@/hooks/useAuth";
 import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { useLanguage } from "@/hooks/useLanguage";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConsolePage } from "@/components/ui/console-page";
 import { ShieldAlert } from "lucide-react";
 
 const FINANCE_SECTIONS = [
@@ -64,7 +65,7 @@ export function FinancePageShell({ activeKey, children }: { activeKey: FinanceTa
 
   if (!mayView) {
     return (
-      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
+      <ConsolePage size="narrow">
         <PageHeader title={t("finModuleTitle")} sticky={false} />
         <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border p-5" style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}>
           <ShieldAlert className="h-5 w-5 shrink-0" />
@@ -73,7 +74,7 @@ export function FinancePageShell({ activeKey, children }: { activeKey: FinanceTa
             <p className="mt-1 text-xs" style={{ color: "var(--text-secondary)" }}>{t("accessDeniedContactAdmin")}</p>
           </div>
         </div>
-      </div>
+      </ConsolePage>
     );
   }
 
@@ -85,9 +86,9 @@ export function FinancePageShell({ activeKey, children }: { activeKey: FinanceTa
     t("finBioAssetReconciliationTitle");
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-7 space-y-5">
+    <ConsolePage>
       <PageHeader title={title} description={t("finPageDescription")} />
       {children}
-    </div>
+    </ConsolePage>
   );
 }

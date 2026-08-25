@@ -5,7 +5,7 @@ import PacksPanel from "@/components/console/production/packs-panel";
 
 export default function ProductionPacksPage() {
   return (
-    <ProductionPageShell title="Packs & Traceability">
+    <ProductionPageShell titleKey="navPacks">
       {() => <PacksPanel />}
     </ProductionPageShell>
   );

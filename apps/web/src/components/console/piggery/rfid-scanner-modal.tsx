@@ -10,6 +10,7 @@ import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Row = Record<string, any>;
 
@@ -42,6 +43,7 @@ export default function RfidScannerModal({
   onAnimalUpdated,
   medItems,
 }: RfidScannerModalProps) {
+  const { t } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [tagInput, setTagInput]     = useState("");
@@ -88,7 +90,7 @@ export default function RfidScannerModal({
       setNewStatus(matched.status || "ACTIVE");
     } catch (err: any) {
       setAnimal(null);
-      setError(err?.message || `No animal found for tag '${tag}'.`);
+      setError(err?.message || t("rfmNoAnimalFoundForTag", { tag }));
     } finally {
       setLoading(false);
     }
@@ -106,7 +108,7 @@ export default function RfidScannerModal({
         uom: doseUom || undefined,
         notes: doseNotes || "Quick dose via RFID Scanner",
       });
-      setActionSuccess(`Dose logged successfully for ${animal.animal_code}.`);
+      setActionSuccess(t("rfmDoseLoggedSuccess", { code: animal.animal_code }));
       setActionTab("none");
       setDoseItemId("");
       setDoseQty("");
@@ -115,7 +117,7 @@ export default function RfidScannerModal({
       // Re-query animal to refresh withdrawal warnings
       handleSearch();
     } catch (err: any) {
-      setError(err?.message || "Failed to log medication dose.");
+      setError(err?.message || t("rfmFailedToLogDose"));
     } finally {
       setSavingAction(false);
     }
@@ -129,12 +131,12 @@ export default function RfidScannerModal({
       await api.put(`/animal/${animal.animal_id}`, {
         status: newStatus,
       });
-      setActionSuccess(`Status updated to ${newStatus} for ${animal.animal_code}.`);
+      setActionSuccess(t("rfmStatusUpdatedSuccess", { status: newStatus, code: animal.animal_code }));
       setActionTab("none");
       if (onAnimalUpdated) onAnimalUpdated();
       handleSearch();
     } catch (err: any) {
-      setError(err?.message || "Failed to update animal status.");
+      setError(err?.message || t("rfmFailedToUpdateStatus"));
     } finally {
       setSavingAction(false);
     }
@@ -155,13 +157,13 @@ export default function RfidScannerModal({
     <Dialog
       open={open}
       onClose={onClose}
-      title="RFID & Ear-Tag Fast Scanner"
-      description="Scan with an RFID wand or barcode reader (auto-Enter) to instantly inspect and update animals."
+      title={t("rfmScannerTitle")}
+      description={t("rfmScannerDescription")}
       maxWidth="lg"
       footer={
         <div className="flex w-full items-center justify-start">
           <Button variant="outline" size="sm" onClick={handleNextScan}>
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Next Scan (Clear)
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> {t("rfmNextScanClear")}
           </Button>
         </div>
       }
@@ -175,7 +177,7 @@ export default function RfidScannerModal({
               ref={inputRef}
               type="text"
               className="nf-input pl-10 text-base font-mono tracking-wider font-semibold"
-              placeholder="Scan RFID wand or enter Visual Ear Tag / Code…"
+              placeholder={t("rfmScanPlaceholder")}
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               disabled={loading}
@@ -209,12 +211,12 @@ export default function RfidScannerModal({
                     </span>
                   </div>
                   <p className="mt-1 text-xs" style={S.sub}>
-                    {animal.animal_type} · {animal.gender === "F" ? "Female" : "Male"} · {animal.breed_name || "Unknown Breed"}
+                    {animal.animal_type} · {animal.gender === "F" ? t("rfmFemale") : t("rfmMale")} · {animal.breed_name || t("rfmUnknownBreed")}
                   </p>
                 </div>
 
                 <div className="text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>Net Book Value (NBV)</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("rfmNetBookValue")}</p>
                   <p className="text-lg font-bold font-mono" style={S.primary}>
                     ₹{animal.book_value ? Number(animal.book_value).toLocaleString("en-IN") : animal.acquisition_cost ? Number(animal.acquisition_cost).toLocaleString("en-IN") : "0"}
                   </p>
@@ -224,20 +226,20 @@ export default function RfidScannerModal({
               {/* Tag & Stage Details */}
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 pt-3 border-t">
                 <div>
-                  <span className="block text-[10px] uppercase font-semibold" style={S.muted}>RFID Tag</span>
+                  <span className="block text-[10px] uppercase font-semibold" style={S.muted}>{t("rfmRfidTag")}</span>
                   <span className="font-mono font-medium" style={S.primary}>{animal.rfid_tag || "—"}</span>
                 </div>
                 <div>
-                  <span className="block text-[10px] uppercase font-semibold" style={S.muted}>Ear Tag</span>
+                  <span className="block text-[10px] uppercase font-semibold" style={S.muted}>{t("rfmEarTag")}</span>
                   <span className="font-mono font-medium" style={S.primary}>{animal.ear_tag || "—"}</span>
                 </div>
                 <div>
-                  <span className="block text-[10px] uppercase font-semibold" style={S.muted}>Current Stage</span>
-                  <span className="font-medium" style={S.primary}>{animal.stage_name || "Quarantine"}</span>
+                  <span className="block text-[10px] uppercase font-semibold" style={S.muted}>{t("rfmCurrentStage")}</span>
+                  <span className="font-medium" style={S.primary}>{animal.stage_name || t("rfmQuarantine")}</span>
                 </div>
                 <div>
-                  <span className="block text-[10px] uppercase font-semibold" style={S.muted}>Parity Count</span>
-                  <span className="font-medium" style={S.primary}>{animal.parity_count || 0} litters</span>
+                  <span className="block text-[10px] uppercase font-semibold" style={S.muted}>{t("rfmParityCount")}</span>
+                  <span className="font-medium" style={S.primary}>{t("rfmLitters", { count: String(animal.parity_count || 0) })}</span>
                 </div>
               </div>
             </div>
@@ -248,11 +250,11 @@ export default function RfidScannerModal({
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="h-5 w-5 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider">Active Medication Withdrawal Warning</p>
+                    <p className="text-xs font-bold uppercase tracking-wider">{t("rfmActiveWithdrawalWarning")}</p>
                     <ul className="mt-1 space-y-0.5 text-xs">
                       {animal.activeWithdrawals.map((w: Row, i: number) => (
                         <li key={i}>
-                          • <span className="font-semibold">{w.item_name}</span>: {w.daysRemaining} day(s) remaining (last given {w.lastDose})
+                          • <span className="font-semibold">{w.item_name}</span>: {t("rfmDaysRemainingLastGiven", { days: String(w.daysRemaining), lastDose: w.lastDose })}
                         </li>
                       ))}
                     </ul>
@@ -264,7 +266,7 @@ export default function RfidScannerModal({
             {/* 1-Click Quick Actions Toolbar */}
             <div className="rounded-[var(--radius-lg)] border p-4" style={S.surface}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={S.muted}>
-                Quick Actions
+                {t("rfmQuickActions")}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -272,45 +274,45 @@ export default function RfidScannerModal({
                   variant={actionTab === "dose" ? "default" : "outline"}
                   onClick={() => setActionTab(actionTab === "dose" ? "none" : "dose")}
                 >
-                  <Pill className="mr-1.5 h-3.5 w-3.5" /> Log Dose
+                  <Pill className="mr-1.5 h-3.5 w-3.5" /> {t("rfmLogDose")}
                 </Button>
                 <Button
                   size="sm"
                   variant={actionTab === "status" ? "default" : "outline"}
                   onClick={() => setActionTab(actionTab === "status" ? "none" : "status")}
                 >
-                  <HeartPulse className="mr-1.5 h-3.5 w-3.5" /> Change Health Status
+                  <HeartPulse className="mr-1.5 h-3.5 w-3.5" /> {t("rfmChangeHealthStatus")}
                 </Button>
               </div>
 
               {/* ── Quick Dose Form ── */}
               {actionTab === "dose" && (
                 <div className="mt-4 rounded-[var(--radius-md)] border p-4 space-y-3" style={S.raised}>
-                  <h4 className="text-xs font-semibold" style={S.primary}>Record Medication / Vaccine Dose</h4>
+                  <h4 className="text-xs font-semibold" style={S.primary}>{t("rfmRecordDoseTitle")}</h4>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="sm:col-span-2">
-                      <label className="nf-label text-xs">Medicine / Vaccine</label>
+                      <label className="nf-label text-xs">{t("rfmMedicineVaccine")}</label>
                       <select
                         className="nf-input text-xs"
                         value={doseItemId}
                         onChange={(e) => setDoseItemId(e.target.value)}
                       >
-                        <option value="">Select medicine…</option>
+                        <option value="">{t("rfmSelectMedicine")}</option>
                         {medItems.map((m) => (
                           <option key={m.item_id} value={m.item_id}>
-                            {m.item_name} ({m.item_type}) {m.withdrawal_days ? `— ${m.withdrawal_days}d withdrawal` : ""}
+                            {m.item_name} ({m.item_type}) {m.withdrawal_days ? t("rfmWithdrawalDaysSuffix", { days: String(m.withdrawal_days) }) : ""}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="nf-label text-xs">Dose Qty</label>
+                      <label className="nf-label text-xs">{t("rfmDoseQty")}</label>
                       <div className="flex gap-1">
                         <input
                           type="number"
                           step="0.01"
                           className="nf-input text-xs"
-                          placeholder="e.g. 5"
+                          placeholder={t("rfmDoseQtyPlaceholder")}
                           value={doseQty}
                           onChange={(e) => setDoseQty(e.target.value)}
                         />
@@ -328,10 +330,10 @@ export default function RfidScannerModal({
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="ghost" size="sm" onClick={() => setActionTab("none")}>Cancel</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setActionTab("none")}>{t("rfmCancel")}</Button>
                     <Button size="sm" onClick={handleQuickDose} disabled={savingAction || !doseItemId}>
                       {savingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
-                      Save Dose
+                      {t("rfmSaveDose")}
                     </Button>
                   </div>
                 </div>
@@ -340,7 +342,7 @@ export default function RfidScannerModal({
               {/* ── Quick Health Status Form ── */}
               {actionTab === "status" && (
                 <div className="mt-4 rounded-[var(--radius-md)] border p-4 space-y-3" style={S.raised}>
-                  <h4 className="text-xs font-semibold" style={S.primary}>Update Health / Reproductive Status</h4>
+                  <h4 className="text-xs font-semibold" style={S.primary}>{t("rfmUpdateHealthStatusTitle")}</h4>
                   <div className="flex flex-wrap gap-2">
                     {["ACTIVE", "SICK", "QUARANTINE", "PREGNANT", "LACTATING", "DRY"].map((st) => (
                       <button
@@ -355,10 +357,10 @@ export default function RfidScannerModal({
                     ))}
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="ghost" size="sm" onClick={() => setActionTab("none")}>Cancel</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setActionTab("none")}>{t("rfmCancel")}</Button>
                     <Button size="sm" onClick={handleQuickStatus} disabled={savingAction}>
                       {savingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
-                      Save Status
+                      {t("rfmSaveStatus")}
                     </Button>
                   </div>
                 </div>

@@ -7,6 +7,7 @@ import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const PAGE_SIZE = 25;
 
@@ -33,6 +34,7 @@ const ENTRY_STYLE: Record<string, any> = {
 };
 
 export default function InventoryLedgerPanel() {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [items, setItems] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,7 +63,7 @@ export default function InventoryLedgerPanel() {
       const res = await api.get(`/inventory-ledger?${params.toString()}`);
       setRows(unwrap<Row[]>(res) || []);
     } catch (err: any) {
-      setError(err?.message || "Failed to load inventory ledger entries.");
+      setError(err?.message || t("ilpFailedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -86,13 +88,13 @@ export default function InventoryLedgerPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold" style={S.primary}>Inventory Ledger</h2>
-        <p className="mt-0.5 text-xs" style={S.sub}>Read-only movement history. Entries are written automatically when documents (Goods Receipt, etc.) are posted.</p>
+        <h2 className="text-lg font-semibold" style={S.primary}>{t("ilpTitle")}</h2>
+        <p className="mt-0.5 text-xs" style={S.sub}>{t("ilpSubtitle")}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <select value={itemId} onChange={(e) => setItemId(e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-          <option value="">All items ({items.length} options)</option>
+          <option value="">{t("ilpAllItemsOptions", { count: items.length })}</option>
           {items.map((it, idx) => (
             <option key={it.item_id} value={it.item_id}>
               {idx + 1}. {it.item_code} — {it.item_name}
@@ -100,17 +102,17 @@ export default function InventoryLedgerPanel() {
           ))}
         </select>
         <select value={transactionType} onChange={(e) => setTransactionType(e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-          <option value="">All transaction types</option>
-          {["PURCHASE", "CONSUMPTION", "OUTPUT", "TRANSFER_SHIPMENT", "TRANSFER_RECEIPT", "SALES", "VARIANCE_POSITIVE", "VARIANCE_NEGATIVE"].map((t) => (
-            <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+          <option value="">{t("ilpAllTransactionTypes")}</option>
+          {["PURCHASE", "CONSUMPTION", "OUTPUT", "TRANSFER_SHIPMENT", "TRANSFER_RECEIPT", "SALES", "VARIANCE_POSITIVE", "VARIANCE_NEGATIVE"].map((tt) => (
+            <option key={tt} value={tt}>{tt.replace(/_/g, " ")}</option>
           ))}
         </select>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-medium" style={S.muted}>From</span>
+          <span className="text-[11px] font-medium" style={S.muted}>{t("ilpFrom")}</span>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputCls} style={S.input} />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-medium" style={S.muted}>To</span>
+          <span className="text-[11px] font-medium" style={S.muted}>{t("ilpTo")}</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputCls} style={S.input} />
         </div>
       </div>
@@ -124,22 +126,22 @@ export default function InventoryLedgerPanel() {
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
               <tr className="border-b border-(--row-border)">
-                <TableHead className="whitespace-nowrap">Posting Date</TableHead>
-                <TableHead className="whitespace-nowrap">Document</TableHead>
-                <TableHead className="whitespace-nowrap">Item</TableHead>
-                <TableHead className="whitespace-nowrap">Type</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Qty</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Remaining</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Rate</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Amount</TableHead>
-                <TableHead className="whitespace-nowrap">Lot No.</TableHead>
+                <TableHead className="whitespace-nowrap">{t("ilpPostingDate")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("ilpDocument")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("ilpItem")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("ilpType")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("ilpQty")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("ilpRemaining")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("ilpRate")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("ilpAmount")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("ilpLotNo")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <tr><TableCell colSpan={9} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
+                <tr><TableCell colSpan={9} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("ilpLoading")}</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><TableCell colSpan={9} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No ledger entries yet — post a Goods Receipt to see movements here.</TableCell></tr>
+                <tr><TableCell colSpan={9} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("ilpNoLedgerEntries")}</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
                   <TableRow key={row.ledger_id}>

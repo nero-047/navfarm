@@ -8,6 +8,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConsolePage } from "@/components/ui/console-page";
 import {
   getStoredUser,
   updateStoredUser,
@@ -19,6 +20,7 @@ import {
   NavUser
 } from "@/hooks/useAuth";
 import { api } from "@/lib/api-client";
+import { resolveLobFamily } from "@/lib/lob";
 
 interface OperationalArea {
   area_id: string;
@@ -146,22 +148,20 @@ export default function OperationalAreasPage() {
     setActiveOperationalAreaId(area.area_id);
     setActiveWorkspaceScope("OPERATIONAL");
 
-    const lobName = (area.lob_id || "PIGGERY").toUpperCase();
-    let normalized = "PIGGERY";
-    if (lobName.includes("DAIRY") || area.area_name.toLowerCase().includes("dairy")) normalized = "DAIRY";
-    else if (lobName.includes("POULTRY") || area.area_name.toLowerCase().includes("poultry")) normalized = "POULTRY";
-    setActiveLob(normalized);
+    // Was matching "DAIRY"/"POULTRY" against area.lob_id — a UUID, so every
+    // area resolved to Piggery regardless of its actual line of business.
+    setActiveLob(resolveLobFamily((area as { lob_code?: string }).lob_code, (area as { lob_name?: string }).lob_name, area.area_name));
 
     updateStoredUser({
       operationalAreaId: area.area_id,
       operational_area_id: area.area_id,
     });
 
-    window.location.href = "/production/batches/daily-entry";
+    window.location.href = "/batches/entry";
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-7 text-(--text-primary)">
+    <ConsolePage className="text-(--text-primary)">
       <PageHeader
         title="Operational Areas"
         description="Operational areas under this company — farm sites, breeding units, and crop sectors, grouped by line of business (LOB)."
@@ -300,7 +300,7 @@ export default function OperationalAreasPage() {
             <form onSubmit={handleCreateArea} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                  <label className="nf-text-label mb-1 block text-(--text-muted)">
                     Area Code *
                   </label>
                   <input
@@ -313,7 +313,7 @@ export default function OperationalAreasPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                  <label className="nf-text-label mb-1 block text-(--text-muted)">
                     Area Name *
                   </label>
                   <input
@@ -329,7 +329,7 @@ export default function OperationalAreasPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                  <label className="nf-text-label mb-1 block text-(--text-muted)">
                     Nature of Business (NOB) *
                   </label>
                   <select
@@ -345,7 +345,7 @@ export default function OperationalAreasPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                  <label className="nf-text-label mb-1 block text-(--text-muted)">
                     Line of Business (LOB) *
                   </label>
                   <select
@@ -364,7 +364,7 @@ export default function OperationalAreasPage() {
 
               {/* Pre-Seeding Source Option */}
               <div>
-                <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1.5">
+                <label className="nf-text-label mb-1.5 block text-(--text-muted)">
                   Pre-Seed Master Data From *
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -390,7 +390,7 @@ export default function OperationalAreasPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase font-bold text-(--text-muted) mb-1">
+                <label className="nf-text-label mb-1 block text-(--text-muted)">
                   Description / Facility Notes
                 </label>
                 <textarea
@@ -422,6 +422,6 @@ export default function OperationalAreasPage() {
           </div>
         </div>
       )}
-    </div>
+    </ConsolePage>
   );
 }

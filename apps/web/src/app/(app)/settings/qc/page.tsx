@@ -5,7 +5,7 @@ import QcParameterPanel from "@/components/console/production/qc-parameter-panel
 
 export default function ProductionQcParametersPage() {
   return (
-    <ProductionPageShell title="QC Parameters">
+    <ProductionPageShell titleKey="navQcParameters">
       {() => <QcParameterPanel />}
     </ProductionPageShell>
   );

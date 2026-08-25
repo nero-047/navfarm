@@ -39,7 +39,7 @@ export function ThemeSelector({ className }: { className?: string }) {
             aria-label={t(labelKey)}
             title={t(labelKey)}
             onClick={() => setThemePreference(value)}
-            className="nf-press flex h-7 w-7 items-center justify-center rounded-[var(--radius-pill)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(194,67,50,0.3)]"
+            className="nf-press flex h-7 w-7 items-center justify-center rounded-[var(--radius-pill)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             style={{
               backgroundColor: active ? "var(--accent)" : "transparent",
               color: active ? "#fff" : "var(--text-secondary)",

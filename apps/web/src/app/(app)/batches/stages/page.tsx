@@ -6,7 +6,7 @@ import DairyLifecycleStepper from "@/components/console/dairy/dairy-lifecycle-st
 
 export default function BatchStagesPage() {
   return (
-    <ProductionPageShell title="Batch Stages (Lifecycle)">
+    <ProductionPageShell titleKey="batchStages">
       {(activeLob) => (activeLob === "DAIRY" ? <DairyLifecycleStepper /> : <PiggeryBatchStagesPanel />)}
     </ProductionPageShell>
   );

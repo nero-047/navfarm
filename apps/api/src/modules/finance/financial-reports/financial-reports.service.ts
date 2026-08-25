@@ -318,7 +318,7 @@ export class FinancialReportsService {
     };
   }
 
-  async getPiggeryHerdAnalytics(tenantId: string, companyId: string) {
+  async getPiggeryHerdAnalytics(tenantId: string, companyId: string, batchId?: string) {
     const animals = await this.db
       .select({
         animal: schema.animalRegister,
@@ -329,10 +329,16 @@ export class FinancialReportsService {
       .leftJoin(schema.breedMaster, eq(schema.animalRegister.breed_id, schema.breedMaster.breed_id))
       .leftJoin(schema.stageMaster, eq(schema.animalRegister.current_stage_id, schema.stageMaster.stage_id))
       .where(
-        and(
-          eq(schema.animalRegister.tenant_id, tenantId),
-          eq(schema.animalRegister.company_id, companyId)
-        )
+        batchId
+          ? and(
+              eq(schema.animalRegister.tenant_id, tenantId),
+              eq(schema.animalRegister.company_id, companyId),
+              eq(schema.animalRegister.current_batch_id, batchId)
+            )
+          : and(
+              eq(schema.animalRegister.tenant_id, tenantId),
+              eq(schema.animalRegister.company_id, companyId)
+            )
       );
 
     const activeAnimals = animals.filter((a) => a.animal.is_active);

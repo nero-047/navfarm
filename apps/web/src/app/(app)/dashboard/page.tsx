@@ -43,7 +43,10 @@ import {
 import { useLanguage } from "../../../hooks/useLanguage";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { ConsolePage } from "../../../components/ui/console-page";
+import { StatRow, StatCard } from "../../../components/ui/stat-row";
 import DairyLifecycleStepper from "../../../components/console/dairy/dairy-lifecycle-stepper";
+import { resolveLobFamily } from "@/lib/lob";
 
 const CHART_COLORS = ["var(--accent)", "var(--success)", "var(--info)", "var(--warning)", "#8a6fd6", "#4fb0a5"];
 
@@ -177,8 +180,7 @@ export default function DashboardPage() {
     setActiveCompanyId(area.company_id);
     setActiveOperationalAreaId(area.area_id);
     setActiveWorkspaceScope("OPERATIONAL");
-    const lobResolved = area.lob_code?.includes("DAIRY") || area.area_name?.toLowerCase().includes("dairy") ? "DAIRY" : "PIGGERY";
-    setActiveLob(lobResolved);
+    setActiveLob(resolveLobFamily(area.lob_code, area.lob_name, area.area_name));
     window.location.href = "/dashboard";
   };
 
@@ -215,7 +217,7 @@ export default function DashboardPage() {
   const activeArea = operationalAreas.find((a) => a.area_id === getActiveOperationalAreaId());
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-7 space-y-6" style={{ color: "var(--text-primary)" }}>
+    <ConsolePage className="text-(--text-primary)">
       {/* ── Top Header Bar & Scope-Specific Title & Filters ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5" style={{ borderColor: "var(--border)" }}>
         <div>
@@ -246,13 +248,13 @@ export default function DashboardPage() {
           {scope === "TENANT" && (
             <>
               {companies.length > 0 && (
-                <div className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+                <div className="flex min-w-0 max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                   <Building2 className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
                   <span style={{ color: "var(--text-secondary)" }}>{t("dashCompanyColon")}</span>
                   <select
                     value={filterTenantCompany}
                     onChange={(e) => setFilterTenantCompany(e.target.value)}
-                    className="bg-transparent font-semibold outline-none cursor-pointer"
+                    className="min-w-0 max-w-full truncate bg-transparent font-semibold outline-none cursor-pointer"
                     style={{ color: "var(--text-primary)" }}
                   >
                     <option value="ALL">{t("dashAllCompanies", { n: companies.length })}</option>
@@ -266,13 +268,13 @@ export default function DashboardPage() {
               )}
 
               {availableLobs.length > 0 && (
-                <div className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+                <div className="flex min-w-0 max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                   <Filter className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
                   <span style={{ color: "var(--text-secondary)" }}>{t("dashLobColon")}</span>
                   <select
                     value={filterLob}
                     onChange={(e) => setFilterLob(e.target.value)}
-                    className="bg-transparent font-semibold outline-none cursor-pointer"
+                    className="min-w-0 max-w-full truncate bg-transparent font-semibold outline-none cursor-pointer"
                     style={{ color: "var(--text-primary)" }}
                   >
                     <option value="ALL">{t("dashAllLobs", { n: availableLobs.length })}</option>
@@ -290,13 +292,13 @@ export default function DashboardPage() {
           {/* Company Scope Filters: LOB + Operational Area */}
           {scope === "COMPANY" && availableLobs.length > 0 && (
             <>
-              <div className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+              <div className="flex min-w-0 max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                 <Filter className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
                 <span style={{ color: "var(--text-secondary)" }}>{t("dashLobColon")}</span>
                 <select
                   value={filterLob}
                   onChange={(e) => setFilterLob(e.target.value)}
-                  className="bg-transparent font-semibold outline-none cursor-pointer"
+                  className="min-w-0 max-w-full truncate bg-transparent font-semibold outline-none cursor-pointer"
                   style={{ color: "var(--text-primary)" }}
                 >
                   <option value="ALL">{t("dashAllCompanyLobs", { n: availableLobs.length })}</option>
@@ -309,13 +311,13 @@ export default function DashboardPage() {
               </div>
 
               {operationalAreas.length > 0 && (
-                <div className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+                <div className="flex min-w-0 max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                   <Layers className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
                   <span style={{ color: "var(--text-secondary)" }}>{t("dashOperationalAreaColon")}</span>
                   <select
                     value={filterArea}
                     onChange={(e) => setFilterArea(e.target.value)}
-                    className="bg-transparent font-semibold outline-none cursor-pointer"
+                    className="min-w-0 max-w-full truncate bg-transparent font-semibold outline-none cursor-pointer"
                     style={{ color: "var(--text-primary)" }}
                   >
                     <option value="ALL">{t("dashAllAreas", { n: operationalAreas.length })}</option>
@@ -338,13 +340,13 @@ export default function DashboardPage() {
                 <span>{activeArea?.area_name || activeLob}</span>
               </div>
               {batches.length > 0 && (
-                <div className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
+                <div className="flex min-w-0 max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                   <Layers className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
                   <span style={{ color: "var(--text-secondary)" }}>{t("dashBatchColon")}</span>
                   <select
                     value={batchViewMode}
                     onChange={(e) => setBatchViewMode(e.target.value)}
-                    className="bg-transparent font-semibold outline-none cursor-pointer"
+                    className="min-w-0 max-w-full truncate bg-transparent font-semibold outline-none cursor-pointer"
                     style={{ color: "var(--text-primary)" }}
                   >
                     <option value="ALL">{t("dashAllBatches", { n: batches.length })}</option>
@@ -367,97 +369,60 @@ export default function DashboardPage() {
       {scope === "TENANT" && (
         <div className="space-y-6">
           {/* 4 Group KPI Stat Strips */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div
+          <StatRow>
+            <StatCard
+              icon={Building2}
+              label={t("dashOperatingCompanies")}
+              value={filteredCompanies.length}
+              unit={t("statusActive")}
               onClick={() => router.push("/companies")}
-              className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
-              style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-                  {t("dashOperatingCompanies")}
+              sub={
+                <span className="flex items-center justify-between">
+                  <span>{filteredCompanies.map(c => c.company_name).slice(0, 2).join(", ") || t("dashConfiguredEntities")}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
                 </span>
-                <Building2 className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold tracking-tight font-mono">{filteredCompanies.length}</span>
-                <span className="text-xs font-medium" style={{ color: "var(--success)" }}>{t("statusActive")}</span>
-              </div>
-              <p className="mt-2 text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                <span>{filteredCompanies.map(c => c.company_name).slice(0, 2).join(", ") || t("dashConfiguredEntities")}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
-              </p>
-            </div>
-
-            <div
-              onClick={() => router.push("/piggery")}
-              className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
-              style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-                  {t("dashBiologicalCensus")}
+              }
+            />
+            <StatCard
+              icon={Activity}
+              label={t("dashBiologicalCensus")}
+              value={tenantScopedAnimals.length > 0 ? tenantScopedAnimals.length : tenantScopedBatches.reduce((sum, b) => sum + (Number(b.closing_quantity) || Number(b.opening_quantity) || 0), 0)}
+              unit={t("dashHeadCount")}
+              onClick={() => router.push("/livestock")}
+              sub={
+                <span className="flex items-center justify-between">
+                  <span>{t("dashAcrossProductionBatches", { n: tenantScopedBatches.length })}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
                 </span>
-                <Activity className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold tracking-tight font-mono">
-                  {tenantScopedAnimals.length > 0 ? tenantScopedAnimals.length : tenantScopedBatches.reduce((sum, b) => sum + (Number(b.closing_quantity) || Number(b.opening_quantity) || 0), 0)}
+              }
+            />
+            <StatCard
+              icon={Layers}
+              label={t("dashActiveBatches")}
+              value={tenantScopedBatches.filter(b => b.status === "ACTIVE" || !b.status).length}
+              unit={t("dashInProgress")}
+              onClick={() => router.push("/batches")}
+              sub={
+                <span className="flex items-center justify-between">
+                  <span>{t("dashNOperationalAreas", { n: tenantScopedAreas.length })}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
                 </span>
-                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{t("dashHeadCount")}</span>
-              </div>
-              <p className="mt-2 text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                <span>{t("dashAcrossProductionBatches", { n: tenantScopedBatches.length })}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
-              </p>
-            </div>
-
-            <div
-              onClick={() => router.push("/production/batches")}
-              className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
-              style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-                  {t("dashActiveBatches")}
-                </span>
-                <Layers className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold tracking-tight font-mono">
-                  {tenantScopedBatches.filter(b => b.status === "ACTIVE" || !b.status).length}
-                </span>
-                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{t("dashInProgress")}</span>
-              </div>
-              <p className="mt-2 text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                <span>{t("dashNOperationalAreas", { n: tenantScopedAreas.length })}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
-              </p>
-            </div>
-
-            <div
+              }
+            />
+            <StatCard
+              icon={DollarSign}
+              label={t("dashGroupBatchValuation")}
+              value={`₹ ${tenantScopedBatches.reduce((sum, b) => sum + (Number(b.wip_value) || 0), 0).toLocaleString("en-IN")}`}
+              unit={t("dashWip")}
               onClick={() => router.push("/finance/journal")}
-              className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
-              style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-                  {t("dashGroupBatchValuation")}
+              sub={
+                <span className="flex items-center justify-between">
+                  <span>{t("dashStandardDirectCostAllocation")}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
                 </span>
-                <DollarSign className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold tracking-tight font-mono">
-                  ₹ {tenantScopedBatches.reduce((sum, b) => sum + (Number(b.wip_value) || 0), 0).toLocaleString("en-IN")}
-                </span>
-                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{t("dashWip")}</span>
-              </div>
-              <p className="mt-2 text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                <span>{t("dashStandardDirectCostAllocation")}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
-              </p>
-            </div>
-          </div>
+              }
+            />
+          </StatRow>
 
           {/* Batches & Population by Company */}
           <ChartCard title={t("dashBatchesPopulationByCompany")} subtitle={t("dashBatchesPopulationByCompanyDesc")}>
@@ -609,7 +574,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/piggery")}
+              onClick={() => router.push("/livestock")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -632,7 +597,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => router.push("/production/batches")}
+              onClick={() => router.push("/batches")}
               className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
               style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
             >
@@ -825,94 +790,64 @@ export default function DashboardPage() {
         return (
           <div className="space-y-6">
             {/* 4 Piggery Operational Stat Strips */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div
-                onClick={() => router.push("/piggery")}
-                className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
-                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-                    {t("dashBreedingSowsGilts")}
+            <StatRow>
+              <StatCard
+                icon={Activity}
+                label={t("dashBreedingSowsGilts")}
+                value={animals.length > 0 ? animals.length : assignedHead}
+                unit={t("dashActiveHerd")}
+                onClick={() => router.push("/livestock")}
+                sub={
+                  <span className="flex items-center justify-between">
+                    {/* Real breed only — this used to fall back to a hardcoded
+                        "Large White lineage", which showed on Landrace batches. */}
+                    <span>{activeBatch?.breed_name || "—"}</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
                   </span>
-                  <Activity className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-                </div>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold tracking-tight font-mono">{animals.length > 0 ? animals.length : assignedHead}</span>
-                  <span className="text-xs font-medium" style={{ color: "var(--success)" }}>{t("dashActiveHerd")}</span>
-                </div>
-                <p className="mt-2 text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                  <span>{activeBatch?.breed_name || t("dashLargeWhiteLineage")}</span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
-                </p>
-              </div>
-
-              <div
-                onClick={() => router.push("/production/batches")}
-                className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
-                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-                    {isAllBatchesView ? t("dashBatchesInView") : t("dashActiveGestationBatch")}
+                }
+              />
+              <StatCard
+                icon={Layers}
+                label={isAllBatchesView ? t("dashBatchesInView") : t("dashActiveGestationBatch")}
+                // In "all batches" mode this rendered the whole sentence
+                // "All batches (2)" at metric size — a phrase styled as a number,
+                // which broke badly in non-Latin scripts. Show the count.
+                value={isAllBatchesView ? batches.length : (activeBatch?.batch_no || "—")}
+                onClick={() => router.push("/batches")}
+                sub={
+                  <span className="flex items-center justify-between">
+                    <span>{isAllBatchesView ? t("dashNDistinctStages", { n: stageBreakdown.length }) : t("dashStageColon", { stage: activeBatch?.current_stage_code || "ACTIVE" })}</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
                   </span>
-                  <Layers className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-                </div>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-2xl font-bold tracking-tight font-mono truncate" style={{ color: "var(--accent)" }}>
-                    {isAllBatchesView ? t("dashAllBatches", { n: batches.length }) : (activeBatch?.batch_no || "PIG-SOW-001")}
+                }
+              />
+              <StatCard
+                icon={Wheat}
+                label={t("dashActiveBatches")}
+                value={batches.length}
+                unit={t("dashBatchesWord")}
+                onClick={() => router.push("/batches/records")}
+                sub={
+                  <span className="flex items-center justify-between">
+                    <span>{t("dashUnderActiveOperations")}</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
                   </span>
-                </div>
-                <p className="mt-2 text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                  <span>{isAllBatchesView ? t("dashNDistinctStages", { n: stageBreakdown.length }) : t("dashStageColon", { stage: activeBatch?.current_stage_code || "ACTIVE" })}</span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
-                </p>
-              </div>
-
-              <div
-                onClick={() => router.push("/production/feed-management")}
-                className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
-                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-                    {t("dashActiveBatches")}
+                }
+              />
+              <StatCard
+                icon={DollarSign}
+                label={t("dashBatchWipValuation")}
+                value={`₹ ${(isAllBatchesView ? aggWip : Number(activeBatch?.wip_value || 0)).toLocaleString("en-IN")}`}
+                unit={t("dashWip")}
+                onClick={() => router.push("/livestock")}
+                sub={
+                  <span className="flex items-center justify-between">
+                    <span>{t("dashDirectCostAllocation")}</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
                   </span>
-                  <Wheat className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-                </div>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold tracking-tight font-mono">{batches.length}</span>
-                  <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{t("dashBatchesWord")}</span>
-                </div>
-                <p className="mt-2 text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                  <span>{t("dashUnderActiveOperations")}</span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
-                </p>
-              </div>
-
-              <div
-                onClick={() => router.push("/piggery")}
-                className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
-                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
-                    {t("dashBatchWipValuation")}
-                  </span>
-                  <DollarSign className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-                </div>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold tracking-tight font-mono">
-                    ₹ {(isAllBatchesView ? aggWip : Number(activeBatch?.wip_value || 0)).toLocaleString("en-IN")}
-                  </span>
-                  <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{t("dashWip")}</span>
-                </div>
-                <p className="mt-2 text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                  <span>{t("dashDirectCostAllocation")}</span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)]" />
-                </p>
-              </div>
-            </div>
+                }
+              />
+            </StatRow>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
@@ -936,7 +871,7 @@ export default function DashboardPage() {
                   <div className="rounded-[var(--radius-md)] border p-5" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-sm font-semibold">{t("dashActiveSowBatchLifecycle", { batchNo: activeBatch?.batch_no || "PIG-BATCH-001" })}</h3>
-                      <Link href="/production/batches/daily-entry" className="text-xs font-semibold hover:underline" style={{ color: "var(--accent)" }}>
+                      <Link href="/batches/entry" className="text-xs font-semibold hover:underline" style={{ color: "var(--accent)" }}>
                         {t("dashOpenBatchEntry")}
                       </Link>
                     </div>
@@ -963,7 +898,7 @@ export default function DashboardPage() {
                   <h3 className="text-sm font-semibold mb-3">{t("quickActionsHeading")}</h3>
                   <div className="space-y-2">
                     <button
-                      onClick={() => router.push("/production/batches/daily-entry")}
+                      onClick={() => router.push("/batches/entry")}
                       className="nf-press flex w-full items-center justify-between rounded-[var(--radius-sm)] border p-2.5 text-xs font-semibold hover:bg-[var(--surface-raised)]"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -971,7 +906,7 @@ export default function DashboardPage() {
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => router.push("/piggery")}
+                      onClick={() => router.push("/livestock")}
                       className="nf-press flex w-full items-center justify-between rounded-[var(--radius-sm)] border p-2.5 text-xs font-semibold hover:bg-[var(--surface-raised)]"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -1007,7 +942,7 @@ export default function DashboardPage() {
             {/* 4 Dairy Operational Stat Strips */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div
-                onClick={() => router.push("/piggery")}
+                onClick={() => router.push("/livestock")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -1028,7 +963,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/production/batches/daily-entry")}
+                onClick={() => router.push("/batches/entry")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -1049,7 +984,7 @@ export default function DashboardPage() {
               </div>
 
               <div
-                onClick={() => router.push("/production/feed-management")}
+                onClick={() => router.push("/batches/records")}
                 className="nf-press group rounded-[var(--radius-md)] border p-5 transition-all hover:bg-[var(--surface-raised)] cursor-pointer"
                 style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
               >
@@ -1137,7 +1072,7 @@ export default function DashboardPage() {
                   <h3 className="text-sm font-semibold mb-3">{t("dashDairyQuickActions")}</h3>
                   <div className="space-y-2">
                     <button
-                      onClick={() => router.push("/production/batches/daily-entry")}
+                      onClick={() => router.push("/batches/entry")}
                       className="nf-press flex w-full items-center justify-between rounded-[var(--radius-sm)] border p-2.5 text-xs font-semibold hover:bg-[var(--surface-raised)]"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -1145,7 +1080,7 @@ export default function DashboardPage() {
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => router.push("/piggery")}
+                      onClick={() => router.push("/livestock")}
                       className="nf-press flex w-full items-center justify-between rounded-[var(--radius-sm)] border p-2.5 text-xs font-semibold hover:bg-[var(--surface-raised)]"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -1159,6 +1094,6 @@ export default function DashboardPage() {
           </div>
         );
       })()}
-    </div>
+    </ConsolePage>
   );
 }

@@ -314,7 +314,7 @@ export default function DairyCowRegisterPanel() {
         <form id="add-dairy-cow-form" onSubmit={handleAddCow} className="space-y-4 text-xs pt-1">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Ear Tag ID *</label>
+              <label className="nf-text-label block text-[var(--text-secondary)] mb-1">Ear Tag ID *</label>
               <input
                 type="text"
                 required
@@ -325,7 +325,7 @@ export default function DairyCowRegisterPanel() {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">RFID Electronic Tag</label>
+              <label className="nf-text-label block text-[var(--text-secondary)] mb-1">RFID Electronic Tag</label>
               <input
                 type="text"
                 value={newCow.rfid}
@@ -338,7 +338,7 @@ export default function DairyCowRegisterPanel() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Cow Name</label>
+              <label className="nf-text-label block text-[var(--text-secondary)] mb-1">Cow Name</label>
               <input
                 type="text"
                 value={newCow.name}
@@ -348,7 +348,7 @@ export default function DairyCowRegisterPanel() {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Breed</label>
+              <label className="nf-text-label block text-[var(--text-secondary)] mb-1">Breed</label>
               <select
                 value={newCow.breed}
                 onChange={(e) => setNewCow({ ...newCow, breed: e.target.value })}
@@ -365,7 +365,7 @@ export default function DairyCowRegisterPanel() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Lactation #</label>
+              <label className="nf-text-label block text-[var(--text-secondary)] mb-1">Lactation #</label>
               <input
                 type="number"
                 value={newCow.lactationNumber}
@@ -375,7 +375,7 @@ export default function DairyCowRegisterPanel() {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Daily Yield (L)</label>
+              <label className="nf-text-label block text-[var(--text-secondary)] mb-1">Daily Yield (L)</label>
               <input
                 type="number"
                 step="0.1"
@@ -386,7 +386,7 @@ export default function DairyCowRegisterPanel() {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Fat %</label>
+              <label className="nf-text-label block text-[var(--text-secondary)] mb-1">Fat %</label>
               <input
                 type="number"
                 step="0.01"

@@ -27,6 +27,7 @@ import { getActiveCompanyId } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useLanguage } from "@/hooks/useLanguage";
+import { AnimalMultiSelect, splitEvenly, truncateRemarks } from "./animal-multi-select";
 
 // file_url from the API is server-relative (e.g. "/uploads/xyz.jpg") — resolve
 // it against the API's own origin, not the web app's, since uploads are served
@@ -43,6 +44,8 @@ interface FeedItem {
   wastage: number;
   rate: number;
   item_id?: string;
+  animalIds?: string[];
+  animalLabels?: string[];
 }
 
 interface MedItem {
@@ -53,6 +56,8 @@ interface MedItem {
   consumed: number;
   cost: number;
   item_id?: string;
+  animalIds?: string[];
+  animalLabels?: string[];
 }
 
 interface MortalityItem {
@@ -60,6 +65,8 @@ interface MortalityItem {
   reason: string;
   count: number;
   remarks: string;
+  animalIds?: string[];
+  animalLabels?: string[];
 }
 
 interface LabourItem {
@@ -148,6 +155,8 @@ export default function OperationalBatchDataEntry() {
   const [newFeedConsumed, setNewFeedConsumed] = useState("45");
   const [newFeedWastage, setNewFeedWastage] = useState("5");
   const [newFeedRate, setNewFeedRate] = useState("35.0");
+  const [newFeedAnimalIds, setNewFeedAnimalIds] = useState<Set<string>>(new Set());
+  const [feedAnimalSearch, setFeedAnimalSearch] = useState("");
 
   const [addMedModalOpen, setAddMedModalOpen] = useState(false);
   const [newMedItem, setNewMedItem] = useState("");
@@ -155,11 +164,27 @@ export default function OperationalBatchDataEntry() {
   const [newMedIssued, setNewMedIssued] = useState("10");
   const [newMedConsumed, setNewMedConsumed] = useState("10");
   const [newMedCost, setNewMedCost] = useState("100");
+  const [newMedAnimalIds, setNewMedAnimalIds] = useState<Set<string>>(new Set());
+  const [medAnimalSearch, setMedAnimalSearch] = useState("");
 
   const [addMortalityModalOpen, setAddMortalityModalOpen] = useState(false);
   const [newMortalityReason, setNewMortalityReason] = useState("");
   const [newMortalityCount, setNewMortalityCount] = useState("1");
   const [newMortalityRemarks, setNewMortalityRemarks] = useState("");
+  const [newMortalityAnimalIds, setNewMortalityAnimalIds] = useState<Set<string>>(new Set());
+  const [mortalityAnimalSearch, setMortalityAnimalSearch] = useState("");
+
+  // Shared per-batch animal roster used by the Feed / Medicine / Mortality
+  // "add row" modals' multi-select pickers.
+  const [batchAnimalOptions, setBatchAnimalOptions] = useState<{ animal_id: string; label: string }[]>([]);
+  const [batchAnimalOptionsLoading, setBatchAnimalOptionsLoading] = useState(false);
+
+  // Top-level "which animals is today's entry for" selector — sits next to
+  // the batch selector, defaults every new Feed/Medicine/Mortality row to
+  // this scope (still overridable per row inside each Add modal).
+  const [topAnimalIds, setTopAnimalIds] = useState<Set<string>>(new Set());
+  const [topAnimalSearch, setTopAnimalSearch] = useState("");
+  const [topAnimalPanelOpen, setTopAnimalPanelOpen] = useState(false);
 
   const [addLabourModalOpen, setAddLabourModalOpen] = useState(false);
   const [newLabourRole, setNewLabourRole] = useState("");
@@ -199,6 +224,24 @@ export default function OperationalBatchDataEntry() {
     }
   }, [currentBatch?.id, currentBatch?.currentStageId]);
 
+  // Load the batch's real animal roster once per batch, shared by every
+  // "scope this row to specific animals" picker below.
+  useEffect(() => {
+    setTopAnimalIds(new Set());
+    setTopAnimalSearch("");
+    setTopAnimalPanelOpen(false);
+    if (!currentBatch?.id) { setBatchAnimalOptions([]); return; }
+    const companyId = getActiveCompanyId();
+    setBatchAnimalOptionsLoading(true);
+    api.get(`/animal?companyId=${companyId}&currentBatchId=${currentBatch.id}&limit=500`)
+      .then((res) => {
+        const list: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+        setBatchAnimalOptions(list.map((a) => ({ animal_id: a.animal_id, label: a.ear_tag || a.animal_code })));
+      })
+      .catch(() => setBatchAnimalOptions([]))
+      .finally(() => setBatchAnimalOptionsLoading(false));
+  }, [currentBatch?.id]);
+
   // ── Step 1: Fetch active batch list from DB ──
   useEffect(() => {
     const companyId = getActiveCompanyId();
@@ -216,13 +259,19 @@ export default function OperationalBatchDataEntry() {
           const fallbackRes = await api.get(`/batch?companyId=${companyId}&limit=50`).catch(() => []);
           list = Array.isArray(fallbackRes) ? fallbackRes : (fallbackRes?.data ?? []);
         }
+        // /batch returns breed_id but not breed_name, so resolve it here. The
+        // old fallback hardcoded "Large White", which showed every batch as
+        // that breed no matter what was actually recorded against it.
+        const breedRes = await api.get(`/breed?companyId=${companyId}&limit=500`).catch(() => []);
+        const breedList: any[] = Array.isArray(breedRes) ? breedRes : (breedRes?.data ?? []);
+        const breedNameById = new Map<string, string>(breedList.map((br: any) => [br.breed_id, br.breed_name]));
         const mapped: BatchMeta[] = list.map((b: any) => {
           const st = resolvePiggeryStage(b);
           return {
             id: b.batch_id,
             code: b.batch_no,
             name: b.remarks || b.batch_no,
-            breed: b.breed_name || b.breed_code || "Large White",
+            breed: b.breed_name || breedNameById.get(b.breed_id) || b.breed_code || "—",
             type: b.lob_name || b.nob_name || "Piggery Production Batch",
             startDate: b.start_date || "",
             currentStage: st.name,
@@ -231,7 +280,10 @@ export default function OperationalBatchDataEntry() {
             stageTotalDays: st.totalDays,
             stageDates: b.start_date ? `${b.start_date} – ${b.expected_end_date || "ongoing"}` : "",
             assignedCount: Number(b.opening_quantity) || 80,
-            currentCount: Number(b.closing_quantity) ?? Number(b.opening_quantity) ?? 80,
+            // closing_quantity is only set once a batch closes; until then the
+            // live count is the opening quantity. Number() never yields
+            // null/undefined, so `??` here silently pinned this to 0.
+            currentCount: Number(b.closing_quantity ?? b.opening_quantity ?? 0) || 0,
             mortalityCount: 0,
             transferredCount: 0,
           };
@@ -281,7 +333,7 @@ export default function OperationalBatchDataEntry() {
                   currentStageId: st.id,
                   stageDay: st.day,
                   stageTotalDays: st.totalDays,
-                  currentCount: Number(batchData.closing_quantity) ?? Number(batchData.opening_quantity) ?? b.currentCount,
+                  currentCount: Number(batchData.closing_quantity ?? batchData.opening_quantity ?? b.currentCount) || b.currentCount,
                 }
                 : b
             )
@@ -291,6 +343,21 @@ export default function OperationalBatchDataEntry() {
 
         const txs: any[] = batchData?.transactions ?? [];
         const sameDayTxs = txs.filter((t: any) => t.transaction_date === selectedDate || t.transaction_date?.startsWith(selectedDate));
+
+        // The summary strip reports batch-level totals, so mortality there has
+        // to be every mortality ever recorded against the batch — not just the
+        // selected day's, which read as 0 on any batch whose losses happened
+        // earlier.
+        const cumulativeMortality = txs
+          .filter((t: any) => t.transaction_type === "MORTALITY")
+          .reduce((sum: number, t: any) => sum + Number(t.quantity || 0), 0);
+        // Stage/pen movements recorded against this batch. `transferredCount`
+        // was hardcoded to 0, so the summary strip always read TRANSFERRED 0
+        // no matter how many times the batch had actually moved.
+        const stageMoves = Array.isArray(batchData?.stage_log) ? batchData.stage_log.length : 0;
+        setBatches((prev) => prev.map((bm) => (bm.id === selectedBatchId
+          ? { ...bm, mortalityCount: cumulativeMortality, transferredCount: stageMoves }
+          : bm)));
 
         const feeds: FeedItem[] = [];
         const meds: MedItem[] = [];
@@ -351,11 +418,15 @@ export default function OperationalBatchDataEntry() {
             if (existing) {
               existing.count = Number(t.quantity || 0);
             } else {
+              // `t.remarks` is the FULL previously-saved "reason — remarks"
+              // string — put it all in `reason` and leave `remarks` blank,
+              // otherwise re-saving this loaded row would concatenate the
+              // same text into itself again (doubling on every save).
               mortalities.push({
                 id: t.transaction_id || `mo-${Date.now()}`,
                 reason: t.remarks || "Recorded Mortality",
                 count: Number(t.quantity || 0),
-                remarks: t.remarks || "",
+                remarks: "",
               });
             }
           } else if (t.transaction_type === "OVERHEAD") {
@@ -367,7 +438,7 @@ export default function OperationalBatchDataEntry() {
                 id: t.transaction_id || `o-${Date.now()}`,
                 type: t.remarks || "Overhead Expense",
                 amount: Math.abs(Number(t.amount || t.quantity || 0)),
-                remarks: t.remarks || "",
+                remarks: "",
               });
             }
           }
@@ -409,7 +480,10 @@ export default function OperationalBatchDataEntry() {
   const totalLabourCost = labourRows.reduce((sum, r) => sum + Number(r.hours || 0) * Number(r.persons || 1) * (r.rate || 75), 0);
   const totalOverheads = overheadRows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
   const totalDailyCost = totalFeedCost + totalMedicineCost + totalLabourCost + totalOverheads;
-  const currentHeadCount = currentBatch ? Math.max(0, currentBatch.currentCount - totalMortality) : 0;
+  // Batch-level mortality (all dates) drives the summary strip; `totalMortality`
+  // stays the selected day's figure that the entry form below edits.
+  const batchMortality = Math.max(currentBatch?.mortalityCount ?? 0, totalMortality);
+  const currentHeadCount = currentBatch ? Math.max(0, currentBatch.currentCount - batchMortality) : 0;
   const estCostPerAnimalDay = currentHeadCount > 0 ? (totalDailyCost / currentHeadCount).toFixed(2) : "0.00";
 
   // Item Removal Handlers
@@ -432,6 +506,7 @@ export default function OperationalBatchDataEntry() {
   // Add Item Handlers
   const handleAddFeedSubmit = () => {
     if (!newFeedItem) return;
+    const selectedAnimalIds = Array.from(newFeedAnimalIds);
     const newItem: FeedItem = {
       id: `f-${Date.now()}`,
       item: newFeedItem,
@@ -441,14 +516,21 @@ export default function OperationalBatchDataEntry() {
       consumed: parseFloat(newFeedConsumed) || 0,
       wastage: parseFloat(newFeedWastage) || 0,
       rate: parseFloat(newFeedRate) || 35.0,
+      animalIds: selectedAnimalIds.length > 0 ? selectedAnimalIds : undefined,
+      animalLabels: selectedAnimalIds.length > 0
+        ? selectedAnimalIds.map((id) => batchAnimalOptions.find((a) => a.animal_id === id)?.label || id)
+        : undefined,
     };
     setFeedRows([...feedRows, newItem]);
     setAddFeedModalOpen(false);
     setNewFeedItem("");
+    setNewFeedAnimalIds(new Set());
+    setFeedAnimalSearch("");
   };
 
   const handleAddMedSubmit = () => {
     if (!newMedItem) return;
+    const selectedAnimalIds = Array.from(newMedAnimalIds);
     const newItem: MedItem = {
       id: `m-${Date.now()}`,
       item: newMedItem,
@@ -456,24 +538,39 @@ export default function OperationalBatchDataEntry() {
       issued: parseFloat(newMedIssued) || 0,
       consumed: parseFloat(newMedConsumed) || 0,
       cost: parseFloat(newMedCost) || 0,
+      animalIds: selectedAnimalIds.length > 0 ? selectedAnimalIds : undefined,
+      animalLabels: selectedAnimalIds.length > 0
+        ? selectedAnimalIds.map((id) => batchAnimalOptions.find((a) => a.animal_id === id)?.label || id)
+        : undefined,
     };
     setMedicineRows([...medicineRows, newItem]);
     setAddMedModalOpen(false);
     setNewMedItem("");
+    setNewMedAnimalIds(new Set());
+    setMedAnimalSearch("");
   };
 
   const handleAddMortalitySubmit = () => {
     if (!newMortalityReason) return;
+    const selectedAnimalIds = Array.from(newMortalityAnimalIds);
     const newItem: MortalityItem = {
       id: `mo-${Date.now()}`,
       reason: newMortalityReason,
-      count: parseInt(newMortalityCount, 10) || 1,
+      // Selecting specific animals overrides the manual count — the number
+      // of animals picked IS the number that died.
+      count: selectedAnimalIds.length > 0 ? selectedAnimalIds.length : (parseInt(newMortalityCount, 10) || 1),
       remarks: newMortalityRemarks || "Logged during morning round",
+      animalIds: selectedAnimalIds.length > 0 ? selectedAnimalIds : undefined,
+      animalLabels: selectedAnimalIds.length > 0
+        ? selectedAnimalIds.map((id) => batchAnimalOptions.find((a) => a.animal_id === id)?.label || id)
+        : undefined,
     };
     setMortalityRows([...mortalityRows, newItem]);
     setAddMortalityModalOpen(false);
     setNewMortalityReason("");
     setNewMortalityRemarks("");
+    setNewMortalityAnimalIds(new Set());
+    setMortalityAnimalSearch("");
   };
 
   const handleAddLabourSubmit = () => {
@@ -570,44 +667,94 @@ export default function OperationalBatchDataEntry() {
       await api.post("/batch/bulk-daily-entry", payload);
 
       // Post individual feed consumption transactions (one per feed formula row)
-      // so they appear in Feed Management with proper item names
+      // so they appear in Feed Management with proper item names — split
+      // evenly across selected animals when the row was scoped to specific
+      // animals, so the sum posted still matches the entered Consumed qty.
       for (const feed of feedRows) {
         if (Number(feed.consumed) > 0) {
-          const txPayload: any = {
-            transaction_date: selectedDate,
-            transaction_type: "CONSUMPTION",
-            quantity: Number(feed.consumed),
-            rate: feed.rate || 0,
-            uom: feed.uom || "KG",
-            remarks: feed.item || "Feed Ration",
-          };
-          if (feed.item_id) txPayload.item_id = feed.item_id;
-          await api.post(`/batch/${currentBatch.id}/transaction`, txPayload);
+          if (feed.animalIds && feed.animalIds.length > 0) {
+            const shares = splitEvenly(Number(feed.consumed), feed.animalIds.length);
+            for (let i = 0; i < feed.animalIds.length; i++) {
+              const txPayload: any = {
+                transaction_date: selectedDate,
+                transaction_type: "CONSUMPTION",
+                quantity: shares[i],
+                rate: feed.rate || 0,
+                uom: feed.uom || "KG",
+                remarks: feed.item || "Feed Ration",
+                animal_id: feed.animalIds[i],
+              };
+              if (feed.item_id) txPayload.item_id = feed.item_id;
+              await api.post(`/batch/${currentBatch.id}/transaction`, txPayload);
+            }
+          } else {
+            const txPayload: any = {
+              transaction_date: selectedDate,
+              transaction_type: "CONSUMPTION",
+              quantity: Number(feed.consumed),
+              rate: feed.rate || 0,
+              uom: feed.uom || "KG",
+              remarks: feed.item || "Feed Ration",
+            };
+            if (feed.item_id) txPayload.item_id = feed.item_id;
+            await api.post(`/batch/${currentBatch.id}/transaction`, txPayload);
+          }
         }
       }
 
-      // Post granular transactions for medicines administered
+      // Post granular transactions for medicines administered — same
+      // even-split-across-selected-animals rule as feed.
       for (const med of medicineRows) {
         if (Number(med.consumed) > 0) {
           const rate = (med.cost && Number(med.consumed) > 0)
             ? Math.round((Number(med.cost) / Number(med.consumed)) * 100) / 100
             : 0;
-          const txPayload: any = {
-            transaction_date: selectedDate,
-            transaction_type: "CONSUMPTION",
-            quantity: Number(med.consumed),
-            rate,
-            uom: med.uom || "ML",
-            remarks: med.item || "Clinical medication",
-          };
-          if (med.item_id) txPayload.item_id = med.item_id;
-          await api.post(`/batch/${currentBatch.id}/transaction`, txPayload);
+          if (med.animalIds && med.animalIds.length > 0) {
+            const shares = splitEvenly(Number(med.consumed), med.animalIds.length);
+            for (let i = 0; i < med.animalIds.length; i++) {
+              const txPayload: any = {
+                transaction_date: selectedDate,
+                transaction_type: "CONSUMPTION",
+                quantity: shares[i],
+                rate,
+                uom: med.uom || "ML",
+                remarks: med.item || "Clinical medication",
+                animal_id: med.animalIds[i],
+              };
+              if (med.item_id) txPayload.item_id = med.item_id;
+              await api.post(`/batch/${currentBatch.id}/transaction`, txPayload);
+            }
+          } else {
+            const txPayload: any = {
+              transaction_date: selectedDate,
+              transaction_type: "CONSUMPTION",
+              quantity: Number(med.consumed),
+              rate,
+              uom: med.uom || "ML",
+              remarks: med.item || "Clinical medication",
+            };
+            if (med.item_id) txPayload.item_id = med.item_id;
+            await api.post(`/batch/${currentBatch.id}/transaction`, txPayload);
+          }
         }
       }
 
-      // Post granular transactions for mortality with specific causes
+      // Post granular transactions for mortality with specific causes — one
+      // row per animal when specific animals were selected, so each death is
+      // attributed to a real animal_id; otherwise a single whole-batch row.
       for (const mort of mortalityRows) {
-        if (Number(mort.count) > 0) {
+        if (mort.animalIds && mort.animalIds.length > 0) {
+          for (const animalId of mort.animalIds) {
+            await api.post(`/batch/${currentBatch.id}/transaction`, {
+              transaction_date: selectedDate,
+              transaction_type: "MORTALITY",
+              quantity: 1,
+              uom: "HEAD",
+              remarks: truncateRemarks(`${mort.reason}${mort.remarks ? ` — ${mort.remarks}` : ""}`),
+              animal_id: animalId,
+            });
+          }
+        } else if (Number(mort.count) > 0) {
           await api.post(`/batch/${currentBatch.id}/transaction`, {
             transaction_date: selectedDate,
             transaction_type: "MORTALITY",
@@ -712,7 +859,7 @@ export default function OperationalBatchDataEntry() {
       <div className="space-y-6 animate-fade-in text-[var(--text-primary)]">
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
           <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-3 text-[var(--accent)]" />
-          <p className="text-sm font-medium text-[var(--text-muted)]">Loading active production batches from database...</p>
+          <p className="text-sm font-medium text-[var(--text-muted)]">{t("bdeLoadingBatches")}</p>
         </div>
       </div>
     );
@@ -753,7 +900,7 @@ export default function OperationalBatchDataEntry() {
                     const b = batches.find((item) => item.id === e.target.value);
                     if (b) setActiveStageId(b.currentStageId || 4);
                   }}
-                  className="max-w-[280px] sm:max-w-[360px] truncate rounded border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
+                  className="max-w-[280px] sm:max-w-[360px] truncate rounded-[var(--radius-xs)] border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
                 >
                   {batches.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -771,6 +918,60 @@ export default function OperationalBatchDataEntry() {
                 >
                   {t("liveActive")}
                 </span>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setTopAnimalPanelOpen((o) => !o)}
+                    className="flex items-center gap-1.5 rounded-[var(--radius-xs)] border px-3 py-1.5 text-xs font-bold"
+                    style={topAnimalIds.size > 0
+                      ? { color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--surface-raised)" }
+                      : { color: "var(--text-primary)", borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)" }}
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    {topAnimalIds.size > 0 ? `${topAnimalIds.size} Animal(s)` : "All Animals"}
+                  </button>
+                  {topAnimalPanelOpen && (
+                    <div
+                      className="absolute z-20 mt-1 w-72 rounded-[var(--radius-md)] border p-3 shadow-lg"
+                      style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+                    >
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                        Scope today&apos;s entry to
+                      </p>
+                      <AnimalMultiSelect
+                        options={batchAnimalOptions}
+                        loading={batchAnimalOptionsLoading}
+                        selected={topAnimalIds}
+                        onToggle={(id) => setTopAnimalIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(id)) next.delete(id); else next.add(id);
+                          return next;
+                        })}
+                        search={topAnimalSearch}
+                        onSearchChange={setTopAnimalSearch}
+                      />
+                      <div className="mt-2 flex justify-end gap-2">
+                        {topAnimalIds.size > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setTopAnimalIds(new Set())}
+                            className="text-[11px] font-semibold text-[var(--text-muted)] hover:underline"
+                          >
+                            Clear (all animals)
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setTopAnimalPanelOpen(false)}
+                          className="text-[11px] font-semibold text-[var(--accent)] hover:underline"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
@@ -800,18 +1001,18 @@ export default function OperationalBatchDataEntry() {
           </div>
 
           {/* Animal Summary KPI Strip */}
-          <div className="flex items-center gap-3 bg-[var(--surface-raised)] p-3 rounded-[var(--radius-md)] border border-[var(--border)]">
-            <div className="text-center px-3 border-r border-[var(--border)]">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3 bg-[var(--surface-raised)] p-3 rounded-[var(--radius-md)] border border-[var(--border)]">
+            <div className="text-center px-3 sm:border-r sm:border-[var(--border)]">
               <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeAssigned")}</p>
               <p className="text-base font-bold text-[var(--text-primary)]">{currentBatch?.assignedCount ?? 0}</p>
             </div>
-            <div className="text-center px-3 border-r border-[var(--border)]">
+            <div className="text-center px-3 sm:border-r sm:border-[var(--border)]">
               <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeCurrent")}</p>
               <p className="text-base font-bold" style={{ color: "var(--success)" }}>{currentHeadCount}</p>
             </div>
-            <div className="text-center px-3 border-r border-[var(--border)]">
+            <div className="text-center px-3 sm:border-r sm:border-[var(--border)]">
               <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeMortality")}</p>
-              <p className="text-base font-bold" style={{ color: "var(--danger)" }}>{totalMortality}</p>
+              <p className="text-base font-bold" style={{ color: "var(--danger)" }}>{batchMortality}</p>
             </div>
             <div className="text-center px-3">
               <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeTransferred")}</p>
@@ -846,18 +1047,18 @@ export default function OperationalBatchDataEntry() {
       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 flex flex-wrap items-center justify-between gap-4 shadow-2xs">
         <div className="flex items-center gap-4 flex-wrap">
           <div>
-            <label className="block text-[10px] uppercase font-bold text-[var(--text-muted)] mb-1">
+            <label className="nf-text-label mb-1 block text-[var(--text-muted)]">
               {t("logEntryDate")}
             </label>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="rounded border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
+              className="rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
             />
           </div>
 
-          <div className="flex items-center gap-2.5 bg-[var(--surface-raised)] border border-[var(--border)] px-3 py-1.5 rounded text-xs">
+          <div className="flex items-center gap-2.5 bg-[var(--surface-raised)] border border-[var(--border)] px-3 py-1.5 rounded-[var(--radius-xs)] text-xs">
             <CloudSun className="w-4 h-4 text-amber-400" />
             <div>
               <span className="text-[10px] text-[var(--text-muted)]">{t("barnClimate")} </span>
@@ -918,17 +1119,27 @@ export default function OperationalBatchDataEntry() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full min-w-[640px] table-fixed text-left text-xs border-collapse">
+                <colgroup>
+                  <col className="w-[34%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[7%]" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                     <th className="px-3 pb-1.5 font-bold">{t("colFeedItem")}</th>
-                    <th className="px-3 pb-1.5 font-bold">{t("colUom")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">{t("colOpening")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">{t("colIssued")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right text-[var(--text-primary)]">{t("colConsumed")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">{t("colWastage")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">{t("colClosing")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">{t("colAction")}</th>
+                    <th className="px-3 pb-1.5 font-bold whitespace-nowrap">{t("colUom")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap">{t("colOpening")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap">{t("colIssued")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap text-[var(--text-primary)]">{t("colConsumed")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap">{t("colWastage")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap">{t("colClosing")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap">{t("colAction")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -943,11 +1154,16 @@ export default function OperationalBatchDataEntry() {
                       const closingQty = r.opening + r.issued - r.consumed - r.wastage;
                       return (
                         <tr key={r.id} className="hover:bg-[var(--surface-raised)] transition-colors">
-                          <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{r.item}</td>
-                          <td className="px-3 py-2 text-[var(--text-secondary)] font-mono">{r.uom}</td>
-                          <td className="px-3 py-2 text-right font-mono">{r.opening}</td>
-                          <td className="px-3 py-2 text-right font-mono">{r.issued}</td>
-                          <td className="px-3 py-2 text-right font-mono">
+                          <td className="px-3 py-2 align-top font-medium text-[var(--text-primary)]">
+                            {r.item}
+                            {r.animalLabels && r.animalLabels.length > 0 && (
+                              <span className="block text-[10px] font-mono font-semibold text-[var(--accent)]">{r.animalLabels.join(", ")}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 align-top whitespace-nowrap text-[var(--text-secondary)] font-mono">{r.uom}</td>
+                          <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono">{r.opening}</td>
+                          <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono">{r.issued}</td>
+                          <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono">
                             <input
                               type="number"
                               step="0.1"
@@ -957,12 +1173,12 @@ export default function OperationalBatchDataEntry() {
                                 updated[i].consumed = Number(e.target.value);
                                 setFeedRows(updated);
                               }}
-                              className="w-16 rounded border border-[var(--border)] bg-[var(--surface-raised)] px-1.5 py-0.5 text-right text-xs font-bold text-[var(--text-primary)]"
+                              className="w-16 rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] px-1.5 py-0.5 text-right text-xs font-bold text-[var(--text-primary)]"
                             />
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-[var(--text-muted)]">{r.wastage}</td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold">{closingQty.toFixed(1)}</td>
-                          <td className="px-3 py-2 text-right">
+                          <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono text-[var(--text-muted)]">{r.wastage}</td>
+                          <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono font-semibold">{closingQty.toFixed(1)}</td>
+                          <td className="px-3 py-2 align-top text-right whitespace-nowrap">
                             <button
                               onClick={() => handleRemoveFeed(r.id)}
                               className="text-[var(--text-muted)] hover:text-rose-500 p-1 transition-colors"
@@ -981,10 +1197,10 @@ export default function OperationalBatchDataEntry() {
           </div>
 
           <button
-            onClick={() => setAddFeedModalOpen(true)}
+            onClick={() => { setNewFeedAnimalIds(new Set(topAnimalIds)); setFeedAnimalSearch(""); setAddFeedModalOpen(true); }}
             className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
-            <Plus className="w-3 h-3" /> Add Feed Line
+            <Plus className="w-3 h-3" /> {t("bdeAddFeedLine")}
           </button>
         </div>
 
@@ -1002,15 +1218,23 @@ export default function OperationalBatchDataEntry() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full min-w-[480px] table-fixed text-left text-xs border-collapse">
+                <colgroup>
+                  <col className="w-[40%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[8%]" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                     <th className="px-3 pb-1.5 font-bold">{t("colMedicineVaccine")}</th>
-                    <th className="px-3 pb-1.5 font-bold">{t("colUom")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">{t("colIssued")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right text-[var(--text-primary)]">{t("colConsumed")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">{t("colCost")}</th>
-                    <th className="px-3 pb-1.5 font-bold text-right">{t("colAction")}</th>
+                    <th className="px-3 pb-1.5 font-bold whitespace-nowrap">{t("colUom")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap">{t("colIssued")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap text-[var(--text-primary)]">{t("colConsumed")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap">{t("colCost")}</th>
+                    <th className="px-3 pb-1.5 font-bold text-right whitespace-nowrap">{t("colAction")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -1023,10 +1247,15 @@ export default function OperationalBatchDataEntry() {
                   ) : (
                     medicineRows.map((r, i) => (
                       <tr key={r.id} className="hover:bg-[var(--surface-raised)] transition-colors">
-                        <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{r.item}</td>
-                        <td className="px-3 py-2 text-[var(--text-secondary)] font-mono">{r.uom}</td>
-                        <td className="px-3 py-2 text-right font-mono">{r.issued}</td>
-                        <td className="px-3 py-2 text-right font-mono">
+                        <td className="px-3 py-2 align-top font-medium text-[var(--text-primary)]">
+                          {r.item}
+                          {r.animalLabels && r.animalLabels.length > 0 && (
+                            <span className="block text-[10px] font-mono font-semibold text-[var(--accent)]">{r.animalLabels.join(", ")}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 align-top whitespace-nowrap text-[var(--text-secondary)] font-mono">{r.uom}</td>
+                        <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono">{r.issued}</td>
+                        <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono">
                           <input
                             type="number"
                             value={r.consumed}
@@ -1035,11 +1264,11 @@ export default function OperationalBatchDataEntry() {
                               updated[i].consumed = Number(e.target.value);
                               setMedicineRows(updated);
                             }}
-                            className="w-16 rounded border border-[var(--border)] bg-[var(--surface-raised)] px-1.5 py-0.5 text-right text-xs font-bold text-[var(--text-primary)]"
+                            className="w-16 rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] px-1.5 py-0.5 text-right text-xs font-bold text-[var(--text-primary)]"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right font-mono font-bold">₹ {r.cost}</td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono font-bold">₹ {r.cost}</td>
+                        <td className="px-3 py-2 align-top text-right whitespace-nowrap">
                           <button
                             onClick={() => handleRemoveMed(r.id)}
                             className="text-[var(--text-muted)] hover:text-rose-500 p-1 transition-colors"
@@ -1057,10 +1286,10 @@ export default function OperationalBatchDataEntry() {
           </div>
 
           <button
-            onClick={() => setAddMedModalOpen(true)}
+            onClick={() => { setNewMedAnimalIds(new Set(topAnimalIds)); setMedAnimalSearch(""); setAddMedModalOpen(true); }}
             className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
-            <Plus className="w-3 h-3" /> Add Clinical Medication
+            <Plus className="w-3 h-3" /> {t("bdeAddClinicalMed")}
           </button>
         </div>
 
@@ -1068,42 +1297,42 @@ export default function OperationalBatchDataEntry() {
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-2xs">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-3 flex items-center gap-1.5">
             <Scale className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-            <span>3. Weight & Body Condition Score (BCS)</span>
+            <span>{t("bdeSecWeightBcs")}</span>
           </h3>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] uppercase font-bold text-[var(--text-muted)] mb-1">
-                Avg Weight (kg)
+              <label className="nf-text-label mb-1 block text-[var(--text-muted)]">
+                {t("bdeAvgWeightKg")}
               </label>
               <input
                 type="number"
                 step="0.1"
                 value={avgWeight}
                 onChange={(e) => setAvgWeight(Number(e.target.value))}
-                className="w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] p-2 text-xs font-bold text-[var(--text-primary)] font-mono"
+                className="w-full rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] p-2 text-xs font-bold text-[var(--text-primary)] font-mono"
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-[var(--text-muted)] mb-1">
-                ADG (kg/day)
+              <label className="nf-text-label mb-1 block text-[var(--text-muted)]">
+                {t("bdeAdg")}
               </label>
               <input
                 type="number"
                 step="0.01"
                 value={weightGain}
                 onChange={(e) => setWeightGain(Number(e.target.value))}
-                className="w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] p-2 text-xs font-bold text-[var(--text-primary)] font-mono"
+                className="w-full rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] p-2 text-xs font-bold text-[var(--text-primary)] font-mono"
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-[var(--text-muted)] mb-1">
-                BCS (1 - 5)
+              <label className="nf-text-label mb-1 block text-[var(--text-muted)]">
+                {t("bdeBcsRange")}
               </label>
               <input
                 type="text"
                 value={bcsScore}
                 onChange={(e) => setBcsScore(e.target.value)}
-                className="w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] p-2 text-xs font-bold text-[var(--text-primary)] font-mono"
+                className="w-full rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] p-2 text-xs font-bold text-[var(--text-primary)] font-mono"
               />
             </div>
           </div>
@@ -1112,8 +1341,8 @@ export default function OperationalBatchDataEntry() {
               type="text"
               value={weightNotes}
               onChange={(e) => setWeightNotes(e.target.value)}
-              placeholder="Condition observations..."
-              className="w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)]"
+              placeholder={t("bdeConditionObs")}
+              className="w-full rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)]"
             />
           </div>
         </div>
@@ -1124,7 +1353,7 @@ export default function OperationalBatchDataEntry() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                <span>4. Mortality & Incident Log</span>
+                <span>{t("bdeSecMortality")}</span>
               </h3>
               <span className={totalMortality > 0 ? "text-xs font-bold text-rose-500 font-mono" : "text-xs font-bold text-emerald-500 font-mono"}>
                 Total: {totalMortality} Head
@@ -1138,10 +1367,13 @@ export default function OperationalBatchDataEntry() {
                 </p>
               ) : (
                 mortalityRows.map((m, idx) => (
-                  <div key={m.id} className="flex items-center gap-2 p-2 rounded bg-[var(--surface-raised)] text-xs">
+                  <div key={m.id} className="flex items-center gap-2 p-2 rounded-[var(--radius-xs)] bg-[var(--surface-raised)] text-xs">
                     <div className="flex-1">
                       <span className="font-semibold text-[var(--text-primary)]">{m.reason}</span>
                       <span className="block text-[10px] text-[var(--text-muted)]">{m.remarks}</span>
+                      {m.animalLabels && m.animalLabels.length > 0 && (
+                        <span className="block text-[10px] font-mono font-semibold text-[var(--accent)]">{m.animalLabels.join(", ")}</span>
+                      )}
                     </div>
                     <input
                       type="number"
@@ -1152,7 +1384,7 @@ export default function OperationalBatchDataEntry() {
                         updated[idx].count = Number(e.target.value);
                         setMortalityRows(updated);
                       }}
-                      className="w-14 rounded border border-[var(--border)] bg-[var(--surface)] p-1 text-xs font-bold text-right text-[var(--text-primary)] font-mono"
+                      className="w-14 rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface)] p-1 text-xs font-bold text-right text-[var(--text-primary)] font-mono"
                     />
                     <button
                       onClick={() => handleRemoveMortality(m.id)}
@@ -1168,10 +1400,14 @@ export default function OperationalBatchDataEntry() {
           </div>
 
           <button
-            onClick={() => setAddMortalityModalOpen(true)}
+            onClick={() => {
+              setNewMortalityAnimalIds(new Set(topAnimalIds));
+              setMortalityAnimalSearch("");
+              setAddMortalityModalOpen(true);
+            }}
             className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
-            <Plus className="w-3 h-3" /> Add Mortality Cause
+            <Plus className="w-3 h-3" /> {t("bdeAddMortalityCause")}
           </button>
         </div>
 
@@ -1181,7 +1417,7 @@ export default function OperationalBatchDataEntry() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                <span>5. Labour & Direct Farm Hours</span>
+                <span>{t("bdeSecLabour")}</span>
               </h3>
               <span className="text-xs font-bold text-[var(--text-primary)] font-mono">
                 ₹ {totalLabourCost.toFixed(2)} ({totalLabourHours} hrs)
@@ -1195,7 +1431,7 @@ export default function OperationalBatchDataEntry() {
                 </p>
               ) : (
                 labourRows.map((l) => (
-                  <div key={l.id} className="flex items-center justify-between p-2 rounded bg-[var(--surface-raised)] text-xs">
+                  <div key={l.id} className="flex items-center justify-between p-2 rounded-[var(--radius-xs)] bg-[var(--surface-raised)] text-xs">
                     <div>
                       <span className="font-semibold text-[var(--text-primary)]">{l.resource}</span>
                       <span className="text-[11px] text-[var(--text-secondary)] block font-mono">
@@ -1221,7 +1457,7 @@ export default function OperationalBatchDataEntry() {
             onClick={() => setAddLabourModalOpen(true)}
             className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
-            <Plus className="w-3 h-3" /> Add Labour Resource
+            <Plus className="w-3 h-3" /> {t("bdeAddLabourResource")}
           </button>
         </div>
 
@@ -1231,7 +1467,7 @@ export default function OperationalBatchDataEntry() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
                 <DollarSign className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                <span>6. Overheads & Utilities</span>
+                <span>{t("bdeSecOverheads")}</span>
               </h3>
               <span className="text-xs font-bold text-[var(--text-primary)] font-mono">
                 Total: ₹ {totalOverheads.toFixed(2)}
@@ -1245,7 +1481,7 @@ export default function OperationalBatchDataEntry() {
                 </p>
               ) : (
                 overheadRows.map((o) => (
-                  <div key={o.id} className="flex items-center justify-between p-2 rounded bg-[var(--surface-raised)] text-xs">
+                  <div key={o.id} className="flex items-center justify-between p-2 rounded-[var(--radius-xs)] bg-[var(--surface-raised)] text-xs">
                     <div>
                       <span className="font-semibold text-[var(--text-primary)]">{o.type}</span>
                       <span className="block text-[10px] text-[var(--text-muted)]">{o.remarks}</span>
@@ -1269,7 +1505,7 @@ export default function OperationalBatchDataEntry() {
             onClick={() => setAddOverheadModalOpen(true)}
             className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline"
           >
-            <Plus className="w-3 h-3" /> Add Overhead Expense
+            <Plus className="w-3 h-3" /> {t("bdeAddOverheadExpense")}
           </button>
         </div>
 
@@ -1277,13 +1513,13 @@ export default function OperationalBatchDataEntry() {
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-2xs">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-3 flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-            <span>7. Daily Notes & Supervisor Observations</span>
+            <span>{t("bdeSecNotes")}</span>
           </h3>
           <textarea
             rows={3}
             value={generalNotes}
             onChange={(e) => setGeneralNotes(e.target.value)}
-            className="w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] p-2.5 text-xs text-[var(--text-primary)] focus:outline-none"
+            className="w-full rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] p-2.5 text-xs text-[var(--text-primary)] focus:outline-none"
           />
         </div>
 
@@ -1292,7 +1528,7 @@ export default function OperationalBatchDataEntry() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-1.5">
               <Camera className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-              <span>8. Inspection Media & Photos</span>
+              <span>{t("bdeSecPhotosDocs")}</span>
             </h3>
             <Button
               variant="outline"
@@ -1300,7 +1536,7 @@ export default function OperationalBatchDataEntry() {
               onClick={() => { setUploadError(""); setUploadingFile(null); setUploadModalOpen(true); }}
               className="h-6 text-[10px] px-2 gap-1 font-medium"
             >
-              <Plus className="w-3 h-3" /> Upload Media
+              <Plus className="w-3 h-3" /> {t("bdeUploadMedia")}
             </Button>
           </div>
 
@@ -1311,7 +1547,7 @@ export default function OperationalBatchDataEntry() {
               </p>
             ) : (
               attachments.map((att) => (
-                <div key={att.attachment_id} className="p-2 rounded bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex items-center justify-between gap-2">
+                <div key={att.attachment_id} className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex items-center justify-between gap-2">
                   <a
                     href={`${API_ORIGIN}${att.file_url}`}
                     target="_blank"
@@ -1357,7 +1593,7 @@ export default function OperationalBatchDataEntry() {
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Estimated Cost / Animal / Day</p>
+              <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeEstCostPerAnimalDay")}</p>
               <p className="text-lg font-bold text-[var(--accent)] font-mono">₹ {estCostPerAnimalDay}</p>
             </div>
             <Button
@@ -1423,7 +1659,7 @@ export default function OperationalBatchDataEntry() {
             </div>
             <div className="grid grid-cols-4 gap-2">
               <div>
-                <label className="font-semibold block mb-1">Opening</label>
+                <label className="font-semibold block mb-1">{t("bdeColOpening")}</label>
                 <input
                   type="number"
                   value={newFeedOpening}
@@ -1432,7 +1668,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Issued</label>
+                <label className="font-semibold block mb-1">{t("bdeColIssued")}</label>
                 <input
                   type="number"
                   value={newFeedIssued}
@@ -1450,7 +1686,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Wastage</label>
+                <label className="font-semibold block mb-1">{t("bdeColWastage")}</label>
                 <input
                   type="number"
                   value={newFeedWastage}
@@ -1458,6 +1694,21 @@ export default function OperationalBatchDataEntry() {
                   className="nf-input w-full font-mono text-[var(--text-muted)]"
                 />
               </div>
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Specific Animal(s) (optional — splits Consumed evenly across them)</label>
+              <AnimalMultiSelect
+                options={batchAnimalOptions}
+                loading={batchAnimalOptionsLoading}
+                selected={newFeedAnimalIds}
+                onToggle={(id) => setNewFeedAnimalIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id); else next.add(id);
+                  return next;
+                })}
+                search={feedAnimalSearch}
+                onSearchChange={setFeedAnimalSearch}
+              />
             </div>
           </div>
         </Dialog>
@@ -1503,7 +1754,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Issued</label>
+                <label className="font-semibold block mb-1">{t("bdeColIssued")}</label>
                 <input
                   type="number"
                   value={newMedIssued}
@@ -1512,7 +1763,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Consumed</label>
+                <label className="font-semibold block mb-1">{t("bdeColConsumed")}</label>
                 <input
                   type="number"
                   value={newMedConsumed}
@@ -1521,7 +1772,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Cost (₹)</label>
+                <label className="font-semibold block mb-1">{t("bdeColCostRs")}</label>
                 <input
                   type="number"
                   value={newMedCost}
@@ -1529,6 +1780,21 @@ export default function OperationalBatchDataEntry() {
                   className="nf-input w-full font-mono font-bold"
                 />
               </div>
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Specific Animal(s) (optional — splits Consumed evenly across them)</label>
+              <AnimalMultiSelect
+                options={batchAnimalOptions}
+                loading={batchAnimalOptionsLoading}
+                selected={newMedAnimalIds}
+                onToggle={(id) => setNewMedAnimalIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id); else next.add(id);
+                  return next;
+                })}
+                search={medAnimalSearch}
+                onSearchChange={setMedAnimalSearch}
+              />
             </div>
           </div>
         </Dialog>
@@ -1564,7 +1830,7 @@ export default function OperationalBatchDataEntry() {
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Head Count</label>
+              <label className="font-semibold block mb-1">{t("bdeColHeadCount")}</label>
               <input
                 type="number"
                 value={newMortalityCount}
@@ -1580,6 +1846,21 @@ export default function OperationalBatchDataEntry() {
                 onChange={(e) => setNewMortalityRemarks(e.target.value)}
                 placeholder="e.g. Pen Row B-04 / Necropsy completed"
                 className="nf-input w-full"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Specific Animal(s) (optional — overrides Head Count above)</label>
+              <AnimalMultiSelect
+                options={batchAnimalOptions}
+                loading={batchAnimalOptionsLoading}
+                selected={newMortalityAnimalIds}
+                onToggle={(id) => setNewMortalityAnimalIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id); else next.add(id);
+                  return next;
+                })}
+                search={mortalityAnimalSearch}
+                onSearchChange={setMortalityAnimalSearch}
               />
             </div>
           </div>
@@ -1617,7 +1898,7 @@ export default function OperationalBatchDataEntry() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="font-semibold block mb-1">Persons</label>
+                <label className="font-semibold block mb-1">{t("bdeColPersons")}</label>
                 <input
                   type="number"
                   value={newLabourPersons}
@@ -1626,7 +1907,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Hours</label>
+                <label className="font-semibold block mb-1">{t("bdeColHours")}</label>
                 <input
                   type="number"
                   step="0.5"
@@ -1688,7 +1969,7 @@ export default function OperationalBatchDataEntry() {
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Remarks</label>
+              <label className="font-semibold block mb-1">{t("bdeColRemarks")}</label>
               <input
                 type="text"
                 value={newOverheadRemarks}

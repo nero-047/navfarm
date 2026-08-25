@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Delete, Param, Body, Query, Req, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, resolve } from 'node:path';
@@ -188,9 +188,10 @@ export class BatchController {
   @RequirePermission('PRODUCTION', 'BATCH', 'view')
   @ApiOperation({ summary: 'Fetch day-by-day standard performance curves vs actual recorded metrics (Feed, Weight, Mortality)' })
   @ApiParam({ name: 'id', description: 'Batch UUID' })
-  async getPerformanceCurves(@Param('id') id: string, @Req() req: any) {
+  @ApiQuery({ name: 'animalId', required: false, description: 'Restrict the curves to transactions attributed to this one animal' })
+  async getPerformanceCurves(@Param('id') id: string, @Query('animalId') animalId: string | undefined, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
-    const result = await this.batchService.getBatchPerformanceCurves(id, tenantId);
+    const result = await this.batchService.getBatchPerformanceCurves(id, tenantId, animalId);
     return { success: true, message: 'Performance curves retrieved successfully.', data: result };
   }
 

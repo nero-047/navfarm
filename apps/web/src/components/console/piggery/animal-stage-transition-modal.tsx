@@ -9,6 +9,7 @@ import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Row = Record<string, any>;
 
@@ -54,6 +55,8 @@ export default function AnimalStageTransitionModal({
   const [saving, setSaving]             = useState(false);
   const [error, setError]               = useState("");
 
+  const { t } = useLanguage();
+
   // When animal opens, auto-suggest next stage if configured on current stage
   useEffect(() => {
     if (!animal || !open) return;
@@ -82,11 +85,11 @@ export default function AnimalStageTransitionModal({
 
   const handleSubmit = async () => {
     if (!toStageId) {
-      setError("Please select a destination stage.");
+      setError(t("astmSelectDestinationStageError"));
       return;
     }
     if (isPrematureMove && !reason.trim()) {
-      setError(`Minimum duration is ${minDays} days (currently ${daysInStage} days). Please provide a reason to override.`);
+      setError(t("astmMinDurationOverrideError", { minDays, daysInStage }));
       return;
     }
 
@@ -104,7 +107,7 @@ export default function AnimalStageTransitionModal({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err?.message || "Failed to record stage transition.");
+      setError(err?.message || t("astmFailedToRecordTransition"));
     } finally {
       setSaving(false);
     }
@@ -114,15 +117,15 @@ export default function AnimalStageTransitionModal({
     <Dialog
       open={open}
       onClose={onClose}
-      title={`Stage & Pen Transition — ${animal.animal_code}`}
-      description="Advance animal to the next production lifecycle stage, reassign pen/location, and track parity."
+      title={t("astmModalTitle", { animalCode: animal.animal_code })}
+      description={t("astmModalDescription")}
       maxWidth="md"
       footer={
         <div className="flex w-full items-center justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t("astmCancel")}</Button>
           <Button onClick={handleSubmit} disabled={saving || !toStageId}>
             {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="mr-1.5 h-3.5 w-3.5" />}
-            Confirm Stage Transition
+            {t("astmConfirmTransition")}
           </Button>
         </div>
       }
@@ -133,19 +136,19 @@ export default function AnimalStageTransitionModal({
         {/* Current State Info */}
         <div className="rounded-[var(--radius-md)] border p-4 space-y-2" style={S.raised}>
           <div className="flex items-center justify-between text-xs">
-            <span style={S.muted}>Animal:</span>
+            <span style={S.muted}>{t("astmAnimalLabel")}</span>
             <span className="font-mono font-bold" style={S.primary}>
-              {animal.animal_code} ({animal.animal_type} · {animal.breed_name || "Pig"})
+              {animal.animal_code} ({animal.animal_type} · {animal.breed_name || t("astmDefaultBreedPig")})
             </span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span style={S.muted}>Current Stage:</span>
-            <span className="font-semibold" style={S.primary}>{animal.stage_name || currentStage?.stage_name || "Quarantine"}</span>
+            <span style={S.muted}>{t("astmCurrentStageLabel")}</span>
+            <span className="font-semibold" style={S.primary}>{animal.stage_name || currentStage?.stage_name || t("astmDefaultStageQuarantine")}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span style={S.muted}>Time in Current Stage:</span>
+            <span style={S.muted}>{t("astmTimeInCurrentStageLabel")}</span>
             <span className="font-mono font-semibold" style={isPrematureMove ? S.warning : S.primary}>
-              {daysInStage} days {minDays > 0 ? `(Min required: ${minDays}d)` : ""}
+              {t("astmDaysCount", { days: daysInStage })} {minDays > 0 ? t("astmMinRequiredSuffix", { minDays }) : ""}
             </span>
           </div>
         </div>
@@ -155,9 +158,9 @@ export default function AnimalStageTransitionModal({
           <div className="rounded-[var(--radius-md)] border p-3 flex items-start gap-2 text-xs" style={S.warning}>
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold">Premature Stage Transition Warning</p>
+              <p className="font-bold">{t("astmPrematureWarningTitle")}</p>
               <p className="mt-0.5">
-                Stage &apos;{currentStage?.stage_name}&apos; recommends at least {minDays} days before moving. Provide an override reason below.
+                {t("astmPrematureWarningBody", { stageName: currentStage?.stage_name, minDays })}
               </p>
             </div>
           </div>
@@ -166,13 +169,13 @@ export default function AnimalStageTransitionModal({
         {/* Transition Form Inputs */}
         <div className="space-y-3">
           <div>
-            <label className="nf-label text-xs">Destination Stage *</label>
+            <label className="nf-label text-xs">{t("astmDestinationStageLabel")}</label>
             <select
               className="nf-input text-xs"
               value={toStageId}
               onChange={(e) => setToStageId(e.target.value)}
             >
-              <option value="">Select destination stage…</option>
+              <option value="">{t("astmSelectDestinationStagePlaceholder")}</option>
               {stages.map((s) => (
                 <option key={s.stage_id} value={s.stage_id}>
                   {s.stage_name} ({s.stage_code}) — {s.stage_category}
@@ -183,13 +186,13 @@ export default function AnimalStageTransitionModal({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="nf-label text-xs">Destination Pen / Location</label>
+              <label className="nf-label text-xs">{t("astmDestinationLocationLabel")}</label>
               <select
                 className="nf-input text-xs"
                 value={toLocationId}
                 onChange={(e) => setToLocationId(e.target.value)}
               >
-                <option value="">Keep current location</option>
+                <option value="">{t("astmKeepCurrentLocation")}</option>
                 {locations.map((loc) => (
                   <option key={loc.location_id} value={loc.location_id}>
                     {loc.location_name} ({loc.location_type || "PEN"})
@@ -199,13 +202,13 @@ export default function AnimalStageTransitionModal({
             </div>
 
             <div>
-              <label className="nf-label text-xs">Destination Batch (Optional)</label>
+              <label className="nf-label text-xs">{t("astmDestinationBatchLabel")}</label>
               <select
                 className="nf-input text-xs"
                 value={toBatchId}
                 onChange={(e) => setToBatchId(e.target.value)}
               >
-                <option value="">None / Keep current</option>
+                <option value="">{t("astmNoneKeepCurrent")}</option>
                 {batches.map((b) => (
                   <option key={b.batch_id} value={b.batch_id}>
                     {b.batch_no} {b.batch_name ? `— ${b.batch_name}` : ""}
@@ -216,7 +219,7 @@ export default function AnimalStageTransitionModal({
           </div>
 
           <div>
-            <label className="nf-label text-xs">Transition Date *</label>
+            <label className="nf-label text-xs">{t("astmTransitionDateLabel")}</label>
             <input
               type="date"
               className="nf-input text-xs"
@@ -227,23 +230,23 @@ export default function AnimalStageTransitionModal({
 
           <div>
             <label className="nf-label text-xs">
-              Reason / Trigger Condition {isPrematureMove ? "(Required for override)" : "(Optional)"}
+              {t("astmReasonLabel")} {isPrematureMove ? t("astmRequiredForOverride") : t("astmOptionalSuffix")}
             </label>
             <input
               type="text"
               className="nf-input text-xs"
-              placeholder="e.g. PREGNANCY_CONFIRMED, WEANED, VET_DIRECTIVE"
+              placeholder={t("astmReasonPlaceholder")}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
           </div>
 
           <div>
-            <label className="nf-label text-xs">Remarks / Notes</label>
+            <label className="nf-label text-xs">{t("astmRemarksLabel")}</label>
             <textarea
               className="nf-input text-xs"
               rows={2}
-              placeholder="Additional operational observations…"
+              placeholder={t("astmRemarksPlaceholder")}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
             />

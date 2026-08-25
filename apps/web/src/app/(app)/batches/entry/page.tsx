@@ -6,7 +6,7 @@ import DairyDailyOperationsEntry from "@/components/console/dairy/dairy-daily-op
 
 export default function BatchDataEntryPage() {
   return (
-    <ProductionPageShell title="Batch Data Entry (Operational)">
+    <ProductionPageShell titleKey="batchDataEntry">
       {(activeLob) => (activeLob === "DAIRY" ? <DairyDailyOperationsEntry /> : <OperationalBatchDataEntry />)}
     </ProductionPageShell>
   );

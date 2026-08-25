@@ -5,6 +5,7 @@ import { Loader2, Inbox, AlertTriangle } from "lucide-react";
 import { api } from "@/services/api-client";
 import { InlineAlert } from "@/components/ui/alert";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 type Row = Record<string, any>;
@@ -30,6 +31,7 @@ function fmt(n: number) {
 }
 
 export default function StockBalancePanel() {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [items, setItems] = useState<Row[]>([]);
   const [warehouses, setWarehouses] = useState<Row[]>([]);
@@ -56,7 +58,7 @@ export default function StockBalancePanel() {
       const apiRows = unwrap<Row[]>(res) || [];
       setRows(apiRows);
     } catch (err: any) {
-      setError(err?.message || "Failed to load stock balance.");
+      setError(err?.message || t("sbpFailedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -81,30 +83,30 @@ export default function StockBalancePanel() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold" style={S.primary}>Stock Balance</h2>
-        <p className="mt-0.5 text-xs" style={S.sub}>Current on-hand quantity per item and warehouse, computed from remaining FIFO layers in the Inventory Ledger.</p>
+        <h2 className="text-lg font-semibold" style={S.primary}>{t("sbpTitle")}</h2>
+        <p className="mt-0.5 text-xs" style={S.sub}>{t("sbpDescription")}</p>
       </div>
 
       {/* Summary figures read as a single line of related numbers; three
           bordered boxes would imply they are independent modules. */}
       <dl className="flex flex-wrap gap-x-10 gap-y-4 border-y py-4" style={{ borderColor: "var(--border)" }}>
         <div>
-          <dt className="nf-text-caption">Item/Warehouse Lines</dt>
+          <dt className="nf-text-caption">{t("sbpItemWarehouseLines")}</dt>
           <dd className="mt-0.5 text-xl font-semibold" style={S.primary}>{rows.length}</dd>
         </div>
         <div>
-          <dt className="nf-text-caption">Total On-Hand Value</dt>
+          <dt className="nf-text-caption">{t("sbpTotalOnHandValue")}</dt>
           <dd className="mt-0.5 text-xl font-semibold" style={S.primary}>₹{fmt(totalValue)}</dd>
         </div>
         <div>
-          <dt className="nf-text-caption">At/Below Reorder Level</dt>
+          <dt className="nf-text-caption">{t("sbpAtBelowReorderLevel")}</dt>
           <dd className="mt-0.5 text-xl font-semibold" style={belowReorderCount > 0 ? S.danger : S.primary}>{belowReorderCount}</dd>
         </div>
       </dl>
 
       <div className="flex flex-wrap items-center gap-2">
         <select value={itemId} onChange={(e) => setItemId(e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-          <option value="">All items ({items.length} options)</option>
+          <option value="">{t("sbpAllItemsWithCount", { count: items.length })}</option>
           {items.map((it, idx) => (
             <option key={it.item_id} value={it.item_id}>
               {idx + 1}. {it.item_code} — {it.item_name}
@@ -112,12 +114,12 @@ export default function StockBalancePanel() {
           ))}
         </select>
         <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-          <option value="">All warehouses</option>
+          <option value="">{t("sbpAllWarehouses")}</option>
           {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code} — {w.warehouse_name}</option>)}
         </select>
         <label className="flex items-center gap-1.5 text-xs font-medium" style={S.sub}>
           <input type="checkbox" checked={belowReorderOnly} onChange={(e) => setBelowReorderOnly(e.target.checked)} />
-          At/below reorder level only
+          {t("sbpAtBelowReorderLevelOnly")}
         </label>
       </div>
 
@@ -130,20 +132,20 @@ export default function StockBalancePanel() {
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
               <tr className="border-b border-(--row-border)">
-                <TableHead className="whitespace-nowrap">Item</TableHead>
-                <TableHead className="whitespace-nowrap">Warehouse</TableHead>
-                <TableHead className="whitespace-nowrap text-right">On Hand</TableHead>
-                <TableHead className="whitespace-nowrap">UOM</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Value</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Reorder Level</TableHead>
-                <TableHead className="whitespace-nowrap">Status</TableHead>
+                <TableHead className="whitespace-nowrap">{t("sbpColItem")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("sbpColWarehouse")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("sbpColOnHand")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("sbpColUom")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("sbpColValue")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("sbpColReorderLevel")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("sbpColStatus")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("sbpLoading")}</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No stock on hand — post a Goods Receipt to bring items into inventory.</TableCell></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("sbpNoStockOnHand")}</TableCell></tr>
               ) : (
                 rows.map((row) => {
                   const belowReorder = row.reorder_level != null && row.on_hand_qty <= row.reorder_level;
@@ -158,10 +160,10 @@ export default function StockBalancePanel() {
                       <TableCell className="whitespace-nowrap">
                         {belowReorder ? (
                           <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--danger-muted, #fee2e2)", color: "var(--danger)" }}>
-                            <AlertTriangle className="h-3 w-3" /> Reorder
+                            <AlertTriangle className="h-3 w-3" /> {t("sbpReorder")}
                           </span>
                         ) : (
-                          <span className="text-[10px] font-medium" style={S.muted}>OK</span>
+                          <span className="text-[10px] font-medium" style={S.muted}>{t("sbpOk")}</span>
                         )}
                       </TableCell>
                     </TableRow>

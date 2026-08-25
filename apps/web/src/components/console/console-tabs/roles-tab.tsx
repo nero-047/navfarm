@@ -296,7 +296,7 @@ export default function RolesTab({
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="font-semibold text-sm" style={S.textPrimary}>{r.role_name}</h4>
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-[var(--radius-xs)] font-mono" style={{ backgroundColor: "var(--badge-bg)", color: "var(--text-secondary)" }}>
                         {r.role_code}
                       </span>
                     </div>
@@ -400,7 +400,7 @@ export default function RolesTab({
                               checked={p[key]}
                               disabled={selectedRole.is_system_role}
                               onChange={() => handleToggleCheckbox(idx, key)}
-                              className="w-4 h-4 rounded border accent-[var(--accent)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus:ring-0 focus:ring-offset-0"
+                              className="w-4 h-4 rounded-[var(--radius-xs)] border accent-[var(--accent)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus:ring-0 focus:ring-offset-0"
                               style={{
                                 backgroundColor: "var(--input-bg)",
                                 borderColor: "var(--input-border)",

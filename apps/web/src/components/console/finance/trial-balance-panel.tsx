@@ -5,6 +5,7 @@ import { Loader2, Inbox } from "lucide-react";
 import { InlineAlert } from "@/components/ui/alert";
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 type Row = Record<string, any>;
@@ -25,6 +26,7 @@ function unwrap<T = any>(res: any): T {
 }
 
 export default function TrialBalancePanel() {
+  const { t } = useLanguage();
   const [asOfDate, setAsOfDate] = useState(new Date().toISOString().slice(0, 10));
   const [report, setReport] = useState<Row | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,7 +43,7 @@ export default function TrialBalancePanel() {
       const res = await api.get(`/financial-reports/trial-balance?${params.toString()}`);
       setReport(unwrap<Row>(res));
     } catch (err: any) {
-      setError(err?.message || "Failed to load Trial Balance.");
+      setError(err?.message || t("tbFailedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -56,11 +58,11 @@ export default function TrialBalancePanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold" style={S.primary}>Trial Balance</h2>
-          <p className="mt-0.5 text-xs" style={S.sub}>Debit/credit totals per GL account, as of a date.</p>
+          <h2 className="text-lg font-semibold" style={S.primary}>{t("tbTitle")}</h2>
+          <p className="mt-0.5 text-xs" style={S.sub}>{t("tbSubtitle")}</p>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-medium" style={S.muted}>As of</span>
+          <span className="text-[11px] font-medium" style={S.muted}>{t("tbAsOf")}</span>
           <input type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} className={inputCls} style={S.input} />
         </div>
       </div>
@@ -74,18 +76,18 @@ export default function TrialBalancePanel() {
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
               <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
-                <TableHead className="whitespace-nowrap">Code</TableHead>
-                <TableHead className="whitespace-nowrap">Account</TableHead>
-                <TableHead className="whitespace-nowrap">Type</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Debit</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Credit</TableHead>
+                <TableHead className="whitespace-nowrap">{t("tbCode")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("tbAccount")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("tbType")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("tbDebit")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("tbCredit")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
+                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("tbLoading")}</TableCell></tr>
               ) : !report || report.accounts.length === 0 ? (
-                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No posted journal activity yet.</TableCell></tr>
+                <tr><TableCell colSpan={5} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("tbNoActivity")}</TableCell></tr>
               ) : (
                 report.accounts.map((a: Row) => (
                   <TableRow key={a.gl_account_id}>
@@ -102,9 +104,9 @@ export default function TrialBalancePanel() {
               <TableFooter>
                 <tr>
                   <TableCell colSpan={3} style={S.sub}>
-                    Total{" "}
+                    {t("tbTotal")}{" "}
                     <span style={{ color: report.isBalanced ? "var(--success)" : "var(--danger)" }}>
-                      ({report.isBalanced ? "balanced" : "not balanced"})
+                      ({report.isBalanced ? t("tbBalanced") : t("tbNotBalanced")})
                     </span>
                   </TableCell>
                   <TableCell className="text-right" style={S.primary}>{report.totalDebit.toFixed(2)}</TableCell>

@@ -255,7 +255,7 @@ export default function AdminTenantsPage() {
                       <Badge variant="neutral">{tenant.plan_id?.replace("PLAN_", "") || "—"}</Badge>
                     </TableCell>
                     <TableCell className="px-5">
-                      <span className={`text-[11px] font-semibold border px-2 py-0.5 rounded inline-flex items-center gap-1 ${active ? "bg-(--success-muted) text-(--success) border-(--success)" : "bg-(--surface-raised) text-(--text-secondary) border-(--border)"}`}>
+                      <span className={`text-[11px] font-semibold border px-2 py-0.5 rounded-[var(--radius-xs)] inline-flex items-center gap-1 ${active ? "bg-(--success-muted) text-(--success) border-(--success)" : "bg-(--surface-raised) text-(--text-secondary) border-(--border)"}`}>
                         {active ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                         {active ? "Active" : "Inactive"}
                       </span>
@@ -415,7 +415,7 @@ export default function AdminTenantsPage() {
                         setSelectedLobIds(allLobIds);
                       }
                     }}
-                    className="text-xs font-semibold px-2.5 py-1 rounded border hover:opacity-80"
+                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--radius-xs)] border hover:opacity-80"
                     style={{ ...S.raised, ...S.accent, borderColor: "var(--accent)" }}
                   >
                     {selectedNobIds.length === nobsList.length ? "Deselect All" : "Select All"}
@@ -458,7 +458,7 @@ export default function AdminTenantsPage() {
                               type="checkbox"
                               checked={isNobChecked}
                               onChange={toggleNob}
-                              className="w-4 h-4 rounded accent-(--accent) cursor-pointer"
+                              className="w-4 h-4 rounded-[var(--radius-xs)] accent-(--accent) cursor-pointer"
                             />
                             <span>{nob.nob_name}</span>
                             <span className="text-[10px] font-mono font-normal opacity-60">({nob.nob_code})</span>
@@ -480,7 +480,7 @@ export default function AdminTenantsPage() {
                                 return (
                                   <label
                                     key={lob.lob_id}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium border cursor-pointer select-none"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-xs)] text-[11px] font-medium border cursor-pointer select-none"
                                     style={{
                                       backgroundColor: isLobChecked ? "var(--surface)" : "transparent",
                                       borderColor: isLobChecked ? "var(--accent)" : "var(--border)",
@@ -491,7 +491,7 @@ export default function AdminTenantsPage() {
                                       type="checkbox"
                                       checked={isLobChecked}
                                       onChange={toggleLob}
-                                      className="w-3 h-3 rounded accent-(--accent) cursor-pointer"
+                                      className="w-3 h-3 rounded-[var(--radius-xs)] accent-(--accent) cursor-pointer"
                                     />
                                     <span>{lob.lob_name}</span>
                                   </label>

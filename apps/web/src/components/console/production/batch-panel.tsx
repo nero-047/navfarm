@@ -8,8 +8,11 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
-import { getActiveCompanyId } from "@/hooks/useAuth";
+import { getActiveCompanyId, getActiveOperationalAreaId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import BatchPerformanceCurvesPanel from "@/components/console/production/batch-performance-curves-panel";
 
 const PAGE_SIZE = 25;
@@ -37,16 +40,8 @@ const emptyOutputLine = () => ({ item_id: "", output_type: "MAIN", cost_split_pc
 const emptyTxForm = () => ({ transaction_date: new Date().toISOString().slice(0, 10), transaction_type: "CONSUMPTION", item_id: "", resource_id: "", quantity: "", uom: "", rate: "", remarks: "", output_type: "", nrv_rate: "" });
 const emptyStdConsumptionLine = () => ({ item_id: "", std_qty_per_unit_per_day: "", std_rate: "" });
 
-const STATUS_STYLE: Record<string, any> = {
-  DRAFT: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" },
-  // A running batch is the healthy steady state, not an alert — brand red
-  // here made every in-flight batch read as a problem.
-  ACTIVE: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
-  CLOSED: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-secondary)" },
-  CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" },
-};
-
 export default function BatchPanel() {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -129,7 +124,6 @@ export default function BatchPanel() {
 
   const companyId = getActiveCompanyId();
   const scope = typeof window !== "undefined" ? localStorage.getItem("active_workspace_scope") : "COMPANY";
-  const activeLob = typeof window !== "undefined" ? (localStorage.getItem("active_lob") || "PIGGERY") : "PIGGERY";
 
   const load = async () => {
     setLoading(true);
@@ -146,22 +140,19 @@ export default function BatchPanel() {
       let finalRows = Array.isArray(list) ? list : [];
 
       if (scope === "OPERATIONAL") {
-        if (activeLob === "DAIRY") {
-          finalRows = finalRows.filter((b) => {
-            const code = (b.batch_no || b.batch_code || "").toUpperCase();
-            return code.includes("COW") || code.includes("DAIRY") || (b.lob_name || "").toUpperCase().includes("DAIRY");
-          });
-        } else if (activeLob === "PIGGERY") {
-          finalRows = finalRows.filter((b) => {
-            const code = (b.batch_no || b.batch_code || "").toUpperCase();
-            return code.includes("PIG") || code.includes("SOW") || (b.lob_name || "").toUpperCase().includes("PIG");
-          });
+        // Scope to the area the user is actually working in. This used to
+        // substring-match the batch number for "PIG"/"SOW"/"COW", which only
+        // worked while batch codes happened to be named that way — a batch
+        // numbered e.g. GSG-BAT-2026-0001 vanished from its own area's list.
+        const areaId = getActiveOperationalAreaId();
+        if (areaId) {
+          finalRows = finalRows.filter((b) => !b.operational_area_id || b.operational_area_id === areaId);
         }
       }
 
       setRows(finalRows);
     } catch (err: any) {
-      setError(err?.message || "Failed to load batches from database.");
+      setError(err?.message || t("blErrLoadBatches"));
       setRows([]);
     } finally {
       setLoading(false);
@@ -256,9 +247,9 @@ export default function BatchPanel() {
     setSaving(true);
     setFormError("");
     try {
-      if (!header.lob_id) throw new Error("Line of Business is required.");
-      if (!header.start_date) throw new Error("Start date is required.");
-      if (!header.opening_quantity || !header.uom) throw new Error("Opening quantity and UOM are required.");
+      if (!header.lob_id) throw new Error(t("blErrLobRequired"));
+      if (!header.start_date) throw new Error(t("blErrStartDateRequired"));
+      if (!header.opening_quantity || !header.uom) throw new Error(t("blErrOpeningQtyUomRequired"));
       const cleanLines = inputLines
         .filter((l) => l.item_id && l.quantity && l.uom)
         .map((l) => ({
@@ -268,7 +259,7 @@ export default function BatchPanel() {
           uom: l.uom,
           rate: l.rate ? Number(l.rate) : undefined,
         }));
-      if (cleanLines.length === 0) throw new Error("Add at least one input line.");
+      if (cleanLines.length === 0) throw new Error(t("blErrAddInputLine"));
 
       let standard: Row | undefined;
       if (header.costing_method === "STANDARD") {
@@ -308,7 +299,7 @@ export default function BatchPanel() {
       setModalOpen(false);
       load();
     } catch (err: any) {
-      setFormError(err?.message || "Failed to save batch.");
+      setFormError(err?.message || t("blErrSaveBatch"));
     } finally {
       setSaving(false);
     }
@@ -325,7 +316,7 @@ export default function BatchPanel() {
       setDataEntryValues({});
       setDataEntryError("");
     } catch (err: any) {
-      setError(err?.message || "Failed to load batch details.");
+      setError(err?.message || t("blErrLoadBatchDetails"));
     }
   };
 
@@ -348,7 +339,7 @@ export default function BatchPanel() {
         Object.fromEntries(dueLines.map((l: Row) => [l.spl_id, l.already_entered_qty ? String(l.already_entered_qty) : ""]))
       );
     } catch (err: any) {
-      setDataEntryError(err?.message || "Failed to load scheduled data-entry lines.");
+      setDataEntryError(err?.message || t("blErrLoadDataEntryLines"));
       setDataEntryLines([]);
     } finally {
       setDataEntryLoading(false);
@@ -378,7 +369,7 @@ export default function BatchPanel() {
       await loadDataEntry();
       await refreshViewing();
     } catch (err: any) {
-      setDataEntryError(err?.message || "Failed to record entry.");
+      setDataEntryError(err?.message || t("blErrRecordEntry"));
     } finally {
       setDataEntrySavingId(null);
     }
@@ -392,7 +383,7 @@ export default function BatchPanel() {
       await refreshViewing();
       load();
     } catch (err: any) {
-      setError(err?.message || "Failed to activate batch.");
+      setError(err?.message || t("blErrActivateBatch"));
     } finally {
       setActing(false);
     }
@@ -403,28 +394,28 @@ export default function BatchPanel() {
     setActing(true);
     setError("");
     try {
-      if (!txForm.transaction_date) throw new Error("Transaction date is required.");
+      if (!txForm.transaction_date) throw new Error(t("blErrTransactionDateRequired"));
       const payload: Row = {
         transaction_date: txForm.transaction_date,
         transaction_type: txForm.transaction_type,
         remarks: txForm.remarks || undefined,
       };
       if (["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type)) {
-        if (!txForm.item_id || !txForm.quantity || !txForm.uom) throw new Error("Item, quantity and UOM are required for this transaction type.");
+        if (!txForm.item_id || !txForm.quantity || !txForm.uom) throw new Error(t("blErrItemQtyUomRequired"));
         payload.item_id = txForm.item_id;
         payload.quantity = Number(txForm.quantity);
         payload.uom = txForm.uom;
         if (txForm.rate) payload.rate = Number(txForm.rate);
         if (txForm.transaction_type === "OUTPUT" && txForm.output_type) {
-          if (!txForm.nrv_rate) throw new Error("Net Realisable Value rate is required when removing a by-product/waste mid-batch.");
+          if (!txForm.nrv_rate) throw new Error(t("blErrNrvRateRequired"));
           payload.output_type = txForm.output_type;
           payload.nrv_rate = Number(txForm.nrv_rate);
         }
       } else if (txForm.transaction_type === "MORTALITY") {
-        if (!txForm.quantity) throw new Error("Quantity is required for mortality.");
+        if (!txForm.quantity) throw new Error(t("blErrQtyRequiredMortality"));
         payload.quantity = Number(txForm.quantity);
       } else if (txForm.transaction_type === "OVERHEAD") {
-        if (!txForm.quantity || !txForm.rate) throw new Error("Quantity and rate are required for overhead.");
+        if (!txForm.quantity || !txForm.rate) throw new Error(t("blErrQtyRateRequiredOverhead"));
         payload.quantity = Number(txForm.quantity);
         payload.rate = Number(txForm.rate);
         if (txForm.resource_id) payload.resource_id = txForm.resource_id;
@@ -433,7 +424,7 @@ export default function BatchPanel() {
       setTxForm(emptyTxForm());
       await refreshViewing();
     } catch (err: any) {
-      setError(err?.message || "Failed to record transaction.");
+      setError(err?.message || t("blErrRecordTransaction"));
     } finally {
       setActing(false);
     }
@@ -469,7 +460,7 @@ export default function BatchPanel() {
           uom: l.uom,
           warehouse_id: l.warehouse_id,
         }));
-      if (cleanLines.length === 0) throw new Error("Add at least one output line.");
+      if (cleanLines.length === 0) throw new Error(t("blErrAddOutputLine"));
       await api.post(`/batch/${viewing.batch_id}/close`, {
         actual_end_date: closeDate,
         closing_quantity: closeQty ? Number(closeQty) : undefined,
@@ -479,7 +470,7 @@ export default function BatchPanel() {
       await refreshViewing();
       load();
     } catch (err: any) {
-      setCloseError(err?.message || "Failed to close batch.");
+      setCloseError(err?.message || t("blErrCloseBatch"));
     } finally {
       setActing(false);
     }
@@ -511,7 +502,7 @@ export default function BatchPanel() {
       let path = "";
       let payload: Row = {};
       if (bioActionOpen === "mature") {
-        if (!bioForm.residual_value_per_unit) throw new Error("Residual value per unit is required.");
+        if (!bioForm.residual_value_per_unit) throw new Error(t("blErrResidualValueRequired"));
         path = `/batch/${viewing.batch_id}/mature`;
         payload = {
           residual_value_per_unit: Number(bioForm.residual_value_per_unit),
@@ -521,23 +512,23 @@ export default function BatchPanel() {
         path = `/batch/${viewing.batch_id}/amortize`;
         payload = { posting_date: bioForm.posting_date };
       } else if (bioActionOpen === "fair-value") {
-        if (!bioForm.fair_value_per_unit) throw new Error("Fair value per unit is required.");
+        if (!bioForm.fair_value_per_unit) throw new Error(t("blErrFairValueRequired"));
         path = `/batch/${viewing.batch_id}/fair-value`;
         payload = { posting_date: bioForm.posting_date, fair_value_per_unit: Number(bioForm.fair_value_per_unit) };
       } else if (bioActionOpen === "dispose") {
-        if (!bioForm.quantity) throw new Error("Quantity is required.");
+        if (!bioForm.quantity) throw new Error(t("blErrQuantityRequired"));
         path = `/batch/${viewing.batch_id}/dispose`;
         payload = { disposal_type: bioForm.disposal_type, quantity: Number(bioForm.quantity), posting_date: bioForm.posting_date };
         if (bioForm.disposal_type === "HARVEST") {
           if (!bioForm.output_item_id || !bioForm.output_uom || !bioForm.output_quantity || !bioForm.warehouse_id) {
-            throw new Error("Output item, UOM, quantity and warehouse are required for a harvest disposal.");
+            throw new Error(t("blErrHarvestFieldsRequired"));
           }
           payload.output_item_id = bioForm.output_item_id;
           payload.output_uom = bioForm.output_uom;
           payload.output_quantity = Number(bioForm.output_quantity);
           payload.warehouse_id = bioForm.warehouse_id;
         } else {
-          if (!bioForm.sale_proceeds) throw new Error("Sale proceeds are required for a sold disposal.");
+          if (!bioForm.sale_proceeds) throw new Error(t("blErrSaleProceedsRequired"));
           payload.sale_proceeds = Number(bioForm.sale_proceeds);
         }
       }
@@ -546,7 +537,7 @@ export default function BatchPanel() {
       await refreshViewing();
       load();
     } catch (err: any) {
-      setBioError(err?.message || "Action failed.");
+      setBioError(err?.message || t("blErrActionFailed"));
     } finally {
       setBioActing(false);
     }
@@ -607,7 +598,7 @@ export default function BatchPanel() {
     setQcSaving(true);
     setQcError("");
     try {
-      if (!qcForm.total_qty_received) throw new Error("Total quantity received is required.");
+      if (!qcForm.total_qty_received) throw new Error(t("blErrTotalQtyReceivedRequired"));
       const results = qcParameters
         .filter((p) => qcResultValues[p.param_id]?.actual_value !== undefined && qcResultValues[p.param_id]?.actual_value !== "")
         .map((p) => ({
@@ -616,7 +607,7 @@ export default function BatchPanel() {
           grade_assigned: qcResultValues[p.param_id].grade_assigned || undefined,
           notes: qcResultValues[p.param_id].notes || undefined,
         }));
-      if (results.length === 0) throw new Error("Record at least one parameter result.");
+      if (results.length === 0) throw new Error(t("blErrRecordParamResult"));
       const result = await api.post("/qc", {
         company_id: companyId,
         source_batch_id: viewing.batch_id,
@@ -635,7 +626,7 @@ export default function BatchPanel() {
       });
       setQcSubmitted(unwrap<Row>(result));
     } catch (err: any) {
-      setQcError(err?.message || "Failed to record QC inspection.");
+      setQcError(err?.message || t("blErrRecordQc"));
     } finally {
       setQcSaving(false);
     }
@@ -667,7 +658,7 @@ export default function BatchPanel() {
     setPackSaving(true);
     setPackError("");
     try {
-      if (!packForm.net_weight || !packForm.pack_uom) throw new Error("Net weight and UOM are required.");
+      if (!packForm.net_weight || !packForm.pack_uom) throw new Error(t("blErrNetWeightUomRequired"));
       const result = await api.post("/qr-code", {
         company_id: companyId,
         batch_id: viewing.batch_id,
@@ -683,7 +674,7 @@ export default function BatchPanel() {
       });
       setGeneratedPack(unwrap<Row>(result));
     } catch (err: any) {
-      setPackError(err?.message || "Failed to generate pack.");
+      setPackError(err?.message || t("blErrGeneratePack"));
     } finally {
       setPackSaving(false);
     }
@@ -716,8 +707,8 @@ export default function BatchPanel() {
     setRenewSaving(true);
     setRenewError("");
     try {
-      if (!renewForm.start_date || !renewForm.opening_quantity || !renewForm.uom) throw new Error("Start date, opening quantity and UOM are required.");
-      if (!renewForm.item_id || !renewForm.quantity || !renewForm.line_uom) throw new Error("The new cycle's input line (item, quantity, UOM) is required.");
+      if (!renewForm.start_date || !renewForm.opening_quantity || !renewForm.uom) throw new Error(t("blErrRenewHeaderFieldsRequired"));
+      if (!renewForm.item_id || !renewForm.quantity || !renewForm.line_uom) throw new Error(t("blErrRenewInputLineRequired"));
       const result = await api.post(`/batch/${viewing.batch_id}/renew`, {
         start_date: renewForm.start_date,
         expected_end_date: renewForm.expected_end_date || undefined,
@@ -735,7 +726,7 @@ export default function BatchPanel() {
       await load();
       setViewing(unwrap<Row>(result));
     } catch (err: any) {
-      setRenewError(err?.message || "Failed to renew batch.");
+      setRenewError(err?.message || t("blErrRenewBatch"));
     } finally {
       setRenewSaving(false);
     }
@@ -775,7 +766,7 @@ export default function BatchPanel() {
     setStageSaving(true);
     setStageError("");
     try {
-      if (!stageForm.to_stage_code) throw new Error("The destination stage code is required.");
+      if (!stageForm.to_stage_code) throw new Error(t("blErrDestStageRequired"));
       const result = await api.post(`/batch/${viewing.batch_id}/transfer-stage`, {
         to_stage_code: stageForm.to_stage_code,
         remarks: stageForm.remarks || undefined,
@@ -783,7 +774,7 @@ export default function BatchPanel() {
       setStageModalOpen(false);
       setViewing(unwrap<Row>(result));
     } catch (err: any) {
-      setStageError(err?.message || "Failed to transfer stage.");
+      setStageError(err?.message || t("blErrTransferStage"));
     } finally {
       setStageSaving(false);
     }
@@ -793,23 +784,23 @@ export default function BatchPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold" style={S.primary}>Batches</h2>
-          <p className="mt-0.5 text-xs" style={S.sub}>Batch lifecycle: input placement, daily consumption/mortality/output, and closing to finished inventory.</p>
+          <h2 className="text-lg font-semibold" style={S.primary}>{t("blPageTitle")}</h2>
+          <p className="mt-0.5 text-xs" style={S.sub}>{t("blPageSubtitle")}</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="nf-input-sm nf-select" style={S.input}>
-            <option value="">All statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="ACTIVE">Active</option>
-            <option value="CLOSED">Closed</option>
-            <option value="CANCELLED">Cancelled</option>
+            <option value="">{t("blFilterAllStatuses")}</option>
+            <option value="DRAFT">{t("blStatusDraft")}</option>
+            <option value="ACTIVE">{t("blStatusActive")}</option>
+            <option value="CLOSED">{t("blStatusClosed")}</option>
+            <option value="CANCELLED">{t("blStatusCancelled")}</option>
           </select>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="nf-input-sm pl-8" style={S.input} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("blSearchPlaceholder")} className="nf-input-sm pl-8" style={S.input} />
           </div>
-          <Button onClick={openCreate} >
-            <Plus className="h-3.5 w-3.5" /> New Batch
+          <Button size="sm" onClick={openCreate} >
+            <Plus className="h-3.5 w-3.5" /> {t("blNewBatch")}
           </Button>
         </div>
       </div>
@@ -823,20 +814,20 @@ export default function BatchPanel() {
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
               <tr className="border-b border-(--row-border)">
-                <TableHead className="whitespace-nowrap">Batch No.</TableHead>
-                <TableHead className="whitespace-nowrap">Start Date</TableHead>
-                <TableHead className="whitespace-nowrap">Method</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Opening Qty</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Unit Cost</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="whitespace-nowrap">{t("blColBatchNo")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("blColStartDate")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("blColMethod")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("blColOpeningQty")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{t("blColUnitCost")}</TableHead>
+                <TableHead className="text-right">{t("blColStatus")}</TableHead>
+                <TableHead className="text-right">{t("blColActions")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("blLoading")}</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No batches yet.</TableCell></tr>
+                <tr><TableCell colSpan={7} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("blNoBatches")}</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
                   <TableRow key={row.batch_id}>
@@ -846,10 +837,10 @@ export default function BatchPanel() {
                     <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.opening_quantity} {row.uom}</TableCell>
                     <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.unit_cost ?? "—"}</TableCell>
                     <TableCell className="text-right">
-                      <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[row.status] || STATUS_STYLE.DRAFT}>{row.status}</span>
+                      <StatusBadge status={row.status} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                      <button onClick={() => openView(row)} title={t("blViewTitle")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
                     </TableCell>
@@ -870,13 +861,13 @@ export default function BatchPanel() {
       <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title="New Batch"
+        title={t("blNewBatch")}
         maxWidth="xl"
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>{t("blCancel")}</Button>
             <Button size="sm" onClick={handleSave} disabled={saving} className="nf-btn-primary">
-              {saving ? "Saving…" : "Save Draft"}
+              {saving ? t("blSaving") : t("blSaveDraft")}
             </Button>
           </>
         }
@@ -888,77 +879,77 @@ export default function BatchPanel() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Nature of Business <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelNob")} <span className="text-(--danger)">*</span></label>
               <select value={nobId} onChange={(e) => { setNobId(e.target.value); setHeader((h) => ({ ...h, lob_id: "" })); }} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("blSelectEllipsis")}</option>
                 {nobs.map((n) => <option key={n.nob_id} value={n.nob_id}>{n.nob_code} — {n.nob_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Line of Business <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelLob")} <span className="text-(--danger)">*</span></label>
               <select value={header.lob_id} onChange={(e) => setHeader((h) => ({ ...h, lob_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!nobId}>
-                <option value="">{nobId ? "Select…" : "Select Nature of Business first…"}</option>
+                <option value="">{nobId ? t("blSelectEllipsis") : t("blSelectNobFirst")}</option>
                 {lobs.map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Costing Method <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelCostingMethod")} <span className="text-(--danger)">*</span></label>
               <select value={header.costing_method} onChange={(e) => setHeader((h) => ({ ...h, costing_method: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="STANDARD">Standard</option>
-                <option value="FIFO">FIFO</option>
-                <option value="BIO_ASSET">Bio-Asset (IAS41)</option>
+                <option value="STANDARD">{t("blCostingStandard")}</option>
+                <option value="FIFO">{t("blCostingFifo")}</option>
+                <option value="BIO_ASSET">{t("blCostingBioAsset")}</option>
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Breed</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelBreed")}</label>
               <select value={header.breed_id} onChange={(e) => setHeader((h) => ({ ...h, breed_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("blSelectEllipsis")}</option>
                 {breeds.map((b) => <option key={b.breed_id} value={b.breed_id}>{b.breed_code} — {b.breed_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Scheduler (KPI monitoring)</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelScheduler")}</label>
               <select value={header.scheduler_id} onChange={(e) => setHeader((h) => ({ ...h, scheduler_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!header.lob_id}>
-                <option value="">{header.lob_id ? "None" : "Select Line of Business first…"}</option>
+                <option value="">{header.lob_id ? t("blNone") : t("blSelectLobFirst")}</option>
                 {schedulers.map((s) => <option key={s.scheduler_id} value={s.scheduler_id}>{s.scheduler_code} — {s.scheduler_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Shed</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelShed")}</label>
               <select value={header.shed_id} onChange={(e) => setHeader((h) => ({ ...h, shed_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("blSelectEllipsis")}</option>
                 {sheds.map((s) => <option key={s.shed_id} value={s.shed_id}>{s.shed_code} — {s.shed_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Start Date <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelStartDate")} <span className="text-(--danger)">*</span></label>
               <input type="date" value={header.start_date} onChange={(e) => setHeader((h) => ({ ...h, start_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Expected End Date</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelExpectedEndDate")}</label>
               <input type="date" value={header.expected_end_date} onChange={(e) => setHeader((h) => ({ ...h, expected_end_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Opening Quantity <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelOpeningQty")} <span className="text-(--danger)">*</span></label>
               <input type="number" value={header.opening_quantity} onChange={(e) => setHeader((h) => ({ ...h, opening_quantity: e.target.value }))} placeholder="5000" className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>UOM <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelUom")} <span className="text-(--danger)">*</span></label>
               <select value={header.uom} onChange={(e) => setHeader((h) => ({ ...h, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("blSelectEllipsis")}</option>
                 {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelRemarks")}</label>
               <input value={header.remarks} onChange={(e) => setHeader((h) => ({ ...h, remarks: e.target.value }))} className={inputCls} style={S.input} />
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Lines</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blInputLinesTitle")}</p>
             <button onClick={addInputLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
+              <Plus className="h-3 w-3" /> {t("blAddLine")}
             </button>
           </div>
 
@@ -966,11 +957,11 @@ export default function BatchPanel() {
             <table className="w-full border-collapse text-left text-xs">
               <TableHeader>
                 <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Source Batch</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Est. Rate</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColSourceBatch")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColQty")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColUom")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColEstRate")}</TableHead>
                   <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
               </TableHeader>
@@ -979,7 +970,7 @@ export default function BatchPanel() {
                   <TableRow key={idx}>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setInputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select Item ({items.length} options)…</option>
+                        <option value="">{t("blSelectItemOptions", { count: items.length })}</option>
                         {items.map((it, i) => (
                           <option key={it.item_id} value={it.item_id}>
                             {i + 1}. {it.item_code} — {it.item_name || it.item_code}
@@ -989,61 +980,61 @@ export default function BatchPanel() {
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.source_batch_id} onChange={(e) => setInputLineField(idx, "source_batch_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">None</option>
+                        <option value="">{t("blNone")}</option>
                         {batches.filter((b) => b.status === "CLOSED").map((b) => <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>)}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.quantity} onChange={(e) => setInputLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5 w-24">
                       <select value={line.uom} onChange={(e) => setInputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
+                        <option value="">{t("blSelectEllipsis")}</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5 w-24"><input type="number" value={line.rate} onChange={(e) => setInputLineField(idx, "rate", e.target.value)} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeInputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeInputLine(idx)} type="button" className="rounded-[var(--radius-xs)] p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </table>
           </div>
-          <p className="text-[11px]" style={S.muted}>Rate is an estimate only — actual cost is drawn from inventory via FIFO when the batch is activated.</p>
+          <p className="text-[11px]" style={S.muted}>{t("blRateEstimateNote")}</p>
 
           {header.costing_method === "STANDARD" && (
             <>
               <div className="pt-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Standard Cost Assumptions</p>
-                <p className="mt-0.5 text-[11px]" style={S.muted}>Optional — set these to enable Price/Usage/Output/Overhead variance calculation when the batch closes.</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blStdCostTitle")}</p>
+                <p className="mt-0.5 text-[11px]" style={S.muted}>{t("blStdCostSubtitle")}</p>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Output Qty</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelStdOutputQty")}</label>
                   <input
                     type="number"
                     value={stdForm.std_output_quantity}
                     onChange={(e) => setStdForm((f: Row) => ({ ...f, std_output_quantity: e.target.value }))}
-                    placeholder={header.breed_id ? "Auto from breed mortality" : "Defaults to opening qty"}
+                    placeholder={header.breed_id ? t("blPlaceholderAutoFromBreed") : t("blPlaceholderDefaultsOpeningQty")}
                     className={inputCls}
                     style={S.input}
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Output Cost/Unit</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelStdOutputCost")}</label>
                   <input type="number" value={stdForm.std_output_cost_per_unit} onChange={(e) => setStdForm((f: Row) => ({ ...f, std_output_cost_per_unit: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Std Overhead Rate/Unit</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelStdOverheadRate")}</label>
                   <input type="number" value={stdForm.std_overhead_rate_per_unit} onChange={(e) => setStdForm((f: Row) => ({ ...f, std_overhead_rate_per_unit: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Consumption Standards</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blConsumptionStandardsTitle")}</p>
                 <button onClick={addStdConsumptionLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-                  <Plus className="h-3 w-3" /> Add Line
+                  <Plus className="h-3 w-3" /> {t("blAddLine")}
                 </button>
               </div>
 
@@ -1051,9 +1042,9 @@ export default function BatchPanel() {
                 <table className="w-full border-collapse text-left text-xs">
                   <TableHeader>
                     <tr className="border-b border-[var(--row-border)]">
-                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Std Qty/Unit/Day</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Std Rate</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColStdQtyPerUnitDay")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColStdRate")}</TableHead>
                       <TableHead className="h-auto px-3 py-2"></TableHead>
                     </tr>
                   </TableHeader>
@@ -1062,7 +1053,7 @@ export default function BatchPanel() {
                       <TableRow key={idx}>
                         <TableCell className="px-2 py-1.5">
                           <select value={line.item_id} onChange={(e) => setStdConsumptionLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                            <option value="">Select Item ({items.length} options)…</option>
+                            <option value="">{t("blSelectItemOptions", { count: items.length })}</option>
                             {items.map((it, i) => (
                               <option key={it.item_id} value={it.item_id}>
                                 {i + 1}. {it.item_code} — {it.item_name || it.item_code}
@@ -1076,13 +1067,13 @@ export default function BatchPanel() {
                             type="number"
                             value={line.std_rate}
                             onChange={(e) => setStdConsumptionLineField(idx, "std_rate", e.target.value)}
-                            placeholder="Item default"
+                            placeholder={t("blPlaceholderItemDefault")}
                             className={inputCls}
                             style={S.input}
                           />
                         </TableCell>
                         <TableCell className="px-2 py-1.5">
-                          <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => removeStdConsumptionLine(idx)} type="button" className="rounded-[var(--radius-xs)] p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1098,8 +1089,8 @@ export default function BatchPanel() {
       <Dialog
         open={!!viewing}
         onClose={() => setViewing(null)}
-        title={viewing ? `Batch: ${viewing.batch_no}` : "Batch Details"}
-        description={viewing?.remarks || "Production batch metadata, performance telemetry, daily operations, and transactions ledger."}
+        title={viewing ? t("blDetailTitle", { batchNo: viewing.batch_no }) : t("blDetailTitleFallback")}
+        description={viewing?.remarks || t("blDetailDescFallback")}
         maxWidth="xl"
       >
         {viewing && (
@@ -1107,42 +1098,38 @@ export default function BatchPanel() {
             {/* Top Batch Metadata Card */}
             <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4 p-3.5 rounded-[var(--radius-md)] border shadow-2xs" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Status</p>
-                <span className="mt-1 inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-bold" style={STATUS_STYLE[viewing.status] || STATUS_STYLE.DRAFT}>
-                  {viewing.status}
-                </span>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelStatus")}</p>
+                <StatusBadge status={viewing.status} className="mt-1" />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Costing Method</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelCostingMethod")}</p>
                 <p className="font-semibold mt-0.5" style={S.primary}>{viewing.costing_method}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Opening Head / Qty</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelOpeningHeadQty")}</p>
                 <p className="font-semibold mt-0.5" style={S.primary}>{viewing.opening_quantity} {viewing.uom || "HEAD"}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Breed / Variety</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelBreedVariety")}</p>
                 <p className="font-semibold mt-0.5" style={S.primary}>{viewing.breed_name || viewing.breed_code || "—"}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Start Date</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelStartDate")}</p>
                 <p className="font-semibold mt-0.5" style={S.primary}>{viewing.start_date || "—"}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Expected End Date</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelExpectedEndDate")}</p>
                 <p className="font-semibold mt-0.5" style={S.primary}>{viewing.expected_end_date || "—"}</p>
               </div>
               {viewing.current_stage_code && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Current Stage</p>
-                  <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={{ color: "var(--accent)", borderColor: "rgba(194,67,50,0.3)", backgroundColor: "var(--accent-muted)" }}>
-                    {viewing.current_stage_code}
-                  </span>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelCurrentStage")}</p>
+                  <Badge variant="accent" className="mt-1">{viewing.current_stage_code}</Badge>
                 </div>
               )}
               {viewing.total_cost != null && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>Total Cost</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelTotalCost")}</p>
                   <p className="font-semibold mt-0.5" style={S.primary}>₹{Number(viewing.total_cost).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
                 </div>
               )}
@@ -1151,10 +1138,10 @@ export default function BatchPanel() {
             {/* Navigation Tabs */}
             <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
               {([
-                ["overview", "Overview & Inputs"],
-                ["curves", "Performance & Curves"],
-                ["transactions", "Transactions Ledger"],
-                ["data-entry", "Daily Log Entry"],
+                ["overview", t("blTabOverview")],
+                ["curves", t("blTabCurves")],
+                ["transactions", t("blTabTransactions")],
+                ["data-entry", t("blTabDataEntry")],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -1175,26 +1162,26 @@ export default function BatchPanel() {
             <>
             {viewing.status === "DRAFT" && (
               <Button onClick={handleActivate} disabled={acting} size="sm" className="nf-btn-primary self-start">
-                <PlayCircle className="h-4 w-4" /> {acting ? "Activating…" : "Activate Batch"}
+                <PlayCircle className="h-4 w-4" /> {acting ? t("blActivating") : t("blActivateBatch")}
               </Button>
             )}
 
             {viewing.status === "ACTIVE" && (
               <Button onClick={openTransferStage} variant="outline" size="sm" className="self-start gap-1.5">
-                <RefreshCw className="h-3.5 w-3.5" /> Transfer Stage
+                <RefreshCw className="h-3.5 w-3.5" /> {t("blTransferStage")}
               </Button>
             )}
 
             {(viewing.stage_log || []).length > 0 && (
               <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Stage History</p>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blStageHistoryTitle")}</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                   <table className="w-full border-collapse text-left text-xs">
                     <TableHeader><tr className="border-b border-[var(--row-border)]">
-                      <TableHead className="h-auto px-3 py-2">From Stage</TableHead>
-                      <TableHead className="h-auto px-3 py-2">To Stage</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Transferred Date</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Remarks</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColFromStage")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColToStage")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColTransferredDate")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColRemarks")}</TableHead>
                     </tr></TableHeader>
                     <TableBody>
                       {(viewing.stage_log || []).map((s: Row) => (
@@ -1212,14 +1199,14 @@ export default function BatchPanel() {
             )}
 
             <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Lines & Initial Requisitions</p>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blInputLinesInitialTitle")}</p>
               <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                 <table className="w-full border-collapse text-left text-xs">
                   <TableHeader><tr className="border-b border-[var(--row-border)]">
-                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Source Batch</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Rate</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColSourceBatch")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColQty")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColRate")}</TableHead>
                   </tr></TableHeader>
                   <TableBody>
                     {(viewing.input_lines || []).map((l: Row) => (
@@ -1236,32 +1223,30 @@ export default function BatchPanel() {
             </div>
             {viewing.costing_method === "BIO_ASSET" && viewing.bio_asset_state && (
               <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Bio-Asset State</p>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blBioAssetStateTitle")}</p>
                 <div className="rounded-[var(--radius-sm)] border p-3" style={S.surface}>
                   <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
                     <div>
-                      <p className="font-semibold uppercase tracking-wider" style={S.muted}>Stage</p>
-                      <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={viewing.bio_asset_state.stage === "MATURE" ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" } : { color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>
-                        {viewing.bio_asset_state.stage}
-                      </span>
+                      <p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("blLabelStage")}</p>
+                      <Badge variant={viewing.bio_asset_state.stage === "MATURE" ? "success" : "accent"} className="mt-1">{viewing.bio_asset_state.stage}</Badge>
                     </div>
-                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Current Qty</p><p style={S.primary}>{viewing.bio_asset_state.current_quantity}</p></div>
-                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>NCA Book Value</p><p style={S.primary}>{viewing.bio_asset_state.nca_book_value}</p></div>
-                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Monthly Amort. Rate / Unit</p><p style={S.primary}>{viewing.bio_asset_state.monthly_amortization_rate ?? "—"}</p></div>
+                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("blLabelCurrentQty")}</p><p style={S.primary}>{viewing.bio_asset_state.current_quantity}</p></div>
+                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("blLabelNcaBookValue")}</p><p style={S.primary}>{viewing.bio_asset_state.nca_book_value}</p></div>
+                    <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("blLabelMonthlyAmortRate")}</p><p style={S.primary}>{viewing.bio_asset_state.monthly_amortization_rate ?? "—"}</p></div>
                   </div>
                   {viewing.status === "ACTIVE" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {viewing.bio_asset_state.stage === "PREMATURE" && (
-                        <Button size="sm" onClick={() => openBioAction("mature")} className="nf-btn-primary">Mature Herd</Button>
+                        <Button size="sm" onClick={() => openBioAction("mature")} className="nf-btn-primary">{t("blMatureHerd")}</Button>
                       )}
                       {viewing.bio_asset_state.stage === "MATURE" && (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => openBioAction("amortize")}>Run Amortization</Button>
-                          <Button size="sm" variant="outline" onClick={() => openBioAction("fair-value")}>Record Fair Value</Button>
+                          <Button size="sm" variant="outline" onClick={() => openBioAction("amortize")}>{t("blRunAmortization")}</Button>
+                          <Button size="sm" variant="outline" onClick={() => openBioAction("fair-value")}>{t("blRecordFairValue")}</Button>
                         </>
                       )}
                       {Number(viewing.bio_asset_state.current_quantity) > 0 && (
-                        <Button size="sm" onClick={() => openBioAction("dispose")} style={{ backgroundColor: "var(--success)", color: "#fff" }}>Dispose</Button>
+                        <Button size="sm" onClick={() => openBioAction("dispose")} style={{ backgroundColor: "var(--success)", color: "#fff" }}>{t("blDispose")}</Button>
                       )}
                     </div>
                   )}
@@ -1274,13 +1259,13 @@ export default function BatchPanel() {
             {detailTab === "data-entry" && (
               <div className="flex flex-col gap-3">
                 {!viewing.scheduler_id ? (
-                  <InlineAlert variant="info">This batch has no scheduler attached — record entries via the Transactions tab instead.</InlineAlert>
+                  <InlineAlert variant="info">{t("blNoSchedulerInfo")}</InlineAlert>
                 ) : viewing.status !== "ACTIVE" ? (
-                  <InlineAlert variant="info">Data Entry is only available while the batch is ACTIVE.</InlineAlert>
+                  <InlineAlert variant="info">{t("blDataEntryActiveOnly")}</InlineAlert>
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Date</label>
+                      <label className="nf-text-label" style={S.sub}>{t("blLabelDate")}</label>
                       <input type="date" value={dataEntryDate} onChange={(e) => setDataEntryDate(e.target.value)} className={inputCls + " w-auto"} style={S.input} />
                       {dataEntryLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" style={S.accent} />}
                     </div>
@@ -1290,18 +1275,18 @@ export default function BatchPanel() {
                     <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                       <table className="w-full border-collapse text-left text-xs">
                         <TableHeader><tr className="border-b border-[var(--row-border)]">
-                          <TableHead className="h-auto px-3 py-2">Parameter Type</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Data Entry Type</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                          <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Occurrence</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Expected</TableHead>
-                          <TableHead className="h-auto px-3 py-2">Actual</TableHead>
+                          <TableHead className="h-auto px-3 py-2">{t("blColParameterType")}</TableHead>
+                          <TableHead className="h-auto px-3 py-2">{t("blColDataEntryType")}</TableHead>
+                          <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                          <TableHead className="h-auto px-3 py-2">{t("blColUom")}</TableHead>
+                          <TableHead className="h-auto px-3 py-2">{t("blColOccurrence")}</TableHead>
+                          <TableHead className="h-auto px-3 py-2">{t("blColExpected")}</TableHead>
+                          <TableHead className="h-auto px-3 py-2">{t("blColActual")}</TableHead>
                           <TableHead className="h-auto px-3 py-2"></TableHead>
                         </tr></TableHeader>
                         <TableBody>
                           {!dataEntryLoading && dataEntryLines.length === 0 ? (
-                            <tr><TableCell colSpan={8} className="py-6 text-center" style={S.sub}>No parameters scheduled for this date.</TableCell></tr>
+                            <tr><TableCell colSpan={8} className="py-6 text-center" style={S.sub}>{t("blNoParamsScheduled")}</TableCell></tr>
                           ) : dataEntryLines.map((line) => (
                             <TableRow key={line.spl_id}>
                               <TableCell className="px-3 py-2" style={S.sub}>{line.parameter_type}</TableCell>
@@ -1326,7 +1311,7 @@ export default function BatchPanel() {
                                   className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                                   style={{ backgroundColor: "var(--accent)" }}
                                 >
-                                  {dataEntrySavingId === line.spl_id ? "Saving…" : "Save"}
+                                  {dataEntrySavingId === line.spl_id ? t("blSaving") : t("blSave")}
                                 </button>
                               </TableCell>
                             </TableRow>
@@ -1343,15 +1328,15 @@ export default function BatchPanel() {
             <>
             {viewing.status === "ACTIVE" && (
               <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Add Transaction</p>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blAddTransactionTitle")}</p>
                 <div className="grid grid-cols-2 gap-2 rounded-[var(--radius-sm)] border p-3 sm:grid-cols-3" style={S.surface}>
                   <select value={txForm.transaction_type} onChange={(e) => setTxForm((f: Row) => ({ ...f, transaction_type: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                    {["CONSUMPTION", "MORTALITY", "OUTPUT", "OVERHEAD", "OBSERVATION"].map((t) => <option key={t} value={t}>{t}</option>)}
+                    {["CONSUMPTION", "MORTALITY", "OUTPUT", "OVERHEAD", "OBSERVATION"].map((tt) => <option key={tt} value={tt}>{tt}</option>)}
                   </select>
                   <input type="date" value={txForm.transaction_date} onChange={(e) => setTxForm((f: Row) => ({ ...f, transaction_date: e.target.value }))} className={inputCls} style={S.input} />
                   {["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type) && (
                     <select value={txForm.item_id} onChange={(e) => setTxForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Select Item ({items.length} options)…</option>
+                      <option value="">{t("blSelectItemOptions", { count: items.length })}</option>
                       {items.map((it, i) => (
                         <option key={it.item_id} value={it.item_id}>
                           {i + 1}. {it.item_code} — {it.item_name || it.item_code}
@@ -1361,55 +1346,55 @@ export default function BatchPanel() {
                   )}
                   {txForm.transaction_type === "OVERHEAD" && (
                     <select value={txForm.resource_id} onChange={(e) => setTxForm((f: Row) => ({ ...f, resource_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Resource…</option>
+                      <option value="">{t("blSelectResourcePlaceholder")}</option>
                       {resources.map((r) => <option key={r.resource_id} value={r.resource_id}>{r.resource_code}</option>)}
                     </select>
                   )}
                   {["CONSUMPTION", "MORTALITY", "OUTPUT", "OVERHEAD"].includes(txForm.transaction_type) && (
-                    <input type="number" placeholder="Qty" value={txForm.quantity} onChange={(e) => setTxForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
+                    <input type="number" placeholder={t("blPlaceholderQty")} value={txForm.quantity} onChange={(e) => setTxForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
                   )}
                   {["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type) && (
                     <select value={txForm.uom} onChange={(e) => setTxForm((f: Row) => ({ ...f, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">UOM…</option>
+                      <option value="">{t("blSelectUomPlaceholder")}</option>
                       {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                     </select>
                   )}
                   {["OUTPUT", "OVERHEAD"].includes(txForm.transaction_type) && (
-                    <input type="number" placeholder="Rate" value={txForm.rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, rate: e.target.value }))} className={inputCls} style={S.input} />
+                    <input type="number" placeholder={t("blPlaceholderRate")} value={txForm.rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, rate: e.target.value }))} className={inputCls} style={S.input} />
                   )}
                   {txForm.transaction_type === "OUTPUT" && (
                     <select value={txForm.output_type} onChange={(e) => setTxForm((f: Row) => ({ ...f, output_type: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Main product (at close)</option>
-                      <option value="BY_PRODUCT">Remove now — By-product (at NRV)</option>
-                      <option value="WASTE">Remove now — Waste (at NRV)</option>
+                      <option value="">{t("blOutputMainProduct")}</option>
+                      <option value="BY_PRODUCT">{t("blOutputByProduct")}</option>
+                      <option value="WASTE">{t("blOutputWaste")}</option>
                     </select>
                   )}
                   {txForm.transaction_type === "OUTPUT" && txForm.output_type && (
-                    <input type="number" placeholder="NRV Rate / Unit" value={txForm.nrv_rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, nrv_rate: e.target.value }))} className={inputCls} style={S.input} />
+                    <input type="number" placeholder={t("blPlaceholderNrvRate")} value={txForm.nrv_rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, nrv_rate: e.target.value }))} className={inputCls} style={S.input} />
                   )}
-                  <input placeholder="Remarks" value={txForm.remarks} onChange={(e) => setTxForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls + " sm:col-span-3"} style={S.input} />
+                  <input placeholder={t("blPlaceholderRemarks")} value={txForm.remarks} onChange={(e) => setTxForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls + " sm:col-span-3"} style={S.input} />
                   <Button onClick={handleAddTransaction} disabled={acting} size="sm" className="nf-btn-primary">
-                    {acting ? "Saving…" : "Add Transaction"}
+                    {acting ? t("blSaving") : t("blAddTransactionBtn")}
                   </Button>
                 </div>
               </div>
             )}
 
             <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Transaction Log</p>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blTransactionLogTitle")}</p>
               <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                 <table className="w-full border-collapse text-left text-xs">
                   <TableHeader><tr className="border-b border-[var(--row-border)]">
-                    <TableHead className="h-auto px-3 py-2">Date</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Type</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Amount</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Remarks</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColDate")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColType")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColQty")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColAmount")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColRemarks")}</TableHead>
                   </tr></TableHeader>
                   <TableBody>
                     {(viewing.transactions || []).length === 0 ? (
-                      <tr><TableCell colSpan={6} className="py-6 text-center" style={S.sub}>No transactions yet.</TableCell></tr>
+                      <tr><TableCell colSpan={6} className="py-6 text-center" style={S.sub}>{t("blNoTransactions")}</TableCell></tr>
                     ) : (viewing.transactions || []).map((t: Row) => (
                       <TableRow key={t.transaction_id}>
                         <TableCell className="px-3 py-2" style={S.primary}>{t.transaction_date}</TableCell>
@@ -1431,16 +1416,16 @@ export default function BatchPanel() {
             <>
             {viewing.costing_method === "BIO_ASSET" && (viewing.bio_asset_entries || []).length > 0 && (
               <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Bio-Asset Ledger</p>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blBioAssetLedgerTitle")}</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                   <table className="w-full border-collapse text-left text-xs">
                     <TableHeader><tr className="border-b border-[var(--row-border)]">
-                      <TableHead className="h-auto px-3 py-2">Date</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Entry Type</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Stage</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Cost Amount</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColDate")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColEntryType")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColStage")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColQty")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColCostAmount")}</TableHead>
                     </tr></TableHeader>
                     <TableBody>
                       {(viewing.bio_asset_entries || []).map((e: Row) => (
@@ -1461,22 +1446,22 @@ export default function BatchPanel() {
 
             {viewing.status === "ACTIVE" && viewing.costing_method !== "BIO_ASSET" && (
               <Button size="sm" onClick={openClose} style={{ backgroundColor: "var(--success)", color: "#fff" }} className="gap-1.5 self-start">
-                <CheckCircle2 className="h-4 w-4" /> Close Batch
+                <CheckCircle2 className="h-4 w-4" /> {t("blCloseBatch")}
               </Button>
             )}
 
             {viewing.status === "CLOSED" && (viewing.output_lines || []).length > 0 && (
               <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output Lines</p>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blOutputLinesTitle")}</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                   <table className="w-full border-collapse text-left text-xs">
                     <TableHeader><tr className="border-b border-[var(--row-border)]">
-                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Type</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Split %</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Cost / Unit Cost</TableHead>
-                      <TableHead className="h-auto px-3 py-2 text-right">QC / Pack</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColType")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColSplitPct")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColQty")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColCostUnitCost")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2 text-right">{t("blColQcPack")}</TableHead>
                     </tr></TableHeader>
                     <TableBody>
                       {(viewing.output_lines || []).map((l: Row) => (
@@ -1488,10 +1473,10 @@ export default function BatchPanel() {
                           <TableCell className="px-3 py-2" style={S.primary}>{l.computed_cost} / {l.unit_cost}</TableCell>
                           <TableCell className="px-3 py-2 text-right">
                             <div className="flex justify-end gap-1">
-                              <button onClick={() => openRecordQc(l)} title="Record QC" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                              <button onClick={() => openRecordQc(l)} title={t("blRecordQcTitle")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                                 <ClipboardCheck className="h-3.5 w-3.5" />
                               </button>
-                              <button onClick={() => openGeneratePack(l)} title="Generate Pack" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                              <button onClick={() => openGeneratePack(l)} title={t("blGeneratePackTitle")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                                 <QrCodeIcon className="h-3.5 w-3.5" />
                               </button>
                             </div>
@@ -1506,15 +1491,15 @@ export default function BatchPanel() {
 
             {viewing.status === "CLOSED" && (viewing.variances || []).length > 0 && (
               <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Cost Variance</p>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blCostVarianceTitle")}</p>
                 <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                   <table className="w-full border-collapse text-left text-xs">
                     <TableHeader><tr className="border-b border-[var(--row-border)]">
-                      <TableHead className="h-auto px-3 py-2">Type</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Std Value</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Actual Value</TableHead>
-                      <TableHead className="h-auto px-3 py-2">Variance</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColType")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColStdValue")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColActualValue")}</TableHead>
+                      <TableHead className="h-auto px-3 py-2">{t("blColVariance")}</TableHead>
                       <TableHead className="h-auto px-3 py-2"></TableHead>
                     </tr></TableHeader>
                     <TableBody>
@@ -1526,9 +1511,7 @@ export default function BatchPanel() {
                           <TableCell className="px-3 py-2" style={S.primary}>{Number(v.actual_value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</TableCell>
                           <TableCell className="px-3 py-2 font-semibold" style={v.is_favorable ? { color: "var(--success)" } : { color: "var(--danger)" }}>{v.variance_amount}</TableCell>
                           <TableCell className="px-3 py-2">
-                            <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={v.is_favorable ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" } : { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" }}>
-                              {v.is_favorable ? "FAV" : "UNFAV"}
-                            </span>
+                            <Badge variant={v.is_favorable ? "success" : "danger"}>{v.is_favorable ? t("blVarianceFav") : t("blVarianceUnfav")}</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1540,7 +1523,7 @@ export default function BatchPanel() {
 
             {viewing.status === "CLOSED" && renewAllowed && (
               <Button size="sm" variant="outline" onClick={openRenew} className="gap-1.5 self-start">
-                <RefreshCw className="h-3.5 w-3.5" /> Renew Batch — Start Next Cycle
+                <RefreshCw className="h-3.5 w-3.5" /> {t("blRenewBatch")}
               </Button>
             )}
             </>
@@ -1565,12 +1548,12 @@ export default function BatchPanel() {
       <Dialog
         open={stageModalOpen}
         onClose={() => !stageSaving && setStageModalOpen(false)}
-        title="Transfer Stage"
+        title={t("blTransferStage")}
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setStageModalOpen(false)} disabled={stageSaving}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setStageModalOpen(false)} disabled={stageSaving}>{t("blCancel")}</Button>
             <Button size="sm" onClick={handleTransferStage} disabled={stageSaving || stageOptions.length === 0 || !stageForm.to_stage_code} className="nf-btn-primary">
-              {stageSaving ? "Transferring…" : "Transfer"}
+              {stageSaving ? t("blTransferring") : t("blTransferBtn")}
             </Button>
           </>
         }
@@ -1579,22 +1562,22 @@ export default function BatchPanel() {
           {stageError && (
             <InlineAlert>{stageError}</InlineAlert>
           )}
-          <p className="text-xs" style={S.sub}>Current stage: <span className="font-semibold" style={S.primary}>{viewing?.current_stage_code || "None"}</span>. This is a tracking event only — no cost or GL impact.</p>
+          <p className="text-xs" style={S.sub}>{t("blCurrentStagePrefix")} <span className="font-semibold" style={S.primary}>{viewing?.current_stage_code || t("blNone")}</span>. {t("blNoCostGlImpactNote")}</p>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>New Stage *</label>
+            <label className="nf-text-label" style={S.sub}>{t("blLabelNewStage")} *</label>
             {stageOptionsLoading ? (
-              <div className="flex items-center gap-2 text-xs" style={S.sub}><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading stages for this batch's scheduler…</div>
+              <div className="flex items-center gap-2 text-xs" style={S.sub}><Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("blLoadingStages")}</div>
             ) : stageOptions.length > 0 ? (
               <select value={stageForm.to_stage_code || ""} onChange={(e) => setStageForm((f: Row) => ({ ...f, to_stage_code: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select a stage…</option>
+                <option value="">{t("blSelectStagePlaceholder")}</option>
                 {stageOptions.map((code) => (<option key={code} value={code}>{code}</option>))}
               </select>
             ) : (
-              <p className="text-xs" style={S.muted}>No stages are configured on this batch's scheduler yet — add stage-scoped parameter lines to the scheduler (Production &rarr; Schedulers) before transferring.</p>
+              <p className="text-xs" style={S.muted}>{t("blNoStagesConfigured")}</p>
             )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+            <label className="nf-text-label" style={S.sub}>{t("blLabelRemarks")}</label>
             <input value={stageForm.remarks || ""} onChange={(e) => setStageForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls} style={S.input} />
           </div>
         </div>
@@ -1604,12 +1587,12 @@ export default function BatchPanel() {
       <Dialog
         open={renewModalOpen}
         onClose={() => !renewSaving && setRenewModalOpen(false)}
-        title="Renew Batch — Start Next Cycle"
+        title={t("blRenewBatch")}
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setRenewModalOpen(false)} disabled={renewSaving}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setRenewModalOpen(false)} disabled={renewSaving}>{t("blCancel")}</Button>
             <Button size="sm" onClick={handleRenew} disabled={renewSaving} className="nf-btn-primary">
-              {renewSaving ? "Creating…" : "Create Next Cycle"}
+              {renewSaving ? t("blCreating") : t("blCreateNextCycle")}
             </Button>
           </>
         }
@@ -1619,54 +1602,54 @@ export default function BatchPanel() {
             <InlineAlert>{renewError}</InlineAlert>
           )}
           <div className="rounded-lg border px-3 py-2 text-xs" style={S.surface}>
-            <p className="mb-1 font-semibold uppercase tracking-wider" style={S.muted}>Carried forward from {viewing?.batch_no}</p>
-            <p style={S.sub}>Breed: <span style={S.primary}>{viewing?.breed_id ? breeds.find((b) => b.breed_id === viewing.breed_id)?.breed_name || "—" : "—"}</span></p>
-            <p style={S.sub}>Scheduler: <span style={S.primary}>{viewing?.scheduler_id ? schedulers.find((s) => s.scheduler_id === viewing.scheduler_id)?.scheduler_name || "—" : "—"}</span></p>
-            <p style={S.sub}>Shed: <span style={S.primary}>{viewing?.shed_id ? sheds.find((s) => s.shed_id === viewing.shed_id)?.shed_name || "—" : "—"}</span></p>
-            <p style={S.sub}>Costing method: <span style={S.primary}>{viewing?.costing_method}</span>{viewing?.standard ? " (standard-cost assumptions carried forward too)" : ""}</p>
+            <p className="mb-1 font-semibold uppercase tracking-wider" style={S.muted}>{t("blCarriedForwardFrom", { batchNo: viewing?.batch_no })}</p>
+            <p style={S.sub}>{t("blLabelBreedColon")} <span style={S.primary}>{viewing?.breed_id ? breeds.find((b) => b.breed_id === viewing.breed_id)?.breed_name || "—" : "—"}</span></p>
+            <p style={S.sub}>{t("blLabelSchedulerColon")} <span style={S.primary}>{viewing?.scheduler_id ? schedulers.find((s) => s.scheduler_id === viewing.scheduler_id)?.scheduler_name || "—" : "—"}</span></p>
+            <p style={S.sub}>{t("blLabelShedColon")} <span style={S.primary}>{viewing?.shed_id ? sheds.find((s) => s.shed_id === viewing.shed_id)?.shed_name || "—" : "—"}</span></p>
+            <p style={S.sub}>{t("blLabelCostingMethodColon")} <span style={S.primary}>{viewing?.costing_method}</span>{viewing?.standard ? t("blStdCostCarriedForwardNote") : ""}</p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Start Date *</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelStartDate")} *</label>
               <input type="date" value={renewForm.start_date || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, start_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Expected End Date</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelExpectedEndDate")}</label>
               <input type="date" value={renewForm.expected_end_date || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, expected_end_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Opening Quantity *</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelOpeningQty")} *</label>
               <input type="number" value={renewForm.opening_quantity ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, opening_quantity: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>UOM *</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelUom")} *</label>
               <select value={renewForm.uom || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("blSelectEllipsis")}</option>
                 {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
               </select>
             </div>
           </div>
           <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Input Line</p>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blInputLineTitle")}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
               <select value={renewForm.item_id || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={inputCls + " sm:col-span-2 nf-select"} style={S.input}>
-                <option value="">Select Item ({items.length} options)…</option>
+                <option value="">{t("blSelectItemOptions", { count: items.length })}</option>
                 {items.map((it, i) => (
                   <option key={it.item_id} value={it.item_id}>
                     {i + 1}. {it.item_code} — {it.item_name || it.item_code}
                   </option>
                 ))}
               </select>
-              <input type="number" placeholder="Qty" value={renewForm.quantity ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
+              <input type="number" placeholder={t("blPlaceholderQty")} value={renewForm.quantity ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
               <select value={renewForm.line_uom || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, line_uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">UOM…</option>
+                <option value="">{t("blSelectUomPlaceholder")}</option>
                 {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
               </select>
-              <input type="number" placeholder="Est. Rate" value={renewForm.rate ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, rate: e.target.value }))} className={inputCls + " sm:col-span-4"} style={S.input} />
+              <input type="number" placeholder={t("blPlaceholderEstRate")} value={renewForm.rate ?? ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, rate: e.target.value }))} className={inputCls + " sm:col-span-4"} style={S.input} />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+            <label className="nf-text-label" style={S.sub}>{t("blLabelRemarks")}</label>
             <input value={renewForm.remarks || ""} onChange={(e) => setRenewForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls} style={S.input} />
           </div>
         </div>
@@ -1676,13 +1659,13 @@ export default function BatchPanel() {
       <Dialog
         open={closeModalOpen}
         onClose={() => !acting && setCloseModalOpen(false)}
-        title={`Close Batch ${viewing?.batch_no || ""}`}
+        title={t("blCloseBatchTitle", { batchNo: viewing?.batch_no || "" })}
         maxWidth="xl"
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setCloseModalOpen(false)} disabled={acting}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setCloseModalOpen(false)} disabled={acting}>{t("blCancel")}</Button>
             <Button size="sm" onClick={handleClose} disabled={acting} className="nf-btn-primary">
-              {acting ? "Closing…" : "Close Batch"}
+              {acting ? t("blClosing") : t("blCloseBatch")}
             </Button>
           </>
         }
@@ -1693,19 +1676,19 @@ export default function BatchPanel() {
           )}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Actual End Date</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelActualEndDate")}</label>
               <input type="date" value={closeDate} onChange={(e) => setCloseDate(e.target.value)} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Closing (Surviving) Quantity</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelClosingQty")}</label>
               <input type="number" value={closeQty} onChange={(e) => setCloseQty(e.target.value)} className={inputCls} style={S.input} />
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output Lines — split % must sum to 100</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blOutputLinesSplitNote")}</p>
             <button onClick={addOutputLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
+              <Plus className="h-3 w-3" /> {t("blAddLine")}
             </button>
           </div>
 
@@ -1713,12 +1696,12 @@ export default function BatchPanel() {
             <table className="w-full border-collapse text-left text-xs">
               <TableHeader>
                 <tr className="border-b border-[var(--row-border)]">
-                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Type</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Split %</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Warehouse</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColType")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColSplitPct")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColQty")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColUom")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("blColWarehouse")}</TableHead>
                   <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
               </TableHeader>
@@ -1727,7 +1710,7 @@ export default function BatchPanel() {
                   <TableRow key={idx}>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setOutputLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select Item ({items.length} options)…</option>
+                        <option value="">{t("blSelectItemOptions", { count: items.length })}</option>
                         {items.map((it, i) => (
                           <option key={it.item_id} value={it.item_id}>
                             {i + 1}. {it.item_code} — {it.item_name || it.item_code}
@@ -1737,33 +1720,33 @@ export default function BatchPanel() {
                     </TableCell>
                     <TableCell className="px-2 py-1.5 w-24">
                       <select value={line.output_type} onChange={(e) => setOutputLineField(idx, "output_type", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="MAIN">Main</option>
-                        <option value="BY_PRODUCT">By-Product</option>
+                        <option value="MAIN">{t("blOutputTypeMain")}</option>
+                        <option value="BY_PRODUCT">{t("blOutputTypeByProduct")}</option>
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.cost_split_pct} onChange={(e) => setOutputLineField(idx, "cost_split_pct", e.target.value)} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5 w-20"><input type="number" value={line.quantity} onChange={(e) => setOutputLineField(idx, "quantity", e.target.value)} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5 w-24">
                       <select value={line.uom} onChange={(e) => setOutputLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
+                        <option value="">{t("blSelectEllipsis")}</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.warehouse_id} onChange={(e) => setOutputLineField(idx, "warehouse_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
+                        <option value="">{t("blSelectEllipsis")}</option>
                         {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code}</option>)}
                       </select>
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeOutputLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeOutputLine(idx)} type="button" className="rounded-[var(--radius-xs)] p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
               <TableFooter>
                 <tr>
-                  <TableCell colSpan={2} className="px-3 py-2" style={S.sub}>Split Total</TableCell>
+                  <TableCell colSpan={2} className="px-3 py-2" style={S.sub}>{t("blSplitTotal")}</TableCell>
                   <TableCell className="px-3 py-2" style={{ color: Math.abs(splitTotal - 100) < 0.01 ? "var(--success)" : "var(--danger)" }}>{splitTotal.toFixed(2)}%</TableCell>
                   <TableCell colSpan={4}></TableCell>
                 </tr>
@@ -1778,16 +1761,16 @@ export default function BatchPanel() {
         open={!!bioActionOpen}
         onClose={() => !bioActing && setBioActionOpen(null)}
         title={
-          bioActionOpen === "mature" ? "Mature Herd"
-            : bioActionOpen === "amortize" ? "Run Amortization"
-            : bioActionOpen === "fair-value" ? "Record Fair Value"
-            : "Dispose"
+          bioActionOpen === "mature" ? t("blMatureHerd")
+            : bioActionOpen === "amortize" ? t("blRunAmortization")
+            : bioActionOpen === "fair-value" ? t("blRecordFairValue")
+            : t("blDispose")
         }
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setBioActionOpen(null)} disabled={bioActing}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setBioActionOpen(null)} disabled={bioActing}>{t("blCancel")}</Button>
             <Button size="sm" onClick={handleBioAction} disabled={bioActing} className="nf-btn-primary">
-              {bioActing ? "Saving…" : "Confirm"}
+              {bioActing ? t("blSaving") : t("blConfirm")}
             </Button>
           </>
         }
@@ -1800,32 +1783,32 @@ export default function BatchPanel() {
           {bioActionOpen === "mature" && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Residual Value / Unit <span className="text-(--danger)">*</span></label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelResidualValue")} <span className="text-(--danger)">*</span></label>
                 <input type="number" value={bioForm.residual_value_per_unit} onChange={(e) => setBioForm((f: Row) => ({ ...f, residual_value_per_unit: e.target.value }))} className={inputCls} style={S.input} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Productive Life (Months)</label>
-                <input type="number" value={bioForm.productive_life_months} onChange={(e) => setBioForm((f: Row) => ({ ...f, productive_life_months: e.target.value }))} placeholder="From breed if left blank" className={inputCls} style={S.input} />
+                <label className="nf-text-label" style={S.sub}>{t("blLabelProductiveLife")}</label>
+                <input type="number" value={bioForm.productive_life_months} onChange={(e) => setBioForm((f: Row) => ({ ...f, productive_life_months: e.target.value }))} placeholder={t("blPlaceholderFromBreed")} className={inputCls} style={S.input} />
               </div>
             </div>
           )}
 
           {bioActionOpen === "amortize" && (
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date</label>
+              <label className="nf-text-label" style={S.sub}>{t("blLabelPostingDate")}</label>
               <input type="date" value={bioForm.posting_date} onChange={(e) => setBioForm((f: Row) => ({ ...f, posting_date: e.target.value }))} className={inputCls} style={S.input} />
-              <p className="text-[11px]" style={S.muted}>One amortization run per calendar month.</p>
+              <p className="text-[11px]" style={S.muted}>{t("blAmortizationNote")}</p>
             </div>
           )}
 
           {bioActionOpen === "fair-value" && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date</label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelPostingDate")}</label>
                 <input type="date" value={bioForm.posting_date} onChange={(e) => setBioForm((f: Row) => ({ ...f, posting_date: e.target.value }))} className={inputCls} style={S.input} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>New Fair Value / Unit <span className="text-(--danger)">*</span></label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelNewFairValue")} <span className="text-(--danger)">*</span></label>
                 <input type="number" value={bioForm.fair_value_per_unit} onChange={(e) => setBioForm((f: Row) => ({ ...f, fair_value_per_unit: e.target.value }))} className={inputCls} style={S.input} />
               </div>
             </div>
@@ -1835,18 +1818,18 @@ export default function BatchPanel() {
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Disposal Type</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelDisposalType")}</label>
                   <select value={bioForm.disposal_type} onChange={(e) => setBioForm((f: Row) => ({ ...f, disposal_type: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                    <option value="HARVEST">Harvest</option>
-                    <option value="SOLD">Sold</option>
+                    <option value="HARVEST">{t("blDisposalHarvest")}</option>
+                    <option value="SOLD">{t("blDisposalSold")}</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Quantity</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelQuantity")}</label>
                   <input type="number" value={bioForm.quantity} onChange={(e) => setBioForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelPostingDate")}</label>
                   <input type="date" value={bioForm.posting_date} onChange={(e) => setBioForm((f: Row) => ({ ...f, posting_date: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
               </div>
@@ -1854,11 +1837,11 @@ export default function BatchPanel() {
               {bioForm.disposal_type === "HARVEST" ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>
-                      Output Item ({items.length} options)
+                    <label className="nf-text-label" style={S.sub}>
+                      {t("blLabelOutputItem", { count: items.length })}
                     </label>
                     <select value={bioForm.output_item_id} onChange={(e) => setBioForm((f: Row) => ({ ...f, output_item_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Select Item ({items.length} options)…</option>
+                      <option value="">{t("blSelectItemOptions", { count: items.length })}</option>
                       {items.map((it, i) => (
                         <option key={it.item_id} value={it.item_id}>
                           {i + 1}. {it.item_code} — {it.item_name || it.item_code}
@@ -1867,29 +1850,29 @@ export default function BatchPanel() {
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output UOM</label>
+                    <label className="nf-text-label" style={S.sub}>{t("blLabelOutputUom")}</label>
                     <select value={bioForm.output_uom} onChange={(e) => setBioForm((f: Row) => ({ ...f, output_uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Select…</option>
+                      <option value="">{t("blSelectEllipsis")}</option>
                       {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Output Quantity</label>
+                    <label className="nf-text-label" style={S.sub}>{t("blLabelOutputQuantity")}</label>
                     <input type="number" value={bioForm.output_quantity} onChange={(e) => setBioForm((f: Row) => ({ ...f, output_quantity: e.target.value }))} className={inputCls} style={S.input} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Warehouse</label>
+                    <label className="nf-text-label" style={S.sub}>{t("blLabelWarehouse")}</label>
                     <select value={bioForm.warehouse_id} onChange={(e) => setBioForm((f: Row) => ({ ...f, warehouse_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">Select…</option>
+                      <option value="">{t("blSelectEllipsis")}</option>
                       {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code}</option>)}
                     </select>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Sale Proceeds</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelSaleProceeds")}</label>
                   <input type="number" value={bioForm.sale_proceeds} onChange={(e) => setBioForm((f: Row) => ({ ...f, sale_proceeds: e.target.value }))} className={inputCls} style={S.input} />
-                  <p className="text-[11px]" style={S.muted}>Gain/loss vs. the disposed animals' book value posts automatically. Cash/receivable isn't recorded here.</p>
+                  <p className="text-[11px]" style={S.muted}>{t("blSaleProceedsNote")}</p>
                 </div>
               )}
             </div>
@@ -1901,14 +1884,14 @@ export default function BatchPanel() {
       <Dialog
         open={qcModalOpen}
         onClose={() => !qcSaving && setQcModalOpen(false)}
-        title={qcLine ? `Record QC — ${itemLabel(qcLine.item_id)}` : "Record QC"}
+        title={qcLine ? t("blRecordQcTitleFull", { item: itemLabel(qcLine.item_id) }) : t("blRecordQc")}
         maxWidth="lg"
         footer={
           qcSubmitted ? undefined : (
             <>
-              <Button variant="outline" size="sm" onClick={() => setQcModalOpen(false)} disabled={qcSaving}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={() => setQcModalOpen(false)} disabled={qcSaving}>{t("blCancel")}</Button>
               <Button size="sm" onClick={handleSaveQc} disabled={qcSaving} className="nf-btn-primary">
-                {qcSaving ? "Saving…" : "Submit Inspection"}
+                {qcSaving ? t("blSaving") : t("blSubmitInspection")}
               </Button>
             </>
           )
@@ -1927,15 +1910,15 @@ export default function BatchPanel() {
                   ? { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" }
                   : { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" }}
               >
-                Overall Result: {qcSubmitted.overall_result}
+                {t("blOverallResult", { result: qcSubmitted.overall_result })}
               </span>
-              <p className="text-xs" style={S.sub}>Disposition: {qcSubmitted.disposition}</p>
+              <p className="text-xs" style={S.sub}>{t("blDispositionLabel", { disposition: qcSubmitted.disposition })}</p>
               <div className="w-full overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
                 <table className="w-full border-collapse text-left text-xs">
                   <TableHeader><tr className="border-b border-(--row-border)">
-                    <TableHead className="h-auto px-3 py-2">Parameter</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Value</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Result</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColParameter")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColValue")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("blColResult")}</TableHead>
                   </tr></TableHeader>
                   <TableBody>
                     {(qcSubmitted.results || []).map((r: Row) => {
@@ -1956,37 +1939,37 @@ export default function BatchPanel() {
             <>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>QC Date</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelQcDate")}</label>
                   <input type="date" value={qcForm.qc_date} onChange={(e) => setQcForm((f: Row) => ({ ...f, qc_date: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Total Qty Received</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelTotalQtyReceived")}</label>
                   <input type="number" value={qcForm.total_qty_received} onChange={(e) => setQcForm((f: Row) => ({ ...f, total_qty_received: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Disposition</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelDisposition")}</label>
                   <select value={qcForm.disposition} onChange={(e) => setQcForm((f: Row) => ({ ...f, disposition: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
                     {["ACCEPT", "REJECT", "REWORK", "QUARANTINE", "CONDITIONAL_ACCEPT"].map((d) => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Pass Qty</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelPassQty")}</label>
                   <input type="number" value={qcForm.pass_qty} onChange={(e) => setQcForm((f: Row) => ({ ...f, pass_qty: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Fail Qty</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelFailQty")}</label>
                   <input type="number" value={qcForm.fail_qty} onChange={(e) => setQcForm((f: Row) => ({ ...f, fail_qty: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Hold Qty</label>
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelHoldQty")}</label>
                   <input type="number" value={qcForm.hold_qty} onChange={(e) => setQcForm((f: Row) => ({ ...f, hold_qty: e.target.value }))} className={inputCls} style={S.input} />
                 </div>
               </div>
 
               <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Parameter Results</p>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blParameterResultsTitle")}</p>
                 {qcParameters.length === 0 ? (
-                  <p className="rounded-[var(--radius-sm)] border p-3 text-xs" style={{ ...S.surface, ...S.sub }}>No QC parameters defined for this Line of Business yet.</p>
+                  <p className="rounded-[var(--radius-sm)] border p-3 text-xs" style={{ ...S.surface, ...S.sub }}>{t("blNoQcParams")}</p>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {qcParameters.map((p) => (
@@ -1997,13 +1980,13 @@ export default function BatchPanel() {
                         </div>
                         <div className="col-span-2">
                           {p.param_type === "NUMERIC" && (
-                            <input type="number" placeholder="Actual value" value={qcResultValues[p.param_id]?.actual_value ?? ""} onChange={(e) => setQcResultField(p.param_id, "actual_value", e.target.value)} className={inputCls} style={S.input} />
+                            <input type="number" placeholder={t("blPlaceholderActualValue")} value={qcResultValues[p.param_id]?.actual_value ?? ""} onChange={(e) => setQcResultField(p.param_id, "actual_value", e.target.value)} className={inputCls} style={S.input} />
                           )}
                           {p.param_type === "BOOLEAN" && (
                             <select value={qcResultValues[p.param_id]?.actual_value ?? ""} onChange={(e) => setQcResultField(p.param_id, "actual_value", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                              <option value="">Select…</option>
-                              <option value="true">Pass (true)</option>
-                              <option value="false">Fail (false)</option>
+                              <option value="">{t("blSelectEllipsis")}</option>
+                              <option value="true">{t("blPassTrue")}</option>
+                              <option value="false">{t("blFailFalse")}</option>
                             </select>
                           )}
                           {p.param_type === "GRADE" && (
@@ -2013,7 +1996,7 @@ export default function BatchPanel() {
                               className={`${inputCls} nf-select`}
                               style={S.input}
                             >
-                              <option value="">Select grade…</option>
+                              <option value="">{t("blSelectGrade")}</option>
                               {Object.keys(p.grade_scale || {}).map((g) => <option key={g} value={g}>{g} — {p.grade_scale[g]}</option>)}
                             </select>
                           )}
@@ -2025,7 +2008,7 @@ export default function BatchPanel() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Notes</label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelNotes")}</label>
                 <input value={qcForm.qc_notes} onChange={(e) => setQcForm((f: Row) => ({ ...f, qc_notes: e.target.value }))} className={inputCls} style={S.input} />
               </div>
             </>
@@ -2037,15 +2020,15 @@ export default function BatchPanel() {
       <Dialog
         open={packModalOpen}
         onClose={() => !packSaving && setPackModalOpen(false)}
-        title={packLine ? `Generate Pack — ${itemLabel(packLine.item_id)}` : "Generate Pack"}
+        title={packLine ? t("blGeneratePackTitleFull", { item: itemLabel(packLine.item_id) }) : t("blGeneratePack")}
         footer={
           generatedPack ? (
-            <Button variant="outline" size="sm" onClick={generateAnotherPack}>Generate Another Pack</Button>
+            <Button variant="outline" size="sm" onClick={generateAnotherPack}>{t("blGenerateAnotherPack")}</Button>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={() => setPackModalOpen(false)} disabled={packSaving}>Cancel</Button>
-              <Button size="sm" onClick={handleGeneratePack} disabled={packSaving || packQcGateBlocked} title={packQcGateBlocked ? "This LOB requires a passing QC record before a pack can be generated" : undefined} className="nf-btn-primary">
-                {packSaving ? "Generating…" : "Generate Pack"}
+              <Button variant="outline" size="sm" onClick={() => setPackModalOpen(false)} disabled={packSaving}>{t("blCancel")}</Button>
+              <Button size="sm" onClick={handleGeneratePack} disabled={packSaving || packQcGateBlocked} title={packQcGateBlocked ? t("blPackQcGateTooltip") : undefined} className="nf-btn-primary">
+                {packSaving ? t("blGenerating") : t("blGeneratePack")}
               </Button>
             </>
           )
@@ -2057,7 +2040,7 @@ export default function BatchPanel() {
           )}
 
           {!generatedPack && packQcRequired && (
-            <InlineAlert variant="warning">This LOB requires QC — select a QC record below with result PASS to generate a pack.</InlineAlert>
+            <InlineAlert variant="warning">{t("blPackQcRequiredWarning")}</InlineAlert>
           )}
 
           {generatedPack ? (
@@ -2071,35 +2054,35 @@ export default function BatchPanel() {
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Net Weight <span className="text-(--danger)">*</span></label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelNetWeight")} <span className="text-(--danger)">*</span></label>
                 <input type="number" value={packForm.net_weight} onChange={(e) => setPackForm((f: Row) => ({ ...f, net_weight: e.target.value }))} className={inputCls} style={S.input} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Gross Weight</label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelGrossWeight")}</label>
                 <input type="number" value={packForm.gross_weight} onChange={(e) => setPackForm((f: Row) => ({ ...f, gross_weight: e.target.value }))} className={inputCls} style={S.input} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Pack UOM <span className="text-(--danger)">*</span></label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelPackUom")} <span className="text-(--danger)">*</span></label>
                 <select value={packForm.pack_uom} onChange={(e) => setPackForm((f: Row) => ({ ...f, pack_uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                  <option value="">Select…</option>
+                  <option value="">{t("blSelectEllipsis")}</option>
                   {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Lot No.</label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelLotNo")}</label>
                 <input value={packForm.lot_no} onChange={(e) => setPackForm((f: Row) => ({ ...f, lot_no: e.target.value }))} className={inputCls} style={S.input} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Warehouse / Facility</label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelWarehouseFacility")}</label>
                 <select value={packForm.warehouse_id} onChange={(e) => setPackForm((f: Row) => ({ ...f, warehouse_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                  <option value="">Select…</option>
+                  <option value="">{t("blSelectEllipsis")}</option>
                   {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Link QC Record{packQcRequired ? " (required — must PASS)" : " (optional)"}</label>
+                <label className="nf-text-label" style={S.sub}>{t("blLabelLinkQcRecord")}{packQcRequired ? t("blQcRequiredSuffix") : t("blQcOptionalSuffix")}</label>
                 <select value={packForm.qc_id} onChange={(e) => setPackForm((f: Row) => ({ ...f, qc_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                  <option value="">None</option>
+                  <option value="">{t("blNone")}</option>
                   {packQcRecords.map((q) => <option key={q.qc_id} value={q.qc_id}>{q.qc_date} — {q.overall_result}</option>)}
                 </select>
               </div>

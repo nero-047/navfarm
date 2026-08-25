@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { translations, TranslationKeys } from "../utils/translations";
 import { masterDataLabelTranslations } from "../utils/master-data-translations";
+import { resolveLobFamily, LOB_LABEL_KEY } from "@/lib/lob";
 
 export type Language = "en" | "hi" | "mr" | "es" | "fr" | "bn" | "te" | "ta";
 
@@ -23,6 +24,7 @@ interface LanguageContextValue {
    * data-driven label/description text like Master Data's configs.ts,
    * where rewriting every string into a keyed dictionary isn't practical.
    * Falls back to the English text itself when no translation exists. */
+  tLob: (code?: string | null) => string;
   tLabel: (text: string) => string;
 }
 
@@ -30,6 +32,7 @@ const LanguageContext = createContext<LanguageContextValue>({
   language: "en",
   setLanguage: () => undefined,
   t: (key: TranslationKeys) => key,
+  tLob: (code?: string | null) => code || "",
   tLabel: (text: string) => text,
 });
 
@@ -74,13 +77,21 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return interpolate(template, vars);
   };
 
+  // LOB codes are raw enums (PIGGERY/DAIRY/POULTRY). Interpolating one straight
+  // into a translated string produced half-translated headings like
+  // "PIGGERY डैशबोर्ड" — the sentence localised, the subject left in English.
+  // Resolves through the shared LOB registry rather than matching three bare
+  // words: a real code like "LVS_PIGGERY" used to fall through and render
+  // literally in the UI.
+  const tLob = (code?: string | null): string => t(LOB_LABEL_KEY[resolveLobFamily(code)]);
+
   const tLabel = (text: string): string => {
     if (language === "en") return text;
     return masterDataLabelTranslations[text]?.[language] || text;
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, tLabel }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, tLob, tLabel }}>
       {children}
     </LanguageContext.Provider>
   );

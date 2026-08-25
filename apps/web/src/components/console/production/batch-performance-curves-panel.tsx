@@ -10,6 +10,10 @@ import {
 import { api } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
+import { StatRow, StatCard } from "@/components/ui/stat-row";
+import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/hooks/useLanguage";
+import { getActiveCompanyId } from "@/hooks/useAuth";
 
 type Row = Record<string, any>;
 
@@ -38,24 +42,36 @@ export default function BatchPerformanceCurvesPanel({
   batchId,
   onSchedulerGenerated,
 }: BatchPerformanceCurvesPanelProps) {
+  const { t } = useLanguage();
   const [loading, setLoading]       = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError]           = useState("");
   const [data, setData]             = useState<Row | null>(null);
+  const [animals, setAnimals]       = useState<Row[]>([]);
+  const [selectedAnimalId, setSelectedAnimalId] = useState("");
 
-  const loadCurves = async () => {
+  const loadCurves = async (animalId?: string) => {
     if (!batchId) return;
     setLoading(true);
     setError("");
     try {
-      const res = await api.get(`/batch/${batchId}/performance-curves`);
+      const qs = animalId ? `?animalId=${animalId}` : "";
+      const res = await api.get(`/batch/${batchId}/performance-curves${qs}`);
       setData(unwrap<Row>(res));
     } catch (err: any) {
-      setError(err?.message || "Failed to load batch performance curves.");
+      setError(err?.message || t("bpcLoadError"));
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!batchId) return;
+    const companyId = getActiveCompanyId();
+    api.get(`/animal?companyId=${companyId}&currentBatchId=${batchId}&limit=500`)
+      .then((res) => setAnimals(unwrap<Row[]>(res) || []))
+      .catch(() => setAnimals([]));
+  }, [batchId]);
 
   const handleGenerateScheduler = async () => {
     setGenerating(true);
@@ -65,7 +81,7 @@ export default function BatchPerformanceCurvesPanel({
       await loadCurves();
       onSchedulerGenerated?.();
     } catch (err: any) {
-      setError(err?.message || "Failed to auto-generate scheduler from breed standards.");
+      setError(err?.message || t("bpcGenerateSchedulerError"));
     } finally {
       setGenerating(false);
     }
@@ -75,11 +91,16 @@ export default function BatchPerformanceCurvesPanel({
     loadCurves();
   }, [batchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleAnimalFilterChange = (animalId: string) => {
+    setSelectedAnimalId(animalId);
+    loadCurves(animalId || undefined);
+  };
+
   if (loading && !data) {
     return (
       <div className="py-16 text-center">
         <Loader2 className="mx-auto h-8 w-8 animate-spin" style={S.accent} />
-        <p className="mt-3 text-sm" style={S.sub}>Loading performance curves & breed standards…</p>
+        <p className="mt-3 text-sm" style={S.sub}>{t("bpcLoadingCurves")}</p>
       </div>
     );
   }
@@ -97,112 +118,96 @@ export default function BatchPerformanceCurvesPanel({
         <div>
           <div className="flex items-center gap-2">
             <h4 className="text-base font-semibold" style={S.primary}>
-              Breed Performance Curves & Live Execution
+              {t("bpcPanelTitle")}
             </h4>
             {batch.has_scheduler ? (
-              <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={S.success}>
-                <CheckCircle2 className="h-3 w-3" /> Scheduler: {batch.scheduler_code}
-              </span>
+              <Badge variant="success"><CheckCircle2 className="h-3 w-3" /> {t("bpcSchedulerLabel", { code: batch.scheduler_code })}</Badge>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={S.warning}>
-                <AlertTriangle className="h-3 w-3" /> No Active Scheduler
-              </span>
+              <Badge variant="warning"><AlertTriangle className="h-3 w-3" /> {t("bpcNoActiveScheduler")}</Badge>
             )}
           </div>
           <p className="text-xs mt-0.5" style={S.muted}>
-            Comparing daily feed intake, target growth, and mortality against {batch.breed_name || "standard breed"} lifecycle curves.
+            {t("bpcCurvesDescription", { breed: batch.breed_name || t("bpcStandardBreed") })}
           </p>
         </div>
 
-        {!batch.has_scheduler && (
-          <Button size="sm" onClick={handleGenerateScheduler} disabled={generating}>
-            {generating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Layers className="mr-1.5 h-3.5 w-3.5" />}
-            Generate Scheduler from Breed Standard
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {animals.length > 0 && (
+            <select
+              value={selectedAnimalId}
+              onChange={(e) => handleAnimalFilterChange(e.target.value)}
+              className="nf-input h-9 text-xs"
+            >
+              <option value="">{t("schedWholeBatch")}</option>
+              {animals.map((a) => (
+                <option key={a.animal_id} value={a.animal_id}>{a.ear_tag || a.animal_code}</option>
+              ))}
+            </select>
+          )}
+          {!batch.has_scheduler && (
+            <Button size="sm" onClick={handleGenerateScheduler} disabled={generating}>
+              {generating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Layers className="mr-1.5 h-3.5 w-3.5" />}
+              {t("bpcGenerateSchedulerButton")}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* ── Summary KPI Cards ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Feed Summary */}
-        <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Total Feed Intake</p>
-            <Utensils className="h-4 w-4" style={S.accent} />
-          </div>
-          <p className="mt-2 text-2xl font-bold" style={S.primary}>
-            {summary.totalActFeedKg?.toLocaleString("en-IN") || 0}{" "}
-            <span className="text-xs font-normal" style={S.muted}>/ {summary.totalStdFeedKg?.toLocaleString("en-IN") || 0} kg std</span>
-          </p>
-          <p className="mt-1 text-xs" style={summary.feedDeviationPct > 10 ? S.warning : S.sub}>
-            {summary.feedDeviationPct > 0 ? `+${summary.feedDeviationPct}%` : `${summary.feedDeviationPct}%`} variance vs target
-          </p>
-        </div>
-
-        {/* Live FCR */}
-        <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Feed Conversion (FCR)</p>
-            <Scale className="h-4 w-4" style={S.accent} />
-          </div>
-          <p className="mt-2 text-2xl font-bold" style={S.primary}>
-            {summary.liveFcr != null ? summary.liveFcr : "—"}{" "}
-            <span className="text-xs font-normal" style={S.muted}>kg feed / kg gain</span>
-          </p>
-          <p className="mt-1 text-xs" style={S.sub}>
-            Last weight: {summary.lastRecordedWeightKg || 1.5} kg
-          </p>
-        </div>
-
-        {/* Mortality */}
-        <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Cumulative Mortality</p>
-            <Skull className="h-4 w-4" style={summary.totalMortality > 0 ? S.danger : S.accent} />
-          </div>
-          <p className="mt-2 text-2xl font-bold" style={S.primary}>
-            {summary.totalMortality || 0}{" "}
-            <span className="text-xs font-normal" style={S.muted}>pigs ({summary.mortalityRatePct || 0}%)</span>
-          </p>
-          <p className="mt-1 text-xs" style={S.sub}>
-            Current headcount: {batch.current_quantity || 0}
-          </p>
-        </div>
-
-        {/* Batch Age */}
-        <div className="rounded-[var(--radius-lg)] border p-4 shadow-sm" style={S.raised}>
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide" style={S.muted}>Batch Timeline</p>
-            <Calendar className="h-4 w-4" style={S.accent} />
-          </div>
-          <p className="mt-2 text-2xl font-bold" style={S.primary}>
-            Day {batch.batch_age_days || 1}
-          </p>
-          <p className="mt-1 text-xs" style={S.sub}>
-            Stage: {batch.current_stage_code || "Quarantine / Grower"}
-          </p>
-        </div>
-      </div>
+      <StatRow>
+        <StatCard
+          icon={Utensils}
+          label={t("bpcTotalFeedIntake")}
+          value={summary.totalActFeedKg?.toLocaleString("en-IN") || 0}
+          unit={t("bpcFeedStdSuffix", { value: summary.totalStdFeedKg?.toLocaleString("en-IN") || 0 })}
+          sub={
+            <span className={summary.feedDeviationPct > 10 ? "text-(--warning)" : undefined}>
+              {summary.feedDeviationPct > 0 ? `+${summary.feedDeviationPct}%` : `${summary.feedDeviationPct}%`} {t("bpcVarianceVsTarget")}
+            </span>
+          }
+        />
+        <StatCard
+          icon={Scale}
+          label={t("bpcFeedConversionFcr")}
+          value={summary.liveFcr != null ? summary.liveFcr : "—"}
+          unit={t("bpcKgFeedPerKgGain")}
+          sub={t("bpcLastWeight", { weight: summary.lastRecordedWeightKg || 1.5 })}
+        />
+        <StatCard
+          icon={Skull}
+          tone={summary.totalMortality > 0 ? "danger" : "default"}
+          label={t("bpcCumulativeMortality")}
+          value={summary.totalMortality || 0}
+          unit={t("bpcPigsWithRate", { rate: summary.mortalityRatePct || 0 })}
+          sub={t("bpcCurrentHeadcount", { count: batch.current_quantity || 0 })}
+        />
+        <StatCard
+          icon={Calendar}
+          label={t("bpcBatchTimeline")}
+          value={t("bpcDayLabel", { day: batch.batch_age_days || 1 })}
+          sub={t("bpcStageLabel", { stage: batch.current_stage_code || t("bpcDefaultStage") })}
+        />
+      </StatRow>
 
       {/* ── Daily Timeline & Execution Grid ── */}
       <div className="rounded-[var(--radius-lg)] border overflow-hidden" style={S.surface}>
         <div className="border-b p-4" style={S.surface}>
-          <h5 className="text-sm font-semibold" style={S.primary}>Day-by-Day Execution vs Standard Curve</h5>
-          <p className="text-xs" style={S.muted}>Comparing daily feed intake & body weight against breed standards</p>
+          <h5 className="text-sm font-semibold" style={S.primary}>{t("bpcDayByDayExecutionTitle")}</h5>
+          <p className="text-xs" style={S.muted}>{t("bpcDayByDayExecutionDescription")}</p>
         </div>
 
         <div className="max-h-96 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 border-b text-left uppercase font-semibold" style={S.raised}>
               <tr>
-                <th className="px-3 py-2.5">Day</th>
-                <th className="px-3 py-2.5">Date</th>
-                <th className="px-3 py-2.5">Daily Feed Target</th>
-                <th className="px-3 py-2.5">Actual Daily Feed</th>
-                <th className="px-3 py-2.5">Feed Progress</th>
-                <th className="px-3 py-2.5">Target Weight</th>
-                <th className="px-3 py-2.5">Actual Weight</th>
-                <th className="px-3 py-2.5">Mortality</th>
+                <th className="px-3 py-2.5">{t("bpcColDay")}</th>
+                <th className="px-3 py-2.5">{t("bpcColDate")}</th>
+                <th className="px-3 py-2.5">{t("bpcColDailyFeedTarget")}</th>
+                <th className="px-3 py-2.5">{t("bpcColActualDailyFeed")}</th>
+                <th className="px-3 py-2.5">{t("bpcColFeedProgress")}</th>
+                <th className="px-3 py-2.5">{t("bpcColTargetWeight")}</th>
+                <th className="px-3 py-2.5">{t("bpcColActualWeight")}</th>
+                <th className="px-3 py-2.5">{t("bpcColMortality")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--row-border)]">
@@ -216,21 +221,21 @@ export default function BatchPerformanceCurvesPanel({
                 return (
                   <tr key={c.day} className={`hover:bg-[var(--row-hover)] transition-colors ${c.day === batch.batch_age_days ? "font-semibold bg-[var(--surface-raised)]" : ""}`}>
                     <td className="px-3 py-2 font-mono">
-                      Day {c.day}
+                      {t("bpcDayLabel", { day: c.day })}
                       {c.day === batch.batch_age_days && (
                         <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase border" style={S.accent}>
-                          Today
+                          {t("bpcTodayBadge")}
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-2 font-mono" style={S.muted}>{c.date}</td>
                     <td className="px-3 py-2 font-mono">
-                      {targetFeed > 0 ? `${targetFeed} kg` : "—"}
+                      {targetFeed > 0 ? t("bpcKgValue", { value: targetFeed }) : "—"}
                     </td>
                     <td className="px-3 py-2 font-mono">
                       {actFeed != null ? (
                         <span style={isOver || isUnder ? S.warning : S.primary}>
-                          {actFeed} kg
+                          {t("bpcKgValue", { value: actFeed })}
                         </span>
                       ) : (
                         <span style={S.muted}>—</span>
@@ -248,22 +253,22 @@ export default function BatchPerformanceCurvesPanel({
                               }}
                             />
                           </div>
-                          <span className="text-[10px]" style={S.muted}>{pct}% of target</span>
+                          <span className="text-[10px]" style={S.muted}>{t("bpcPctOfTarget", { pct })}</span>
                         </div>
                       ) : (
-                        <span style={S.muted}>Pending</span>
+                        <span style={S.muted}>{t("bpcPending")}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 font-mono" style={S.muted}>
-                      {c.stdTargetWeight ? `${c.stdTargetWeight} kg` : "—"}
+                      {c.stdTargetWeight ? t("bpcKgValue", { value: c.stdTargetWeight }) : "—"}
                     </td>
                     <td className="px-3 py-2 font-mono font-semibold" style={S.primary}>
-                      {c.actWeight ? `${c.actWeight} kg` : "—"}
+                      {c.actWeight ? t("bpcKgValue", { value: c.actWeight }) : "—"}
                     </td>
                     <td className="px-3 py-2 font-mono">
                       {c.actDailyMort != null ? (
                         <span style={c.actDailyMort > 0 ? S.danger : S.muted}>
-                          {c.actDailyMort} head
+                          {t("bpcHeadCount", { count: c.actDailyMort })}
                         </span>
                       ) : (
                         <span style={S.muted}>0</span>

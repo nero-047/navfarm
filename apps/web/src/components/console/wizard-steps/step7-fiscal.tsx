@@ -124,7 +124,7 @@ export default function Step7Fiscal({ onSubmit, isSubmitting, initialData }: Ste
             id="tax_audit_applicable"
             checked={formData.tax_audit_applicable}
             onChange={(e) => setFormData({ ...formData, tax_audit_applicable: e.target.checked })}
-            className="w-4 h-4 rounded border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent)"
+            className="w-4 h-4 rounded-[var(--radius-xs)] border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent)"
           />
           <label htmlFor="tax_audit_applicable" className="text-xs text-(--text-secondary) font-medium cursor-pointer">
             Mandatory Statutory Tax Audit Applicable

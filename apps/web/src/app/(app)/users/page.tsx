@@ -19,6 +19,7 @@ import { Toast } from "../../../components/ui/toast";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 import { EditMemberModal, UserTypeBadge, Label } from "../../../components/console/edit-member-modal";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { ConsolePage } from "../../../components/ui/console-page";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -209,7 +210,7 @@ export default function UsersPage() {
   if (loading) return <LoadingState label={t("usrLoadingTeam")} />;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+    <ConsolePage>
       {/* The uppercase "People & access" kicker that sat above this title is
           gone: the breadcrumb directly above now states the same location, and
           a second label stacked over the H1 is the marketing-page hierarchy
@@ -440,6 +441,6 @@ export default function UsersPage() {
           }}
         />
       )}
-    </div>
+    </ConsolePage>
   );
 }

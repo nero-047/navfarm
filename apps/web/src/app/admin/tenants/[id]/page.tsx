@@ -474,7 +474,7 @@ export default function TenantDetailPage() {
                         {resolvedNobs.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {resolvedNobs.map((n: string) => (
-                              <span key={n} className="text-[10px] font-semibold px-1.5 py-0.5 rounded border"
+                              <span key={n} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-[var(--radius-xs)] border"
                                 style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>{n}</span>
                             ))}
                           </div>
@@ -484,11 +484,11 @@ export default function TenantDetailPage() {
                         {resolvedLobs.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {resolvedLobs.slice(0, 3).map((l: string) => (
-                              <span key={l} className="text-[10px] px-1.5 py-0.5 rounded border font-semibold"
+                              <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-[var(--radius-xs)] border font-semibold"
                                 style={{ backgroundColor: "var(--surface-raised)", color: "var(--text-secondary)", borderColor: "var(--border)" }}>{l}</span>
                             ))}
                             {resolvedLobs.length > 3 && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded border" style={{ ...S.raised, ...S.muted }}>+{resolvedLobs.length - 3}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-[var(--radius-xs)] border" style={{ ...S.raised, ...S.muted }}>+{resolvedLobs.length - 3}</span>
                             )}
                           </div>
                         ) : <span style={S.muted}>—</span>}
@@ -641,7 +641,7 @@ export default function TenantDetailPage() {
                                               <TableCell className="py-2.5" style={S.sub}>{u.email || "—"}</TableCell>
                                               <TableCell className="py-2.5" style={S.sub}>{u.phone || "—"}</TableCell>
                                               <TableCell className="py-2.5">
-                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded border"
+                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-[var(--radius-xs)] border"
                                                   style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", borderColor: "var(--accent)" }}>
                                                   {u.user_type?.replace(/_/g, " ") || "—"}
                                                 </span>
@@ -794,7 +794,7 @@ export default function TenantDetailPage() {
                           type="checkbox"
                           checked={isNobChecked}
                           onChange={toggleNob}
-                          className="w-4 h-4 rounded accent-(--accent) cursor-pointer"
+                          className="w-4 h-4 rounded-[var(--radius-xs)] accent-(--accent) cursor-pointer"
                         />
                         <span>{nob.nob_name}</span>
                         <span className="text-[10px] font-mono font-normal opacity-60">({nob.nob_code})</span>
@@ -815,7 +815,7 @@ export default function TenantDetailPage() {
                             return (
                               <label
                                 key={lob.lob_id}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium border cursor-pointer select-none"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-xs)] text-[11px] font-medium border cursor-pointer select-none"
                                 style={{
                                   backgroundColor: isLobChecked ? "var(--surface)" : "transparent",
                                   borderColor: isLobChecked ? "var(--accent)" : "var(--border)",
@@ -826,7 +826,7 @@ export default function TenantDetailPage() {
                                   type="checkbox"
                                   checked={isLobChecked}
                                   onChange={toggleLob}
-                                  className="w-3 h-3 rounded accent-(--accent) cursor-pointer"
+                                  className="w-3 h-3 rounded-[var(--radius-xs)] accent-(--accent) cursor-pointer"
                                 />
                                 <span>{lob.lob_name}</span>
                               </label>

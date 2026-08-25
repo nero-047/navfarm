@@ -18,9 +18,10 @@ import {
   CalendarClock,
   Wheat,
   Pill,
-  HeartPulse,
   CheckSquare,
   Settings,
+  AlertTriangle,
+  Package,
 } from "lucide-react";
 import {
   getStoredUser,
@@ -44,11 +45,13 @@ import { AppShell, AppShellNavItem } from "../../components/shell/AppShell";
 import { ContextNavProvider } from "../../components/shell/ContextNav";
 import { PROFILE_ITEMS } from "../../components/shell/ProfilePopover";
 import { ThemeIconButton } from "../../components/shell/ThemeIconButton";
+import { resolveLobFamily } from "@/lib/lob";
+import { LIVESTOCK_SECTIONS } from "@/components/console/livestock/livestock-page-shell";
 
 export default function ConsoleLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { t } = useLanguage();
+  const { t, tLob } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -200,7 +203,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
           <span className="text-lg font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
             NAV<span style={{ color: "var(--accent)" }}>Farm</span>
           </span>
-          <span className="ml-2 hidden text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded sm:inline-flex" style={{ color: "var(--text-muted)", backgroundColor: "var(--surface-raised)" }}>
+          <span className="ml-2 hidden text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded-[var(--radius-xs)] sm:inline-flex" style={{ color: "var(--text-muted)", backgroundColor: "var(--surface-raised)" }}>
             Company Setup
           </span>
           <div className="ml-auto flex items-center gap-3">
@@ -239,6 +242,8 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
   // Tenant Admin's company-scoped tabs (Master Data/Inventory/Finance/Production/
   const activeScope = getActiveWorkspaceScope();
   const activeLob = getActiveLob();
+  // One resolution point — nav labels must agree with what every page decides.
+  const lobFamily = resolveLobFamily(activeLob);
 
   let navItems: AppShellNavItem[] = [];
 
@@ -259,36 +264,75 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
       { label: t("masterData"),      href: "/master-data",    icon: Database },
       { label: t("inventory"),       href: "/inventory/balance", icon: Boxes },
       { label: t("finance"),         href: "/finance/journal", icon: Landmark },
-      { label: t("production"),      href: "/production/batches", icon: Wheat },
-      { label: t("animalHerdRegister"), href: "/piggery",     icon: Pill },
+      { label: t("production"),      href: "/batches", icon: Wheat },
+      { label: t("animalHerdRegister"), href: "/livestock",     icon: Pill },
       { label: t("teamManagement"),  href: "/users",          icon: Users },
       { label: t("rolePermissions"), href: "/roles",          icon: ShieldAlert },
       { label: t("notifications"),   href: "/notifications",  icon: Bell },
     ];
   } else {
-    // OPERATIONAL Area Scope (e.g. Piggery / Dairy / Poultry)
+    /**
+     * OPERATIONAL area scope.
+     *
+     * Grouped the way the work actually runs, not the way the backend modules
+     * were laid out. Everything in an operational area revolves around a
+     * batch, so Batches is the first group and owns the whole batch lifecycle
+     * — stages, its animals, daily entry, the record log, and the transfers
+     * that end a cycle. Livestock is the animal-centric family beside it.
+     * Settings collects the three configuration screens that were previously
+     * scattered across /production/* and a top-level /area-settings.
+     *
+     * Labels come from the LOB where the LOB actually changes the meaning
+     * (the register is "Cow Register" for Dairy), so a new line of business
+     * reads correctly without a new nav tree.
+     */
     navItems = [
-      { label: t("lobDashboard", { lob: activeLob || "Farm" }), href: "/dashboard", icon: LayoutDashboard },
+      { label: t("lobDashboard", { lob: tLob(activeLob) }), href: "/dashboard", icon: LayoutDashboard },
       {
-        label: t("batchManagement"),
-        href: "/production/batches",
+        label: t("navBatches"),
+        href: "/batches",
         icon: Layers,
         children: [
-          { label: t("batchList"), href: "/production/batches" },
-          { label: t("batchStages"), href: "/production/batches/stages" },
-          { label: t("animalAssignment"), href: "/production/batches/animal-assignment" },
-          { label: t("batchDataEntry"), href: "/production/batches/daily-entry" },
+          { label: t("batchList"), href: "/batches" },
+          { label: t("batchStages"), href: "/batches/stages" },
+          { label: t("navBatchAnimals"), href: "/batches/animals" },
+          { label: t("navBatchEntry"), href: "/batches/entry" },
+          { label: t("navBatchRecords"), href: "/batches/records" },
+          { label: t("navBatchTransfers"), href: "/batches/transfers" },
         ],
       },
-      { label: t("scheduler"), href: "/production/scheduler", icon: CalendarClock },
-      { label: t("feedManagement"), href: "/production/feed-management", icon: Wheat },
-      { label: activeLob === "DAIRY" ? t("dairyCowRegister") : t("animalHerdRegister"), href: "/piggery", icon: Pill },
+      { label: t("navSchedulers"), href: "/schedulers", icon: CalendarClock },
+      {
+        label: t("navLivestock"),
+        href: "/livestock",
+        icon: Pill,
+        // Rendered from the shell's own section list so the sidebar and the
+        // routes can never drift apart. Dairy calls its register something
+        // else, and that is the only per-LOB override.
+        children: LIVESTOCK_SECTIONS.map((section) => ({
+          label:
+            section.key === "register" && lobFamily === "DAIRY"
+              ? t("dairyCowRegister")
+              : t(section.labelKey),
+          href: section.href,
+        })),
+      },
       { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes },
-      { label: t("mortalityHealth"), href: "/production/mortality-health", icon: HeartPulse },
       { label: t("financeCosting"), href: "/finance/journal", icon: Landmark },
-      { label: t("masterData"), href: "/master-data", icon: Database },
+      { label: t("navAlerts"), href: "/alerts", icon: AlertTriangle },
+      { label: t("navTraceability"), href: "/traceability", icon: Package },
       { label: t("approvals"), href: "/approvals", icon: CheckSquare },
-      { label: t("settings"), href: "/area-settings", icon: Settings },
+      { label: t("masterData"), href: "/master-data", icon: Database },
+      {
+        label: t("settings"),
+        href: "/settings/area",
+        icon: Settings,
+        children: [
+          { label: t("navSettingsArea"), href: "/settings/area" },
+          { label: t("navParameters"), href: "/settings/parameters" },
+          { label: t("navQcParameters"), href: "/settings/qc" },
+        ],
+      },
     ];
   }
 

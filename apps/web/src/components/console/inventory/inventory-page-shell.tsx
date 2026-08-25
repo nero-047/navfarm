@@ -6,6 +6,7 @@ import { getStoredUser, hasPermission, NavUser, getActiveWorkspaceScope, getActi
 import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { useLanguage } from "@/hooks/useLanguage";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConsolePage } from "@/components/ui/console-page";
 import { ShieldAlert } from "lucide-react";
 
 const INVENTORY_SECTIONS = [
@@ -46,7 +47,7 @@ function useInventoryPageState() {
 }
 
 export function InventoryPageShell({ activeKey, children }: { activeKey: InventoryTabKey; children: React.ReactNode }) {
-  const { t } = useLanguage();
+  const { t, tLob } = useLanguage();
   const router = useRouter();
   const { ready, scope, activeLob, mayView } = useInventoryPageState();
 
@@ -69,7 +70,7 @@ export function InventoryPageShell({ activeKey, children }: { activeKey: Invento
 
   if (!mayView) {
     return (
-      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
+      <ConsolePage size="narrow">
         <PageHeader title={t("invModuleTitle")} sticky={false} />
         <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border p-5" style={{ borderColor: "var(--warning)", backgroundColor: "var(--warning-muted)", color: "var(--warning)" }}>
           <ShieldAlert className="h-5 w-5 shrink-0" />
@@ -78,7 +79,7 @@ export function InventoryPageShell({ activeKey, children }: { activeKey: Invento
             <p className="mt-1 text-xs text-[var(--text-secondary)]">{t("accessDeniedContactAdmin")}</p>
           </div>
         </div>
-      </div>
+      </ConsolePage>
     );
   }
 
@@ -88,15 +89,15 @@ export function InventoryPageShell({ activeKey, children }: { activeKey: Invento
     activeKey === "goods-issue" ? t("invGoodsIssueTitle") :
     activeKey === "stock-adjustment" ? t("invStockAdjustmentTitle") :
     activeKey === "ledger" ? t("invLedgerTitle") :
-    scope === "OPERATIONAL" ? t("invUnitBalanceTitle", { lob: activeLob }) : t("invCompanyBalanceTitle");
+    scope === "OPERATIONAL" ? t("invUnitBalanceTitle", { lob: tLob(activeLob) }) : t("invCompanyBalanceTitle");
 
   const description =
-    scope === "OPERATIONAL" ? t("invOperationalDesc", { lob: activeLob }) : t("invCompanyDesc");
+    scope === "OPERATIONAL" ? t("invOperationalDesc", { lob: tLob(activeLob) }) : t("invCompanyDesc");
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-7 space-y-5">
+    <ConsolePage>
       <PageHeader title={title} description={description} />
       {children}
-    </div>
+    </ConsolePage>
   );
 }

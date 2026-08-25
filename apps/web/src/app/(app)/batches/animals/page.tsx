@@ -5,7 +5,7 @@ import BatchAnimalAssignmentPanel from "@/components/console/piggery/batch-anima
 
 export default function BatchAnimalAssignmentPage() {
   return (
-    <ProductionPageShell title="Batch Animal Assignment">
+    <ProductionPageShell titleKey="animalAssignment">
       {() => <BatchAnimalAssignmentPanel />}
     </ProductionPageShell>
   );

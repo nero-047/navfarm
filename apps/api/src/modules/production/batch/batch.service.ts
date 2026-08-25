@@ -35,6 +35,17 @@ const toDays = (value: number, calcUnit: string): number => {
   return value;
 };
 
+// Splits `total` into `n` shares that sum back to exactly `total` — any
+// rounding remainder is absorbed into the last share. Mirrors the frontend's
+// animal-multi-select.tsx helper of the same name.
+const splitEvenly = (total: number, n: number): number[] => {
+  const base = Math.floor((total / n) * 10000) / 10000;
+  const shares = new Array(n).fill(base);
+  const remainder = Math.round((total - base * n) * 10000) / 10000;
+  shares[n - 1] = Math.round((shares[n - 1] + remainder) * 10000) / 10000;
+  return shares;
+};
+
 export interface UserContext {
   userId?: string;
   email?: string;
@@ -192,6 +203,30 @@ export class BatchService {
         current_quantity: dto.opening_quantity.toString(),
         nca_book_value: '0.0000',
       });
+
+      // Livestock (breed_id set) batches get one animal_register row per head
+      // of opening_quantity, so every physical animal is individually
+      // selectable from day one instead of only whichever few a user later
+      // registers by hand. Deliberately does NOT post to bio_asset_ledger —
+      // activate() already posts one aggregate ACQUISITION entry for the
+      // batch's full input-line cost; a second, per-animal posting here would
+      // double-count the acquisition value in the ledger.
+      if (dto.breed_id) {
+        await this.registerPlaceholderAnimals({
+          batchId,
+          tenantId,
+          companyId: dto.company_id,
+          nobId: lob.nob_id,
+          lobId: dto.lob_id,
+          breedId: dto.breed_id,
+          locationId: dto.location_id || null,
+          headcount: dto.opening_quantity,
+          entryDate: dto.start_date,
+          inputLines: dto.input_lines,
+          sourceBatchId: dto.input_lines.find((l) => l.source_batch_id)?.source_batch_id || null,
+          userId: userPayload?.userId,
+        });
+      }
     }
 
     await this.auditService.log({
@@ -305,11 +340,15 @@ export class BatchService {
         hours: schema.batchTransaction.hours,
         adg: schema.batchTransaction.adg,
         bcs_score: schema.batchTransaction.bcs_score,
+        animal_id: schema.batchTransaction.animal_id,
         item_name: schema.itemMaster.item_name,
         item_code: schema.itemMaster.item_code,
+        animal_ear_tag: schema.animalRegister.ear_tag,
+        animal_code: schema.animalRegister.animal_code,
       })
       .from(schema.batchTransaction)
       .leftJoin(schema.itemMaster, eq(schema.batchTransaction.item_id, schema.itemMaster.item_id))
+      .leftJoin(schema.animalRegister, eq(schema.batchTransaction.animal_id, schema.animalRegister.animal_id))
       .where(eq(schema.batchTransaction.batch_id, id));
     const outputLines = await this.db.select().from(schema.batchOutputLine).where(eq(schema.batchOutputLine.batch_id, id));
     const attachments = await this.db
@@ -439,6 +478,87 @@ export class BatchService {
     if (batch.status !== expected) {
       throw new BadRequestException(`Batch must be ${expected} for this action — it is currently ${batch.status}.`);
     }
+  }
+
+  /**
+   * Auto-registers `headcount` placeholder animal_register rows for a
+   * newly-created BIO_ASSET batch. Per-animal fields that have no real
+   * source at batch-creation time are deliberately generic/even-split rather
+   * than guessed specifics — animal_type is the neutral COMMERCIAL_PIG (not
+   * SOW/BOAR/GILT, which would presume an unverified breeding-stock role),
+   * gender alternates M/F, and acquisition_cost is the batch's total
+   * input-line cost split evenly per head. All fields remain individually
+   * editable later via the normal animal-register edit flow.
+   */
+  private async registerPlaceholderAnimals(params: {
+    batchId: string;
+    tenantId: string;
+    companyId: string;
+    nobId: string;
+    lobId: string;
+    breedId: string;
+    locationId: string | null;
+    headcount: number;
+    entryDate: string;
+    inputLines: Array<{ item_id: string; quantity: number; rate?: number; source_batch_id?: string }>;
+    sourceBatchId: string | null;
+    userId?: string;
+  }) {
+    const { batchId, tenantId, companyId, nobId, lobId, breedId, locationId, headcount, entryDate, inputLines, sourceBatchId, userId } = params;
+    if (headcount <= 0) return;
+
+    const itemId = inputLines[0]?.item_id;
+    if (!itemId) return; // no input line to attribute cost/item to — skip rather than guess
+
+    const totalCost = inputLines.reduce((sum, l) => sum + Number(l.quantity) * Number(l.rate || 0), 0);
+    const shares = splitEvenly(totalCost, headcount);
+    const entryType = sourceBatchId ? 'TRANSFERRED_IN' : 'PURCHASED_LOCAL';
+
+    const createdIds: string[] = [];
+    for (let i = 0; i < headcount; i++) {
+      const animalId = randomUUID();
+      // Sequential, not Promise.all — generateNext row-locks the series and
+      // must serialize to hand out distinct codes.
+      const animalCode = await this.numberSeriesService.generateNext('ANIMAL_PIGGERY', tenantId, companyId);
+      const cost = shares[i];
+      await this.db.insert(schema.animalRegister).values({
+        animal_id: animalId,
+        tenant_id: tenantId,
+        company_id: companyId,
+        nob_id: nobId,
+        lob_id: lobId,
+        animal_code: animalCode,
+        animal_type: 'COMMERCIAL_PIG',
+        breed_id: breedId,
+        gender: i % 2 === 0 ? 'F' : 'M',
+        entry_type: entryType,
+        entry_date: entryDate,
+        source_batch_id: sourceBatchId || null,
+        item_id: itemId,
+        current_batch_id: batchId,
+        current_location_id: locationId,
+        acquisition_cost: cost.toFixed(4),
+        total_opening_asset_value: cost.toFixed(4),
+        current_bio_asset_value: cost.toFixed(4),
+        total_amortised: '0.0000',
+        book_value: cost.toFixed(4),
+        status: 'ACTIVE',
+        is_active: true,
+        created_by: userId || null,
+        updated_by: userId || null,
+      });
+      createdIds.push(animalId);
+    }
+
+    await this.auditService.log({
+      tenantId,
+      companyId,
+      userId,
+      action: 'CREATE',
+      entityName: 'animal_register',
+      entityId: batchId,
+      newValues: { auto_registered_for_batch: batchId, headcount, animal_ids: createdIds },
+    });
   }
 
   /** DRAFT → ACTIVE: consumes each input line from inventory via FIFO, mirrors to GL. */
@@ -929,6 +1049,7 @@ export class BatchService {
       hours: dto.hours?.toString() ?? null,
       adg: dto.adg?.toString() ?? null,
       bcs_score: dto.bcs_score?.toString() ?? null,
+      animal_id: dto.animal_id || null,
       created_by: userPayload?.userId || null,
     });
 
@@ -1825,6 +1946,38 @@ export class BatchService {
     return { success: true, message: `Batch '${batch.batch_no}' has been cancelled.` };
   }
 
+  // Resolves a daily-entry row's animal scope: null means "whole batch"
+  // (unchanged historical behaviour); an array (possibly empty) means the
+  // caller asked to target specific animals or all-but-some via animal_ids /
+  // exclude_animal_ids.
+  private async resolveScopedAnimalIds(
+    batchId: string,
+    animalIds: string[] | undefined,
+    excludeAnimalIds: string[] | undefined
+  ): Promise<string[] | null> {
+    if (animalIds && animalIds.length > 0) return animalIds;
+    if (excludeAnimalIds && excludeAnimalIds.length > 0) {
+      const inBatch = await this.db
+        .select({ animal_id: schema.animalRegister.animal_id })
+        .from(schema.animalRegister)
+        .where(and(eq(schema.animalRegister.current_batch_id, batchId), eq(schema.animalRegister.is_active, true)));
+      const excludeSet = new Set(excludeAnimalIds);
+      return inBatch.map((a) => a.animal_id).filter((animalId) => !excludeSet.has(animalId));
+    }
+    return null;
+  }
+
+  // Splits `total` into `n` shares that sum back to exactly `total` (4dp,
+  // matching batch_transaction.quantity's decimal(18,4)) — any rounding
+  // remainder is absorbed into the last share.
+  private splitQuantityEvenly(total: number, n: number): number[] {
+    const base = Math.floor((total / n) * 10000) / 10000;
+    const shares = new Array(n).fill(base);
+    const remainder = Math.round((total - base * n) * 10000) / 10000;
+    shares[n - 1] = Math.round((shares[n - 1] + remainder) * 10000) / 10000;
+    return shares;
+  }
+
   async bulkAddDailyTransactions(dto: BulkDailyEntryDto, tenantId: string, userPayload?: UserContext) {
     let successCount = 0;
     const errors: Array<{ batch_id: string; error: string }> = [];
@@ -1851,6 +2004,11 @@ export class BatchService {
           batch = { batch_id: row.batch_id, opening_quantity: 1 };
         }
 
+        const scopedAnimalIds = await this.resolveScopedAnimalIds(row.batch_id, row.animal_ids, row.exclude_animal_ids);
+        if (scopedAnimalIds && scopedAnimalIds.length === 0) {
+          throw new Error('No animals resolved for the selected scope (animal_ids/exclude_animal_ids) — nothing to record.');
+        }
+
         // 1. Feed Consumption
         if (row.feed_qty != null && Number(row.feed_qty) > 0) {
           let feedItemId = row.feed_item_id;
@@ -1867,24 +2025,64 @@ export class BatchService {
             }
           }
 
-          await this.addTransaction(
-            row.batch_id,
-            {
-              transaction_date: dto.entry_date,
-              transaction_type: 'CONSUMPTION',
-              item_id: feedItemId,
-              quantity: Number(row.feed_qty),
-              uom: 'KG',
-              remarks: row.remarks || 'Daily feed log',
-            },
-            tenantId,
-            userPayload
-          );
-          successCount++;
+          if (scopedAnimalIds) {
+            const shares = this.splitQuantityEvenly(Number(row.feed_qty), scopedAnimalIds.length);
+            for (let i = 0; i < scopedAnimalIds.length; i++) {
+              await this.addTransaction(
+                row.batch_id,
+                {
+                  transaction_date: dto.entry_date,
+                  transaction_type: 'CONSUMPTION',
+                  item_id: feedItemId,
+                  quantity: shares[i],
+                  uom: 'KG',
+                  remarks: row.remarks || 'Daily feed log',
+                  animal_id: scopedAnimalIds[i],
+                },
+                tenantId,
+                userPayload
+              );
+              successCount++;
+            }
+          } else {
+            await this.addTransaction(
+              row.batch_id,
+              {
+                transaction_date: dto.entry_date,
+                transaction_type: 'CONSUMPTION',
+                item_id: feedItemId,
+                quantity: Number(row.feed_qty),
+                uom: 'KG',
+                remarks: row.remarks || 'Daily feed log',
+              },
+              tenantId,
+              userPayload
+            );
+            successCount++;
+          }
         }
 
-        // 2. Mortality
-        if (row.mortality_count != null && Number(row.mortality_count) > 0) {
+        // 2. Mortality — when animal-scoped, the number of selected animals IS
+        // the mortality count (one dead animal per row), so any row.mortality_count
+        // value is ignored in favour of the selection size.
+        if (scopedAnimalIds) {
+          for (const animalId of scopedAnimalIds) {
+            await this.addTransaction(
+              row.batch_id,
+              {
+                transaction_date: dto.entry_date,
+                transaction_type: 'MORTALITY',
+                quantity: 1,
+                uom: 'HEAD',
+                remarks: row.remarks || 'Daily mortality log',
+                animal_id: animalId,
+              },
+              tenantId,
+              userPayload
+            );
+            successCount++;
+          }
+        } else if (row.mortality_count != null && Number(row.mortality_count) > 0) {
           await this.addTransaction(
             row.batch_id,
             {
@@ -1902,36 +2100,78 @@ export class BatchService {
 
         // 3. Water intake observation
         if (row.water_qty != null && Number(row.water_qty) > 0) {
-          await this.addTransaction(
-            row.batch_id,
-            {
-              transaction_date: dto.entry_date,
-              transaction_type: 'OBSERVATION',
-              quantity: Number(row.water_qty),
-              uom: 'L',
-              remarks: `Water Intake: ${row.water_qty} L`,
-            },
-            tenantId,
-            userPayload
-          );
-          successCount++;
+          if (scopedAnimalIds) {
+            const shares = this.splitQuantityEvenly(Number(row.water_qty), scopedAnimalIds.length);
+            for (let i = 0; i < scopedAnimalIds.length; i++) {
+              await this.addTransaction(
+                row.batch_id,
+                {
+                  transaction_date: dto.entry_date,
+                  transaction_type: 'OBSERVATION',
+                  quantity: shares[i],
+                  uom: 'L',
+                  remarks: `Water Intake: ${row.water_qty} L`,
+                  animal_id: scopedAnimalIds[i],
+                },
+                tenantId,
+                userPayload
+              );
+              successCount++;
+            }
+          } else {
+            await this.addTransaction(
+              row.batch_id,
+              {
+                transaction_date: dto.entry_date,
+                transaction_type: 'OBSERVATION',
+                quantity: Number(row.water_qty),
+                uom: 'L',
+                remarks: `Water Intake: ${row.water_qty} L`,
+              },
+              tenantId,
+              userPayload
+            );
+            successCount++;
+          }
         }
 
-        // 4. Shed temperature observation
+        // 4. Shed temperature observation — an environmental reading, not a
+        // divisible quantity, so when animal-scoped it's recorded once per
+        // animal at the SAME value (for per-animal viewing/filtering) rather
+        // than split; it carries no cost/GL impact either way.
         if (row.temperature != null && String(row.temperature).trim() !== '') {
-          await this.addTransaction(
-            row.batch_id,
-            {
-              transaction_date: dto.entry_date,
-              transaction_type: 'OBSERVATION',
-              quantity: Number(row.temperature),
-              uom: '°C',
-              remarks: `Shed Temperature: ${row.temperature}°C`,
-            },
-            tenantId,
-            userPayload
-          );
-          successCount++;
+          if (scopedAnimalIds) {
+            for (const animalId of scopedAnimalIds) {
+              await this.addTransaction(
+                row.batch_id,
+                {
+                  transaction_date: dto.entry_date,
+                  transaction_type: 'OBSERVATION',
+                  quantity: Number(row.temperature),
+                  uom: '°C',
+                  remarks: `Shed Temperature: ${row.temperature}°C`,
+                  animal_id: animalId,
+                },
+                tenantId,
+                userPayload
+              );
+              successCount++;
+            }
+          } else {
+            await this.addTransaction(
+              row.batch_id,
+              {
+                transaction_date: dto.entry_date,
+                transaction_type: 'OBSERVATION',
+                quantity: Number(row.temperature),
+                uom: '°C',
+                remarks: `Shed Temperature: ${row.temperature}°C`,
+              },
+              tenantId,
+              userPayload
+            );
+            successCount++;
+          }
         }
       } catch (err: unknown) {
         errors.push({
@@ -2172,7 +2412,7 @@ export class BatchService {
   /**
    * Returns day-by-day standard breed performance curves vs actual recorded data for a batch.
    */
-  async getBatchPerformanceCurves(batchId: string, tenantId?: string) {
+  async getBatchPerformanceCurves(batchId: string, tenantId?: string, animalId?: string) {
     const batch = await this.findOne(batchId);
     if (tenantId && batch.tenant_id && batch.tenant_id !== tenantId) {
       throw new NotFoundException(`Batch ${batchId} not found for current tenant`);
@@ -2181,7 +2421,9 @@ export class BatchService {
     const today = new Date();
     const batchAgeDays = Math.max(1, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
-    // 1. Fetch all batch transactions
+    // 1. Fetch batch transactions — optionally restricted to one animal, so
+    // the curves reflect just that animal's own recorded feed/weight/mortality
+    // rows instead of the whole batch.
     const transactions = await this.db
       .select({
         tx: schema.batchTransaction,
@@ -2189,7 +2431,11 @@ export class BatchService {
       })
       .from(schema.batchTransaction)
       .leftJoin(schema.itemMaster, eq(schema.batchTransaction.item_id, schema.itemMaster.item_id))
-      .where(eq(schema.batchTransaction.batch_id, batchId))
+      .where(
+        animalId
+          ? and(eq(schema.batchTransaction.batch_id, batchId), eq(schema.batchTransaction.animal_id, animalId))
+          : eq(schema.batchTransaction.batch_id, batchId)
+      )
       .orderBy(schema.batchTransaction.transaction_date);
 
     // 2. Fetch scheduler lines if present

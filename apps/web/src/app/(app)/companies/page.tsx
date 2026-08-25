@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { LoadingState, ErrorState } from "@/components/ui/states";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConsolePage } from "@/components/ui/console-page";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -82,7 +83,7 @@ export default function CompaniesIndexPage() {
   // ── Tenant-wide directory (Tenant Admin) ──
   if (user?.userType === "TENANT_ADMIN") {
     return (
-      <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <ConsolePage>
         <PageHeader
           title={t("coTitle")}
           description={t("coDirectoryDesc", { n: companies.length })}
@@ -98,22 +99,22 @@ export default function CompaniesIndexPage() {
             {createError && <ErrorState message={createError} />}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{t("coFieldCompanyCode")}</label>
+                <label className="nf-text-label mb-1 block" style={S.sub}>{t("coFieldCompanyCode")}</label>
                 <Input required placeholder={t("coPhCompanyCode")} value={createForm.company_code}
                   onChange={e => setCreateForm(f => ({ ...f, company_code: e.target.value.toUpperCase() }))} />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{t("coFieldLegalName")}</label>
+                <label className="nf-text-label mb-1 block" style={S.sub}>{t("coFieldLegalName")}</label>
                 <Input required placeholder={t("coPhLegalName")} value={createForm.company_name}
                   onChange={e => setCreateForm(f => ({ ...f, company_name: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{t("coFieldDisplayName")}</label>
+                <label className="nf-text-label mb-1 block" style={S.sub}>{t("coFieldDisplayName")}</label>
                 <Input placeholder={t("coPhDisplayName")} value={createForm.company_display_name}
                   onChange={e => setCreateForm(f => ({ ...f, company_display_name: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{t("coFieldClassification")}</label>
+                <label className="nf-text-label mb-1 block" style={S.sub}>{t("coFieldClassification")}</label>
                 <Select required value={createForm.company_type}
                   onChange={e => setCreateForm(f => ({ ...f, company_type: e.target.value }))}>
                   {["Pvt Ltd","Ltd","LLP","Partnership","Proprietorship","Trust","NGO"].map(ty => (
@@ -122,7 +123,7 @@ export default function CompaniesIndexPage() {
                 </Select>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{t("coFieldIndustry")}</label>
+                <label className="nf-text-label mb-1 block" style={S.sub}>{t("coFieldIndustry")}</label>
                 <Select required value={createForm.industry_type}
                   onChange={e => setCreateForm(f => ({ ...f, industry_type: e.target.value }))}>
                   {[
@@ -139,17 +140,17 @@ export default function CompaniesIndexPage() {
                 </Select>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{t("coFieldRegistrationNo")}</label>
+                <label className="nf-text-label mb-1 block" style={S.sub}>{t("coFieldRegistrationNo")}</label>
                 <Input placeholder={t("coPhRegistrationNo")} value={createForm.registration_no}
                   onChange={e => setCreateForm(f => ({ ...f, registration_no: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{t("coFieldTaxId")}</label>
+                <label className="nf-text-label mb-1 block" style={S.sub}>{t("coFieldTaxId")}</label>
                 <Input placeholder={t("coPhTaxId")} value={createForm.tax_id}
                   onChange={e => setCreateForm(f => ({ ...f, tax_id: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1" style={S.sub}>{t("coFieldCountry")}</label>
+                <label className="nf-text-label mb-1 block" style={S.sub}>{t("coFieldCountry")}</label>
                 <Select required value={createForm.country_id}
                   onChange={e => setCreateForm(f => ({ ...f, country_id: e.target.value }))}>
                   <option value="IND">{t("coCountryIndia")}</option>
@@ -231,21 +232,21 @@ export default function CompaniesIndexPage() {
             </TableBody>
           </table>
         </div>
-      </div>
+      </ConsolePage>
     );
   }
 
   // ── Fallback for a non-admin user without an assigned company ──
   if (!companies.length) {
     return (
-      <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+      <ConsolePage>
         <PageHeader title={t("coSettingsTitle")} sticky={false} />
         <div className="rounded-[var(--radius-md)] border p-12 text-center" style={S.surface}>
           <Building2 className="w-10 h-10 mx-auto mb-3" style={S.muted} />
           <p className="text-sm font-semibold" style={S.sub}>{t("coNoCompanyAssigned")}</p>
           <p className="text-xs mt-1" style={S.muted}>{t("coContactTenantAdmin")}</p>
         </div>
-      </div>
+      </ConsolePage>
     );
   }
 

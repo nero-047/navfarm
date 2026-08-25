@@ -179,13 +179,13 @@ export default function AdminPlansPage() {
               <label className="flex items-center gap-2 cursor-pointer text-sm" style={s.text}>
                 <input type="checkbox" checked={!!form.feature_flags?.qr_traceability}
                   onChange={(e) => setForm({ ...form, feature_flags: { ...form.feature_flags, qr_traceability: e.target.checked } })}
-                  className="w-4 h-4 rounded" />
+                  className="w-4 h-4 rounded-[var(--radius-xs)]" />
                 QR Traceability
               </label>
               <label className="flex items-center gap-2 cursor-pointer text-sm" style={s.text}>
                 <input type="checkbox" checked={!!form.feature_flags?.api_access}
                   onChange={(e) => setForm({ ...form, feature_flags: { ...form.feature_flags, api_access: e.target.checked } })}
-                  className="w-4 h-4 rounded" />
+                  className="w-4 h-4 rounded-[var(--radius-xs)]" />
                 API Access
               </label>
             </div>
@@ -224,7 +224,7 @@ export default function AdminPlansPage() {
                 <TableCell className="font-semibold" style={s.text}>{plan.plan_name}</TableCell>
                 <TableCell style={s.sub}>${plan.price}</TableCell>
                 <TableCell>
-                  <span className="text-[11px] px-2 py-0.5 rounded font-medium"
+                  <span className="text-[11px] px-2 py-0.5 rounded-[var(--radius-xs)] font-medium"
                     style={{ backgroundColor: "var(--surface-raised)", color: "var(--text-secondary)" }}>{plan.billing_cycle}</span>
                 </TableCell>
                 <TableCell className="text-center font-semibold" style={s.text}>{plan.max_companies}</TableCell>

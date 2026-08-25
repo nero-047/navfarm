@@ -9,6 +9,8 @@ import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const PAGE_SIZE = 25;
 
@@ -32,13 +34,8 @@ function unwrap<T = any>(res: any): T {
 
 const emptyLine = () => ({ item_id: "", quantity: "", uom: "", rate: "" });
 
-const STATUS_STYLE: Record<string, any> = {
-  DRAFT: { color: "var(--text-secondary)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" },
-  POSTED: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
-  CANCELLED: { color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--surface-raised)" },
-};
-
 export default function StockAdjustmentPanel() {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,7 +71,7 @@ export default function StockAdjustmentPanel() {
       const res = await api.get(`/stock-adjustment?${params.toString()}`);
       setRows(unwrap<Row[]>(res) || []);
     } catch (err: any) {
-      setError(err?.message || "Failed to load stock adjustments.");
+      setError(err?.message || t("sapFailedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -117,18 +114,18 @@ export default function StockAdjustmentPanel() {
     setSaving(true);
     setFormError("");
     try {
-      if (!header.warehouse_id) throw new Error("Warehouse is required.");
-      if (!header.posting_date) throw new Error("Posting date is required.");
+      if (!header.warehouse_id) throw new Error(t("sapWarehouseRequired"));
+      if (!header.posting_date) throw new Error(t("sapPostingDateRequired"));
       const cleanLines = lines
         .filter((l) => l.item_id && l.quantity && l.uom)
         .map((l) => {
           const quantity = Number(l.quantity);
           if (quantity > 0 && !l.rate) {
-            throw new Error("Rate is required for lines with a positive (found stock) quantity.");
+            throw new Error(t("sapRateRequiredForPositive"));
           }
           return { item_id: l.item_id, quantity, uom: l.uom, rate: quantity > 0 ? Number(l.rate) : undefined };
         });
-      if (cleanLines.length === 0) throw new Error("Add at least one line with item, quantity and UOM.");
+      if (cleanLines.length === 0) throw new Error(t("sapAddAtLeastOneLine"));
 
       await api.post("/stock-adjustment", {
         company_id: companyId,
@@ -141,7 +138,7 @@ export default function StockAdjustmentPanel() {
       setModalOpen(false);
       load();
     } catch (err: any) {
-      setFormError(err?.message || "Failed to save stock adjustment.");
+      setFormError(err?.message || t("sapFailedToSave"));
     } finally {
       setSaving(false);
     }
@@ -152,7 +149,7 @@ export default function StockAdjustmentPanel() {
       const res = await api.get(`/stock-adjustment/${row.adjustment_id}`);
       setViewing(unwrap<Row>(res));
     } catch (err: any) {
-      setError(err?.message || "Failed to load stock adjustment details.");
+      setError(err?.message || t("sapFailedToLoadDetails"));
     }
   };
 
@@ -164,7 +161,7 @@ export default function StockAdjustmentPanel() {
       setViewing(unwrap<Row>(res));
       load();
     } catch (err: any) {
-      setError(err?.message || "Failed to post stock adjustment.");
+      setError(err?.message || t("sapFailedToPost"));
     } finally {
       setPosting(false);
     }
@@ -180,22 +177,22 @@ export default function StockAdjustmentPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold" style={S.primary}>Stock Adjustment</h2>
-          <p className="mt-0.5 text-xs" style={S.sub}>Correct stock for physical counts, damage or loss. Positive quantity = found stock (needs a rate); negative = missing/damaged (costed via FIFO).</p>
+          <h2 className="text-lg font-semibold" style={S.primary}>{t("sapTitle")}</h2>
+          <p className="mt-0.5 text-xs" style={S.sub}>{t("sapDescription")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border py-1.5 px-2 text-xs outline-none nf-select" style={S.input}>
-            <option value="">All statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="POSTED">Posted</option>
-            <option value="CANCELLED">Cancelled</option>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="nf-input-sm px-2" style={S.input}>
+            <option value="">{t("sapAllStatuses")}</option>
+            <option value="DRAFT">{t("sapStatusDraft")}</option>
+            <option value="POSTED">{t("sapStatusPosted")}</option>
+            <option value="CANCELLED">{t("sapStatusCancelled")}</option>
           </select>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none" style={S.input} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("sapSearchPlaceholder")} className="nf-input-sm pl-8 pr-3" style={S.input} />
           </div>
-          <Button onClick={openCreate} >
-            <Plus className="h-3.5 w-3.5" /> New Adjustment
+          <Button size="sm" onClick={openCreate} >
+            <Plus className="h-3.5 w-3.5" /> {t("sapNewAdjustment")}
           </Button>
         </div>
       </div>
@@ -209,19 +206,19 @@ export default function StockAdjustmentPanel() {
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
               <tr className="border-b border-(--row-border)">
-                <TableHead className="whitespace-nowrap">Adjustment No.</TableHead>
-                <TableHead className="whitespace-nowrap">Posting Date</TableHead>
-                <TableHead className="whitespace-nowrap">Warehouse</TableHead>
-                <TableHead className="whitespace-nowrap">Reason</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="whitespace-nowrap">{t("sapAdjustmentNo")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("sapPostingDate")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("sapWarehouse")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("sapReason")}</TableHead>
+                <TableHead className="text-right">{t("sapStatus")}</TableHead>
+                <TableHead className="text-right">{t("sapActions")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</TableCell></tr>
+                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("sapLoading")}</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No stock adjustments yet.</TableCell></tr>
+                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("sapNoAdjustmentsYet")}</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
                   <TableRow key={row.adjustment_id}>
@@ -230,10 +227,10 @@ export default function StockAdjustmentPanel() {
                     <TableCell className="whitespace-nowrap" style={S.primary}>{warehouseLabel(row.warehouse_id)}</TableCell>
                     <TableCell className="whitespace-nowrap" style={S.sub}>{row.reason || "—"}</TableCell>
                     <TableCell className="text-right">
-                      <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[row.status] || STATUS_STYLE.DRAFT}>{row.status}</span>
+                      <StatusBadge status={row.status} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <button onClick={() => openView(row)} title="View" className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
+                      <button onClick={() => openView(row)} title={t("sapView")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
                     </TableCell>
@@ -254,13 +251,13 @@ export default function StockAdjustmentPanel() {
       <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title="New Stock Adjustment"
+        title={t("sapNewStockAdjustment")}
         maxWidth="xl"
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>{t("sapCancel")}</Button>
             <Button size="sm" onClick={handleSave} disabled={saving} className="nf-btn-primary">
-              {saving ? "Saving…" : "Save Draft"}
+              {saving ? t("sapSaving") : t("sapSaveDraft")}
             </Button>
           </>
         }
@@ -272,30 +269,30 @@ export default function StockAdjustmentPanel() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Warehouse <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("sapWarehouse")} <span className="text-(--danger)">*</span></label>
               <select value={header.warehouse_id} onChange={(e) => setHeader((h) => ({ ...h, warehouse_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">Select…</option>
+                <option value="">{t("sapSelectEllipsis")}</option>
                 {warehouses.map((w) => <option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_code} — {w.warehouse_name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Posting Date <span className="text-(--danger)">*</span></label>
+              <label className="nf-text-label" style={S.sub}>{t("sapPostingDate")} <span className="text-(--danger)">*</span></label>
               <input type="date" value={header.posting_date} onChange={(e) => setHeader((h) => ({ ...h, posting_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Reason</label>
-              <input value={header.reason} onChange={(e) => setHeader((h) => ({ ...h, reason: e.target.value }))} placeholder="Physical count variance" className={inputCls} style={S.input} />
+              <label className="nf-text-label" style={S.sub}>{t("sapReason")}</label>
+              <input value={header.reason} onChange={(e) => setHeader((h) => ({ ...h, reason: e.target.value }))} placeholder={t("sapPhysicalCountVariance")} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Remarks</label>
+              <label className="nf-text-label" style={S.sub}>{t("sapRemarks")}</label>
               <input value={header.remarks} onChange={(e) => setHeader((h) => ({ ...h, remarks: e.target.value }))} className={inputCls} style={S.input} />
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Lines</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("sapLines")}</p>
             <button onClick={addLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
-              <Plus className="h-3 w-3" /> Add Line
+              <Plus className="h-3 w-3" /> {t("sapAddLine")}
             </button>
           </div>
 
@@ -303,10 +300,10 @@ export default function StockAdjustmentPanel() {
             <table className="w-full border-collapse text-left text-xs">
               <TableHeader>
                 <tr className="border-b border-(--row-border)">
-                  <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Qty (± signed)</TableHead>
-                  <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                  <TableHead className="h-auto px-3 py-2">Rate (if +)</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("sapItem")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("sapQtySigned")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("sapUom")}</TableHead>
+                  <TableHead className="h-auto px-3 py-2">{t("sapRateIfPositive")}</TableHead>
                   <TableHead className="h-auto px-3 py-2"></TableHead>
                 </tr>
               </TableHeader>
@@ -315,14 +312,14 @@ export default function StockAdjustmentPanel() {
                   <TableRow key={idx}>
                     <TableCell className="px-2 py-1.5">
                       <select value={line.item_id} onChange={(e) => setLineField(idx, "item_id", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
+                        <option value="">{t("sapSelectEllipsis")}</option>
                         {items.map((it) => <option key={it.item_id} value={it.item_id}>{it.item_code} — {it.item_name}</option>)}
                       </select>
                     </TableCell>
-                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} placeholder="e.g. -5 or 10" className={inputCls} style={S.input} /></TableCell>
+                    <TableCell className="px-2 py-1.5 w-28"><input type="number" value={line.quantity} onChange={(e) => setLineField(idx, "quantity", e.target.value)} placeholder={t("sapQtyPlaceholder")} className={inputCls} style={S.input} /></TableCell>
                     <TableCell className="px-2 py-1.5 w-28">
                       <select value={line.uom} onChange={(e) => setLineField(idx, "uom", e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
-                        <option value="">Select…</option>
+                        <option value="">{t("sapSelectEllipsis")}</option>
                         {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
                       </select>
                     </TableCell>
@@ -330,7 +327,7 @@ export default function StockAdjustmentPanel() {
                       <input type="number" value={line.rate} onChange={(e) => setLineField(idx, "rate", e.target.value)} disabled={Number(line.quantity) <= 0} className={inputCls} style={S.input} />
                     </TableCell>
                     <TableCell className="px-2 py-1.5">
-                      <button onClick={() => removeLine(idx)} type="button" className="rounded p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeLine(idx)} type="button" className="rounded-[var(--radius-xs)] p-1 transition hover:bg-(--danger-muted)" style={{ color: "var(--danger)" }}><Trash2 className="h-3.5 w-3.5" /></button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -344,14 +341,14 @@ export default function StockAdjustmentPanel() {
       <Dialog
         open={!!viewing}
         onClose={() => setViewing(null)}
-        title={viewing ? `Stock Adjustment ${viewing.adjustment_no}` : ""}
+        title={viewing ? t("sapStockAdjustmentTitle", { no: viewing.adjustment_no }) : ""}
         maxWidth="xl"
         footer={
           viewing?.status === "DRAFT" ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => setViewing(null)}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={() => setViewing(null)}>{t("sapCancel")}</Button>
               <Button size="sm" onClick={handlePost} disabled={posting} className="flex items-center gap-1.5 nf-btn-primary">
-                <CheckCircle2 className="h-4 w-4" /> {posting ? "Posting…" : "Post"}
+                <CheckCircle2 className="h-4 w-4" /> {posting ? t("sapPosting") : t("sapPost")}
               </Button>
             </>
           ) : undefined
@@ -360,21 +357,21 @@ export default function StockAdjustmentPanel() {
         {viewing && (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Status</p><span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold" style={STATUS_STYLE[viewing.status] || STATUS_STYLE.DRAFT}>{viewing.status}</span></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Posting Date</p><p style={S.primary}>{viewing.posting_date}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Warehouse</p><p style={S.primary}>{warehouseLabel(viewing.warehouse_id)}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Reason</p><p style={S.primary}>{viewing.reason || "—"}</p></div>
-              {viewing.posted_at && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Posted At</p><p style={S.primary}>{viewing.posted_at}</p></div>}
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("sapStatus")}</p><StatusBadge status={viewing.status} className="mt-1" /></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("sapPostingDate")}</p><p style={S.primary}>{viewing.posting_date}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("sapWarehouse")}</p><p style={S.primary}>{warehouseLabel(viewing.warehouse_id)}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("sapReason")}</p><p style={S.primary}>{viewing.reason || "—"}</p></div>
+              {viewing.posted_at && <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("sapPostedAt")}</p><p style={S.primary}>{viewing.posted_at}</p></div>}
             </div>
 
             <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
               <table className="w-full border-collapse text-left text-xs">
                 <TableHeader>
                   <tr className="border-b border-(--row-border)">
-                    <TableHead className="h-auto px-3 py-2">Item</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Qty</TableHead>
-                    <TableHead className="h-auto px-3 py-2">UOM</TableHead>
-                    <TableHead className="h-auto px-3 py-2">Rate</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("sapItem")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("sapQty")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("sapUom")}</TableHead>
+                    <TableHead className="h-auto px-3 py-2">{t("sapRate")}</TableHead>
                   </tr>
                 </TableHeader>
                 <TableBody>

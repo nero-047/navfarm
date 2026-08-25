@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe } from "lucide-react";
+import { Globe, ChevronDown } from "lucide-react";
 import { useLanguage } from "../../hooks/useLanguage";
 
 // Each language's own name, in its own script — not the English name and
@@ -17,71 +17,34 @@ const NATIVE_NAMES: Record<string, string> = {
   ta: "தமிழ்",
 };
 
+/**
+ * Hover and focus are CSS state, not JS state. This used to mutate
+ * `style.borderColor` from onMouseEnter/onMouseLeave — opening the native
+ * dropdown swallows the matching mouseleave, so the accent border stayed
+ * painted on afterwards and looked like a stuck error ring. It also set
+ * `outline: none` with nothing in its place, which apple.design.md §29 rules
+ * out. Both are handled by the shared `.nf-lang-select` class in global.css.
+ */
 export function LanguageSelector() {
   const { language, setLanguage } = useLanguage();
   return (
-    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-      <Globe
-        size={14}
-        style={{
-          position: "absolute",
-          left: "9px",
-          top: "50%",
-          transform: "translateY(-50%)",
-          pointerEvents: "none",
-          color: "var(--text-muted)",
-        }}
-      />
+    <div className="nf-lang">
+      <Globe size={14} className="nf-lang-icon" aria-hidden="true" />
       <select
         value={language}
         onChange={(e) => setLanguage(e.target.value as any)}
         aria-label="Language"
-        style={{
-          padding: "0 24px 0 28px",
-          borderRadius: "16px",
-          border: "1px solid var(--border)",
-          backgroundColor: "transparent",
-          color: "var(--text-secondary)",
-          fontSize: "12px",
-          fontWeight: 600,
-          cursor: "pointer",
-          outline: "none",
-          height: "32px",
-          appearance: "none",
-          WebkitAppearance: "none",
-          MozAppearance: "none",
-          transition: "border-color 150ms, color 150ms",
-        }}
-        onMouseEnter={(e) => {
-          const b = e.currentTarget;
-          b.style.borderColor = "var(--accent)";
-          b.style.color = "var(--accent)";
-        }}
-        onMouseLeave={(e) => {
-          const b = e.currentTarget;
-          b.style.borderColor = "var(--border)";
-          b.style.color = "var(--text-secondary)";
-        }}
+        className="nf-lang-select"
       >
         {Object.entries(NATIVE_NAMES).map(([code, name]) => (
-          <option key={code} value={code} style={{ backgroundColor: "var(--surface)", color: "var(--text-primary)" }}>
+          <option key={code} value={code}>
             {name}
           </option>
         ))}
       </select>
-      <span style={{
-        position: "absolute",
-        right: "8px",
-        top: "50%",
-        transform: "translateY(-50%)",
-        pointerEvents: "none",
-        color: "var(--text-muted)",
-        fontSize: "8px",
-        display: "flex",
-        alignItems: "center"
-      }}>
-        ▼
-      </span>
+      <ChevronDown size={13} className="nf-lang-chevron" aria-hidden="true" />
     </div>
   );
 }
+
+export default LanguageSelector;

@@ -7,7 +7,9 @@ import {
 } from "lucide-react";
 import { api } from "@/services/api-client";
 import { InlineAlert } from "@/components/ui/alert";
+import { StatRow, StatCard } from "@/components/ui/stat-row";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Row = Record<string, any>;
 
@@ -34,21 +36,26 @@ function formatCurrency(val?: number | string | null) {
 }
 
 export default function HerdAnalyticsPanel() {
+  const { t } = useLanguage();
   const companyId = getActiveCompanyId();
 
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
   const [data, setData]         = useState<Row | null>(null);
+  const [batches, setBatches]   = useState<Row[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState("");
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = async (batchId?: string) => {
     if (!companyId) return;
     setLoading(true);
     setError("");
     try {
-      const res = await api.get(`/financial-reports/herd-analytics?companyId=${companyId}`);
+      const qs = new URLSearchParams({ companyId });
+      if (batchId) qs.set("batchId", batchId);
+      const res = await api.get(`/financial-reports/herd-analytics?${qs.toString()}`);
       setData(unwrap<Row>(res));
     } catch (err: any) {
-      setError(err?.message || "Failed to load Piggery Herd Analytics.");
+      setError(err?.message || t("hapLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -56,7 +63,15 @@ export default function HerdAnalyticsPanel() {
 
   useEffect(() => {
     loadAnalytics();
+    if (companyId) {
+      api.get(`/batch?companyId=${companyId}&limit=200`).then((r) => setBatches(unwrap<Row[]>(r) || [])).catch(() => setBatches([]));
+    }
   }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleBatchFilterChange = (batchId: string) => {
+    setSelectedBatchId(batchId);
+    loadAnalytics(batchId || undefined);
+  };
 
   const maxParityCount = data
     ? Math.max(...Object.values(data.parityDistribution as Record<string, number>), 1)
@@ -65,9 +80,23 @@ export default function HerdAnalyticsPanel() {
   return (
     <div className="space-y-6">
       {/* ── Top Header ── */}
-      <div className="rounded-[var(--radius-lg)] border p-4" style={S.surface}>
-        <h3 className="text-base font-semibold" style={S.primary}>Piggery Herd Analytics & Demographics</h3>
-        <p className="text-xs" style={S.muted}>Real-time census, parity distribution curve, and biological asset valuation</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border p-4" style={S.surface}>
+        <div>
+          <h3 className="text-base font-semibold" style={S.primary}>{t("hapTitle")}</h3>
+          <p className="text-xs" style={S.muted}>{t("hapSubtitle")}</p>
+        </div>
+        {batches.length > 0 && (
+          <select
+            value={selectedBatchId}
+            onChange={(e) => handleBatchFilterChange(e.target.value)}
+            className="nf-input h-9 text-xs"
+          >
+            <option value="">{t("hapAllBatches")}</option>
+            {batches.map((b) => (
+              <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {error && <InlineAlert variant="danger">{error}</InlineAlert>}
@@ -75,76 +104,51 @@ export default function HerdAnalyticsPanel() {
       {loading && (
         <div className="py-16 text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin" style={S.accent} />
-          <p className="mt-3 text-sm" style={S.sub}>Analyzing herd demographics and productivity metrics…</p>
+          <p className="mt-3 text-sm" style={S.sub}>{t("hapLoadingMessage")}</p>
         </div>
       )}
 
       {!loading && data && (
         <div className="space-y-6">
           {/* ── KPI Summary Cards ── */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Active Herd Size</p>
-                <Users className="h-4 w-4" style={{ color: "var(--accent)" }} />
-              </div>
-              <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
-                {data.totalHeadcount.toLocaleString("en-IN")} <span className="text-xs font-normal" style={S.muted}>head</span>
-              </p>
-              <p className="mt-1 text-[11px]" style={S.sub}>
-                {data.genderBreakdown.Female} Females · {data.genderBreakdown.Male} Males
-              </p>
-            </div>
-
-            <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Asset Valuation</p>
-                <TrendingUp className="h-4 w-4" style={{ color: "var(--accent)" }} />
-              </div>
-              <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
-                {formatCurrency(data.totalBookValue)}
-              </p>
-              <p className="mt-1 text-[11px]" style={S.sub}>
-                Avg {formatCurrency(data.totalHeadcount > 0 ? data.totalBookValue / data.totalHeadcount : 0)} / head
-              </p>
-            </div>
-
-            <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Live Births</p>
-                <HeartPulse className="h-4 w-4" style={{ color: "var(--accent)" }} />
-              </div>
-              <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
-                {data.productivity.totalPigletsBornLive.toLocaleString("en-IN")} <span className="text-xs font-normal" style={S.muted}>piglets</span>
-              </p>
-              <p className="mt-1 text-[11px]" style={S.sub}>
-                {data.productivity.totalPigletsWeaned.toLocaleString("en-IN")} successfully weaned
-              </p>
-            </div>
-
-            <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Weaning Rate</p>
-                <Activity className="h-4 w-4" style={{ color: "var(--accent)" }} />
-              </div>
-              <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
-                {data.productivity.weaningRate}%
-              </p>
-              <p className="mt-1 text-[11px]" style={S.sub}>
-                {data.productivity.weaningRate >= 85 ? "Optimal weaning efficiency" : "Monitoring recommended"}
-              </p>
-            </div>
-          </div>
+          <StatRow>
+            <StatCard
+              icon={Users}
+              label={t("hapActiveHerdSize")}
+              value={data.totalHeadcount.toLocaleString("en-IN")}
+              unit={t("hapHeadUnit")}
+              sub={t("hapGenderSplit", { female: data.genderBreakdown.Female, male: data.genderBreakdown.Male })}
+            />
+            <StatCard
+              icon={TrendingUp}
+              label={t("hapAssetValuation")}
+              value={formatCurrency(data.totalBookValue)}
+              sub={t("hapAvgPerHead", { value: formatCurrency(data.totalHeadcount > 0 ? data.totalBookValue / data.totalHeadcount : 0) })}
+            />
+            <StatCard
+              icon={HeartPulse}
+              label={t("hapLiveBirths")}
+              value={data.productivity.totalPigletsBornLive.toLocaleString("en-IN")}
+              unit={t("hapPigletsUnit")}
+              sub={t("hapSuccessfullyWeaned", { count: data.productivity.totalPigletsWeaned.toLocaleString("en-IN") })}
+            />
+            <StatCard
+              icon={Activity}
+              label={t("hapWeaningRate")}
+              value={`${data.productivity.weaningRate}%`}
+              sub={data.productivity.weaningRate >= 85 ? t("hapOptimalWeaningEfficiency") : t("hapMonitoringRecommended")}
+            />
+          </StatRow>
 
           {/* ── Parity Profile Curve & Breeding Distribution ── */}
           <div className="rounded-[var(--radius-lg)] border p-5 shadow-sm" style={S.surface}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h4 className="text-sm font-semibold" style={S.primary}>Sow Herd Parity Profile Curve</h4>
-                <p className="text-xs" style={S.muted}>Headcount distribution of breeding females across gestation cycles</p>
+                <h4 className="text-sm font-semibold" style={S.primary}>{t("hapParityCurveTitle")}</h4>
+                <p className="text-xs" style={S.muted}>{t("hapParityCurveSubtitle")}</p>
               </div>
               <span className="inline-flex items-center gap-1 text-xs font-medium" style={S.accent}>
-                <BarChart3 className="h-3.5 w-3.5" /> Target: Balanced Parity 1–4 Peak
+                <BarChart3 className="h-3.5 w-3.5" /> {t("hapParityTarget")}
               </span>
             </div>
 
@@ -155,7 +159,7 @@ export default function HerdAnalyticsPanel() {
                   <div key={label} className="space-y-1">
                     <div className="flex justify-between text-xs font-medium">
                       <span style={S.primary}>{label}</span>
-                      <span style={S.sub}>{count} head</span>
+                      <span style={S.sub}>{t("hapCountHead", { count })}</span>
                     </div>
                     <div className="h-4 w-full rounded-full overflow-hidden" style={S.raised}>
                       <div
@@ -178,14 +182,14 @@ export default function HerdAnalyticsPanel() {
             <div className="rounded-[var(--radius-lg)] border p-5 shadow-sm" style={S.surface}>
               <div className="flex items-center gap-2 mb-4">
                 <ShieldCheck className="h-4 w-4" style={S.accent} />
-                <h4 className="text-sm font-semibold" style={S.primary}>Distribution by Production Stage</h4>
+                <h4 className="text-sm font-semibold" style={S.primary}>{t("hapDistributionByStage")}</h4>
               </div>
               <div className="space-y-2 text-sm">
                 {data.stageBreakdown.map((s: Row) => (
                   <div key={s.stage_name} className="flex items-center justify-between py-2 border-b">
                     <span style={S.sub}>{s.stage_name}</span>
                     <div className="flex items-center gap-3">
-                      <span className="font-semibold" style={S.primary}>{s.count} head</span>
+                      <span className="font-semibold" style={S.primary}>{t("hapCountHead", { count: s.count })}</span>
                       <span className="text-xs" style={S.muted}>
                         {((s.count / (data.totalHeadcount || 1)) * 100).toFixed(1)}%
                       </span>
@@ -193,7 +197,7 @@ export default function HerdAnalyticsPanel() {
                   </div>
                 ))}
                 {data.stageBreakdown.length === 0 && (
-                  <p className="text-xs" style={S.muted}>No animals in active stages.</p>
+                  <p className="text-xs" style={S.muted}>{t("hapNoAnimalsInActiveStages")}</p>
                 )}
               </div>
             </div>
@@ -202,14 +206,14 @@ export default function HerdAnalyticsPanel() {
             <div className="rounded-[var(--radius-lg)] border p-5 shadow-sm" style={S.surface}>
               <div className="flex items-center gap-2 mb-4">
                 <Users className="h-4 w-4" style={S.accent} />
-                <h4 className="text-sm font-semibold" style={S.primary}>Distribution by Genetic Breed</h4>
+                <h4 className="text-sm font-semibold" style={S.primary}>{t("hapDistributionByBreed")}</h4>
               </div>
               <div className="space-y-2 text-sm">
                 {data.breedBreakdown.map((b: Row) => (
                   <div key={b.breed_name} className="flex items-center justify-between py-2 border-b">
                     <span style={S.sub}>{b.breed_name}</span>
                     <div className="flex items-center gap-3">
-                      <span className="font-semibold" style={S.primary}>{b.count} head</span>
+                      <span className="font-semibold" style={S.primary}>{t("hapCountHead", { count: b.count })}</span>
                       <span className="text-xs" style={S.muted}>
                         {((b.count / (data.totalHeadcount || 1)) * 100).toFixed(1)}%
                       </span>
@@ -217,7 +221,7 @@ export default function HerdAnalyticsPanel() {
                   </div>
                 ))}
                 {data.breedBreakdown.length === 0 && (
-                  <p className="text-xs" style={S.muted}>No breed registrations found.</p>
+                  <p className="text-xs" style={S.muted}>{t("hapNoBreedRegistrations")}</p>
                 )}
               </div>
             </div>
@@ -227,11 +231,11 @@ export default function HerdAnalyticsPanel() {
           <div className="rounded-[var(--radius-lg)] border p-5 shadow-sm" style={S.surface}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h4 className="text-sm font-semibold" style={S.primary}>Herd Disposals & Realized Exit Gain / Loss</h4>
-                <p className="text-xs" style={S.muted}>Historical animal exits (Sold, Slaughtered, Culled, Mortalities)</p>
+                <h4 className="text-sm font-semibold" style={S.primary}>{t("hapDisposalsTitle")}</h4>
+                <p className="text-xs" style={S.muted}>{t("hapDisposalsSubtitle")}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs uppercase font-semibold" style={S.muted}>Net Gain / Loss on Disposal</p>
+                <p className="text-xs uppercase font-semibold" style={S.muted}>{t("hapNetGainLoss")}</p>
                 <p className="text-base font-bold" style={Number(data.disposals.totalGainLoss) >= 0 ? S.success : S.danger}>
                   {formatCurrency(data.disposals.totalGainLoss)}
                 </p>
@@ -242,12 +246,12 @@ export default function HerdAnalyticsPanel() {
               {Object.entries(data.disposals.disposalBreakdown as Record<string, number>).map(([type, count]) => (
                 <div key={type} className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
                   <p className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{type}</p>
-                  <p className="mt-1 text-xl font-bold" style={S.primary}>{count} <span className="text-xs font-normal" style={S.muted}>head</span></p>
+                  <p className="mt-1 text-xl font-bold" style={S.primary}>{count} <span className="text-xs font-normal" style={S.muted}>{t("hapHeadUnit")}</span></p>
                 </div>
               ))}
               {Object.keys(data.disposals.disposalBreakdown).length === 0 && (
                 <div className="col-span-4 py-4 text-center">
-                  <p className="text-xs" style={S.muted}>No disposal events recorded.</p>
+                  <p className="text-xs" style={S.muted}>{t("hapNoDisposalEvents")}</p>
                 </div>
               )}
             </div>

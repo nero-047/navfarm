@@ -41,9 +41,11 @@
   --accent: #c24332;
   --accent-hover: #a9382a;
   --accent-muted: rgba(194, 67, 50, 0.1);
-  --danger: #c24332;
-  --danger-hover: #a9382a;
-  --danger-muted: rgba(194, 67, 50, 0.08);
+  /* Danger is deliberately a cooler, more crimson red than brand accent —
+     same hex as brand red made a Save button and a SICK badge indistinguishable. */
+  --danger: #b7293e;
+  --danger-hover: #9c2233;
+  --danger-muted: rgba(183, 41, 62, 0.08);
   --success: #2f7d5b;
   --success-muted: rgba(47, 125, 91, 0.1);
   --warning: #b7791f;
@@ -1184,6 +1186,83 @@ textarea:focus-visible {
     border-color: var(--input-border-focus);
     box-shadow: 0 0 0 3px var(--focus-ring);
   }
+  /* A <select> is sized by its longest <option>, and a flex/grid child defaults
+     to min-width:auto — together that let filter-bar selects push the page
+     wider than the viewport on mobile. apple.design.md §28: never conceal a
+     broken layout with hidden overflow; make the control shrink instead. */
+  .nf-input,
+  .nf-input-sm {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Exactly two control sizes, one radius. Measured across the console, form
+     controls were rendering at six different heights (26/30/31/32/37/39px) and
+     three radii (5/8/18px) — a pill-ish search box could sit directly beside a
+     square-ish select on the same toolbar. `nf-input` is the form-field size,
+     `nf-input-sm` the dense filter-bar/table-cell size; both share the same
+     corner so a toolbar reads as one row of controls. */
+  .nf-input {
+    height: 44px;
+    border-radius: var(--radius-sm);
+  }
+  .nf-input-sm {
+    height: 36px;
+    border-radius: var(--radius-sm);
+  }
+  /* Multi-line and native pickers size to their own content. */
+  textarea.nf-input,
+  textarea.nf-input-sm,
+  select[multiple].nf-input,
+  select[multiple].nf-input-sm {
+    height: auto;
+  }
+}
+
+/* Language selector — hover/focus in CSS so opening the native dropdown can't
+   strand a hover colour on the control (see language-selector.tsx). */
+.nf-lang {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.nf-lang-icon,
+.nf-lang-chevron {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+  transition: color 150ms ease;
+}
+.nf-lang-icon { left: 9px; }
+.nf-lang-chevron { right: 8px; }
+.nf-lang-select {
+  height: 32px;
+  padding: 0 26px 0 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background-color: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.nf-lang:hover .nf-lang-select { border-color: var(--border-strong); color: var(--text-primary); }
+.nf-lang:hover .nf-lang-icon,
+.nf-lang:hover .nf-lang-chevron { color: var(--text-secondary); }
+.nf-lang-select:focus-visible {
+  outline: none;
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.nf-lang-select option {
+  background-color: var(--surface);
+  color: var(--text-primary);
 }
 
 /* Wrapper-free select styling. The <Select> primitive positions its chevron in
@@ -1270,9 +1349,9 @@ html[data-theme='dark'] {
   --accent: #e0785f;
   --accent-hover: #eb937d;
   --accent-muted: rgba(217, 105, 79, 0.18);
-  --danger: #e0785f;
-  --danger-hover: #eb937d;
-  --danger-muted: rgba(217, 105, 79, 0.16);
+  --danger: #f0616f;
+  --danger-hover: #f58a95;
+  --danger-muted: rgba(240, 97, 111, 0.16);
   --success: #4ba57e;
   --success-muted: rgba(75, 165, 126, 0.16);
   --warning: #d99a3f;

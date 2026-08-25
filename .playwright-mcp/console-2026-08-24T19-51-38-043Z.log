@@ -1,0 +1,48 @@
+[    1962ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:3000/login:0
+[    2107ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    2210ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    2343ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    2416ms] [LOG] [Fast Refresh] done in 175ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    2448ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   21150ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   21875ms] [LOG] [Fast Refresh] done in 827ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   22170ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   23459ms] [LOG] [Fast Refresh] done in 1391ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   23631ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   23978ms] [LOG] [Fast Refresh] done in 448ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   24130ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   24403ms] [LOG] [Fast Refresh] done in 374ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   24560ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   24820ms] [LOG] [Fast Refresh] done in 362ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   24974ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   25206ms] [LOG] [Fast Refresh] done in 335ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   25370ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   25663ms] [LOG] [Fast Refresh] done in 396ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   25767ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   26003ms] [LOG] [Fast Refresh] done in 339ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   26143ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   26350ms] [LOG] [Fast Refresh] done in 309ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   26494ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   26706ms] [LOG] [Fast Refresh] done in 315ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   26809ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   27073ms] [LOG] [Fast Refresh] done in 367ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   27218ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   27425ms] [LOG] [Fast Refresh] done in 308ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   27526ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   27739ms] [LOG] [Fast Refresh] done in 314ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   27871ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   28047ms] [LOG] [Fast Refresh] done in 278ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   28151ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   28408ms] [LOG] [Fast Refresh] done in 361ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   28550ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   28552ms] [LOG] [Fast Refresh] done in 104ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   28761ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   28969ms] [LOG] [Fast Refresh] done in 308ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   29102ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   29325ms] [LOG] [Fast Refresh] done in 325ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   29478ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   29653ms] [LOG] [Fast Refresh] done in 277ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   29791ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   29960ms] [LOG] [Fast Refresh] done in 272ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   30063ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[   30076ms] [LOG] [Fast Refresh] done in 116ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297

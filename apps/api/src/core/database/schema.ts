@@ -1900,6 +1900,10 @@ export const batchTransaction = mysqlTable('batch_transaction', {
   hours: decimal('hours', { precision: 8, scale: 2 }),
   adg: decimal('adg', { precision: 10, scale: 4 }),
   bcs_score: decimal('bcs_score', { precision: 4, scale: 2 }),
+  // Optional per-animal attribution — null means the row applies to the whole
+  // batch (unchanged historical behaviour); set when a caller scoped the
+  // entry to one or more specific animals in the batch.
+  animal_id: varchar('animal_id', { length: 36 }).references(() => animalRegister.animal_id, { onDelete: 'set null' }),
   created_by: varchar('created_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
 });
@@ -1946,6 +1950,66 @@ export const batchStageLog = mysqlTable('batch_stage_log', {
   transferred_by: varchar('transferred_by', { length: 36 }),
   remarks: text('remarks'),
 });
+
+/**
+ * Movement of livestock between batches — distinct from `batch_stage_log`,
+ * which walks a batch through its own lifecycle (QUARANTINE → GILT_GROWER).
+ * This is the A → B movement that happens when a cycle closes, or when a
+ * subset of animals is moved out early. Transferred animals stay fully
+ * operable: their `animal_register.current_batch_id` is repointed, so every
+ * downstream entry screen picks them up under the destination batch.
+ *
+ * A transfer is a balance-sheet reclassification, never income — value moves
+ * from the source batch's WIP to the destination's, and the posting logic
+ * mirrors that rather than touching P&L.
+ */
+export const batchTransfer = mysqlTable('batch_transfer', {
+  transfer_id: varchar('transfer_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  transfer_no: varchar('transfer_no', { length: 50 }).notNull(),
+  from_batch_id: varchar('from_batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  to_batch_id: varchar('to_batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  transfer_date: date('transfer_date', { mode: 'string' }).notNull(),
+  // FULL_BATCH moves every remaining animal and closes the source; PARTIAL
+  // moves only the selected animals and leaves the source running.
+  transfer_type: varchar('transfer_type', { length: 20 }).default('PARTIAL').notNull(),
+  head_count: decimal('head_count', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  transfer_value: decimal('transfer_value', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  reason: varchar('reason', { length: 100 }),
+  remarks: text('remarks'),
+  status: varchar('status', { length: 20 }).default('DRAFT').notNull(),
+  posted_at: timestamp('posted_at', { mode: 'string' }),
+  posted_by: varchar('posted_by', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+});
+
+/** One row per animal moved, carrying the book value it moved at. */
+export const batchTransferLine = mysqlTable('batch_transfer_line', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  transfer_id: varchar('transfer_id', { length: 36 }).notNull().references(() => batchTransfer.transfer_id, { onDelete: 'cascade' }),
+  line_no: int('line_no').notNull(),
+  animal_id: varchar('animal_id', { length: 36 }).notNull().references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
+  from_location_id: varchar('from_location_id', { length: 36 }),
+  to_location_id: varchar('to_location_id', { length: 36 }),
+  book_value: decimal('book_value', { precision: 18, scale: 4 }).default('0.0000').notNull(),
+  remarks: varchar('remarks', { length: 500 }),
+});
+
+export const batchTransferRelations = relations(batchTransfer, ({ one, many }) => ({
+  fromBatch: one(batchHeader, { fields: [batchTransfer.from_batch_id], references: [batchHeader.batch_id], relationName: 'transferFromBatch' }),
+  toBatch: one(batchHeader, { fields: [batchTransfer.to_batch_id], references: [batchHeader.batch_id], relationName: 'transferToBatch' }),
+  lines: many(batchTransferLine),
+}));
+
+export const batchTransferLineRelations = relations(batchTransferLine, ({ one }) => ({
+  transfer: one(batchTransfer, { fields: [batchTransferLine.transfer_id], references: [batchTransfer.transfer_id] }),
+  animal: one(animalRegister, { fields: [batchTransferLine.animal_id], references: [animalRegister.animal_id] }),
+}));
 
 export const batchHeaderRelations = relations(batchHeader, ({ one, many }) => ({
   company: one(companyMaster, { fields: [batchHeader.company_id], references: [companyMaster.company_id] }),
@@ -2891,3 +2955,101 @@ export const semenBatchRelations = relations(semenBatch, ({ one }) => ({
   outputItem: one(itemMaster, { fields: [semenBatch.output_item_id], references: [itemMaster.item_id] }),
 }));
 
+
+/**
+ * Per-operational-area operating configuration.
+ *
+ * The area's identity (name, code, parent farm, NOB/LOB) is NOT duplicated
+ * here — that lives in `operational_area_master` and is read from there. This
+ * table only holds the knobs an operator actually sets.
+ *
+ * The split between typed columns and `lob_config` is deliberate and is what
+ * makes the screen work for LOBs that do not exist yet: costing method, feed
+ * UOM, mortality and temperature thresholds mean the same thing for Piggery,
+ * Dairy and Poultry, so they are real columns. Capacity is where LOBs diverge
+ * (sow places and farrowing crates vs. milking points vs. brooder rings), so
+ * it goes in `lob_config` and a new LOB ships without a migration.
+ */
+export const operationalAreaSettings = mysqlTable('operational_area_settings', {
+  setting_id: varchar('setting_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  // FKs declared below rather than inline: the auto-derived constraint names
+  // ("operational_area_settings_area_id_operational_area_master_area_id_fk")
+  // blow past MySQL's 64-character identifier limit.
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  area_id: varchar('area_id', { length: 36 }).notNull().unique(),
+  costing_method: varchar('costing_method', { length: 20 }).default('STANDARD').notNull(),
+  default_feed_uom: varchar('default_feed_uom', { length: 20 }).default('KG').notNull(),
+  mortality_threshold_pct: decimal('mortality_threshold_pct', { precision: 6, scale: 3 }),
+  temp_threshold_min: decimal('temp_threshold_min', { precision: 6, scale: 2 }),
+  temp_threshold_max: decimal('temp_threshold_max', { precision: 6, scale: 2 }),
+  // Requests at or below this quantity skip the approval queue entirely.
+  auto_approve_ration_under_qty: decimal('auto_approve_ration_under_qty', { precision: 18, scale: 4 }),
+  lob_config: json('lob_config'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  companyFk: foreignKey({ columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'oa_settings_company_fk' }).onDelete('cascade'),
+  areaFk: foreignKey({ columns: [table.area_id], foreignColumns: [operationalAreaMaster.area_id], name: 'oa_settings_area_fk' }).onDelete('cascade'),
+}));
+
+/**
+ * Operational approval queue — the requests an area lead has to sign off
+ * (feed ration changes, goods receipts, stock transfers, stage closures,
+ * veterinary disposals).
+ *
+ * `doc_type` stays a plain varchar rather than an enum so a future LOB can add
+ * its own request kind without a migration; the UI decides which icon and
+ * label a type gets.
+ */
+export const approvalRequest = mysqlTable('approval_request', {
+  request_id: varchar('request_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  // Named explicitly — the derived name exceeds MySQL's 64-char limit.
+  operational_area_id: varchar('operational_area_id', { length: 36 }),
+  doc_type: varchar('doc_type', { length: 40 }).notNull(),
+  doc_no: varchar('doc_no', { length: 50 }).notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  requested_by: varchar('requested_by', { length: 36 }).references(() => userMaster.user_id, { onDelete: 'set null' }),
+  // Snapshot of who asked, kept alongside the FK: a request must still read
+  // correctly years later even if that user is deleted or changes role.
+  requestor_label: varchar('requestor_label', { length: 150 }),
+  requestor_role: varchar('requestor_role', { length: 60 }),
+  location_label: varchar('location_label', { length: 200 }),
+  batch_id: varchar('batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'set null' }),
+  urgency: varchar('urgency', { length: 10 }).default('MEDIUM').notNull(), // HIGH, MEDIUM, LOW
+  item_or_stage: varchar('item_or_stage', { length: 200 }),
+  requested_qty: varchar('requested_qty', { length: 100 }),
+  uom: varchar('uom', { length: 20 }),
+  cost_impact: decimal('cost_impact', { precision: 18, scale: 4 }),
+  justification: text('justification'),
+  status: varchar('status', { length: 20 }).default('PENDING').notNull(), // PENDING, APPROVED, REJECTED
+  submitted_at: timestamp('submitted_at', { mode: 'string' }).defaultNow().notNull(),
+  decided_at: timestamp('decided_at', { mode: 'string' }),
+  decided_by: varchar('decided_by', { length: 36 }).references(() => userMaster.user_id, { onDelete: 'set null' }),
+  decider_label: varchar('decider_label', { length: 150 }),
+  rejection_reason: text('rejection_reason'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => ({
+  areaFk: foreignKey({ columns: [table.operational_area_id], foreignColumns: [operationalAreaMaster.area_id], name: 'approval_request_area_fk' }).onDelete('set null'),
+}));
+
+export const operationalAreaSettingsRelations = relations(operationalAreaSettings, ({ one }) => ({
+  area: one(operationalAreaMaster, { fields: [operationalAreaSettings.area_id], references: [operationalAreaMaster.area_id] }),
+  company: one(companyMaster, { fields: [operationalAreaSettings.company_id], references: [companyMaster.company_id] }),
+}));
+
+export const approvalRequestRelations = relations(approvalRequest, ({ one }) => ({
+  company: one(companyMaster, { fields: [approvalRequest.company_id], references: [companyMaster.company_id] }),
+  area: one(operationalAreaMaster, { fields: [approvalRequest.operational_area_id], references: [operationalAreaMaster.area_id] }),
+  batch: one(batchHeader, { fields: [approvalRequest.batch_id], references: [batchHeader.batch_id] }),
+  requester: one(userMaster, { fields: [approvalRequest.requested_by], references: [userMaster.user_id], relationName: 'approval_requester' }),
+  decider: one(userMaster, { fields: [approvalRequest.decided_by], references: [userMaster.user_id], relationName: 'approval_decider' }),
+}));

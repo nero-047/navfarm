@@ -8,7 +8,10 @@ import {
 
 import { api } from "@/services/api-client";
 import { InlineAlert } from "@/components/ui/alert";
+import { Dialog } from "@/components/ui/dialog";
+import { StatRow, StatCard } from "@/components/ui/stat-row";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Row = Record<string, any>;
 
@@ -29,11 +32,29 @@ const S = {
 };
 
 export default function FacilityOccupancyPanel() {
+  const { t } = useLanguage();
   const companyId = getActiveCompanyId();
 
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [locations, setLocations] = useState<Row[]>([]);
+
+  const [viewingLocation, setViewingLocation] = useState<Row | null>(null);
+  const [locationAnimals, setLocationAnimals] = useState<Row[]>([]);
+  const [locationAnimalsLoading, setLocationAnimalsLoading] = useState(false);
+
+  const openLocationAnimals = async (loc: Row) => {
+    setViewingLocation(loc);
+    setLocationAnimalsLoading(true);
+    try {
+      const res = await api.get(`/animal?companyId=${companyId}&currentLocationId=${loc.location_id}&limit=500`);
+      setLocationAnimals(unwrap<Row[]>(res) || []);
+    } catch {
+      setLocationAnimals([]);
+    } finally {
+      setLocationAnimalsLoading(false);
+    }
+  };
 
   const loadOccupancy = async () => {
     if (!companyId) return;
@@ -43,7 +64,7 @@ export default function FacilityOccupancyPanel() {
       const res = await api.get(`/location/occupancy?companyId=${companyId}`);
       setLocations(unwrap<Row[]>(res) || []);
     } catch (err: any) {
-      setError(err?.message || "Failed to load facility occupancy.");
+      setError(err?.message || t("fopFailedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -62,79 +83,52 @@ export default function FacilityOccupancyPanel() {
     <div className="space-y-6">
       {/* ── Top Header Bar ── */}
       <div className="rounded-[var(--radius-lg)] border p-4" style={S.surface}>
-        <h3 className="text-base font-semibold" style={S.primary}>Facility & Pen Live Occupancy Tracker</h3>
-        <p className="text-xs" style={S.muted}>Real-time pen headcount, utilization gauges, and biosecurity isolation tracking</p>
+        <h3 className="text-base font-semibold" style={S.primary}>{t("fopTitle")}</h3>
+        <p className="text-xs" style={S.muted}>{t("fopSubtitle")}</p>
       </div>
 
       {error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
       {/* ── Top Executive KPI Cards ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Total Capacity</p>
-            <Building2 className="h-4 w-4" style={{ color: "var(--accent)" }} />
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
-            {totalCapacity > 0 ? totalCapacity.toLocaleString("en-IN") : "—"}{" "}
-            <span className="text-xs font-normal" style={S.muted}>head</span>
-          </p>
-          <p className="mt-1 text-[11px]" style={S.sub}>{locations.length} configured locations/pens</p>
-        </div>
-
-        <div className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Current Occupancy</p>
-            <Users className="h-4 w-4" style={{ color: "var(--accent)" }} />
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono" style={S.primary}>
-            {totalOccupied.toLocaleString("en-IN")}{" "}
-            <span className="text-xs font-normal" style={S.muted}>head</span>
-          </p>
-          <p className="mt-1 text-[11px]" style={S.sub}>
-            {totalCapacity > 0 ? `${Math.round((totalOccupied / totalCapacity) * 100)}% overall utilization` : "Headcount active"}
-          </p>
-        </div>
-
-        <div
-          className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]"
-          style={totalQuarantinePens > 0 ? S.warning : { backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wider">Biosecurity Alert</p>
-            {totalQuarantinePens > 0 ? <ShieldAlert className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" style={{ color: "var(--accent)" }} />}
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono">
-            {totalQuarantinePens}{" "}
-            <span className="text-xs font-normal">pens</span>
-          </p>
-          <p className="mt-1 text-[11px]">
-            {totalQuarantinePens > 0 ? "Active quarantine/sick isolation" : "All pens operating normally"}
-          </p>
-        </div>
-
-        <div
-          className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]"
-          style={totalOverCapacity > 0 ? S.danger : { backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wider">Over-Capacity Pens</p>
-            <AlertTriangle className="h-4 w-4" />
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono">
-            {totalOverCapacity}{" "}
-            <span className="text-xs font-normal">pens</span>
-          </p>
-          <p className="mt-1 text-[11px]">
-            {totalOverCapacity > 0 ? "Requires pen rebalancing" : "Optimal animal density"}
-          </p>
-        </div>
-      </div>
+      <StatRow>
+        <StatCard
+          icon={Building2}
+          label={t("fopTotalCapacity")}
+          value={totalCapacity > 0 ? totalCapacity.toLocaleString("en-IN") : "—"}
+          unit={t("fopHead")}
+          sub={t("fopConfiguredLocationsPens", { count: locations.length })}
+        />
+        <StatCard
+          icon={Users}
+          label={t("fopCurrentOccupancy")}
+          value={totalOccupied.toLocaleString("en-IN")}
+          unit={t("fopHead")}
+          sub={totalCapacity > 0 ? t("fopOverallUtilization", { pct: Math.round((totalOccupied / totalCapacity) * 100) }) : t("fopHeadcountActive")}
+        />
+        <StatCard
+          icon={totalQuarantinePens > 0 ? ShieldAlert : ShieldCheck}
+          tone={totalQuarantinePens > 0 ? "warning" : "default"}
+          emphasis
+          label={t("fopBiosecurityAlert")}
+          value={totalQuarantinePens}
+          unit={t("fopPens")}
+          sub={totalQuarantinePens > 0 ? t("fopActiveQuarantine") : t("fopAllPensNormal")}
+        />
+        <StatCard
+          icon={AlertTriangle}
+          tone={totalOverCapacity > 0 ? "danger" : "default"}
+          emphasis
+          label={t("fopOverCapacityPens")}
+          value={totalOverCapacity}
+          unit={t("fopPens")}
+          sub={totalOverCapacity > 0 ? t("fopRequiresRebalancing") : t("fopOptimalDensity")}
+        />
+      </StatRow>
 
       {loading && (
         <div className="py-16 text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin" style={S.accent} />
-          <p className="mt-3 text-sm" style={S.sub}>Loading facility occupancy metrics…</p>
+          <p className="mt-3 text-sm" style={S.sub}>{t("fopLoadingMetrics")}</p>
         </div>
       )}
 
@@ -166,17 +160,17 @@ export default function FacilityOccupancyPanel() {
                       {loc.location_name}
                     </p>
                     <p className="text-[11px]" style={S.muted}>
-                      Under {loc.parent_name}
+                      {t("fopUnderParent", { parent: loc.parent_name })}
                     </p>
                   </div>
 
                   {isQuarantine ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase rounded border px-2 py-0.5" style={S.warning}>
-                      <ShieldAlert className="h-3 w-3" /> Sick: {loc.sick_animal_count}
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase rounded-[var(--radius-xs)] border px-2 py-0.5" style={S.warning}>
+                      <ShieldAlert className="h-3 w-3" /> {t("fopSickCount", { count: loc.sick_animal_count })}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase rounded border px-2 py-0.5" style={S.surface}>
-                      <CheckCircle2 className="h-3 w-3" style={S.accent} /> Clean
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase rounded-[var(--radius-xs)] border px-2 py-0.5" style={S.surface}>
+                      <CheckCircle2 className="h-3 w-3" style={S.accent} /> {t("fopClean")}
                     </span>
                   )}
                 </div>
@@ -184,7 +178,7 @@ export default function FacilityOccupancyPanel() {
                 {/* Progress Bar */}
                 <div className="mt-4 space-y-1.5">
                   <div className="flex justify-between text-xs font-medium">
-                    <span style={S.sub}>Occupancy</span>
+                    <span style={S.sub}>{t("fopOccupancy")}</span>
                     <span className="font-mono font-bold" style={S.primary}>
                       {loc.current_occupancy} / {loc.max_capacity != null ? `${loc.max_capacity} ${loc.capacity_uom}` : "∞"}
                     </span>
@@ -201,14 +195,21 @@ export default function FacilityOccupancyPanel() {
                   </div>
 
                   <div className="flex justify-between text-[11px]" style={S.muted}>
-                    <span>Animals: {loc.animal_count} · Batches: {loc.batch_count}</span>
-                    <span>{loc.max_capacity ? `${pct}%` : "No limit set"}</span>
+                    <button
+                      type="button"
+                      onClick={() => openLocationAnimals(loc)}
+                      className="underline decoration-dotted hover:opacity-80"
+                      style={S.accent}
+                    >
+                      {t("fopAnimalsBatches", { animals: loc.animal_count, batches: loc.batch_count })}
+                    </button>
+                    <span>{loc.max_capacity ? `${pct}%` : t("fopNoLimitSet")}</span>
                   </div>
 
                   {(loc.last_cleaned_date || loc.last_disinfected_date) && (
                     <div className="pt-2 border-t border-slate-800/40 text-[10px] text-slate-400 flex justify-between">
-                      <span>Cleaned: {loc.last_cleaned_date || "--"}</span>
-                      <span>Disinfected: {loc.last_disinfected_date || "--"}</span>
+                      <span>{t("fopCleaned", { date: loc.last_cleaned_date || "--" })}</span>
+                      <span>{t("fopDisinfected", { date: loc.last_disinfected_date || "--" })}</span>
                     </div>
                   )}
                 </div>
@@ -218,10 +219,38 @@ export default function FacilityOccupancyPanel() {
 
           {locations.length === 0 && (
             <div className="col-span-3 py-12 text-center rounded-[var(--radius-lg)] border" style={S.surface}>
-              <p className="text-sm" style={S.sub}>No farm locations or pens configured.</p>
+              <p className="text-sm" style={S.sub}>{t("fopNoLocationsConfigured")}</p>
             </div>
           )}
         </div>
+      )}
+
+      {/* ── MODAL: Animals at this location ── */}
+      {viewingLocation && (
+        <Dialog
+          open={!!viewingLocation}
+          onClose={() => setViewingLocation(null)}
+          title={t("fopAnimalsAtLocationTitle", { code: viewingLocation.location_code })}
+          maxWidth="md"
+        >
+          {locationAnimalsLoading ? (
+            <div className="py-10 text-center">
+              <Loader2 className="mx-auto h-5 w-5 animate-spin" style={S.accent} />
+            </div>
+          ) : locationAnimals.length === 0 ? (
+            <p className="py-8 text-center text-sm" style={S.sub}>{t("fopNoAnimalsAtLocation")}</p>
+          ) : (
+            <div className="max-h-96 overflow-y-auto rounded-[var(--radius-sm)] border" style={S.surface}>
+              {locationAnimals.map((a) => (
+                <div key={a.animal_id} className="flex items-center justify-between border-b px-3 py-2 text-xs last:border-b-0" style={{ borderColor: "var(--border)" }}>
+                  <span className="font-mono font-semibold" style={S.accent}>{a.ear_tag || a.animal_code}</span>
+                  <span style={S.muted}>{a.animal_type}</span>
+                  <span style={S.muted}>{a.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Dialog>
       )}
     </div>
   );

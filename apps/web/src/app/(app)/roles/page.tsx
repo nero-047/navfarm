@@ -9,6 +9,7 @@ import RolesTab from "../../../components/console/console-tabs/roles-tab";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { Toast } from "../../../components/ui/toast";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { ConsolePage } from "../../../components/ui/console-page";
 
 const S = {
   surface: { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -64,7 +65,7 @@ export default function RolesPage() {
   if (loading) return <LoadingState label={t("roleLoadingRoles")} />;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+    <ConsolePage>
       <PageHeader
         title={t("rolePermissions")}
         description={
@@ -88,6 +89,6 @@ export default function RolesPage() {
           setActionSuccess={setSuccess}
         />
       </div>
-    </div>
+    </ConsolePage>
   );
 }

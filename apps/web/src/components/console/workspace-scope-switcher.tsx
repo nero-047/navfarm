@@ -25,6 +25,7 @@ import {
   NavUser
 } from "@/hooks/useAuth";
 import { api } from "@/lib/api-client";
+import { resolveLobFamily } from "@/lib/lob";
 
 interface OperationalAreaItem {
   area_id: string;
@@ -153,13 +154,7 @@ export default function WorkspaceScopeSwitcher({
     setActiveOperationalAreaId(area.area_id);
     setActiveWorkspaceScope("OPERATIONAL");
     
-    // Determine LOB code (PIGGERY, DAIRY, POULTRY)
-    const lobName = (area.lob_name || area.lob_code || area.lob_id || "PIGGERY").toUpperCase();
-    let normalizedLob = "PIGGERY";
-    if (lobName.includes("DAIRY") || lobName.includes("CATTLE")) normalizedLob = "DAIRY";
-    else if (lobName.includes("POULTRY") || lobName.includes("BROILER") || lobName.includes("LAYER")) normalizedLob = "POULTRY";
-    else if (lobName.includes("PIG") || lobName.includes("SWINE")) normalizedLob = "PIGGERY";
-
+    const normalizedLob = resolveLobFamily(area.lob_code, area.lob_name, area.area_name);
     setActiveLob(normalizedLob);
     setCurrentScope("OPERATIONAL");
     setActiveAreaId(area.area_id);
@@ -392,7 +387,7 @@ export default function WorkspaceScopeSwitcher({
                         }
                       >
                         <span
-                          className="flex h-5 w-5 items-center justify-center rounded border"
+                          className="flex h-5 w-5 items-center justify-center rounded-[var(--radius-xs)] border"
                           style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}
                         >
                           <Layers className="h-3 w-3" style={{ color: "var(--accent)" }} />

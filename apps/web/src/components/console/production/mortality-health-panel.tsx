@@ -11,14 +11,17 @@ import {
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { StatRow, StatCard } from "@/components/ui/stat-row";
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type MortalityRecord = {
   id: string;
   record_date: string;
   batch_no: string;
   ear_tag?: string;
+  animal_id?: string;
   pen_location: string;
   head_count: number;
   cause_of_death: string;
@@ -31,6 +34,7 @@ type TreatmentRecord = {
   id: string;
   treatment_date: string;
   ear_tag: string;
+  animal_id?: string;
   batch_no: string;
   diagnosis: string;
   medicine_name: string;
@@ -52,6 +56,7 @@ type VaccinationItem = {
 };
 
 export default function MortalityHealthPanel() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<"mortality" | "treatments" | "vaccines">("mortality");
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +65,14 @@ export default function MortalityHealthPanel() {
   const [treatmentList, setTreatmentList] = useState<TreatmentRecord[]>([]);
   const [vaccineList] = useState<VaccinationItem[]>([]);
   const [batches, setBatches] = useState<{ id: string; no: string }[]>([]);
+
+  // ── Animal-scope filters/pickers ──
+  const [mortalityAnimalFilter, setMortalityAnimalFilter] = useState("");
+  const [treatmentAnimalFilter, setTreatmentAnimalFilter] = useState("");
+  const [modalAnimals, setModalAnimals] = useState<{ animal_id: string; label: string }[]>([]);
+  const [modalAnimalsLoading, setModalAnimalsLoading] = useState(false);
+  const [mortalityAnimalIds, setMortalityAnimalIds] = useState<Set<string>>(new Set());
+  const [treatmentAnimalIds, setTreatmentAnimalIds] = useState<Set<string>>(new Set());
 
   // ── Dialogs ──
   const [mortalityDialogOpen, setMortalityDialogOpen] = useState(false);
@@ -114,7 +127,8 @@ export default function MortalityHealthPanel() {
                     id: t.transaction_id || `m-${Date.now()}`,
                     record_date: t.transaction_date || "",
                     batch_no: b.batch_no,
-                    ear_tag: "Batch Herd Animal",
+                    ear_tag: t.animal_ear_tag || t.animal_code || undefined,
+                    animal_id: t.animal_id || undefined,
                     pen_location: "Production Shed",
                     head_count: Number(t.quantity || 1),
                     cause_of_death: t.remarks || "Mortality Logged",
@@ -139,7 +153,8 @@ export default function MortalityHealthPanel() {
                   treatments.push({
                     id: t.transaction_id || `t-${Date.now()}`,
                     treatment_date: t.transaction_date || "",
-                    ear_tag: "Batch Herd Cohort",
+                    ear_tag: t.animal_ear_tag || t.animal_code || "Batch Herd Cohort",
+                    animal_id: t.animal_id || undefined,
                     batch_no: b.batch_no,
                     diagnosis: t.remarks || "Clinical Protocol Administration",
                     medicine_name: t.item_name || t.item_code || t.remarks || "Clinical Medication",
@@ -164,28 +179,87 @@ export default function MortalityHealthPanel() {
       });
   }, []);
 
+  const loadModalAnimals = async (batchNo: string) => {
+    const companyId = getActiveCompanyId();
+    const batchObj = batches.find((b) => b.no === batchNo);
+    if (!companyId || !batchObj) {
+      setModalAnimals([]);
+      return;
+    }
+    setModalAnimalsLoading(true);
+    try {
+      const res = await api.get(`/animal?companyId=${companyId}&currentBatchId=${batchObj.id}&limit=500`);
+      const list: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+      setModalAnimals(list.map((a) => ({ animal_id: a.animal_id, label: a.ear_tag || a.animal_code })));
+    } catch {
+      setModalAnimals([]);
+    } finally {
+      setModalAnimalsLoading(false);
+    }
+  };
+
+  const toggleMortalityAnimal = (animalId: string) => {
+    setMortalityAnimalIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(animalId)) next.delete(animalId);
+      else next.add(animalId);
+      return next;
+    });
+  };
+
+  const toggleTreatmentAnimal = (animalId: string) => {
+    setTreatmentAnimalIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(animalId)) next.delete(animalId);
+      else next.add(animalId);
+      return next;
+    });
+  };
+
   const handleSaveMortality = async () => {
     if (!newMortality.cause_of_death) return;
     const batchObj = batches.find((b) => b.no === newMortality.batch_no) || batches[0];
-    const qty = Number(newMortality.head_count) || 1;
+    const selectedAnimals = Array.from(mortalityAnimalIds);
+    // When specific animals are selected, they ARE the mortality count (one
+    // dead animal per row) — the manually entered head_count is only used
+    // for a whole-batch (unattributed) entry.
+    const qty = selectedAnimals.length > 0 ? selectedAnimals.length : Number(newMortality.head_count) || 1;
 
     if (batchObj) {
       try {
-        await api.post(`/batch/${batchObj.id}/transaction`, {
-          transaction_date: newMortality.record_date || new Date().toISOString().slice(0, 10),
-          transaction_type: "MORTALITY",
-          quantity: qty,
-          amount: 0,
-          remarks: `${newMortality.cause_of_death} (${newMortality.pen_location || "Shed"})`,
-        });
+        if (selectedAnimals.length > 0) {
+          for (const animalId of selectedAnimals) {
+            await api.post(`/batch/${batchObj.id}/transaction`, {
+              transaction_date: newMortality.record_date || new Date().toISOString().slice(0, 10),
+              transaction_type: "MORTALITY",
+              quantity: 1,
+              amount: 0,
+              remarks: `${newMortality.cause_of_death} (${newMortality.pen_location || "Shed"})`,
+              animal_id: animalId,
+            });
+          }
+        } else {
+          await api.post(`/batch/${batchObj.id}/transaction`, {
+            transaction_date: newMortality.record_date || new Date().toISOString().slice(0, 10),
+            transaction_type: "MORTALITY",
+            quantity: qty,
+            amount: 0,
+            remarks: `${newMortality.cause_of_death} (${newMortality.pen_location || "Shed"})`,
+          });
+        }
       } catch {}
     }
+
+    const earTagLabel = selectedAnimals.length > 0
+      ? selectedAnimals.map((id) => modalAnimals.find((a) => a.animal_id === id)?.label || id).join(", ")
+      : "Unidentified / Litter";
 
     const record: MortalityRecord = {
       id: `m-${Date.now()}`,
       record_date: newMortality.record_date || new Date().toISOString().slice(0, 10),
       batch_no: newMortality.batch_no || (batchObj?.no ?? "BATCH-01"),
-      ear_tag: newMortality.ear_tag || "Unidentified / Litter",
+      ear_tag: earTagLabel,
+      animal_id: selectedAnimals.length === 1 ? selectedAnimals[0] : undefined,
       pen_location: newMortality.pen_location || "Barn 1",
       head_count: qty,
       cause_of_death: newMortality.cause_of_death || "Unknown",
@@ -194,11 +268,14 @@ export default function MortalityHealthPanel() {
       recorded_by: "Farm Attending Officer",
     };
     setMortalityList([record, ...mortalityList]);
+    setMortalityAnimalIds(new Set());
     setMortalityDialogOpen(false);
   };
 
   const handleSaveTreatment = async () => {
-    if (!newTreatment.ear_tag || !newTreatment.medicine_name) return;
+    const selectedAnimals = Array.from(treatmentAnimalIds);
+    if (selectedAnimals.length === 0 && !newTreatment.ear_tag) return;
+    if (!newTreatment.medicine_name) return;
     const batchObj = batches.find((b) => b.no === newTreatment.batch_no) || batches[0];
     const dosage = newTreatment.dosage || "Standard therapeutic dose";
     const route = newTreatment.route || "IM";
@@ -207,20 +284,38 @@ export default function MortalityHealthPanel() {
 
     if (batchObj) {
       try {
-        await api.post(`/batch/${batchObj.id}/transaction`, {
-          transaction_date: newTreatment.treatment_date || new Date().toISOString().slice(0, 10),
-          transaction_type: "CONSUMPTION",
-          quantity: 1,
-          uom: "DOSES",
-          remarks: `${newTreatment.medicine_name} — ${diagnosis} (${dosage}, ${route}, vet: ${vet}, withdrawal ${newTreatment.withdrawal_days || 0}d)`,
-        });
+        if (selectedAnimals.length > 0) {
+          for (const animalId of selectedAnimals) {
+            await api.post(`/batch/${batchObj.id}/transaction`, {
+              transaction_date: newTreatment.treatment_date || new Date().toISOString().slice(0, 10),
+              transaction_type: "CONSUMPTION",
+              quantity: 1,
+              uom: "DOSES",
+              remarks: `${newTreatment.medicine_name} — ${diagnosis} (${dosage}, ${route}, vet: ${vet}, withdrawal ${newTreatment.withdrawal_days || 0}d)`,
+              animal_id: animalId,
+            });
+          }
+        } else {
+          await api.post(`/batch/${batchObj.id}/transaction`, {
+            transaction_date: newTreatment.treatment_date || new Date().toISOString().slice(0, 10),
+            transaction_type: "CONSUMPTION",
+            quantity: 1,
+            uom: "DOSES",
+            remarks: `${newTreatment.medicine_name} — ${diagnosis} (${dosage}, ${route}, vet: ${vet}, withdrawal ${newTreatment.withdrawal_days || 0}d)`,
+          });
+        }
       } catch { void 0; }
     }
+
+    const earTagLabel = selectedAnimals.length > 0
+      ? selectedAnimals.map((id) => modalAnimals.find((a) => a.animal_id === id)?.label || id).join(", ")
+      : (newTreatment.ear_tag as string);
 
     const rec: TreatmentRecord = {
       id: `t-${Date.now()}`,
       treatment_date: newTreatment.treatment_date || new Date().toISOString().slice(0, 10),
-      ear_tag: newTreatment.ear_tag,
+      ear_tag: earTagLabel,
+      animal_id: selectedAnimals.length === 1 ? selectedAnimals[0] : undefined,
       batch_no: newTreatment.batch_no || (batches[0]?.no ?? "BATCH-01"),
       diagnosis,
       medicine_name: newTreatment.medicine_name,
@@ -231,16 +326,26 @@ export default function MortalityHealthPanel() {
       veterinarian: vet,
     };
     setTreatmentList([rec, ...treatmentList]);
+    setTreatmentAnimalIds(new Set());
     setTreatmentDialogOpen(false);
   };
 
   const totalMortalityHeads = mortalityList.reduce((acc, m) => acc + m.head_count, 0);
   const activeTreatmentsCount = treatmentList.filter((t) => t.status === "ACTIVE").length;
 
+  const mortalityAnimalOptions = Array.from(
+    new Map(mortalityList.filter((m) => m.animal_id).map((m) => [m.animal_id as string, m.ear_tag || (m.animal_id as string)])).entries()
+  );
+  const treatmentAnimalOptions = Array.from(
+    new Map(treatmentList.filter((t) => t.animal_id).map((t) => [t.animal_id as string, t.ear_tag])).entries()
+  );
+  const filteredMortalityList = mortalityAnimalFilter ? mortalityList.filter((m) => m.animal_id === mortalityAnimalFilter) : mortalityList;
+  const filteredTreatmentList = treatmentAnimalFilter ? treatmentList.filter((t) => t.animal_id === treatmentAnimalFilter) : treatmentList;
+
   if (loading) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
-        <p className="text-sm font-medium text-[var(--text-muted)]">Loading mortality and health registers from database...</p>
+        <p className="text-sm font-medium text-[var(--text-muted)]">{t("mhLoadingRegisters")}</p>
       </div>
     );
   }
@@ -248,67 +353,34 @@ export default function MortalityHealthPanel() {
   return (
     <div className="space-y-6 text-[var(--text-primary)]">
       {/* ── Top Header and Summary Metrics ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div
-          className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]"
-          style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-        >
-          <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-secondary)" }}>
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Cumulative Mortality</span>
-            <Skull className="h-4 w-4" style={{ color: "var(--danger)" }} />
-          </div>
-          <p className="text-2xl font-bold font-mono mt-2" style={{ color: "var(--text-primary)" }}>
-            {totalMortalityHeads} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>Head (0.35%)</span>
-          </p>
-          <p className="text-[11px] font-medium mt-1" style={{ color: "var(--success)" }}>
-            Below standard threshold (2.0%)
-          </p>
-        </div>
-
-        <div
-          className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]"
-          style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-        >
-          <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-secondary)" }}>
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Active Clinical Cases</span>
-            <HeartPulse className="h-4 w-4" style={{ color: "var(--warning)" }} />
-          </div>
-          <p className="text-2xl font-bold font-mono mt-2" style={{ color: "var(--text-primary)" }}>
-            {activeTreatmentsCount} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>In Isolation</span>
-          </p>
-          <p className="text-[11px] mt-1" style={{ color: "var(--text-secondary)" }}>
-            Under active veterinary withdrawal
-          </p>
-        </div>
-
-        <div
-          className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]"
-          style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-        >
-          <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-secondary)" }}>
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Vaccination Coverage</span>
-            <ShieldCheck className="h-4 w-4" style={{ color: "var(--success)" }} />
-          </div>
-          <p className="text-2xl font-bold font-mono mt-2" style={{ color: "var(--text-primary)" }}>100%</p>
-          <p className="text-[11px] mt-1" style={{ color: "var(--success)" }}>
-            FMD & PRRS protocols current
-          </p>
-        </div>
-
-        <div
-          className="rounded-[var(--radius-md)] border p-4 transition-all hover:bg-[var(--surface-raised)]"
-          style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-        >
-          <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-secondary)" }}>
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Biosecurity Standard</span>
-            <Stethoscope className="h-4 w-4" style={{ color: "var(--accent)" }} />
-          </div>
-          <p className="text-2xl font-bold font-mono mt-2" style={{ color: "var(--text-primary)" }}>Grade A</p>
-          <p className="text-[11px] mt-1" style={{ color: "var(--text-secondary)" }}>
-            Disinfection & barrier protocol active
-          </p>
-        </div>
-      </div>
+      <StatRow>
+        <StatCard
+          icon={Skull}
+          label={t("mhCumulativeMortality")}
+          value={totalMortalityHeads}
+          unit={t("mhHeadPercent")}
+          sub={<span className="text-(--success)">{t("mhBelowStandardThreshold")}</span>}
+        />
+        <StatCard
+          icon={HeartPulse}
+          label={t("mhActiveClinicalCases")}
+          value={activeTreatmentsCount}
+          unit={t("mhInIsolation")}
+          sub={t("mhUnderActiveVeterinaryWithdrawal")}
+        />
+        <StatCard
+          icon={ShieldCheck}
+          label={t("mhVaccinationCoverage")}
+          value="100%"
+          sub={<span className="text-(--success)">{t("mhFmdPrrsProtocolsCurrent")}</span>}
+        />
+        <StatCard
+          icon={Stethoscope}
+          label={t("mhBiosecurityStandard")}
+          value={t("mhGradeA")}
+          sub={t("mhDisinfectionBarrierProtocolActive")}
+        />
+      </StatRow>
 
       {/* ── Sub-Navigation & Actions ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-1" style={{ borderColor: "var(--border)" }}>
@@ -322,7 +394,7 @@ export default function MortalityHealthPanel() {
             }`}
           >
             <Skull className="h-3.5 w-3.5" />
-            <span>Mortality & Post-Mortem Register</span>
+            <span>{t("mhMortalityPostMortemRegister")}</span>
           </button>
           <button
             onClick={() => setActiveTab("treatments")}
@@ -333,7 +405,7 @@ export default function MortalityHealthPanel() {
             }`}
           >
             <Stethoscope className="h-3.5 w-3.5" />
-            <span>Veterinary Treatments & Care</span>
+            <span>{t("mhVeterinaryTreatmentsCare")}</span>
           </button>
           <button
             onClick={() => setActiveTab("vaccines")}
@@ -344,27 +416,27 @@ export default function MortalityHealthPanel() {
             }`}
           >
             <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Vaccination Protocols</span>
+            <span>{t("mhVaccinationProtocols")}</span>
           </button>
         </div>
 
         <div className="pb-1">
           {activeTab === "mortality" && (
             <button
-              onClick={() => setMortalityDialogOpen(true)}
+              onClick={() => { setMortalityAnimalIds(new Set()); loadModalAnimals(newMortality.batch_no || batches[0]?.no || ""); setMortalityDialogOpen(true); }}
               className="nf-press flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3.5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
               style={{ backgroundColor: "var(--accent)" }}
             >
-              <Plus className="h-4 w-4" /> Log Mortality Record
+              <Plus className="h-4 w-4" /> {t("mhLogMortalityRecord")}
             </button>
           )}
           {activeTab === "treatments" && (
             <button
-              onClick={() => setTreatmentDialogOpen(true)}
+              onClick={() => { setTreatmentAnimalIds(new Set()); loadModalAnimals(newTreatment.batch_no || batches[0]?.no || ""); setTreatmentDialogOpen(true); }}
               className="nf-press flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3.5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
               style={{ backgroundColor: "var(--accent)" }}
             >
-              <Plus className="h-4 w-4" /> Record Treatment
+              <Plus className="h-4 w-4" /> {t("mhRecordTreatment")}
             </button>
           )}
         </div>
@@ -374,26 +446,38 @@ export default function MortalityHealthPanel() {
       {activeTab === "mortality" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
-            <span>Historical Post-Mortem & Carcass Disposal Log</span>
-            <span>Total Deaths Logged: {mortalityList.length}</span>
+            <span>{t("mhHistoricalPostMortemLog")}</span>
+            <div className="flex items-center gap-3">
+              {mortalityAnimalOptions.length > 0 && (
+                <select
+                  value={mortalityAnimalFilter}
+                  onChange={(e) => setMortalityAnimalFilter(e.target.value)}
+                  className="nf-input h-7 text-[11px]"
+                >
+                  <option value="">{t("bulkScopeWholeBatch")}</option>
+                  {mortalityAnimalOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              )}
+              <span>{t("mhTotalDeathsLogged", { count: filteredMortalityList.length })}</span>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)]">
             <table className="w-full text-left text-xs border-collapse">
               <TableHeader>
                 <TableRow className="border-b border-[var(--border)] bg-[var(--surface-raised)]">
-                  <TableHead className="py-2.5 px-3 font-semibold">Date</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Batch / Pen</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Ear Tag / ID</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold text-center">Head Count</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Cause of Death</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Post-Mortem Findings</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Disposal Method</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Recorded By</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhDate")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhBatchPen")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhEarTagId")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold text-center">{t("mhHeadCount")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhCauseOfDeath")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhPostMortemFindings")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhDisposalMethod")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhRecordedBy")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mortalityList.map((m) => (
+                {filteredMortalityList.map((m) => (
                   <TableRow key={m.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-raised)] transition-colors">
                     <TableCell className="py-2.5 px-3 font-mono">{m.record_date}</TableCell>
                     <TableCell className="py-2.5 px-3 font-semibold text-[var(--text-primary)]">
@@ -431,49 +515,61 @@ export default function MortalityHealthPanel() {
       {activeTab === "treatments" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
-            <span>Prescription & Veterinary Interventions Log</span>
-            <span>Active Cases: {activeTreatmentsCount}</span>
+            <span>{t("mhPrescriptionVeterinaryInterventionsLog")}</span>
+            <div className="flex items-center gap-3">
+              {treatmentAnimalOptions.length > 0 && (
+                <select
+                  value={treatmentAnimalFilter}
+                  onChange={(e) => setTreatmentAnimalFilter(e.target.value)}
+                  className="nf-input h-7 text-[11px]"
+                >
+                  <option value="">{t("bulkScopeWholeBatch")}</option>
+                  {treatmentAnimalOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              )}
+              <span>{t("mhActiveCases", { count: activeTreatmentsCount })}</span>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)]">
             <table className="w-full text-left text-xs border-collapse">
               <TableHeader>
                 <TableRow className="border-b border-[var(--border)] bg-[var(--surface-raised)]">
-                  <TableHead className="py-2.5 px-3 font-semibold">Treatment Date</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Ear Tag</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Diagnosis</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Prescription & Dose</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Route</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold text-center">Withdrawal (Days)</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Status</TableHead>
-                  <TableHead className="py-2.5 px-3 font-semibold">Attending Vet</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhTreatmentDate")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhEarTag")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhDiagnosis")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhPrescriptionDose")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhRoute")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold text-center">{t("mhWithdrawalDays")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhStatus")}</TableHead>
+                  <TableHead className="py-2.5 px-3 font-semibold">{t("mhAttendingVet")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {treatmentList.map((t) => (
-                  <TableRow key={t.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-raised)] transition-colors">
-                    <TableCell className="py-2.5 px-3 font-mono">{t.treatment_date}</TableCell>
-                    <TableCell className="py-2.5 px-3 font-mono font-bold text-[var(--accent)]">{t.ear_tag}</TableCell>
-                    <TableCell className="py-2.5 px-3 font-medium text-[var(--text-primary)]">{t.diagnosis}</TableCell>
+                {filteredTreatmentList.map((tr) => (
+                  <TableRow key={tr.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-raised)] transition-colors">
+                    <TableCell className="py-2.5 px-3 font-mono">{tr.treatment_date}</TableCell>
+                    <TableCell className="py-2.5 px-3 font-mono font-bold text-[var(--accent)]">{tr.ear_tag}</TableCell>
+                    <TableCell className="py-2.5 px-3 font-medium text-[var(--text-primary)]">{tr.diagnosis}</TableCell>
                     <TableCell className="py-2.5 px-3">
-                      <span className="font-semibold text-[var(--text-primary)]">{t.medicine_name}</span>
-                      <span className="block text-[10px] text-[var(--text-secondary)]">{t.dosage}</span>
+                      <span className="font-semibold text-[var(--text-primary)]">{tr.medicine_name}</span>
+                      <span className="block text-[10px] text-[var(--text-secondary)]">{tr.dosage}</span>
                     </TableCell>
-                    <TableCell className="py-2.5 px-3 text-[var(--text-secondary)]">{t.route}</TableCell>
-                    <TableCell className="py-2.5 px-3 text-center font-semibold" style={{ color: "var(--warning)" }}>{t.withdrawal_days} d</TableCell>
+                    <TableCell className="py-2.5 px-3 text-[var(--text-secondary)]">{tr.route}</TableCell>
+                    <TableCell className="py-2.5 px-3 text-center font-semibold" style={{ color: "var(--warning)" }}>{t("mhDaysValue", { count: tr.withdrawal_days })}</TableCell>
                     <TableCell className="py-2.5 px-3">
                       <span
                         className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] px-2 py-0.5 text-[10px] font-semibold border"
                         style={{
-                          backgroundColor: t.status === "ACTIVE" ? "var(--warning-muted)" : "var(--success-muted)",
-                          color: t.status === "ACTIVE" ? "var(--warning)" : "var(--success)",
-                          borderColor: t.status === "ACTIVE" ? "rgba(183, 121, 31, 0.2)" : "rgba(47, 125, 91, 0.2)",
+                          backgroundColor: tr.status === "ACTIVE" ? "var(--warning-muted)" : "var(--success-muted)",
+                          color: tr.status === "ACTIVE" ? "var(--warning)" : "var(--success)",
+                          borderColor: tr.status === "ACTIVE" ? "rgba(183, 121, 31, 0.2)" : "rgba(47, 125, 91, 0.2)",
                         }}
                       >
-                        {t.status === "ACTIVE" ? "● Under Treatment" : "✓ Recovered"}
+                        {tr.status === "ACTIVE" ? t("mhUnderTreatment") : t("mhRecovered")}
                       </span>
                     </TableCell>
-                    <TableCell className="py-2.5 px-3 text-[var(--text-secondary)]">{t.veterinarian}</TableCell>
+                    <TableCell className="py-2.5 px-3 text-[var(--text-secondary)]">{tr.veterinarian}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -486,7 +582,7 @@ export default function MortalityHealthPanel() {
       {activeTab === "vaccines" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
-            <span>Herd Immunization & Deworming Protocol Schedule</span>
+            <span>{t("mhHerdImmunizationDewormingSchedule")}</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -505,18 +601,18 @@ export default function MortalityHealthPanel() {
                     {v.status}
                   </span>
                 </div>
-                <p className="text-xs text-[var(--text-secondary)]">Target: {v.target_disease}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{t("mhTargetLabel", { target: v.target_disease })}</p>
                 <div className="text-xs space-y-1">
                   <div className="flex justify-between text-[11px] text-[var(--text-secondary)]">
-                    <span>Target Stage:</span>
+                    <span>{t("mhTargetStage")}</span>
                     <span className="font-medium text-[var(--text-primary)]">{v.target_stage}</span>
                   </div>
                   <div className="flex justify-between text-[11px] text-[var(--text-secondary)]">
-                    <span>Due Date:</span>
+                    <span>{t("mhDueDate")}</span>
                     <span className="font-mono text-[var(--text-primary)]">{v.scheduled_date}</span>
                   </div>
                   <div className="flex justify-between text-[11px] text-[var(--text-secondary)]">
-                    <span>Herd Coverage:</span>
+                    <span>{t("mhHerdCoverage")}</span>
                     <span className="font-bold text-[var(--accent)]">{v.coverage_pct}%</span>
                   </div>
                 </div>
@@ -530,13 +626,13 @@ export default function MortalityHealthPanel() {
       <Dialog
         open={mortalityDialogOpen}
         onClose={() => setMortalityDialogOpen(false)}
-        title="Log Mortality / Post-Mortem Event"
+        title={t("mhLogMortalityPostMortemEvent")}
         maxWidth="md"
       >
         <div className="space-y-4 text-xs pt-2">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold block mb-1">Date of Death</label>
+              <label className="font-semibold block mb-1">{t("mhDateOfDeath")}</label>
               <input
                 type="date"
                 value={newMortality.record_date}
@@ -545,7 +641,7 @@ export default function MortalityHealthPanel() {
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Head Count</label>
+              <label className="font-semibold block mb-1">{t("mhHeadCount")}</label>
               <input
                 type="number"
                 min="1"
@@ -558,74 +654,92 @@ export default function MortalityHealthPanel() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold block mb-1">Batch / Barn Location</label>
+              <label className="font-semibold block mb-1">{t("mhBatchBarnLocation")}</label>
               <input
                 type="text"
                 value={newMortality.pen_location}
                 onChange={(e) => setNewMortality({ ...newMortality, pen_location: e.target.value })}
-                placeholder="e.g. Gestation Barn 1"
+                placeholder={t("mhGestationBarn1Placeholder")}
                 className="nf-input w-full"
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Ear Tag ID (Optional)</label>
-              <input
-                type="text"
-                value={newMortality.ear_tag}
-                onChange={(e) => setNewMortality({ ...newMortality, ear_tag: e.target.value })}
-                placeholder="e.g. ET-25-0014"
+              <label className="font-semibold block mb-1">{t("mhBatchPen")}</label>
+              <select
+                value={newMortality.batch_no}
+                onChange={(e) => { setNewMortality({ ...newMortality, batch_no: e.target.value }); setMortalityAnimalIds(new Set()); loadModalAnimals(e.target.value); }}
                 className="nf-input w-full"
-              />
+              >
+                {batches.map((b) => <option key={b.id} value={b.no}>{b.no}</option>)}
+              </select>
             </div>
           </div>
 
           <div>
-            <label className="font-semibold block mb-1">Primary Cause of Death</label>
+            <label className="font-semibold block mb-1">{t("mhEarTagIdOptional")}</label>
+            {modalAnimalsLoading ? (
+              <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("bulkScopeLoading")}</p>
+            ) : modalAnimals.length === 0 ? (
+              <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("bulkScopeNoAnimals")}</p>
+            ) : (
+              <div className="max-h-40 overflow-y-auto rounded-[var(--radius-sm)] border" style={{ borderColor: "var(--border)" }}>
+                {modalAnimals.map((a) => (
+                  <label key={a.animal_id} className="flex cursor-pointer items-center gap-2 border-b px-3 py-1.5 last:border-b-0" style={{ borderColor: "var(--border)" }}>
+                    <input type="checkbox" checked={mortalityAnimalIds.has(a.animal_id)} onChange={() => toggleMortalityAnimal(a.animal_id)} className="h-3.5 w-3.5 rounded-[var(--radius-xs)] accent-(--accent)" />
+                    <span className="font-mono font-semibold" style={{ color: "var(--accent)" }}>{a.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">{t("mhPrimaryCauseOfDeath")}</label>
             <select
               value={newMortality.cause_of_death}
               onChange={(e) => setNewMortality({ ...newMortality, cause_of_death: e.target.value })}
               className="nf-input w-full"
             >
-              <option value="Respiratory Distress / Pneumonia">Respiratory Distress / Pneumonia</option>
-              <option value="Overlay / Crushing">Overlay / Crushing (Piglet)</option>
-              <option value="Gastric Ulcer / Hemorrhage">Gastric Ulcer / Hemorrhage</option>
-              <option value="Colibacillosis / Enteritis">Colibacillosis / Severe Enteritis</option>
-              <option value="Uterine / Rectal Prolapse">Uterine / Rectal Prolapse</option>
-              <option value="Sudden Heart Failure / Stress">Sudden Heart Failure / Stress</option>
-              <option value="Other Non-Infectious">Other Non-Infectious Cause</option>
+              <option value="Respiratory Distress / Pneumonia">{t("mhCauseRespiratoryDistress")}</option>
+              <option value="Overlay / Crushing">{t("mhCauseOverlayCrushing")}</option>
+              <option value="Gastric Ulcer / Hemorrhage">{t("mhCauseGastricUlcer")}</option>
+              <option value="Colibacillosis / Enteritis">{t("mhCauseColibacillosis")}</option>
+              <option value="Uterine / Rectal Prolapse">{t("mhCauseUterineProlapse")}</option>
+              <option value="Sudden Heart Failure / Stress">{t("mhCauseSuddenHeartFailure")}</option>
+              <option value="Other Non-Infectious">{t("mhCauseOtherNonInfectious")}</option>
             </select>
           </div>
 
           <div>
-            <label className="font-semibold block mb-1">Post-Mortem Examination Notes</label>
+            <label className="font-semibold block mb-1">{t("mhPostMortemExaminationNotes")}</label>
             <textarea
               rows={2}
               value={newMortality.post_mortem_notes}
               onChange={(e) => setNewMortality({ ...newMortality, post_mortem_notes: e.target.value })}
-              placeholder="Enter gross lesions, organ observations, and pathologist findings..."
+              placeholder={t("mhPostMortemNotesPlaceholder")}
               className="nf-input w-full"
             />
           </div>
 
           <div>
-            <label className="font-semibold block mb-1">Biosecure Disposal Method</label>
+            <label className="font-semibold block mb-1">{t("mhBiosecureDisposalMethod")}</label>
             <select
               value={newMortality.disposal_method}
               onChange={(e) => setNewMortality({ ...newMortality, disposal_method: e.target.value })}
               className="nf-input w-full"
             >
-              <option value="Incineration (Biosecure)">High-Temp Incineration (Biosecure)</option>
-              <option value="Deep Burial with Lime">Deep Burial with Quicklime</option>
-              <option value="Certified Carcass Rendering">Certified Rendering Service</option>
+              <option value="Incineration (Biosecure)">{t("mhDisposalIncineration")}</option>
+              <option value="Deep Burial with Lime">{t("mhDisposalDeepBurial")}</option>
+              <option value="Certified Carcass Rendering">{t("mhDisposalCertifiedRendering")}</option>
             </select>
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
             <Button variant="outline" onClick={() => setMortalityDialogOpen(false)}>
-              Cancel
+              {t("mhCancel")}
             </Button>
             <Button onClick={handleSaveMortality} className="nf-btn-primary">
-              Save Mortality Entry
+              {t("mhSaveMortalityEntry")}
             </Button>
           </div>
         </div>
@@ -635,13 +749,13 @@ export default function MortalityHealthPanel() {
       <Dialog
         open={treatmentDialogOpen}
         onClose={() => setTreatmentDialogOpen(false)}
-        title="Record Veterinary Treatment"
+        title={t("mhRecordVeterinaryTreatment")}
         maxWidth="md"
       >
         <div className="space-y-4 text-xs pt-2">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold block mb-1">Treatment Date</label>
+              <label className="font-semibold block mb-1">{t("mhTreatmentDate")}</label>
               <input
                 type="date"
                 value={newTreatment.treatment_date}
@@ -650,46 +764,64 @@ export default function MortalityHealthPanel() {
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Animal Ear Tag ID</label>
-              <input
-                type="text"
-                value={newTreatment.ear_tag}
-                onChange={(e) => setNewTreatment({ ...newTreatment, ear_tag: e.target.value })}
-                placeholder="e.g. ET-25-0004"
+              <label className="font-semibold block mb-1">{t("mhBatchPen")}</label>
+              <select
+                value={newTreatment.batch_no}
+                onChange={(e) => { setNewTreatment({ ...newTreatment, batch_no: e.target.value }); setTreatmentAnimalIds(new Set()); loadModalAnimals(e.target.value); }}
                 className="nf-input w-full"
-              />
+              >
+                {batches.map((b) => <option key={b.id} value={b.no}>{b.no}</option>)}
+              </select>
             </div>
           </div>
 
           <div>
-            <label className="font-semibold block mb-1">Clinical Diagnosis</label>
+            <label className="font-semibold block mb-1">{t("mhAnimalEarTagId")}</label>
+            {modalAnimalsLoading ? (
+              <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("bulkScopeLoading")}</p>
+            ) : modalAnimals.length === 0 ? (
+              <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("bulkScopeNoAnimals")}</p>
+            ) : (
+              <div className="max-h-40 overflow-y-auto rounded-[var(--radius-sm)] border" style={{ borderColor: "var(--border)" }}>
+                {modalAnimals.map((a) => (
+                  <label key={a.animal_id} className="flex cursor-pointer items-center gap-2 border-b px-3 py-1.5 last:border-b-0" style={{ borderColor: "var(--border)" }}>
+                    <input type="checkbox" checked={treatmentAnimalIds.has(a.animal_id)} onChange={() => toggleTreatmentAnimal(a.animal_id)} className="h-3.5 w-3.5 rounded-[var(--radius-xs)] accent-(--accent)" />
+                    <span className="font-mono font-semibold" style={{ color: "var(--accent)" }}>{a.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">{t("mhClinicalDiagnosis")}</label>
             <input
               type="text"
               value={newTreatment.diagnosis}
               onChange={(e) => setNewTreatment({ ...newTreatment, diagnosis: e.target.value })}
-              placeholder="e.g. Swine Erysipelas, Mastitis, Hoof Lameness"
+              placeholder={t("mhDiagnosisPlaceholder")}
               className="nf-input w-full"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold block mb-1">Medicine / Vaccine Administered</label>
+              <label className="font-semibold block mb-1">{t("mhMedicineVaccineAdministered")}</label>
               <input
                 type="text"
                 value={newTreatment.medicine_name}
                 onChange={(e) => setNewTreatment({ ...newTreatment, medicine_name: e.target.value })}
-                placeholder="e.g. Oxytetracycline 20% LA"
+                placeholder={t("mhMedicinePlaceholder")}
                 className="nf-input w-full"
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Dosage & Route</label>
+              <label className="font-semibold block mb-1">{t("mhDosageRoute")}</label>
               <input
                 type="text"
                 value={newTreatment.dosage}
                 onChange={(e) => setNewTreatment({ ...newTreatment, dosage: e.target.value })}
-                placeholder="e.g. 10 mL IM (Deep Neck)"
+                placeholder={t("mhDosagePlaceholder")}
                 className="nf-input w-full"
               />
             </div>
@@ -697,7 +829,7 @@ export default function MortalityHealthPanel() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold block mb-1">Meat Withdrawal Period (Days)</label>
+              <label className="font-semibold block mb-1">{t("mhMeatWithdrawalPeriodDays")}</label>
               <input
                 type="number"
                 min="0"
@@ -707,12 +839,12 @@ export default function MortalityHealthPanel() {
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Attending Veterinarian</label>
+              <label className="font-semibold block mb-1">{t("mhAttendingVeterinarian")}</label>
               <input
                 type="text"
                 value={newTreatment.veterinarian}
                 onChange={(e) => setNewTreatment({ ...newTreatment, veterinarian: e.target.value })}
-                placeholder="e.g. Dr. Sharma"
+                placeholder={t("mhVeterinarianPlaceholder")}
                 className="nf-input w-full"
               />
             </div>
@@ -720,10 +852,10 @@ export default function MortalityHealthPanel() {
 
           <div className="flex justify-end gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
             <Button variant="outline" onClick={() => setTreatmentDialogOpen(false)}>
-              Cancel
+              {t("mhCancel")}
             </Button>
             <Button onClick={handleSaveTreatment} className="nf-btn-primary">
-              Save Treatment Record
+              {t("mhSaveTreatmentRecord")}
             </Button>
           </div>
         </div>

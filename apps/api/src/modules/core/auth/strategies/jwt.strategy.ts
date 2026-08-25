@@ -44,6 +44,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       userId: user.user_id,
       email: user.email,
+      // Carried so screens that record "who did this" (approvals, transfers,
+      // audit) can show a person's name instead of falling back to their email.
+      fullName: user.full_name,
       tenantId: user.tenant_id,
       companyId: user.company_id,
       userType: user.user_type,

@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsBoolean, IsNumber, IsObject, IsEmail } from 'class-validator';
 
 export enum PreseedSource {
   TENANT = 'TENANT',
@@ -78,4 +78,59 @@ export class AssignUserToAreaDto {
   @IsBoolean()
   @IsOptional()
   is_primary?: boolean = true;
+}
+
+/**
+ * Area operating settings. Identity fields (name, code, farm, NOB/LOB) are
+ * deliberately absent — those belong to the area master and are edited there,
+ * not duplicated on the settings screen.
+ */
+export class UpdateAreaSettingsDto {
+  @IsString()
+  @IsOptional()
+  costing_method?: string;
+
+  @IsString()
+  @IsOptional()
+  default_feed_uom?: string;
+
+  @IsNumber()
+  @IsOptional()
+  mortality_threshold_pct?: number;
+
+  @IsNumber()
+  @IsOptional()
+  temp_threshold_min?: number;
+
+  @IsNumber()
+  @IsOptional()
+  temp_threshold_max?: number;
+
+  @IsNumber()
+  @IsOptional()
+  auto_approve_ration_under_qty?: number;
+
+  /**
+   * LOB-specific capacity and configuration (sow places and farrowing crates
+   * for Piggery, milking points for Dairy, and so on). Free-form on purpose so
+   * a new line of business needs no migration.
+   */
+  @IsObject()
+  @IsOptional()
+  lob_config?: Record<string, unknown>;
+}
+
+export class AssignAreaStaffDto {
+  @IsString()
+  @IsOptional()
+  user_id?: string;
+
+  /** Alternative to user_id — resolve an existing user by their login email. */
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  is_primary?: boolean;
 }

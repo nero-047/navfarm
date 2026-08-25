@@ -5,7 +5,7 @@ import StageWiseConsumptionOutputPanel from "@/components/console/piggery/stage-
 
 export default function FeedManagementPage() {
   return (
-    <ProductionPageShell title="Stage-wise Consumption & Output">
+    <ProductionPageShell titleKey="feedManagement">
       {() => <StageWiseConsumptionOutputPanel />}
     </ProductionPageShell>
   );

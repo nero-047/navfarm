@@ -54,7 +54,7 @@ export class FinancialReportsController {
   @ApiOperation({ summary: 'Piggery Herd Analytics — headcount, parity profile, and productivity' })
   async herdAnalytics(@Query() query: HerdAnalyticsQueryDto, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
-    const result = await this.reportsService.getPiggeryHerdAnalytics(tenantId, query.companyId);
+    const result = await this.reportsService.getPiggeryHerdAnalytics(tenantId, query.companyId, query.batchId);
     return { success: true, message: 'Piggery Herd Analytics retrieved.', data: result };
   }
 

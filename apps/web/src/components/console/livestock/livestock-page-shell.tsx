@@ -1,23 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, hasPermission, NavUser, getActiveLob } from "@/hooks/useAuth";
-import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { useLanguage } from "@/hooks/useLanguage";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConsolePage } from "@/components/ui/console-page";
 import { ShieldAlert } from "lucide-react";
 
-const PIGGERY_SECTIONS = [
-  { key: "animals", href: "/piggery/animals", labelKey: "pigAnimals" },
-  { key: "breeding", href: "/piggery/breeding", labelKey: "pigBreeding" },
-  { key: "facility-occupancy", href: "/piggery/facility-occupancy", labelKey: "pigFacilityOccupancy" },
-  { key: "herd-analytics", href: "/piggery/herd-analytics", labelKey: "pigHerdAnalytics" },
+/**
+ * Section nav for the Livestock family. Named for the family rather than for
+ * Piggery: Dairy areas already render through this shell, and Goat & Sheep and
+ * Poultry will too — a shell called "Piggery" that every livestock LOB has to
+ * use is exactly the naming this restructure set out to remove.
+ *
+ * Keys match the last path segment so a route and its tab can never drift.
+ */
+export const LIVESTOCK_SECTIONS = [
+  { key: "register", href: "/livestock", labelKey: "navLivestockRegister" },
+  { key: "breeding", href: "/livestock/breeding", labelKey: "pigBreeding" },
+  // Health sits in this family but renders through ProductionPageShell (it is
+  // batch-and-animal shaped, not register-shaped), so it has no tab key here —
+  // it is listed so the sidebar has one list to render from.
+  { key: null, href: "/livestock/health", labelKey: "navLivestockHealth" },
+  { key: "facility", href: "/livestock/facility", labelKey: "pigFacilityOccupancy" },
+  { key: "analytics", href: "/livestock/analytics", labelKey: "pigHerdAnalytics" },
 ] as const;
 
-export type PiggeryTabKey = (typeof PIGGERY_SECTIONS)[number]["key"];
+export type LivestockTabKey = Exclude<(typeof LIVESTOCK_SECTIONS)[number]["key"], null>;
 
-export function usePiggeryPageState() {
+export function useLivestockPageState() {
   const router = useRouter();
   const [user, setUser] = useState<NavUser | null>(null);
   const [ready, setReady] = useState(false);
@@ -46,31 +58,22 @@ export function usePiggeryPageState() {
   return { ready, activeLob, mayView };
 }
 
-export function PiggeryPageShell({ activeKey, children }: { activeKey: PiggeryTabKey; children: React.ReactNode }) {
+export function LivestockPageShell({ activeKey, children }: { activeKey: LivestockTabKey; children: React.ReactNode }) {
   const { t } = useLanguage();
-  const router = useRouter();
-  const { ready, activeLob, mayView } = usePiggeryPageState();
+  const { ready, activeLob, mayView } = useLivestockPageState();
 
-  const contextNav = useMemo<ContextNavModel | null>(() => {
-    if (!ready || !mayView || activeLob === "DAIRY") return null;
-    return {
-      label: t("moduleSections", { module: t("animalHerdRegister") }),
-      groups: [{ items: PIGGERY_SECTIONS.map((s) => ({ key: s.key, label: t(s.labelKey as any) })) }],
-      activeKey,
-      onSelect: (key) => {
-        const target = PIGGERY_SECTIONS.find((s) => s.key === key);
-        if (target) router.push(target.href);
-      },
-    };
-  }, [ready, mayView, activeKey, activeLob, t, router]);
-
-  useContextNav(contextNav);
+  // No context nav here any more. Livestock is a primary group in the sidebar
+  // and lists its five sections there, so a second copy of the same five links
+  // in a context rail was the same navigation rendered twice. Module shells
+  // that are a SINGLE sidebar entry (Inventory, Finance, Master Data) still use
+  // the context nav — that is the rule: sidebar children for the two domain
+  // groups, context nav for module shells.
 
   if (!ready) return null;
 
   if (!mayView) {
     return (
-      <div className="mx-auto max-w-2xl px-4 pb-8 sm:px-6 lg:px-7">
+      <ConsolePage size="narrow">
         <PageHeader title={activeLob === "DAIRY" ? t("dairyCowRegister") : t("pigSwineRegister")} sticky={false} />
         <div
           className="flex items-center gap-3 rounded-[var(--radius-lg)] border p-5"
@@ -82,14 +85,14 @@ export function PiggeryPageShell({ activeKey, children }: { activeKey: PiggeryTa
             <p className="mt-1 text-xs" style={{ color: "var(--text-secondary)" }}>{t("accessDeniedContactAdmin")}</p>
           </div>
         </div>
-      </div>
+      </ConsolePage>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-7 space-y-5">
+    <ConsolePage>
       <PageHeader title={t("pigAnimalRegisterTitle")} description={t("pigAnimalRegisterDesc")} />
       {children}
-    </div>
+    </ConsolePage>
   );
 }

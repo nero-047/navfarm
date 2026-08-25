@@ -9,6 +9,8 @@ import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/hooks/useLanguage";
+import { Badge } from "@/components/ui/badge";
 
 const PAGE_SIZE = 25;
 
@@ -28,6 +30,7 @@ function unwrap<T = any>(res: any): T {
 }
 
 export default function PacksPanel() {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -51,7 +54,7 @@ export default function PacksPanel() {
       const res = await api.get(`/qr-code?${params.toString()}`);
       setRows(unwrap<Row[]>(res) || []);
     } catch (err: any) {
-      setError(err?.message || "Failed to load packs.");
+      setError(err?.message || t("pkFailedToLoadPacks"));
     } finally {
       setLoading(false);
     }
@@ -83,7 +86,7 @@ export default function PacksPanel() {
   const pagedFiltered = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const handleVoid = async (row: Row) => {
-    if (!confirm(`Void pack ${row.pack_no}? This cannot be undone.`)) return;
+    if (!confirm(t("pkVoidPackConfirm", { packNo: row.pack_no }))) return;
     setVoidingId(row.qr_id);
     setError("");
     try {
@@ -91,7 +94,7 @@ export default function PacksPanel() {
       await load();
       if (viewing?.qr_id === row.qr_id) setViewing((v) => (v ? { ...v, is_voided: true } : v));
     } catch (err: any) {
-      setError(err?.message || "Failed to void pack.");
+      setError(err?.message || t("pkFailedToVoidPack"));
     } finally {
       setVoidingId(null);
     }
@@ -101,12 +104,12 @@ export default function PacksPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold" style={S.primary}>Packs</h2>
-          <p className="mt-0.5 text-xs" style={S.sub}>Generated traceability packs (QR codes) for batch output — farm-to-pack lineage.</p>
+          <h2 className="text-lg font-semibold" style={S.primary}>{t("pkPacks")}</h2>
+          <p className="mt-0.5 text-xs" style={S.sub}>{t("pkPacksDescription")}</p>
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search pack / lot…" className="rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none" style={S.input} />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("pkSearchPackLotPlaceholder")} className="nf-input-sm pl-8 pr-3" style={S.input} />
         </div>
       </div>
 
@@ -115,9 +118,9 @@ export default function PacksPanel() {
       )}
 
       {loading ? (
-        <div className="rounded-[var(--radius-md)] border py-10 text-center text-xs" style={S.surface}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> Loading…</div>
+        <div className="rounded-[var(--radius-md)] border py-10 text-center text-xs" style={S.surface}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("pkLoading")}</div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-[var(--radius-md)] border py-10 text-center text-xs" style={{ ...S.surface, ...S.sub }}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> No packs generated yet.</div>
+        <div className="rounded-[var(--radius-md)] border py-10 text-center text-xs" style={{ ...S.surface, ...S.sub }}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("pkNoPacksGeneratedYet")}</div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {pagedFiltered.map((row) => (
@@ -129,16 +132,16 @@ export default function PacksPanel() {
             >
               <div className="flex w-full items-center justify-between">
                 <span className="text-xs font-semibold" style={S.primary}>{row.pack_no}</span>
-                {row.is_voided && <span className="rounded-full border px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }}>VOIDED</span>}
-                {row.grade && !row.is_voided && <span className="rounded-full border px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--accent)", borderColor: "var(--accent)", backgroundColor: "var(--accent-muted)" }}>Grade {row.grade}</span>}
+                {row.is_voided && <Badge variant="danger">{t("pkVoided")}</Badge>}
+                {row.grade && !row.is_voided && <Badge variant="accent">{t("pkGrade", { grade: row.grade })}</Badge>}
               </div>
               <div className="flex w-full justify-center rounded-lg bg-white p-2">
                 <QRCode value={JSON.stringify(row.qr_data)} size={96} />
               </div>
               <div className="w-full text-[11px]" style={S.sub}>
                 <p style={S.primary}>{itemLabel(row.item_id)}</p>
-                <p>Batch: {batchLabel(row.batch_id)}</p>
-                <p>{row.net_weight} {row.pack_uom}{row.gross_weight ? ` (gross ${row.gross_weight})` : ""}</p>
+                <p>{t("pkBatchLabel", { batch: batchLabel(row.batch_id) })}</p>
+                <p>{row.net_weight} {row.pack_uom}{row.gross_weight ? ` ${t("pkGrossWeightSuffix", { gross: row.gross_weight })}` : ""}</p>
                 <p>{row.production_date}{row.expiry_date ? ` → ${row.expiry_date}` : ""}</p>
               </div>
             </button>
@@ -153,7 +156,7 @@ export default function PacksPanel() {
       <Dialog
         open={!!viewing}
         onClose={() => setViewing(null)}
-        title={viewing ? `Pack ${viewing.pack_no}` : ""}
+        title={viewing ? t("pkPackTitle", { packNo: viewing.pack_no }) : ""}
         footer={
           viewing && !viewing.is_voided ? (
             <Button
@@ -164,7 +167,7 @@ export default function PacksPanel() {
               className="gap-1.5"
               style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
             >
-              <Ban className="h-4 w-4" /> {voidingId === viewing.qr_id ? "Voiding…" : "Void Pack"}
+              <Ban className="h-4 w-4" /> {voidingId === viewing.qr_id ? t("pkVoidingEllipsis") : t("pkVoidPack")}
             </Button>
           ) : undefined
         }
@@ -175,18 +178,18 @@ export default function PacksPanel() {
               <QRCode value={JSON.stringify(viewing.qr_data)} size={200} />
             </div>
             <div className="grid w-full grid-cols-2 gap-3 text-xs">
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Item</p><p style={S.primary}>{itemLabel(viewing.item_id)}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Batch</p><p style={S.primary}>{batchLabel(viewing.batch_id)}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Lot No.</p><p style={S.primary}>{viewing.lot_no || "—"}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Grade</p><p style={S.primary}>{viewing.grade || "—"}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Net / Gross Weight</p><p style={S.primary}>{viewing.net_weight} / {viewing.gross_weight ?? "—"} {viewing.pack_uom}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Production / Expiry</p><p style={S.primary}>{viewing.production_date} {viewing.expiry_date ? `→ ${viewing.expiry_date}` : ""}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>QC Link</p><p style={S.primary}>{viewing.qc_id ? `Linked (${viewing.qr_data?.qc?.overall_result || "—"})` : "Not linked"}</p></div>
-              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>Status</p><p style={viewing.is_voided ? { color: "var(--danger)" } : { color: "var(--success)" }}>{viewing.is_voided ? "Voided" : "Active"}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("pkItem")}</p><p style={S.primary}>{itemLabel(viewing.item_id)}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("pkBatch")}</p><p style={S.primary}>{batchLabel(viewing.batch_id)}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("pkLotNo")}</p><p style={S.primary}>{viewing.lot_no || "—"}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("pkGradeLabel")}</p><p style={S.primary}>{viewing.grade || "—"}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("pkNetGrossWeight")}</p><p style={S.primary}>{viewing.net_weight} / {viewing.gross_weight ?? "—"} {viewing.pack_uom}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("pkProductionExpiry")}</p><p style={S.primary}>{viewing.production_date} {viewing.expiry_date ? `→ ${viewing.expiry_date}` : ""}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("pkQcLink")}</p><p style={S.primary}>{viewing.qc_id ? t("pkLinkedResult", { result: viewing.qr_data?.qc?.overall_result || "—" }) : t("pkNotLinked")}</p></div>
+              <div><p className="font-semibold uppercase tracking-wider" style={S.muted}>{t("pkStatus")}</p><p style={viewing.is_voided ? { color: "var(--danger)" } : { color: "var(--success)" }}>{viewing.is_voided ? t("pkVoided2") : t("pkActive")}</p></div>
             </div>
             {viewing.origin_batch_chain && (
               <div className="w-full">
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>Origin Chain</p>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("pkOriginChain")}</p>
                 <pre className="overflow-x-auto rounded-[var(--radius-sm)] border p-3 text-[10px]" style={S.surface}>{JSON.stringify(viewing.origin_batch_chain, null, 2)}</pre>
               </div>
             )}

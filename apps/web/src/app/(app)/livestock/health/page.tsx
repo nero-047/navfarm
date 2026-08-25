@@ -5,7 +5,7 @@ import MortalityHealthPanel from "@/components/console/production/mortality-heal
 
 export default function MortalityHealthPage() {
   return (
-    <ProductionPageShell title="Mortality & Clinical Health Register">
+    <ProductionPageShell titleKey="mortalityHealth">
       {() => <MortalityHealthPanel />}
     </ProductionPageShell>
   );

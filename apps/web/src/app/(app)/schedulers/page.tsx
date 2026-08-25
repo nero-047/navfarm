@@ -5,7 +5,7 @@ import SchedulerPanel from "@/components/console/production/scheduler-panel";
 
 export default function ProductionSchedulerPage() {
   return (
-    <ProductionPageShell title="Schedulers">
+    <ProductionPageShell titleKey="scheduler">
       {() => <SchedulerPanel />}
     </ProductionPageShell>
   );

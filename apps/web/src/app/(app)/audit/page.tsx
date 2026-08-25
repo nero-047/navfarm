@@ -9,6 +9,7 @@ import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { Badge } from "../../../components/ui/badge";
 import { Input } from "../../../components/ui/input";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { ConsolePage } from "../../../components/ui/console-page";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
 
 export default function AuditPage() {
@@ -72,7 +73,7 @@ export default function AuditPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+    <ConsolePage>
       <PageHeader
         title="Audit Ledger"
         description={`${auditLogs.length} events recorded`}
@@ -129,6 +130,6 @@ export default function AuditPage() {
           </TableBody>
         </table>
       </div>
-    </div>
+    </ConsolePage>
   );
 }

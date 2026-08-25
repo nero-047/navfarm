@@ -19,6 +19,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
+import { AnimalMultiSelect, splitEvenly, type AnimalOption } from "../production/animal-multi-select";
 
 interface BatchProfile {
   id: string;
@@ -91,19 +92,244 @@ interface StageProfile {
     value: string;
     notes: string;
   }[];
+  // Real stage/pen movements from batch_stage_log. The previous shape carried
+  // headCount / avgWeightKg / wipValue, none of which that table records — the
+  // array was hardcoded empty, so the columns never had a source.
   transferLogs: {
     date: string;
-    destination: string;
-    headCount: number;
-    avgWeightKg: number;
-    wipValue: number;
-    status: string;
+    fromStage: string;
+    toStage: string;
+    remarks: string;
+  }[];
+  attachments: {
+    date: string;
+    fileName: string;
+    fileType: string;
+    url: string;
   }[];
   outputHead: number;
 }
 
-const TAB_KEYS = ["feed", "medicine", "labour", "overheads", "mortality", "weight", "observations", "transfers", "summary"] as const;
+const TAB_KEYS = ["feed", "medicine", "labour", "overheads", "mortality", "weight", "observations", "transfers", "attachments", "summary"] as const;
 type TabKey = (typeof TAB_KEYS)[number];
+
+// Aggregates a batch's raw transactions into a StageProfile. Pure w.r.t. its
+// inputs — called once unfiltered at fetch time to build the default view,
+// and again (with `txs` pre-filtered to one animal_id) to derive the
+// per-animal view, so per-animal filtering needs no backend round-trip.
+function buildStageProfile(b: any, txs: any[], stageLog: any[] = [], attachments: any[] = []): StageProfile {
+  // Helper to detect medicine transactions vs feed
+  const isMedicine = (t: any) => {
+    if (t.item_type === "MEDICINE" || t.item_category_code === "MEDICINE") return true;
+    const uom = (t.uom || "").toUpperCase();
+    if (["ML", "DOSES", "VIAL", "BOTTLE", "TAB", "AMPOULE", "SYRINGE", "MG"].includes(uom)) return true;
+    const text = `${t.item_name || ""} ${t.item_code || ""} ${t.remarks || ""}`.toLowerCase();
+    return (
+      text.includes("med") ||
+      text.includes("vaccin") ||
+      text.includes("deworm") ||
+      text.includes("iron") ||
+      text.includes("antibiotic") ||
+      text.includes("dextran") ||
+      text.includes("ivermectin") ||
+      text.includes("vitamin") ||
+      text.includes("electrolyt") ||
+      text.includes("inject") ||
+      text.includes("dose") ||
+      text.includes("treatment") ||
+      text.includes("clinical") ||
+      text.includes("parvovirus") ||
+      text.includes("circovirus") ||
+      text.includes("amoxicillin") ||
+      text.includes("oxytetracycline")
+    );
+  };
+
+  const feedTxs = txs.filter((t: any) => t.transaction_type === "CONSUMPTION" && !isMedicine(t));
+  const medTxs = txs.filter((t: any) => t.transaction_type === "CONSUMPTION" && isMedicine(t));
+  const overheadTxs = txs.filter((t: any) => t.transaction_type === "OVERHEAD");
+  const mortalityTxs = txs.filter((t: any) => t.transaction_type === "MORTALITY");
+
+  // Aggregate feed consumption by formula / item name
+  const feedMap = new Map<string, {
+    item: string;
+    uom: string;
+    opening: number;
+    issued: number;
+    consumed: number;
+    wastage: number;
+    rate: number;
+  }>();
+
+  feedTxs.forEach((t: any) => {
+    // Key by remarks first (which holds the exact user input from Batch Data Entry), then item_name
+    const itemName = t.remarks || t.item_name || t.item_code || "Standard Feed Ration";
+    const qty = Number(t.quantity || 0);
+    const rate = Number(t.rate || 35.0);
+    const uom = t.uom || "KG";
+
+    if (feedMap.has(itemName)) {
+      const existing = feedMap.get(itemName)!;
+      existing.issued += qty;
+      existing.consumed += qty;
+    } else {
+      feedMap.set(itemName, {
+        item: itemName,
+        uom,
+        opening: 0,
+        issued: qty,
+        consumed: qty,
+        wastage: 0,
+        rate,
+      });
+    }
+  });
+
+  const feedData = Array.from(feedMap.values());
+
+  // Map medical and vaccine consumption
+  const medMap = new Map<string, {
+    item: string;
+    uom: string;
+    issued: number;
+    consumed: number;
+    wastage: number;
+    cost: number;
+  }>();
+
+  medTxs.forEach((t: any) => {
+    // Key by remarks first (which holds the exact user input from Batch Data Entry), then item_name
+    const itemName = t.remarks || t.item_name || t.item_code || "Clinical Medication";
+    const qty = Number(t.quantity || 0);
+    const rate = Number(t.rate || 20.0);
+    // amount is stored negative in DB — always use Math.abs with null-coalescing
+    const cost = Math.abs(Number(t.amount ?? (qty * rate)));
+    const uom = t.uom || "ML";
+
+    if (medMap.has(itemName)) {
+      const existing = medMap.get(itemName)!;
+      existing.issued += qty;
+      existing.consumed += qty;
+      existing.cost += cost;
+    } else {
+      medMap.set(itemName, {
+        item: itemName,
+        uom,
+        issued: qty,
+        consumed: qty,
+        wastage: 0,
+        cost,
+      });
+    }
+  });
+
+  const medData = Array.from(medMap.values());
+
+  const labourTxs = overheadTxs.filter((t: any) =>
+    (t.remarks || "").toLowerCase().includes("labour") || t.uom === "HRS"
+  );
+  const generalOverheadTxs = overheadTxs.filter((t: any) =>
+    !((t.remarks || "").toLowerCase().includes("labour") || t.uom === "HRS")
+  );
+
+  const labourData = labourTxs.map((t: any) => {
+    const qty = Number(t.quantity ?? 1);
+    const rate = Number(t.rate ?? 0);
+    const cost = Math.abs(Number(t.amount ?? (qty * rate)));
+    return {
+      resource: t.remarks || "Farm Operations Labour",
+      date: t.transaction_date || "",
+      hours: qty,
+      rate,
+      cost,
+      remarks: t.remarks || "Daily Farm Operations",
+    };
+  });
+
+  const overheadData = generalOverheadTxs.map((t: any) => {
+    const qty = Number(t.quantity ?? 1);
+    const rate = Number(t.rate ?? 0);
+    // amount is stored as negative in DB — use null-coalescing (not ||) to handle negatives
+    const cost = Math.abs(Number(t.amount ?? (qty * rate)));
+    return {
+      item: t.remarks || "Operational Overhead",
+      basis: t.uom || "Units",
+      rate,
+      qty,
+      cost,
+    };
+  });
+
+  const mortalityLogs = mortalityTxs.map((t: any) => ({
+    date: t.transaction_date || "",
+    count: Number(t.quantity || 1),
+    reason: t.remarks || "Mortality Recorded",
+    pen: "Main Shed",
+    vetAction: "Recorded in clinical register",
+  }));
+
+  const weightTxs = txs.filter((t: any) =>
+    t.transaction_type === "WEIGHT_ENTRY" ||
+    (t.transaction_type === "OBSERVATION" &&
+      ((t.remarks || "").toLowerCase().includes("weight") || t.uom === "KG"))
+  );
+  const weightLogs = weightTxs.map((t: any) => ({
+    date: t.transaction_date || "",
+    avgWeightKg: Number(t.quantity || 0),
+    remarks: t.remarks || "Body Weight Sampling Recorded",
+  }));
+
+  const obsTxs = txs.filter((t: any) =>
+    t.transaction_type === "OBSERVATION" &&
+    !((t.remarks || "").toLowerCase().includes("weight") && t.uom === "KG")
+  );
+  const observationLogs = obsTxs.map((t: any) => ({
+    date: t.transaction_date || "",
+    type: t.uom === "°C" ? "Temperature" : t.uom === "L" ? "Water Intake" : t.uom === "%" ? "Humidity" : "Daily Observation",
+    value: `${t.quantity ?? ""} ${t.uom || ""}`.trim(),
+    notes: t.remarks || "Observation Logged",
+  }));
+
+  const opening = Number(b.opening_quantity) || 20;
+  const recordedMortality = mortalityLogs.reduce((sum: number, m: any) => sum + m.count, 0);
+  // Number() never returns null/undefined, so `??` never reached the fallback —
+  // an open batch (closing_quantity NULL) reported a closing count of 0.
+  const closing = b.closing_quantity != null ? Number(b.closing_quantity) : opening - recordedMortality;
+  const totalMortality = Math.max(0, opening - closing);
+
+  return {
+    id: `st-${b.batch_id}`,
+    code: b.current_stage_code || "ACTIVE",
+    name: `${(b.current_stage_code || "Production").replace(/_/g, " ")} Stage`,
+    startDate: b.start_date || new Date().toISOString().slice(0, 10),
+    endDate: b.expected_end_date || new Date().toISOString().slice(0, 10),
+    standardDays: 60,
+    startAnimals: opening,
+    endAnimals: closing,
+    mortality: totalMortality,
+    avgAgeDays: 45,
+    feedData,
+    medData,
+    labourData,
+    overheadData,
+    mortalityLogs,
+    weightLogs,
+    observationLogs,
+    transferLogs: (stageLog || []).map((l: any) => ({
+      date: (l.transferred_at || "").toString().slice(0, 10),
+      fromStage: l.from_stage_code || "—",
+      toStage: l.to_stage_code || "—",
+      remarks: l.remarks || "",
+    })),
+    attachments: (attachments || []).map((a: any) => ({
+      date: (a.uploaded_at || a.created_at || "").toString().slice(0, 10),
+      fileName: a.file_name || a.original_name || "Attachment",
+      fileType: a.file_type || a.mime_type || "",
+      url: a.file_url || a.file_path || "",
+    })),
+    outputHead: closing,
+  };
+}
 
 export default function StageWiseConsumptionOutputPanel() {
   const { t } = useLanguage();
@@ -148,9 +374,43 @@ export default function StageWiseConsumptionOutputPanel() {
       weightLogs: [],
       observationLogs: [],
       transferLogs: [],
+      attachments: [],
       outputHead: 0,
     };
   }, [currentBatch, selectedStageId]);
+
+  // Raw per-batch transactions/metadata, cached at fetch time so an animal
+  // filter can re-derive the stage profile client-side (no refetch needed).
+  const [rawTxsByBatch, setRawTxsByBatch] = useState<Record<string, any[]>>({});
+  const [rawBatchMeta, setRawBatchMeta] = useState<Record<string, any>>({});
+
+  // Animal filter — narrows every tab below to one animal's own transactions.
+  const [selectedAnimalId, setSelectedAnimalId] = useState("");
+  const [batchAnimalOptions, setBatchAnimalOptions] = useState<AnimalOption[]>([]);
+  const [batchAnimalOptionsLoading, setBatchAnimalOptionsLoading] = useState(false);
+
+  useEffect(() => {
+    setSelectedAnimalId("");
+    if (!selectedBatchId) { setBatchAnimalOptions([]); return; }
+    const companyId = getActiveCompanyId();
+    setBatchAnimalOptionsLoading(true);
+    api.get(`/animal?companyId=${companyId}&currentBatchId=${selectedBatchId}&limit=500`)
+      .then((res) => {
+        const list: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+        setBatchAnimalOptions(list.map((a) => ({ animal_id: a.animal_id, label: a.ear_tag || a.animal_code })));
+      })
+      .catch(() => setBatchAnimalOptions([]))
+      .finally(() => setBatchAnimalOptionsLoading(false));
+  }, [selectedBatchId]);
+
+  const displayStage = useMemo(() => {
+    if (!selectedAnimalId) return currentStage;
+    const rawB = rawBatchMeta[selectedBatchId];
+    const rawTxs = rawTxsByBatch[selectedBatchId] || [];
+    if (!rawB) return currentStage;
+    const filteredTxs = rawTxs.filter((t: any) => t.animal_id === selectedAnimalId);
+    return buildStageProfile(rawB, filteredTxs, rawB.stage_log || [], rawB.attachments || []);
+  }, [selectedAnimalId, rawBatchMeta, rawTxsByBatch, selectedBatchId, currentStage]);
 
   const sectionParam = searchParams.get("section");
   const activeTab: TabKey = (TAB_KEYS as readonly string[]).includes(sectionParam || "") ? (sectionParam as TabKey) : "feed";
@@ -172,8 +432,12 @@ export default function StageWiseConsumptionOutputPanel() {
   const [logItem, setLogItem] = useState("");
   const [logQty, setLogQty] = useState("");
   const [logRate, setLogRate] = useState("");
+  const [logAnimalIds, setLogAnimalIds] = useState<Set<string>>(new Set());
+  const [logAnimalSearch, setLogAnimalSearch] = useState("");
+  const [logSaving, setLogSaving] = useState(false);
+  const [logError, setLogError] = useState("");
 
-  useEffect(() => {
+  const loadBatches = (preserveSelection?: boolean) => {
     const companyId = getActiveCompanyId();
     if (!companyId) {
       setLoading(false);
@@ -189,219 +453,31 @@ export default function StageWiseConsumptionOutputPanel() {
           return;
         }
 
+        const rawTxs: Record<string, any[]> = {};
+        const rawMeta: Record<string, any> = {};
+
         const detailedBatches: BatchProfile[] = await Promise.all(
           list.slice(0, 10).map(async (b: any) => {
             try {
               const detailsRes = await api.get(`/batch/${b.batch_id}`).catch(() => null);
               const details = detailsRes?.data ?? detailsRes ?? b;
               const txs: any[] = details.transactions || [];
-              
-              // Helper to detect medicine transactions vs feed
-              const isMedicine = (t: any) => {
-                if (t.item_type === "MEDICINE" || t.item_category_code === "MEDICINE") return true;
-                const uom = (t.uom || "").toUpperCase();
-                if (["ML", "DOSES", "VIAL", "BOTTLE", "TAB", "AMPOULE", "SYRINGE", "MG"].includes(uom)) return true;
-                const text = `${t.item_name || ""} ${t.item_code || ""} ${t.remarks || ""}`.toLowerCase();
-                return (
-                  text.includes("med") ||
-                  text.includes("vaccin") ||
-                  text.includes("deworm") ||
-                  text.includes("iron") ||
-                  text.includes("antibiotic") ||
-                  text.includes("dextran") ||
-                  text.includes("ivermectin") ||
-                  text.includes("vitamin") ||
-                  text.includes("electrolyt") ||
-                  text.includes("inject") ||
-                  text.includes("dose") ||
-                  text.includes("treatment") ||
-                  text.includes("clinical") ||
-                  text.includes("parvovirus") ||
-                  text.includes("circovirus") ||
-                  text.includes("amoxicillin") ||
-                  text.includes("oxytetracycline")
-                );
-              };
+              const stageLog: any[] = details.stage_log || [];
+              const atts: any[] = details.attachments || [];
+              rawTxs[b.batch_id] = txs;
+              // stage_log/attachments only come back on the detail call, so keep
+              // them on the cached meta — the animal-filter recompute reads it.
+              rawMeta[b.batch_id] = { ...b, stage_log: stageLog, attachments: atts };
 
-              const feedTxs = txs.filter((t: any) => t.transaction_type === "CONSUMPTION" && !isMedicine(t));
-              const medTxs = txs.filter((t: any) => t.transaction_type === "CONSUMPTION" && isMedicine(t));
-              const overheadTxs = txs.filter((t: any) => t.transaction_type === "OVERHEAD");
-              const mortalityTxs = txs.filter((t: any) => t.transaction_type === "MORTALITY");
-
-              // Aggregate feed consumption by formula / item name
-              const feedMap = new Map<string, {
-                item: string;
-                uom: string;
-                opening: number;
-                issued: number;
-                consumed: number;
-                wastage: number;
-                rate: number;
-              }>();
-
-              feedTxs.forEach((t: any) => {
-                // Key by remarks first (which holds the exact user input from Batch Data Entry), then item_name
-                const itemName = t.remarks || t.item_name || t.item_code || "Standard Feed Ration";
-                const qty = Number(t.quantity || 0);
-                const rate = Number(t.rate || 35.0);
-                const uom = t.uom || "KG";
-
-                if (feedMap.has(itemName)) {
-                  const existing = feedMap.get(itemName)!;
-                  existing.issued += qty;
-                  existing.consumed += qty;
-                } else {
-                  feedMap.set(itemName, {
-                    item: itemName,
-                    uom,
-                    opening: 0,
-                    issued: qty,
-                    consumed: qty,
-                    wastage: 0,
-                    rate,
-                  });
-                }
-              });
-
-              const feedData = Array.from(feedMap.values());
-
-              // Map medical and vaccine consumption
-              const medMap = new Map<string, {
-                item: string;
-                uom: string;
-                issued: number;
-                consumed: number;
-                wastage: number;
-                cost: number;
-              }>();
-
-              medTxs.forEach((t: any) => {
-                // Key by remarks first (which holds the exact user input from Batch Data Entry), then item_name
-                const itemName = t.remarks || t.item_name || t.item_code || "Clinical Medication";
-                const qty = Number(t.quantity || 0);
-                const rate = Number(t.rate || 20.0);
-                // amount is stored negative in DB — always use Math.abs with null-coalescing
-                const cost = Math.abs(Number(t.amount ?? (qty * rate)));
-                const uom = t.uom || "ML";
-
-                if (medMap.has(itemName)) {
-                  const existing = medMap.get(itemName)!;
-                  existing.issued += qty;
-                  existing.consumed += qty;
-                  existing.cost += cost;
-                } else {
-                  medMap.set(itemName, {
-                    item: itemName,
-                    uom,
-                    issued: qty,
-                    consumed: qty,
-                    wastage: 0,
-                    cost,
-                  });
-                }
-              });
-
-              const medData = Array.from(medMap.values());
-
-              const labourTxs = overheadTxs.filter((t: any) =>
-                (t.remarks || "").toLowerCase().includes("labour") || t.uom === "HRS"
-              );
-              const generalOverheadTxs = overheadTxs.filter((t: any) =>
-                !((t.remarks || "").toLowerCase().includes("labour") || t.uom === "HRS")
-              );
-
-              const labourData = labourTxs.map((t: any) => {
-                const qty = Number(t.quantity ?? 1);
-                const rate = Number(t.rate ?? 0);
-                const cost = Math.abs(Number(t.amount ?? (qty * rate)));
-                return {
-                  resource: t.remarks || "Farm Operations Labour",
-                  date: t.transaction_date || "",
-                  hours: qty,
-                  rate,
-                  cost,
-                  remarks: t.remarks || "Daily Farm Operations",
-                };
-              });
-
-              const overheadData = generalOverheadTxs.map((t: any) => {
-                const qty = Number(t.quantity ?? 1);
-                const rate = Number(t.rate ?? 0);
-                // amount is stored as negative in DB — use null-coalescing (not ||) to handle negatives
-                const cost = Math.abs(Number(t.amount ?? (qty * rate)));
-                return {
-                  item: t.remarks || "Operational Overhead",
-                  basis: t.uom || "Units",
-                  rate,
-                  qty,
-                  cost,
-                };
-              });
-
-              const mortalityLogs = mortalityTxs.map((t: any) => ({
-                date: t.transaction_date || "",
-                count: Number(t.quantity || 1),
-                reason: t.remarks || "Mortality Recorded",
-                pen: "Main Shed",
-                vetAction: "Recorded in clinical register",
-              }));
-
-              const weightTxs = txs.filter((t: any) =>
-                t.transaction_type === "WEIGHT_ENTRY" ||
-                (t.transaction_type === "OBSERVATION" &&
-                  ((t.remarks || "").toLowerCase().includes("weight") || t.uom === "KG"))
-              );
-              const weightLogs = weightTxs.map((t: any) => ({
-                date: t.transaction_date || "",
-                avgWeightKg: Number(t.quantity || 0),
-                remarks: t.remarks || "Body Weight Sampling Recorded",
-              }));
-
-              const obsTxs = txs.filter((t: any) =>
-                t.transaction_type === "OBSERVATION" &&
-                !((t.remarks || "").toLowerCase().includes("weight") && t.uom === "KG")
-              );
-              const observationLogs = obsTxs.map((t: any) => ({
-                date: t.transaction_date || "",
-                type: t.uom === "°C" ? "Temperature" : t.uom === "L" ? "Water Intake" : t.uom === "%" ? "Humidity" : "Daily Observation",
-                value: `${t.quantity ?? ""} ${t.uom || ""}`.trim(),
-                notes: t.remarks || "Observation Logged",
-              }));
-
-              const opening = Number(b.opening_quantity) || 20;
-              const recordedMortality = mortalityLogs.reduce((sum: number, m: any) => sum + m.count, 0);
-              const closing = Number(b.closing_quantity) ?? (opening - recordedMortality);
-              const totalMortality = Math.max(0, opening - closing);
-
-              const stageProfile: StageProfile = {
-                id: `st-${b.batch_id}`,
-                code: b.current_stage_code || "ACTIVE",
-                name: `${(b.current_stage_code || "Production").replace(/_/g, " ")} Stage`,
-                startDate: b.start_date || new Date().toISOString().slice(0, 10),
-                endDate: b.expected_end_date || new Date().toISOString().slice(0, 10),
-                standardDays: 60,
-                startAnimals: opening,
-                endAnimals: closing,
-                mortality: totalMortality,
-                avgAgeDays: 45,
-                feedData,
-                medData,
-                labourData,
-                overheadData,
-                mortalityLogs,
-                weightLogs,
-                observationLogs,
-                transferLogs: [],
-                outputHead: closing,
-              };
+              const stageProfile = buildStageProfile(b, txs, stageLog, atts);
 
               return {
                 id: b.batch_id,
                 code: b.batch_no,
                 name: b.remarks || b.batch_no,
-                breed: b.breed_name || b.breed_code || "Large White",
+                breed: b.breed_name || b.breed_code || "—",
                 batchType: b.lob_name || "Piggery Production Batch",
-                startCount: opening,
+                startCount: stageProfile.startAnimals,
                 stages: [stageProfile],
               };
             } catch {
@@ -409,7 +485,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 id: b.batch_id,
                 code: b.batch_no,
                 name: b.remarks || b.batch_no,
-                breed: b.breed_name || b.breed_code || "Large White",
+                breed: b.breed_name || b.breed_code || "—",
                 batchType: b.lob_name || "Piggery Production Batch",
                 startCount: Number(b.opening_quantity) || 20,
                 stages: [],
@@ -418,13 +494,20 @@ export default function StageWiseConsumptionOutputPanel() {
           })
         );
 
+        setRawTxsByBatch(rawTxs);
+        setRawBatchMeta(rawMeta);
         setBatches(detailedBatches);
         if (detailedBatches.length > 0) {
-          setSelectedBatchId(detailedBatches[0].id);
-          if (detailedBatches[0].stages.length > 0) {
-            setSelectedStageId(detailedBatches[0].stages[0].id);
-            setDateFrom(detailedBatches[0].stages[0].startDate);
-            setDateTo(detailedBatches[0].stages[0].endDate);
+          const existingMatch = preserveSelection ? detailedBatches.find((b) => b.id === selectedBatchId) : undefined;
+          const keepExisting = !!existingMatch;
+          const target = existingMatch || detailedBatches[0];
+          if (!keepExisting) setSelectedBatchId(target.id);
+          if (target.stages.length > 0) {
+            setSelectedStageId(target.stages[0].id);
+            if (!keepExisting) {
+              setDateFrom(target.stages[0].startDate);
+              setDateTo(target.stages[0].endDate);
+            }
           }
         }
         setLoading(false);
@@ -432,35 +515,37 @@ export default function StageWiseConsumptionOutputPanel() {
       .catch(() => {
         setLoading(false);
       });
-  }, []);
+  };
+
+  useEffect(() => { loadBatches(); }, []);
 
   // Dynamic calculations
   const totalFeedKg = useMemo(
-    () => currentStage.feedData.reduce((sum, f) => sum + f.consumed, 0),
-    [currentStage]
+    () => displayStage.feedData.reduce((sum, f) => sum + f.consumed, 0),
+    [displayStage]
   );
   const totalFeedCost = useMemo(
-    () => currentStage.feedData.reduce((sum, f) => sum + f.consumed * f.rate, 0),
-    [currentStage]
+    () => displayStage.feedData.reduce((sum, f) => sum + f.consumed * f.rate, 0),
+    [displayStage]
   );
   const totalMedCost = useMemo(
-    () => currentStage.medData.reduce((sum, m) => sum + m.cost, 0),
-    [currentStage]
+    () => displayStage.medData.reduce((sum, m) => sum + m.cost, 0),
+    [displayStage]
   );
   const totalLabourCost = useMemo(
-    () => (currentStage.labourData || []).reduce((sum, l) => sum + l.cost, 0),
-    [currentStage]
+    () => (displayStage.labourData || []).reduce((sum, l) => sum + l.cost, 0),
+    [displayStage]
   );
   const totalOverheadCost = useMemo(
-    () => currentStage.overheadData.reduce((sum, o) => sum + o.cost, 0),
-    [currentStage]
+    () => displayStage.overheadData.reduce((sum, o) => sum + o.cost, 0),
+    [displayStage]
   );
   const totalStageWipCost = totalFeedCost + totalMedCost + totalLabourCost + totalOverheadCost;
 
-  const durationDays = currentStage.standardDays;
-  const avgAnimals = (currentStage.startAnimals + currentStage.endAnimals) / 2;
+  const durationDays = displayStage.standardDays;
+  const avgAnimals = (displayStage.startAnimals + displayStage.endAnimals) / 2;
   const costPerHeadDay = avgAnimals > 0 && durationDays > 0 ? (totalStageWipCost / (avgAnimals * durationDays)).toFixed(2) : "0.00";
-  const mortalityPct = currentStage.startAnimals > 0 ? ((currentStage.mortality / currentStage.startAnimals) * 100).toFixed(1) : "0.0";
+  const mortalityPct = displayStage.startAnimals > 0 ? ((displayStage.mortality / displayStage.startAnimals) * 100).toFixed(1) : "0.0";
 
   const handleBatchChange = (batchId: string) => {
     setSelectedBatchId(batchId);
@@ -495,10 +580,10 @@ export default function StageWiseConsumptionOutputPanel() {
     const csvContent =
       "data:text/csv;charset=utf-8," +
       `Batch,${currentBatch.code} (${currentBatch.name})\n` +
-      `Stage,${currentStage.code} - ${currentStage.name}\n` +
+      `Stage,${displayStage.code} - ${displayStage.name}\n` +
       `Date Range,${dateFrom} to ${dateTo}\n` +
-      `Animals Start,${currentStage.startAnimals}\n` +
-      `Animals End,${currentStage.endAnimals}\n` +
+      `Animals Start,${displayStage.startAnimals}\n` +
+      `Animals End,${displayStage.endAnimals}\n` +
       `Total Feed Consumed (KG),${totalFeedKg}\n` +
       `Total Feed Cost (INR),${totalFeedCost}\n` +
       `Total Medicine Cost (INR),${totalMedCost}\n` +
@@ -509,7 +594,7 @@ export default function StageWiseConsumptionOutputPanel() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Stage_Consumption_${currentBatch.code}_${currentStage.code}.csv`);
+    link.setAttribute("download", `Stage_Consumption_${currentBatch.code}_${displayStage.code}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -518,36 +603,51 @@ export default function StageWiseConsumptionOutputPanel() {
     setTimeout(() => setToastMsg(""), 3000);
   };
 
-  const handleAddConsumption = () => {
-    if (!logItem || !logQty) return;
+  const handleAddConsumption = async () => {
+    if (!logItem || !logQty || !selectedBatchId) return;
     const qty = parseFloat(logQty) || 0;
     const rate = parseFloat(logRate) || 0;
+    const animalIds = Array.from(logAnimalIds);
 
-    if (logType === "FEED") {
-      currentStage.feedData.push({
-        item: logItem,
-        uom: "KG",
-        opening: 0,
-        issued: qty,
-        consumed: qty,
-        wastage: 0,
-        rate: rate || 35.0,
-      });
-    } else {
-      currentStage.medData.push({
-        item: logItem,
-        uom: "ML",
-        issued: qty,
-        consumed: qty,
-        wastage: 0,
-        cost: qty * (rate || 250),
-      });
+    setLogSaving(true);
+    setLogError("");
+    try {
+      const basePayload =
+        logType === "FEED"
+          ? { transaction_type: "CONSUMPTION", uom: "KG", rate: rate || 35.0, remarks: logItem }
+          : { transaction_type: "CONSUMPTION", uom: "ML", rate: rate || 250, remarks: logItem };
+
+      if (animalIds.length > 0) {
+        const shares = splitEvenly(qty, animalIds.length);
+        for (let i = 0; i < animalIds.length; i++) {
+          await api.post(`/batch/${selectedBatchId}/transaction`, {
+            transaction_date: new Date().toISOString().slice(0, 10),
+            ...basePayload,
+            quantity: shares[i],
+            animal_id: animalIds[i],
+          });
+        }
+      } else {
+        await api.post(`/batch/${selectedBatchId}/transaction`, {
+          transaction_date: new Date().toISOString().slice(0, 10),
+          ...basePayload,
+          quantity: qty,
+        });
+      }
+    } catch (err: any) {
+      setLogSaving(false);
+      setLogError(err?.message || "Failed to save consumption entry.");
+      return;
     }
 
+    setLogSaving(false);
     setLogModalOpen(false);
     setLogItem("");
     setLogQty("");
     setLogRate("");
+    setLogAnimalIds(new Set());
+    setLogAnimalSearch("");
+    loadBatches(true);
     setToastMsg(`✓ Added ${logType === "FEED" ? "feed" : "medicine"} record: ${logItem} (${qty})`);
     setTimeout(() => setToastMsg(""), 3500);
   };
@@ -570,7 +670,7 @@ export default function StageWiseConsumptionOutputPanel() {
             <select
               value={selectedBatchId}
               onChange={(e) => handleBatchChange(e.target.value)}
-              className="max-w-[240px] sm:max-w-[300px] truncate rounded border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
+              className="nf-input-sm nf-select max-w-[240px] sm:max-w-[300px] truncate font-semibold"
             >
               {batches.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -585,7 +685,7 @@ export default function StageWiseConsumptionOutputPanel() {
             <select
               value={selectedStageId}
               onChange={(e) => handleStageChange(e.target.value)}
-              className="max-w-[240px] sm:max-w-[300px] truncate rounded border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
+              className="nf-input-sm nf-select max-w-[240px] sm:max-w-[300px] truncate font-semibold"
             >
               {currentBatch.stages.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -602,24 +702,40 @@ export default function StageWiseConsumptionOutputPanel() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="rounded border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-1 text-xs font-medium text-[var(--text-primary)]"
+                className="nf-input-sm font-medium"
               />
               <span className="text-[var(--text-muted)]">to</span>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="rounded border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-1 text-xs font-medium text-[var(--text-primary)]"
+                className="nf-input-sm font-medium"
               />
             </div>
           </div>
+
+          {batchAnimalOptions.length > 0 && (
+            <div>
+              <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">{t("swAnimal")}</span>
+              <select
+                value={selectedAnimalId}
+                onChange={(e) => setSelectedAnimalId(e.target.value)}
+                className="nf-input-sm nf-select max-w-[200px] truncate font-semibold"
+              >
+                <option value="">{t("schedWholeBatch")}</option>
+                {batchAnimalOptions.map((a) => (
+                  <option key={a.animal_id} value={a.animal_id}>{a.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setLogModalOpen(true)}
+            onClick={() => { setLogAnimalIds(new Set()); setLogAnimalSearch(""); setLogModalOpen(true); }}
             className="text-xs h-8 gap-1.5 font-medium"
           >
             <Plus className="h-3.5 w-3.5" /> {t("swLogConsumption")}
@@ -661,14 +777,14 @@ export default function StageWiseConsumptionOutputPanel() {
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swAnimalsStart")}</p>
-          <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{currentStage.startAnimals}</p>
+          <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{displayStage.startAnimals}</p>
         </div>
         <div
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swAnimalsEnd")}</p>
-          <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{currentStage.endAnimals}</p>
+          <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{displayStage.endAnimals}</p>
         </div>
         <div
           className="rounded-[var(--radius-md)] border p-3.5 text-center transition-all hover:bg-[var(--surface-raised)]"
@@ -676,7 +792,7 @@ export default function StageWiseConsumptionOutputPanel() {
         >
           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swAvgAge")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>
-            {currentStage.avgAgeDays} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>d</span>
+            {displayStage.avgAgeDays} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>d</span>
           </p>
         </div>
         <div
@@ -711,8 +827,8 @@ export default function StageWiseConsumptionOutputPanel() {
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("bdeMortality")}</p>
-          <p className="text-xl font-bold font-mono mt-1" style={{ color: currentStage.mortality > 0 ? "var(--danger)" : "var(--text-primary)" }}>
-            {currentStage.mortality} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>({mortalityPct}%)</span>
+          <p className="text-xl font-bold font-mono mt-1" style={{ color: displayStage.mortality > 0 ? "var(--danger)" : "var(--text-primary)" }}>
+            {displayStage.mortality} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>({mortalityPct}%)</span>
           </p>
         </div>
         <div
@@ -720,7 +836,7 @@ export default function StageWiseConsumptionOutputPanel() {
           style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swStageOutput")}</p>
-          <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{currentStage.outputHead} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>{t("head")}</span></p>
+          <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>{displayStage.outputHead} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>{t("head")}</span></p>
         </div>
       </div>
 
@@ -728,14 +844,15 @@ export default function StageWiseConsumptionOutputPanel() {
       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-2xs">
         <div className="flex items-center gap-1 border-b border-[var(--border)] bg-[var(--surface-raised)] px-4 pt-2 text-xs font-semibold overflow-x-auto">
           {[
-            { key: "feed", label: t("swTabFeedConsumption", { n: currentStage.feedData.length }) },
-            { key: "medicine", label: t("swTabMedicineClinical", { n: currentStage.medData.length }) },
-            { key: "labour", label: t("swTabLabourManpower", { n: currentStage.labourData?.length || 0 }) },
-            { key: "overheads", label: t("swTabOverheadsUtilities", { n: currentStage.overheadData.length }) },
-            { key: "mortality", label: t("swTabMortalityIncidents", { n: currentStage.mortalityLogs.length }) },
-            { key: "weight", label: t("swTabWeightGrowth", { n: currentStage.weightLogs?.length || 0 }) },
-            { key: "observations", label: t("swTabNotesLogs", { n: currentStage.observationLogs?.length || 0 }) },
-            { key: "transfers", label: t("swTabTransfers", { n: currentStage.transferLogs.length }) },
+            { key: "feed", label: t("swTabFeedConsumption", { n: displayStage.feedData.length }) },
+            { key: "medicine", label: t("swTabMedicineClinical", { n: displayStage.medData.length }) },
+            { key: "labour", label: t("swTabLabourManpower", { n: displayStage.labourData?.length || 0 }) },
+            { key: "overheads", label: t("swTabOverheadsUtilities", { n: displayStage.overheadData.length }) },
+            { key: "mortality", label: t("swTabMortalityIncidents", { n: displayStage.mortalityLogs.length }) },
+            { key: "weight", label: t("swTabWeightGrowth", { n: displayStage.weightLogs?.length || 0 }) },
+            { key: "observations", label: t("swTabNotesLogs", { n: displayStage.observationLogs?.length || 0 }) },
+            { key: "transfers", label: t("swTabStageTransfers", { n: displayStage.transferLogs.length }) },
+            { key: "attachments", label: t("swTabAttachments", { n: displayStage.attachments.length }) },
             { key: "summary", label: t("swTabSummary") },
           ].map((tab) => (
             <button
@@ -772,7 +889,7 @@ export default function StageWiseConsumptionOutputPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {currentStage.feedData.map((f, index) => {
+                  {displayStage.feedData.map((f, index) => {
                     const closing = f.opening + f.issued - f.consumed - f.wastage;
                     const cost = f.consumed * f.rate;
                     return (
@@ -819,7 +936,7 @@ export default function StageWiseConsumptionOutputPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {currentStage.medData.map((m, index) => (
+                  {displayStage.medData.map((m, index) => (
                     <tr key={m.item} className="hover:bg-[var(--surface-raised)] transition-colors">
                       <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
                       <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{m.item}</td>
@@ -856,14 +973,14 @@ export default function StageWiseConsumptionOutputPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {(currentStage.labourData || []).length === 0 ? (
+                  {(displayStage.labourData || []).length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-6 text-center text-xs text-[var(--text-muted)]">
                         No direct farm labour hours logged yet. Add labour records via Daily Batch Entry.
                       </td>
                     </tr>
                   ) : (
-                    (currentStage.labourData || []).map((l, index) => (
+                    (displayStage.labourData || []).map((l, index) => (
                       <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
                         <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
                         <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{l.date || "—"}</td>
@@ -904,14 +1021,14 @@ export default function StageWiseConsumptionOutputPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {currentStage.overheadData.length === 0 ? (
+                  {displayStage.overheadData.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-6 text-center text-xs text-[var(--text-muted)]">
                         No general overhead allocations logged for this stage.
                       </td>
                     </tr>
                   ) : (
-                    currentStage.overheadData.map((o, index) => (
+                    displayStage.overheadData.map((o, index) => (
                       <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
                         <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
                         <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{o.item}</td>
@@ -936,13 +1053,13 @@ export default function StageWiseConsumptionOutputPanel() {
           {/* TAB 5: MORTALITY */}
           {activeTab === "mortality" && (
             <div className="space-y-3">
-              {currentStage.mortalityLogs.length === 0 ? (
+              {displayStage.mortalityLogs.length === 0 ? (
                 <div className="p-6 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-raised)] rounded-[var(--radius-sm)]">
                   ✓ Zero mortality logged during this stage. Herd health condition is optimal.
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {currentStage.mortalityLogs.map((m, idx) => (
+                  {displayStage.mortalityLogs.map((m, idx) => (
                     <div key={idx} className="p-3.5 rounded-[var(--radius-sm)] bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
@@ -950,12 +1067,12 @@ export default function StageWiseConsumptionOutputPanel() {
                             <AlertTriangle className="h-3.5 w-3.5" /> {m.count} Head Mortality
                           </span>
                           <span className="text-[var(--text-muted)] font-mono text-[11px]">({m.date})</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-600 border border-rose-500/20">{m.pen}</span>
+                          <span className="px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-semibold bg-rose-500/10 text-rose-600 border border-rose-500/20">{m.pen}</span>
                         </div>
                         <p className="mt-1 font-semibold text-[var(--text-primary)]">{m.reason}</p>
                         <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{m.vetAction}</p>
                       </div>
-                      <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] shrink-0 bg-[var(--surface)] px-2 py-1 rounded border border-[var(--border)]">
+                      <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] shrink-0 bg-[var(--surface)] px-2 py-1 rounded-[var(--radius-xs)] border border-[var(--border)]">
                         Necropsy Recorded
                       </span>
                     </div>
@@ -978,14 +1095,14 @@ export default function StageWiseConsumptionOutputPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {(currentStage.weightLogs || []).length === 0 ? (
+                  {(displayStage.weightLogs || []).length === 0 ? (
                     <tr>
                       <td colSpan={4} className="py-6 text-center text-xs text-[var(--text-muted)]">
                         No weight sampling records logged yet. Enter herd weights via Daily Batch Entry.
                       </td>
                     </tr>
                   ) : (
-                    (currentStage.weightLogs || []).map((w, index) => (
+                    (displayStage.weightLogs || []).map((w, index) => (
                       <tr key={index} className="hover:bg-[var(--surface-raised)] transition-colors">
                         <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
                         <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{w.date || "—"}</td>
@@ -1004,19 +1121,19 @@ export default function StageWiseConsumptionOutputPanel() {
           {/* TAB 7: NOTES & OBSERVATIONS */}
           {activeTab === "observations" && (
             <div className="space-y-3">
-              {(currentStage.observationLogs || []).length === 0 ? (
+              {(displayStage.observationLogs || []).length === 0 ? (
                 <div className="p-6 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-raised)] rounded-[var(--radius-sm)]">
                   No supervisor observations or environmental logs recorded for this stage yet.
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {(currentStage.observationLogs || []).map((obs, idx) => (
+                  {(displayStage.observationLogs || []).map((obs, idx) => (
                     <div key={idx} className="p-3.5 rounded-[var(--radius-sm)] bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-[var(--accent)]">{obs.type}</span>
                           {obs.value && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
+                            <span className="px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-bold bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
                               {obs.value}
                             </span>
                           )}
@@ -1031,38 +1148,74 @@ export default function StageWiseConsumptionOutputPanel() {
             </div>
           )}
 
-          {/* TAB 8: TRANSFERS OUT & SALES */}
+          {/* TAB 8: STAGE & PEN TRANSFERS (batch_stage_log) */}
           {activeTab === "transfers" && (
             <div className="space-y-3">
-              {currentStage.transferLogs.length === 0 ? (
+              {displayStage.transferLogs.length === 0 ? (
                 <div className="p-6 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-raised)] rounded-[var(--radius-sm)]">
-                  No stage transitions or market sales logged for this active in-progress stage.
+                  {t("swNoStageTransfers")}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <table className="w-full min-w-[560px] table-fixed text-left text-xs border-collapse">
+                    <colgroup>
+                      <col className="w-[16%]" /><col className="w-[22%]" /><col className="w-[22%]" /><col className="w-[40%]" />
+                    </colgroup>
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                        <th className="px-3 pb-2 font-bold">Transfer Date</th>
-                        <th className="px-3 pb-2 font-bold">Destination Pen / Stage</th>
-                        <th className="px-3 pb-2 font-bold text-right">Head Count</th>
-                        <th className="px-3 pb-2 font-bold text-right">Avg Weight (KG)</th>
-                        <th className="px-3 pb-2 font-bold text-right">Capitalized WIP (₹)</th>
-                        <th className="px-3 pb-2 font-bold">Status</th>
+                        <th className="px-3 pb-2 font-bold">{t("swColTransferDate")}</th>
+                        <th className="px-3 pb-2 font-bold">{t("swColFromStage")}</th>
+                        <th className="px-3 pb-2 font-bold">{t("swColToStage")}</th>
+                        <th className="px-3 pb-2 font-bold">{t("swColRemarks")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
-                      {currentStage.transferLogs.map((t, idx) => (
+                      {displayStage.transferLogs.map((tr, idx) => (
                         <tr key={idx} className="hover:bg-[var(--surface-raised)]">
-                          <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{t.date}</td>
-                          <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{t.destination}</td>
-                          <td className="px-3 py-2.5 text-right font-mono font-bold">{t.headCount} Head</td>
-                          <td className="px-3 py-2.5 text-right font-mono">{t.avgWeightKg} kg</td>
-                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-500">₹ {t.wipValue.toLocaleString("en-IN")}</td>
-                          <td className="px-3 py-2.5">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                              {t.status}
-                            </span>
+                          <td className="px-3 py-2.5 align-top whitespace-nowrap font-mono text-[var(--text-secondary)]">{tr.date}</td>
+                          <td className="px-3 py-2.5 align-top font-mono text-[var(--text-secondary)]">{tr.fromStage}</td>
+                          <td className="px-3 py-2.5 align-top font-mono font-semibold text-[var(--text-primary)]">{tr.toStage}</td>
+                          <td className="px-3 py-2.5 align-top text-[var(--text-secondary)]">{tr.remarks || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 9: ATTACHMENTS & INSPECTION MEDIA (batch_attachment) */}
+          {activeTab === "attachments" && (
+            <div className="space-y-3">
+              {displayStage.attachments.length === 0 ? (
+                <div className="p-6 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-raised)] rounded-[var(--radius-sm)]">
+                  {t("swNoAttachments")}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[520px] table-fixed text-left text-xs border-collapse">
+                    <colgroup><col className="w-[18%]" /><col className="w-[46%]" /><col className="w-[20%]" /><col className="w-[16%]" /></colgroup>
+                    <thead>
+                      <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                        <th className="px-3 pb-2 font-bold">{t("swColUploaded")}</th>
+                        <th className="px-3 pb-2 font-bold">{t("swColFileName")}</th>
+                        <th className="px-3 pb-2 font-bold">{t("swColFileType")}</th>
+                        <th className="px-3 pb-2 font-bold text-right">{t("swColAction")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {displayStage.attachments.map((a, idx) => (
+                        <tr key={idx} className="hover:bg-[var(--surface-raised)]">
+                          <td className="px-3 py-2.5 align-top whitespace-nowrap font-mono text-[var(--text-secondary)]">{a.date || "—"}</td>
+                          <td className="px-3 py-2.5 align-top font-semibold text-[var(--text-primary)]">{a.fileName}</td>
+                          <td className="px-3 py-2.5 align-top font-mono text-[var(--text-secondary)]">{a.fileType || "—"}</td>
+                          <td className="px-3 py-2.5 align-top text-right">
+                            {a.url ? (
+                              <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[var(--accent)] hover:underline">
+                                {t("swOpenFile")}
+                              </a>
+                            ) : <span className="text-[var(--text-muted)]">—</span>}
                           </td>
                         </tr>
                       ))}
@@ -1143,23 +1296,26 @@ export default function StageWiseConsumptionOutputPanel() {
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => setLogModalOpen(false)}>
+              <Button variant="outline" size="sm" onClick={() => setLogModalOpen(false)} disabled={logSaving}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleAddConsumption} className="nf-btn-primary">
-                Add to Stage WIP
+              <Button size="sm" onClick={handleAddConsumption} className="nf-btn-primary" disabled={logSaving}>
+                {logSaving ? "Saving…" : "Add to Stage WIP"}
               </Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
+            {logError && (
+              <p className="rounded-[var(--radius-xs)] border px-3 py-2 text-xs" style={{ color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }}>{logError}</p>
+            )}
             <div>
               <label className="font-semibold block mb-1">Entry Category</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setLogType("FEED")}
-                  className={`px-3 py-2 rounded text-xs font-semibold border ${
+                  className={`px-3 py-2 rounded-[var(--radius-xs)] text-xs font-semibold border ${
                     logType === "FEED" ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--text-secondary)]"
                   }`}
                 >
@@ -1168,7 +1324,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 <button
                   type="button"
                   onClick={() => setLogType("MEDICINE")}
-                  className={`px-3 py-2 rounded text-xs font-semibold border ${
+                  className={`px-3 py-2 rounded-[var(--radius-xs)] text-xs font-semibold border ${
                     logType === "MEDICINE" ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--text-secondary)]"
                   }`}
                 >
@@ -1212,6 +1368,22 @@ export default function StageWiseConsumptionOutputPanel() {
                   className="nf-input w-full font-mono"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="font-semibold block mb-1">Specific Animal(s) (optional — splits Quantity evenly across them)</label>
+              <AnimalMultiSelect
+                options={batchAnimalOptions}
+                loading={batchAnimalOptionsLoading}
+                selected={logAnimalIds}
+                onToggle={(id) => setLogAnimalIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id); else next.add(id);
+                  return next;
+                })}
+                search={logAnimalSearch}
+                onSearchChange={setLogAnimalSearch}
+              />
             </div>
           </div>
         </Dialog>

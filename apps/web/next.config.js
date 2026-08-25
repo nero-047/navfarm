@@ -20,9 +20,52 @@ const DEVELOPMENT_PAGE_EXTENSIONS = [...PRODUCTION_PAGE_EXTENSIONS, 'dev.tsx'];
  * @param {string} phase
  * @returns {import('next').NextConfig}
  */
+/**
+ * The operational-scope routes were renamed to match how the work actually
+ * runs: everything in an area revolves around a batch, so the batch lifecycle
+ * lives under /batches, the animal-centric screens under /livestock, and the
+ * three configuration screens under /settings. The old paths leaked the
+ * backend's module layout (/production/*, /piggery/*) rather than the domain,
+ * and /piggery in particular was wrong the moment a second line of business
+ * existed.
+ *
+ * These are permanent redirects so existing bookmarks, and any link already
+ * shared with a customer, land on the new route instead of a 404.
+ */
+const LEGACY_ROUTE_REDIRECTS = [
+  ['/production/batches/animal-assignment', '/batches/animals'],
+  ['/production/batches/daily-entry', '/batches/entry'],
+  ['/production/batches/transfers', '/batches/transfers'],
+  ['/production/batches/stages', '/batches/stages'],
+  ['/production/batches', '/batches'],
+  ['/production/feed-management', '/batches/records'],
+  ['/production/mortality-health', '/livestock/health'],
+  ['/production/qc-parameters', '/settings/qc'],
+  ['/production/parameters', '/settings/parameters'],
+  ['/production/scheduler', '/schedulers'],
+  ['/production/alerts', '/alerts'],
+  ['/production/packs', '/traceability'],
+  ['/production', '/batches'],
+  ['/piggery/facility-occupancy', '/livestock/facility'],
+  ['/piggery/herd-analytics', '/livestock/analytics'],
+  ['/piggery/breeding', '/livestock/breeding'],
+  ['/piggery/animals', '/livestock'],
+  ['/piggery', '/livestock'],
+  ['/area-settings', '/settings/area'],
+  // /settings has no index of its own; Area Settings is its landing screen.
+  ['/settings', '/settings/area'],
+];
+
 module.exports = (phase) => ({
   turbopack: {
     root: join(__dirname, '../..'),
+  },
+  async redirects() {
+    return LEGACY_ROUTE_REDIRECTS.map(([source, destination]) => ({
+      source,
+      destination,
+      permanent: true,
+    }));
   },
   pageExtensions:
     phase === PHASE_DEVELOPMENT_SERVER

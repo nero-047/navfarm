@@ -288,6 +288,11 @@ export class AddBatchTransactionDto {
   @IsNumber()
   @IsOptional()
   bcs_score?: number;
+
+  @ApiProperty({ description: 'Attribute this transaction to a single animal in the batch instead of the whole batch — omit for a whole-batch entry', required: false })
+  @IsUUID()
+  @IsOptional()
+  animal_id?: string;
 }
 
 export class BatchOutputLineInput {
@@ -489,6 +494,18 @@ export class BulkDailyEntryRowDto {
   @IsString()
   @IsOptional()
   remarks?: string;
+
+  @ApiProperty({ description: 'Scope this row to only these animals in the batch (mutually exclusive with exclude_animal_ids) — feed/water quantities split evenly across them, mortality count becomes the number of animals selected, temperature is recorded per animal unchanged. Omit both arrays for the historical whole-batch behaviour.', required: false, type: [String] })
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @IsOptional()
+  animal_ids?: string[];
+
+  @ApiProperty({ description: 'Scope this row to every animal currently in the batch EXCEPT these ones (mutually exclusive with animal_ids)', required: false, type: [String] })
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @IsOptional()
+  exclude_animal_ids?: string[];
 }
 
 export class BulkDailyEntryDto {
@@ -509,3 +526,93 @@ export class BulkDailyEntryDto {
   entries: BulkDailyEntryRowDto[];
 }
 
+
+const TRANSFER_TYPES = ['FULL_BATCH', 'PARTIAL'] as const;
+
+export class CreateBatchTransferDto {
+  @ApiProperty({ description: 'Company UUID' })
+  @IsUUID()
+  @IsNotEmpty()
+  company_id: string;
+
+  @ApiProperty({ description: 'Destination batch UUID' })
+  @IsUUID()
+  @IsNotEmpty()
+  to_batch_id: string;
+
+  @ApiProperty({ description: 'Date the animals physically moved', example: '2026-08-24' })
+  @IsDateString()
+  @IsNotEmpty()
+  transfer_date: string;
+
+  @ApiProperty({ enum: TRANSFER_TYPES, default: 'PARTIAL', required: false })
+  @IsOptional()
+  @IsIn(TRANSFER_TYPES as unknown as string[])
+  transfer_type?: (typeof TRANSFER_TYPES)[number];
+
+  @ApiProperty({
+    description:
+      'Animals to move. Required for PARTIAL. For FULL_BATCH leave empty and every remaining animal is moved.',
+    type: [String],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  animal_ids?: string[];
+
+  @ApiProperty({ description: 'Destination pen/location UUID', required: false })
+  @IsOptional()
+  @IsUUID()
+  to_location_id?: string;
+
+  @ApiProperty({ description: 'Why the animals moved', required: false })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+
+  @ApiProperty({
+    description: 'Post immediately instead of leaving the transfer in DRAFT',
+    required: false,
+    default: true,
+  })
+  @IsOptional()
+  post_immediately?: boolean;
+}
+
+export class QueryBatchTransferDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  company_id?: string;
+
+  @ApiProperty({ required: false, description: 'Transfers into OR out of this batch' })
+  @IsOptional()
+  @IsUUID()
+  batch_id?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  operational_area_id?: string;
+
+  @ApiProperty({ required: false, enum: ['DRAFT', 'POSTED', 'CANCELLED'] })
+  @IsOptional()
+  @IsIn(['DRAFT', 'POSTED', 'CANCELLED'])
+  status?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsDateString()
+  from_date?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsDateString()
+  to_date?: string;
+}

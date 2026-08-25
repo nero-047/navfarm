@@ -5,7 +5,7 @@ import BatchPanel from "@/components/console/production/batch-panel";
 
 export default function BatchListPage() {
   return (
-    <ProductionPageShell title="Batch List">
+    <ProductionPageShell titleKey="batchList">
       {() => <BatchPanel />}
     </ProductionPageShell>
   );
