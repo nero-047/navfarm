@@ -439,9 +439,14 @@ export class FinancialReportsService {
   }
 
   async getBatchCostVarianceReport(tenantId: string, companyId: string, batchId?: string) {
+    // batch_cost_variance has no tenant_id/company_id of its own — those
+    // live on the batch it belongs to, so scoping goes through the join.
+    // It's also one row per (batch, item, variance_type PRICE/USAGE/OUTPUT/
+    // OVERHEAD), not one row per batch — this pivots those rows into a
+    // single per-batch summary, which is the shape this report presents.
     const conditions: any[] = [
-      eq(schema.batchCostVariance.tenant_id, tenantId),
-      eq(schema.batchCostVariance.company_id, companyId),
+      eq(schema.batchHeader.tenant_id, tenantId),
+      eq(schema.batchHeader.company_id, companyId),
     ];
     if (batchId) {
       conditions.push(eq(schema.batchCostVariance.batch_id, batchId));
@@ -455,31 +460,71 @@ export class FinancialReportsService {
       .from(schema.batchCostVariance)
       .innerJoin(schema.batchHeader, eq(schema.batchCostVariance.batch_id, schema.batchHeader.batch_id))
       .where(and(...conditions))
-      .orderBy(schema.batchCostVariance.variance_date);
+      .orderBy(schema.batchCostVariance.created_at);
 
-    return rows.map(({ variance, batch }) => {
-      const stdCost = Number(variance.standard_cost) || 0;
-      const actCost = Number(variance.actual_cost) || 0;
-      const totalVar = Number(variance.total_variance) || 0;
-      const pct = stdCost > 0 ? (totalVar / stdCost) * 100 : 0;
+    const byBatch = new Map<string, {
+      batch: typeof schema.batchHeader.$inferSelect;
+      standardCost: number;
+      actualCost: number;
+      priceVariance: number;
+      usageVariance: number;
+      outputVariance: number;
+      overheadVariance: number;
+      totalVariance: number;
+      lastRecordedAt: string;
+    }>();
+
+    for (const { variance, batch } of rows) {
+      let entry = byBatch.get(batch.batch_id);
+      if (!entry) {
+        entry = {
+          batch,
+          standardCost: 0,
+          actualCost: 0,
+          priceVariance: 0,
+          usageVariance: 0,
+          outputVariance: 0,
+          overheadVariance: 0,
+          totalVariance: 0,
+          lastRecordedAt: variance.created_at,
+        };
+        byBatch.set(batch.batch_id, entry);
+      }
+
+      const stdValue = Number(variance.std_value) || 0;
+      const actValue = Number(variance.actual_value) || 0;
+      const amount = Number(variance.variance_amount) || 0;
+
+      entry.standardCost += stdValue;
+      entry.actualCost += actValue;
+      entry.totalVariance += amount;
+      if (variance.created_at > entry.lastRecordedAt) entry.lastRecordedAt = variance.created_at;
+
+      switch (variance.variance_type) {
+        case 'PRICE': entry.priceVariance += amount; break;
+        case 'USAGE': entry.usageVariance += amount; break;
+        case 'OUTPUT': entry.outputVariance += amount; break;
+        case 'OVERHEAD': entry.overheadVariance += amount; break;
+      }
+    }
+
+    return Array.from(byBatch.values()).map((entry) => {
+      const pct = entry.standardCost > 0 ? (entry.totalVariance / entry.standardCost) * 100 : 0;
 
       return {
-        variance_id: variance.variance_id,
-        batch_id: batch.batch_id,
-        batch_code: batch.batch_code,
-        batch_name: batch.batch_name,
-        batch_type: batch.batch_type,
-        costing_method: batch.costing_method,
-        variance_date: variance.variance_date,
-        standard_cost: stdCost,
-        actual_cost: actCost,
-        price_variance: Number(variance.price_variance) || 0,
-        usage_variance: Number(variance.usage_variance) || 0,
-        output_variance: Number(variance.output_variance) || 0,
-        overhead_variance: Number(variance.overhead_variance) || 0,
-        total_variance: totalVar,
+        batch_id: entry.batch.batch_id,
+        batch_no: entry.batch.batch_no,
+        costing_method: entry.batch.costing_method,
+        recorded_at: entry.lastRecordedAt,
+        standard_cost: entry.standardCost,
+        actual_cost: entry.actualCost,
+        price_variance: entry.priceVariance,
+        usage_variance: entry.usageVariance,
+        output_variance: entry.outputVariance,
+        overhead_variance: entry.overheadVariance,
+        total_variance: entry.totalVariance,
         variance_pct: Number(pct.toFixed(2)),
-        is_favorable: totalVar <= 0,
+        is_favorable: entry.totalVariance <= 0,
       };
     });
   }

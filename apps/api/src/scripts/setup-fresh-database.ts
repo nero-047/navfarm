@@ -5,6 +5,9 @@ const host = process.env.DATABASE_HOST || 'localhost';
 const port = Number(process.env.DATABASE_PORT || 3306);
 const user = process.env.DATABASE_USERNAME || 'root';
 const password = process.env.DATABASE_PASSWORD || '';
+const ssl = process.env.DATABASE_SSL === 'true'
+  ? { minVersion: 'TLSv1.2' as const, rejectUnauthorized: true }
+  : undefined;
 const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
 const isPiggeryIsolated = masterDatabase.startsWith('piggery_');
 const tenantPrefix = isPiggeryIsolated ? 'piggery_tenant_' : 'tenant_';
@@ -42,7 +45,7 @@ async function runFreshSetup() {
 
   // 1. DROP ALL LINKED DATABASES
   console.log('🧹 Step 1: Dropping all linked databases...');
-  const server = await mysql.createConnection({ host, port, user, password });
+  const server = await mysql.createConnection({ host, port, user, password, ssl });
   try {
     const [dbRows] = await server.query<mysql.RowDataPacket[]>('SHOW DATABASES');
     const targetDbs = (dbRows as Array<{ Database: string }>)
@@ -66,44 +69,19 @@ async function runFreshSetup() {
   runStep('Step 4: Syncing Locales, Timezones & Countries', 'sync-locale-master.ts');
   runStep('Step 5: Seeding Reference Masters (UOMs, Species, Breeds, Stages, Items)', 'seed-system-master-data.ts');
 
-  // 4. PROVISION APEX TENANT & 2 COMPANIES (APEXBREED & HIGHLAND)
-  runStep('Step 6: Provisioning Tenant (apexagri) & 2 Companies (APEXBREED & HIGHLAND)', 'seed-dev-tenant.ts');
-
-  // 5. SEED COMPLETE PIGGERY DATASET FOR BOTH COMPANIES
-  runStep('Step 7: Seeding Complete Piggery Dataset (Herd Animals, Breeding, Schedulers, Batches)', 'seed-piggery-complete-data.ts');
-
-  // 6. PROVISION DEMO TENANT
-  runStep('Step 8: Provisioning Demo Tenant (demo)', 'seed-demo-tenant.ts');
-
   console.log('\n================================================================');
-  console.log('🎉 ALL DATABASES MIGRATED & DATA LINKED TOGETHER SUCCESSFULLY!');
+  console.log('🎉 PLATFORM DATABASE READY — NO TENANTS PROVISIONED');
   console.log('================================================================');
-  console.log('Ready-to-Use Login Credentials (Password: 12345678):');
+  console.log('Migrations ran and reference/master data is seeded, but no demo');
+  console.log('or dev tenant was created. Sign up through the app to create a');
+  console.log('real tenant/company, or run one of the standalone dev seed');
+  console.log('scripts manually (e.g. `pnpm nx run api:db-seed-dev-tenant`) if');
+  console.log('you want fixture data for local development.');
   console.log('');
-  console.log('  1. Tenant Super Admin (Access to Both Companies & Areas):');
-  console.log('     URL:      http://localhost:3001/login?tenant=devco');
-  console.log('     Email:    admin@apexagri.local');
-  console.log('     Name:     Rajesh Varma (Group CEO)');
-  console.log('     Password: 12345678');
-  console.log('');
-  console.log('  2. Company 1 Admin (Apex Swine Genetics & Breeding):');
-  console.log('     URL:      http://localhost:3001/login?tenant=devco');
-  console.log('     Email:    arjun.sharma@apexagri.local');
-  console.log('     Name:     Dr. Arjun Sharma (Director - Genetics & Breeding)');
-  console.log('     Area:     APEX-BREED-01 (Apex Nucleus Breeding & Gestation Unit)');
-  console.log('     Password: 12345678');
-  console.log('');
-  console.log('  3. Company 2 Admin (Highland Commercial Porkers & Processing):');
-  console.log('     URL:      http://localhost:3001/login?tenant=devco');
-  console.log('     Email:    vikram.singh@highlandpork.local');
-  console.log('     Name:     Vikram Singh (Operations Director)');
-  console.log('     Area:     HIGH-GROW-01 (Highland Grow-Finish Commercial Complex)');
-  console.log('     Password: 12345678');
-  console.log('');
-  console.log('  4. Platform Super Administrator:');
+  console.log('  Platform Super Administrator:');
   console.log('     URL:      http://localhost:3001/login  (or /admin)');
-  console.log('     Email:    admin@navfarm.local');
-  console.log('     Password: 12345678');
+  console.log(`     Email:    ${process.env.SYSTEM_ADMIN_EMAIL || 'admin@navfarm.local'}`);
+  console.log('     Password: value of SYSTEM_ADMIN_PASSWORD in your .env');
   console.log('================================================================\n');
 }
 

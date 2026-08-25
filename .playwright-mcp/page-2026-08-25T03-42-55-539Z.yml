@@ -1,0 +1,96 @@
+- generic [active] [ref=f3e1]:
+  - button "Open Next.js Dev Tools" [ref=f3e7] [cursor=pointer]
+  - alert [ref=f3e11]
+  - generic [ref=f3e12]:
+    - banner [ref=f3e13]:
+      - generic [ref=f3e14]: NAVFarm
+      - generic [ref=f3e15]: कंपनी सेटअप
+      - generic [ref=f3e16]:
+        - button "Switch to dark theme" [ref=f3e17] [cursor=pointer]
+        - button "साइन आउट" [ref=f3e20] [cursor=pointer]
+    - generic [ref=f3e25]:
+      - complementary [ref=f3e26]:
+        - generic [ref=f3e27]:
+          - heading "ERP सेटअप विज़ार्ड" [level=3] [ref=f3e28]
+          - paragraph [ref=f3e29]: कृषि प्रबंधन सक्रिय करने हेतु अपनी कंपनी सेटिंग्स कॉन्फ़िगर करें।
+        - button "कंपनी प्रोफ़ाइल" [ref=f3e30] [cursor=pointer]
+        - button "संचालन पते" [disabled] [ref=f3e37]
+        - button "प्राथमिक संपर्क" [disabled] [ref=f3e43]
+        - button "भाषा कैटलॉग" [disabled] [ref=f3e50]
+        - button "आधार मुद्रा" [disabled] [ref=f3e56]
+        - button "समय क्षेत्र और देश" [disabled] [ref=f3e64]
+        - button "वित्तीय लेखांकन" [disabled] [ref=f3e70]
+        - button "व्यवसाय की प्रकृति" [disabled] [ref=f3e75]
+        - button "विज़ार्ड पूर्ण करें" [disabled] [ref=f3e82]
+      - main [ref=f3e88]:
+        - generic [ref=f3e90]:
+          - generic [ref=f3e91]:
+            - 'heading "चरण 1: कंपनी प्रोफ़ाइल पंजीकृत करें" [level=2] [ref=f3e92]'
+            - paragraph [ref=f3e97]: पंजीकरण नाम, कंपनी लोगो और ब्रांड विवरण दें। आपकी मूल्य योजना द्वारा निर्धारित सीमाएँ लागू होती हैं।
+          - generic [ref=f3e104]:
+            - generic [ref=f3e105]: कंपनी ब्रांड लोगो
+            - paragraph [ref=f3e106]: "समर्थित प्रारूप: PNG, JPG, SVG, WebP (अधिकतम 5 MB)।"
+            - generic [ref=f3e107]: Upload Logo
+          - generic [ref=f3e112]:
+            - generic [ref=f3e113]:
+              - generic [ref=f3e114]: कंपनी कोड (संक्षिप्त आईडी)*
+              - textbox "कंपनी कोड (संक्षिप्त आईडी)*" [ref=f3e115]:
+                - /placeholder: जैसे GVF
+            - generic [ref=f3e116]:
+              - generic [ref=f3e117]: कानूनी इकाई का नाम*
+              - textbox "कानूनी इकाई का नाम*" [ref=f3e118]:
+                - /placeholder: ग्रीन वैली फ़ार्म्स प्राइवेट लिमिटेड
+            - generic [ref=f3e119]:
+              - generic [ref=f3e120]: प्रदर्शन नाम
+              - textbox "प्रदर्शन नाम" [ref=f3e121]:
+                - /placeholder: ग्रीन वैली फ़ार्म्स
+            - generic [ref=f3e122]:
+              - generic [ref=f3e123]: व्यवसाय वर्ग
+              - combobox [ref=f3e125] [cursor=pointer]:
+                - option "एकल स्वामित्व"
+                - option "साझेदारी"
+                - option "प्राइवेट लिमिटेड" [selected]
+                - option "LLP"
+            - generic [ref=f3e126]:
+              - generic [ref=f3e127]: उद्योग वर्गीकरण
+              - combobox [ref=f3e129] [cursor=pointer]:
+                - option "पोल्ट्री फार्मिंग" [selected]
+                - option "पशुधन खेती"
+                - option "कृषि और फ़सल खेती"
+                - option "जलकृषि और मत्स्य पालन"
+                - option "कीट पालन और मधुमक्खी पालन"
+                - option "फ़ीड मिल और खाद्य प्रसंस्करण"
+            - generic [ref=f3e130]:
+              - generic [ref=f3e131]: पंजीकरण प्रमाणपत्र संख्या
+              - textbox "पंजीकरण प्रमाणपत्र संख्या" [ref=f3e132]:
+                - /placeholder: जैसे U01403DL2023PTC123456
+            - generic [ref=f3e133]:
+              - generic [ref=f3e134]: करदाता आईडी / GSTIN
+              - textbox "करदाता आईडी / GSTIN" [ref=f3e135]:
+                - /placeholder: जैसे 07AAAAA1111A1Z1
+            - generic [ref=f3e136]:
+              - generic [ref=f3e137]: कर व्यवस्था
+              - combobox [ref=f3e139] [cursor=pointer]:
+                - option "मानक योजना" [selected]
+                - option "कंपोजिशन योजना"
+                - option "छूट प्राप्त / गैर-कर योग्य"
+            - generic [ref=f3e140]:
+              - generic [ref=f3e141]: निगमन तिथि
+              - textbox "निगमन तिथि" [ref=f3e142]
+            - generic [ref=f3e143]:
+              - generic [ref=f3e144]: वेबसाइट URL
+              - textbox "वेबसाइट URL" [ref=f3e145]:
+                - /placeholder: https://greenvalleyfarms.in
+            - generic [ref=f3e146]:
+              - generic [ref=f3e147]: ईमेल डोमेन (स्वतः-सत्यापन हेतु)
+              - textbox "ईमेल डोमेन (स्वतः-सत्यापन हेतु)" [ref=f3e148]:
+                - /placeholder: greenvalleyfarms.in
+            - generic [ref=f3e149]:
+              - generic [ref=f3e150]: सहायता ईमेल
+              - textbox "सहायता ईमेल" [ref=f3e151]:
+                - /placeholder: support@greenvalleyfarms.in
+            - generic [ref=f3e152]:
+              - generic [ref=f3e153]: प्राथमिक फ़ोन / लैंडलाइन
+              - textbox "प्राथमिक फ़ोन / लैंडलाइन" [ref=f3e154]:
+                - /placeholder: +91 11 2345 6789
+          - button "Save & Continue" [ref=f3e155] [cursor=pointer]

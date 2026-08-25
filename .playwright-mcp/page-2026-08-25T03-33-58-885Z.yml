@@ -1,0 +1,102 @@
+- generic [active] [ref=f1e1]:
+  - button "Open Next.js Dev Tools" [ref=f1e7] [cursor=pointer]:
+    - generic [ref=f1e10]:
+      - text: Compiling
+      - generic [ref=f1e11]:
+        - generic [ref=f1e12]: .
+        - generic [ref=f1e13]: .
+        - generic [ref=f1e14]: .
+  - alert [ref=f1e15]
+  - generic [ref=f1e16]:
+    - banner [ref=f1e17]:
+      - generic [ref=f1e18]: NAVFarm
+      - generic [ref=f1e19]: Company Setup
+      - generic [ref=f1e20]:
+        - button "Switch to dark theme" [ref=f1e21] [cursor=pointer]
+        - button "Sign Out" [ref=f1e24] [cursor=pointer]
+    - generic [ref=f1e29]:
+      - complementary [ref=f1e30]:
+        - generic [ref=f1e31]:
+          - heading "ERP Setup Wizard" [level=3] [ref=f1e32]
+          - paragraph [ref=f1e33]: Configure your company settings to activate agricultural management.
+        - button "Company Profile" [ref=f1e34] [cursor=pointer]
+        - button "Operating Addresses" [disabled] [ref=f1e41]
+        - button "Primary Contact" [disabled] [ref=f1e47]
+        - button "Language Catalog" [disabled] [ref=f1e54]
+        - button "Base Currency" [disabled] [ref=f1e60]
+        - button "Timezone & Country" [disabled] [ref=f1e68]
+        - button "Fiscal Accounting" [disabled] [ref=f1e74]
+        - button "Nature of Business" [disabled] [ref=f1e79]
+        - button "Complete Wizard" [disabled] [ref=f1e86]
+      - main [ref=f1e92]:
+        - generic [ref=f1e94]:
+          - generic [ref=f1e95]:
+            - 'heading "Step 1: Register Company Profile" [level=2] [ref=f1e96]'
+            - paragraph [ref=f1e101]: Provide registration names, company logo and brand details. Limits set by your pricing plan are applied.
+          - generic [ref=f1e108]:
+            - generic [ref=f1e109]: Company Brand Logo
+            - paragraph [ref=f1e110]: "Supported formats: PNG, JPG, SVG, WebP (max 5 MB)."
+            - generic [ref=f1e111]: Upload Logo
+          - generic [ref=f1e116]:
+            - generic [ref=f1e117]:
+              - generic [ref=f1e118]: Company Code (Short ID)*
+              - textbox "Company Code (Short ID)*" [ref=f1e119]:
+                - /placeholder: e.g. GVF
+            - generic [ref=f1e120]:
+              - generic [ref=f1e121]: Legal Entity Name*
+              - textbox "Legal Entity Name*" [ref=f1e122]:
+                - /placeholder: Green Valley Farms Pvt Ltd
+            - generic [ref=f1e123]:
+              - generic [ref=f1e124]: Display Name
+              - textbox "Display Name" [ref=f1e125]:
+                - /placeholder: Green Valley Farms
+            - generic [ref=f1e126]:
+              - generic [ref=f1e127]: Business Class
+              - combobox [ref=f1e129] [cursor=pointer]:
+                - option "Sole Proprietor"
+                - option "Partnership"
+                - option "Pvt Ltd" [selected]
+                - option "LLP"
+            - generic [ref=f1e130]:
+              - generic [ref=f1e131]: Industry Classification
+              - combobox [ref=f1e133] [cursor=pointer]:
+                - option "Poultry Farming" [selected]
+                - option "Livestock Farming"
+                - option "Agriculture & Crop Farming"
+                - option "Aquaculture & Fisheries"
+                - option "Insect Farming & Apiaries"
+                - option "Feed Mill & Food Processing"
+            - generic [ref=f1e134]:
+              - generic [ref=f1e135]: Registration Certificate No
+              - textbox "Registration Certificate No" [ref=f1e136]:
+                - /placeholder: e.g. U01403DL2023PTC123456
+            - generic [ref=f1e137]:
+              - generic [ref=f1e138]: Taxpayer ID / GSTIN
+              - textbox "Taxpayer ID / GSTIN" [ref=f1e139]:
+                - /placeholder: e.g. 07AAAAA1111A1Z1
+            - generic [ref=f1e140]:
+              - generic [ref=f1e141]: Tax Regime
+              - combobox [ref=f1e143] [cursor=pointer]:
+                - option "Standard Scheme" [selected]
+                - option "Composition Scheme"
+                - option "Exempt / Non-Taxable"
+            - generic [ref=f1e144]:
+              - generic [ref=f1e145]: Incorporation Date
+              - textbox "Incorporation Date" [ref=f1e146]
+            - generic [ref=f1e147]:
+              - generic [ref=f1e148]: Website URL
+              - textbox "Website URL" [ref=f1e149]:
+                - /placeholder: https://greenvalleyfarms.in
+            - generic [ref=f1e150]:
+              - generic [ref=f1e151]: Email Domain (for Auto-verify)
+              - textbox "Email Domain (for Auto-verify)" [ref=f1e152]:
+                - /placeholder: greenvalleyfarms.in
+            - generic [ref=f1e153]:
+              - generic [ref=f1e154]: Support Email
+              - textbox "Support Email" [ref=f1e155]:
+                - /placeholder: support@greenvalleyfarms.in
+            - generic [ref=f1e156]:
+              - generic [ref=f1e157]: Primary Phone / Landline
+              - textbox "Primary Phone / Landline" [ref=f1e158]:
+                - /placeholder: +91 11 2345 6789
+          - button "Save & Continue" [ref=f1e159] [cursor=pointer]

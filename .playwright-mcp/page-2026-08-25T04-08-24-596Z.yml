@@ -1,0 +1,127 @@
+- generic [active] [ref=f7e1]:
+  - button "Open Next.js Dev Tools" [ref=f7e7] [cursor=pointer]
+  - alert [ref=f7e11]
+  - generic [ref=f7e12]:
+    - generic [ref=f7e13]:
+      - generic [ref=f7e14]:
+        - link "Navfarm NAVFarm Management console" [ref=f7e15] [cursor=pointer]:
+          - /url: /dashboard
+          - img "Navfarm" [ref=f7e16]
+          - generic [ref=f7e17]:
+            - generic [ref=f7e18]: NAVFarm
+            - generic [ref=f7e19]: Management console
+        - button "Switch Workspace Scope" [ref=f7e22] [cursor=pointer]:
+          - generic [ref=f7e23]: AREA · DAIRY
+          - paragraph [ref=f7e28]: Main Milking & Lactation Unit
+          - paragraph [ref=f7e29]: Greenfield Dairy Farms Pvt Ltd Farm Operations
+      - navigation "Primary" [ref=f7e30]:
+        - paragraph [ref=f7e31]: Organization
+        - list [ref=f7e32]:
+          - listitem [ref=f7e33]:
+            - link "Dairy Dashboard" [ref=f7e34] [cursor=pointer]:
+              - /url: /dashboard
+          - listitem [ref=f7e42]:
+            - button "Batches" [ref=f7e43] [cursor=pointer]
+            - list [ref=f7e52]:
+              - listitem [ref=f7e53]:
+                - link "Batch List" [ref=f7e54] [cursor=pointer]:
+                  - /url: /batches
+              - listitem [ref=f7e55]:
+                - link "Batch Stages" [ref=f7e56] [cursor=pointer]:
+                  - /url: /batches/stages
+              - listitem [ref=f7e57]:
+                - link "Batch Animals" [ref=f7e58] [cursor=pointer]:
+                  - /url: /batches/animals
+              - listitem [ref=f7e59]:
+                - link "Data Entry" [ref=f7e60] [cursor=pointer]:
+                  - /url: /batches/entry
+              - listitem [ref=f7e61]:
+                - link "Records & Logs" [ref=f7e62] [cursor=pointer]:
+                  - /url: /batches/records
+              - listitem [ref=f7e63]:
+                - link "Batch Transfers" [ref=f7e64] [cursor=pointer]:
+                  - /url: /batches/transfers
+          - listitem [ref=f7e65]:
+            - link "Schedulers" [ref=f7e66] [cursor=pointer]:
+              - /url: /schedulers
+          - listitem [ref=f7e73]:
+            - button "Livestock" [ref=f7e74] [cursor=pointer]
+            - list [ref=f7e82]:
+              - listitem [ref=f7e83]:
+                - link "Dairy Cow Register" [ref=f7e84] [cursor=pointer]:
+                  - /url: /livestock
+              - listitem [ref=f7e85]:
+                - link "Breeding & Insemination" [ref=f7e86] [cursor=pointer]:
+                  - /url: /livestock/breeding
+              - listitem [ref=f7e87]:
+                - link "Health & Mortality" [ref=f7e88] [cursor=pointer]:
+                  - /url: /livestock/health
+              - listitem [ref=f7e89]:
+                - link "Pen Occupancy & Biosecurity" [ref=f7e90] [cursor=pointer]:
+                  - /url: /livestock/facility
+              - listitem [ref=f7e91]:
+                - link "Herd Analytics & Parity" [ref=f7e92] [cursor=pointer]:
+                  - /url: /livestock/analytics
+          - listitem [ref=f7e93]:
+            - link "Inventory & Stock" [ref=f7e94] [cursor=pointer]:
+              - /url: /inventory/balance
+          - listitem [ref=f7e107]:
+            - link "Finance & Costing" [ref=f7e108] [cursor=pointer]:
+              - /url: /finance/journal
+          - listitem [ref=f7e113]:
+            - link "Alerts" [ref=f7e114] [cursor=pointer]:
+              - /url: /alerts
+          - listitem [ref=f7e119]:
+            - link "Traceability" [ref=f7e120] [cursor=pointer]:
+              - /url: /traceability
+          - listitem [ref=f7e127]:
+            - link "Approvals" [ref=f7e128] [cursor=pointer]:
+              - /url: /approvals
+          - listitem [ref=f7e134]:
+            - link "Master Data" [ref=f7e135] [cursor=pointer]:
+              - /url: /master-data
+          - listitem [ref=f7e142]:
+            - button "Settings" [ref=f7e143] [cursor=pointer]
+            - list [ref=f7e151]:
+              - listitem [ref=f7e152]:
+                - link "Area Settings" [ref=f7e153] [cursor=pointer]:
+                  - /url: /settings/area
+              - listitem [ref=f7e154]:
+                - link "Parameters" [ref=f7e155] [cursor=pointer]:
+                  - /url: /settings/parameters
+              - listitem [ref=f7e156]:
+                - link "QC Parameters" [ref=f7e157] [cursor=pointer]:
+                  - /url: /settings/qc
+    - banner [ref=f7e158]:
+      - generic [ref=f7e159]:
+        - combobox "Language" [ref=f7e162] [cursor=pointer]:
+          - option "English" [selected]
+          - option "हिन्दी"
+          - option "मराठी"
+          - option "Español"
+          - option "Français"
+          - option "বাংলা"
+          - option "తెలుగు"
+          - option "தமிழ்"
+        - button "Account menu — Greenfield Group Admin" [ref=f7e164] [cursor=pointer]:
+          - generic [ref=f7e165]: GG
+    - main [ref=f7e167]:
+      - navigation "Breadcrumb" [ref=f7e168]:
+        - list [ref=f7e169]:
+          - listitem [ref=f7e170]: NAVFarm
+          - listitem [ref=f7e171]: / DAIRY Area
+      - generic [ref=f7e172]:
+        - generic [ref=f7e175]:
+          - heading "Data Entry" [level=1] [ref=f7e176]
+          - paragraph [ref=f7e177]: Dairy Operational Area — Lifecycle tracking, batch feed & health logs, and cost-allocated closing.
+        - generic [ref=f7e178]:
+          - generic [ref=f7e180]:
+            - generic [ref=f7e181]:
+              - generic [ref=f7e187]:
+                - text: From batch
+                - combobox "From batch" [ref=f7e189] [cursor=pointer]
+              - generic [ref=f7e190]:
+                - text: "Log Date:"
+                - textbox "Log Date:" [ref=f7e194]: 2026-08-25
+            - button "Save milking" [disabled]
+          - generic [ref=f7e195]: Loading the day…

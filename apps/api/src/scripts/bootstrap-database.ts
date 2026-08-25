@@ -17,6 +17,9 @@ const host = process.env.DATABASE_HOST || 'localhost';
 const port = Number(process.env.DATABASE_PORT || 3306);
 const user = process.env.DATABASE_USERNAME || 'root';
 const password = process.env.DATABASE_PASSWORD || '';
+const ssl = process.env.DATABASE_SSL === 'true'
+  ? { minVersion: 'TLSv1.2' as const, rejectUnauthorized: true }
+  : undefined;
 const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
 const systemDatabase = process.env.SYSTEM_TENANT_DATABASE || 'tenant_system';
 const adminEmail = process.env.SYSTEM_ADMIN_EMAIL || 'admin@navfarm.local';
@@ -37,7 +40,7 @@ async function bootstrap() {
   assertDatabaseName(masterDatabase);
   assertDatabaseName(systemDatabase);
 
-  const server = await mysql.createConnection({ host, port, user, password });
+  const server = await mysql.createConnection({ host, port, user, password, ssl });
   await server.query(`CREATE DATABASE IF NOT EXISTS \`${masterDatabase}\``);
   await server.query(`CREATE DATABASE IF NOT EXISTS \`${systemDatabase}\``);
   await server.end();
@@ -48,6 +51,7 @@ async function bootstrap() {
     user,
     password,
     database: masterDatabase,
+    ssl,
   });
   const tenantPool = mysql.createPool({
     host,
@@ -55,6 +59,7 @@ async function bootstrap() {
     user,
     password,
     database: systemDatabase,
+    ssl,
   });
   const masterDb = drizzle(masterPool, { schema: master, mode: 'default' });
   const tenantDb = drizzle(tenantPool, { schema: tenant, mode: 'default' });

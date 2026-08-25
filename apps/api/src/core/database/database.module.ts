@@ -21,8 +21,9 @@ export { MASTER_CONNECTION, PG_CONNECTION };
         const port = config.get<number>('database.port');
         const user = config.get<string>('database.username');
         const database = config.get<string>('database.database') || 'navfarm_master';
-        
-        console.log(`[Master Database] Connecting to ${user}@${host}:${port}/${database}`);
+        const ssl = config.get<boolean>('database.ssl');
+
+        console.log(`[Master Database] Connecting to ${user}@${host}:${port}/${database}${ssl ? ' (TLS)' : ''}`);
 
         const pool = mysql.createPool({
           host,
@@ -33,6 +34,7 @@ export { MASTER_CONNECTION, PG_CONNECTION };
           waitForConnections: true,
           connectionLimit: 10,
           queueLimit: 0,
+          ...(ssl ? { ssl: { minVersion: 'TLSv1.2' as const, rejectUnauthorized: true } } : {}),
         });
 
         return drizzle(pool, { schema: masterSchema, mode: 'default' });

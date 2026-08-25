@@ -1,0 +1,146 @@
+- generic [active] [ref=f6e1]:
+  - button "Open Next.js Dev Tools" [ref=f6e7] [cursor=pointer]
+  - alert [ref=f6e11]
+  - generic [ref=f6e12]:
+    - generic [ref=f6e13]:
+      - generic [ref=f6e14]:
+        - link "Navfarm NAVFarm Management console" [ref=f6e15] [cursor=pointer]:
+          - /url: /dashboard
+          - img "Navfarm" [ref=f6e16]
+          - generic [ref=f6e17]:
+            - generic [ref=f6e18]: NAVFarm
+            - generic [ref=f6e19]: Management console
+        - button "Switch Workspace Scope" [ref=f6e22] [cursor=pointer]:
+          - generic [ref=f6e23]: AREA · DAIRY
+          - paragraph [ref=f6e28]: DAIRY Operational Area
+          - paragraph [ref=f6e29]: Greenfield Agro Group HQ Farm Operations
+      - navigation "Primary" [ref=f6e30]:
+        - paragraph [ref=f6e31]: Organization
+        - list [ref=f6e32]:
+          - listitem [ref=f6e33]:
+            - link "Dairy Dashboard" [ref=f6e34] [cursor=pointer]:
+              - /url: /dashboard
+          - listitem [ref=f6e42]:
+            - button "Batches" [ref=f6e43] [cursor=pointer]
+            - list [ref=f6e52]:
+              - listitem [ref=f6e53]:
+                - link "Batch List" [ref=f6e54] [cursor=pointer]:
+                  - /url: /batches
+              - listitem [ref=f6e55]:
+                - link "Batch Stages" [ref=f6e56] [cursor=pointer]:
+                  - /url: /batches/stages
+              - listitem [ref=f6e57]:
+                - link "Batch Animals" [ref=f6e58] [cursor=pointer]:
+                  - /url: /batches/animals
+              - listitem [ref=f6e59]:
+                - link "Data Entry" [ref=f6e60] [cursor=pointer]:
+                  - /url: /batches/entry
+              - listitem [ref=f6e61]:
+                - link "Records & Logs" [ref=f6e62] [cursor=pointer]:
+                  - /url: /batches/records
+              - listitem [ref=f6e63]:
+                - link "Batch Transfers" [ref=f6e64] [cursor=pointer]:
+                  - /url: /batches/transfers
+          - listitem [ref=f6e65]:
+            - link "Schedulers" [ref=f6e66] [cursor=pointer]:
+              - /url: /schedulers
+          - listitem [ref=f6e73]:
+            - button "Livestock" [ref=f6e74] [cursor=pointer]
+            - list [ref=f6e82]:
+              - listitem [ref=f6e83]:
+                - link "Dairy Cow Register" [ref=f6e84] [cursor=pointer]:
+                  - /url: /livestock
+              - listitem [ref=f6e85]:
+                - link "Breeding & Insemination" [ref=f6e86] [cursor=pointer]:
+                  - /url: /livestock/breeding
+              - listitem [ref=f6e87]:
+                - link "Health & Mortality" [ref=f6e88] [cursor=pointer]:
+                  - /url: /livestock/health
+              - listitem [ref=f6e89]:
+                - link "Pen Occupancy & Biosecurity" [ref=f6e90] [cursor=pointer]:
+                  - /url: /livestock/facility
+              - listitem [ref=f6e91]:
+                - link "Herd Analytics & Parity" [ref=f6e92] [cursor=pointer]:
+                  - /url: /livestock/analytics
+          - listitem [ref=f6e93]:
+            - link "Inventory & Stock" [ref=f6e94] [cursor=pointer]:
+              - /url: /inventory/balance
+          - listitem [ref=f6e107]:
+            - link "Finance & Costing" [ref=f6e108] [cursor=pointer]:
+              - /url: /finance/journal
+          - listitem [ref=f6e113]:
+            - link "Alerts" [ref=f6e114] [cursor=pointer]:
+              - /url: /alerts
+          - listitem [ref=f6e119]:
+            - link "Traceability" [ref=f6e120] [cursor=pointer]:
+              - /url: /traceability
+          - listitem [ref=f6e127]:
+            - link "Approvals" [ref=f6e128] [cursor=pointer]:
+              - /url: /approvals
+          - listitem [ref=f6e134]:
+            - link "Master Data" [ref=f6e135] [cursor=pointer]:
+              - /url: /master-data
+          - listitem [ref=f6e142]:
+            - button "Settings" [ref=f6e143] [cursor=pointer]
+            - list [ref=f6e151]:
+              - listitem [ref=f6e152]:
+                - link "Area Settings" [ref=f6e153] [cursor=pointer]:
+                  - /url: /settings/area
+              - listitem [ref=f6e154]:
+                - link "Parameters" [ref=f6e155] [cursor=pointer]:
+                  - /url: /settings/parameters
+              - listitem [ref=f6e156]:
+                - link "QC Parameters" [ref=f6e157] [cursor=pointer]:
+                  - /url: /settings/qc
+    - banner [ref=f6e158]:
+      - generic [ref=f6e159]:
+        - combobox "Language" [ref=f6e162] [cursor=pointer]:
+          - option "English" [selected]
+          - option "हिन्दी"
+          - option "मराठी"
+          - option "Español"
+          - option "Français"
+          - option "বাংলা"
+          - option "తెలుగు"
+          - option "தமிழ்"
+        - button "Account menu — Greenfield Group Admin" [ref=f6e164] [cursor=pointer]:
+          - generic [ref=f6e165]: GG
+    - main [ref=f6e167]:
+      - navigation "Breadcrumb" [ref=f6e168]:
+        - list [ref=f6e169]:
+          - listitem [ref=f6e170]: NAVFarm
+          - listitem [ref=f6e171]: / DAIRY Area
+      - generic [ref=f6e172]:
+        - generic [ref=f6e175]:
+          - heading "Dairy Cow & Herd Register" [level=1] [ref=f6e176]
+          - paragraph [ref=f6e177]: Individual cattle identification, RFID ear tags, DIM (days in milk), lactation curve, and daily milking yields.
+        - generic [ref=f6e178]:
+          - generic [ref=f6e179]:
+            - generic [ref=f6e180]:
+              - paragraph [ref=f6e182]: Total Dairy Herd
+              - paragraph [ref=f6e183]: 0Head
+            - generic [ref=f6e184]:
+              - paragraph [ref=f6e186]: Milking Cows
+              - paragraph [ref=f6e187]: "0"
+              - paragraph [ref=f6e188]: Active lactation stages
+            - generic [ref=f6e189]:
+              - paragraph [ref=f6e191]: Avg Yield / Cow
+              - paragraph [ref=f6e192]: —
+              - paragraph [ref=f6e193]: No per-cow yield recorded today
+            - generic [ref=f6e194]:
+              - paragraph [ref=f6e196]: Dry & Heifers
+              - paragraph [ref=f6e197]: 0Head
+              - paragraph [ref=f6e198]: 0 dry • 0 pregnant
+          - generic [ref=f6e199]:
+            - generic [ref=f6e200]:
+              - textbox "Search tag, RFID or name…" [ref=f6e205]
+              - combobox [ref=f6e206] [cursor=pointer]:
+                - option "All Statuses" [selected]
+                - option "Milking"
+                - option "Dry"
+                - option "Pregnant Heifer"
+                - option "Quarantine"
+              - combobox [ref=f6e207] [cursor=pointer]:
+                - option "All Breeds" [selected]
+            - button "Register Dairy Cow" [ref=f6e208] [cursor=pointer]
+          - generic [ref=f6e210]: Loading the herd…

@@ -1,0 +1,13 @@
+[    2023ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:3000/login:0
+[    2056ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    2163ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    2286ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    4724ms] [LOG] [Fast Refresh] done in 2537ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    4880ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    4901ms] [LOG] [Fast Refresh] done in 123ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    5000ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:2877/api/v1/tenant/8cbab5f6-518d-439c-94fb-a3ae563f1b29:0
+[    5000ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:2877/api/v1/company/tenant/8cbab5f6-518d-439c-94fb-a3ae563f1b29:0
+[    5000ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:2877/api/v1/tenant/8cbab5f6-518d-439c-94fb-a3ae563f1b29:0
+[    5000ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:2877/api/v1/company/tenant/8cbab5f6-518d-439c-94fb-a3ae563f1b29:0
+[    5189ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297
+[    5308ms] [LOG] [Fast Refresh] done in 220ms @ http://localhost:3000/_next/static/chunks/fa2c7_next_dist_4060d9f0._.js:2297

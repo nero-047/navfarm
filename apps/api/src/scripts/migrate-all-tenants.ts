@@ -17,10 +17,13 @@ const host = process.env.DATABASE_HOST || 'localhost';
 const port = Number(process.env.DATABASE_PORT || 3306);
 const user = process.env.DATABASE_USERNAME || 'root';
 const password = process.env.DATABASE_PASSWORD || '';
+const ssl = process.env.DATABASE_SSL === 'true'
+  ? { minVersion: 'TLSv1.2' as const, rejectUnauthorized: true }
+  : undefined;
 const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
 
 async function run() {
-  const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase });
+  const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase, ssl });
   const masterDb = drizzle(masterPool, { schema: master, mode: 'default' });
 
   try {
@@ -34,6 +37,7 @@ async function run() {
         user: t.db_user || user,
         password: t.db_password || password,
         database: t.db_name,
+        ssl,
       });
       const tenantDb = drizzle(tenantPool, { schema: tenant, mode: 'default' });
 

@@ -21,6 +21,11 @@ export class ConnectionManagerService implements OnModuleDestroy {
       return this.tenantConnections.get(cacheKey)!;
     }
 
+    // Same physical DB host as the master connection for now, so it shares
+    // the master's TLS requirement (TiDB Cloud etc.) rather than needing a
+    // per-tenant ssl flag in the tenant registry.
+    const ssl = process.env.DATABASE_SSL === 'true';
+
     const pool = mysql.createPool({
       host: tenant.db_host,
       port: tenant.db_port,
@@ -30,6 +35,7 @@ export class ConnectionManagerService implements OnModuleDestroy {
       connectionLimit: 10,
       waitForConnections: true,
       queueLimit: 0,
+      ...(ssl ? { ssl: { minVersion: 'TLSv1.2' as const, rejectUnauthorized: true } } : {}),
     });
 
     const db = drizzle(pool, { schema, mode: 'default' });
