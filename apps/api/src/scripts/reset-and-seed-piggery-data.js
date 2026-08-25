@@ -1,16 +1,29 @@
 const mysql = require('mysql2/promise');
 const { randomUUID } = require('crypto');
 
-const dbName = 'piggery_tenant_devco';
-
 const host = process.env.DATABASE_HOST || 'localhost';
 const port = Number(process.env.DATABASE_PORT || 3306);
 const user = process.env.DATABASE_USERNAME || 'root';
 const password = process.env.DATABASE_PASSWORD || '';
+const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
 const isRemoteOrTidb = port === 4000 || host.includes('tidbcloud') || process.env.DATABASE_SSL === 'true';
 const ssl = isRemoteOrTidb ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined;
 
 async function run() {
+  // Resolve the devco tenant's *actual* registered database from the master DB rather
+  // than assuming a fixed name — the tenant prefix/naming depends on DATABASE_NAME
+  // (e.g. `tenant_devco` vs a `piggery_`-prefixed setup), and a hardcoded guess here
+  // previously seeded a stale, disconnected database that the live app never read from.
+  const masterConn = await mysql.createConnection({ host, port, user, password, database: masterDatabase, ssl });
+  let dbName;
+  try {
+    const [tenants] = await masterConn.query(`SELECT db_name FROM tenant_master WHERE tenant_code = 'devco' LIMIT 1`);
+    if (!tenants.length) throw new Error(`No tenant registered with tenant_code='devco' in ${masterDatabase}. Run seed-dev-tenant.ts first.`);
+    dbName = tenants[0].db_name;
+  } finally {
+    await masterConn.end();
+  }
+
   const connection = await mysql.createConnection({
     host,
     port,

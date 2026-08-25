@@ -25,8 +25,11 @@ import {
   Pencil,
   History,
   X,
+  Search,
+  PackageSearch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/services/api-client";
 
 interface BatchDataEntryTabProps {
@@ -42,11 +45,22 @@ interface BatchDataEntryTabProps {
   saving?: boolean;
 }
 
+const OVERHEAD_CATEGORIES = [
+  { name: "Barn Electricity & Ventilation", cost: "85.00" },
+  { name: "Water Supply & Misting", cost: "45.00" },
+  { name: "Shed Rent / Depreciation", cost: "120.00" },
+  { name: "Equipment Maintenance", cost: "60.00" },
+  { name: "Waste & Effluent Disposal", cost: "35.00" },
+  { name: "Insurance", cost: "25.00" },
+  { name: "Fuel / Generator Backup", cost: "50.00" },
+  { name: "Miscellaneous Overhead", cost: "50.00" },
+];
+
 export function BatchDataEntryTab({
   batch,
   currentDate,
   onDateChange,
-  items: _items,
+  items = [],
   batches: _batches,
   dataEntryData,
   dataEntryLoading = false,
@@ -109,6 +123,112 @@ export function BatchDataEntryTab({
   const [loadingBatchAnimals, setLoadingBatchAnimals] = useState(false);
 
   const activeLots = useMemo(() => (batch?.lots || []).filter((l: any) => l.status === "ACTIVE"), [batch?.lots]);
+
+  // Resources (labour/equipment) for the picker modal below — items come in as a prop
+  // (already fetched by the parent), resources are fetched once here since no other
+  // tab on this page needed them yet.
+  const [resources, setResources] = useState<any[]>([]);
+  useEffect(() => {
+    api
+      .get(`/resource?limit=200`)
+      .then((res: any) => setResources(res?.data ?? res ?? []))
+      .catch(() => setResources([]));
+  }, []);
+
+  // "Add row" picker — replaces silently-inserted placeholder rows with a real
+  // master-data pick (feed/medicine/output → item_master filtered by item_type,
+  // resource → resource_master, overhead → a fixed category list since there's no
+  // overhead master table). Selecting an option appends a properly-linked row.
+  const [picker, setPicker] = useState<null | { kind: "feed" | "medicine" | "output" | "resource" | "overhead"; search: string }>(null);
+
+  const pickerOptions = useMemo(() => {
+    if (!picker) return [];
+    const q = picker.search.trim().toLowerCase();
+    const matches = (label: string) => !q || label.toLowerCase().includes(q);
+    // Scope to this batch's own line-of-business where the item declares one, so a
+    // piggery batch doesn't surface poultry/aqua/apiary items from other verticals.
+    const inLob = (i: any) => !batch?.lob_id || !i.lob_id || i.lob_id === batch.lob_id;
+    if (picker.kind === "feed") {
+      return items.filter((i: any) => i.item_type === "FEED" && inLob(i) && matches(i.item_name));
+    }
+    if (picker.kind === "medicine") {
+      return items.filter((i: any) => (i.item_type === "MEDICINE" || i.item_type === "VACCINE") && inLob(i) && matches(i.item_name));
+    }
+    if (picker.kind === "output") {
+      return items.filter((i: any) => (i.item_type === "LIVESTOCK" || i.item_type === "FINISHED_GOODS") && inLob(i) && matches(i.item_name));
+    }
+    if (picker.kind === "resource") {
+      return resources.filter((r: any) => (!batch?.lob_id || !r.lob_id || r.lob_id === batch.lob_id) && matches(r.resource_name));
+    }
+    if (picker.kind === "overhead") {
+      return OVERHEAD_CATEGORIES.filter((c) => matches(c.name));
+    }
+    return [];
+  }, [picker, items, resources]);
+
+  const selectPickerOption = (option: any) => {
+    if (!picker) return;
+    if (picker.kind === "feed") {
+      setFeedRows((prev) => [
+        ...prev,
+        {
+          id: `f-${Date.now()}`,
+          item_id: option.item_id,
+          item_name: option.item_name,
+          lot_no: `LOT-${currentDate.replace(/-/g, "").slice(2)}-SUP`,
+          std_qty: 0,
+          actual_qty: "0.00",
+          uom: option.uom_primary || "KG",
+          unit_cost: Number(option.standard_cost) || 0,
+        },
+      ]);
+    } else if (picker.kind === "medicine") {
+      setMedRows((prev) => [
+        ...prev,
+        {
+          id: `m-${Date.now()}`,
+          item_id: option.item_id,
+          item_name: option.item_name,
+          lot_no: `MEDLOT-${currentDate.replace(/-/g, "").slice(2)}-02`,
+          issued_qty: "1.00",
+          consumed_qty: "1.00",
+          uom: option.uom_primary || "DOSES",
+          withdrawal_days: option.withdrawal_days ? `${option.withdrawal_days} days withdrawal` : "No withdrawal",
+          remarks: "",
+        },
+      ]);
+    } else if (picker.kind === "output") {
+      setOutputRows((prev) => [
+        ...prev,
+        {
+          id: `out-${Date.now()}`,
+          item_id: option.item_id,
+          item_name: option.item_name,
+          expected_qty: 0,
+          actual_qty: "0",
+          avg_weight: "1.50",
+          output_type: "MAIN",
+          uom: option.uom_primary || "HEAD",
+          remarks: "",
+        },
+      ]);
+    } else if (picker.kind === "resource") {
+      setResourceRows((prev) => [
+        ...prev,
+        {
+          id: `res-${Date.now()}`,
+          resource_id: option.resource_id,
+          resource_name: option.resource_name,
+          hours: "1.0",
+          rate: String(option.cost_rate ?? "0.00"),
+          remarks: "",
+        },
+      ]);
+    } else if (picker.kind === "overhead") {
+      setOverheadRows((prev) => [...prev, { id: `oh-${Date.now()}`, name: option.name, cost: option.cost, remarks: "" }]);
+    }
+    setPicker(null);
+  };
 
   useEffect(() => {
     if (!animalWiseMode || !batch?.batch_id || batchAnimals.length > 0) return;
@@ -564,21 +684,6 @@ export function BatchDataEntryTab({
     );
   };
 
-  const addFeedRow = () => {
-    setFeedRows((prev) => [
-      ...prev,
-      {
-        id: `f-${Date.now()}`,
-        item_name: "Supplementary Ration Feed",
-        lot_no: `LOT-${currentDate.replace(/-/g, "").slice(2)}-SUP`,
-        std_qty: 0,
-        actual_qty: "10.00",
-        uom: "KG",
-        unit_cost: 12.5,
-      },
-    ]);
-  };
-
   const removeFeedRow = (id: string) => {
     if (feedRows.length > 1) {
       setFeedRows((prev) => prev.filter((r) => r.id !== id));
@@ -590,22 +695,6 @@ export function BatchDataEntryTab({
     setMedRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
   };
 
-  const addMedRow = () => {
-    setMedRows((prev) => [
-      ...prev,
-      {
-        id: `m-${Date.now()}`,
-        item_name: "Ad-hoc Treatment / Booster",
-        lot_no: `MEDLOT-${currentDate.replace(/-/g, "").slice(2)}-02`,
-        issued_qty: "1.00",
-        consumed_qty: "1.00",
-        uom: "DOSES",
-        withdrawal_days: "14 days withdrawal",
-        remarks: "As required by veterinarian",
-      },
-    ]);
-  };
-
   const removeMedRow = (id: string) => {
     setMedRows((prev) => prev.filter((r) => r.id !== id));
   };
@@ -613,22 +702,6 @@ export function BatchDataEntryTab({
   // Handlers for outputs
   const updateOutputField = (id: string, field: string, val: string) => {
     setOutputRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
-  };
-
-  const addOutputRow = () => {
-    setOutputRows((prev) => [
-      ...prev,
-      {
-        id: `out-${Date.now()}`,
-        item_name: "Harvested Piglets / Output",
-        expected_qty: 0,
-        actual_qty: "10",
-        avg_weight: "1.50",
-        output_type: "MAIN",
-        uom: "HEAD",
-        remarks: "Additional yield",
-      },
-    ]);
   };
 
   const removeOutputRow = (id: string) => {
@@ -671,13 +744,6 @@ export function BatchDataEntryTab({
     setOverheadRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
   };
 
-  const addOverheadRow = () => {
-    setOverheadRows((prev) => [
-      ...prev,
-      { id: `oh-${Date.now()}`, name: "Miscellaneous Overhead", cost: "50.00", remarks: "" },
-    ]);
-  };
-
   const removeOverheadRow = (id: string) => {
     if (overheadRows.length > 1) {
       setOverheadRows((prev) => prev.filter((r) => r.id !== id));
@@ -687,13 +753,6 @@ export function BatchDataEntryTab({
   // Handlers for resources
   const updateResourceField = (id: string, field: string, val: string) => {
     setResourceRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
-  };
-
-  const addResourceRow = () => {
-    setResourceRows((prev) => [
-      ...prev,
-      { id: `res-${Date.now()}`, resource_name: "Veterinary Inspection Rounds", hours: "1.0", rate: "40.00", remarks: "Health review" },
-    ]);
   };
 
   const removeResourceRow = (id: string) => {
@@ -717,8 +776,10 @@ export function BatchDataEntryTab({
   };
 
   // Discard draft
+  const [draftError, setDraftError] = useState("");
   const handleDiscardDraft = async () => {
     if (!confirm(`Discard the saved draft for ${currentDate}?`)) return;
+    setDraftError("");
     try {
       await api.delete(`/batch/${batch.batch_id}/daily-entry/draft?date=${currentDate}`);
       setHasDraft(false);
@@ -726,7 +787,7 @@ export function BatchDataEntryTab({
       if (onDateChange) onDateChange(currentDate);
       setTimeout(() => setNotification(null), 3000);
     } catch (err: any) {
-      alert(err?.message || "Failed to discard draft.");
+      setDraftError(err?.message || "Failed to discard draft.");
     }
   };
 
@@ -902,6 +963,13 @@ export function BatchDataEntryTab({
           >
             <RotateCcw className="w-3 h-3" /> Discard Draft
           </Button>
+        </div>
+      )}
+
+      {draftError && (
+        <div className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 p-3 text-xs text-rose-700 dark:text-rose-300 flex items-center justify-between gap-2">
+          <span>{draftError}</span>
+          <button onClick={() => setDraftError("")} className="font-semibold hover:underline shrink-0">Dismiss</button>
         </div>
       )}
 
@@ -1126,6 +1194,88 @@ export function BatchDataEntryTab({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Add-Row Picker Modal — feed/medicine/output/resource pick from real master
+          data (filtered by item_type / resource_master); overhead picks from a fixed
+          category list since there's no overhead master table yet. ── */}
+      {picker && (
+        <Dialog
+          open
+          onClose={() => setPicker(null)}
+          title={
+            picker.kind === "feed"
+              ? "Select Feed Item"
+              : picker.kind === "medicine"
+              ? "Select Medicine / Vaccine"
+              : picker.kind === "output"
+              ? "Select Output Item"
+              : picker.kind === "resource"
+              ? "Select Labour / Resource"
+              : "Select Overhead Category"
+          }
+          description={
+            picker.kind === "feed"
+              ? "Showing items of type FEED from the item master."
+              : picker.kind === "medicine"
+              ? "Showing items of type MEDICINE / VACCINE from the item master."
+              : picker.kind === "output"
+              ? "Showing items of type LIVESTOCK / FINISHED_GOODS from the item master."
+              : picker.kind === "resource"
+              ? "Showing active labour and equipment resources."
+              : "Common overhead cost categories — enter the actual amount after adding."
+          }
+          maxWidth="sm"
+        >
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+              <input
+                autoFocus
+                type="text"
+                value={picker.search}
+                onChange={(e) => setPicker({ ...picker, search: e.target.value })}
+                placeholder="Search…"
+                className="w-full pl-8 pr-3 py-2 text-xs text-[var(--text-primary)] bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl"
+              />
+            </div>
+            <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)] rounded-xl border border-[var(--border)]">
+              {pickerOptions.length === 0 ? (
+                <div className="p-6 text-center text-xs text-[var(--text-muted)] flex flex-col items-center gap-2">
+                  <PackageSearch className="w-6 h-6" />
+                  {picker.kind === "resource"
+                    ? "No matching resources found."
+                    : picker.kind === "overhead"
+                    ? "No matching category found."
+                    : "No matching items found — check the Item Master has items of this type."}
+                </div>
+              ) : (
+                pickerOptions.map((opt: any, idx: number) => (
+                  <button
+                    key={opt.item_id || opt.resource_id || opt.name || idx}
+                    type="button"
+                    onClick={() => selectPickerOption(opt)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-[var(--surface-raised)]/50 transition"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[var(--text-primary)] truncate">
+                        {opt.item_name || opt.resource_name || opt.name}
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)]">
+                        {opt.item_code || opt.resource_code || (opt.cost ? `Default ₹${opt.cost}` : "")}
+                      </div>
+                    </div>
+                    {(opt.standard_cost || opt.cost_rate) && (
+                      <div className="text-[11px] font-mono font-bold text-[var(--text-secondary)] shrink-0">
+                        ₹{Number(opt.standard_cost || opt.cost_rate).toFixed(2)}
+                      </div>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </Dialog>
       )}
 
       {/* ── Top Header Toolbar ── */}
@@ -1360,7 +1510,7 @@ export function BatchDataEntryTab({
             <div className="p-3 border-t border-[var(--border)] bg-[var(--surface-raised)]/20 flex items-center justify-between">
               <button
                 type="button"
-                onClick={addFeedRow}
+                onClick={() => setPicker({ kind: "feed", search: "" })}
                 className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline"
               >
                 <Plus className="w-3.5 h-3.5" /> Add supplementary feed row
@@ -1391,7 +1541,7 @@ export function BatchDataEntryTab({
                 <p>No mandatory medications or vaccines scheduled for Day {dataEntryData?.day_of_batch ?? "today"}.</p>
                 <button
                   type="button"
-                  onClick={addMedRow}
+                  onClick={() => setPicker({ kind: "medicine", search: "" })}
                   className="mt-2 text-xs font-bold text-purple-700 dark:text-purple-400 hover:underline inline-flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add ad-hoc treatment
@@ -1466,7 +1616,7 @@ export function BatchDataEntryTab({
               <div className="p-3 border-t border-[var(--border)] bg-[var(--surface-raised)]/20">
                 <button
                   type="button"
-                  onClick={addMedRow}
+                  onClick={() => setPicker({ kind: "medicine", search: "" })}
                   className="flex items-center gap-1.5 text-xs font-bold text-purple-700 dark:text-purple-400 hover:underline"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add medication protocol
@@ -1498,7 +1648,7 @@ export function BatchDataEntryTab({
                 <p>No mandatory output yield scheduled for Day {dataEntryData?.day_of_batch ?? "today"}.</p>
                 <button
                   type="button"
-                  onClick={addOutputRow}
+                  onClick={() => setPicker({ kind: "output", search: "" })}
                   className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline inline-flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" /> Record ad-hoc output harvest
@@ -1578,7 +1728,7 @@ export function BatchDataEntryTab({
               <div className="p-3 border-t border-[var(--border)] bg-[var(--surface-raised)]/20">
                 <button
                   type="button"
-                  onClick={addOutputRow}
+                  onClick={() => setPicker({ kind: "output", search: "" })}
                   className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add output line
@@ -1843,7 +1993,7 @@ export function BatchDataEntryTab({
 
             <button
               type="button"
-              onClick={addOverheadRow}
+              onClick={() => setPicker({ kind: "overhead", search: "" })}
               className="pt-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1"
             >
               <Plus className="w-3 h-3" /> Add overhead line
@@ -1894,7 +2044,7 @@ export function BatchDataEntryTab({
 
             <button
               type="button"
-              onClick={addResourceRow}
+              onClick={() => setPicker({ kind: "resource", search: "" })}
               className="pt-1 text-[11px] font-bold text-blue-700 dark:text-blue-400 hover:underline flex items-center gap-1"
             >
               <Plus className="w-3 h-3" /> Add labour line

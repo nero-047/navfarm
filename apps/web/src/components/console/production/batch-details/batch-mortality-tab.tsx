@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Download, AlertTriangle, CheckCircle2, Plus, X, Loader2 } from "lucide-react";
+import { Download, AlertTriangle, AlertCircle, CheckCircle2, Plus, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/services/api-client";
 
@@ -14,6 +14,7 @@ export function BatchMortalityTab({ batch, onRefreshBatch }: BatchMortalityTabPr
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [formError, setFormError] = useState("");
 
   // Form state
   const [formDate, setFormDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -84,11 +85,12 @@ export function BatchMortalityTab({ batch, onRefreshBatch }: BatchMortalityTabPr
   const handleRecordSubmit = async () => {
     const count = parseInt(formCount, 10);
     if (isNaN(count) || count <= 0) {
-      alert("Please enter a valid head count.");
+      setFormError("Please enter a valid head count.");
       return;
     }
 
     setSubmitting(true);
+    setFormError("");
     try {
       const remarks = `Reason: ${formReason}${formRemarks ? ` - ${formRemarks}` : ""}`;
       await api.post(`/batch/${batch.batch_id}/transaction`, {
@@ -104,7 +106,7 @@ export function BatchMortalityTab({ batch, onRefreshBatch }: BatchMortalityTabPr
       if (onRefreshBatch) await onRefreshBatch();
       setTimeout(() => setNotification(null), 4000);
     } catch (err: any) {
-      alert(err?.message || "Failed to log mortality event.");
+      setFormError(err?.message || "Failed to log mortality event.");
     } finally {
       setSubmitting(false);
     }
@@ -158,7 +160,7 @@ export function BatchMortalityTab({ batch, onRefreshBatch }: BatchMortalityTabPr
                   <Download className="w-3.5 h-3.5" /> Export Log
                 </Button>
                 <Button
-                  onClick={() => setModalOpen(true)}
+                  onClick={() => { setFormError(""); setModalOpen(true); }}
                   className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-8 px-3 gap-1.5 font-bold shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" /> Log Mortality
@@ -305,6 +307,12 @@ export function BatchMortalityTab({ batch, onRefreshBatch }: BatchMortalityTabPr
             </div>
 
             <div className="p-4 space-y-3 text-xs">
+              {formError && (
+                <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {formError}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">Date</label>

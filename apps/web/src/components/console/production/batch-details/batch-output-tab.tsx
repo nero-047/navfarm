@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { ClipboardCheck, QrCode as QrCodeIcon, Sparkles, Plus, X, Loader2, CheckCircle2 } from "lucide-react";
+import { ClipboardCheck, QrCode as QrCodeIcon, Sparkles, Plus, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/services/api-client";
 
@@ -26,6 +26,7 @@ export function BatchOutputTab({
   const [activeLine, setActiveLine] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [formError, setFormError] = useState("");
 
   // Form state for Record Output
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
@@ -67,11 +68,12 @@ export function BatchOutputTab({
   const handleRecordSubmit = async () => {
     const qty = parseFloat(formQty);
     if (isNaN(qty) || qty <= 0) {
-      alert("Please enter a valid quantity.");
+      setFormError("Please enter a valid quantity.");
       return;
     }
 
     setSubmitting(true);
+    setFormError("");
     try {
       await api.post(`/batch/${batch.batch_id}/transaction`, {
         transaction_date: formDate,
@@ -86,7 +88,7 @@ export function BatchOutputTab({
       if (onRefreshBatch) await onRefreshBatch();
       setTimeout(() => setNotification(null), 4000);
     } catch (err: any) {
-      alert(err?.message || "Failed to record output yield.");
+      setFormError(err?.message || "Failed to record output yield.");
     } finally {
       setSubmitting(false);
     }
@@ -136,7 +138,7 @@ export function BatchOutputTab({
               </div>
 
               <Button
-                onClick={() => setModalOpen(true)}
+                onClick={() => { setFormError(""); setModalOpen(true); }}
                 className="bg-[#1A3A5C] text-white text-xs h-8 px-3 gap-1.5 font-bold shadow-xs self-start sm:self-center"
               >
                 <Plus className="w-3.5 h-3.5" /> Record Harvest
@@ -165,7 +167,7 @@ export function BatchOutputTab({
                   )}
                 </p>
                 <Button
-                  onClick={() => setModalOpen(true)}
+                  onClick={() => { setFormError(""); setModalOpen(true); }}
                   variant="outline"
                   className="text-xs h-8 px-3 gap-1.5 font-bold mt-2"
                 >
@@ -313,6 +315,12 @@ export function BatchOutputTab({
             </div>
 
             <div className="p-4 space-y-3.5 text-xs">
+              {formError && (
+                <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {formError}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">Harvest Date</label>

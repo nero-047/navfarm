@@ -69,87 +69,83 @@ export function BatchHeader({
     return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
   };
 
-  // Determine stage template based on costing method & current stage code
   const currentStageCode = (batch.current_stage_code || batch.stage_code || "").toUpperCase();
-  const isPorkerBatch =
-    batch.costing_method === "STANDARD" ||
-    batch.costing_method === "FIFO" ||
-    ["NURSERY", "GROWER", "FINISHER", "SLAUGHTER", "CB_GROWER", "WEANER"].includes(currentStageCode);
-
   const startDate = batch.start_date ? new Date(batch.start_date) : null;
   const endDate = batch.expected_end_date ? new Date(batch.expected_end_date) : null;
   const curr = new Date(currentDate || new Date().toISOString().slice(0, 10));
 
-  let dayOfBatch = 1;
-  const defaultTotalDays = isPorkerBatch ? 150 : 147;
-  let totalDays = defaultTotalDays;
-
-  if (startDate) {
-    dayOfBatch = Math.max(1, Math.floor((curr.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-    if (batch.scheduler?.duration_value) {
-      totalDays = Number(batch.scheduler.duration_value);
-    } else if (endDate) {
-      totalDays = Math.max(dayOfBatch, Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  const stageDurationDays = (value?: number | string | null, unit?: string | null) => {
+    const v = Number(value) || 0;
+    switch ((unit || "DAY").toUpperCase()) {
+      case "WEEK":
+        return v * 7;
+      case "MONTH":
+        return v * 30;
+      default:
+        return v;
     }
-  }
+  };
 
+  // Real lifecycle stages this batch actually has scheduled — generated per-batch
+  // from stage_master/breed_lifecycle_stages for its own LOB and breed, sorted into
+  // true lifecycle order (batch.service.ts findOne() joins in stage_sequence for
+  // exactly this). Replaces a previous hardcoded 4/8-stage guess keyed only off
+  // costing method, which had no connection to the batch's real stage plan and
+  // could show a stage the batch was never actually in.
+  const lifecycleStages = useMemo(() => {
+    const schedulers = (batch.stage_schedulers || []) as any[];
+    return schedulers.map((s: any) => ({
+      code: (s.stage_code || "").toUpperCase(),
+      name: s.stage_name || s.stage_code || "Stage",
+      durationDays: stageDurationDays(s.duration_value, s.duration_unit),
+      effectiveFrom: s.effective_from ? new Date(s.effective_from) : null,
+      effectiveTo: s.effective_to ? new Date(s.effective_to) : null,
+    }));
+  }, [batch.stage_schedulers]);
+
+  const totalDays = useMemo(() => {
+    if (lifecycleStages.length > 0) {
+      return lifecycleStages.reduce((sum, s) => sum + (s.durationDays || 0), 0) || 1;
+    }
+    if (startDate && endDate) {
+      return Math.max(1, Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
+    }
+    return 150;
+  }, [lifecycleStages, startDate, endDate]);
+
+  const dayOfBatch = startDate ? Math.max(1, Math.floor((curr.getTime() - startDate.getTime()) / 86400000) + 1) : 1;
   const weekOfBatch = Math.ceil(dayOfBatch / 7);
   const totalWeeks = Math.ceil(totalDays / 7);
   const daysRemaining = Math.max(0, totalDays - dayOfBatch);
   const progressPct = Math.min(100, Math.max(1, Math.round((dayOfBatch / totalDays) * 100)));
 
-  const baseStages = useMemo(() => {
-    if (isPorkerBatch) {
-      return [
-        { code: "NURSERY", name: "Nursery", daysFrom: 1, daysTo: 42 },
-        { code: "GROWER", name: "Grower", daysFrom: 43, daysTo: 90 },
-        { code: "FINISHER", name: "Finisher", daysFrom: 91, daysTo: 145 },
-        { code: "SLAUGHTER", name: "Slaughter", daysFrom: 146, daysTo: 150 },
-      ];
-    } else {
-      return [
-        { code: "QUARANTINE", name: "Quarantine", daysFrom: 1, daysTo: 14 },
-        { code: "GILT_GROWER", name: "Gilt Grower", daysFrom: 15, daysTo: 30 },
-        { code: "FLUSH_SERVICE", name: "Flush / Service", daysFrom: 31, daysTo: 37 },
-        { code: "DRY_SOW_GESTATION", name: "Gestation", daysFrom: 38, daysTo: 144 },
-        { code: "FARROWING", name: "Farrowing", daysFrom: 145, daysTo: 147 },
-        { code: "LACTATION", name: "Lactation", daysFrom: 148, daysTo: 172 },
-        { code: "WEANING", name: "Weaning", daysFrom: 173, daysTo: 177 },
-        { code: "NEXT_CYCLE", name: "Next cycle", daysFrom: 178, daysTo: 180 },
-      ];
-    }
-  }, [isPorkerBatch]);
-
-  // Compute real date spans for each lifecycle stage based on batch.start_date
-  const lifecycleStages = useMemo(() => {
+  // Date range shown per pill: prefer the scheduler's own effective_from/to (real,
+  // backend-computed from this batch's actual start date); fall back to a cumulative
+  // day-range estimate only for a scheduler that hasn't been assigned real dates yet.
+  const stagesWithDates = useMemo(() => {
     const sDate = startDate || new Date();
-    return baseStages.map((stg) => {
-      const sObj = new Date(sDate.getTime() + (stg.daysFrom - 1) * 86400000);
-      const eObj = new Date(sDate.getTime() + (stg.daysTo - 1) * 86400000);
-      return {
-        code: stg.code,
-        name: stg.name,
-        dates: `${formatShortDate(sObj)} to ${formatShortDate(eObj)}`,
-        daysFrom: stg.daysFrom,
-        daysTo: stg.daysTo,
-      };
+    let cursor = 0;
+    return lifecycleStages.map((stg) => {
+      const from = stg.effectiveFrom || new Date(sDate.getTime() + cursor * 86400000);
+      const to = stg.effectiveTo || new Date(sDate.getTime() + (cursor + Math.max(0, stg.durationDays - 1)) * 86400000);
+      cursor += stg.durationDays || 0;
+      return { code: stg.code, name: stg.name, dates: `${formatShortDate(from)} to ${formatShortDate(to)}` };
     });
-  }, [baseStages, startDate]);
+  }, [lifecycleStages, startDate]);
 
-  // Find active stage index
+  // Find active stage index — matches on the batch's real current_stage_code first
+  // (now reliable, since these are the batch's own generated stage codes), falling
+  // back to a loose name match only if that somehow doesn't resolve.
   const activeIdx = useMemo(() => {
-    const idxByCode = lifecycleStages.findIndex((s) => s.code === currentStageCode);
+    const idxByCode = stagesWithDates.findIndex((s) => s.code === currentStageCode);
     if (idxByCode >= 0) return idxByCode;
-
     const stageName = (batch.stage_name || batch.current_stage_code || "").toLowerCase();
-    const idxByName = lifecycleStages.findIndex(
+    if (!stageName) return 0;
+    const idxByName = stagesWithDates.findIndex(
       (s) => stageName.includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(stageName)
     );
-    if (idxByName >= 0) return idxByName;
-
-    const idxByDay = lifecycleStages.findIndex((s) => dayOfBatch >= s.daysFrom && dayOfBatch <= s.daysTo);
-    return idxByDay >= 0 ? idxByDay : 0;
-  }, [lifecycleStages, currentStageCode, batch.stage_name, batch.current_stage_code, dayOfBatch]);
+    return idxByName >= 0 ? idxByName : 0;
+  }, [stagesWithDates, currentStageCode, batch.stage_name, batch.current_stage_code]);
 
   return (
     <div className="rounded-[var(--radius-lg)] border bg-[var(--surface)] shadow-sm overflow-hidden mb-5">
@@ -290,7 +286,12 @@ export function BatchHeader({
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            {lifecycleStages.map((stg, i) => {
+            {stagesWithDates.length === 0 && (
+              <span className="text-[11px] text-[var(--text-muted)]">
+                No stage schedulers generated yet for this batch.
+              </span>
+            )}
+            {stagesWithDates.map((stg, i) => {
               const isDone = i < activeIdx;
               const isCur = i === activeIdx;
               return (

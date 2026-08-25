@@ -185,7 +185,7 @@ export default function OnboardingWizard({
     setIsSubmitting(true);
     setActionError("");
     try {
-      await api.post(`/setup/wizard/step-6/${activeCompany.company_id}/${encodeURIComponent(tz)}/${country.toUpperCase()}`);
+      await api.post(`/setup/wizard/step-6/${activeCompany.company_id}/${country.toUpperCase()}?timezoneId=${encodeURIComponent(tz)}`);
       setActionSuccess("Timezone and locale saved!");
       await fetchWizardProgress(activeCompany.company_id);
       await fetchSetupDetails(activeCompany.company_id);

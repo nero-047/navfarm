@@ -35,12 +35,14 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
   const [loadingUnassigned, setLoadingUnassigned] = useState(false);
   const [selectedAnimalIds, setSelectedAnimalIds] = useState<string[]>([]);
   const [submittingAssign, setSubmittingAssign] = useState(false);
+  const [assignError, setAssignError] = useState("");
 
   // Upload tags state
   const [rawTagsInput, setRawTagsInput] = useState("");
   const [submittingUpload, setSubmittingUpload] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
-  const [notification, setNotification] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ text: string; variant: "success" | "danger" } | null>(null);
 
   const openingQty = Math.round(Number(batch?.opening_quantity || 30));
   const breedName = batch?.breed_name || "Yorkshire Swine";
@@ -70,6 +72,7 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
   const openAssignModal = async () => {
     setAssignModalOpen(true);
     setSelectedAnimalIds([]);
+    setAssignError("");
     setLoadingUnassigned(true);
     try {
       const res = await api.get(`/animal?limit=100`);
@@ -88,17 +91,20 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
   const handleAssignSubmit = async () => {
     if (selectedAnimalIds.length === 0) return;
     setSubmittingAssign(true);
+    setAssignError("");
     try {
       await api.post(`/batch/${batch.batch_id}/assign-animals`, {
         animal_ids: selectedAnimalIds,
       });
-      setNotification(`✓ Successfully assigned ${selectedAnimalIds.length} animals to batch!`);
+      setNotification({ text: `✓ Successfully assigned ${selectedAnimalIds.length} animals to batch!`, variant: "success" });
       setAssignModalOpen(false);
       await fetchAnimals();
       if (onRefreshBatch) await onRefreshBatch();
       setTimeout(() => setNotification(null), 4000);
     } catch (err: any) {
-      alert(err?.message || "Failed to assign animals.");
+      // Shown inline inside the still-open modal, not a raw browser alert() — the
+      // user needs to see the error without losing their in-progress selection.
+      setAssignError(err?.message || "Failed to assign animals.");
     } finally {
       setSubmittingAssign(false);
     }
@@ -112,11 +118,12 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
       .filter(Boolean);
 
     if (tags.length === 0) {
-      alert("Please enter at least one ear tag or RFID tag.");
+      setUploadError("Please enter at least one ear tag or RFID tag.");
       return;
     }
 
     setSubmittingUpload(true);
+    setUploadError("");
     try {
       await api.post(`/batch/${batch.batch_id}/bulk-register-animals`, {
         tags,
@@ -124,14 +131,14 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
         animal_type: isBreedingSow ? "SOW" : "PORKER",
         gender: isBreedingSow ? "F" : "M",
       });
-      setNotification(`✓ Registered and assigned ${tags.length} animals to batch!`);
+      setNotification({ text: `✓ Registered and assigned ${tags.length} animals to batch!`, variant: "success" });
       setUploadModalOpen(false);
       setRawTagsInput("");
       await fetchAnimals();
       if (onRefreshBatch) await onRefreshBatch();
       setTimeout(() => setNotification(null), 4000);
     } catch (err: any) {
-      alert(err?.message || "Failed to register animals.");
+      setUploadError(err?.message || "Failed to register animals.");
     } finally {
       setSubmittingUpload(false);
     }
@@ -144,12 +151,12 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
       await api.post(`/batch/${batch.batch_id}/unassign-animals`, {
         animal_ids: [animalId],
       });
-      setNotification(`✓ Unassigned animal ${tag} from batch.`);
+      setNotification({ text: `✓ Unassigned animal ${tag} from batch.`, variant: "success" });
       await fetchAnimals();
       if (onRefreshBatch) await onRefreshBatch();
       setTimeout(() => setNotification(null), 4000);
     } catch (err: any) {
-      alert(err?.message || "Failed to unassign animal.");
+      setNotification({ text: err?.message || "Failed to unassign animal.", variant: "danger" });
     }
   };
 
@@ -181,10 +188,20 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
     <div className="space-y-6">
       {/* Toast Notification */}
       {notification && (
-        <div className="rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/70 p-3.5 flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-100 shadow-md">
+        <div
+          className={`rounded-xl border p-3.5 flex items-center justify-between text-xs shadow-md ${
+            notification.variant === "danger"
+              ? "border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/70 text-rose-900 dark:text-rose-100"
+              : "border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/70 text-emerald-900 dark:text-emerald-100"
+          }`}
+        >
           <div className="flex items-center gap-2 font-bold">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>{notification}</span>
+            {notification.variant === "danger" ? (
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            )}
+            <span>{notification.text}</span>
           </div>
           <button onClick={() => setNotification(null)} className="text-xs font-semibold hover:underline">
             Dismiss
@@ -214,7 +231,7 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setUploadModalOpen(true)}
+                  onClick={() => { setUploadError(""); setUploadModalOpen(true); }}
                   className="text-xs h-8 px-3 gap-1.5 font-bold border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                 >
                   <Upload className="w-3.5 h-3.5" /> Upload ear tags
@@ -415,6 +432,12 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
             </div>
 
             <div className="p-4 flex-1 overflow-y-auto space-y-3">
+              {assignError && (
+                <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {assignError}
+                </div>
+              )}
               {loadingUnassigned ? (
                 <div className="p-8 text-center text-xs text-[var(--text-muted)] flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" /> Loading unassigned animals…
@@ -526,6 +549,12 @@ export function BatchAnimalAssignmentTab({ batch, onRefreshBatch }: BatchAnimalA
             </div>
 
             <div className="p-4 space-y-3">
+              {uploadError && (
+                <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {uploadError}
+                </div>
+              )}
               <label className="text-xs font-bold text-[var(--text-secondary)] block">
                 Ear Tags List (separated by commas or new lines):
               </label>

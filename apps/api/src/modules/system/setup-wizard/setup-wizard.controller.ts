@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, Request, UseGuards, HttpStatus, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, resolve } from 'node:path';
@@ -109,18 +109,18 @@ export class SetupWizardController {
     return this.wizardService.saveStep5Currency(companyId, currencyId);
   }
 
-  @Post('step-6/:companyId/:timezoneId/:countryId')
+  @Post('step-6/:companyId/:countryId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Step 6: Save default Timezone and Region references' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
-  @ApiParam({ name: 'timezoneId', description: 'Timezone identifier (e.g., Asia/Kolkata)' })
   @ApiParam({ name: 'countryId', description: 'Country Master UUID' })
+  @ApiQuery({ name: 'timezoneId', description: 'Timezone identifier (e.g., Asia/Kolkata) — query param since it contains a literal "/"' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Step completed.' })
   async saveStep6(
     @Param('companyId') companyId: string,
-    @Param('timezoneId') timezoneId: string,
     @Param('countryId') countryId: string,
+    @Query('timezoneId') timezoneId: string,
   ) {
     return this.wizardService.saveStep6Timezone(companyId, timezoneId, countryId);
   }
@@ -155,7 +155,7 @@ export class SetupWizardController {
   @Post('complete/:companyId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Validate steps 1-9 and complete setup wizard, unlocking dashboard' })
+  @ApiOperation({ summary: 'Validate mandatory steps 1-8 and complete setup wizard, unlocking dashboard (step 9 — admin account — is not blocking since it already exists by the time this runs)' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   async completeWizard(@Param('companyId') companyId: string) {
     return this.wizardService.completeWizard(companyId);

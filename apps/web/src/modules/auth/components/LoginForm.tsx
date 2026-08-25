@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,9 +16,18 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { login, user, loading } = useAuth();
   const router = useRouter();
   const { t } = useLanguage();
+
+  // Landing here already signed in (e.g. Back-navigating into a cached /login page
+  // after a previous session) should bounce straight to the console instead of
+  // showing a stale login form for an active session.
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace(user.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
+    }
+  }, [loading, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +40,9 @@ export function LoginForm() {
     try {
       setTenantCompanyMode(false);
       const signedInUser = await login(email, password);
-      router.push(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
+      // replace, not push — otherwise /login stays in browser history and pressing
+      // Back after a successful sign-in lands the user right back on the login screen.
+      router.replace(signedInUser.userType === 'SYSTEM_ADMIN' ? '/admin' : '/console');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to sign in');
     } finally {

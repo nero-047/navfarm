@@ -70,10 +70,10 @@ async function runFreshSetup() {
   runStep('Step 4: Syncing Locales, Timezones & Countries', 'sync-locale-master.ts');
   runStep('Step 5: Seeding Reference Masters (UOMs, Species, Breeds, Stages, Items)', 'seed-system-master-data.ts');
 
-  // 4. PROVISION DEV TENANT & COMPANY DEVCO
+  // 4. PROVISION DEV TENANT & COMPANY DEVCO (seed-dev-tenant.ts already runs the full
+  // drizzle tenant migration set against the tenant's real db_name, so scheduler/draft
+  // schema extensions land automatically — no separate ad-hoc schema-patch step needed)
   runStep('Step 6: Provisioning Dev Tenant (devco) & Company (DEVCO)', 'seed-dev-tenant.ts');
-  runStep('Step 6b: Applying Schedulers Schema Extensions', 'migrate-scheduler-tables.js');
-  runStep('Step 6c: Applying Draft Table Schema Extensions', 'migrate-draft-table.js');
 
   // 5. SEED COMPLETE PIGGERY DATASET (ANIMALS, REPRODUCTION, BATCHES, TRANSACTIONS)
   runStep('Step 7: Seeding Complete Piggery Dataset (Herd Animals, Breeding, Farrowing, Batches)', 'seed-piggery-complete-data.ts');

@@ -424,7 +424,7 @@ export default function CompanyTab({
         await Promise.all([
           api.post(`/setup/wizard/step-4/${targetCompany.company_id}/${default_language_id}`),
           api.post(`/setup/wizard/step-5/${targetCompany.company_id}/${base_currency_id}`),
-          api.post(`/setup/wizard/step-6/${targetCompany.company_id}/${encodeURIComponent(default_timezone_id)}/${country_id.toUpperCase()}`)
+          api.post(`/setup/wizard/step-6/${targetCompany.company_id}/${country_id.toUpperCase()}?timezoneId=${encodeURIComponent(default_timezone_id)}`)
         ]);
       } else if (settingsTab === "fiscal") {
         const isAprilStart = parseInt(fiscalForm.fiscal_start_month as any) === 4;

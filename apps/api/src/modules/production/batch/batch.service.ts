@@ -286,11 +286,16 @@ export class BatchService {
     const [scheduler] = batch.scheduler_id
       ? await this.db.select().from(schema.schedulerMaster).where(eq(schema.schedulerMaster.scheduler_id, batch.scheduler_id)).limit(1)
       : [];
-    const stageSchedulers = await this.db
-      .select()
+    // Joined with stage_sequence so consumers (the batch header's lifecycle progress
+    // bar, in particular) can render this batch's *real* stage plan in true lifecycle
+    // order, instead of a hardcoded stage list unrelated to this LOB/breed.
+    const stageSchedulerRows = await this.db
+      .select({ scheduler: schema.schedulerMaster, stage_sequence: schema.stageMaster.stage_sequence })
       .from(schema.schedulerMaster)
+      .leftJoin(schema.stageMaster, eq(schema.schedulerMaster.stage_id, schema.stageMaster.stage_id))
       .where(and(eq(schema.schedulerMaster.batch_id, id), eq(schema.schedulerMaster.is_active, true)))
-      .orderBy(schema.schedulerMaster.stage_code);
+      .orderBy(schema.stageMaster.stage_sequence, schema.schedulerMaster.stage_code);
+    const stageSchedulers = stageSchedulerRows.map((r) => ({ ...r.scheduler, stage_sequence: r.stage_sequence }));
     const alerts = await this.db.select().from(schema.notificationAlertLog).where(eq(schema.notificationAlertLog.batch_id, id));
     const stageLog = await this.db.select().from(schema.batchStageLog).where(eq(schema.batchStageLog.batch_id, id));
     const lots = await this.db
@@ -299,8 +304,13 @@ export class BatchService {
       .where(eq(schema.batchLocationLot.batch_id, id))
       .orderBy(schema.batchLocationLot.lot_no);
     const activeLots = lots.filter((l) => l.status === 'ACTIVE');
-    const currentHeadcount = activeLots.length > 0
-      ? activeLots.reduce((sum, l) => sum + Number(l.current_quantity), 0)
+    // Same formula as getBatchHeadcount() — unlotted remainder (opening_quantity minus
+    // every lot ever created, any status) plus whatever's alive in ACTIVE lots now.
+    // See that method's comment for why a partial split must not drop the un-lotted head.
+    const everLottedOpening = lots.reduce((sum, l) => sum + Number(l.opening_quantity), 0);
+    const unlottedHeadcount = Math.max(0, Number(batch.opening_quantity) - everLottedOpening);
+    const currentHeadcount = lots.length > 0
+      ? unlottedHeadcount + activeLots.reduce((sum, l) => sum + Number(l.current_quantity), 0)
       : Number(batch.opening_quantity);
 
     // Stage-duration overdue: "days in stage" anchors to the most recent whole-batch
@@ -385,20 +395,33 @@ export class BatchService {
   }
 
   /**
-   * Current headcount: SUM(current_quantity) across ACTIVE lots when any exist
-   * for this batch, else opening_quantity — batches that were never split into
-   * lots behave exactly as before. Computed on read, not stored, to avoid
-   * reintroducing the class of drift bug batch_header.current_quantity had.
+   * Current headcount = whatever was never split into a lot, plus whatever's alive in
+   * ACTIVE lots right now. Splitting a lot peels headcount OUT of the batch's unlotted
+   * pool — it doesn't shrink the batch, so a batch that's only partially split (e.g. 3
+   * of 20 head moved into one lot) must still count the other 17 as part of the total,
+   * not silently drop them. `opening_quantity` across ALL lots ever created (any
+   * status) is subtracted from the batch's own opening_quantity to get the unlotted
+   * remainder — MERGED lots' headcount lives on in their target lot's current_quantity
+   * (still counted, just under a different lot), CLOSED lots' headcount is done and
+   * excluded from both the unlotted pool and the active sum, matching how closing the
+   * whole batch works. Computed on read, not stored, to avoid reintroducing the class
+   * of drift bug batch_header.current_quantity had.
    */
   async getBatchHeadcount(batchId: string, tenantId: string): Promise<number> {
     const [batch] = await this.db.select().from(schema.batchHeader).where(eq(schema.batchHeader.batch_id, batchId)).limit(1);
     if (!batch) return 0;
-    const lots = await this.db
+    const allLots = await this.db
       .select()
       .from(schema.batchLocationLot)
-      .where(and(eq(schema.batchLocationLot.batch_id, batchId), eq(schema.batchLocationLot.status, 'ACTIVE')));
-    if (lots.length === 0) return Number(batch.opening_quantity);
-    return lots.reduce((sum, l) => sum + Number(l.current_quantity), 0);
+      .where(and(eq(schema.batchLocationLot.batch_id, batchId), eq(schema.batchLocationLot.tenant_id, tenantId)));
+    if (allLots.length === 0) return Number(batch.opening_quantity);
+
+    const everLottedOpening = allLots.reduce((sum, l) => sum + Number(l.opening_quantity), 0);
+    const unlotted = Math.max(0, Number(batch.opening_quantity) - everLottedOpening);
+    const activeLotsCurrent = allLots
+      .filter((l) => l.status === 'ACTIVE')
+      .reduce((sum, l) => sum + Number(l.current_quantity), 0);
+    return unlotted + activeLotsCurrent;
   }
 
   /**
@@ -889,6 +912,12 @@ export class BatchService {
       }
     }
     const bioAssetSubjectItemId = batch.input_lines[0]?.item_id;
+    if (isBioAsset && !bioAssetSubjectItemId) {
+      throw new BadRequestException(
+        `Batch '${batch.batch_no}' has no input lines, so its bio-asset item can't be determined. ` +
+        `A BIO_ASSET batch must have at least one input line recording what it opened with.`
+      );
+    }
 
     const transactionId = overrideTransactionId || randomUUID();
     let ledgerId: string | null = null;
@@ -1193,6 +1222,23 @@ export class BatchService {
           .set({ current_quantity: newLotQty.toString(), updated_at: toMysqlTimestamp() })
           .where(eq(schema.batchLocationLot.lot_id, dto.lot_id));
       }
+    }
+
+    // A registered animal tied to a MORTALITY transaction is disposed here — in
+    // addTransaction() itself, not the caller — so this applies uniformly whether the
+    // entry came through postDailyEntry() or a direct POST /batch/:id/transaction call.
+    if (dto.transaction_type === 'MORTALITY' && dto.animal_id) {
+      await this.db
+        .update(schema.animalRegister)
+        .set({
+          status: 'DEAD',
+          is_active: false,
+          disposal_date: dto.transaction_date,
+          disposal_type: 'DIED',
+          updated_by: userPayload?.userId || null,
+          updated_at: toMysqlTimestamp(),
+        })
+        .where(eq(schema.animalRegister.animal_id, dto.animal_id));
     }
 
     if (batch.scheduler_id && dto.quantity !== undefined && dto.quantity !== null) {
@@ -1854,21 +1900,6 @@ export class BatchService {
           tenantId,
           userPayload
         );
-
-        // A registered animal that died is disposed, not left dangling as ACTIVE.
-        if (mort.animal_id) {
-          await this.db
-            .update(schema.animalRegister)
-            .set({
-              status: 'DEAD',
-              is_active: false,
-              disposal_date: dto.date,
-              disposal_type: 'DIED',
-              updated_by: userPayload?.userId || null,
-              updated_at: toMysqlTimestamp(),
-            })
-            .where(eq(schema.animalRegister.animal_id, mort.animal_id));
-        }
       }
     }
 
@@ -1979,6 +2010,11 @@ export class BatchService {
       await this.deleteDailyEntryDraft(id, dto.date);
     } catch {}
 
+    // A posted day is no longer a draft — without this, the draft row for this date
+    // lingers and GET /data-entry keeps reporting it as in-progress even after the
+    // entries are fully committed to the ledger/GL.
+    await this.deleteDailyEntryDraft(id, dto.date);
+
     return this.findOne(id);
   }
 
@@ -2081,7 +2117,12 @@ export class BatchService {
           current_batch_id: batchId,
           current_stage_id: lot?.stage_id ?? batch.stage_id ?? null,
           current_lot_id: lot?.lot_id ?? null,
-          current_location_id: lot?.location_id ?? batch.location_id ?? batch.shed_id ?? null,
+          // batch.shed_id is a shed_master row — a different table from location_master,
+          // which is what current_location_id's FK actually points to. Falling back to
+          // it here would write a shed's UUID into a location-scoped column and trip
+          // the FK constraint (as it did). Leave it unset unless a real location is
+          // known (via the lot or the batch's own location_id).
+          current_location_id: lot?.location_id ?? batch.location_id ?? null,
           updated_by: userPayload?.userId || null,
         })
         .where(

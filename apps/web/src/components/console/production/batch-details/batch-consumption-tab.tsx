@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Download, Plus, X, Loader2, CheckCircle2, Wheat, HeartPulse } from "lucide-react";
+import { Download, Plus, X, Loader2, CheckCircle2, AlertCircle, Wheat, HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/services/api-client";
 
@@ -16,6 +16,7 @@ export function BatchConsumptionTab({ batch, items = [], onRefreshBatch }: Batch
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [formError, setFormError] = useState("");
 
   // Form state
   const [formType, setFormType] = useState<"FEED" | "MEDICINE">("FEED");
@@ -125,11 +126,12 @@ export function BatchConsumptionTab({ batch, items = [], onRefreshBatch }: Batch
   // Handle Record Consumption Submission
   const handleRecordSubmit = async () => {
     if (!formQty || Number(formQty) <= 0) {
-      alert("Please enter a valid quantity.");
+      setFormError("Please enter a valid quantity.");
       return;
     }
 
     setSubmitting(true);
+    setFormError("");
     try {
       const selectedItem = items.find((i: any) => i.item_id === formItemId);
       const itemName = selectedItem?.item_name || formCustomName || (formType === "FEED" ? "Supplement Feed Ration" : "Veterinary Treatment");
@@ -150,7 +152,7 @@ export function BatchConsumptionTab({ batch, items = [], onRefreshBatch }: Batch
       if (onRefreshBatch) await onRefreshBatch();
       setTimeout(() => setNotification(null), 4000);
     } catch (err: any) {
-      alert(err?.message || "Failed to record consumption.");
+      setFormError(err?.message || "Failed to record consumption.");
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +206,7 @@ export function BatchConsumptionTab({ batch, items = [], onRefreshBatch }: Batch
                   <Download className="w-3.5 h-3.5" /> Export
                 </Button>
                 <Button
-                  onClick={() => setModalOpen(true)}
+                  onClick={() => { setFormError(""); setModalOpen(true); }}
                   className="bg-[#1A3A5C] hover:bg-[#132b45] text-white text-xs h-8 px-3 gap-1.5 font-bold shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" /> Record Consumption
@@ -353,6 +355,12 @@ export function BatchConsumptionTab({ batch, items = [], onRefreshBatch }: Batch
             </div>
 
             <div className="p-4 space-y-3.5 text-xs">
+              {formError && (
+                <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {formError}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">Type</label>

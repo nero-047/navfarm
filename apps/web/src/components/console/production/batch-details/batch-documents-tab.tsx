@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Edit2, Check, X, FileText, Image as ImageIcon, Trash2, CheckCircle2 } from "lucide-react";
+import { Plus, Edit2, Check, X, FileText, Image as ImageIcon, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface BatchDocumentsTabProps {
@@ -17,6 +17,7 @@ export function BatchDocumentsTab({ batch }: BatchDocumentsTabProps) {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState("");
 
   // Upload modal state
   const [fileName, setFileName] = useState("");
@@ -56,9 +57,10 @@ export function BatchDocumentsTab({ batch }: BatchDocumentsTabProps) {
 
   const handleAddFile = () => {
     if (!fileName) {
-      alert("Please enter a file name.");
+      setUploadError("Please enter a file name.");
       return;
     }
+    setUploadError("");
 
     const newDoc = {
       id: `doc-${Date.now()}`,
@@ -120,7 +122,7 @@ export function BatchDocumentsTab({ batch }: BatchDocumentsTabProps) {
                 </p>
               </div>
               <Button
-                onClick={() => setUploadModalOpen(true)}
+                onClick={() => { setUploadError(""); setUploadModalOpen(true); }}
                 className="bg-[#1A3A5C] text-white text-xs h-8 px-3 gap-1.5 font-bold shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" /> Upload file
@@ -238,6 +240,12 @@ export function BatchDocumentsTab({ batch }: BatchDocumentsTabProps) {
             </div>
 
             <div className="p-4 space-y-3.5 text-xs">
+              {uploadError && (
+                <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {uploadError}
+                </div>
+              )}
               <div>
                 <label className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">
                   Document Title / File Name *

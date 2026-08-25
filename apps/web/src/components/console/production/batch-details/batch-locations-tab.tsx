@@ -37,13 +37,19 @@ export function BatchLocationsTab({ batch, onRefreshBatch }: BatchLocationsTabPr
   const [submittingMerge, setSubmittingMerge] = useState(false);
 
   const [closingLotId, setClosingLotId] = useState<string | null>(null);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ text: string; variant: "success" | "danger" } | null>(null);
 
   const lots = useMemo(() => batch?.lots || [], [batch?.lots]);
   const activeLots = useMemo(() => lots.filter((l: any) => l.status === "ACTIVE"), [lots]);
   const totalHeadcount = Number(batch?.current_headcount ?? batch?.opening_quantity ?? 0);
   const lottedHeadcount = activeLots.reduce((sum: number, l: any) => sum + Number(l.current_quantity || 0), 0);
-  const unlottedHeadcount = Math.max(0, Number(batch?.opening_quantity ?? 0) - lottedHeadcount);
+  // Unassigned = never split into any lot yet — a lot's opening_quantity permanently
+  // leaves this pool the moment it's created, whatever status that lot is in now (a
+  // MERGED lot's headcount lives on in its target; a CLOSED lot's headcount is done).
+  // Matches batch.service.ts's getBatchHeadcount() exactly, so "Unassigned" here and
+  // "Batch total" above always reconcile instead of double-counting or dropping head.
+  const everLottedOpening = lots.reduce((sum: number, l: any) => sum + Number(l.opening_quantity || 0), 0);
+  const unlottedHeadcount = Math.max(0, Number(batch?.opening_quantity ?? 0) - everLottedOpening);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,7 +110,7 @@ export function BatchLocationsTab({ batch, onRefreshBatch }: BatchLocationsTabPr
     try {
       await api.post(`/batch/${batch.batch_id}/lots/split`, { lots: parsed });
       setSplitModalOpen(false);
-      setNotification(`Batch split across ${parsed.length} location${parsed.length > 1 ? "s" : ""}.`);
+      setNotification({ text: `Batch split across ${parsed.length} location${parsed.length > 1 ? "s" : ""}.`, variant: "success" });
       await onRefreshBatch?.();
     } catch (err: any) {
       setSplitError(err?.message || "Failed to split batch into location lots.");
@@ -125,13 +131,13 @@ export function BatchLocationsTab({ batch, onRefreshBatch }: BatchLocationsTabPr
         source_lot_ids: selectedLotIds.filter((id) => id !== mergeTargetId),
         target_lot_id: mergeTargetId,
       });
-      setNotification("Location lots merged successfully.");
+      setNotification({ text: "Location lots merged successfully.", variant: "success" });
       setMergeMode(false);
       setSelectedLotIds([]);
       setMergeTargetId("");
       await onRefreshBatch?.();
     } catch (err: any) {
-      setNotification(err?.message || "Failed to merge lots.");
+      setNotification({ text: err?.message || "Failed to merge lots.", variant: "danger" });
     } finally {
       setSubmittingMerge(false);
     }
@@ -141,10 +147,10 @@ export function BatchLocationsTab({ batch, onRefreshBatch }: BatchLocationsTabPr
     setClosingLotId(lotId);
     try {
       await api.post(`/batch/${batch.batch_id}/lots/${lotId}/close`, {});
-      setNotification("Lot closed.");
+      setNotification({ text: "Lot closed.", variant: "success" });
       await onRefreshBatch?.();
     } catch (err: any) {
-      setNotification(err?.message || "Failed to close lot.");
+      setNotification({ text: err?.message || "Failed to close lot.", variant: "danger" });
     } finally {
       setClosingLotId(null);
     }
@@ -155,7 +161,7 @@ export function BatchLocationsTab({ batch, onRefreshBatch }: BatchLocationsTabPr
       {notification && (
         <div className="flex items-start gap-2">
           <div className="flex-1">
-            <InlineAlert variant="info">{notification}</InlineAlert>
+            <InlineAlert variant={notification.variant}>{notification.text}</InlineAlert>
           </div>
           <button
             onClick={() => setNotification(null)}

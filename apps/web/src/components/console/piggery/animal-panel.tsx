@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Plus, Search, Loader2, Inbox, Eye, Trash2, Pill, AlertCircle, AlertTriangle, ChevronRight, Scan, ArrowRight,
+  Plus, Search, Loader2, Inbox, Eye, Trash2, Pill, AlertCircle, AlertTriangle, ChevronRight, Scan, ArrowRight, Pencil,
 } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
@@ -55,6 +55,10 @@ const STATUS_STYLE: Record<string, any> = {
 const ANIMAL_TYPES = ["SOW", "BOAR", "GILT", "PIGLET", "COMMERCIAL_PIG"];
 const GENDERS      = [{ value: "F", label: "Female" }, { value: "M", label: "Male" }];
 const ENTRY_TYPES  = ["PURCHASED_IMPORTED", "PURCHASED_LOCAL", "BORN_ON_FARM", "TRANSFERRED_IN"];
+// Live/in-herd condition statuses editable from the correction form — the terminal
+// disposal statuses (CULLED/DEAD/SOLD/SLAUGHTERED) only come from the Dispose flow,
+// which also records disposal_date/type/value and the resulting book-value impact.
+const EDITABLE_STATUSES = ["ACTIVE", "QUARANTINE", "SICK", "PREGNANT", "LACTATING", "DRY"];
 const DISPOSAL_TYPES = ["SOLD", "SLAUGHTERED", "DIED", "TRANSFERRED"] as const;
 
 function formatDate(d?: string | null) {
@@ -185,6 +189,68 @@ export default function AnimalPanel() {
     item_id: "", administered_date: new Date().toISOString().slice(0, 10),
     dose_qty: "", uom: "", administered_by: "", notes: "",
   });
+
+  // ── Edit modal — corrects mistakes on an already-registered animal (breed, DOB,
+  // tags, lineage, breeding tier, condition status, notes). Deliberately excludes
+  // disposal-terminal statuses (CULLED/DEAD/SOLD/SLAUGHTERED) and valuation fields —
+  // those go through the dedicated Dispose flow so book-value/GL math stays correct.
+  const [editOpen, setEditOpen]     = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError]   = useState("");
+  const [editForm, setEditForm]     = useState<Row>({});
+  const [editBreeds, setEditBreeds] = useState<Row[]>([]);
+
+  const openEdit = () => {
+    if (!viewing) return;
+    setEditForm({
+      breed_id: viewing.breed_id || "",
+      dob: viewing.dob || "",
+      ear_tag: viewing.ear_tag || "",
+      rfid_tag: viewing.rfid_tag || "",
+      sire_animal_id: viewing.sire_animal_id || "",
+      dam_animal_id: viewing.dam_animal_id || "",
+      breeding_tier: viewing.breeding_tier || "",
+      status: EDITABLE_STATUSES.includes(viewing.status) ? viewing.status : "",
+      notes: viewing.notes || "",
+    });
+    setEditError("");
+    setEditOpen(true);
+  };
+
+  useEffect(() => {
+    if (!editOpen || !viewing?.lob_id) { setEditBreeds([]); return; }
+    const qs = new URLSearchParams();
+    qs.set("lobId", viewing.lob_id);
+    api.get(`/breed?${qs.toString()}`).then((r) => setEditBreeds(unwrap<Row[]>(r) || [])).catch(() => setEditBreeds([]));
+  }, [editOpen, viewing?.lob_id]);
+
+  const handleEditSave = async () => {
+    if (!viewing) return;
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const payload: Row = {
+        breed_id: editForm.breed_id || undefined,
+        dob: editForm.dob || undefined,
+        ear_tag: editForm.ear_tag || undefined,
+        rfid_tag: editForm.rfid_tag || undefined,
+        sire_animal_id: editForm.sire_animal_id || undefined,
+        dam_animal_id: editForm.dam_animal_id || undefined,
+        breeding_tier: editForm.breeding_tier || undefined,
+        status: editForm.status || undefined,
+        notes: editForm.notes || undefined,
+      };
+      const res = await api.put(`/animal/${viewing.animal_id}`, payload);
+      const updated = unwrap<Row>(res);
+      setViewing((v) => (v ? { ...v, ...updated } : updated));
+      setEditOpen(false);
+      await load();
+    } catch (err: any) {
+      setEditError(err?.message || "Failed to update animal.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   // ── Dispose modal ───────────────────────────────────────────────────────────
   const [disposeOpen, setDisposeOpen]   = useState(false);
@@ -772,6 +838,11 @@ export default function AnimalPanel() {
                     Transfer Stage / Pen
                   </Button>
                 )}
+
+                <Button id="animal-edit-btn" variant="outline" size="sm" onClick={openEdit}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Edit
+                </Button>
               </div>
               <Button variant="ghost" onClick={() => setViewing(null)}>Close</Button>
             </div>
@@ -1041,6 +1112,95 @@ export default function AnimalPanel() {
         </Dialog>
       )}
 
+      {/* ═══ Edit Animal Modal — corrects mistakes on an already-registered animal ═══ */}
+      {viewing && (
+        <Dialog
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          title={`Edit: ${viewing.animal_code}`}
+          description="Corrects registration mistakes — breed, DOB, tags, lineage, breeding tier, condition, notes."
+          maxWidth="lg"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setEditOpen(false)} disabled={editSaving}>Cancel</Button>
+              <Button id="animal-edit-save-btn" onClick={handleEditSave} disabled={editSaving}>
+                {editSaving ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Saving…</> : "Save Changes"}
+              </Button>
+            </>
+          }
+        >
+          {editError && <div className="mb-4"><InlineAlert variant="danger">{editError}</InlineAlert></div>}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="nf-label" htmlFor="ea-breed">Breed</label>
+              <select id="ea-breed" className={inputCls} value={editForm.breed_id || ""} onChange={(e) => setEditForm((f) => ({ ...f, breed_id: e.target.value }))}>
+                <option value="">— unchanged —</option>
+                {editBreeds.map((b) => <option key={b.breed_id} value={b.breed_id}>{b.breed_name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="nf-label" htmlFor="ea-dob">Date of Birth</label>
+              <input id="ea-dob" type="date" className={inputCls} value={editForm.dob || ""} onChange={(e) => setEditForm((f) => ({ ...f, dob: e.target.value }))} />
+            </div>
+
+            <div>
+              <label className="nf-label" htmlFor="ea-ear-tag">Ear Tag</label>
+              <input id="ea-ear-tag" type="text" className={inputCls} placeholder="Visual tag number" value={editForm.ear_tag || ""} onChange={(e) => setEditForm((f) => ({ ...f, ear_tag: e.target.value }))} />
+            </div>
+
+            <div>
+              <label className="nf-label" htmlFor="ea-rfid">RFID Tag</label>
+              <input id="ea-rfid" type="text" className={inputCls} placeholder="RFID scan number (unique)" value={editForm.rfid_tag || ""} onChange={(e) => setEditForm((f) => ({ ...f, rfid_tag: e.target.value }))} />
+            </div>
+
+            <div>
+              <label className="nf-label" htmlFor="ea-breeding-tier">Breeding Tier</label>
+              <select id="ea-breeding-tier" className={inputCls} value={editForm.breeding_tier || ""} onChange={(e) => setEditForm((f) => ({ ...f, breeding_tier: e.target.value }))}>
+                <option value="">— not set —</option>
+                <option value="GGP">GGP (Great-Grandparent / Nucleus)</option>
+                <option value="GP">GP (Grandparent)</option>
+                <option value="PS">PS (Parent Stock)</option>
+                <option value="COMMERCIAL">Commercial</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="nf-label" htmlFor="ea-status">Condition Status</label>
+              <select id="ea-status" className={inputCls} value={editForm.status || ""} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}>
+                <option value="">— unchanged —</option>
+                {EDITABLE_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="nf-label" htmlFor="ea-sire">Sire (father)</label>
+              <select id="ea-sire" className={inputCls} value={editForm.sire_animal_id || ""} onChange={(e) => setEditForm((f) => ({ ...f, sire_animal_id: e.target.value }))}>
+                <option value="">— not set —</option>
+                {rows.filter((a) => a.gender === "M" && a.animal_id !== viewing.animal_id).map((a) => (
+                  <option key={a.animal_id} value={a.animal_id}>{a.animal_code}{a.ear_tag ? ` (${a.ear_tag})` : ""}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="nf-label" htmlFor="ea-dam">Dam (mother)</label>
+              <select id="ea-dam" className={inputCls} value={editForm.dam_animal_id || ""} onChange={(e) => setEditForm((f) => ({ ...f, dam_animal_id: e.target.value }))}>
+                <option value="">— not set —</option>
+                {rows.filter((a) => a.gender === "F" && a.animal_id !== viewing.animal_id).map((a) => (
+                  <option key={a.animal_id} value={a.animal_id}>{a.animal_code}{a.ear_tag ? ` (${a.ear_tag})` : ""}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="nf-label" htmlFor="ea-notes">Notes</label>
+              <textarea id="ea-notes" className={inputCls} rows={2} value={editForm.notes || ""} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+        </Dialog>
+      )}
 
       {/* ═══ Log Dose Modal ════════════════════════════════════════════════════ */}
       <Dialog

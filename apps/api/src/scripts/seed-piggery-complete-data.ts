@@ -1404,6 +1404,24 @@ export async function seedPiggeryData() {
           created_by: userId,
         });
 
+        // Every batch needs at least one input line recording what it opened with —
+        // BatchService.addTransaction() derives its bio-asset subject item from this
+        // (batch.input_lines[0].item_id) and throws if a BIO_ASSET batch has none.
+        const inputItemCode =
+          b.costing === 'BIO_ASSET' ? 'BIO-SWINE-SOW' : b.stage === 'SLAUGHTER' ? 'BIO-SWINE-FINISHER' : 'BIO-SWINE-PIGLET';
+        const inputItemId = itemMap.get(inputItemCode)!;
+        const inputItem = itemCatalog.find((it) => it.code === inputItemCode)!;
+        await db.insert(schema.batchInputLine).values({
+          line_id: randomUUID(),
+          batch_id: batId,
+          line_no: 1,
+          item_id: inputItemId,
+          quantity: b.qty,
+          uom: 'HEAD',
+          rate: inputItem.cost,
+          amount: (Number(b.qty) * Number(inputItem.cost)).toFixed(4),
+        });
+
         if (b.costing === 'BIO_ASSET') {
           const bioStage = b.stage === 'DRY_SOW_GESTATION' || b.stage === 'LACTATION' ? 'MATURE' : 'PREMATURE';
           await db.insert(schema.batchBioAssetState).values({
