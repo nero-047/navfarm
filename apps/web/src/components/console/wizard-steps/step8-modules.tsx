@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Layers, Check } from "lucide-react";
 import { api } from "../../../services/api-client";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Step8ModulesProps {
   onSubmit: (modules: string[]) => Promise<void>;
@@ -19,6 +20,7 @@ const isLivestockNob = (n: any) => (n.nob_name || n.nob_code || "").toLowerCase(
 const isPiggeryLob = (l: any) => (l.lob_name || l.lob_code || "").toLowerCase().includes("piggery");
 
 export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModules }: Step8ModulesProps) {
+  const { t } = useLanguage();
   const visibleNobs = PIGGERY_ONLY ? nobs.filter(isLivestockNob) : nobs;
   const [selectedNobs, setSelectedNobs] = useState<string[]>([]);
   const [selectedLobs, setSelectedLobs] = useState<string[]>([]);
@@ -99,15 +101,13 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
-          <Layers className="w-5 h-5 text-(--text-muted)" />
-          Step 8: Nature of Farming Business
-        </h2>
-        <p className="text-xs text-(--text-secondary)">Enable lines of businesses to activate standard templates and workflows.</p>
+          <Layers className="w-5 h-5 text-(--text-muted)" />{t("wzStep8Title")}</h2>
+        <p className="text-xs text-(--text-secondary)">{t("wzStep8Desc")}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         {nobs.length === 0 ? (
-          <div className="p-4 bg-(--surface-raised) rounded-[var(--radius-sm)] text-(--text-secondary) text-sm">Loading business modules catalog...</div>
+          <div className="p-4 bg-(--surface-raised) rounded-[var(--radius-sm)] text-(--text-secondary) text-sm">{t("wzLoadingModulesCatalog")}</div>
         ) : (
           visibleNobs.map((n: any) => {
             const isChecked = selectedNobs.includes(n.nob_code);
@@ -134,11 +134,11 @@ export default function Step8Modules({ onSubmit, isSubmitting, nobs, initialModu
                 {/* Sub-LOBs options rendered inside the parent NOB card */}
                 {isChecked && (
                   <div className="mt-3 pt-3 border-t border-(--border) flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[10px] font-semibold text-(--accent) uppercase tracking-wider">Select Active Operations (LOBs):</span>
+                    <span className="text-[10px] font-semibold text-(--accent) uppercase tracking-wider">{t("ctSelectActiveLobs")}</span>
                     {loadingLobs[n.nob_id] ? (
-                      <div className="text-[11px] text-(--text-secondary) animate-pulse py-1">Loading active sub-sectors...</div>
+                      <div className="text-[11px] text-(--text-secondary) animate-pulse py-1">{t("wzLoadingSubSectors")}</div>
                     ) : !lobMap[n.nob_id] || (PIGGERY_ONLY ? lobMap[n.nob_id].filter(isPiggeryLob) : lobMap[n.nob_id]).length === 0 ? (
-                      <div className="text-[11px] text-(--text-secondary) py-1">No sub-sectors available.</div>
+                      <div className="text-[11px] text-(--text-secondary) py-1">{t("ctNoSubSectors")}</div>
                     ) : (
                       <div className="flex flex-col gap-1.5 mt-1">
                         {(PIGGERY_ONLY ? lobMap[n.nob_id].filter(isPiggeryLob) : lobMap[n.nob_id]).map((lob: any) => {

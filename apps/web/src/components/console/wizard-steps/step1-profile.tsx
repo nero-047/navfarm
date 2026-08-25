@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Building2, Upload, X, Image as ImageIcon } from "lucide-react";
 import { api } from "../../../services/api-client";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Step1ProfileProps {
   onSubmit: (data: any) => Promise<void>;
@@ -13,6 +14,7 @@ interface Step1ProfileProps {
 }
 
 export default function Step1Profile({ onSubmit, isSubmitting, initialData }: Step1ProfileProps) {
+  const { t } = useLanguage();
   const [logoUrl, setLogoUrl] = useState(initialData?.company_logo_url || "");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoError, setLogoError] = useState("");
@@ -98,10 +100,8 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-(--text-muted)" />
-          Step 1: Register Company Profile
-        </h2>
-        <p className="text-xs text-(--text-secondary)">Provide registration names, company logo, and brand details. Limits set by pricing plan are applied.</p>
+          <Building2 className="w-5 h-5 text-(--text-muted)" />{t("wzStep1Title")}</h2>
+        <p className="text-xs text-(--text-secondary)">{t("wzStep1Desc")}</p>
       </div>
 
       {/* ── Company Logo Upload Section ── */}
@@ -110,7 +110,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
           {logoUrl ? (
             <img
               src={logoUrl.startsWith('/') ? `${backendUrl}${logoUrl}` : logoUrl}
-              alt="Company Logo"
+              alt={t("ctCompanyLogoAlt")}
               className="w-full h-full object-contain p-1"
             />
           ) : (
@@ -119,8 +119,8 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 w-full">
-          <label className="text-xs font-semibold text-(--text-secondary)">Company Brand Logo</label>
-          <p className="text-[11px] text-(--text-secondary)">Supported formats: PNG, JPG, SVG, WebP (Max 5MB). Saved to server /uploads folder.</p>
+          <label className="text-xs font-semibold text-(--text-secondary)">{t("wzCompanyBrandLogo")}</label>
+          <p className="text-[11px] text-(--text-secondary)">{t("wzLogoFormats")}</p>
 
           <div className="flex items-center gap-3 mt-1">
             <label className="nf-press cursor-pointer inline-flex min-h-9 items-center gap-2 px-3 py-1.5 rounded-[var(--radius-sm)] bg-(--surface-secondary) text-(--text-primary) border border-(--border) text-xs font-semibold transition-colors hover:bg-(--border)">
@@ -141,9 +141,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
                 onClick={handleClearLogo}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-sm)] bg-(--danger-muted) text-(--danger) border border-(--danger) text-xs font-semibold transition-colors hover:bg-(--danger) hover:text-white"
               >
-                <X className="w-3.5 h-3.5" />
-                Remove
-              </button>
+                <X className="w-3.5 h-3.5" />{t("wzRemove")}</button>
             )}
           </div>
 
@@ -152,89 +150,89 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Company Code (Short ID)" htmlFor={fieldId("company_code")} required>
+        <Field label={t("wzCompanyCodeShort")} htmlFor={fieldId("company_code")} required>
           <Input
             id={fieldId("company_code")}
-            placeholder="e.g. GVF"
+            placeholder={t("wzPhCompanyCode")}
             value={formData.company_code}
             onChange={(e) => setFormData({ ...formData, company_code: e.target.value.toUpperCase() })}
             required
           />
         </Field>
-        <Field label="Legal Entity Name" htmlFor={fieldId("company_name")} required>
+        <Field label={t("ctLegalEntityName")} htmlFor={fieldId("company_name")} required>
           <Input
             id={fieldId("company_name")}
-            placeholder="Green Valley Farms Pvt Ltd"
+            placeholder={t("wzPhLegalName")}
             value={formData.company_name}
             onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
             required
           />
         </Field>
-        <Field label="Display Name" htmlFor={fieldId("company_display_name")}>
+        <Field label={t("wzDisplayName")} htmlFor={fieldId("company_display_name")}>
           <Input
             id={fieldId("company_display_name")}
-            placeholder="Green Valley Farms"
+            placeholder={t("wzPhDisplayName")}
             value={formData.company_display_name}
             onChange={(e) => setFormData({ ...formData, company_display_name: e.target.value })}
           />
         </Field>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Business Class</label>
+          <label className="text-xs text-(--text-secondary) font-medium">{t("wzBusinessClass")}</label>
           <Select
             value={formData.company_type}
             onChange={(e) => setFormData({ ...formData, company_type: e.target.value })}
             className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
-            <option value="Sole Proprietor">Sole Proprietor</option>
-            <option value="Partnership">Partnership</option>
-            <option value="Pvt Ltd">Pvt Ltd</option>
+            <option value="Sole Proprietor">{t("ctClsSoleProprietor")}</option>
+            <option value="Partnership">{t("ctClsPartnership")}</option>
+            <option value="Pvt Ltd">{t("ctClsPvtLtd")}</option>
             <option value="LLP">LLP</option>
           </Select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Industry Classification</label>
+          <label className="text-xs text-(--text-secondary) font-medium">{t("wzIndustryClassification")}</label>
           <Select
             value={formData.industry_type}
             onChange={(e) => setFormData({ ...formData, industry_type: e.target.value })}
             className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
-            <option value="Poultry Farming">Poultry Farming</option>
-            <option value="Livestock">Livestock Farming</option>
-            <option value="Agriculture">Agriculture & Crop Farming</option>
-            <option value="Aquaculture">Aquaculture & Fisheries</option>
-            <option value="Insect Farming">Insect Farming & Apiaries</option>
-            <option value="Feed & Processing">Feed Mill & Food Processing</option>
+            <option value="Poultry Farming">{t("coIndustryPoultryFarming")}</option>
+            <option value="Livestock">{t("dashDefaultNob")}</option>
+            <option value="Agriculture">{t("wzIndAgriCrop")}</option>
+            <option value="Aquaculture">{t("wzIndAquaculture")}</option>
+            <option value="Insect Farming">{t("wzIndInsectApiary")}</option>
+            <option value="Feed & Processing">{t("wzIndFeedMill")}</option>
           </Select>
         </div>
-        <Field label="Registration Certificate No" htmlFor={fieldId("registration_no")}>
+        <Field label={t("wzRegCertificateNo")} htmlFor={fieldId("registration_no")}>
           <Input
             id={fieldId("registration_no")}
-            placeholder="e.g. U01403DL2023PTC123456"
+            placeholder={t("wzPhRegCertNo")}
             value={formData.registration_no}
             onChange={(e) => setFormData({ ...formData, registration_no: e.target.value })}
           />
         </Field>
-        <Field label="Taxpayer ID / GSTIN" htmlFor={fieldId("tax_id")}>
+        <Field label={t("wzTaxpayerIdGstin")} htmlFor={fieldId("tax_id")}>
           <Input
             id={fieldId("tax_id")}
-            placeholder="e.g. 07AAAAA1111A1Z1"
+            placeholder={t("wzPhTaxpayerId")}
             value={formData.tax_id}
             onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
           />
         </Field>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Tax Regime</label>
+          <label className="text-xs text-(--text-secondary) font-medium">{t("ctTaxRegime")}</label>
           <Select
             value={formData.tax_regime}
             onChange={(e) => setFormData({ ...formData, tax_regime: e.target.value })}
             className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
-            <option value="STANDARD">Standard Scheme</option>
-            <option value="COMPOSITION">Composition Scheme</option>
-            <option value="EXEMPT">Exempt / Non-Taxable</option>
+            <option value="STANDARD">{t("ctSchemeStandard")}</option>
+            <option value="COMPOSITION">{t("ctSchemeComposition")}</option>
+            <option value="EXEMPT">{t("ctSchemeExempt")}</option>
           </Select>
         </div>
-        <Field label="Incorporation Date" htmlFor={fieldId("incorporation_date")}>
+        <Field label={t("ctIncorporationDate")} htmlFor={fieldId("incorporation_date")}>
           <Input
             id={fieldId("incorporation_date")}
             type="date"
@@ -242,7 +240,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             onChange={(e) => setFormData({ ...formData, incorporation_date: e.target.value })}
           />
         </Field>
-        <Field label="Website URL" htmlFor={fieldId("website")}>
+        <Field label={t("ctWebsiteUrl")} htmlFor={fieldId("website")}>
           <Input
             id={fieldId("website")}
             placeholder="https://greenvalleyfarms.in"
@@ -250,7 +248,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             onChange={(e) => setFormData({ ...formData, website: e.target.value })}
           />
         </Field>
-        <Field label="Email Domain (for Auto-verify)" htmlFor={fieldId("email_domain")}>
+        <Field label={t("ctEmailDomainAutoVerify")} htmlFor={fieldId("email_domain")}>
           <Input
             id={fieldId("email_domain")}
             placeholder="greenvalleyfarms.in"
@@ -258,7 +256,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             onChange={(e) => setFormData({ ...formData, email_domain: e.target.value })}
           />
         </Field>
-        <Field label="Support Email" htmlFor={fieldId("support_email")}>
+        <Field label={t("ctSupportEmail")} htmlFor={fieldId("support_email")}>
           <Input
             id={fieldId("support_email")}
             placeholder="support@greenvalleyfarms.in"
@@ -267,7 +265,7 @@ export default function Step1Profile({ onSubmit, isSubmitting, initialData }: St
             onChange={(e) => setFormData({ ...formData, support_email: e.target.value })}
           />
         </Field>
-        <Field label="Primary Phone / Landline" htmlFor={fieldId("phone_primary")}>
+        <Field label={t("ctPrimaryPhoneLandline")} htmlFor={fieldId("phone_primary")}>
           <Input
             id={fieldId("phone_primary")}
             placeholder="+91 11 2345 6789"

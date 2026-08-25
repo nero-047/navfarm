@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ShieldAlert, Plus, Save, RefreshCw, Edit3, Trash2 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { useLanguage } from "../../../hooks/useLanguage";
+import type { TranslationKeys } from "../../../utils/translations";
 import { Dialog } from "../../ui/dialog";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../ui/table";
 
@@ -25,53 +26,53 @@ interface RolesTabProps {
 // here: checking its box would look like it does something and wouldn't.
 const DEFAULT_RESOURCES = [
   // AUDIT
-  { module_code: "AUDIT", resource: "LOGS", name: "Audit Logs & Trails" },
+  { module_code: "AUDIT", resource: "LOGS", name: "Audit Logs & Trails", nameKey: "rolAuditLogsTrails" },
   // COMPANY
-  { module_code: "COMPANY", resource: "SETTINGS", name: "Company Profiles" },
+  { module_code: "COMPANY", resource: "SETTINGS", name: "Company Profiles", nameKey: "rolCompanyProfiles" },
   // FINANCE (Phase 4)
-  { module_code: "FINANCE", resource: "JOURNAL", name: "Journal Entries" },
-  { module_code: "FINANCE", resource: "REPORTS", name: "Financial Reports" },
+  { module_code: "FINANCE", resource: "JOURNAL", name: "Journal Entries", nameKey: "jpJournalEntries" },
+  { module_code: "FINANCE", resource: "REPORTS", name: "Financial Reports", nameKey: "rolFinancialReports" },
   // INVENTORY (Phase 3)
-  { module_code: "INVENTORY", resource: "GOODS_RECEIPT", name: "Goods Receipt" },
-  { module_code: "INVENTORY", resource: "GOODS_ISSUE", name: "Goods Issue" },
-  { module_code: "INVENTORY", resource: "STOCK_TRANSFER", name: "Stock Transfer" },
-  { module_code: "INVENTORY", resource: "STOCK_ADJUSTMENT", name: "Stock Adjustment" },
-  { module_code: "INVENTORY", resource: "LEDGER", name: "Inventory Ledger" },
-  { module_code: "INVENTORY", resource: "BIO_ASSET_LEDGER", name: "Bio-Asset Ledger" },
+  { module_code: "INVENTORY", resource: "GOODS_RECEIPT", name: "Goods Receipt", nameKey: "grpTitle" },
+  { module_code: "INVENTORY", resource: "GOODS_ISSUE", name: "Goods Issue", nameKey: "invGoodsIssue" },
+  { module_code: "INVENTORY", resource: "STOCK_TRANSFER", name: "Stock Transfer", nameKey: "apDocType_STOCK_TRANSFER" },
+  { module_code: "INVENTORY", resource: "STOCK_ADJUSTMENT", name: "Stock Adjustment", nameKey: "invStockAdjustment" },
+  { module_code: "INVENTORY", resource: "LEDGER", name: "Inventory Ledger", nameKey: "invLedger" },
+  { module_code: "INVENTORY", resource: "BIO_ASSET_LEDGER", name: "Bio-Asset Ledger", nameKey: "blBioAssetLedgerTitle" },
   // MASTER_DATA (Phase 2)
-  { module_code: "MASTER_DATA", resource: "UOM", name: "Units of Measure" },
-  { module_code: "MASTER_DATA", resource: "SPECIES", name: "Species" },
-  { module_code: "MASTER_DATA", resource: "BREED", name: "Breeds" },
-  { module_code: "MASTER_DATA", resource: "FARM", name: "Farms" },
-  { module_code: "MASTER_DATA", resource: "WAREHOUSE", name: "Warehouses" },
-  { module_code: "MASTER_DATA", resource: "SHED", name: "Sheds" },
-  { module_code: "MASTER_DATA", resource: "LOCATION", name: "Locations" },
-  { module_code: "MASTER_DATA", resource: "ITEM_CATEGORY", name: "Item Categories" },
-  { module_code: "MASTER_DATA", resource: "ITEM", name: "Items" },
-  { module_code: "MASTER_DATA", resource: "ITEM_ATTRIBUTE", name: "Item Attributes" },
-  { module_code: "MASTER_DATA", resource: "SUPPLIER", name: "Suppliers" },
-  { module_code: "MASTER_DATA", resource: "CUSTOMER", name: "Customers" },
-  { module_code: "MASTER_DATA", resource: "RESOURCE", name: "Resources (Labor/Equipment)" },
-  { module_code: "MASTER_DATA", resource: "DISEASE", name: "Diseases" },
-  { module_code: "MASTER_DATA", resource: "MEDICINE", name: "Medicines" },
-  { module_code: "MASTER_DATA", resource: "FEED_FORMULA", name: "Feed Formulas" },
-  { module_code: "MASTER_DATA", resource: "GL_ACCOUNT", name: "GL Accounts" },
-  { module_code: "MASTER_DATA", resource: "GL_MAPPING", name: "GL Mappings" },
-  { module_code: "MASTER_DATA", resource: "COST_CENTER", name: "Cost Centers" },
+  { module_code: "MASTER_DATA", resource: "UOM", name: "Units of Measure", nameKey: "rolUnitsOfMeasure" },
+  { module_code: "MASTER_DATA", resource: "SPECIES", name: "Species", nameKey: "rolSpecies" },
+  { module_code: "MASTER_DATA", resource: "BREED", name: "Breeds", nameKey: "rolBreeds" },
+  { module_code: "MASTER_DATA", resource: "FARM", name: "Farms", nameKey: "rolFarms" },
+  { module_code: "MASTER_DATA", resource: "WAREHOUSE", name: "Warehouses", nameKey: "rolWarehouses" },
+  { module_code: "MASTER_DATA", resource: "SHED", name: "Sheds", nameKey: "rolSheds" },
+  { module_code: "MASTER_DATA", resource: "LOCATION", name: "Locations", nameKey: "rolLocations" },
+  { module_code: "MASTER_DATA", resource: "ITEM_CATEGORY", name: "Item Categories", nameKey: "rolItemCategories" },
+  { module_code: "MASTER_DATA", resource: "ITEM", name: "Items", nameKey: "rolItems" },
+  { module_code: "MASTER_DATA", resource: "ITEM_ATTRIBUTE", name: "Item Attributes", nameKey: "rolItemAttributes" },
+  { module_code: "MASTER_DATA", resource: "SUPPLIER", name: "Suppliers", nameKey: "gSuppliers" },
+  { module_code: "MASTER_DATA", resource: "CUSTOMER", name: "Customers", nameKey: "rolCustomers" },
+  { module_code: "MASTER_DATA", resource: "RESOURCE", name: "Resources (Labor/Equipment)", nameKey: "rolResourcesLabor" },
+  { module_code: "MASTER_DATA", resource: "DISEASE", name: "Diseases", nameKey: "rolDiseases" },
+  { module_code: "MASTER_DATA", resource: "MEDICINE", name: "Medicines", nameKey: "rolMedicines" },
+  { module_code: "MASTER_DATA", resource: "FEED_FORMULA", name: "Feed Formulas", nameKey: "rolFeedFormulas" },
+  { module_code: "MASTER_DATA", resource: "GL_ACCOUNT", name: "GL Accounts", nameKey: "rolGlAccounts" },
+  { module_code: "MASTER_DATA", resource: "GL_MAPPING", name: "GL Mappings", nameKey: "rolGlMappings" },
+  { module_code: "MASTER_DATA", resource: "COST_CENTER", name: "Cost Centers", nameKey: "rolCostCenters" },
   // NOTIFICATION
-  { module_code: "NOTIFICATION", resource: "SETTINGS", name: "Notification Gateway Settings" },
+  { module_code: "NOTIFICATION", resource: "SETTINGS", name: "Notification Gateway Settings", nameKey: "rolNotificationGateway" },
   // PRODUCTION (Phase 5)
-  { module_code: "PRODUCTION", resource: "BATCH", name: "Production Batches" },
+  { module_code: "PRODUCTION", resource: "BATCH", name: "Production Batches", nameKey: "dashProductionBatches" },
   // PRODUCTION (Phase 6)
-  { module_code: "PRODUCTION", resource: "PARAMETER", name: "Production Parameters" },
-  { module_code: "PRODUCTION", resource: "SCHEDULER", name: "Production Schedulers" },
+  { module_code: "PRODUCTION", resource: "PARAMETER", name: "Production Parameters", nameKey: "rolProductionParameters" },
+  { module_code: "PRODUCTION", resource: "SCHEDULER", name: "Production Schedulers", nameKey: "rolProductionSchedulers" },
   // PRODUCTION (QC/QR)
-  { module_code: "PRODUCTION", resource: "QC_PARAMETER", name: "QC Parameters" },
-  { module_code: "PRODUCTION", resource: "QC", name: "QC Inspections" },
-  { module_code: "PRODUCTION", resource: "QR_CODE", name: "Traceability Packs (QR)" },
+  { module_code: "PRODUCTION", resource: "QC_PARAMETER", name: "QC Parameters", nameKey: "navQcParameters" },
+  { module_code: "PRODUCTION", resource: "QC", name: "QC Inspections", nameKey: "rolQcInspections" },
+  { module_code: "PRODUCTION", resource: "QR_CODE", name: "Traceability Packs (QR)", nameKey: "rolTraceabilityPacks" },
   // RBAC
-  { module_code: "RBAC", resource: "ROLE", name: "User Roles & Team Management" },
-  { module_code: "RBAC", resource: "USER", name: "User Accounts" },
+  { module_code: "RBAC", resource: "ROLE", name: "User Roles & Team Management", nameKey: "rolUserRolesTeam" },
+  { module_code: "RBAC", resource: "USER", name: "User Accounts", nameKey: "rolUserAccounts" },
 ];
 
 const S = {
@@ -128,6 +129,7 @@ export default function RolesTab({
           module_code: def.module_code,
           resource: def.resource,
           name: def.name,
+          nameKey: (def as { nameKey?: string }).nameKey,
           can_view: matchingRule ? !!matchingRule.can_view : false,
           can_create: matchingRule ? !!matchingRule.can_create : false,
           can_edit: matchingRule ? !!matchingRule.can_edit : false,
@@ -390,7 +392,7 @@ export default function RolesTab({
                     {permissions.map((p, idx) => (
                       <TableRow key={idx} style={S.textPrimary}>
                         <TableCell className="px-0 py-3.5 font-semibold">
-                          <div style={S.textPrimary}>{p.name}</div>
+                          <div style={S.textPrimary}>{p.nameKey ? t(p.nameKey as TranslationKeys) : p.name}</div>
                           <div className="text-[9px] font-mono mt-0.5" style={S.textMuted}>{p.module_code} • {p.resource}</div>
                         </TableCell>
                         {["can_view", "can_create", "can_edit", "can_delete", "can_approve"].map(key => (

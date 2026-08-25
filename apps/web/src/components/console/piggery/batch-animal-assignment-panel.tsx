@@ -998,7 +998,7 @@ export default function BatchAnimalAssignmentPanel() {
         >
           <div className="space-y-3 text-xs pt-1">
             <p className="text-[var(--text-secondary)]">
-              {t("baapPasteLinesDesc")} <code className="text-[var(--accent)] font-mono">EarTag, AnimalID, PenLocation</code>:
+              {t("baapPasteLinesDesc")} <code className="text-[var(--accent)] font-mono">{t("gCsvHeaderHint")}</code>:
             </p>
             <textarea
               rows={5}

@@ -259,12 +259,12 @@ export default function UsersPage() {
             <div>
               <Label>{t("usrFullName")}</Label>
               <Input required value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
-                placeholder="Jane Smith" />
+                placeholder={t("gPhJaneSmith")} />
             </div>
             <div>
               <Label>{t("usrEmailAddress")}</Label>
               <Input required type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                placeholder="jane@company.com" />
+                placeholder={t("gPhJaneEmail")} />
             </div>
             <div>
               <Label>{t("usrTempPassword")}</Label>

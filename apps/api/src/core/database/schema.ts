@@ -3053,3 +3053,50 @@ export const approvalRequestRelations = relations(approvalRequest, ({ one }) => 
   requester: one(userMaster, { fields: [approvalRequest.requested_by], references: [userMaster.user_id], relationName: 'approval_requester' }),
   decider: one(userMaster, { fields: [approvalRequest.decided_by], references: [userMaster.user_id], relationName: 'approval_decider' }),
 }));
+
+/**
+ * Daily milk production.
+ *
+ * The Dairy screens were rendering invented numbers — eight named cows, four
+ * feed lines and a bulk-tank reading, all hardcoded in the component — because
+ * nothing in the database could hold a milk record. This is that table.
+ *
+ * One row per session (a herd's morning and evening milking are two rows), so
+ * a day's total is a sum rather than a column that can disagree with its parts.
+ * `animal_id` is null for a bulk/parlour record and set when a farm records
+ * per-cow yields, which lets the same table serve both without a second one.
+ */
+export const milkProductionLog = mysqlTable('milk_production_log', {
+  log_id: varchar('log_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  operational_area_id: varchar('operational_area_id', { length: 36 }),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  animal_id: varchar('animal_id', { length: 36 }).references(() => animalRegister.animal_id, { onDelete: 'set null' }),
+  log_date: date('log_date', { mode: 'string' }).notNull(),
+  session: varchar('session', { length: 20 }).default('MORNING').notNull(), // MORNING, EVENING, BULK
+  quantity_litres: decimal('quantity_litres', { precision: 18, scale: 3 }).notNull(),
+  // Quality composition. Nullable because a farm may weigh milk daily but only
+  // test composition when the bulk tank is collected.
+  fat_pct: decimal('fat_pct', { precision: 6, scale: 3 }),
+  snf_pct: decimal('snf_pct', { precision: 6, scale: 3 }),
+  scc_count: int('scc_count'), // somatic cell count per mL
+  bmc_temperature_c: decimal('bmc_temperature_c', { precision: 6, scale: 2 }),
+  remarks: text('remarks'),
+  recorded_by: varchar('recorded_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => ({
+  // One record per batch/animal/date/session — a double-submit of the morning
+  // milking must fail loudly rather than double-count the day's yield.
+  uqSession: uniqueIndex('uq_milk_log_batch_date_session_animal').on(
+    table.batch_id, table.log_date, table.session, table.animal_id
+  ),
+}));
+
+export const milkProductionLogRelations = relations(milkProductionLog, ({ one }) => ({
+  batch: one(batchHeader, { fields: [milkProductionLog.batch_id], references: [batchHeader.batch_id] }),
+  animal: one(animalRegister, { fields: [milkProductionLog.animal_id], references: [animalRegister.animal_id] }),
+  company: one(companyMaster, { fields: [milkProductionLog.company_id], references: [companyMaster.company_id] }),
+}));

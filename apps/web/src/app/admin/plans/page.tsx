@@ -9,6 +9,7 @@ import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const s = {
   input: { borderColor: "var(--input-border)", backgroundColor: "var(--input-bg)", color: "var(--input-text)" },
@@ -28,6 +29,7 @@ const emptyPlan = {
 };
 
 export default function AdminPlansPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +114,7 @@ export default function AdminPlansPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="animate-spin w-5 h-5 mr-2" style={s.accent} />
-        <span className="text-sm" style={s.sub}>Loading plans…</span>
+        <span className="text-sm" style={s.sub}>{t("admLoadingPlans")}</span>
       </div>
     );
   }
@@ -120,14 +122,13 @@ export default function AdminPlansPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
       <PageHeader
-        title="Subscription Plans"
+        title={t("admSubscriptionPlans")}
         description={`${plans.length} plans configured`}
         actions={
           <button onClick={() => handleOpen()}
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
             style={{ backgroundColor: "var(--accent)" }}>
-            <Plus className="w-4 h-4" /> Add Plan
-          </button>
+            <Plus className="w-4 h-4" />{t("admAddPlan")}</button>
         }
       />
 
@@ -135,12 +136,12 @@ export default function AdminPlansPage() {
       {success && <div className="flex items-center gap-2 text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-4 text-sm"><CheckCircle className="w-4 h-4 shrink-0" /> {success}</div>}
 
       {/* Form */}
-      <Dialog open={showForm} onClose={() => setShowForm(false)} title={editingPlan ? "Edit subscription plan" : "Create subscription plan"} description="Set billing, capacity, and feature availability." maxWidth="lg">
+      <Dialog open={showForm} onClose={() => setShowForm(false)} title={editingPlan ? "Edit subscription plan" : "Create subscription plan"} description={t("admPlansDesc")} maxWidth="lg">
           <form onSubmit={handleSave} className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { key: "plan_id", label: "Plan ID", placeholder: "PLAN_BASIC", disabled: !!editingPlan },
-              { key: "plan_name", label: "Plan Name", placeholder: "Basic Starter" },
-              { key: "price", label: "Price (USD)", placeholder: "49.00" },
+              { key: "plan_id", label: t("admPlanId"), placeholder: "PLAN_BASIC", disabled: !!editingPlan },
+              { key: "plan_name", label: t("admPlanName"), placeholder: "Basic Starter" },
+              { key: "price", label: t("admPriceUsd"), placeholder: "49.00" },
             ].map(({ key, label, placeholder, disabled }) => (
               <Field label="{label}">
                 <input required value={(form as any)[key]}
@@ -150,27 +151,27 @@ export default function AdminPlansPage() {
               </Field>
             ))}
 
-            <Field label="Billing Cycle">
+            <Field label={t("admBillingCycle")}>
               <select value={form.billing_cycle} onChange={(e) => setForm({ ...form, billing_cycle: e.target.value })}
                 className={`${inputCls} nf-select`} style={s.input}>
-                <option value="MONTHLY">Monthly</option>
-                <option value="ANNUAL">Annual</option>
+                <option value="MONTHLY">{t("monthly")}</option>
+                <option value="ANNUAL">{t("admAnnual")}</option>
               </select>
             </Field>
 
-            <Field label="Max Companies">
+            <Field label={t("admMaxCompanies")}>
               <input type="number" min={1} value={form.max_companies}
                 onChange={(e) => setForm({ ...form, max_companies: +e.target.value })}
                 className={inputCls} style={s.input} />
             </Field>
 
-            <Field label="Max Users">
+            <Field label={t("admMaxUsers")}>
               <input type="number" min={1} value={form.max_users}
                 onChange={(e) => setForm({ ...form, max_users: +e.target.value })}
                 className={inputCls} style={s.input} />
             </Field>
 
-            <Field label="Storage (GB)">
+            <Field label={t("admStorageGb")}>
               <input value={form.storage_limit_gb} onChange={(e) => setForm({ ...form, storage_limit_gb: e.target.value })}
                 className={inputCls} style={s.input} />
             </Field>
@@ -179,15 +180,11 @@ export default function AdminPlansPage() {
               <label className="flex items-center gap-2 cursor-pointer text-sm" style={s.text}>
                 <input type="checkbox" checked={!!form.feature_flags?.qr_traceability}
                   onChange={(e) => setForm({ ...form, feature_flags: { ...form.feature_flags, qr_traceability: e.target.checked } })}
-                  className="w-4 h-4 rounded-[var(--radius-xs)]" />
-                QR Traceability
-              </label>
+                  className="w-4 h-4 rounded-[var(--radius-xs)]" />{t("admQrTraceability")}</label>
               <label className="flex items-center gap-2 cursor-pointer text-sm" style={s.text}>
                 <input type="checkbox" checked={!!form.feature_flags?.api_access}
                   onChange={(e) => setForm({ ...form, feature_flags: { ...form.feature_flags, api_access: e.target.checked } })}
-                  className="w-4 h-4 rounded-[var(--radius-xs)]" />
-                API Access
-              </label>
+                  className="w-4 h-4 rounded-[var(--radius-xs)]" />{t("admApiAccess")}</label>
             </div>
 
             <div className="flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:col-span-2 sm:flex-row sm:justify-end lg:col-span-3">
@@ -197,9 +194,7 @@ export default function AdminPlansPage() {
                 {saving ? "Saving…" : editingPlan ? "Save Changes" : "Create Plan"}
               </button>
               <button type="button" onClick={() => setShowForm(false)}
-                className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">
-                Cancel
-              </button>
+                className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm font-medium text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
             </div>
           </form>
       </Dialog>
@@ -216,7 +211,7 @@ export default function AdminPlansPage() {
           </TableHeader>
           <TableBody>
             {plans.length === 0 && (
-              <tr><TableCell colSpan={9} className="text-center py-10" style={s.muted}>No plans configured yet.</TableCell></tr>
+              <tr><TableCell colSpan={9} className="text-center py-10" style={s.muted}>{t("admNoPlans")}</TableCell></tr>
             )}
             {plans.map((plan) => (
               <TableRow key={plan.plan_id}>
@@ -233,8 +228,7 @@ export default function AdminPlansPage() {
                 <TableCell className="text-center">{plan.feature_flags?.api_access ? <CheckCircle className="w-4 h-4 text-(--success) mx-auto" /> : <X className="w-4 h-4 mx-auto" style={s.muted} />}</TableCell>
                 <TableCell>
                   <button onClick={() => handleOpen(plan)} className="text-xs font-medium flex items-center gap-1" style={s.accent}>
-                    <Edit2 className="w-3.5 h-3.5" /> Edit
-                  </button>
+                    <Edit2 className="w-3.5 h-3.5" />{t("edit")}</button>
                 </TableCell>
               </TableRow>
             ))}

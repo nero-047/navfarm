@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useAuth";
 import { api } from "@/lib/api-client";
 import { resolveLobFamily } from "@/lib/lob";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface OperationalArea {
   area_id: string;
@@ -37,6 +38,7 @@ interface OperationalArea {
 }
 
 export default function OperationalAreasPage() {
+  const { t } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
   const [areas, setAreas] = useState<OperationalArea[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,40 +165,34 @@ export default function OperationalAreasPage() {
   return (
     <ConsolePage className="text-(--text-primary)">
       <PageHeader
-        title="Operational Areas"
-        description="Operational areas under this company — farm sites, breeding units, and crop sectors, grouped by line of business (LOB)."
+        title={t("operationalAreas")}
+        description={t("oaPageDescription")}
       />
 
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs text-(--text-secondary)">
-          <span className="font-semibold text-(--text-primary)">{areas.length}</span> Active Operational Areas
-        </div>
+          <span className="font-semibold text-(--text-primary)">{areas.length}</span>{t("oaActiveAreas")}</div>
         <button
           onClick={() => setShowModal(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-sm)] bg-(--accent) hover:opacity-90 text-xs font-bold text-white shadow-xs transition-all"
         >
-          <Plus className="w-4 h-4" /> Create Operational Area
-        </button>
+          <Plus className="w-4 h-4" />{t("oaCreateArea")}</button>
       </div>
 
       {/* ── Operational Areas Cards Grid ── */}
       {loading ? (
         <div className="p-8 text-center text-xs text-(--text-muted) flex items-center justify-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin text-(--accent)" /> Loading operational areas…
-        </div>
+          <RefreshCw className="w-4 h-4 animate-spin text-(--accent)" />{t("oaLoadingAreas")}</div>
       ) : areas.length === 0 ? (
         <div className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-10 text-center">
           <Layers className="w-10 h-10 text-(--text-muted) mx-auto mb-3" />
-          <h3 className="text-sm font-bold text-(--text-primary)">No Operational Areas Created Yet</h3>
-          <p className="text-xs text-(--text-secondary) mt-1 max-w-md mx-auto">
-            Create an operational area (e.g. Piggery Unit or Dairy Unit) with pre-seeded master data to immediately start batch operations.
-          </p>
+          <h3 className="text-sm font-bold text-(--text-primary)">{t("oaNoAreasTitle")}</h3>
+          <p className="text-xs text-(--text-secondary) mt-1 max-w-md mx-auto">{t("oaNoAreasDesc")}</p>
           <button
             onClick={() => setShowModal(true)}
             className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-sm)] bg-(--accent) text-xs font-bold text-white shadow-xs"
           >
-            <Plus className="w-4 h-4" /> Create First Area
-          </button>
+            <Plus className="w-4 h-4" />{t("oaCreateFirstArea")}</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -231,9 +227,7 @@ export default function OperationalAreasPage() {
                     <span
                       className="px-2 py-0.5 rounded-full text-[10px] font-medium border"
                       style={{ backgroundColor: "var(--success-muted)", borderColor: "var(--success)", color: "var(--success)" }}
-                    >
-                      Active
-                    </span>
+                    >{t("statusActive")}</span>
                   </div>
 
                   <h4 className="text-sm font-semibold tracking-tight mb-1" style={{ color: "var(--text-primary)" }}>
@@ -248,14 +242,14 @@ export default function OperationalAreasPage() {
                     style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
                   >
                     <div className="flex justify-between">
-                      <span style={{ color: "var(--text-muted)" }}>Master Data Source:</span>
+                      <span style={{ color: "var(--text-muted)" }}>{t("oaMasterDataSource")}</span>
                       <span className="font-medium" style={{ color: "var(--text-primary)" }}>
                         {area.preseed_source === "COMPANY" ? "Company Master Data" : "Tenant Master Templates"}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span style={{ color: "var(--text-muted)" }}>Operational Status:</span>
-                      <span className="font-medium" style={{ color: "var(--success)" }}>Active Unit</span>
+                      <span style={{ color: "var(--text-muted)" }}>{t("oaOperationalStatus")}</span>
+                      <span className="font-medium" style={{ color: "var(--success)" }}>{t("oaActiveUnit")}</span>
                     </div>
                   </div>
                 </div>
@@ -268,8 +262,7 @@ export default function OperationalAreasPage() {
                     onClick={() => handleEnterArea(area)}
                     className="flex items-center gap-1 text-xs font-semibold hover:underline"
                     style={{ color: "var(--accent)" }}
-                  >
-                    Open Workspace <ArrowRight className="w-3.5 h-3.5" />
+                  >{t("oaOpenWorkspace")}<ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -284,10 +277,8 @@ export default function OperationalAreasPage() {
           <div className="w-full max-w-lg rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) shadow-2xl overflow-hidden text-(--text-primary) animate-scale-in">
             <div className="px-5 py-4 border-b border-(--border) bg-(--surface-raised) flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-(--text-primary)">Create Operational Area</h3>
-                <p className="text-xs text-(--text-secondary) mt-0.5">
-                  Establish a new Line of Business farm unit with instant master data pre-seeding.
-                </p>
+                <h3 className="text-sm font-bold text-(--text-primary)">{t("oaCreateArea")}</h3>
+                <p className="text-xs text-(--text-secondary) mt-0.5">{t("oaCreateAreaDesc")}</p>
               </div>
               <button
                 onClick={() => setShowModal(false)}
@@ -300,26 +291,22 @@ export default function OperationalAreasPage() {
             <form onSubmit={handleCreateArea} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="nf-text-label mb-1 block text-(--text-muted)">
-                    Area Code *
-                  </label>
+                  <label className="nf-text-label mb-1 block text-(--text-muted)">{t("oaAreaCodeRequired")}</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. PIG-UNIT-01"
+                    placeholder={t("oaPhAreaCode")}
                     value={form.area_code}
                     onChange={(e) => setForm({ ...form, area_code: e.target.value })}
                     className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-2 text-xs font-semibold text-(--text-primary)"
                   />
                 </div>
                 <div>
-                  <label className="nf-text-label mb-1 block text-(--text-muted)">
-                    Area Name *
-                  </label>
+                  <label className="nf-text-label mb-1 block text-(--text-muted)">{t("oaAreaNameRequired")}</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Piggery Breeding Unit"
+                    placeholder={t("oaPhAreaName")}
                     value={form.area_name}
                     onChange={(e) => setForm({ ...form, area_name: e.target.value })}
                     className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-2 text-xs font-semibold text-(--text-primary)"
@@ -329,9 +316,7 @@ export default function OperationalAreasPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="nf-text-label mb-1 block text-(--text-muted)">
-                    Nature of Business (NOB) *
-                  </label>
+                  <label className="nf-text-label mb-1 block text-(--text-muted)">{t("oaNobRequired")}</label>
                   <select
                     value={form.nob_id}
                     onChange={(e) => handleNobChange(e.target.value)}
@@ -345,9 +330,7 @@ export default function OperationalAreasPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="nf-text-label mb-1 block text-(--text-muted)">
-                    Line of Business (LOB) *
-                  </label>
+                  <label className="nf-text-label mb-1 block text-(--text-muted)">{t("oaLobRequired")}</label>
                   <select
                     value={form.lob_id}
                     onChange={(e) => setForm({ ...form, lob_id: e.target.value })}
@@ -364,14 +347,12 @@ export default function OperationalAreasPage() {
 
               {/* Pre-Seeding Source Option */}
               <div>
-                <label className="nf-text-label mb-1.5 block text-(--text-muted)">
-                  Pre-Seed Master Data From *
-                </label>
+                <label className="nf-text-label mb-1.5 block text-(--text-muted)">{t("oaPreseedFromRequired")}</label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: "TENANT", label: "Tenant Master Data", desc: "Global catalog templates" },
-                    { id: "COMPANY", label: "Company Master Data", desc: "Existing company items" },
-                    { id: "NONE", label: "Blank Setup", desc: "No pre-seeding" },
+                    { id: "TENANT", label: t("oaSrcTenantMaster"), desc: "Global catalog templates" },
+                    { id: "COMPANY", label: t("oaSrcCompanyMaster"), desc: "Existing company items" },
+                    { id: "NONE", label: t("oaSrcBlankSetup"), desc: "No pre-seeding" },
                   ].map((src) => (
                     <div
                       key={src.id}
@@ -390,12 +371,10 @@ export default function OperationalAreasPage() {
               </div>
 
               <div>
-                <label className="nf-text-label mb-1 block text-(--text-muted)">
-                  Description / Facility Notes
-                </label>
+                <label className="nf-text-label mb-1 block text-(--text-muted)">{t("oaDescriptionNotes")}</label>
                 <textarea
                   rows={2}
-                  placeholder="Optional unit description..."
+                  placeholder={t("oaPhDescription")}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-2 text-xs text-(--text-primary)"
@@ -407,9 +386,7 @@ export default function OperationalAreasPage() {
                   type="button"
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) text-xs font-semibold text-(--text-secondary)"
-                >
-                  Cancel
-                </button>
+                >{t("cancel")}</button>
                 <button
                   type="submit"
                   disabled={submitting}

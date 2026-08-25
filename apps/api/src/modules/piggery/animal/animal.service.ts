@@ -99,6 +99,37 @@ export class AnimalService {
     }
   }
 
+  /**
+   * Animal codes were always drawn from the ANIMAL_PIGGERY series, so a dairy
+   * cow or a layer bird would be issued a code like PIG-2026-0001. The series
+   * is now resolved from the animal's line of business, falling back to a
+   * tenant-wide ANIMAL series and finally to ANIMAL_PIGGERY so existing
+   * piggery tenants keep their numbering unchanged.
+   */
+  private async generateAnimalCode(lobId: string, tenantId: string, companyId: string): Promise<string> {
+    const [lob] = await this.db
+      .select({ lob_code: schema.lobMaster.lob_code })
+      .from(schema.lobMaster)
+      .where(eq(schema.lobMaster.lob_id, lobId))
+      .limit(1);
+
+    const candidates = [
+      lob?.lob_code ? `ANIMAL_${lob.lob_code.toUpperCase()}` : null,
+      'ANIMAL',
+      'ANIMAL_PIGGERY',
+    ].filter((x): x is string => !!x);
+
+    let lastError: unknown;
+    for (const seriesCode of candidates) {
+      try {
+        return await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError;
+  }
+
   async create(dto: CreateAnimalDto, tenantId: string, userPayload?: any) {
     await this.assertExists(
       this.db.select().from(schema.companyMaster).where(eq(schema.companyMaster.company_id, dto.company_id)),
@@ -185,7 +216,7 @@ export class AnimalService {
     }
 
     const animalId = randomUUID();
-    const animalCode = await this.numberSeriesService.generateNext('ANIMAL_PIGGERY', tenantId, dto.company_id);
+    const animalCode = await this.generateAnimalCode(dto.lob_id, tenantId, dto.company_id);
     const totalOpeningAssetValue = dto.acquisition_cost + (dto.landing_cost || 0);
 
     const newAnimal = {

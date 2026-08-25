@@ -2,6 +2,7 @@
 
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from "@/hooks/useLanguage";
 
 export type ToastVariant = 'success' | 'danger' | 'info';
 
@@ -20,6 +21,7 @@ const icons: Record<ToastVariant, typeof CheckCircle2> = {
 
 /** Presentational toast — render conditionally from local page state (no global provider). */
 export function Toast({ variant = 'info', message, onClose, className }: ToastProps) {
+  const { t } = useLanguage();
   const Icon = icons[variant];
   const colorVar = variant === 'success' ? '--success' : variant === 'danger' ? '--danger' : '--info';
 
@@ -35,7 +37,7 @@ export function Toast({ variant = 'info', message, onClose, className }: ToastPr
       <Icon size={16} className="shrink-0" />
       <span className="flex-1 text-(--text-primary)">{message}</span>
       {onClose && (
-        <button onClick={onClose} aria-label="Dismiss" className="nf-press shrink-0 text-(--text-muted) hover:text-(--text-primary)">
+        <button onClick={onClose} aria-label={t("gDismiss")} className="nf-press shrink-0 text-(--text-muted) hover:text-(--text-primary)">
           <X size={14} />
         </button>
       )}

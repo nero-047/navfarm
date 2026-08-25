@@ -26,6 +26,7 @@ import {
 } from "@/hooks/useAuth";
 import { api } from "@/lib/api-client";
 import { resolveLobFamily } from "@/lib/lob";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface OperationalAreaItem {
   area_id: string;
@@ -44,6 +45,7 @@ export default function WorkspaceScopeSwitcher({
 }: {
   onScopeChanged?: () => void;
 }) {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<NavUser | null>(null);
   const [currentScope, setCurrentScope] = useState<WorkspaceScope>("COMPANY");
@@ -242,7 +244,7 @@ export default function WorkspaceScopeSwitcher({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full text-left transition-all duration-150 rounded-[var(--radius-sm)] border border-white/10 bg-white/[0.05] hover:bg-white/[0.08] p-2.5 group focus:outline-none focus:ring-1 focus:ring-white/20"
-        aria-label="Switch Workspace Scope"
+        aria-label={t("wsSwitchScope")}
       >
         {identityBlock}
       </button>
@@ -264,9 +266,7 @@ export default function WorkspaceScopeSwitcher({
               borderColor: "var(--border)",
             }}
           >
-            <span className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: "var(--text-secondary)" }}>
-              Workspace Scope
-            </span>
+            <span className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: "var(--text-secondary)" }}>{t("wsWorkspaceScope")}</span>
             <span className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>
               {user?.userType?.replace(/_/g, " ")}
             </span>
@@ -276,9 +276,7 @@ export default function WorkspaceScopeSwitcher({
             {/* 1. Tenant Scope (Available for TENANT_ADMIN) */}
             {isTenantAdmin && (
               <div>
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                  Organization Level
-                </div>
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("wsOrganizationLevel")}</div>
                 <button
                   onClick={handleSelectTenantScope}
                   className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[var(--radius-sm)] text-xs transition-colors text-left ${
@@ -294,10 +292,8 @@ export default function WorkspaceScopeSwitcher({
                 >
                   <Building className="w-4 h-4 shrink-0" style={{ color: "var(--accent)" }} />
                   <div className="flex-1 min-w-0">
-                    <p className="truncate font-medium">Tenant Root Workspace</p>
-                    <p className="text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>
-                      Consolidated metrics & All Companies
-                    </p>
+                    <p className="truncate font-medium">{t("wsTenantRootWorkspace")}</p>
+                    <p className="text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>{t("wsConsolidatedMetrics")}</p>
                   </div>
                   {currentScope === "TENANT" && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />}
                 </button>
@@ -307,9 +303,7 @@ export default function WorkspaceScopeSwitcher({
             {/* 2. Companies List */}
             {isCompanyAdmin && companies.length > 0 && (
               <div>
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                  Legal Entities / Companies
-                </div>
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("wsLegalEntities")}</div>
                 <div className="space-y-0.5">
                   {companies.map((comp) => {
                     const isSelected = currentScope === "COMPANY" && activeCompId === comp.company_id;
@@ -346,7 +340,7 @@ export default function WorkspaceScopeSwitcher({
             {/* 3. Operational Areas */}
             <div>
               <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between" style={{ color: "var(--text-muted)" }}>
-                <span>Operational Farm Areas</span>
+                <span>{t("wsOperationalFarmAreas")}</span>
                 {isCompanyAdmin && (
                   <a
                     href="/operational-areas"
@@ -354,15 +348,12 @@ export default function WorkspaceScopeSwitcher({
                     className="text-[10px] hover:underline flex items-center gap-0.5"
                     style={{ color: "var(--accent)" }}
                   >
-                    <Plus className="w-2.5 h-2.5" /> New Area
-                  </a>
+                    <Plus className="w-2.5 h-2.5" />{t("wsNewArea")}</a>
                 )}
               </div>
 
               {operationalAreas.length === 0 ? (
-                <div className="px-3 py-2 text-center text-xs" style={{ color: "var(--text-muted)" }}>
-                  No operational areas configured yet.
-                </div>
+                <div className="px-3 py-2 text-center text-xs" style={{ color: "var(--text-muted)" }}>{t("dashNoOpAreasConfigured")}</div>
               ) : (
                 <div className="space-y-0.5">
                   {operationalAreas.map((area) => {
@@ -408,9 +399,7 @@ export default function WorkspaceScopeSwitcher({
           </div>
 
           <div className="p-2 border-t" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
-            <p className="text-[10px] text-center" style={{ color: "var(--text-muted)" }}>
-              Active workspace controls sidebar modules & permissions.
-            </p>
+            <p className="text-[10px] text-center" style={{ color: "var(--text-muted)" }}>{t("wsActiveScopeNote")}</p>
           </div>
         </div>
       )}

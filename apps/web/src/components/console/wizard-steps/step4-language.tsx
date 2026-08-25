@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Globe } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Step4LanguageProps {
   onSubmit: (langId: string) => Promise<void>;
@@ -11,6 +12,7 @@ interface Step4LanguageProps {
 }
 
 export default function Step4Language({ onSubmit, isSubmitting, languages, initialValue }: Step4LanguageProps) {
+  const { t } = useLanguage();
   const [selectedLang, setSelectedLang] = useState(initialValue || (languages.length > 0 ? languages[0].lang_id : ""));
 
   useEffect(() => {
@@ -28,14 +30,12 @@ export default function Step4Language({ onSubmit, isSubmitting, languages, initi
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
-          <Globe className="w-5 h-5 text-(--text-muted)" />
-          Step 4: Default Language Configuration
-        </h2>
-        <p className="text-xs text-(--text-secondary)">Choose the standard workspace interface language.</p>
+          <Globe className="w-5 h-5 text-(--text-muted)" />{t("wzStep4Title")}</h2>
+        <p className="text-xs text-(--text-secondary)">{t("wzStep4Desc")}</p>
       </div>
 
       <div className="flex flex-col gap-2 max-w-md mt-4">
-        <label className="text-xs text-(--text-secondary) font-medium">Select Language</label>
+        <label className="text-xs text-(--text-secondary) font-medium">{t("ctSelectLanguage")}</label>
         <Select
           value={selectedLang}
           onChange={(e) => setSelectedLang(e.target.value)}

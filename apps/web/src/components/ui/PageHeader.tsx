@@ -25,9 +25,9 @@ import type { ReactNode } from "react";
  * compose rather than reach for another styling flag:
  *
  *   <PageHeader
- *     title="Suppliers"
- *     description="Vendors and raw material suppliers."
- *     actions={<Button>Add supplier</Button>}
+ *     title={t("gSuppliers")}
+ *     description={t("gSuppliersDesc")}
+ *     actions={<Button>{t("gAddSupplier")}</Button>}
  *   />
  */
 export interface PageHeaderProps {

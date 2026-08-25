@@ -52,6 +52,7 @@ import { StageModule } from './modules/production/stage/stage.module';
 import { SchedulerModule } from './modules/production/scheduler/scheduler.module';
 import { AlertModule } from './modules/production/alert/alert.module';
 import { ApprovalModule } from './modules/production/approval/approval.module';
+import { MilkModule } from './modules/production/milk/milk.module';
 import { QcParameterModule } from './modules/production/qc-parameter/qc-parameter.module';
 import { QcModule } from './modules/production/qc/qc.module';
 import { QrCodeModule } from './modules/production/qr-code/qr-code.module';
@@ -130,6 +131,7 @@ import { SystemController } from './system/system.controller';
     SchedulerModule,
     AlertModule,
     ApprovalModule,
+    MilkModule,
     QcParameterModule,
     QcModule,
     QrCodeModule,

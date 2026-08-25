@@ -31,6 +31,7 @@ import { api } from "../../../services/api-client";
 import { Dialog } from "../../ui/dialog";
 import { FullPageDialogBoundary } from "../../ui/full-page-overlay";
 import { EditMemberModal, ActiveStatusBadge } from "../edit-member-modal";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface CompanyTabProps {
   activeCompany: any;
@@ -54,6 +55,7 @@ export default function CompanyTab({
   onSelectCompany,
   skipDirectory = false,
 }: CompanyTabProps) {
+  const { t } = useLanguage();
   const isTenantAdmin = currentUser?.userType === "TENANT_ADMIN";
   const isCompanyAdmin = currentUser?.userType === "COMPANY_ADMIN";
   const canEditCompany = isTenantAdmin || isCompanyAdmin;
@@ -588,15 +590,14 @@ export default function CompanyTab({
 
         <div className="flex justify-between items-center bg-(--surface) border border-(--border) p-5 rounded-[var(--radius-md)]">
           <div className="flex flex-col gap-1">
-            <h3 className="font-semibold text-(--text-primary) text-base">Corporate Directory</h3>
-            <p className="text-xs text-(--text-secondary)">Monitor and configure company business nodes under this SaaS tenant.</p>
+            <h3 className="font-semibold text-(--text-primary) text-base">{t("ctDirectoryTitle")}</h3>
+            <p className="text-xs text-(--text-secondary)">{t("ctDirectoryDesc")}</p>
           </div>
           <Button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-1.5 py-2.5 px-4 text-xs cursor-pointer hover:scale-[1.02]"
           >
-            <Plus className="w-4 h-4" /> Add Company Node
-          </Button>
+            <Plus className="w-4 h-4" />{t("ctAddCompany")}</Button>
         </div>
 
         <Card className="p-0 border-(--border) bg-(--surface) overflow-hidden">
@@ -605,18 +606,18 @@ export default function CompanyTab({
               <TableHeader>
                 <tr className="border-b border-(--row-border)">
                   <TableHead className="text-center w-12">#</TableHead>
-                  <TableHead className="w-28">Code</TableHead>
-                  <TableHead>Company Name</TableHead>
-                  <TableHead className="w-44">Industry</TableHead>
-                  <TableHead className="w-48">Identifiers</TableHead>
-                  <TableHead className="text-center w-28">Status</TableHead>
-                  <TableHead className="text-right w-36">Actions</TableHead>
+                  <TableHead className="w-28">{t("paramColCode")}</TableHead>
+                  <TableHead>{t("companyName")}</TableHead>
+                  <TableHead className="w-44">{t("ctIndustry")}</TableHead>
+                  <TableHead className="w-48">{t("ctIdentifiers")}</TableHead>
+                  <TableHead className="text-center w-28">{t("btColStatus")}</TableHead>
+                  <TableHead className="text-right w-36">{t("actionsColumn")}</TableHead>
                 </tr>
               </TableHeader>
               <TableBody>
                 {companies.length === 0 ? (
                   <tr>
-                    <TableCell colSpan={7} className="p-8 text-center" style={{ color: "var(--text-secondary)" }}>No corporate profiles registered. Click above to add one.</TableCell>
+                    <TableCell colSpan={7} className="p-8 text-center" style={{ color: "var(--text-secondary)" }}>{t("ctNoCompanies")}</TableCell>
                   </tr>
                 ) : (
                   companies.map((comp, idx) => (
@@ -655,9 +656,7 @@ export default function CompanyTab({
                           // legacy primitive was display:flex — it is the one
                           // call site that sat in block flow rather than a flex row.
                           className="w-full py-1.5 px-3 text-[10px] uppercase font-semibold tracking-wider hover:scale-[1.02] cursor-pointer"
-                        >
-                          Manage Profile
-                        </Button>
+                        >{t("ctManageProfile")}</Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -670,14 +669,14 @@ export default function CompanyTab({
         <Dialog
           open={showCreateModal}
           onClose={() => !creating && setShowCreateModal(false)}
-          title="Register new company"
-          description="Create the company record. Detailed ERP setup continues after registration."
+          title={t("ctRegisterCompanyTitle")}
+          description={t("ctRegisterCompanyDesc")}
           maxWidth="lg"
           className="nf-company-config"
         >
             <form onSubmit={handleCreateCompany} className="flex flex-col gap-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Company Code" htmlFor="create-company-code" required>
+                <Field label={t("ctCompanyCode")} htmlFor="create-company-code" required>
                   <Input
                     id="create-company-code"
                     placeholder="UNIQUE_CODE"
@@ -686,47 +685,47 @@ export default function CompanyTab({
                     required
                   />
                 </Field>
-                <Field label="Legal Entity Name" htmlFor="create-company-name" required>
+                <Field label={t("ctLegalEntityName")} htmlFor="create-company-name" required>
                   <Input
                     id="create-company-name"
-                    placeholder="Company Pvt Ltd"
+                    placeholder={t("ctPhCompanyPvtLtd")}
                     value={createForm.company_name}
                     onChange={(e) => setCreateForm({ ...createForm, company_name: e.target.value })}
                     required
                   />
                 </Field>
-                <Field label="Display / Brand Name" htmlFor="create-company-display-name">
+                <Field label={t("coFieldDisplayName")} htmlFor="create-company-display-name">
                   <Input
                     id="create-company-display-name"
-                    placeholder="Brand Name"
+                    placeholder={t("ctPhBrandName")}
                     value={createForm.company_display_name}
                     onChange={(e) => setCreateForm({ ...createForm, company_display_name: e.target.value })}
                   />
                 </Field>
                 <div className="flex flex-col gap-1.5">
-                  <label className="nf-text-label text-(--text-secondary)">Classification</label>
+                  <label className="nf-text-label text-(--text-secondary)">{t("ctClassification")}</label>
                   <Select
                     value={createForm.company_type}
                     onChange={(e) => setCreateForm({ ...createForm, company_type: e.target.value })}
                   >
-                    <option value="Pvt Ltd">Pvt Ltd</option>
-                    <option value="Sole Proprietor">Sole Proprietor</option>
-                    <option value="Partnership">Partnership</option>
+                    <option value="Pvt Ltd">{t("ctClsPvtLtd")}</option>
+                    <option value="Sole Proprietor">{t("ctClsSoleProprietor")}</option>
+                    <option value="Partnership">{t("ctClsPartnership")}</option>
                     <option value="LLP">LLP</option>
-                    <option value="Trust">Trust</option>
-                    <option value="Co-operative">Co-operative</option>
+                    <option value="Trust">{t("ctClsTrust")}</option>
+                    <option value="Co-operative">{t("ctClsCooperative")}</option>
                   </Select>
                 </div>
-                <Field label="Primary Industry" htmlFor="create-industry-type" required>
+                <Field label={t("ctPrimaryIndustry")} htmlFor="create-industry-type" required>
                   <Input
                     id="create-industry-type"
-                    placeholder="Poultry Farming"
+                    placeholder={t("coIndustryPoultryFarming")}
                     value={createForm.industry_type}
                     onChange={(e) => setCreateForm({ ...createForm, industry_type: e.target.value })}
                     required
                   />
                 </Field>
-                <Field label="Operating Country" htmlFor="create-country-id">
+                <Field label={t("ctOperatingCountry")} htmlFor="create-country-id">
                   <Input
                     id="create-country-id"
                     placeholder="IND"
@@ -734,7 +733,7 @@ export default function CompanyTab({
                     onChange={(e) => setCreateForm({ ...createForm, country_id: e.target.value })}
                   />
                 </Field>
-                <Field label="Timezone" htmlFor="create-timezone">
+                <Field label={t("ctTimezone")} htmlFor="create-timezone">
                   <Input
                     id="create-timezone"
                     placeholder="Asia/Kolkata"
@@ -742,7 +741,7 @@ export default function CompanyTab({
                     onChange={(e) => setCreateForm({ ...createForm, default_timezone_id: e.target.value })}
                   />
                 </Field>
-                <Field label="Tax Registration ID" htmlFor="create-tax-id">
+                <Field label={t("ctTaxRegIdShort")} htmlFor="create-tax-id">
                   <Input
                     id="create-tax-id"
                     placeholder="GSTIN12345"
@@ -750,7 +749,7 @@ export default function CompanyTab({
                     onChange={(e) => setCreateForm({ ...createForm, tax_id: e.target.value })}
                   />
                 </Field>
-                <Field label="Corporate Registration No" htmlFor="create-registration-no">
+                <Field label={t("ctCorpRegNoShort")} htmlFor="create-registration-no">
                   <Input
                     id="create-registration-no"
                     placeholder="CIN12345"
@@ -759,7 +758,7 @@ export default function CompanyTab({
                   />
                 </Field>
                 <div className="flex flex-col gap-1.5">
-                  <label className="nf-text-label text-(--text-secondary)">Brand Hex Accent Color</label>
+                  <label className="nf-text-label text-(--text-secondary)">{t("ctBrandHexColor")}</label>
                   <div className="flex gap-2 items-center">
                     <input
                       type="color"
@@ -778,9 +777,7 @@ export default function CompanyTab({
               </div>
 
               <div className="flex flex-col-reverse gap-3 border-t border-(--border) pt-4 sm:flex-row sm:justify-end">
-                <Button type="button" variant="outline" disabled={creating} onClick={() => setShowCreateModal(false)} className="min-h-10 px-4 text-sm cursor-pointer">
-                  Cancel
-                </Button>
+                <Button type="button" variant="outline" disabled={creating} onClick={() => setShowCreateModal(false)} className="min-h-10 px-4 text-sm cursor-pointer">{t("cancel")}</Button>
                 <Button type="submit" disabled={creating} className="min-h-10 px-5 text-sm cursor-pointer">
                   {creating ? "Creating..." : "Create Company"}
                 </Button>
@@ -818,8 +815,7 @@ export default function CompanyTab({
           onClick={() => setSelectedCompanyDetails(null)}
           className="flex items-center gap-2 text-xs text-(--text-secondary) hover:text-(--text-primary) cursor-pointer w-fit font-semibold bg-(--surface-raised) py-2 px-4 rounded-[var(--radius-sm)] border border-(--border) transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Workspace Directory
-        </button>
+          <ArrowLeft className="w-4 h-4" />{t("ctBackToDirectory")}</button>
       )}
 
       <div className="company-settings-container grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
@@ -832,7 +828,7 @@ export default function CompanyTab({
           <Card role={isEditing ? "dialog" : undefined} aria-modal={isEditing ? true : undefined} className={`nf-company-config flex flex-col gap-5 border-(--border) bg-(--surface) p-5 ${isEditing ? "max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-[0_24px_80px_rgba(0,0,0,0.24)] sm:max-h-[calc(100dvh-3rem)]" : ""}`}>
             <div className="flex justify-between items-center border-b border-(--border) pb-4">
               <div>
-                <h3 className="text-sm font-semibold text-(--text-primary)">ERP setup configuration</h3>
+                <h3 className="text-sm font-semibold text-(--text-primary)">{t("ctErpSetupConfig")}</h3>
                 {targetCompany && (
                   <span className="text-[9px] text-(--text-secondary) font-mono font-semibold bg-(--surface-raised) px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-(--border) mt-1 block w-fit">{targetCompany.company_id}</span>
                 )}
@@ -846,15 +842,13 @@ export default function CompanyTab({
                       onClick={() => setIsEditing(true)}
                       className="flex h-10 items-center gap-1.5 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-4 text-xs font-semibold text-(--accent) transition hover:bg-(--accent-muted)"
                     >
-                      <Edit2 className="w-3.5 h-3.5" /> Edit Configuration
-                    </button>
+                      <Edit2 className="w-3.5 h-3.5" />{t("ctEditConfiguration")}</button>
                   ) : (
                     <button
                       onClick={() => setIsEditing(false)}
                       className="flex items-center gap-1 text-xs text-(--text-secondary) hover:text-(--text-primary) font-semibold bg-(--surface-raised) py-1.5 px-3 rounded-lg border border-(--border) cursor-pointer transition-colors"
                     >
-                      <X className="w-3.5 h-3.5" /> Close Editor
-                    </button>
+                      <X className="w-3.5 h-3.5" />{t("ctCloseEditor")}</button>
                   )}
                 </div>
               )}
@@ -870,10 +864,10 @@ export default function CompanyTab({
             {!targetCompany ? (
               <div className="text-center p-8 text-(--text-secondary)">
                 <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30 text-(--accent)" />
-                <p className="text-xs">No active company profile found.</p>
+                <p className="text-xs">{t("ctNoActiveProfile")}</p>
               </div>
             ) : loadingDetails ? (
-              <div className="text-xs text-(--text-secondary) text-center py-12 animate-pulse">Loading step configurations...</div>
+              <div className="text-xs text-(--text-secondary) text-center py-12 animate-pulse">{t("ctLoadingSteps")}</div>
             ) : (
               <div className="flex flex-col md:flex-row gap-6 items-start">
 
@@ -888,8 +882,7 @@ export default function CompanyTab({
                         : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
                     }`}
                   >
-                    <Building2 className="w-4 h-4 shrink-0" /> Step 1: Profile
-                  </button>
+                    <Building2 className="w-4 h-4 shrink-0" />{t("ctStep1Profile")}</button>
                   <button
                     type="button"
                     onClick={() => setSettingsTab("address")}
@@ -899,8 +892,7 @@ export default function CompanyTab({
                         : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
                     }`}
                   >
-                    <MapPin className="w-4 h-4 shrink-0" /> Step 2: Address
-                  </button>
+                    <MapPin className="w-4 h-4 shrink-0" />{t("ctStep2Address")}</button>
                   <button
                     type="button"
                     onClick={() => setSettingsTab("contact")}
@@ -910,8 +902,7 @@ export default function CompanyTab({
                         : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
                     }`}
                   >
-                    <Contact className="w-4 h-4 shrink-0" /> Step 3: Contact
-                  </button>
+                    <Contact className="w-4 h-4 shrink-0" />{t("ctStep3Contact")}</button>
                   <button
                     type="button"
                     onClick={() => setSettingsTab("localization")}
@@ -921,8 +912,7 @@ export default function CompanyTab({
                         : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
                     }`}
                   >
-                    <Globe className="w-4 h-4 shrink-0" /> Steps 4-6: Locale & TZ
-                  </button>
+                    <Globe className="w-4 h-4 shrink-0" />{t("ctStep456Locale")}</button>
                   <button
                     type="button"
                     onClick={() => setSettingsTab("fiscal")}
@@ -932,8 +922,7 @@ export default function CompanyTab({
                         : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
                     }`}
                   >
-                    <Calendar className="w-4 h-4 shrink-0" /> Step 7: Fiscal Config
-                  </button>
+                    <Calendar className="w-4 h-4 shrink-0" />{t("ctStep7Fiscal")}</button>
                   <button
                     type="button"
                     onClick={() => setSettingsTab("modules")}
@@ -943,8 +932,7 @@ export default function CompanyTab({
                         : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
                     }`}
                   >
-                    <Layers className="w-4 h-4 shrink-0" /> Step 8: Sectors & LOBs
-                  </button>
+                    <Layers className="w-4 h-4 shrink-0" />{t("ctStep8Sectors")}</button>
                 </div>
 
                 {/* Tab content body */}
@@ -960,7 +948,7 @@ export default function CompanyTab({
                             {currentLogoUrl ? (
                               <img
                                 src={currentLogoUrl.startsWith('/') ? `${backendUrl}${currentLogoUrl}` : currentLogoUrl}
-                                alt="Company Logo"
+                                alt={t("ctCompanyLogoAlt")}
                                 className="w-full h-full object-contain p-1"
                               />
                             ) : (
@@ -980,65 +968,65 @@ export default function CompanyTab({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Company Code</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctCompanyCode")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-1 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
                               {setupDetails?.company?.company_code || targetCompany?.company_code}
                             </span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Legal Entity Name</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctLegalEntityName")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_name || targetCompany?.company_name}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Display / Brand Name</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("coFieldDisplayName")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_display_name || targetCompany?.company_display_name || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Business Classification</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctBusinessClassification")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_type || targetCompany?.company_type || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Primary Industry</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryIndustry")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.industry_type || targetCompany?.industry_type || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Tax Registration ID (GSTIN / TIN)</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctTaxRegIdFull")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-1 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
                               {setupDetails?.company?.tax_id || targetCompany?.tax_id || "—"}
                             </span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Tax Regime Scheme</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctTaxRegimeScheme")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.tax_regime || "STANDARD"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Corporate Registration No (CIN)</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctCorpRegNoFull")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-1.5 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
                               {setupDetails?.company?.registration_no || targetCompany?.registration_no || "—"}
                             </span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Incorporation Date</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctIncorporationDate")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.incorporation_date || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Official Website</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctOfficialWebsite")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.website || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Auto-Verify Email Domain</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctAutoVerifyDomain")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.email_domain || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Support Email</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctSupportEmail")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.support_email || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Primary Phone / Landline</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryPhoneLandline")}</span>
                             <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.phone_primary || "—"}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">Primary Accent Color</span>
+                            <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryAccentColor")}</span>
                             <div className="flex items-center gap-2 mt-2">
                               <div className="w-5 h-5 rounded-lg border border-(--border)" style={{ backgroundColor: setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79" }} />
                               <span className="text-xs font-mono text-(--text-secondary) uppercase">{setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79"}</span>
@@ -1054,7 +1042,7 @@ export default function CompanyTab({
                             {profileForm.company_logo_url ? (
                               <img
                                 src={profileForm.company_logo_url.startsWith('/') ? `${backendUrl}${profileForm.company_logo_url}` : profileForm.company_logo_url}
-                                alt="Logo Preview"
+                                alt={t("ctLogoPreviewAlt")}
                                 className="w-full h-full object-contain p-1"
                               />
                             ) : (
@@ -1062,7 +1050,7 @@ export default function CompanyTab({
                             )}
                           </div>
                           <div className="flex flex-col gap-1 flex-1">
-                            <label className="text-xs font-semibold text-(--text-secondary)">Company Logo Image</label>
+                            <label className="text-xs font-semibold text-(--text-secondary)">{t("ctCompanyLogoImage")}</label>
                             <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-(--accent)/10 text-(--accent) border border-(--accent)/30 text-xs font-semibold hover:bg-(--accent)/20 transition-all w-fit">
                               <Upload className="w-3.5 h-3.5" />
                               {uploadingLogo ? "Uploading..." : profileForm.company_logo_url ? "Change Logo" : "Upload Logo"}
@@ -1078,7 +1066,7 @@ export default function CompanyTab({
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Field label="Company Code (Read Only)" htmlFor="profile-company-code">
+                          <Field label={t("ctCompanyCodeReadOnly")} htmlFor="profile-company-code">
                             <Input
                               id="profile-company-code"
                               value={profileForm.company_code}
@@ -1086,7 +1074,7 @@ export default function CompanyTab({
                               className="opacity-50"
                             />
                           </Field>
-                          <Field label="Legal Entity Name" htmlFor="profile-company-name" required>
+                          <Field label={t("ctLegalEntityName")} htmlFor="profile-company-name" required>
                             <Input
                               id="profile-company-name"
                               value={profileForm.company_name}
@@ -1094,7 +1082,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Display / Brand Name" htmlFor="profile-company-display-name">
+                          <Field label={t("coFieldDisplayName")} htmlFor="profile-company-display-name">
                             <Input
                               id="profile-company-display-name"
                               value={profileForm.company_display_name}
@@ -1102,20 +1090,20 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Classification</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctClassification")}</label>
                             <Select
                               value={profileForm.company_type}
                               onChange={(e) => setProfileForm({ ...profileForm, company_type: e.target.value })}
                             >
-                              <option value="Sole Proprietor">Sole Proprietor</option>
-                              <option value="Partnership">Partnership</option>
-                              <option value="Pvt Ltd">Pvt Ltd</option>
+                              <option value="Sole Proprietor">{t("ctClsSoleProprietor")}</option>
+                              <option value="Partnership">{t("ctClsPartnership")}</option>
+                              <option value="Pvt Ltd">{t("ctClsPvtLtd")}</option>
                               <option value="LLP">LLP</option>
-                              <option value="Trust">Trust</option>
-                              <option value="Co-operative">Co-operative</option>
+                              <option value="Trust">{t("ctClsTrust")}</option>
+                              <option value="Co-operative">{t("ctClsCooperative")}</option>
                             </Select>
                           </div>
-                          <Field label="Primary Industry" htmlFor="profile-industry-type" required>
+                          <Field label={t("ctPrimaryIndustry")} htmlFor="profile-industry-type" required>
                             <Input
                               id="profile-industry-type"
                               value={profileForm.industry_type}
@@ -1123,7 +1111,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Tax Registration ID" htmlFor="profile-tax-id">
+                          <Field label={t("ctTaxRegIdShort")} htmlFor="profile-tax-id">
                             <Input
                               id="profile-tax-id"
                               value={profileForm.tax_id}
@@ -1131,24 +1119,24 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Tax Regime</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctTaxRegime")}</label>
                             <Select
                               value={profileForm.tax_regime}
                               onChange={(e) => setProfileForm({ ...profileForm, tax_regime: e.target.value })}
                             >
-                              <option value="STANDARD">Standard Scheme</option>
-                              <option value="COMPOSITION">Composition Scheme</option>
-                              <option value="EXEMPT">Exempt / Non-Taxable</option>
+                              <option value="STANDARD">{t("ctSchemeStandard")}</option>
+                              <option value="COMPOSITION">{t("ctSchemeComposition")}</option>
+                              <option value="EXEMPT">{t("ctSchemeExempt")}</option>
                             </Select>
                           </div>
-                          <Field label="Corporate Registration No" htmlFor="profile-registration-no">
+                          <Field label={t("ctCorpRegNoShort")} htmlFor="profile-registration-no">
                             <Input
                               id="profile-registration-no"
                               value={profileForm.registration_no}
                               onChange={(e) => setProfileForm({ ...profileForm, registration_no: e.target.value })}
                             />
                           </Field>
-                          <Field label="Incorporation Date" htmlFor="profile-incorporation-date">
+                          <Field label={t("ctIncorporationDate")} htmlFor="profile-incorporation-date">
                             <Input
                               id="profile-incorporation-date"
                               type="date"
@@ -1156,7 +1144,7 @@ export default function CompanyTab({
                               onChange={(e) => setProfileForm({ ...profileForm, incorporation_date: e.target.value })}
                             />
                           </Field>
-                          <Field label="Website URL" htmlFor="profile-website">
+                          <Field label={t("ctWebsiteUrl")} htmlFor="profile-website">
                             <Input
                               id="profile-website"
                               placeholder="https://greenvalleyfarms.in"
@@ -1164,7 +1152,7 @@ export default function CompanyTab({
                               onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
                             />
                           </Field>
-                          <Field label="Email Domain (for Auto-verify)" htmlFor="profile-email-domain">
+                          <Field label={t("ctEmailDomainAutoVerify")} htmlFor="profile-email-domain">
                             <Input
                               id="profile-email-domain"
                               placeholder="greenvalleyfarms.in"
@@ -1172,7 +1160,7 @@ export default function CompanyTab({
                               onChange={(e) => setProfileForm({ ...profileForm, email_domain: e.target.value })}
                             />
                           </Field>
-                          <Field label="Support Email" htmlFor="profile-support-email">
+                          <Field label={t("ctSupportEmail")} htmlFor="profile-support-email">
                             <Input
                               id="profile-support-email"
                               placeholder="support@greenvalleyfarms.in"
@@ -1181,7 +1169,7 @@ export default function CompanyTab({
                               onChange={(e) => setProfileForm({ ...profileForm, support_email: e.target.value })}
                             />
                           </Field>
-                          <Field label="Primary Phone / Landline" htmlFor="profile-phone-primary">
+                          <Field label={t("ctPrimaryPhoneLandline")} htmlFor="profile-phone-primary">
                             <Input
                               id="profile-phone-primary"
                               placeholder="+91 11 2345 6789"
@@ -1190,7 +1178,7 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Brand Hex Accent Color</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctBrandHexColor")}</label>
                             <div className="flex gap-2 items-center">
                               <input
                                 type="color"
@@ -1219,39 +1207,39 @@ export default function CompanyTab({
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Address Label / Tag</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctAddressLabelTag")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.address_label || "Primary HQ"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Address Type</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctAddressType")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.address_type || "HQ"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Address Line 1</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctAddressLine1")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.line1 || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Address Line 2</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctAddressLine2")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.line2 || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">City</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctCity")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.city || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">State / Province</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctStateProvince")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.state_id || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Country Code</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctCountryCode")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.address?.country_id || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Pincode / Postal Code</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctPincodePostal")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.address?.pincode || "—"}</span>
                         </div>
                         <div className="flex flex-col sm:col-span-2">
-                          <span className="nf-text-label text-(--text-secondary)">GPS Coordinates</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctGpsCoordinates")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">
                             {setupDetails?.address?.gps_latitude && setupDetails?.address?.gps_longitude
                               ? `${setupDetails.address.gps_latitude}, ${setupDetails.address.gps_longitude}`
@@ -1262,27 +1250,27 @@ export default function CompanyTab({
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Field label="Address Nickname / Tag" htmlFor="address-label">
+                          <Field label={t("ctAddressNicknameTag")} htmlFor="address-label">
                             <Input
                               id="address-label"
-                              placeholder="e.g. Headquarters - Gate 1"
+                              placeholder={t("ctPhHeadquartersGate")}
                               value={addressForm.address_label}
                               onChange={(e) => setAddressForm({ ...addressForm, address_label: e.target.value })}
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Address Type</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctAddressType")}</label>
                             <Select
                               value={addressForm.address_type}
                               onChange={(e) => setAddressForm({ ...addressForm, address_type: e.target.value })}
                             >
-                              <option value="HQ">Corporate HQ</option>
-                              <option value="Branch">Branch Office</option>
-                              <option value="Warehouse">Warehouse Depot</option>
-                              <option value="Farm">Farm Site</option>
+                              <option value="HQ">{t("ctAddrCorporateHq")}</option>
+                              <option value="Branch">{t("ctAddrBranchOffice")}</option>
+                              <option value="Warehouse">{t("ctAddrWarehouseDepot")}</option>
+                              <option value="Farm">{t("ctAddrFarmSite")}</option>
                             </Select>
                           </div>
-                          <Field label="Address Line 1" htmlFor="address-line1" required>
+                          <Field label={t("ctAddressLine1")} htmlFor="address-line1" required>
                             <Input
                               id="address-line1"
                               value={addressForm.line1}
@@ -1290,14 +1278,14 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Address Line 2" htmlFor="address-line2">
+                          <Field label={t("ctAddressLine2")} htmlFor="address-line2">
                             <Input
                               id="address-line2"
                               value={addressForm.line2}
                               onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
                             />
                           </Field>
-                          <Field label="City" htmlFor="address-city" required>
+                          <Field label={t("ctCity")} htmlFor="address-city" required>
                             <Input
                               id="address-city"
                               value={addressForm.city}
@@ -1305,7 +1293,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="State / Province" htmlFor="address-state" required>
+                          <Field label={t("ctStateProvince")} htmlFor="address-state" required>
                             <Input
                               id="address-state"
                               value={addressForm.state_id}
@@ -1313,7 +1301,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Country" htmlFor="address-country" required>
+                          <Field label={t("country")} htmlFor="address-country" required>
                             <Input
                               id="address-country"
                               value={addressForm.country_id}
@@ -1321,7 +1309,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Pincode" htmlFor="address-pincode" required>
+                          <Field label={t("ctPincode")} htmlFor="address-pincode" required>
                             <Input
                               id="address-pincode"
                               value={addressForm.pincode}
@@ -1330,18 +1318,18 @@ export default function CompanyTab({
                             />
                           </Field>
                           <div className="grid grid-cols-2 gap-2 sm:col-span-2">
-                            <Field label="GPS Latitude" htmlFor="address-gps-lat">
+                            <Field label={t("ctGpsLatitude")} htmlFor="address-gps-lat">
                               <Input
                                 id="address-gps-lat"
-                                placeholder="e.g. 28.6139"
+                                placeholder={t("ctPhLatitude")}
                                 value={addressForm.gps_latitude}
                                 onChange={(e) => setAddressForm({ ...addressForm, gps_latitude: e.target.value })}
                               />
                             </Field>
-                            <Field label="GPS Longitude" htmlFor="address-gps-lng">
+                            <Field label={t("ctGpsLongitude")} htmlFor="address-gps-lng">
                               <Input
                                 id="address-gps-lng"
-                                placeholder="e.g. 77.2090"
+                                placeholder={t("ctPhLongitude")}
                                 value={addressForm.gps_longitude}
                                 onChange={(e) => setAddressForm({ ...addressForm, gps_longitude: e.target.value })}
                               />
@@ -1360,33 +1348,33 @@ export default function CompanyTab({
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Contact Person Name</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctContactPersonName")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.contact?.full_name || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Designation</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("profileDesignation")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.contact?.designation || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Primary Phone</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryPhone")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.phone_primary || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Secondary Phone</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctSecondaryPhone")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.phone_secondary || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Primary Email</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryEmail")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.email || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Alerts & System Emails</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctAlertEmails")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {setupDetails?.contact?.receives_alerts ? "Active - Receives ERP threshold notifications" : "Disabled"}
                           </span>
                         </div>
                         <div className="flex flex-col sm:col-span-2">
-                          <span className="nf-text-label text-(--text-secondary)">Executive Reports Emails</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctExecReportEmails")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {setupDetails?.contact?.receives_reports ? "Active - Receives periodic executive summary reports" : "Disabled"}
                           </span>
@@ -1395,7 +1383,7 @@ export default function CompanyTab({
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Field label="Key Contact Person Full Name" htmlFor="contact-full-name" required>
+                          <Field label={t("ctKeyContactFullName")} htmlFor="contact-full-name" required>
                             <Input
                               id="contact-full-name"
                               value={contactForm.full_name}
@@ -1403,7 +1391,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Designation Role" htmlFor="contact-designation" required>
+                          <Field label={t("ctDesignationRole")} htmlFor="contact-designation" required>
                             <Input
                               id="contact-designation"
                               value={contactForm.designation}
@@ -1411,7 +1399,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Primary Contact Phone" htmlFor="contact-phone-primary" required>
+                          <Field label={t("ctPrimaryContactPhone")} htmlFor="contact-phone-primary" required>
                             <Input
                               id="contact-phone-primary"
                               value={contactForm.phone_primary}
@@ -1419,14 +1407,14 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Secondary Contact Phone" htmlFor="contact-phone-secondary">
+                          <Field label={t("ctSecondaryContactPhone")} htmlFor="contact-phone-secondary">
                             <Input
                               id="contact-phone-secondary"
                               value={contactForm.phone_secondary}
                               onChange={(e) => setContactForm({ ...contactForm, phone_secondary: e.target.value })}
                             />
                           </Field>
-                          <Field label="Primary Email" htmlFor="contact-email" required>
+                          <Field label={t("ctPrimaryEmail")} htmlFor="contact-email" required>
                             <Input
                               id="contact-email"
                               type="email"
@@ -1443,7 +1431,7 @@ export default function CompanyTab({
                                 onChange={(e) => setContactForm({ ...contactForm, receives_alerts: e.target.checked })}
                                 className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
                               />
-                              <span className="text-(--text-secondary) font-medium">Receive system threshold alerts</span>
+                              <span className="text-(--text-secondary) font-medium">{t("ctReceiveThresholdAlerts")}</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer text-xs">
                               <input
@@ -1452,7 +1440,7 @@ export default function CompanyTab({
                                 onChange={(e) => setContactForm({ ...contactForm, receives_reports: e.target.checked })}
                                 className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
                               />
-                              <span className="text-(--text-secondary) font-medium">Receive periodic executive reports</span>
+                              <span className="text-(--text-secondary) font-medium">{t("ctReceiveExecReports")}</span>
                             </label>
                           </div>
                         </div>
@@ -1469,23 +1457,23 @@ export default function CompanyTab({
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Default Language</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctDefaultLanguage")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {languages.find(l => l.lang_id === setupDetails?.company?.default_language_id)?.lang_name || setupDetails?.company?.default_language_id || "—"}
                           </span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Base Currency</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctBaseCurrency")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {currencies.find(c => c.currency_id === setupDetails?.company?.base_currency_id)?.currency_name || setupDetails?.company?.base_currency_id || "—"}
                           </span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Default Timezone</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctDefaultTimezone")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.default_timezone_id || "—"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Country Locale Code</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctCountryLocaleCode")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.country_id || "—"}</span>
                         </div>
                       </div>
@@ -1493,30 +1481,30 @@ export default function CompanyTab({
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Default Language</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctDefaultLanguage")}</label>
                             <Select
                               value={localizationForm.default_language_id}
                               onChange={(e) => setLocalizationForm({ ...localizationForm, default_language_id: e.target.value })}
                             >
-                              <option value="">Select Language</option>
+                              <option value="">{t("ctSelectLanguage")}</option>
                               {languages.map((l: any) => (
                                 <option key={l.lang_id} value={l.lang_id}>{l.lang_name} ({l.lang_code})</option>
                               ))}
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Base Currency</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctBaseCurrency")}</label>
                             <Select
                               value={localizationForm.base_currency_id}
                               onChange={(e) => setLocalizationForm({ ...localizationForm, base_currency_id: e.target.value })}
                             >
-                              <option value="">Select Currency</option>
+                              <option value="">{t("ctSelectCurrency")}</option>
                               {currencies.map((c: any) => (
                                 <option key={c.currency_id} value={c.currency_id}>{c.currency_name} ({c.currency_code})</option>
                               ))}
                             </Select>
                           </div>
-                          <Field label="Timezone ID" htmlFor="localization-timezone" required>
+                          <Field label={t("ctTimezoneId")} htmlFor="localization-timezone" required>
                             <Input
                               id="localization-timezone"
                               value={localizationForm.default_timezone_id}
@@ -1524,7 +1512,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label="Operating Country Code" htmlFor="localization-country" required>
+                          <Field label={t("ctOperatingCountryCode")} htmlFor="localization-country" required>
                             <Input
                               id="localization-country"
                               value={localizationForm.country_id}
@@ -1545,47 +1533,47 @@ export default function CompanyTab({
                     !isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Fiscal Year Format</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctFiscalYearFormat")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.fiscal_year_format || "FY APR-MAR"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Fiscal Start Month & Day</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctFiscalStartMonthDay")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {setupDetails?.fiscal?.fiscal_start_month ? `Month ${setupDetails.fiscal.fiscal_start_month}` : "Month 4 (April)"} (Day {setupDetails?.fiscal?.fiscal_start_day || 1} to Day {setupDetails?.fiscal?.fiscal_end_day || 31})
                           </span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Current Fiscal Year</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctCurrentFiscalYear")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.current_fiscal_year || "2026-27"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Period Type</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctPeriodType")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.period_type || "MONTHLY"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Accounting Standard</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctAccountingStandard")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.accounting_standard || "Local GAAP"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Asset Depreciation Model</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctDepreciationModel")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.depreciation_method || "SLM (Straight Line)"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Inventory Costing Model</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctInventoryCostingModel")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.inventory_valuation || "FIFO"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">GST / Tax Filing Frequency</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctTaxFilingFrequency")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.gst_filing_frequency || "MONTHLY"}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Statutory Tax Audit</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctStatutoryTaxAudit")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2">
                             {setupDetails?.fiscal?.tax_audit_applicable ? "Mandatory Tax Audit Applicable" : "Not Applicable"}
                           </span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">Decimal Precision</span>
+                          <span className="nf-text-label text-(--text-secondary)">{t("ctDecimalPrecision")}</span>
                           <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.decimal_places ?? 2} Decimal Places</span>
                         </div>
                       </div>
@@ -1593,79 +1581,79 @@ export default function CompanyTab({
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Fiscal Start Month</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctFiscalStartMonth")}</label>
                             <Select
                               value={fiscalForm.fiscal_start_month}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, fiscal_start_month: parseInt(e.target.value) })}
                             >
-                              <option value={1}>January</option>
-                              <option value={4}>April</option>
+                              <option value={1}>{t("ctMonthJanuary")}</option>
+                              <option value={4}>{t("ctMonthApril")}</option>
                             </Select>
                           </div>
-                          <Field label="Current Fiscal Year" htmlFor="fiscal-year" required>
+                          <Field label={t("ctCurrentFiscalYear")} htmlFor="fiscal-year" required>
                             <Input
                               id="fiscal-year"
-                              placeholder="e.g. 2026-27"
+                              placeholder={t("ctPhFiscalYear")}
                               value={fiscalForm.current_fiscal_year}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, current_fiscal_year: e.target.value })}
                               required
                             />
                           </Field>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Accounting Periodicity</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctAccountingPeriodicity")}</label>
                             <Select
                               value={fiscalForm.period_type}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, period_type: e.target.value })}
                             >
-                              <option value="MONTHLY">Monthly Periods</option>
-                              <option value="QUARTERLY">Quarterly Periods</option>
+                              <option value="MONTHLY">{t("ctPeriodMonthly")}</option>
+                              <option value="QUARTERLY">{t("ctPeriodQuarterly")}</option>
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Accounting Standard</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctAccountingStandard")}</label>
                             <Select
                               value={fiscalForm.accounting_standard}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, accounting_standard: e.target.value })}
                             >
-                              <option value="Local GAAP">Local GAAP</option>
+                              <option value="Local GAAP">{t("ctLocalGaap")}</option>
                               <option value="IFRS">IFRS</option>
                               <option value="US GAAP">US GAAP</option>
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Asset Depreciation Model</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctDepreciationModel")}</label>
                             <Select
                               value={fiscalForm.depreciation_method}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, depreciation_method: e.target.value })}
                             >
-                              <option value="SLM">Straight Line Method (SLM)</option>
-                              <option value="WDV">Written Down Value (WDV)</option>
-                              <option value="UNITS_OF_PRODUCTION">Units of Production</option>
+                              <option value="SLM">{t("ctDeprSlm")}</option>
+                              <option value="WDV">{t("ctDeprWdv")}</option>
+                              <option value="UNITS_OF_PRODUCTION">{t("ctDeprUnitsOfProduction")}</option>
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Inventory Costing Method</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctInventoryCostingMethod")}</label>
                             <Select
                               value={fiscalForm.inventory_valuation}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, inventory_valuation: e.target.value })}
                             >
-                              <option value="FIFO">FIFO (First-In, First-Out)</option>
-                              <option value="Weighted Average">Weighted Average Cost</option>
-                              <option value="STANDARD COSTING">Standard Costing</option>
+                              <option value="FIFO">{t("ctCostFifo")}</option>
+                              <option value="Weighted Average">{t("ctCostWeightedAverage")}</option>
+                              <option value="STANDARD COSTING">{t("ctCostStandard")}</option>
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">GST / Tax Filing Frequency</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctTaxFilingFrequency")}</label>
                             <Select
                               value={fiscalForm.gst_filing_frequency}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, gst_filing_frequency: e.target.value })}
                             >
-                              <option value="MONTHLY">Monthly Filing</option>
-                              <option value="QUARTERLY">Quarterly Filing</option>
+                              <option value="MONTHLY">{t("ctFilingMonthly")}</option>
+                              <option value="QUARTERLY">{t("ctFilingQuarterly")}</option>
                             </Select>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">Decimal Precision</label>
+                            <label className="nf-text-label text-(--text-secondary)">{t("ctDecimalPrecision")}</label>
                             <Select
                               value={fiscalForm.decimal_places}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, decimal_places: parseInt(e.target.value) })}
@@ -1683,7 +1671,7 @@ export default function CompanyTab({
                                 onChange={(e) => setFiscalForm({ ...fiscalForm, tax_audit_applicable: e.target.checked })}
                                 className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
                               />
-                              <span className="text-(--text-secondary) font-medium">Mandatory Statutory Tax Audit Applicable</span>
+                              <span className="text-(--text-secondary) font-medium">{t("ctStatutoryAuditApplicable")}</span>
                             </label>
                           </div>
                         </div>
@@ -1699,9 +1687,9 @@ export default function CompanyTab({
                   {settingsTab === "modules" && (
                     !isEditing ? (
                       <div className="flex flex-col gap-4">
-                        <span className="nf-text-label text-(--text-secondary)">Activated Sectors & LOB Verticals</span>
+                        <span className="nf-text-label text-(--text-secondary)">{t("ctActivatedSectors")}</span>
                         {modulesForm.length === 0 ? (
-                          <div className="text-xs text-(--text-secondary) bg-(--surface-raised) p-4 rounded-[var(--radius-sm)] border border-(--border)">No business modules enabled. Click Edit above to select sectors.</div>
+                          <div className="text-xs text-(--text-secondary) bg-(--surface-raised) p-4 rounded-[var(--radius-sm)] border border-(--border)">{t("ctNoModulesEnabled")}</div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {nobs.map((n: any) => {
@@ -1715,12 +1703,12 @@ export default function CompanyTab({
                                 <div key={n.nob_id} className="p-4 rounded-[var(--radius-sm)] bg-(--surface-raised) border border-(--border) flex flex-col gap-2">
                                   <div className="flex items-center gap-2 border-b border-(--border) pb-2">
                                     <span className="font-semibold text-xs text-(--text-primary)">{n.nob_name}</span>
-                                    <span className="text-[9px] bg-(--accent)/10 text-(--accent) font-semibold border border-(--accent)/20 px-1.5 py-0.5 rounded-[var(--radius-xs)] font-mono uppercase shrink-0">Active</span>
+                                    <span className="text-[9px] bg-(--accent)/10 text-(--accent) font-semibold border border-(--accent)/20 px-1.5 py-0.5 rounded-[var(--radius-xs)] font-mono uppercase shrink-0">{t("statusActive")}</span>
                                   </div>
                                   <div className="flex flex-col gap-1 mt-1">
-                                    <span className="text-[9px] font-semibold text-(--accent) uppercase tracking-wider">Active Operations (LOBs):</span>
+                                    <span className="text-[9px] font-semibold text-(--accent) uppercase tracking-wider">{t("ctActiveLobsLabel")}</span>
                                     {activeLobs.length === 0 ? (
-                                      <span className="text-xs text-(--text-secondary)">None active</span>
+                                      <span className="text-xs text-(--text-secondary)">{t("ctNoneActive")}</span>
                                     ) : (
                                       <div className="flex flex-wrap gap-1.5 mt-1">
                                         {activeLobs.map(lob => (
@@ -1765,11 +1753,11 @@ export default function CompanyTab({
                                 {/* LOB Checkboxes inside setup view */}
                                 {isNobChecked && (
                                   <div className="mt-3 pt-3 border-t border-(--border)/80 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-                                    <span className="text-[10px] font-semibold text-(--accent) uppercase tracking-wider">Select Active Operations (LOBs):</span>
+                                    <span className="text-[10px] font-semibold text-(--accent) uppercase tracking-wider">{t("ctSelectActiveLobs")}</span>
                                     {loadingLobs[n.nob_id] ? (
-                                      <div className="text-[11px] text-(--text-secondary) animate-pulse py-1">Loading active sub-sectors...</div>
+                                      <div className="text-[11px] text-(--text-secondary) animate-pulse py-1">{t("ctLoadingSubSectors")}</div>
                                     ) : associatedLobs.length === 0 ? (
-                                      <div className="text-[11px] text-(--text-secondary) py-1">No sub-sectors available.</div>
+                                      <div className="text-[11px] text-(--text-secondary) py-1">{t("ctNoSubSectors")}</div>
                                     ) : (
                                       <div className="flex flex-col gap-1.5 mt-1">
                                         {associatedLobs.map((lob: any) => {
@@ -1815,27 +1803,27 @@ export default function CompanyTab({
 
           {/* Details footer stats */}
           <Card className="nf-company-config flex flex-col gap-4 border-(--border) bg-(--surface) p-6">
-            <h4 className="text-sm font-semibold text-(--text-primary)">Tenant configuration summary</h4>
+            <h4 className="text-sm font-semibold text-(--text-primary)">{t("ctTenantConfigSummary")}</h4>
             {targetCompany ? (
               <div className="text-xs text-(--text-secondary) flex flex-col gap-4">
                 <div className="flex justify-between items-center py-2 border-b border-(--border)">
-                  <span className="text-(--text-secondary) font-medium">Base Currency</span>
+                  <span className="text-(--text-secondary) font-medium">{t("ctBaseCurrency")}</span>
                   <span className="text-(--text-primary) font-semibold font-mono bg-(--surface-raised) px-2 py-0.5 rounded-[var(--radius-xs)] border border-(--border)">
                     {currencies.find(c => c.currency_id === targetCompany?.base_currency_id)?.currency_name || "INR"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-(--border)">
-                  <span className="text-(--text-secondary) font-medium">Timezone</span>
+                  <span className="text-(--text-secondary) font-medium">{t("ctTimezone")}</span>
                   <span className="text-(--text-primary) font-semibold">{targetCompany?.default_timezone_id || "Asia/Kolkata"}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-(--border)">
-                  <span className="text-(--text-secondary) font-medium">Operating Country</span>
+                  <span className="text-(--text-secondary) font-medium">{t("ctOperatingCountry")}</span>
                   <span className="text-(--text-primary) font-semibold font-mono bg-(--surface-raised) px-2 py-0.5 rounded-[var(--radius-xs)] border border-(--border)">
                     {targetCompany?.country_id || "IND"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-(--text-secondary) font-medium">Onboarding Status</span>
+                  <span className="text-(--text-secondary) font-medium">{t("ctOnboardingStatus")}</span>
                   <span className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-semibold ${
                     targetCompany?.onboarding_status === 'COMPLETED' ? 'bg-(--success-muted) text-(--success) border border-(--success)' : 'bg-(--warning-muted) text-(--warning) border border-(--warning)'
                   }`}>
@@ -1844,7 +1832,7 @@ export default function CompanyTab({
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-(--text-secondary)">No company selected.</div>
+              <div className="text-xs text-(--text-secondary)">{t("ctNoCompanySelected")}</div>
             )}
           </Card>
 
@@ -1862,9 +1850,9 @@ export default function CompanyTab({
 
             <div className="flex flex-col gap-3 max-h-60 overflow-y-auto pr-1">
               {loadingUsers ? (
-                <div className="text-xs text-(--text-secondary) text-center py-6">Loading team directory...</div>
+                <div className="text-xs text-(--text-secondary) text-center py-6">{t("ctLoadingTeam")}</div>
               ) : companyUsers.length === 0 ? (
-                <div className="text-xs text-(--text-secondary) text-center py-6">No users assigned. Register one below.</div>
+                <div className="text-xs text-(--text-secondary) text-center py-6">{t("ctNoUsersAssigned")}</div>
               ) : (
                 companyUsers.map((u) => {
                   const isSelf = !!currentUser?.userId && u.user_id === currentUser.userId;
@@ -1888,7 +1876,7 @@ export default function CompanyTab({
                             <Badge key={r.role_id} variant="accent">{r.role_name}</Badge>
                           ))
                         ) : (
-                          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>No role assigned</span>
+                          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("ctNoRoleAssigned")}</span>
                         )}
                       </div>
                     </div>
@@ -1896,7 +1884,7 @@ export default function CompanyTab({
                       <span
                         onClick={(e) => { e.stopPropagation(); setEditingOperator(u); }}
                         className="p-1.5 text-(--text-secondary) hover:text-(--accent) hover:bg-(--accent-muted) rounded-lg cursor-pointer transition-colors"
-                        title="View / edit"
+                        title={t("ctViewEdit")}
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </span>
@@ -1904,7 +1892,7 @@ export default function CompanyTab({
                         <span
                           onClick={(e) => { e.stopPropagation(); setUserPendingDeletion(u.user_id); }}
                           className="p-1.5 text-(--text-secondary) hover:text-(--danger) hover:bg-(--danger-muted) rounded-lg cursor-pointer transition-colors"
-                          title="Deactivate account"
+                          title={t("ctDeactivateAccount")}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </span>
@@ -1925,7 +1913,7 @@ export default function CompanyTab({
             maxWidth="md"
             footer={
               <>
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowAdminDialog(false)}>Cancel</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowAdminDialog(false)}>{t("cancel")}</Button>
                 <Button type="submit" form="add-admin-form" disabled={addingAdmin} size="sm" className="flex items-center gap-1.5 nf-btn-primary">
                   <UserPlus className="w-3.5 h-3.5" /> {addingAdmin ? "Registering..." : (isTenantAdmin ? "Add Administrator" : "Add Operator")}
                 </Button>
@@ -1933,16 +1921,16 @@ export default function CompanyTab({
             }
           >
             <form id="add-admin-form" onSubmit={handleAddCompanyAdmin} className="flex flex-col gap-4 pt-1">
-              <Field label="Full Name" htmlFor="admin-full-name" required>
+              <Field label={t("authFullName")} htmlFor="admin-full-name" required>
                 <Input
                   id="admin-full-name"
-                  placeholder="John Doe"
+                  placeholder={t("ctPhPersonName")}
                   value={adminForm.fullName}
                   onChange={(e) => setAdminForm({ ...adminForm, fullName: e.target.value })}
                   required
                 />
               </Field>
-              <Field label="Email Address" htmlFor="admin-email" required>
+              <Field label={t("usrEmailAddress")} htmlFor="admin-email" required>
                 <Input
                   id="admin-email"
                   type="email"
@@ -1952,17 +1940,17 @@ export default function CompanyTab({
                   required
                 />
               </Field>
-              <Field label="Temporary Password" htmlFor="admin-password" required>
+              <Field label={t("usrTempPassword")} htmlFor="admin-password" required>
                 <Input
                   id="admin-password"
                   type="password"
-                  placeholder="At least 8 characters"
+                  placeholder={t("ctPhMinEightChars")}
                   value={adminForm.password}
                   onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
                   required
                 />
               </Field>
-              <Field label="Phone Number" htmlFor="admin-phone">
+              <Field label={t("ctPhoneNumber")} htmlFor="admin-phone">
                 <Input
                   id="admin-phone"
                   placeholder="+919999911111"
@@ -1976,17 +1964,17 @@ export default function CompanyTab({
           <Dialog
             open={Boolean(userPendingDeletion)}
             onClose={() => setUserPendingDeletion(null)}
-            title="Deactivate account"
-            description="The user will no longer be able to access this company workspace."
+            title={t("ctDeactivateAccount")}
+            description={t("ctDeactivateWarning")}
             maxWidth="sm"
             footer={
               <>
-                <Button variant="outline" size="sm" onClick={() => setUserPendingDeletion(null)}>Cancel</Button>
-                <Button variant="destructive" size="sm" onClick={() => userPendingDeletion && handleDeleteUser(userPendingDeletion)}>Deactivate</Button>
+                <Button variant="outline" size="sm" onClick={() => setUserPendingDeletion(null)}>{t("cancel")}</Button>
+                <Button variant="destructive" size="sm" onClick={() => userPendingDeletion && handleDeleteUser(userPendingDeletion)}>{t("deactivate")}</Button>
               </>
             }
           >
-            <p className="text-xs leading-5 text-(--text-secondary) pt-1">Are you sure you want to deactivate this account?</p>
+            <p className="text-xs leading-5 text-(--text-secondary) pt-1">{t("ctConfirmDeactivate")}</p>
           </Dialog>
 
           {editingOperator && (

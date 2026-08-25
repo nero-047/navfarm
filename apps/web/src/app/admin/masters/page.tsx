@@ -11,6 +11,7 @@ import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // ── Shared style tokens ─────────────────────────────────────────────────────
 const S = {
@@ -31,6 +32,7 @@ const inputCls = "nf-input";
 type MasterTab = "nobs" | "currencies" | "languages" | "timezones" | "countries" | "costingMethods";
 
 export default function AdminMastersPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [activeTab,  setActiveTab]  = useState<MasterTab>("nobs");
   const [loading,    setLoading]    = useState(true);
@@ -243,7 +245,7 @@ export default function AdminMastersPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="animate-spin w-5 h-5 mr-2" style={S.accent} />
-        <span className="text-sm" style={S.sub}>Loading master data…</span>
+        <span className="text-sm" style={S.sub}>{t("admLoadingMasterData")}</span>
       </div>
     );
   }
@@ -264,8 +266,8 @@ export default function AdminMastersPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
       <PageHeader
-        title="Master Data"
-        description="Manage global seed data: NOBs, LOBs, Currencies, Languages, Timezones, Countries & States, Costing Methods"
+        title={t("masterData")}
+        description={t("admMastersDesc")}
       />
 
       {error   && <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /> {error}</div>}
@@ -289,14 +291,13 @@ export default function AdminMastersPage() {
           {activeTab === "nobs" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Nature of Business</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{t("dashColNob")}</p>
                 <button onClick={() => setShowNobForm(!showNobForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
-                  <Plus className="w-3.5 h-3.5" /> Add NOB
-                </button>
+                  <Plus className="w-3.5 h-3.5" />{t("admAddNob")}</button>
               </div>
 
-              <Dialog open={showNobForm} onClose={() => setShowNobForm(false)} title="Add nature of business" description="Create a configurable farming vertical for company setup." maxWidth="md">
+              <Dialog open={showNobForm} onClose={() => setShowNobForm(false)} title={t("admAddNobTitle")} description={t("admAddNobDesc")} maxWidth="md">
                 <form onSubmit={handleSaveNob} className="grid grid-cols-2 gap-4">
                   {[
                     { k: "nob_code",    l: "NOB Code",    p: "POULTRY"              },
@@ -311,13 +312,13 @@ export default function AdminMastersPage() {
                       </Field>
                     </div>
                   ))}
-                  <Field label="Costing Method">
+                  <Field label={t("blLabelCostingMethod")}>
                     <select value={nobForm.default_costing_method}
                       onChange={(e) => setNobForm({ ...nobForm, default_costing_method: e.target.value })}
                       className={`${inputCls} nf-select`} style={S.input}>
                       <option value="FIFO">FIFO</option>
-                      <option value="STANDARD">Standard</option>
-                      <option value="BIO">Bio Asset (IAS 41)</option>
+                      <option value="STANDARD">{t("blCostingStandard")}</option>
+                      <option value="BIO">{t("admBioAssetIas41")}</option>
                     </select>
                   </Field>
                   <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
@@ -326,9 +327,7 @@ export default function AdminMastersPage() {
                       {savingNob ? "Saving…" : "Save NOB"}
                     </button>
                     <button type="button" onClick={() => setShowNobForm(false)}
-                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
-                      Cancel
-                    </button>
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
                   </div>
                 </form>
               </Dialog>
@@ -336,7 +335,7 @@ export default function AdminMastersPage() {
               {/* One list of peers separated by hairlines, not a stack of
                   cards — each row is a sibling entry, not its own module. */}
               <div className="border-t" style={S.border}>
-                {nobs.length === 0 && <p className="text-sm text-center py-8" style={S.muted}>No NOBs configured.</p>}
+                {nobs.length === 0 && <p className="text-sm text-center py-8" style={S.muted}>{t("admNoNobs")}</p>}
                 {nobs.map((nob) => {
                   const isExp = expandedNob === nob.nob_id;
                   return (
@@ -361,14 +360,13 @@ export default function AdminMastersPage() {
                       {isExp && (
                         <div className="px-4 py-3 border-t" style={{ ...S.surface, ...S.border }}>
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Lines of Business</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{t("admLinesOfBusiness")}</p>
                             <button onClick={() => setShowLobForm(showLobForm === nob.nob_id ? null : nob.nob_id)}
                               className="text-xs font-semibold flex items-center gap-1" style={S.accent}>
-                              <Plus className="w-3.5 h-3.5" /> Add LOB
-                            </button>
+                              <Plus className="w-3.5 h-3.5" />{t("admAddLob")}</button>
                           </div>
 
-                          <Dialog open={showLobForm === nob.nob_id} onClose={() => setShowLobForm(null)} title="Add line of business" description={`Add an operating line beneath ${nob.nob_name}.`} maxWidth="md">
+                          <Dialog open={showLobForm === nob.nob_id} onClose={() => setShowLobForm(null)} title={t("admAddLobTitle")} description={`Add an operating line beneath ${nob.nob_name}.`} maxWidth="md">
                             <form onSubmit={(e) => handleSaveLob(e, nob.nob_id)} className="grid grid-cols-2 gap-4">
                               {[
                                 { k: "lob_code", l: "LOB Code", p: "BROILER"           },
@@ -386,19 +384,16 @@ export default function AdminMastersPage() {
                                   {savingLob ? "Saving…" : "Save LOB"}
                                 </button>
                                 <button type="button" onClick={() => setShowLobForm(null)}
-                                  className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
-                                  Cancel
-                                </button>
+                                  className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
                               </div>
                             </form>
                           </Dialog>
 
                           {loadingLobs[nob.nob_id] ? (
                             <div className="text-xs flex items-center gap-1.5" style={S.muted}>
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading…
-                            </div>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />{t("loadingEllipsis")}</div>
                           ) : (lobs[nob.nob_id] || []).length === 0 ? (
-                            <p className="text-xs" style={S.muted}>No LOBs defined yet.</p>
+                            <p className="text-xs" style={S.muted}>{t("admNoLobs")}</p>
                           ) : (
                             <div className="flex flex-wrap gap-2">
                               {(lobs[nob.nob_id] || []).map((lob: any) => (
@@ -424,14 +419,13 @@ export default function AdminMastersPage() {
           {activeTab === "currencies" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Supported Currencies</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{t("admSupportedCurrencies")}</p>
                 <button onClick={() => setShowCurrForm(!showCurrForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
-                  <Plus className="w-3.5 h-3.5" /> Add Currency
-                </button>
+                  <Plus className="w-3.5 h-3.5" />{t("admAddCurrency")}</button>
               </div>
 
-              <Dialog open={showCurrForm} onClose={() => setShowCurrForm(false)} title="Add currency" description="Add a reporting or accounting currency to the system catalog." maxWidth="md">
+              <Dialog open={showCurrForm} onClose={() => setShowCurrForm(false)} title={t("admAddCurrencyTitle")} description={t("admAddCurrencyDesc")} maxWidth="md">
                 <form onSubmit={handleSaveCurrency} className="grid grid-cols-2 gap-4">
                   {[
                     { k: "iso_code",       l: "ISO Code", p: "USD"        },
@@ -444,12 +438,12 @@ export default function AdminMastersPage() {
                         placeholder={p} className={inputCls} style={S.input} />
                     </Field>
                   ))}
-                  <Field label="Symbol Position">
+                  <Field label={t("admSymbolPosition")}>
                     <select value={currForm.symbol_position}
                       onChange={(e) => setCurrForm({ ...currForm, symbol_position: e.target.value })}
                       className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="BEFORE">Before amount</option>
-                      <option value="AFTER">After amount</option>
+                      <option value="BEFORE">{t("admBeforeAmount")}</option>
+                      <option value="AFTER">{t("admAfterAmount")}</option>
                     </select>
                   </Field>
                   <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
@@ -458,14 +452,14 @@ export default function AdminMastersPage() {
                       {savingCurr ? "Saving…" : "Add Currency"}
                     </button>
                     <button type="button" onClick={() => setShowCurrForm(false)}
-                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
                   </div>
                 </form>
               </Dialog>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 {currencies.length === 0 && (
-                  <p className="text-sm col-span-full text-center py-4" style={S.muted}>No currencies configured.</p>
+                  <p className="text-sm col-span-full text-center py-4" style={S.muted}>{t("admNoCurrencies")}</p>
                 )}
                 {currencies.map((curr) => (
                   <div key={curr.iso_code}
@@ -476,7 +470,7 @@ export default function AdminMastersPage() {
                     <div className="text-[10px] mt-0.5 truncate" style={S.muted}>{curr.currency_name}</div>
                     {curr.is_system_default && (
                       <span className="mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded-[var(--radius-xs)]"
-                        style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)" }}>Default</span>
+                        style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)" }}>{t("admDefault")}</span>
                     )}
                   </div>
                 ))}
@@ -488,14 +482,13 @@ export default function AdminMastersPage() {
           {activeTab === "languages" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Supported Languages</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{t("admSupportedLanguages")}</p>
                 <button onClick={() => setShowLangForm(!showLangForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
-                  <Plus className="w-3.5 h-3.5" /> Add Language
-                </button>
+                  <Plus className="w-3.5 h-3.5" />{t("admAddLanguage")}</button>
               </div>
 
-              <Dialog open={showLangForm} onClose={() => setShowLangForm(false)} title="Add language" description="Add a supported interface language and script direction." maxWidth="md">
+              <Dialog open={showLangForm} onClose={() => setShowLangForm(false)} title={t("admAddLanguageTitle")} description={t("admAddLanguageDesc")} maxWidth="md">
                 <form onSubmit={handleSaveLanguage} className="grid grid-cols-2 gap-4">
                   {[
                     { k: "lang_code",         l: "Code",          p: "en"      },
@@ -508,12 +501,12 @@ export default function AdminMastersPage() {
                         placeholder={p} className={inputCls} style={S.input} />
                     </Field>
                   ))}
-                  <Field label="Script Direction">
+                  <Field label={t("admScriptDirection")}>
                     <select value={langForm.script}
                       onChange={(e) => setLangForm({ ...langForm, script: e.target.value })}
                       className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="LTR">Left to Right (LTR)</option>
-                      <option value="RTL">Right to Left (RTL)</option>
+                      <option value="LTR">{t("admLtr")}</option>
+                      <option value="RTL">{t("admRtl")}</option>
                     </select>
                   </Field>
                   <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
@@ -522,7 +515,7 @@ export default function AdminMastersPage() {
                       {savingLang ? "Saving…" : "Add Language"}
                     </button>
                     <button type="button" onClick={() => setShowLangForm(false)}
-                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
                   </div>
                 </form>
               </Dialog>
@@ -538,7 +531,7 @@ export default function AdminMastersPage() {
                   </TableHeader>
                   <TableBody>
                     {languages.length === 0 && (
-                      <tr><TableCell colSpan={5} className="text-center py-8" style={S.muted}>No languages configured.</TableCell></tr>
+                      <tr><TableCell colSpan={5} className="text-center py-8" style={S.muted}>{t("admNoLanguages")}</TableCell></tr>
                     )}
                     {languages.map((lang) => (
                       <TableRow key={lang.lang_code}>
@@ -567,31 +560,30 @@ export default function AdminMastersPage() {
           {activeTab === "timezones" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Supported Timezones</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{t("admSupportedTimezones")}</p>
                 <button onClick={() => setShowTzForm(!showTzForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
-                  <Plus className="w-3.5 h-3.5" /> Add Timezone
-                </button>
+                  <Plus className="w-3.5 h-3.5" />{t("admAddTimezone")}</button>
               </div>
 
-              <Dialog open={showTzForm} onClose={() => setShowTzForm(false)} title="Add timezone" description="Add an IANA timezone to the system catalog." maxWidth="md">
+              <Dialog open={showTzForm} onClose={() => setShowTzForm(false)} title={t("admAddTimezoneTitle")} description={t("admAddTimezoneDesc")} maxWidth="md">
                 <form onSubmit={handleSaveTimezone} className="grid grid-cols-2 gap-4">
-                  <Field label="IANA Code">
+                  <Field label={t("admIanaCode")}>
                     <input required value={tzForm.tz_code}
                       onChange={(e) => setTzForm({ ...tzForm, tz_code: e.target.value })}
                       placeholder="Asia/Kolkata" className={inputCls} style={S.input} />
                   </Field>
-                  <Field label="Display Name">
+                  <Field label={t("wzDisplayName")}>
                     <input required value={tzForm.tz_name}
                       onChange={(e) => setTzForm({ ...tzForm, tz_name: e.target.value })}
-                      placeholder="India Standard Time" className={inputCls} style={S.input} />
+                      placeholder={t("admPhIndiaStandardTime")} className={inputCls} style={S.input} />
                   </Field>
-                  <Field label="UTC Offset">
+                  <Field label={t("admUtcOffset")}>
                     <input required value={tzForm.utc_offset}
                       onChange={(e) => setTzForm({ ...tzForm, utc_offset: e.target.value })}
                       placeholder="+05:30" className={inputCls} style={S.input} />
                   </Field>
-                  <Field label="Offset (minutes)">
+                  <Field label={t("admOffsetMinutes")}>
                     <input required type="number" value={tzForm.offset_minutes}
                       onChange={(e) => setTzForm({ ...tzForm, offset_minutes: parseInt(e.target.value) || 0 })}
                       placeholder="330" className={inputCls} style={S.input} />
@@ -602,14 +594,14 @@ export default function AdminMastersPage() {
                       {savingTz ? "Saving…" : "Add Timezone"}
                     </button>
                     <button type="button" onClick={() => setShowTzForm(false)}
-                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
                   </div>
                 </form>
               </Dialog>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 {timezones.length === 0 && (
-                  <p className="text-sm col-span-full text-center py-4" style={S.muted}>No timezones configured.</p>
+                  <p className="text-sm col-span-full text-center py-4" style={S.muted}>{t("admNoTimezones")}</p>
                 )}
                 {timezones.map((tz) => (
                   <div key={tz.tz_code} className="border rounded-lg p-4 text-center" style={S.raised}>
@@ -618,7 +610,7 @@ export default function AdminMastersPage() {
                     <div className="text-[10px] mt-0.5 truncate" style={S.muted}>{tz.tz_name}</div>
                     {tz.is_dst && (
                       <span className="mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded-[var(--radius-xs)]"
-                        style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)" }}>Observes DST</span>
+                        style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)" }}>{t("admObservesDst")}</span>
                     )}
                   </div>
                 ))}
@@ -630,14 +622,13 @@ export default function AdminMastersPage() {
           {activeTab === "countries" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Countries</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{t("admCountries")}</p>
                 <button onClick={() => setShowCountryForm(!showCountryForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
-                  <Plus className="w-3.5 h-3.5" /> Add Country
-                </button>
+                  <Plus className="w-3.5 h-3.5" />{t("admAddCountry")}</button>
               </div>
 
-              <Dialog open={showCountryForm} onClose={() => setShowCountryForm(false)} title="Add country" description="Add a country to the system catalog." maxWidth="md">
+              <Dialog open={showCountryForm} onClose={() => setShowCountryForm(false)} title={t("admAddCountryTitle")} description={t("admAddCountryDesc")} maxWidth="md">
                 <form onSubmit={handleSaveCountry} className="grid grid-cols-2 gap-4">
                   {[
                     { k: "iso2",         l: "ISO2 Code",  p: "IN"    },
@@ -658,13 +649,13 @@ export default function AdminMastersPage() {
                       {savingCountry ? "Saving…" : "Add Country"}
                     </button>
                     <button type="button" onClick={() => setShowCountryForm(false)}
-                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
                   </div>
                 </form>
               </Dialog>
 
               <div className="border-t" style={S.border}>
-                {countries.length === 0 && <p className="text-sm text-center py-8" style={S.muted}>No countries configured.</p>}
+                {countries.length === 0 && <p className="text-sm text-center py-8" style={S.muted}>{t("admNoCountries")}</p>}
                 {countries.map((country) => {
                   const isExp = expandedCountry === country.country_id;
                   return (
@@ -688,24 +679,23 @@ export default function AdminMastersPage() {
                       {isExp && (
                         <div className="px-4 py-3 border-t" style={{ ...S.surface, ...S.border }}>
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>States / Provinces</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{t("admStatesProvinces")}</p>
                             <button onClick={() => setShowStateForm(showStateForm === country.country_id ? null : country.country_id)}
                               className="text-xs font-semibold flex items-center gap-1" style={S.accent}>
-                              <Plus className="w-3.5 h-3.5" /> Add State
-                            </button>
+                              <Plus className="w-3.5 h-3.5" />{t("admAddState")}</button>
                           </div>
 
-                          <Dialog open={showStateForm === country.country_id} onClose={() => setShowStateForm(null)} title="Add state/province" description={`Add a state/province beneath ${country.country_name}.`} maxWidth="md">
+                          <Dialog open={showStateForm === country.country_id} onClose={() => setShowStateForm(null)} title={t("admAddStateTitle")} description={`Add a state/province beneath ${country.country_name}.`} maxWidth="md">
                             <form onSubmit={(e) => handleSaveState(e, country.country_id)} className="grid grid-cols-2 gap-4">
-                              <Field label="State Code">
+                              <Field label={t("admStateCode")}>
                                 <input required value={stateForm.state_code}
                                   onChange={(e) => setStateForm({ ...stateForm, state_code: e.target.value })}
                                   placeholder="MH" className={inputCls} style={S.input} />
                               </Field>
-                              <Field label="State Name">
+                              <Field label={t("admStateName")}>
                                 <input required value={stateForm.state_name}
                                   onChange={(e) => setStateForm({ ...stateForm, state_name: e.target.value })}
-                                  placeholder="Maharashtra" className={inputCls} style={S.input} />
+                                  placeholder={t("admPhMaharashtra")} className={inputCls} style={S.input} />
                               </Field>
                               <div className="col-span-2 flex flex-col-reverse gap-3 border-t border-(--border) pt-5 sm:flex-row sm:justify-end">
                                 <button type="submit" disabled={savingState}
@@ -713,19 +703,16 @@ export default function AdminMastersPage() {
                                   {savingState ? "Saving…" : "Save State"}
                                 </button>
                                 <button type="button" onClick={() => setShowStateForm(null)}
-                                  className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">
-                                  Cancel
-                                </button>
+                                  className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
                               </div>
                             </form>
                           </Dialog>
 
                           {loadingStates[country.country_id] ? (
                             <div className="text-xs flex items-center gap-1.5" style={S.muted}>
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading…
-                            </div>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />{t("loadingEllipsis")}</div>
                           ) : (states[country.country_id] || []).length === 0 ? (
-                            <p className="text-xs" style={S.muted}>No states/provinces defined yet.</p>
+                            <p className="text-xs" style={S.muted}>{t("admNoStates")}</p>
                           ) : (
                             <div className="flex flex-wrap gap-2">
                               {(states[country.country_id] || []).map((state: any) => (
@@ -751,26 +738,25 @@ export default function AdminMastersPage() {
           {activeTab === "costingMethods" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>Costing Methods</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.muted}>{t("admCostingMethods")}</p>
                 <button onClick={() => setShowCostingForm(!showCostingForm)}
                   className="flex items-center gap-1.5 text-xs font-semibold" style={S.accent}>
-                  <Plus className="w-3.5 h-3.5" /> Add Costing Method
-                </button>
+                  <Plus className="w-3.5 h-3.5" />{t("admAddCostingMethod")}</button>
               </div>
 
-              <Dialog open={showCostingForm} onClose={() => setShowCostingForm(false)} title="Add costing method" description="Add an extensible costing method to the system catalog — no code change required to use it as reference data." maxWidth="md">
+              <Dialog open={showCostingForm} onClose={() => setShowCostingForm(false)} title={t("admAddCostingTitle")} description={t("admAddCostingDesc")} maxWidth="md">
                 <form onSubmit={handleSaveCostingMethod} className="grid grid-cols-2 gap-4">
-                  <Field label="Method Code">
+                  <Field label={t("admMethodCode")}>
                     <input required value={costingForm.method_code}
                       onChange={(e) => setCostingForm({ ...costingForm, method_code: e.target.value.toUpperCase() })}
                       placeholder="WEIGHTED_AVG" className={inputCls} style={S.input} />
                   </Field>
-                  <Field label="Method Name">
+                  <Field label={t("admMethodName")}>
                     <input required value={costingForm.method_name}
                       onChange={(e) => setCostingForm({ ...costingForm, method_name: e.target.value })}
-                      placeholder="Weighted Average Costing" className={inputCls} style={S.input} />
+                      placeholder={t("admPhWeightedAverage")} className={inputCls} style={S.input} />
                   </Field>
-                  <Field label="Auto-post Variance">
+                  <Field label={t("admAutoPostVariance")}>
                     <select value={costingForm.variance_auto}
                       onChange={(e) => setCostingForm({ ...costingForm, variance_auto: e.target.value })}
                       className={`${inputCls} nf-select`} style={S.input}>
@@ -797,7 +783,7 @@ export default function AdminMastersPage() {
                       {savingCosting ? "Saving…" : "Add Costing Method"}
                     </button>
                     <button type="button" onClick={() => setShowCostingForm(false)}
-                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">Cancel</button>
+                      className="h-11 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-5 text-sm text-(--text-secondary) hover:bg-(--surface-raised)">{t("cancel")}</button>
                   </div>
                 </form>
               </Dialog>
@@ -813,7 +799,7 @@ export default function AdminMastersPage() {
                   </TableHeader>
                   <TableBody>
                     {costingMethods.length === 0 && (
-                      <tr><TableCell colSpan={6} className="text-center py-8" style={S.muted}>No costing methods configured.</TableCell></tr>
+                      <tr><TableCell colSpan={6} className="text-center py-8" style={S.muted}>{t("admNoCostingMethods")}</TableCell></tr>
                     )}
                     {costingMethods.map((cm) => (
                       <TableRow key={cm.method_code}>

@@ -46,9 +46,7 @@ export default function AdminLayout({ children, modal }: { children: React.React
           <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" style={{ color: "var(--accent)" }}>
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          Authorizing admin session…
-        </div>
+          </svg>{t("admAuthorizingSession")}</div>
       </div>
     );
   }
@@ -60,7 +58,7 @@ export default function AdminLayout({ children, modal }: { children: React.React
   const sidebarSummary = (
     <div className="rounded-[var(--radius-sm)] border border-white/10 bg-white/[0.05] px-3 py-2.5">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">Access level</span>
+        <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">{t("admAccessLevel")}</span>
         <ShieldCheck className="h-3.5 w-3.5 text-white/50" />
       </div>
       <p className="mt-1 text-sm font-semibold text-white">{t("systemAdmin")}</p>

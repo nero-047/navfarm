@@ -93,7 +93,7 @@ export default function ProfilePage() {
   return (
     <Dialog open onClose={close} title={t("profilePageTitle")} description={t("profilePageDescription")} maxWidth="lg">
       {loading || !profile ? (
-        <div className="text-sm" style={{ color: "var(--text-secondary)" }}>Loading…</div>
+        <div className="text-sm" style={{ color: "var(--text-secondary)" }}>{t("loadingEllipsis")}</div>
       ) : (
       <div className="space-y-6">
       <Card>

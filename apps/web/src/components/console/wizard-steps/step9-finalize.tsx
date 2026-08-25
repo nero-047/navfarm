@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Step9FinalizeProps {
   onSubmit: () => Promise<void>;
@@ -8,15 +9,14 @@ interface Step9FinalizeProps {
 }
 
 export default function Step9Finalize({ onSubmit, isSubmitting }: Step9FinalizeProps) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-col gap-4 text-center items-center justify-center py-8">
       <div className="w-16 h-16 rounded-full bg-(--accent-muted) flex items-center justify-center text-(--accent) mb-2 border border-(--accent)/20">
         <CheckCircle2 className="w-8 h-8" />
       </div>
-      <h2 className="text-2xl font-semibold text-(--text-primary)">All Configuration Steps Complete!</h2>
-      <p className="text-(--text-secondary) text-sm max-w-md mt-1">
-        Your database is fully seeded and custom parameters are registered. Click below to launch your NAVFarm ERP space.
-      </p>
+      <h2 className="text-2xl font-semibold text-(--text-primary)">{t("wzAllStepsComplete")}</h2>
+      <p className="text-(--text-secondary) text-sm max-w-md mt-1">{t("wzAllStepsCompleteDesc")}</p>
       <Button
         onClick={onSubmit}
         disabled={isSubmitting}

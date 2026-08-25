@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Coins } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Step5CurrencyProps {
   onSubmit: (currencyId: string) => Promise<void>;
@@ -11,6 +12,7 @@ interface Step5CurrencyProps {
 }
 
 export default function Step5Currency({ onSubmit, isSubmitting, currencies, initialValue }: Step5CurrencyProps) {
+  const { t } = useLanguage();
   const [selectedCurr, setSelectedCurr] = useState(initialValue || (currencies.length > 0 ? currencies[0].currency_id : ""));
 
   useEffect(() => {
@@ -28,14 +30,12 @@ export default function Step5Currency({ onSubmit, isSubmitting, currencies, init
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
-          <Coins className="w-5 h-5 text-(--text-muted)" />
-          Step 5: Base Currency Configuration
-        </h2>
-        <p className="text-xs text-(--text-secondary)">Configure standard currency precision for ledger balances.</p>
+          <Coins className="w-5 h-5 text-(--text-muted)" />{t("wzStep5Title")}</h2>
+        <p className="text-xs text-(--text-secondary)">{t("wzStep5Desc")}</p>
       </div>
 
       <div className="flex flex-col gap-2 max-w-md mt-4">
-        <label className="text-xs text-(--text-secondary) font-medium">Select Currency</label>
+        <label className="text-xs text-(--text-secondary) font-medium">{t("ctSelectCurrency")}</label>
         <Select
           value={selectedCurr}
           onChange={(e) => setSelectedCurr(e.target.value)}

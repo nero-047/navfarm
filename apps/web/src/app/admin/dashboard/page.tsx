@@ -69,7 +69,7 @@ export default function AdminDashboardPage() {
   };
 
   if (loading) {
-    return <LoadingState label="Loading system stats…" />;
+    return <LoadingState label={t("admLoadingStats")} />;
   }
 
   if (error) {

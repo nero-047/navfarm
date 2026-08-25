@@ -2,7 +2,23 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsIn, IsInt, Min, IsNumber, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 
-const ANIMAL_TYPES = ['SOW', 'BOAR', 'GILT', 'PIGLET', 'COMMERCIAL_PIG'] as const;
+/**
+ * Animal types across every livestock line of business, not just Piggery.
+ *
+ * This list was piggery-only (SOW/BOAR/GILT/PIGLET/COMMERCIAL_PIG), which meant
+ * a dairy cow could not be registered at all — the Dairy screens worked around
+ * that by inventing their herd in component state. Grouped by LOB so adding a
+ * line of business is an entry here, and nothing else: `animal_register
+ * .animal_type` is a plain varchar, so no migration follows.
+ */
+export const ANIMAL_TYPES_BY_LOB = {
+  PIGGERY: ['SOW', 'BOAR', 'GILT', 'PIGLET', 'COMMERCIAL_PIG'],
+  DAIRY: ['COW', 'HEIFER', 'CALF', 'BULL'],
+  SMALL_RUMINANT: ['DOE', 'BUCK', 'KID', 'EWE', 'RAM', 'LAMB'],
+  POULTRY: ['LAYER', 'BROILER', 'CHICK', 'BREEDER'],
+} as const;
+
+const ANIMAL_TYPES = Object.values(ANIMAL_TYPES_BY_LOB).flat();
 const GENDERS = ['F', 'M'] as const;
 const ENTRY_TYPES = ['PURCHASED_IMPORTED', 'PURCHASED_LOCAL', 'BORN_ON_FARM', 'TRANSFERRED_IN'] as const;
 const STATUSES = ['ACTIVE', 'QUARANTINE', 'SICK', 'PREGNANT', 'LACTATING', 'DRY', 'CULLED', 'DEAD', 'SOLD', 'SLAUGHTERED'] as const;

@@ -2,8 +2,10 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function Index() {
+  const { t } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export default function Index() {
         <p className="text-xl font-semibold tracking-tight text-(--text-primary)">
           NAV<span className="text-(--accent)">Farm</span>
         </p>
-        <p className="mt-2 text-sm text-(--text-secondary)">Opening your workspace…</p>
+        <p className="mt-2 text-sm text-(--text-secondary)">{t("gOpeningWorkspace")}</p>
       </div>
     </div>
   );

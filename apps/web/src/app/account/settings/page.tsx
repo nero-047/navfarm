@@ -107,7 +107,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {prefs.length === 0 ? (
-            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>Loading…</p>
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{t("loadingEllipsis")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[13px]">

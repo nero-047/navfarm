@@ -14,6 +14,7 @@ import { getStoredToken, getStoredUser } from "../../../../hooks/useAuth";
 import { Dialog } from "../../../../components/ui/dialog";
 import { PageHeader } from "../../../../components/ui/PageHeader";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../../components/ui/table";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -84,6 +85,7 @@ const CountryMap: Record<string, string> = {
 };
 
 export default function TenantDetailPage() {
+  const { t } = useLanguage();
   const router   = useRouter();
   const params   = useParams();
   const tenantId = params?.id as string;
@@ -211,18 +213,16 @@ export default function TenantDetailPage() {
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <RefreshCw className="animate-spin w-5 h-5 mr-2" style={S.accent} />
-      <span className="text-sm" style={S.sub}>Loading tenant details…</span>
+      <span className="text-sm" style={S.sub}>{t("admLoadingTenantDetails")}</span>
     </div>
   );
 
   if (!tenant) return (
     <div className="p-6">
       <div className="flex items-center gap-2 text-(--danger) bg-(--danger-muted) border border-(--danger) rounded-lg p-4 text-sm">
-        <AlertCircle className="w-4 h-4 shrink-0" /> Tenant not found.
-      </div>
+        <AlertCircle className="w-4 h-4 shrink-0" />{t("admTenantNotFound")}</div>
       <Link href="/admin/tenants" className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium" style={S.accent}>
-        <ArrowLeft className="w-4 h-4" /> Back to Tenants
-      </Link>
+        <ArrowLeft className="w-4 h-4" />{t("admBackToTenants")}</Link>
     </div>
   );
 
@@ -235,8 +235,7 @@ export default function TenantDetailPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
       <Link href="/admin/tenants" className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline" style={S.sub}>
-        <ArrowLeft className="w-4 h-4" /> Back to Tenants
-      </Link>
+        <ArrowLeft className="w-4 h-4" />{t("admBackToTenants")}</Link>
 
       <PageHeader
         title={tenant.tenant_name}
@@ -253,7 +252,7 @@ export default function TenantDetailPage() {
               {tenant.is_active ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
               {tenant.is_active ? "Active" : "Inactive"}
             </Badge>
-            {tenant.is_trial && <Badge color="amber">Trial</Badge>}
+            {tenant.is_trial && <Badge color="amber">{t("admTrial")}</Badge>}
           </>
         }
       />
@@ -267,13 +266,13 @@ export default function TenantDetailPage() {
         className="grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-md)] border sm:grid-cols-4"
         style={{ backgroundColor: "var(--border)", borderColor: "var(--border)" }}
       >
-        <StatCard icon={Building} label="Companies" value={companies.length}
+        <StatCard icon={Building} label={t("companies")} value={companies.length}
           sub={`${completedCos} onboarded · ${companies.length - completedCos} pending`} />
-        <StatCard icon={Users}    label="Users"      value={users.length}
+        <StatCard icon={Users}    label={t("admUsers")}      value={users.length}
           sub={`${activeUsers} active · ${users.length - activeUsers} inactive`} />
-        <StatCard icon={Layers}   label="Plan"       value={planLabel}
+        <StatCard icon={Layers}   label={t("admPlan")}       value={planLabel}
           sub={tenant.billing_cycle || "—"} />
-        <StatCard icon={Database} label="Database"   value={tenant.db_name || "—"}
+        <StatCard icon={Database} label={t("admDatabase")}   value={tenant.db_name || "—"}
           sub={`${tenant.db_host || "localhost"}:${tenant.db_port || 3306}`} />
       </div>
 
@@ -281,23 +280,23 @@ export default function TenantDetailPage() {
       <div className="rounded-lg border overflow-hidden" style={S.surface}>
         <div className="px-6 py-4 border-b flex items-center gap-2" style={S.border}>
           <Shield className="w-4 h-4" style={S.muted} />
-          <h2 className="nf-text-label-strong" style={S.primary}>Tenant Configuration</h2>
+          <h2 className="nf-text-label-strong" style={S.primary}>{t("admTenantConfiguration")}</h2>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-          <InfoRow label="Tenant ID"       value={tenant.tenant_id} />
-          <InfoRow label="Tenant Code"     value={tenant.tenant_code} />
-          <InfoRow label="Type"            value={tenant.tenant_type || "STANDARD"} />
-          <InfoRow label="Plan"            value={planLabel} />
-          <InfoRow label="Billing Cycle"   value={tenant.billing_cycle || "—"} />
-          <InfoRow label="Max Companies"   value={tenant.max_companies} />
-          <InfoRow label="Max Users"       value={tenant.max_users} />
-          <InfoRow label="API Rate Limit"  value={tenant.api_rate_limit ? `${tenant.api_rate_limit} req/hr` : "—"} />
-          <InfoRow label="Plan Start"      value={tenant.plan_start_date || "—"} />
-          <InfoRow label="Plan End"        value={tenant.plan_end_date || "Ongoing"} />
-          <InfoRow label="DB Host"         value={`${tenant.db_host || "localhost"}:${tenant.db_port || 3306}`} />
-          <InfoRow label="DB Name"         value={tenant.db_name || "—"} />
-          <InfoRow label="Billing Email"   value={tenant.billing_email || "—"} />
-          <InfoRow label="Created At"      value={tenant.created_at ? new Date(tenant.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"} />
+          <InfoRow label={t("admTenantId")}       value={tenant.tenant_id} />
+          <InfoRow label={t("admTenantCode")}     value={tenant.tenant_code} />
+          <InfoRow label={t("btColAnimalType")}            value={tenant.tenant_type || "STANDARD"} />
+          <InfoRow label={t("admPlan")}            value={planLabel} />
+          <InfoRow label={t("admBillingCycle")}   value={tenant.billing_cycle || "—"} />
+          <InfoRow label={t("admMaxCompanies")}   value={tenant.max_companies} />
+          <InfoRow label={t("admMaxUsers")}       value={tenant.max_users} />
+          <InfoRow label={t("admApiRateLimit")}  value={tenant.api_rate_limit ? `${tenant.api_rate_limit} req/hr` : "—"} />
+          <InfoRow label={t("admPlanStart")}      value={tenant.plan_start_date || "—"} />
+          <InfoRow label={t("admPlanEnd")}        value={tenant.plan_end_date || "Ongoing"} />
+          <InfoRow label={t("admDbHost")}         value={`${tenant.db_host || "localhost"}:${tenant.db_port || 3306}`} />
+          <InfoRow label={t("admDbName")}         value={tenant.db_name || "—"} />
+          <InfoRow label={t("admBillingEmail")}   value={tenant.billing_email || "—"} />
+          <InfoRow label={t("admCreatedAt")}      value={tenant.created_at ? new Date(tenant.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"} />
         </div>
       </div>
 
@@ -306,7 +305,7 @@ export default function TenantDetailPage() {
         <div className="px-6 py-4 border-b flex items-center justify-between" style={S.border}>
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4" style={S.muted} />
-            <h2 className="nf-text-label-strong" style={S.primary}>Permitted Business Sectors (NOB & LOB)</h2>
+            <h2 className="nf-text-label-strong" style={S.primary}>{t("admPermittedSectors")}</h2>
           </div>
           <button
             onClick={() => {
@@ -320,15 +319,11 @@ export default function TenantDetailPage() {
             }}
             className="nf-press flex min-h-9 items-center gap-1.5 rounded-[var(--radius-sm)] border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-(--surface-secondary)"
             style={{ ...S.surface, ...S.primary }}
-          >
-            Configure Sector Access
-          </button>
+          >{t("admConfigureSectorAccess")}</button>
         </div>
         <div className="p-6">
           {(!tenant.allowed_nob_ids || tenant.allowed_nob_ids.length === 0) ? (
-            <p className="text-xs font-semibold text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-3">
-              Full Unrestricted Sector Access — All Nature of Business (NOB) and Line of Business (LOB) sectors are permitted for this tenant.
-            </p>
+            <p className="text-xs font-semibold text-(--success) bg-(--success-muted) border border-(--success) rounded-lg p-3">{t("admFullSectorAccess")}</p>
           ) : (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -360,17 +355,17 @@ export default function TenantDetailPage() {
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-(--warning-muted) p-2 text-(--warning)"><ArrowUpRight className="h-4 w-4" /></div>
           <div>
-            <h2 className="text-sm font-semibold" style={S.primary}>Subscription plan</h2>
+            <h2 className="text-sm font-semibold" style={S.primary}>{t("admSubscriptionPlan")}</h2>
             <p className="mt-0.5 text-sm" style={S.sub}>{isSystemTenant ? "The platform tenant uses a fixed plan." : `Currently on ${planLabel}.`}</p>
           </div>
         </div>
-        {!isSystemTenant && <button type="button" onClick={() => setShowPlanDialog(true)} className="min-h-10 rounded-lg bg-(--accent) px-4 text-sm font-semibold text-white hover:bg-(--accent-hover)">Change plan</button>}
+        {!isSystemTenant && <button type="button" onClick={() => setShowPlanDialog(true)} className="min-h-10 rounded-lg bg-(--accent) px-4 text-sm font-semibold text-white hover:bg-(--accent-hover)">{t("admChangePlan")}</button>}
       </div>
 
-      <Dialog open={showPlanDialog} onClose={() => !upgrading && setShowPlanDialog(false)} title="Change subscription plan" description={`Choose a new plan for ${tenant.tenant_name}.`} maxWidth="sm">
+      <Dialog open={showPlanDialog} onClose={() => !upgrading && setShowPlanDialog(false)} title={t("admChangeSubscriptionPlan")} description={`Choose a new plan for ${tenant.tenant_name}.`} maxWidth="sm">
         <form onSubmit={handleUpgrade} className="space-y-5">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={S.sub}>New plan</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={S.sub}>{t("admNewPlan")}</label>
             <select value={selectedPlan} onChange={(e) => setSelectedPlan(e.target.value)}
               className="min-h-11 w-full rounded-lg border px-4 text-sm nf-select" style={S.input}>
               <option value="">— Select a plan —</option>
@@ -380,10 +375,10 @@ export default function TenantDetailPage() {
             </select>
           </div>
           {selectedPlan && selectedPlan === tenant?.plan_id && (
-            <p className="text-xs" style={S.muted}>This is the current plan.</p>
+            <p className="text-xs" style={S.muted}>{t("admCurrentPlan")}</p>
           )}
           <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
-            <button type="button" disabled={upgrading} onClick={() => setShowPlanDialog(false)} className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">Cancel</button>
+            <button type="button" disabled={upgrading} onClick={() => setShowPlanDialog(false)} className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">{t("cancel")}</button>
             <button type="submit" disabled={!selectedPlan || upgrading || selectedPlan === tenant?.plan_id}
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
               {upgrading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
@@ -412,7 +407,7 @@ export default function TenantDetailPage() {
             </TableHeader>
             <TableBody>
               {companies.length === 0 ? (
-                <tr><TableCell colSpan={9} className="text-center py-12" style={S.muted}>No companies registered yet.</TableCell></tr>
+                <tr><TableCell colSpan={9} className="text-center py-12" style={S.muted}>{t("coNoCompanies")}</TableCell></tr>
               ) : companies.map((co, idx) => {
                 const d          = companyDetails[co.company_id];
                 const isExpanded = expandedCompany === co.company_id;
@@ -495,7 +490,7 @@ export default function TenantDetailPage() {
                       </TableCell>
                       <TableCell>
                         {co.onboarding_status === "COMPLETED" ? (
-                          <Badge color="green"><CheckCircle className="w-3 h-3" /> Complete</Badge>
+                          <Badge color="green"><CheckCircle className="w-3 h-3" />{t("coStatusComplete")}</Badge>
                         ) : (
                           <Badge color="amber"><Activity className="w-3 h-3" /> {co.onboarding_status || "Pending"}</Badge>
                         )}
@@ -513,24 +508,22 @@ export default function TenantDetailPage() {
                         <TableCell colSpan={9} className="border-b p-0" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
                           {isLoading ? (
                             <div className="flex items-center gap-2 px-8 py-6 text-sm" style={S.muted}>
-                              <RefreshCw className="w-4 h-4 animate-spin" /> Loading details…
-                            </div>
+                              <RefreshCw className="w-4 h-4 animate-spin" />{t("admLoadingDetails")}</div>
                           ) : d ? (
                             <div className="px-6 py-5 space-y-6 border-l-4" style={{ borderColor: "var(--accent)" }}>
 
                               {/* Profile */}
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={S.muted}>
-                                  <Building className="w-3.5 h-3.5" /> Company Profile
-                                </p>
+                                  <Building className="w-3.5 h-3.5" />{t("admCompanyProfile")}</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-                                  <MiniCard label="Legal Name"   value={d.company?.company_name} />
-                                  <MiniCard label="Display Name" value={d.company?.company_display_name || d.company?.company_name} />
-                                  <MiniCard label="Type"         value={d.company?.company_type} />
-                                  <MiniCard label="Industry"     value={d.company?.industry_type} />
-                                  <MiniCard label="Tax ID"       value={d.company?.tax_id} />
-                                  <MiniCard label="Country"      value={countryName} />
-                                  <MiniCard label="Currency"     value={currencyName} />
+                                  <MiniCard label={t("admLegalName")}   value={d.company?.company_name} />
+                                  <MiniCard label={t("wzDisplayName")} value={d.company?.company_display_name || d.company?.company_name} />
+                                  <MiniCard label={t("btColAnimalType")}         value={d.company?.company_type} />
+                                  <MiniCard label={t("ctIndustry")}     value={d.company?.industry_type} />
+                                  <MiniCard label={t("admTaxId")}       value={d.company?.tax_id} />
+                                  <MiniCard label={t("country")}      value={countryName} />
+                                  <MiniCard label={t("admCurrency")}     value={currencyName} />
                                 </div>
                               </div>
 
@@ -538,14 +531,13 @@ export default function TenantDetailPage() {
                               {d.address && (
                                 <div>
                                   <p className="text-[10px] font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={S.muted}>
-                                    <MapPin className="w-3.5 h-3.5" /> Registered Address
-                                  </p>
+                                    <MapPin className="w-3.5 h-3.5" />{t("admRegisteredAddress")}</p>
                                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                                    <MiniCard label="Type"    value={d.address.address_type} />
-                                    <MiniCard label="Line 1"  value={d.address.line1} />
-                                    <MiniCard label="City"    value={d.address.city} />
-                                    <MiniCard label="State"   value={d.address.state_id} />
-                                    <MiniCard label="Pincode" value={d.address.pincode} />
+                                    <MiniCard label={t("btColAnimalType")}    value={d.address.address_type} />
+                                    <MiniCard label={t("admLine1")}  value={d.address.line1} />
+                                    <MiniCard label={t("ctCity")}    value={d.address.city} />
+                                    <MiniCard label={t("admState")}   value={d.address.state_id} />
+                                    <MiniCard label={t("ctPincode")} value={d.address.pincode} />
                                   </div>
                                 </div>
                               )}
@@ -554,13 +546,12 @@ export default function TenantDetailPage() {
                               {d.contact && (
                                 <div>
                                   <p className="text-[10px] font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={S.muted}>
-                                    <Phone className="w-3.5 h-3.5" /> Primary Contact
-                                  </p>
+                                    <Phone className="w-3.5 h-3.5" />{t("admPrimaryContact")}</p>
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                    <MiniCard label="Name"        value={d.contact.full_name} />
-                                    <MiniCard label="Designation" value={d.contact.designation} />
-                                    <MiniCard label="Email"       value={d.contact.email} />
-                                    <MiniCard label="Phone"       value={d.contact.phone_primary} />
+                                    <MiniCard label={t("usrColName")}        value={d.contact.full_name} />
+                                    <MiniCard label={t("profileDesignation")} value={d.contact.designation} />
+                                    <MiniCard label={t("authEmail")}       value={d.contact.email} />
+                                    <MiniCard label={t("profilePhone")}       value={d.contact.phone_primary} />
                                   </div>
                                 </div>
                               )}
@@ -569,15 +560,14 @@ export default function TenantDetailPage() {
                               {d.fiscal && (
                                 <div>
                                   <p className="text-[10px] font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={S.muted}>
-                                    <Calendar className="w-3.5 h-3.5" /> Fiscal Configuration
-                                  </p>
+                                    <Calendar className="w-3.5 h-3.5" />{t("admFiscalConfiguration")}</p>
                                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                                    <MiniCard label="Fiscal Year"    value={d.fiscal.current_fiscal_year} />
-                                    <MiniCard label="Start Month"    value={d.fiscal.fiscal_start_month} />
-                                    <MiniCard label="Period Type"    value={d.fiscal.period_type} />
-                                    <MiniCard label="Standard"       value={d.fiscal.accounting_standard} />
-                                    <MiniCard label="Inventory Val." value={d.fiscal.inventory_valuation} />
-                                    <MiniCard label="FY Format"      value={d.fiscal.fiscal_year_format} />
+                                    <MiniCard label={t("admFiscalYear")}    value={d.fiscal.current_fiscal_year} />
+                                    <MiniCard label={t("admStartMonth")}    value={d.fiscal.fiscal_start_month} />
+                                    <MiniCard label={t("ctPeriodType")}    value={d.fiscal.period_type} />
+                                    <MiniCard label={t("blCostingStandard")}       value={d.fiscal.accounting_standard} />
+                                    <MiniCard label={t("admInventoryVal")} value={d.fiscal.inventory_valuation} />
+                                    <MiniCard label={t("admFyFormat")}      value={d.fiscal.fiscal_year_format} />
                                   </div>
                                 </div>
                               )}
@@ -662,7 +652,7 @@ export default function TenantDetailPage() {
                               })()}
                             </div>
                           ) : (
-                            <p className="px-8 py-5 text-xs" style={S.muted}>No detailed setup found for this company.</p>
+                            <p className="px-8 py-5 text-xs" style={S.muted}>{t("admNoSetupFound")}</p>
                           )}
                         </TableCell>
                       </tr>
@@ -694,7 +684,7 @@ export default function TenantDetailPage() {
             </TableHeader>
             <TableBody>
               {users.length === 0 ? (
-                <tr><TableCell colSpan={8} className="text-center py-12" style={S.muted}>No users found.</TableCell></tr>
+                <tr><TableCell colSpan={8} className="text-center py-12" style={S.muted}>{t("admNoUsersFound")}</TableCell></tr>
               ) : users.map((u, idx) => (
                 <TableRow key={u.user_id || idx} className="hover:opacity-90">
                   <TableCell className="font-mono" style={S.muted}>{idx + 1}</TableCell>
@@ -723,7 +713,7 @@ export default function TenantDetailPage() {
                         <div className="font-mono text-[10px] mt-0.5" style={S.muted}>{u.company_id.substring(0, 12)}…</div>
                       </div>
                     ) : u.user_type === "TENANT_ADMIN" ? (
-                      <Badge color="purple">All Companies</Badge>
+                      <Badge color="purple">{t("admAllCompanies")}</Badge>
                     ) : (
                       <span style={S.muted}>—</span>
                     )}
@@ -753,15 +743,13 @@ export default function TenantDetailPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b" style={S.border}>
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5" style={S.accent} />
-                <h2 className="text-base font-semibold" style={S.primary}>Configure Permitted Business Sectors</h2>
+                <h2 className="text-base font-semibold" style={S.primary}>{t("admConfigureSectorsTitle")}</h2>
               </div>
               <button onClick={() => setShowSectorModal(false)} style={S.muted} className="cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="px-6 py-5 space-y-4">
-              <p className="text-xs" style={S.sub}>
-                Select which Nature of Business (NOB) and Line of Business (LOB) sectors this tenant is permitted to configure during company onboarding.
-              </p>
+              <p className="text-xs" style={S.sub}>{t("admConfigureSectorsDesc")}</p>
 
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {nobs.map((nob: any) => {
@@ -866,9 +854,7 @@ export default function TenantDetailPage() {
                   {savingSectors ? "Saving..." : "Save Sector Licensing"}
                 </button>
                 <button type="button" onClick={() => setShowSectorModal(false)}
-                  className="px-5 py-2.5 text-sm font-medium rounded-lg border cursor-pointer" style={{ ...S.raised, ...S.sub }}>
-                  Cancel
-                </button>
+                  className="px-5 py-2.5 text-sm font-medium rounded-lg border cursor-pointer" style={{ ...S.raised, ...S.sub }}>{t("cancel")}</button>
               </div>
             </div>
           </div>

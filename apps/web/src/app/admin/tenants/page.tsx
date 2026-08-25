@@ -14,6 +14,7 @@ import { Field } from "../../../components/ui/field";
 import { Badge } from "../../../components/ui/badge";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const S = {
   surface:  { backgroundColor: "var(--surface)",        borderColor: "var(--border)" },
@@ -27,6 +28,7 @@ const S = {
 };
 
 export default function AdminTenantsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [tenants,  setTenants]  = useState<any[]>([]);
   const [plans,    setPlans]    = useState<any[]>([]);
@@ -165,7 +167,7 @@ export default function AdminTenantsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="animate-spin w-5 h-5 mr-2" style={S.accent} />
-        <span className="text-sm" style={S.sub}>Loading tenants…</span>
+        <span className="text-sm" style={S.sub}>{t("admLoadingTenants")}</span>
       </div>
     );
   }
@@ -173,22 +175,21 @@ export default function AdminTenantsPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
       <PageHeader
-        title="Tenant Registry"
+        title={t("admTenantRegistry")}
         description={`${tenants.length} tenants registered on platform`}
         actions={
         <div className="flex w-full items-center gap-3 sm:w-auto">
           <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={S.muted} />
             <input value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tenants…"
+              placeholder={t("admPhSearchTenants")}
               className="w-full rounded-lg border py-2 pl-9 pr-4 text-sm sm:w-60"
               style={S.input} />
           </div>
           <button onClick={() => { setCreateError(""); setShowAddModal(true); }}
             className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white"
             style={{ backgroundColor: "var(--accent)" }}>
-            <Plus className="w-4 h-4" /> Add Tenant
-          </button>
+            <Plus className="w-4 h-4" />{t("admAddTenant")}</button>
         </div>
         }
       />
@@ -199,12 +200,12 @@ export default function AdminTenantsPage() {
       <Dialog
         open={Boolean(upgradingTenant)}
         onClose={() => { if (!upgrading) { setUpgradingTenant(null); setSelectedPlanId(""); } }}
-        title="Change subscription plan"
+        title={t("admChangeSubscriptionPlan")}
         description={upgradingTenant ? `Choose a new plan for ${upgradingTenant.tenant_name}.` : undefined}
         maxWidth="sm"
       >
           <form onSubmit={handleUpgrade} className="space-y-5">
-            <label className="block text-xs font-semibold uppercase tracking-wider" style={S.sub}>New plan</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider" style={S.sub}>{t("admNewPlan")}</label>
             <select value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)}
               className="min-h-11 w-full rounded-lg border px-3 text-sm nf-select" style={S.input}>
               <option value="">— Select new plan —</option>
@@ -214,7 +215,7 @@ export default function AdminTenantsPage() {
             </select>
             <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
               <button type="button" disabled={upgrading} onClick={() => { setUpgradingTenant(null); setSelectedPlanId(""); }}
-                className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">Cancel</button>
+                className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-4 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">{t("cancel")}</button>
               <button type="submit" disabled={!selectedPlanId || upgrading}
                 className="min-h-10 rounded-lg bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                 {upgrading ? "Updating…" : "Apply plan change"}
@@ -235,7 +236,7 @@ export default function AdminTenantsPage() {
           </TableHeader>
           <TableBody>
             {filtered.length === 0 && (
-              <tr><TableCell colSpan={6} className="px-5 text-center py-10" style={S.muted}>No tenants found.</TableCell></tr>
+              <tr><TableCell colSpan={6} className="px-5 text-center py-10" style={S.muted}>{t("admNoTenantsFound")}</TableCell></tr>
             )}
             {filtered.map((tenant, idx) => {
               const isExpanded = expandedId === tenant.tenant_id;
@@ -267,21 +268,18 @@ export default function AdminTenantsPage() {
                       <div className="flex flex-wrap items-center gap-4">
                         <button onClick={() => handleExpand(tenant)}
                           className="flex items-center gap-1 text-xs font-semibold text-(--text-secondary) transition-colors hover:text-(--text-primary) hover:underline">
-                          {isExpanded ? <><ChevronUp className="w-3.5 h-3.5" /> Hide</> : <><ChevronDown className="w-3.5 h-3.5" /> Companies</>}
+                          {isExpanded ? <><ChevronUp className="w-3.5 h-3.5" />{t("admHide")}</> : <><ChevronDown className="w-3.5 h-3.5" />{t("companies")}</>}
                         </button>
                         <Link href={`/admin/tenants/${tenant.tenant_id}`}
                           className="flex items-center gap-1 text-xs font-semibold text-(--text-secondary) transition-colors hover:text-(--text-primary) hover:underline">
-                          <Eye className="w-3.5 h-3.5" /> Details
-                        </Link>
+                          <Eye className="w-3.5 h-3.5" />{t("apDetails")}</Link>
                         {tenant.tenant_id === "00000000-0000-0000-0000-000000000000" || tenant.tenant_code === "system" ? (
-                          <span className="flex cursor-not-allowed items-center gap-1 text-xs font-semibold text-(--text-disabled)" title="System plan cannot be changed">
-                            <ArrowUpRight className="w-3.5 h-3.5" /> Upgrade
-                          </span>
+                          <span className="flex cursor-not-allowed items-center gap-1 text-xs font-semibold text-(--text-disabled)" title={t("systemPlanCannotBeChanged")}>
+                            <ArrowUpRight className="w-3.5 h-3.5" />{t("upgrade")}</span>
                         ) : (
                           <button onClick={() => { setUpgradingTenant(tenant); setSelectedPlanId(""); }}
                             className="flex items-center gap-1 text-xs font-semibold text-(--text-secondary) transition-colors hover:text-(--text-primary) hover:underline">
-                            <ArrowUpRight className="w-3.5 h-3.5" /> Upgrade
-                          </button>
+                            <ArrowUpRight className="w-3.5 h-3.5" />{t("upgrade")}</button>
                         )}
                       </div>
                     </TableCell>
@@ -296,10 +294,9 @@ export default function AdminTenantsPage() {
                         </p>
                         {loadingCos ? (
                           <div className="text-xs flex items-center gap-2" style={S.muted}>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading companies…
-                          </div>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />{t("coLoadingCompanies")}</div>
                         ) : expandedCompanies.length === 0 ? (
-                          <p className="text-xs" style={S.muted}>No companies registered under this tenant yet.</p>
+                          <p className="text-xs" style={S.muted}>{t("admNoCompaniesUnderTenant")}</p>
                         ) : (
                           <div className="flex flex-wrap gap-2">
                             {expandedCompanies.map((co: any) => (
@@ -318,8 +315,7 @@ export default function AdminTenantsPage() {
                         <Link href={`/admin/tenants/${tenant.tenant_id}`}
                           className="mt-3 inline-flex items-center gap-1 text-xs font-medium hover:underline"
                           style={S.accent}>
-                          <Eye className="w-3 h-3" /> View full tenant details →
-                        </Link>
+                          <Eye className="w-3 h-3" />{t("admViewFullTenant")}</Link>
                       </TableCell>
                     </tr>
                   )}
@@ -333,8 +329,8 @@ export default function AdminTenantsPage() {
       <Dialog
         open={showAddModal}
         onClose={() => !creating && setShowAddModal(false)}
-        title="Register new tenant"
-        description="Create the tenant account and its first administrator. Additional setup can be completed afterward."
+        title={t("admRegisterTenantTitle")}
+        description={t("admRegisterTenantDesc")}
         maxWidth="lg"
       >
             <form onSubmit={handleCreateTenant} className="space-y-6">
@@ -347,28 +343,28 @@ export default function AdminTenantsPage() {
               <div className="space-y-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-(--accent)">1. Tenant & Invoicing Info</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Legal Tenant Name *">
-                    <input required placeholder="e.g. Green Valley Farms" value={createForm.tenant_name}
+                  <Field label={t("admLegalTenantName")}>
+                    <input required placeholder={t("admPhTenantName")} value={createForm.tenant_name}
                       onChange={e => setCreateForm(f => ({ ...f, tenant_name: e.target.value }))}
                       className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
                   </Field>
-                  <Field label="Subdomain / Code *">
-                    <input required placeholder="e.g. gvf" value={createForm.tenant_code}
+                  <Field label={t("admSubdomainCode")}>
+                    <input required placeholder={t("admPhSubdomain")} value={createForm.tenant_code}
                       onChange={e => setCreateForm(f => ({ ...f, tenant_code: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "") }))}
                       className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
                   </Field>
-                  <Field label="Billing/Invoicing Email *">
-                    <input required type="email" placeholder="billing@greenvalley.com" value={createForm.billing_email}
+                  <Field label={t("admBillingEmailRequired")}>
+                    <input required type="email" placeholder={t("admPhBillingEmail")} value={createForm.billing_email}
                       onChange={e => setCreateForm(f => ({ ...f, billing_email: e.target.value }))}
                       className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
                   </Field>
-                  <Field label="Pricing Plan *">
+                  <Field label={t("admPricingPlanRequired")}>
                     <select required value={createForm.plan_id}
                       onChange={e => setCreateForm(f => ({ ...f, plan_id: e.target.value }))}
                       className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus) nf-select" style={S.input}>
-                      <option value="PLAN_BASIC">Basic Plan ($49/mo)</option>
-                      <option value="PLAN_PRO">Pro Plan ($149/mo)</option>
-                      <option value="PLAN_ENTERPRISE">Enterprise Plan ($499/mo)</option>
+                      <option value="PLAN_BASIC">{t("admPlanBasic")}</option>
+                      <option value="PLAN_PRO">{t("admPlanPro")}</option>
+                      <option value="PLAN_ENTERPRISE">{t("admPlanEnterprise")}</option>
                     </select>
                   </Field>
                 </div>
@@ -377,18 +373,18 @@ export default function AdminTenantsPage() {
               <div className="space-y-4 pt-4 border-t" style={S.border}>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-(--accent)">2. Initial Tenant Admin Account</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Administrator Name *">
-                    <input required placeholder="e.g. John Doe" value={createForm.admin_name}
+                  <Field label={t("admAdminName")}>
+                    <input required placeholder={t("admPhAdminName")} value={createForm.admin_name}
                       onChange={e => setCreateForm(f => ({ ...f, admin_name: e.target.value }))}
                       className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
                   </Field>
-                  <Field label="Administrator Email *">
-                    <input required type="email" placeholder="admin@domain.com" value={createForm.admin_email}
+                  <Field label={t("admAdminEmail")}>
+                    <input required type="email" placeholder={t("admPhAdminEmail")} value={createForm.admin_email}
                       onChange={e => setCreateForm(f => ({ ...f, admin_email: e.target.value }))}
                       className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
                   </Field>
-                  <Field label="Administrator Password *">
-                    <input required type="password" placeholder="At least 8 characters" value={createForm.admin_password}
+                  <Field label={t("admAdminPassword")}>
+                    <input required type="password" placeholder={t("ctPhMinEightChars")} value={createForm.admin_password}
                       onChange={e => setCreateForm(f => ({ ...f, admin_password: e.target.value }))}
                       className="w-full border rounded-[var(--radius-sm)] px-3 py-2.5 text-sm focus-visible:border-(--input-border-focus)" style={S.input} />
                   </Field>
@@ -400,7 +396,7 @@ export default function AdminTenantsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-(--accent)">3. Permitted Business Sectors (NOB & LOB)</h3>
-                    <p className="text-xs mt-0.5" style={S.muted}>Select which Nature of Business (NOB) & Line of Business (LOB) options this tenant is licensed to use.</p>
+                    <p className="text-xs mt-0.5" style={S.muted}>{t("admSelectLicensedSectors")}</p>
                   </div>
                   <button
                     type="button"
@@ -424,7 +420,7 @@ export default function AdminTenantsPage() {
 
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                   {nobsList.length === 0 ? (
-                    <p className="text-xs italic" style={S.muted}>No NOB sectors configured in master catalog.</p>
+                    <p className="text-xs italic" style={S.muted}>{t("admNoNobInCatalog")}</p>
                   ) : (
                     nobsList.map((nob: any) => {
                       const isNobChecked = selectedNobIds.includes(nob.nob_id);
@@ -508,9 +504,7 @@ export default function AdminTenantsPage() {
 
               <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end" style={S.border}>
                 <button type="button" disabled={creating} onClick={() => setShowAddModal(false)}
-                  className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-5 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">
-                  Cancel
-                </button>
+                  className="min-h-10 rounded-lg border border-(--border) bg-(--surface) px-5 text-sm font-semibold text-(--text-secondary) hover:bg-(--surface-raised) disabled:opacity-50">{t("cancel")}</button>
                 <button type="submit" disabled={creating}
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-(--accent) px-5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-50">
                   {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}

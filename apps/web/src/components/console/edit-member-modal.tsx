@@ -221,7 +221,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
               <div>
                 <Label>{t("usrFullName")}</Label>
                 <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  required className={inputCls} style={S.input} placeholder="Jane Smith" />
+                  required className={inputCls} style={S.input} placeholder={t("gPhJaneSmith")} />
               </div>
               <div>
                 <Label>{t("usrPhone")}</Label>
@@ -231,12 +231,12 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
               <div>
                 <Label>{t("edmDepartment")}</Label>
                 <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}
-                  className={inputCls} style={S.input} placeholder="Farm Operations" />
+                  className={inputCls} style={S.input} placeholder={t("gFarmOperations")} />
               </div>
               <div>
                 <Label>{t("edmDesignation")}</Label>
                 <input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })}
-                  className={inputCls} style={S.input} placeholder="Senior Farm Manager" />
+                  className={inputCls} style={S.input} placeholder={t("gSeniorFarmManager")} />
               </div>
               <div>
                 <Label>{t("edmEmployeeId")}</Label>
@@ -321,7 +321,7 @@ export function EditMemberModal({ member, roles, isTenantAdmin, onClose, onSaved
                         <button
                           onClick={() => handleUnassignRole(r.assign_id)}
                           className="ml-0.5 hover:text-[var(--danger)] transition-colors"
-                          title="Remove role"
+                          title={t("gRemoveRole")}
                         >
                           <X className="w-3 h-3" />
                         </button>

@@ -186,9 +186,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
   const Spinner = () => (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "var(--bg)" }}>
       <div className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-        <RefreshCw className="animate-spin w-4 h-4" style={{ color: "var(--accent)" }} />
-        Loading workspace…
-      </div>
+        <RefreshCw className="animate-spin w-4 h-4" style={{ color: "var(--accent)" }} />{t("gLoadingWorkspace")}</div>
     </div>
   );
 
@@ -203,9 +201,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
           <span className="text-lg font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
             NAV<span style={{ color: "var(--accent)" }}>Farm</span>
           </span>
-          <span className="ml-2 hidden text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded-[var(--radius-xs)] sm:inline-flex" style={{ color: "var(--text-muted)", backgroundColor: "var(--surface-raised)" }}>
-            Company Setup
-          </span>
+          <span className="ml-2 hidden text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded-[var(--radius-xs)] sm:inline-flex" style={{ color: "var(--text-muted)", backgroundColor: "var(--surface-raised)" }}>{t("gCompanySetup")}</span>
           <div className="ml-auto flex items-center gap-3">
             <ThemeIconButton />
             <button onClick={handleLogout} aria-label={t("signOut")} className="text-sm flex h-10 items-center gap-1.5 rounded-[var(--radius-sm)] px-2 sm:px-3" style={{ color: "var(--text-secondary)" }}>

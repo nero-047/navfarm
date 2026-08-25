@@ -14,6 +14,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { ProfilePopover, type ProfileMenuItem } from "./ProfilePopover";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export const NAVFARM_LOGO_SRC = "https://nav-cdn.pages.dev/images/favicon.png";
 
@@ -149,6 +150,7 @@ function PrimaryNavContent({
   searchParams: URLSearchParams | null;
   onItemClick: () => void;
 }) {
+  const { t } = useLanguage();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   const allNavHrefs = useMemo(() => {
@@ -166,7 +168,7 @@ function PrimaryNavContent({
   }, [navItems]);
 
   return (
-    <nav aria-label="Primary" data-shell-nav-scroll className="p-3">
+    <nav aria-label={t("ntPrimary")} data-shell-nav-scroll className="p-3">
       <p className="px-3 pb-2 pt-2 text-[10px] font-normal uppercase tracking-[0.18em] text-white/35">
         {navSectionLabel}
       </p>
@@ -365,6 +367,7 @@ function PrimaryNav({
  * tree.
  */
 export function AppShell(props: AppShellProps) {
+  const { t } = useLanguage();
   const {
     brandHref,
     brandSubtitle,
@@ -431,7 +434,7 @@ export function AppShell(props: AppShellProps) {
       {mobileOpen && (
         <button
           type="button"
-          aria-label="Dismiss navigation overlay"
+          aria-label={t("shDismissNavOverlay")}
           tabIndex={-1}
           onClick={close}
           data-shell-scrim
@@ -453,7 +456,7 @@ export function AppShell(props: AppShellProps) {
           <button
             type="button"
             onClick={close}
-            aria-label="Close navigation"
+            aria-label={t("shCloseNavigation")}
             className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
           >
             <X size={18} />
@@ -491,7 +494,7 @@ export function AppShell(props: AppShellProps) {
         <button
           ref={openerRef}
           onClick={() => setMobileOpen(true)}
-          aria-label="Open navigation"
+          aria-label={t("shOpenNavigation")}
           aria-expanded={mobileOpen}
           className="mr-3 flex h-11 w-11 shrink-0 items-center justify-center -ml-2.5 text-[var(--text-secondary)] lg:hidden"
         >
@@ -525,7 +528,7 @@ export function AppShell(props: AppShellProps) {
               exists on every page and no page can add a second. It scrolls
               away under the page header rather than pinning — the title is
               what has to stay legible while the work surface moves. */}
-          <nav aria-label="Breadcrumb" data-shell-breadcrumb>
+          <nav aria-label={t("shBreadcrumb")} data-shell-breadcrumb>
             <ol>
               <li>{breadcrumbRoot}</li>
               <li aria-current="page">{breadcrumbCurrent}</li>

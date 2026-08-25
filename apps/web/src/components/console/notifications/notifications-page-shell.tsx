@@ -232,7 +232,7 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={t("ntSmtpHost")}>
                   <input value={emailForm.smtp_host} onChange={(e) => setEmailForm({ ...emailForm, smtp_host: e.target.value })}
-                    placeholder="smtp.gmail.com" className={inputCls} style={inputStyle} />
+                    placeholder={t("ntPhSmtpHost")} className={inputCls} style={inputStyle} />
                 </Field>
                 <Field label={t("ntSmtpPort")}>
                   <input type="number" value={emailForm.smtp_port} onChange={(e) => setEmailForm({ ...emailForm, smtp_port: +e.target.value })}
@@ -240,14 +240,14 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
                 </Field>
                 <Field label={t("ntSmtpUser")}>
                   <input value={emailForm.smtp_user} onChange={(e) => setEmailForm({ ...emailForm, smtp_user: e.target.value })}
-                    placeholder="your@gmail.com" className={inputCls} style={inputStyle} />
+                    placeholder={t("ntPhSmtpUser")} className={inputCls} style={inputStyle} />
                 </Field>
                 <Field label={`${t("ntAppPassword")}${configs.find((c) => c.channel === "EMAIL")?.smtp_password_configured ? t("ntAppPasswordConfigured") : ""}`}>
                   <div className="relative">
                     <input type={showPassword ? "text" : "password"}
                       value={emailForm.smtp_password}
                       onChange={(e) => setEmailForm({ ...emailForm, smtp_password: e.target.value })}
-                      placeholder="App-specific password" className={`${inputCls} pr-10`} style={inputStyle} />
+                      placeholder={t("ntPhSmtpPassword")} className={`${inputCls} pr-10`} style={inputStyle} />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -257,11 +257,11 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
                 <Field label={t("ntFromEmail")}>
                   <input type="email" value={emailForm.from_email}
                     onChange={(e) => setEmailForm({ ...emailForm, from_email: e.target.value })}
-                    placeholder="alerts@yourcompany.com" className={inputCls} style={inputStyle} />
+                    placeholder={t("ntPhFromEmail")} className={inputCls} style={inputStyle} />
                 </Field>
                 <Field label={t("ntFromName")}>
                   <input value={emailForm.from_name} onChange={(e) => setEmailForm({ ...emailForm, from_name: e.target.value })}
-                    placeholder="NAVFarm Alerts" className={inputCls} style={inputStyle} />
+                    placeholder={t("ntPhFromName")} className={inputCls} style={inputStyle} />
                 </Field>
               </div>
               <div className="flex gap-3 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
@@ -287,7 +287,7 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
                 <Field label={`${t("ntSecretKeyOptional")}${configs.find((c) => c.channel === "WEBHOOK")?.webhook_secret_configured ? t("ntSecretConfigured") : ""}`}>
                   <input value={webhookForm.webhook_secret}
                     onChange={(e) => setWebhookForm({ ...webhookForm, webhook_secret: e.target.value })}
-                    placeholder="Signing secret for payload verification" className={inputCls} style={inputStyle} />
+                    placeholder={t("ntPhSigningSecret")} className={inputCls} style={inputStyle} />
                 </Field>
               </div>
               <div className="flex gap-3 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
@@ -342,7 +342,7 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
         <form onSubmit={handleTestSend} className="space-y-5">
           <Field label={t("ntRecipientEmail")}>
             <input type="email" required autoFocus value={testRecipient} onChange={(e) => setTestRecipient(e.target.value)}
-              placeholder="recipient@example.com" className={inputCls} style={inputStyle} />
+              placeholder={t("ntPhRecipient")} className={inputCls} style={inputStyle} />
           </Field>
           <Field label={t("ntTestMessage")}>
             <textarea required rows={4} value={testMessage} onChange={(e) => setTestMessage(e.target.value)}

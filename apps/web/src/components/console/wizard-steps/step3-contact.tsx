@@ -3,6 +3,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Contact } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Step3ContactProps {
   onSubmit: (data: any) => Promise<void>;
@@ -11,6 +12,7 @@ interface Step3ContactProps {
 }
 
 export default function Step3Contact({ onSubmit, isSubmitting, initialData }: Step3ContactProps) {
+  const { t } = useLanguage();
   const uid = useId();
   const fieldId = (name: string) => `${uid}-${name}`;
   const [formData, setFormData] = useState({
@@ -47,32 +49,30 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
-          <Contact className="w-5 h-5 text-(--text-muted)" />
-          Step 3: Primary Contact Details
-        </h2>
-        <p className="text-xs text-(--text-secondary)">Provide the contact profile for administrative alerts and reporting.</p>
+          <Contact className="w-5 h-5 text-(--text-muted)" />{t("wzStep3Title")}</h2>
+        <p className="text-xs text-(--text-secondary)">{t("wzStep3Desc")}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Contact Person Name" htmlFor={fieldId("contact_name")} required>
+        <Field label={t("ctContactPersonName")} htmlFor={fieldId("contact_name")} required>
           <Input
             id={fieldId("contact_name")}
-            placeholder="Amit Sharma"
+            placeholder={t("wzPhContactName")}
             value={formData.contact_name}
             onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
             required
           />
         </Field>
-        <Field label="Email Address" htmlFor={fieldId("contact_email")} required>
+        <Field label={t("usrEmailAddress")} htmlFor={fieldId("contact_email")} required>
           <Input
             id={fieldId("contact_email")}
-            placeholder="amit@greenvalley.com"
+            placeholder={t("wzPhContactEmail")}
             value={formData.contact_email}
             onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
             required
           />
         </Field>
-        <Field label="Primary Mobile Phone" htmlFor={fieldId("contact_phone")} required>
+        <Field label={t("wzPrimaryMobile")} htmlFor={fieldId("contact_phone")} required>
           <Input
             id={fieldId("contact_phone")}
             placeholder="+91 99999 88888"
@@ -81,7 +81,7 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
             required
           />
         </Field>
-        <Field label="Secondary / Alternate Phone" htmlFor={fieldId("phone_secondary")}>
+        <Field label={t("wzSecondaryPhone")} htmlFor={fieldId("phone_secondary")}>
           <Input
             id={fieldId("phone_secondary")}
             placeholder="+91 99999 77777"
@@ -89,10 +89,10 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
             onChange={(e) => setFormData({ ...formData, phone_secondary: e.target.value })}
           />
         </Field>
-        <Field label="Job Designation" htmlFor={fieldId("designation")}>
+        <Field label={t("wzJobDesignation")} htmlFor={fieldId("designation")}>
           <Input
             id={fieldId("designation")}
-            placeholder="Operations Manager"
+            placeholder={t("wzPhDesignation")}
             value={formData.designation}
             onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
           />
@@ -105,9 +105,7 @@ export default function Step3Contact({ onSubmit, isSubmitting, initialData }: St
             onChange={(e) => setFormData({ ...formData, receives_reports: e.target.checked })}
             className="w-4 h-4 rounded-[var(--radius-xs)] border-(--input-border) bg-(--input-bg) text-(--accent) focus:ring-(--accent)"
           />
-          <label htmlFor="receives_reports" className="text-xs text-(--text-secondary) font-medium cursor-pointer">
-            Receive periodic executive report emails (weekly P&L, batch metrics)
-          </label>
+          <label htmlFor="receives_reports" className="text-xs text-(--text-secondary) font-medium cursor-pointer">{t("wzReceiveExecEmails")}</label>
         </div>
       </div>
 

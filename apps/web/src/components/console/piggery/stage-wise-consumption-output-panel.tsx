@@ -344,7 +344,7 @@ export default function StageWiseConsumptionOutputPanel() {
     () => batches.find((b) => b.id === selectedBatchId) || batches[0] || {
       id: "",
       code: "—",
-      name: "No Batches",
+      name: t("bpNoBatches"),
       breed: "—",
       batchType: "—",
       startCount: 0,
@@ -358,7 +358,7 @@ export default function StageWiseConsumptionOutputPanel() {
     return currentBatch?.stages?.find((s) => s.id === selectedStageId) || currentBatch?.stages?.[0] || {
       id: "st-default",
       code: "ST-01",
-      name: "Active Stage",
+      name: t("swActiveStageFallback"),
       startDate: new Date().toISOString().slice(0, 10),
       endDate: new Date().toISOString().slice(0, 10),
       standardDays: 30,
@@ -655,7 +655,7 @@ export default function StageWiseConsumptionOutputPanel() {
   if (loading) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
-        <p className="text-sm font-medium text-[var(--text-muted)]">Loading batch stage consumption and WIP data...</p>
+        <p className="text-sm font-medium text-[var(--text-muted)]">{t("swLoadingStageData")}</p>
       </div>
     );
   }
@@ -910,7 +910,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
-                    <td colSpan={5} className="py-2.5 px-2">Stage Feed Totals</td>
+                    <td colSpan={5} className="py-2.5 px-2">{t("swStageFeedTotals")}</td>
                     <td className="px-3 py-2.5 text-right text-emerald-500 font-mono">{totalFeedKg.toFixed(2)} KG</td>
                     <td colSpan={3} className="py-2.5"></td>
                     <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalFeedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
@@ -965,19 +965,17 @@ export default function StageWiseConsumptionOutputPanel() {
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                     <th className="px-3 pb-2 font-bold">#</th>
-                    <th className="px-3 pb-2 font-bold">Date</th>
-                    <th className="px-3 pb-2 font-bold">Labour Resource / Activity</th>
-                    <th className="px-3 pb-2 font-bold text-right">Hours Logged</th>
-                    <th className="px-3 pb-2 font-bold text-right">Hourly Rate (₹)</th>
-                    <th className="px-3 pb-2 font-bold text-right">Total Cost (₹)</th>
+                    <th className="px-3 pb-2 font-bold">{t("btColDate")}</th>
+                    <th className="px-3 pb-2 font-bold">{t("swLabourResourceActivity")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swHoursLogged")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("obHourlyRate")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swTotalCost")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {(displayStage.labourData || []).length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-xs text-[var(--text-muted)]">
-                        No direct farm labour hours logged yet. Add labour records via Daily Batch Entry.
-                      </td>
+                      <td colSpan={6} className="py-6 text-center text-xs text-[var(--text-muted)]">{t("swNoLabourLogged")}</td>
                     </tr>
                   ) : (
                     (displayStage.labourData || []).map((l, index) => (
@@ -996,7 +994,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
-                    <td colSpan={5} className="py-2.5 px-2">Total Stage Labour Cost</td>
+                    <td colSpan={5} className="py-2.5 px-2">{t("swTotalStageLabourCost")}</td>
                     <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">
                       ₹ {totalLabourCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
@@ -1013,19 +1011,17 @@ export default function StageWiseConsumptionOutputPanel() {
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                     <th className="px-3 pb-2 font-bold">#</th>
-                    <th className="px-3 pb-2 font-bold">Overhead / Activity Description</th>
-                    <th className="px-3 pb-2 font-bold">Allocation Basis</th>
-                    <th className="px-3 pb-2 font-bold text-right">Standard Rate (₹)</th>
-                    <th className="px-3 pb-2 font-bold text-right">Applied Qty</th>
-                    <th className="px-3 pb-2 font-bold text-right">Allocated Cost (₹)</th>
+                    <th className="px-3 pb-2 font-bold">{t("swOverheadActivityDesc")}</th>
+                    <th className="px-3 pb-2 font-bold">{t("swAllocationBasis")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swStandardRateInr")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swAppliedQty")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swAllocatedCostInr")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {displayStage.overheadData.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-xs text-[var(--text-muted)]">
-                        No general overhead allocations logged for this stage.
-                      </td>
+                      <td colSpan={6} className="py-6 text-center text-xs text-[var(--text-muted)]">{t("swNoOverheadAllocations")}</td>
                     </tr>
                   ) : (
                     displayStage.overheadData.map((o, index) => (
@@ -1042,7 +1038,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
-                    <td colSpan={5} className="py-2.5 px-2">Total Stage Overheads Allocation</td>
+                    <td colSpan={5} className="py-2.5 px-2">{t("swTotalStageOverheads")}</td>
                     <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalOverheadCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tfoot>
@@ -1072,9 +1068,7 @@ export default function StageWiseConsumptionOutputPanel() {
                         <p className="mt-1 font-semibold text-[var(--text-primary)]">{m.reason}</p>
                         <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{m.vetAction}</p>
                       </div>
-                      <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] shrink-0 bg-[var(--surface)] px-2 py-1 rounded-[var(--radius-xs)] border border-[var(--border)]">
-                        Necropsy Recorded
-                      </span>
+                      <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] shrink-0 bg-[var(--surface)] px-2 py-1 rounded-[var(--radius-xs)] border border-[var(--border)]">{t("swNecropsyRecorded")}</span>
                     </div>
                   ))}
                 </div>
@@ -1089,17 +1083,15 @@ export default function StageWiseConsumptionOutputPanel() {
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                     <th className="px-3 pb-2 font-bold">#</th>
-                    <th className="px-3 pb-2 font-bold">Sampling Date</th>
-                    <th className="px-3 pb-2 font-bold text-right">Average Body Weight (KG)</th>
-                    <th className="px-3 pb-2 font-bold">Sampling Remarks & Body Condition</th>
+                    <th className="px-3 pb-2 font-bold">{t("swSamplingDate")}</th>
+                    <th className="px-3 pb-2 font-bold text-right">{t("swAvgBodyWeightKg")}</th>
+                    <th className="px-3 pb-2 font-bold">{t("swSamplingRemarks")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {(displayStage.weightLogs || []).length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-6 text-center text-xs text-[var(--text-muted)]">
-                        No weight sampling records logged yet. Enter herd weights via Daily Batch Entry.
-                      </td>
+                      <td colSpan={4} className="py-6 text-center text-xs text-[var(--text-muted)]">{t("swNoWeightSampling")}</td>
                     </tr>
                   ) : (
                     (displayStage.weightLogs || []).map((w, index) => (
@@ -1122,9 +1114,7 @@ export default function StageWiseConsumptionOutputPanel() {
           {activeTab === "observations" && (
             <div className="space-y-3">
               {(displayStage.observationLogs || []).length === 0 ? (
-                <div className="p-6 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-raised)] rounded-[var(--radius-sm)]">
-                  No supervisor observations or environmental logs recorded for this stage yet.
-                </div>
+                <div className="p-6 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-raised)] rounded-[var(--radius-sm)]">{t("swNoObservationsLogged")}</div>
               ) : (
                 <div className="space-y-2">
                   {(displayStage.observationLogs || []).map((obs, idx) => (
@@ -1232,27 +1222,27 @@ export default function StageWiseConsumptionOutputPanel() {
               <div className="p-4 rounded-[var(--radius-md)] bg-[var(--surface-raised)] border border-[var(--border)] space-y-3">
                 <div className="flex items-center gap-2 font-bold text-sm text-[var(--text-primary)] border-b pb-2" style={{ borderColor: "var(--border)" }}>
                   <DollarSign className="h-4 w-4 text-[var(--accent)]" />
-                  <span>Cost Element Breakdown</span>
+                  <span>{t("swCostElementBreakdown")}</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Feed & Nutrition:</span>
+                    <span className="text-[var(--text-secondary)]">{t("swFeedNutrition")}</span>
                     <span className="font-mono font-bold">₹ {totalFeedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalFeedCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Medicine & Vaccine:</span>
+                    <span className="text-[var(--text-secondary)]">{t("swMedicineVaccine")}</span>
                     <span className="font-mono font-bold">₹ {totalMedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalMedCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Direct Farm Labour:</span>
+                    <span className="text-[var(--text-secondary)]">{t("swDirectFarmLabour")}</span>
                     <span className="font-mono font-bold">₹ {totalLabourCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalLabourCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Direct Overheads & Utilities:</span>
+                    <span className="text-[var(--text-secondary)]">{t("swDirectOverheads")}</span>
                     <span className="font-mono font-bold">₹ {totalOverheadCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalOverheadCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="border-t pt-2 flex justify-between font-bold text-sm" style={{ borderColor: "var(--border)" }}>
-                    <span>Total Stage WIP Incurred:</span>
+                    <span>{t("swTotalStageWip")}</span>
                     <span className="text-[var(--accent)] font-mono">₹ {totalStageWipCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
@@ -1261,23 +1251,23 @@ export default function StageWiseConsumptionOutputPanel() {
               <div className="p-4 rounded-[var(--radius-md)] bg-[var(--surface-raised)] border border-[var(--border)] space-y-3">
                 <div className="flex items-center gap-2 font-bold text-sm text-[var(--text-primary)] border-b pb-2" style={{ borderColor: "var(--border)" }}>
                   <Activity className="h-4 w-4 text-emerald-500" />
-                  <span>Biological Asset Unit Metrics</span>
+                  <span>{t("swBioAssetUnitMetrics")}</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Average Head Maintained:</span>
+                    <span className="text-[var(--text-secondary)]">{t("swAvgHeadMaintained")}</span>
                     <span className="font-mono font-bold">{avgAnimals} Head</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Total Active Days:</span>
+                    <span className="text-[var(--text-secondary)]">{t("swTotalActiveDays")}</span>
                     <span className="font-mono font-bold">{durationDays} Days</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Average Feed Per Head / Day:</span>
+                    <span className="text-[var(--text-secondary)]">{t("swAvgFeedPerHeadDay")}</span>
                     <span className="font-mono font-bold">{avgAnimals > 0 && durationDays > 0 ? (totalFeedKg / (avgAnimals * durationDays)).toFixed(2) : "0.00"} KG</span>
                   </div>
                   <div className="border-t pt-2 flex justify-between font-bold text-sm text-emerald-600 dark:text-emerald-400" style={{ borderColor: "var(--border)" }}>
-                    <span>Cost per Animal / Day:</span>
+                    <span>{t("swCostPerAnimalDay")}</span>
                     <span className="font-mono">₹ {costPerHeadDay} / head-day</span>
                   </div>
                 </div>
@@ -1292,13 +1282,11 @@ export default function StageWiseConsumptionOutputPanel() {
         <Dialog
           open={logModalOpen}
           onClose={() => setLogModalOpen(false)}
-          title="Log Operational Stage Consumption"
+          title={t("swLogStageConsumption")}
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => setLogModalOpen(false)} disabled={logSaving}>
-                Cancel
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setLogModalOpen(false)} disabled={logSaving}>{t("cancel")}</Button>
               <Button size="sm" onClick={handleAddConsumption} className="nf-btn-primary" disabled={logSaving}>
                 {logSaving ? "Saving…" : "Add to Stage WIP"}
               </Button>
@@ -1310,7 +1298,7 @@ export default function StageWiseConsumptionOutputPanel() {
               <p className="rounded-[var(--radius-xs)] border px-3 py-2 text-xs" style={{ color: "var(--danger)", borderColor: "var(--danger)", backgroundColor: "var(--danger-muted)" }}>{logError}</p>
             )}
             <div>
-              <label className="font-semibold block mb-1">Entry Category</label>
+              <label className="font-semibold block mb-1">{t("swEntryCategory")}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -1319,8 +1307,7 @@ export default function StageWiseConsumptionOutputPanel() {
                     logType === "FEED" ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--text-secondary)]"
                   }`}
                 >
-                  <Wheat className="inline-block h-3.5 w-3.5 mr-1" /> Feed Consumption
-                </button>
+                  <Wheat className="inline-block h-3.5 w-3.5 mr-1" />{t("swFeedConsumption")}</button>
                 <button
                   type="button"
                   onClick={() => setLogType("MEDICINE")}
@@ -1328,13 +1315,12 @@ export default function StageWiseConsumptionOutputPanel() {
                     logType === "MEDICINE" ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--text-secondary)]"
                   }`}
                 >
-                  <Pill className="inline-block h-3.5 w-3.5 mr-1" /> Medicine / Vaccine
-                </button>
+                  <Pill className="inline-block h-3.5 w-3.5 mr-1" />{t("colMedicineVaccine")}</button>
               </div>
             </div>
 
             <div>
-              <label className="font-semibold block mb-1">Item Description / Formula</label>
+              <label className="font-semibold block mb-1">{t("swItemDescFormula")}</label>
               <input
                 type="text"
                 value={logItem}
@@ -1352,26 +1338,26 @@ export default function StageWiseConsumptionOutputPanel() {
                   step="0.1"
                   value={logQty}
                   onChange={(e) => setLogQty(e.target.value)}
-                  placeholder="e.g. 50"
+                  placeholder={t("swPhFifty")}
                   className="nf-input w-full font-mono"
                 />
               </div>
 
               <div>
-                <label className="font-semibold block mb-1">Standard Rate / Cost (₹)</label>
+                <label className="font-semibold block mb-1">{t("swStandardRateCost")}</label>
                 <input
                   type="number"
                   step="0.5"
                   value={logRate}
                   onChange={(e) => setLogRate(e.target.value)}
-                  placeholder="e.g. 35.00"
+                  placeholder={t("swPhThirtyFive")}
                   className="nf-input w-full font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-semibold block mb-1">Specific Animal(s) (optional — splits Quantity evenly across them)</label>
+              <label className="font-semibold block mb-1">{t("swSpecificAnimalsSplitQty")}</label>
               <AnimalMultiSelect
                 options={batchAnimalOptions}
                 loading={batchAnimalOptionsLoading}

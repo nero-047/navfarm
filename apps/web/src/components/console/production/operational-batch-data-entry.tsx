@@ -922,9 +922,7 @@ export default function OperationalBatchDataEntry() {
                       className="absolute z-20 mt-1 w-72 rounded-[var(--radius-md)] border p-3 shadow-lg"
                       style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
                     >
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                        Scope today&apos;s entry to
-                      </p>
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("obScopeEntryTo")}</p>
                       <AnimalMultiSelect
                         options={batchAnimalOptions}
                         loading={batchAnimalOptionsLoading}
@@ -943,17 +941,13 @@ export default function OperationalBatchDataEntry() {
                             type="button"
                             onClick={() => setTopAnimalIds(new Set())}
                             className="text-[11px] font-semibold text-[var(--text-muted)] hover:underline"
-                          >
-                            Clear (all animals)
-                          </button>
+                          >{t("bdeClearAllAnimals")}</button>
                         )}
                         <button
                           type="button"
                           onClick={() => setTopAnimalPanelOpen(false)}
                           className="text-[11px] font-semibold text-[var(--accent)] hover:underline"
-                        >
-                          Done
-                        </button>
+                        >{t("plsDone")}</button>
                       </div>
                     </div>
                   )}
@@ -1019,7 +1013,7 @@ export default function OperationalBatchDataEntry() {
           }}
         >
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>No automated production scheduler is linked to this batch in the database. You can manually record daily feed, medication, labour, and overhead entries using the <strong>+ Add</strong> buttons below.</span>
+          <span>{t("obNoSchedulerLinked")}<strong>+ Add</strong> buttons below.</span>
         </div>
       )}
 
@@ -1168,7 +1162,7 @@ export default function OperationalBatchDataEntry() {
                             <button
                               onClick={() => handleRemoveFeed(r.id)}
                               className="text-[var(--text-muted)] hover:text-rose-500 p-1 transition-colors"
-                              title="Remove line"
+                              title={t("obRemoveLine")}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1258,7 +1252,7 @@ export default function OperationalBatchDataEntry() {
                           <button
                             onClick={() => handleRemoveMed(r.id)}
                             className="text-[var(--text-muted)] hover:text-rose-500 p-1 transition-colors"
-                            title="Remove medication"
+                            title={t("obRemoveMedication")}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1375,7 +1369,7 @@ export default function OperationalBatchDataEntry() {
                     <button
                       onClick={() => handleRemoveMortality(m.id)}
                       className="text-[var(--text-muted)] hover:text-rose-500 p-1"
-                      title="Remove cause"
+                      title={t("obRemoveCause")}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1412,9 +1406,7 @@ export default function OperationalBatchDataEntry() {
 
             <div className="space-y-2">
               {labourRows.length === 0 ? (
-                <p className="py-3 text-center text-xs text-[var(--text-muted)] italic">
-                  No labour hours logged today. Click '+ Add Labour Resource' to record.
-                </p>
+                <p className="py-3 text-center text-xs text-[var(--text-muted)] italic">{t("bdeNoLabourToday")}</p>
               ) : (
                 labourRows.map((l) => (
                   <div key={l.id} className="flex items-center justify-between p-2 rounded-[var(--radius-xs)] bg-[var(--surface-raised)] text-xs">
@@ -1462,9 +1454,7 @@ export default function OperationalBatchDataEntry() {
 
             <div className="space-y-1.5">
               {overheadRows.length === 0 ? (
-                <p className="py-3 text-center text-xs text-[var(--text-muted)] italic">
-                  No overheads allocated today. Click '+ Add Overhead Expense' to record.
-                </p>
+                <p className="py-3 text-center text-xs text-[var(--text-muted)] italic">{t("bdeNoOverheadsToday")}</p>
               ) : (
                 overheadRows.map((o) => (
                   <div key={o.id} className="flex items-center justify-between p-2 rounded-[var(--radius-xs)] bg-[var(--surface-raised)] text-xs">
@@ -1528,9 +1518,7 @@ export default function OperationalBatchDataEntry() {
 
           <div className="space-y-2">
             {attachments.length === 0 ? (
-              <p className="py-3 text-center text-xs text-[var(--text-muted)] italic">
-                No inspection media attached for this date. Click '+ Upload Media' to attach a photo or document.
-              </p>
+              <p className="py-3 text-center text-xs text-[var(--text-muted)] italic">{t("obNoInspectionMedia")}</p>
             ) : (
               attachments.map((att) => (
                 <div key={att.attachment_id} className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex items-center justify-between gap-2">
@@ -1550,7 +1538,7 @@ export default function OperationalBatchDataEntry() {
                     <button
                       onClick={() => handleRemoveAttachment(att.attachment_id)}
                       className="text-[var(--text-muted)] hover:text-rose-500 p-1"
-                      title="Remove attachment"
+                      title={t("obRemoveAttachment")}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1567,10 +1555,8 @@ export default function OperationalBatchDataEntry() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-2">
-              <Scale className="w-4 h-4 text-[var(--accent)]" /> Daily Batch WIP Financial & Operational Summary
-            </h4>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
-              Feed: <strong className="text-[var(--text-primary)]">₹ {totalFeedCost.toFixed(2)}</strong> ({totalFeedConsumed.toFixed(1)} KG) ·
+              <Scale className="w-4 h-4 text-[var(--accent)]" />{t("bdeWipSummaryTitle")}</h4>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">{t("obFeedLabel")}<strong className="text-[var(--text-primary)]">₹ {totalFeedCost.toFixed(2)}</strong> ({totalFeedConsumed.toFixed(1)} KG) ·
               Meds: <strong className="text-[var(--text-primary)]">₹ {totalMedicineCost.toFixed(2)}</strong> ·
               Labour: <strong className="text-[var(--text-primary)]">₹ {totalLabourCost.toFixed(2)}</strong> ·
               Overheads: <strong className="text-[var(--text-primary)]">₹ {totalOverheads.toFixed(2)}</strong> ·
@@ -1599,27 +1585,23 @@ export default function OperationalBatchDataEntry() {
         <Dialog
           open={addFeedModalOpen}
           onClose={() => setAddFeedModalOpen(false)}
-          title="Add Feed / Supplement Line"
+          title={t("obAddFeedLine")}
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => setAddFeedModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAddFeedSubmit} className="nf-btn-primary">
-                Add Feed
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAddFeedModalOpen(false)}>{t("cancel")}</Button>
+              <Button size="sm" onClick={handleAddFeedSubmit} className="nf-btn-primary">{t("obAddFeed")}</Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">Feed Item Description *</label>
+              <label className="font-semibold block mb-1">{t("obFeedItemDesc")}</label>
               <input
                 type="text"
                 value={newFeedItem}
                 onChange={(e) => setNewFeedItem(e.target.value)}
-                placeholder="e.g. Grower Mash (GF-201) / Lysine Premix"
+                placeholder={t("obPhFeedItem")}
                 className="nf-input w-full"
               />
             </div>
@@ -1634,7 +1616,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Standard Rate (₹/UOM)</label>
+                <label className="font-semibold block mb-1">{t("obStandardRateUom")}</label>
                 <input
                   type="number"
                   value={newFeedRate}
@@ -1663,7 +1645,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Consumed *</label>
+                <label className="font-semibold block mb-1">{t("obConsumed")}</label>
                 <input
                   type="number"
                   value={newFeedConsumed}
@@ -1682,7 +1664,7 @@ export default function OperationalBatchDataEntry() {
               </div>
             </div>
             <div>
-              <label className="font-semibold block mb-1">Specific Animal(s) (optional — splits Consumed evenly across them)</label>
+              <label className="font-semibold block mb-1">{t("obSpecificAnimalsSplit")}</label>
               <AnimalMultiSelect
                 options={batchAnimalOptions}
                 loading={batchAnimalOptionsLoading}
@@ -1705,27 +1687,23 @@ export default function OperationalBatchDataEntry() {
         <Dialog
           open={addMedModalOpen}
           onClose={() => setAddMedModalOpen(false)}
-          title="Add Clinical Medication / Vaccine"
+          title={t("obAddClinicalMed")}
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => setAddMedModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAddMedSubmit} className="nf-btn-primary">
-                Add Medication
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAddMedModalOpen(false)}>{t("cancel")}</Button>
+              <Button size="sm" onClick={handleAddMedSubmit} className="nf-btn-primary">{t("obAddMedication")}</Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">Medicine Name / Vaccine *</label>
+              <label className="font-semibold block mb-1">{t("obMedicineName")}</label>
               <input
                 type="text"
                 value={newMedItem}
                 onChange={(e) => setNewMedItem(e.target.value)}
-                placeholder="e.g. PRRS Vaccine / Electrolyte Powder"
+                placeholder={t("obPhMedicine")}
                 className="nf-input w-full"
               />
             </div>
@@ -1768,7 +1746,7 @@ export default function OperationalBatchDataEntry() {
               </div>
             </div>
             <div>
-              <label className="font-semibold block mb-1">Specific Animal(s) (optional — splits Consumed evenly across them)</label>
+              <label className="font-semibold block mb-1">{t("obSpecificAnimalsSplit")}</label>
               <AnimalMultiSelect
                 options={batchAnimalOptions}
                 loading={batchAnimalOptionsLoading}
@@ -1791,27 +1769,23 @@ export default function OperationalBatchDataEntry() {
         <Dialog
           open={addMortalityModalOpen}
           onClose={() => setAddMortalityModalOpen(false)}
-          title="Add Mortality Incident Cause"
+          title={t("obAddMortalityCause")}
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => setAddMortalityModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAddMortalitySubmit} className="nf-btn-primary">
-                Add Mortality Record
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAddMortalityModalOpen(false)}>{t("cancel")}</Button>
+              <Button size="sm" onClick={handleAddMortalitySubmit} className="nf-btn-primary">{t("obAddMortality")}</Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">Cause of Death / Diagnosis *</label>
+              <label className="font-semibold block mb-1">{t("obCauseOfDeath")}</label>
               <input
                 type="text"
                 value={newMortalityReason}
                 onChange={(e) => setNewMortalityReason(e.target.value)}
-                placeholder="e.g. Acute Respiratory Infection / Trauma"
+                placeholder={t("obPhCause")}
                 className="nf-input w-full"
               />
             </div>
@@ -1825,17 +1799,17 @@ export default function OperationalBatchDataEntry() {
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Remarks & Vet Post-Mortem</label>
+              <label className="font-semibold block mb-1">{t("obRemarksVetPm")}</label>
               <input
                 type="text"
                 value={newMortalityRemarks}
                 onChange={(e) => setNewMortalityRemarks(e.target.value)}
-                placeholder="e.g. Pen Row B-04 / Necropsy completed"
+                placeholder={t("obPhMortalityRemarks")}
                 className="nf-input w-full"
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Specific Animal(s) (optional — overrides Head Count above)</label>
+              <label className="font-semibold block mb-1">{t("obSpecificAnimalsOverride")}</label>
               <AnimalMultiSelect
                 options={batchAnimalOptions}
                 loading={batchAnimalOptionsLoading}
@@ -1858,27 +1832,23 @@ export default function OperationalBatchDataEntry() {
         <Dialog
           open={addLabourModalOpen}
           onClose={() => setAddLabourModalOpen(false)}
-          title="Add Direct Labour Resource"
+          title={t("obAddLabourResource")}
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => setAddLabourModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAddLabourSubmit} className="nf-btn-primary">
-                Add Labour
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAddLabourModalOpen(false)}>{t("cancel")}</Button>
+              <Button size="sm" onClick={handleAddLabourSubmit} className="nf-btn-primary">{t("obAddLabour")}</Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">Resource / Worker Role *</label>
+              <label className="font-semibold block mb-1">{t("obResourceWorkerRole")}</label>
               <input
                 type="text"
                 value={newLabourRole}
                 onChange={(e) => setNewLabourRole(e.target.value)}
-                placeholder="e.g. Disinfection Specialist / Night Feeder"
+                placeholder={t("obPhLabour")}
                 className="nf-input w-full"
               />
             </div>
@@ -1903,7 +1873,7 @@ export default function OperationalBatchDataEntry() {
                 />
               </div>
               <div>
-                <label className="font-semibold block mb-1">Hourly Rate (₹)</label>
+                <label className="font-semibold block mb-1">{t("obHourlyRate")}</label>
                 <input
                   type="number"
                   value={newLabourRate}
@@ -1921,32 +1891,28 @@ export default function OperationalBatchDataEntry() {
         <Dialog
           open={addOverheadModalOpen}
           onClose={() => setAddOverheadModalOpen(false)}
-          title="Add Overhead / Utility Expense"
+          title={t("obAddOverheadExpense")}
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => setAddOverheadModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAddOverheadSubmit} className="nf-btn-primary">
-                Add Overhead
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAddOverheadModalOpen(false)}>{t("cancel")}</Button>
+              <Button size="sm" onClick={handleAddOverheadSubmit} className="nf-btn-primary">{t("obAddOverhead")}</Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">Overhead Type *</label>
+              <label className="font-semibold block mb-1">{t("obOverheadType")}</label>
               <input
                 type="text"
                 value={newOverheadType}
                 onChange={(e) => setNewOverheadType(e.target.value)}
-                placeholder="e.g. Slurry Cleaning / Water Heating"
+                placeholder={t("obPhOverhead")}
                 className="nf-input w-full"
               />
             </div>
             <div>
-              <label className="font-semibold block mb-1">Allocated Amount (₹) *</label>
+              <label className="font-semibold block mb-1">{t("obAllocatedAmount")}</label>
               <input
                 type="number"
                 value={newOverheadAmount}
@@ -1960,7 +1926,7 @@ export default function OperationalBatchDataEntry() {
                 type="text"
                 value={newOverheadRemarks}
                 onChange={(e) => setNewOverheadRemarks(e.target.value)}
-                placeholder="Allocation justification"
+                placeholder={t("obAllocationJustification")}
                 className="nf-input w-full"
               />
             </div>
@@ -1973,22 +1939,18 @@ export default function OperationalBatchDataEntry() {
         <Dialog
           open={uploadModalOpen}
           onClose={() => setUploadModalOpen(false)}
-          title="Upload Daily Inspection Media"
+          title={t("obUploadInspectionMedia")}
           maxWidth="sm"
           footer={
             <>
-              <Button variant="outline" size="sm" onClick={() => { setUploadModalOpen(false); setUploadingFile(null); setUploadError(""); }}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAddAttachment} disabled={!uploadingFile} className="nf-btn-primary">
-                Attach to Daily Log
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setUploadModalOpen(false); setUploadingFile(null); setUploadError(""); }}>{t("cancel")}</Button>
+              <Button size="sm" onClick={handleAddAttachment} disabled={!uploadingFile} className="nf-btn-primary">{t("obAttachToDailyLog")}</Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
             <div>
-              <label className="font-semibold block mb-1">File *</label>
+              <label className="font-semibold block mb-1">{t("obFileRequired")}</label>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/heic,application/pdf"
@@ -1998,14 +1960,14 @@ export default function OperationalBatchDataEntry() {
             </div>
 
             <div>
-              <label className="font-semibold block mb-1">Media Type</label>
+              <label className="font-semibold block mb-1">{t("obMediaType")}</label>
               <select
                 value={newAttachmentType}
                 onChange={(e) => setNewAttachmentType(e.target.value)}
                 className="nf-input w-full"
               >
-                <option value="IMAGE">Site Inspection Image (JPG, PNG, WebP, HEIC)</option>
-                <option value="PDF">Veterinary Lab Report / Prescription (PDF)</option>
+                <option value="IMAGE">{t("obMediaSiteImage")}</option>
+                <option value="PDF">{t("obMediaVetReport")}</option>
               </select>
             </div>
 

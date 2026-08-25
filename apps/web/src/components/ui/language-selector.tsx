@@ -26,14 +26,14 @@ const NATIVE_NAMES: Record<string, string> = {
  * out. Both are handled by the shared `.nf-lang-select` class in global.css.
  */
 export function LanguageSelector() {
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   return (
     <div className="nf-lang">
       <Globe size={14} className="nf-lang-icon" aria-hidden="true" />
       <select
         value={language}
         onChange={(e) => setLanguage(e.target.value as any)}
-        aria-label="Language"
+        aria-label={t("settingsLanguage")}
         className="nf-lang-select"
       >
         {Object.entries(NATIVE_NAMES).map(([code, name]) => (

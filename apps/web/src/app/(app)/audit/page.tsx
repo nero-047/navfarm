@@ -11,8 +11,10 @@ import { Input } from "../../../components/ui/input";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { ConsolePage } from "../../../components/ui/console-page";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../../components/ui/table";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function AuditPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
@@ -69,13 +71,13 @@ export default function AuditPage() {
   };
 
   if (loading) {
-    return <LoadingState label="Loading audit logs…" />;
+    return <LoadingState label={t("loadingAuditLogs")} />;
   }
 
   return (
     <ConsolePage>
       <PageHeader
-        title="Audit Ledger"
+        title={t("auditLedger")}
         description={`${auditLogs.length} events recorded`}
         actions={
           <div className="relative w-full sm:w-auto">
@@ -83,7 +85,7 @@ export default function AuditPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search logs…"
+              placeholder={t("searchLogs")}
               className="pl-9 sm:w-64"
             />
           </div>

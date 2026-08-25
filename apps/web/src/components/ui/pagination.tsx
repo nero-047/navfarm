@@ -40,7 +40,7 @@ export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChan
           <select
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            aria-label="Rows per page"
+            aria-label={t("gRowsPerPage")}
             className="nf-input-sm nf-select"
             style={S.input}
           >

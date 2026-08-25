@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { Building2, LogOut, Settings2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from "@/hooks/useLanguage";
 
 export function AdminShell({
   title,
@@ -15,6 +16,7 @@ export function AdminShell({
   eyebrow: string;
   children: ReactNode;
 }) {
+  const { t } = useLanguage();
   const { user, loading, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -59,8 +61,7 @@ export function AdminShell({
             }}
             className="flex items-center gap-2 text-xs text-white/60"
           >
-            <LogOut size={14} /> Sign out
-          </button>
+            <LogOut size={14} />{t("admSignOut")}</button>
         </div>
       </header>
       <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8">

@@ -4,6 +4,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Step2AddressProps {
   onSubmit: (data: any) => Promise<void>;
@@ -12,6 +13,7 @@ interface Step2AddressProps {
 }
 
 export default function Step2Address({ onSubmit, isSubmitting, initialData }: Step2AddressProps) {
+  const { t } = useLanguage();
   const uid = useId();
   const fieldId = (name: string) => `${uid}-${name}`;
   const [formData, setFormData] = useState({
@@ -54,58 +56,56 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold text-(--text-primary) flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-(--text-muted)" />
-          Step 2: Operating Addresses
-        </h2>
-        <p className="text-xs text-(--text-secondary)">Provide operating physical addresses for billing and tax allocations.</p>
+          <MapPin className="w-5 h-5 text-(--text-muted)" />{t("wzStep2Title")}</h2>
+        <p className="text-xs text-(--text-secondary)">{t("wzStep2Desc")}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Address Tag / Label" htmlFor={fieldId("address_label")}>
+        <Field label={t("wzAddressTagLabel")} htmlFor={fieldId("address_label")}>
           <Input
             id={fieldId("address_label")}
-            placeholder="e.g. Head Office - Gate 1"
+            placeholder={t("wzPhAddressTag")}
             value={formData.address_label}
             onChange={(e) => setFormData({ ...formData, address_label: e.target.value })}
           />
         </Field>
-        <Field label="Street Address line 1" htmlFor={fieldId("address_line_1")} required>
+        <Field label={t("wzStreetLine1")} htmlFor={fieldId("address_line_1")} required>
           <Input
             id={fieldId("address_line_1")}
-            placeholder="Main Farm Gate Road"
+            placeholder={t("wzPhStreetLine1")}
             value={formData.address_line_1}
             onChange={(e) => setFormData({ ...formData, address_line_1: e.target.value })}
             required
           />
         </Field>
 
-        <Field label="Street Address line 2" htmlFor={fieldId("address_line_2")}>
+        <Field label={t("wzStreetLine2")} htmlFor={fieldId("address_line_2")}>
           <Input
             id={fieldId("address_line_2")}
-            placeholder="Shed Area 4"
+            placeholder={t("wzPhStreetLine2")}
             value={formData.address_line_2}
             onChange={(e) => setFormData({ ...formData, address_line_2: e.target.value })}
           />
         </Field>
-        <Field label="City" htmlFor={fieldId("city")} required>
+        <Field label={t("ctCity")} htmlFor={fieldId("city")} required>
           <Input
             id={fieldId("city")}
-            placeholder="Gurugram"
+            placeholder={t("wzPhCity")}
             value={formData.city}
             onChange={(e) => setFormData({ ...formData, city: e.target.value })}
             required
           />
         </Field>
-        <Field label="State / Province" htmlFor={fieldId("state_province")} required>
+        <Field label={t("ctStateProvince")} htmlFor={fieldId("state_province")} required>
           <Input
             id={fieldId("state_province")}
-            placeholder="Haryana"
+            placeholder={t("wzPhState")}
             value={formData.state_province}
             onChange={(e) => setFormData({ ...formData, state_province: e.target.value })}
             required
           />
         </Field>
-        <Field label="Postal Code" htmlFor={fieldId("postal_code")} required>
+        <Field label={t("wzPostalCode")} htmlFor={fieldId("postal_code")} required>
           <Input
             id={fieldId("postal_code")}
             placeholder="122001"
@@ -115,15 +115,15 @@ export default function Step2Address({ onSubmit, isSubmitting, initialData }: St
           />
         </Field>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-(--text-secondary) font-medium">Location Type</label>
+          <label className="text-xs text-(--text-secondary) font-medium">{t("wzLocationType")}</label>
           <Select
             value={formData.address_type}
             onChange={(e) => setFormData({ ...formData, address_type: e.target.value })}
             className="bg-(--input-bg) border border-(--input-border) rounded-[var(--radius-sm)] px-4 h-12 text-sm text-(--input-text) focus:border-(--input-border-focus)"
           >
-            <option value="HEAD_OFFICE">Head Office</option>
-            <option value="FARM">Farm Location</option>
-            <option value="WAREHOUSE">Warehouse</option>
+            <option value="HEAD_OFFICE">{t("wzLocHeadOffice")}</option>
+            <option value="FARM">{t("wzLocFarmLocation")}</option>
+            <option value="WAREHOUSE">{t("gipWarehouse")}</option>
           </Select>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { api } from '@/lib/api-client';
 import { fetchTenantCompanies } from '@/modules/company';
 import { saveApiCompanies } from '@/modules/company/use-current-company';
 import type { CompanyMeta } from '@/modules/company';
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface TenantDetails {
   tenant_id: string;
@@ -35,6 +36,7 @@ interface UserRow {
 }
 
 export function TenantAdminPage() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const [tenant, setTenant] = useState<TenantDetails | null>(null);
   const [companies, setCompanies] = useState<CompanyMeta[]>([]);
@@ -65,8 +67,8 @@ export function TenantAdminPage() {
   ];
 
   return (
-    <AdminShell title="Organization" eyebrow={tenant?.tenant_name || 'Tenant workspace'}>
-      <p className="mt-2 text-sm text-(--text-secondary)">Manage companies, members and plan capacity using tenant-scoped backend data.</p>
+    <AdminShell title={t("tapOrganization")} eyebrow={tenant?.tenant_name || 'Tenant workspace'}>
+      <p className="mt-2 text-sm text-(--text-secondary)">{t("tapManageDesc")}</p>
       {error && <p className="mt-4 rounded-[var(--radius-sm)] bg-(--danger-muted) px-4 py-3 text-xs text-(--danger)">{error}</p>}
       <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map(([label, value, Icon, detail]) => (
@@ -74,17 +76,17 @@ export function TenantAdminPage() {
         ))}
       </div>
       <section className="mt-6 overflow-hidden rounded-[var(--radius-md)] border border-(--border) bg-(--surface)">
-        <header className="border-b border-(--border) px-6 py-4"><h2 className="font-semibold text-(--text-primary)">Company portfolio</h2><p className="mt-1 text-xs text-(--text-secondary)">Active companies returned by the API.</p></header>
+        <header className="border-b border-(--border) px-6 py-4"><h2 className="font-semibold text-(--text-primary)">{t("tapCompanyPortfolio")}</h2><p className="mt-1 text-xs text-(--text-secondary)">{t("tapCompanyPortfolioDesc")}</p></header>
         <div className="divide-y divide-(--border)">
-          {companies.length === 0 && <p className="px-6 py-5 text-xs text-(--text-secondary)">No operating companies yet. Create one from Company workspaces.</p>}
+          {companies.length === 0 && <p className="px-6 py-5 text-xs text-(--text-secondary)">{t("tapNoCompanies")}</p>}
           {companies.map((company) => (
-            <div key={company.slug} className="grid gap-3 px-6 py-4 sm:grid-cols-[1fr_160px_140px_auto] sm:items-center"><div><p className="text-sm font-semibold text-(--text-primary)">{company.icon} {company.name}</p><p className="mt-1 text-xs text-(--text-secondary)">{company.location}</p></div><span className="text-xs text-(--text-secondary)">{company.nobName}</span><span className="text-xs text-(--text-secondary)">Setup {company.setupProgress}%</span><Link href={`/${company.slug}/dashboard`} className="text-xs font-semibold text-(--accent)">Open workspace</Link></div>
+            <div key={company.slug} className="grid gap-3 px-6 py-4 sm:grid-cols-[1fr_160px_140px_auto] sm:items-center"><div><p className="text-sm font-semibold text-(--text-primary)">{company.icon} {company.name}</p><p className="mt-1 text-xs text-(--text-secondary)">{company.location}</p></div><span className="text-xs text-(--text-secondary)">{company.nobName}</span><span className="text-xs text-(--text-secondary)">Setup {company.setupProgress}%</span><Link href={`/${company.slug}/dashboard`} className="text-xs font-semibold text-(--accent)">{t("tapOpenWorkspace")}</Link></div>
           ))}
         </div>
       </section>
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <section className="rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-6"><h2 className="font-semibold text-(--text-primary)">Organization profile</h2><p className="mt-1 text-xs text-(--text-secondary)">Identity and subscription from tenant master.</p><div className="mt-5 grid grid-cols-2 gap-4 text-xs">{[['Legal name',tenant?.tenant_name || 'Loading…'],['Workspace code',tenant?.tenant_code || '—'],['Tenant type',tenant?.tenant_type || '—'],['Plan',tenant?.subscription?.plan_code || tenant?.plan_id || '—'],['Billing email',tenant?.billing_email || '—'],['Support tier',tenant?.subscription?.support_tier || '—']].map(([label,value])=><div key={label}><p className="text-[10px] uppercase tracking-wide text-(--text-muted)">{label}</p><p className="mt-1 font-semibold text-(--text-primary)">{value}</p></div>)}</div></section>
-        <section className="rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-6"><h2 className="font-semibold text-(--text-primary)">Organization members</h2><p className="mt-1 text-xs text-(--text-secondary)">Users from the active tenant database.</p><div className="mt-4 divide-y divide-(--border)">{members.map((member)=><div key={member.userId || member.user_id || member.email} className="flex items-center gap-3 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--accent-muted) text-[10px] font-semibold text-(--accent)">{(member.fullName || member.full_name || member.email).charAt(0)}</span><div className="flex-1"><p className="text-xs font-semibold text-(--text-primary)">{member.fullName || member.full_name || member.email}</p><p className="mt-0.5 text-[10px] text-(--text-muted)">{member.userType || member.user_type || 'User'} · {member.email}</p></div><span className={`text-[10px] font-semibold ${member.is_active === false ? 'text-slate-500' : 'text-(--success)'}`}>{member.is_active === false ? 'Inactive' : 'Active'}</span></div>)}</div></section>
+        <section className="rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-6"><h2 className="font-semibold text-(--text-primary)">{t("tapOrgProfile")}</h2><p className="mt-1 text-xs text-(--text-secondary)">{t("tapOrgProfileDesc")}</p><div className="mt-5 grid grid-cols-2 gap-4 text-xs">{[['Legal name',tenant?.tenant_name || 'Loading…'],['Workspace code',tenant?.tenant_code || '—'],['Tenant type',tenant?.tenant_type || '—'],['Plan',tenant?.subscription?.plan_code || tenant?.plan_id || '—'],['Billing email',tenant?.billing_email || '—'],['Support tier',tenant?.subscription?.support_tier || '—']].map(([label,value])=><div key={label}><p className="text-[10px] uppercase tracking-wide text-(--text-muted)">{label}</p><p className="mt-1 font-semibold text-(--text-primary)">{value}</p></div>)}</div></section>
+        <section className="rounded-[var(--radius-md)] border border-(--border) bg-(--surface) p-6"><h2 className="font-semibold text-(--text-primary)">{t("tapOrgMembers")}</h2><p className="mt-1 text-xs text-(--text-secondary)">{t("tapOrgMembersDesc")}</p><div className="mt-4 divide-y divide-(--border)">{members.map((member)=><div key={member.userId || member.user_id || member.email} className="flex items-center gap-3 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--accent-muted) text-[10px] font-semibold text-(--accent)">{(member.fullName || member.full_name || member.email).charAt(0)}</span><div className="flex-1"><p className="text-xs font-semibold text-(--text-primary)">{member.fullName || member.full_name || member.email}</p><p className="mt-0.5 text-[10px] text-(--text-muted)">{member.userType || member.user_type || 'User'} · {member.email}</p></div><span className={`text-[10px] font-semibold ${member.is_active === false ? 'text-slate-500' : 'text-(--success)'}`}>{member.is_active === false ? 'Inactive' : 'Active'}</span></div>)}</div></section>
       </div>
     </AdminShell>
   );

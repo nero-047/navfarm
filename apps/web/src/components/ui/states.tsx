@@ -2,6 +2,7 @@ import { type ElementType } from 'react';
 import { RefreshCw, AlertCircle, Inbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface EmptyStateProps {
   icon?: ElementType;
@@ -47,6 +48,7 @@ interface ErrorStateProps {
 }
 
 export function ErrorState({ message, onRetry, className }: ErrorStateProps) {
+  const { t } = useLanguage();
   return (
     <div
       className={cn(
@@ -57,9 +59,7 @@ export function ErrorState({ message, onRetry, className }: ErrorStateProps) {
       <AlertCircle size={16} className="shrink-0" />
       <span className="flex-1">{message}</span>
       {onRetry && (
-        <button onClick={onRetry} className="nf-press shrink-0 font-semibold underline underline-offset-2">
-          Retry
-        </button>
+        <button onClick={onRetry} className="nf-press shrink-0 font-semibold underline underline-offset-2">{t("gRetry")}</button>
       )}
     </div>
   );

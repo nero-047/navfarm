@@ -10,6 +10,7 @@ import Step7Fiscal from "./wizard-steps/step7-fiscal";
 import Step8Modules from "./wizard-steps/step8-modules";
 import Step9Finalize from "./wizard-steps/step9-finalize";
 import { api } from "../../services/api-client";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface OnboardingWizardProps {
   wizardSteps: any[];
@@ -50,6 +51,7 @@ export default function OnboardingWizard({
   fetchWizardProgress,
   loadConsoleWorkspace,
 }: OnboardingWizardProps) {
+  const { t } = useLanguage();
 
   const [setupDetails, setSetupDetails] = React.useState<any>(null);
   const [loadingDetails, setLoadingDetails] = React.useState(false);
@@ -269,7 +271,7 @@ export default function OnboardingWizard({
       <div className="rounded-[var(--radius-lg)] border p-4 md:hidden" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)", color: "var(--text-primary)" }}>
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">Company setup</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">{t("owCompanySetup")}</p>
             <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">Step {activeWizardStep} of 9</p>
           </div>
           <span className="rounded-full border px-3 py-1 text-[10px] font-semibold" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
@@ -285,20 +287,20 @@ export default function OnboardingWizard({
       <aside className="hidden md:flex md:w-72 shrink-0 flex-col gap-3">
         {/* Intro copy is the column's heading, not a module */}
         <div className="mb-4 flex flex-col gap-1 px-3">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">ERP Setup Wizard</h3>
-          <p className="text-xs text-[var(--text-secondary)]">Configure your company settings to activate agricultural management.</p>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("owErpSetupWizard")}</h3>
+          <p className="text-xs text-[var(--text-secondary)]">{t("owErpSetupWizardDesc")}</p>
         </div>
 
         {[
-          { order: 1, label: "Company Profile", icon: <Building2 className="w-4 h-4" /> },
-          { order: 2, label: "Operating Addresses", icon: <MapPin className="w-4 h-4" /> },
-          { order: 3, label: "Primary Contact", icon: <Contact className="w-4 h-4" /> },
-          { order: 4, label: "Language Catalog", icon: <Globe className="w-4 h-4" /> },
-          { order: 5, label: "Base Currency", icon: <Coins className="w-4 h-4" /> },
-          { order: 6, label: "Timezone & Country", icon: <Clock className="w-4 h-4" /> },
-          { order: 7, label: "Fiscal Accounting", icon: <Calendar className="w-4 h-4" /> },
-          { order: 8, label: "Nature of Business", icon: <Layers className="w-4 h-4" /> },
-          { order: 9, label: "Complete Wizard", icon: <CheckCircle2 className="w-4 h-4" /> }
+          { order: 1, label: t("wzNavCompanyProfile"), icon: <Building2 className="w-4 h-4" /> },
+          { order: 2, label: t("wzNavOperatingAddresses"), icon: <MapPin className="w-4 h-4" /> },
+          { order: 3, label: t("wzNavPrimaryContact"), icon: <Contact className="w-4 h-4" /> },
+          { order: 4, label: t("wzNavLanguageCatalog"), icon: <Globe className="w-4 h-4" /> },
+          { order: 5, label: t("wzNavBaseCurrency"), icon: <Coins className="w-4 h-4" /> },
+          { order: 6, label: t("wzNavTimezoneCountry"), icon: <Clock className="w-4 h-4" /> },
+          { order: 7, label: t("wzNavFiscalAccounting"), icon: <Calendar className="w-4 h-4" /> },
+          { order: 8, label: t("wzNavNatureOfBusiness"), icon: <Layers className="w-4 h-4" /> },
+          { order: 9, label: t("wzNavCompleteWizard"), icon: <CheckCircle2 className="w-4 h-4" /> }
         ].map((step) => {
           const isCompleted = wizardSteps.find(s => s.stepOrder === step.order)?.status === "COMPLETED";
           const isActive = activeWizardStep === step.order;

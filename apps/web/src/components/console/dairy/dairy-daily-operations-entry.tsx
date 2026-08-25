@@ -1,414 +1,413 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  Save,
-  CheckCircle2,
-  Calendar,
-  CloudSun,
-  Activity,
-  Milk,
-  Boxes,
-  Stethoscope,
-  HeartPulse,
-  Layers,
-} from "lucide-react";
-import DairyLifecycleStepper from "./dairy-lifecycle-stepper";
-import { api } from "../../../services/api-client";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Calendar, CheckCircle2, Layers, Milk, Save, Activity, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { api } from "@/services/api-client";
+import { getActiveCompanyId, getActiveOperationalAreaId } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { InlineAlert } from "@/components/ui/alert";
+import { StatRow, StatCard } from "@/components/ui/stat-row";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
 
+type Row = Record<string, any>;
+
+function unwrap<T = any>(res: any): T {
+  return (Array.isArray(res) ? res : res?.data ?? res) as T;
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+const money = (v: unknown) =>
+  `₹ ${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Daily milking entry for a dairy herd.
+ *
+ * What this screen used to be: a fixed day — 1,180 L morning, 1,100 L evening,
+ * 4.15% fat, 80 lactating cows, four feed lines with hardcoded prices, and a
+ * weather reading — none of it from the database. Worse, "Save Daily Milking"
+ * posted `batch_id: "COW-LAC-2025-001"` (not a UUID) in a body the API does not
+ * accept, and swallowed the rejection with `.catch(() => null)`, so it always
+ * reported success while storing nothing.
+ *
+ * Now: the batch is chosen from real ACTIVE batches, the sessions read and
+ * write `milk_production_log`, the head count is the live count of lactating
+ * animals, and costs are the day's actual `batch_transaction` rows. A failed
+ * save shows the error instead of a tick.
+ */
 export default function DairyDailyOperationsEntry() {
-  const [selectedDate, setSelectedDate] = useState("2025-04-28");
+  const { t } = useLanguage();
+  const router = useRouter();
+  const companyId = getActiveCompanyId();
+  const areaId = getActiveOperationalAreaId();
+
+  const [batches, setBatches] = useState<Row[]>([]);
+  const [batchId, setBatchId] = useState("");
+  const [selectedDate, setSelectedDate] = useState(today);
+
+  const [summary, setSummary] = useState<Row | null>(null);
+  const [costs, setCosts] = useState<Row | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  // Session inputs. Empty string means "not recorded" — distinct from zero,
+  // which is a real reading of no milk.
+  const [morning, setMorning] = useState("");
+  const [evening, setEvening] = useState("");
+  const [fatPct, setFatPct] = useState("");
+  const [snfPct, setSnfPct] = useState("");
+  const [scc, setScc] = useState("");
+  const [bmcTemp, setBmcTemp] = useState("");
+  const [notes, setNotes] = useState("");
+
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Milking Yield Data
-  const [morningYield, setMorningYield] = useState<number>(1180);
-  const [eveningYield, setEveningYield] = useState<number>(1100);
-  const [fatPct, setFatPct] = useState<number>(4.15);
-  const [snfPct, setSnfPct] = useState<number>(8.85);
-  const sccCount = 145000;
+  useEffect(() => {
+    if (!companyId) {
+      setLoading(false);
+      setLoadError(t("dyNoCompany"));
+      return;
+    }
+    api
+      .get(`/batch?companyId=${companyId}&status=ACTIVE&limit=100`)
+      .then((r) => {
+        const rows = unwrap<Row[]>(r) || [];
+        const scoped = areaId ? rows.filter((b) => b.operational_area_id === areaId) : rows;
+        setBatches(scoped);
+        if (scoped.length) setBatchId((prev) => prev || scoped[0].batch_id);
+        else setLoading(false);
+      })
+      .catch((err: any) => {
+        setLoadError(err?.message || t("dyFailedToLoadBatches"));
+        setLoading(false);
+      });
+  }, [companyId, areaId, t]);
 
-  // Feed items state
-  const feedRows = [
-    { id: 1, name: "Dairy TMR (Total Mixed Ration)", uom: "KG", opening: 3500, issued: 1600, consumed: 1560, wastage: 40, closing: 1940, unitCost: 14.50 },
-    { id: 2, name: "Maize / Corn Silage", uom: "KG", opening: 5000, issued: 1200, consumed: 1180, wastage: 20, closing: 3820, unitCost: 6.20 },
-    { id: 3, name: "Dairy Concentrate 20% CP", uom: "KG", opening: 1800, issued: 450, consumed: 440, wastage: 10, closing: 1360, unitCost: 28.00 },
-    { id: 4, name: "Mineral Mixture (Bovine)", uom: "KG", opening: 120, issued: 12, consumed: 12, wastage: 0, closing: 108, unitCost: 110.00 },
-  ];
+  const load = useCallback(async () => {
+    if (!batchId) return;
+    setLoading(true);
+    setLoadError("");
+    try {
+      const [sumRes, costRes] = await Promise.all([
+        api.get(`/milk-production/daily-summary?batch_id=${batchId}&log_date=${selectedDate}`),
+        api.get(`/milk-production/daily-costs?batch_id=${batchId}&log_date=${selectedDate}`).catch(() => null),
+      ]);
+      const s = unwrap<Row>(sumRes);
+      setSummary(s);
+      setCosts(costRes ? unwrap<Row>(costRes) : null);
+      // Seed the form from what is already recorded, so opening a day that has
+      // entries shows them rather than blank boxes.
+      setMorning(s?.morning ? String(Number(s.morning.quantity_litres)) : "");
+      setEvening(s?.evening ? String(Number(s.evening.quantity_litres)) : "");
+      setFatPct(s?.fat_pct !== null && s?.fat_pct !== undefined ? String(s.fat_pct) : "");
+      setSnfPct(s?.snf_pct !== null && s?.snf_pct !== undefined ? String(s.snf_pct) : "");
+      setScc(s?.scc_count !== null && s?.scc_count !== undefined ? String(s.scc_count) : "");
+      setBmcTemp(s?.bmc_temperature_c !== null && s?.bmc_temperature_c !== undefined ? String(s.bmc_temperature_c) : "");
+      setNotes(s?.remarks || "");
+    } catch (err: any) {
+      setLoadError(err?.message || t("dyFailedToLoadDay"));
+    } finally {
+      setLoading(false);
+    }
+  }, [batchId, selectedDate, t]);
 
-  // Medication items state
-  const medRows = [
-    { id: 1, name: "Calcium Gel Bolus", uom: "PCS", issued: 4, consumed: 4, notes: "Administered to 2 fresh post-calving cows" },
-    { id: 2, name: "Iodine Teat Dip Solution", uom: "LITER", issued: 5, consumed: 4.8, notes: "Post-milking teat sanitization (100% compliance)" },
-    { id: 3, name: "Multivitamin B-Complex Inj.", uom: "ML", issued: 40, consumed: 40, notes: "Supportive therapy for COW-25-0012" },
-  ];
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  // Labour & Resource state
-  const labourRows = [
-    { id: 1, role: "Milking Parlour Operator", persons: 2, hours: 5.0 },
-    { id: 2, role: "Feed Wagon / TMR Mixer Operator", persons: 1, hours: 3.5 },
-    { id: 3, role: "Barn Cleaning & Bedding Worker", persons: 2, hours: 4.0 },
-  ];
+  const batch = useMemo(() => batches.find((b) => b.batch_id === batchId), [batches, batchId]);
 
-  // Overheads state
-  const overheads = {
-    electricity: 450.00,
-    water: 120.00,
-    sanitation: 180.00,
-  };
+  const totalLitres = useMemo(() => {
+    const m = morning.trim() === "" ? 0 : Number(morning);
+    const e = evening.trim() === "" ? 0 : Number(evening);
+    return m + e;
+  }, [morning, evening]);
 
-  const [notes, setNotes] = useState("Herd health is optimal. Morning and evening bulk milk fat tested at 4.15% (grade A). Bulk chiller held at steady 3.8°C.");
-
-  const totalYield = morningYield + eveningYield;
-  const activeCowCount = 80;
-  const avgYieldPerCow = (totalYield / activeCowCount).toFixed(2);
-
-  const totalFeedCost = feedRows.reduce((sum, r) => sum + r.consumed * r.unitCost, 0);
-  const totalMedCost = 1450.00;
-  const totalOverheadCost = overheads.electricity + overheads.water + overheads.sanitation;
-  const totalLabourCost = labourRows.reduce((sum, r) => sum + r.persons * r.hours * 60, 0);
-  const totalDailyCost = totalFeedCost + totalMedCost + totalOverheadCost + totalLabourCost;
-  const costPerLitre = (totalDailyCost / totalYield).toFixed(2);
+  const milkingHead = Number(summary?.milking_head || 0);
+  const avgPerCow = milkingHead > 0 ? (totalLitres / milkingHead).toFixed(2) : null;
+  const totalCost = Number(costs?.total_cost || 0);
+  const costPerLitre = totalLitres > 0 && totalCost > 0 ? (totalCost / totalLitres).toFixed(2) : null;
 
   const handleSave = async () => {
+    setSaveError("");
+    if (!batchId || !companyId) return setSaveError(t("dyNoBatchSelected"));
+    if (morning.trim() === "" && evening.trim() === "") {
+      return setSaveError(t("dyNeedOneSession"));
+    }
+
     setSaving(true);
     try {
-      await api.post("/batch/bulk-daily-entry", {
-        batch_id: "COW-LAC-2025-001",
-        entry_date: selectedDate,
-        feed_consumed_kg: feedRows.reduce((acc, r) => acc + r.consumed, 0),
-        mortality_count: 0,
-        notes: notes,
-      }).catch(() => null);
-
+      const base = {
+        company_id: companyId,
+        batch_id: batchId,
+        log_date: selectedDate,
+        ...(areaId ? { operational_area_id: areaId } : {}),
+        ...(fatPct.trim() ? { fat_pct: Number(fatPct) } : {}),
+        ...(snfPct.trim() ? { snf_pct: Number(snfPct) } : {}),
+        ...(scc.trim() ? { scc_count: Number(scc) } : {}),
+        ...(bmcTemp.trim() ? { bmc_temperature_c: Number(bmcTemp) } : {}),
+        ...(notes.trim() ? { remarks: notes.trim() } : {}),
+      };
+      // Each session is its own record, so a day's total is always the sum of
+      // what was actually milked.
+      if (morning.trim() !== "") {
+        await api.post(`/milk-production`, { ...base, session: "MORNING", quantity_litres: Number(morning) });
+      }
+      if (evening.trim() !== "") {
+        await api.post(`/milk-production`, { ...base, session: "EVENING", quantity_litres: Number(evening) });
+      }
+      await load();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3500);
-    } catch {
-      // Handled
+    } catch (err: any) {
+      // Deliberately surfaced. The previous version caught and discarded this,
+      // then showed a success tick regardless.
+      setSaveError(err?.message || t("dyFailedToSaveMilk"));
     } finally {
       setSaving(false);
     }
   };
 
+  if (!loading && !loadError && batches.length === 0) {
+    return (
+      <EmptyState
+        icon={Milk}
+        title={t("dyNoActiveBatches")}
+        description={t("dyNoActiveBatchesHint")}
+        action={{ label: t("batchList"), onClick: () => router.push("/batches") }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 text-[var(--text-primary)]">
-      {/* ── Top Action & Batch Header Card ── */}
+      {saveError && <InlineAlert variant="danger">{saveError}</InlineAlert>}
+      {saveSuccess && <InlineAlert variant="success">{t("dyMilkSaved")}</InlineAlert>}
+
+      {/* Batch, date and the save action */}
       <div
         className="rounded-[var(--radius-lg)] border p-5 shadow-xs"
         style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] text-[var(--accent)]" style={{ backgroundColor: "var(--accent-muted)" }}>
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div className="flex flex-wrap items-end gap-4">
+            <div
+              className="hidden h-12 w-12 items-center justify-center rounded-[var(--radius-md)] text-[var(--accent)] sm:flex"
+              style={{ backgroundColor: "var(--accent-muted)" }}
+            >
               <Layers className="h-6 w-6" />
             </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="font-mono text-base font-bold text-[var(--accent)]">
-                  COW-LAC-2025-001
-                </h1>
-                <span className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] px-2.5 py-0.5 text-xs font-semibold text-[var(--success)]" style={{ backgroundColor: "var(--success-muted)" }}>
-                  <CheckCircle2 className="h-3 w-3" /> ACTIVE LACTATION
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Breed: <strong>Holstein Friesian</strong> • Batch Type: <strong>Milking Herd (Lactation 1-100d)</strong> • Start: <strong>01-Mar-2025</strong>
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Metrics & Save */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="text-right pr-4 border-r hidden sm:block" style={{ borderColor: "var(--border)" }}>
-              <span className="text-[10px] uppercase font-semibold text-[var(--text-secondary)]">Lactating Cows</span>
-              <p className="text-lg font-bold font-mono text-[var(--text-primary)]">80 Head</p>
-            </div>
-            <div className="text-right pr-4 border-r hidden sm:block" style={{ borderColor: "var(--border)" }}>
-              <span className="text-[10px] uppercase font-semibold text-[var(--text-secondary)]">Today's Total Milk</span>
-              <p className="text-lg font-bold font-mono text-[var(--text-primary)]">{totalYield.toLocaleString()} L</p>
-            </div>
-            <div className="text-right pr-4 border-r hidden sm:block" style={{ borderColor: "var(--border)" }}>
-              <span className="text-[10px] uppercase font-semibold text-[var(--text-secondary)]">Avg Yield / Cow</span>
-              <p className="text-lg font-bold font-mono text-[var(--accent)]">{avgYieldPerCow} L/day</p>
-            </div>
-
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="nf-press flex items-center gap-2 rounded-[var(--radius-sm)] px-4 py-2 text-xs font-semibold text-white shadow-xs transition-opacity hover:opacity-90 disabled:opacity-50"
-              style={{ backgroundColor: "var(--accent)" }}
-            >
-              {saving ? (
-                <Activity className="h-4 w-4 animate-spin" />
-              ) : saveSuccess ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              <span>{saving ? "Saving to DB…" : saveSuccess ? "Saved Successfully!" : "Save Daily Milking"}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 9-Stage Dairy Lifecycle Stepper ── */}
-      <DairyLifecycleStepper currentStageCode="EARLY_LAC" />
-
-      {/* ── Date, Weather & Context Bar ── */}
-      <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-[var(--radius-md)] border p-3.5 text-xs font-medium"
-        style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-      >
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-[var(--accent)]" />
-          <span className="text-[var(--text-secondary)]">Log Date:</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-[var(--radius-xs)] border px-2.5 py-1 text-xs font-semibold outline-none"
-            style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-primary)" }}
-          />
-        </div>
-
-        <div className="flex items-center gap-4 text-[var(--text-secondary)]">
-          <span className="flex items-center gap-1.5">
-            <CloudSun className="h-4 w-4 text-amber-500" /> 26.5°C • 58% Humidity
-          </span>
-          <span>Barn: Main Free-Stall Barn 1</span>
-          <span>BMC Temp: <strong className="text-blue-600">3.8°C</strong></span>
-        </div>
-      </div>
-
-      {/* ── 11 Operations Panels ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Col 1 & 2: Milking Yield & Feed Consumption */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Panel 1: Milking Yield Log */}
-          <div
-            className="rounded-[var(--radius-lg)] border p-5 space-y-4"
-            style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-          >
-            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2">
-                <Milk className="h-4 w-4 text-blue-500" />
-                <h3 className="text-sm font-semibold">1. Daily Milking Yield & Quality Composition</h3>
-              </div>
-              <span className="text-xs font-semibold text-blue-600">Total: {totalYield.toLocaleString()} Litres</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="rounded-[var(--radius-md)] border p-3.5" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
-                <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase">Morning Session (4:30 AM)</span>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <input
-                    type="number"
-                    value={morningYield}
-                    onChange={(e) => setMorningYield(Number(e.target.value))}
-                    className="w-24 bg-transparent text-xl font-bold outline-none"
-                  />
-                  <span className="text-xs font-semibold">Litres</span>
-                </div>
-                <p className="mt-1 text-[11px] text-[var(--text-secondary)]">Avg {(morningYield / 80).toFixed(2)} L / cow</p>
-              </div>
-
-              <div className="rounded-[var(--radius-md)] border p-3.5" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
-                <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase">Evening Session (4:30 PM)</span>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <input
-                    type="number"
-                    value={eveningYield}
-                    onChange={(e) => setEveningYield(Number(e.target.value))}
-                    className="w-24 bg-transparent text-xl font-bold outline-none"
-                  />
-                  <span className="text-xs font-semibold">Litres</span>
-                </div>
-                <p className="mt-1 text-[11px] text-[var(--text-secondary)]">Avg {(eveningYield / 80).toFixed(2)} L / cow</p>
-              </div>
-
-              <div className="rounded-[var(--radius-md)] border p-3.5 space-y-2" style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)" }}>
-                <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase">Quality Composition</span>
-                <div className="flex justify-between text-xs">
-                  <span className="text-[var(--text-secondary)]">Fat %:</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={fatPct}
-                    onChange={(e) => setFatPct(Number(e.target.value))}
-                    className="w-14 text-right font-bold outline-none bg-transparent"
-                  />
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-[var(--text-secondary)]">SNF %:</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={snfPct}
-                    onChange={(e) => setSnfPct(Number(e.target.value))}
-                    className="w-14 text-right font-bold outline-none bg-transparent"
-                  />
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-[var(--text-secondary)]">SCC Count:</span>
-                  <span className="font-bold text-emerald-600">{sccCount.toLocaleString()} / mL</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Panel 2: Feed & TMR Consumption */}
-          <div
-            className="rounded-[var(--radius-lg)] border p-5 space-y-4"
-            style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-          >
-            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2">
-                <Boxes className="h-4 w-4 text-amber-500" />
-                <h3 className="text-sm font-semibold">2. TMR & Feed Intake Log</h3>
-              </div>
-              <span className="text-xs font-semibold text-amber-600">
-                Total Intake: {feedRows.reduce((a, b) => a + b.consumed, 0).toLocaleString()} KG
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b text-[11px] font-semibold uppercase text-[var(--text-secondary)]" style={{ borderColor: "var(--border)" }}>
-                    <th className="px-3 pb-2">Feed / Ration Item</th>
-                    <th className="px-3 pb-2">UOM</th>
-                    <th className="px-3 pb-2 text-right">Opening</th>
-                    <th className="px-3 pb-2 text-right">Issued</th>
-                    <th className="px-3 pb-2 text-right">Consumed</th>
-                    <th className="px-3 pb-2 text-right">Wastage</th>
-                    <th className="px-3 pb-2 text-right">Closing</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
-                  {feedRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="px-3 py-2.5 font-semibold">{row.name}</td>
-                      <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{row.uom}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{row.opening.toLocaleString()}</td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--accent)]">{row.issued.toLocaleString()}</td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-600">{row.consumed.toLocaleString()}</td>
-                      <td className="px-3 py-2.5 text-right font-mono text-red-500">{row.wastage}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{row.closing.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Panel 4 & 5: Herd Veterinary & Reproduction */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Panel 4: Health */}
-            <div className="rounded-[var(--radius-lg)] border p-4 space-y-3" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
-                <Stethoscope className="h-4 w-4 text-emerald-500" />
-                <h4 className="text-xs font-semibold">3. Veterinary Treatments</h4>
-              </div>
-              <div className="space-y-2">
-                {medRows.map((med) => (
-                  <div key={med.id} className="rounded-[var(--radius-xs)] border p-2 text-xs" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }}>
-                    <div className="flex justify-between font-semibold">
-                      <span>{med.name}</span>
-                      <span className="font-mono text-[var(--accent)]">{med.consumed} {med.uom}</span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{med.notes}</p>
-                  </div>
+            <label className="block">
+              <span className="nf-text-label">{t("btFromBatch")}</span>
+              <Select value={batchId} onChange={(e) => setBatchId(e.target.value)} className="min-w-[220px]">
+                {batches.map((b) => (
+                  <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>
                 ))}
+              </Select>
+            </label>
+            <label className="block">
+              <span className="nf-text-label">{t("dyLogDate")}</span>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-[var(--accent)]" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="nf-input text-sm"
+                />
               </div>
-            </div>
-
-            {/* Panel 5: Reproduction */}
-            <div className="rounded-[var(--radius-lg)] border p-4 space-y-3" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
-                <HeartPulse className="h-4 w-4 text-red-500" />
-                <h4 className="text-xs font-semibold">4. Reproduction & AI Log</h4>
-              </div>
-              <div className="space-y-2">
-                <div className="rounded-[var(--radius-xs)] border p-2 text-xs" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }}>
-                  <span className="font-semibold text-emerald-600">2 Inseminations Recorded Today</span>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">COW-25-0018 & COW-25-0024 • Straw: HF-SUPER-LOT-44</p>
-                </div>
-                <div className="rounded-[var(--radius-xs)] border p-2 text-xs" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }}>
-                  <span className="font-semibold text-blue-600">Ultrasound Pregnancy Check</span>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">4 cows confirmed pregnant at 45d post-AI</p>
-                </div>
-              </div>
-            </div>
+            </label>
           </div>
+
+          <Button onClick={handleSave} disabled={saving || loading} className="gap-2">
+            {saving ? <Activity className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? t("asSaving") : t("dySaveMilking")}
+          </Button>
         </div>
 
-        {/* Col 3: Cost Allocation & Today's Summary */}
-        <div className="space-y-6">
-          {/* Summary Panel */}
-          <div
-            className="rounded-[var(--radius-lg)] border p-5 space-y-4"
-            style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-          >
-            <h3 className="text-sm font-semibold border-b pb-2" style={{ borderColor: "var(--border)" }}>
-              Today's Production & Financial Summary
-            </h3>
-
-            <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Total Milk Output</span>
-                <span className="font-bold text-blue-600">{totalYield.toLocaleString()} Litres</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Average Yield / Cow</span>
-                <span className="font-bold">{avgYieldPerCow} Litres / day</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Milk Fat / SNF</span>
-                <span className="font-mono font-semibold">{fatPct}% Fat / {snfPct}% SNF</span>
-              </div>
-
-              <div className="border-t pt-2 space-y-1.5" style={{ borderColor: "var(--border)" }}>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Total Feed Cost</span>
-                  <span className="font-mono">₹ {totalFeedCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Veterinary & Health</span>
-                  <span className="font-mono">₹ {totalMedCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Labour & Machinery</span>
-                  <span className="font-mono">₹ {totalLabourCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Overheads & Utilities</span>
-                  <span className="font-mono">₹ {totalOverheadCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-              </div>
-
-              <div className="border-t pt-3 flex justify-between text-sm font-bold" style={{ borderColor: "var(--border)" }}>
-                <span>Unit Cost of Milk</span>
-                <span className="text-emerald-600">₹ {costPerLitre} / Litre</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes & Observations */}
-          <div
-            className="rounded-[var(--radius-lg)] border p-5 space-y-3"
-            style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-          >
-            <h3 className="text-sm font-semibold">Clinical & Facility Notes</h3>
-            <textarea
-              rows={4}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-[var(--radius-sm)] border p-2.5 text-xs outline-none"
-              style={{ backgroundColor: "var(--surface-raised)", borderColor: "var(--border)", color: "var(--text-primary)" }}
-            />
-          </div>
-        </div>
+        {batch && (
+          <p className="mt-3 text-xs text-[var(--text-secondary)]">
+            {batch.batch_no}
+            {batch.current_stage_code ? ` • ${batch.current_stage_code}` : ""}
+            {batch.start_date ? ` • ${t("bdeStartLabel")} ${batch.start_date}` : ""}
+          </p>
+        )}
       </div>
+
+      {loading ? (
+        <LoadingState label={t("dyLoadingDay")} />
+      ) : loadError ? (
+        <ErrorState message={loadError} onRetry={load} />
+      ) : (
+        <>
+          <StatRow columns={4}>
+            <StatCard label={t("dyLactatingCows")} value={milkingHead} unit={t("btColHead")} />
+            <StatCard label={t("dyTodaysTotalMilk")} value={totalLitres ? totalLitres.toLocaleString() : "—"} unit={t("dyLitres")}  />
+            <StatCard label={t("dyAvgYieldPerCow")} value={avgPerCow ?? "—"} unit={avgPerCow ? t("dyLitres") : undefined} />
+            <StatCard
+              label={t("dyUnitCostOfMilk")}
+              value={costPerLitre ? money(costPerLitre) : "—"}
+              sub={costPerLitre ? t("dyPerLitre") : t("dyNoCostsRecorded")}
+            />
+          </StatRow>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              {/* Milking sessions */}
+              <section
+                className="space-y-4 rounded-[var(--radius-lg)] border p-5"
+                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+              >
+                <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-2">
+                    <Milk className="h-4 w-4 text-[var(--accent)]" />
+                    <h3 className="text-sm font-semibold">{t("dyMilkingYieldHeader")}</h3>
+                  </div>
+                  <span className="text-xs font-semibold text-[var(--accent)]">
+                    {totalLitres ? `${totalLitres.toLocaleString()} ${t("dyLitres")}` : "—"}
+                  </span>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="nf-text-label">{t("dyMorningSession")}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={morning}
+                      onChange={(e) => setMorning(e.target.value)}
+                      placeholder={t("dyNotRecorded")}
+                      className="nf-input w-full font-mono text-sm"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="nf-text-label">{t("dyEveningSession")}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={evening}
+                      onChange={(e) => setEvening(e.target.value)}
+                      placeholder={t("dyNotRecorded")}
+                      className="nf-input w-full font-mono text-sm"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              {/* Quality composition */}
+              <section
+                className="space-y-4 rounded-[var(--radius-lg)] border p-5"
+                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+              >
+                <div className="border-b pb-3" style={{ borderColor: "var(--border)" }}>
+                  <h3 className="text-sm font-semibold">{t("dyQualityComposition")}</h3>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-4">
+                  <label className="block">
+                    <span className="nf-text-label">{t("dyFatPct")}</span>
+                    <input type="number" step="0.01" min={0} value={fatPct} onChange={(e) => setFatPct(e.target.value)} className="nf-input w-full font-mono text-sm" />
+                  </label>
+                  <label className="block">
+                    <span className="nf-text-label">SNF %</span>
+                    <input type="number" step="0.01" min={0} value={snfPct} onChange={(e) => setSnfPct(e.target.value)} className="nf-input w-full font-mono text-sm" />
+                  </label>
+                  <label className="block">
+                    <span className="nf-text-label">{t("dySccCount")}</span>
+                    <input type="number" min={0} value={scc} onChange={(e) => setScc(e.target.value)} className="nf-input w-full font-mono text-sm" />
+                  </label>
+                  <label className="block">
+                    <span className="nf-text-label">{t("dyBmcTemp")}</span>
+                    <input type="number" step="0.1" value={bmcTemp} onChange={(e) => setBmcTemp(e.target.value)} className="nf-input w-full font-mono text-sm" />
+                  </label>
+                </div>
+              </section>
+
+              {/* Notes */}
+              <section
+                className="space-y-3 rounded-[var(--radius-lg)] border p-5"
+                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+              >
+                <h3 className="text-sm font-semibold">{t("dyClinicalFacilityNotes")}</h3>
+                <textarea
+                  rows={3}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={t("dyNotesPlaceholder")}
+                  className="w-full rounded-[var(--radius-sm)] border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--input-text)]"
+                />
+              </section>
+            </div>
+
+            {/* The day's real cost lines */}
+            <div className="space-y-6">
+              <section
+                className="space-y-3 rounded-[var(--radius-lg)] border p-5 text-xs"
+                style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+              >
+                <div className="border-b pb-3" style={{ borderColor: "var(--border)" }}>
+                  <h3 className="text-sm font-semibold">{t("dyTodaysProdSummary")}</h3>
+                </div>
+
+                {!costs || costs.recorded_lines === 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-[var(--text-secondary)]">{t("dyNoCostLines")}</p>
+                    {/* Feed, medicine, labour and overheads are recorded on the
+                        shared Data Entry screen for every LOB — this panel does
+                        not duplicate that form, it links to it. */}
+                    <Button variant="outline" size="sm" onClick={() => router.push("/batches/entry")} className="w-full gap-1.5">
+                      {t("navBatchEntry")} <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <CostLine label={t("dyTotalFeedCost")} value={costs.feed?.total} />
+                    <CostLine label={t("dyVeterinaryHealth")} value={costs.medicine?.total} />
+                    <CostLine label={t("dyLabourMachinery")} value={costs.labour?.total} />
+                    <CostLine label={t("dyOverheadsUtilities")} value={costs.utilities?.total} />
+                    {Number(costs.other_consumption?.total) > 0 && (
+                      <CostLine label={t("swCostElementBreakdown")} value={costs.other_consumption?.total} />
+                    )}
+                    <div className="flex items-center justify-between border-t pt-2 font-semibold" style={{ borderColor: "var(--border)" }}>
+                      <span>{t("swTotalStageWip")}</span>
+                      <span className="font-mono text-[var(--accent)]">{money(costs.total_cost)}</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/batches/entry")} className="mt-2 w-full gap-1.5">
+                      {t("navBatchEntry")} <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                )}
+              </section>
+
+              {summary && summary.recorded_sessions > 0 && (
+                <section
+                  className="space-y-2 rounded-[var(--radius-lg)] border p-5 text-xs"
+                  style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+                >
+                  <div className="flex items-center gap-2 font-semibold text-[var(--success)]">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{t("dySessionsRecorded", { n: String(summary.recorded_sessions) })}</span>
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CostLine({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[var(--text-secondary)]">{label}</span>
+      <span className="font-mono">{money(value)}</span>
     </div>
   );
 }
