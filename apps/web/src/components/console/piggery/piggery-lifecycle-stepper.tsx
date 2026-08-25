@@ -61,8 +61,8 @@ export default function PiggeryLifecycleStepper({
             return (
               <div
                 key={stage.id}
-                onClick={() => onSelectStage && onSelectStage(stage)}
-                className="flex flex-col items-center cursor-pointer group flex-1 max-w-[120px]"
+                onClick={() => onSelectStage?.(stage)}
+                className={`flex flex-col items-center group flex-1 max-w-[120px] ${onSelectStage ? "cursor-pointer" : ""}`}
               >
                 {/* 1. Circle Indicator (strictly 32px height, top-aligned) */}
                 <div

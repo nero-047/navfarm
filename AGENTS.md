@@ -26,11 +26,11 @@
 
 ## Current Product Phase and Scope
 
-- NAVFarm is currently a frontend demo. The backend will be designed and implemented by another developer.
-- Current product work is limited to the web demo in `apps/web` and, when explicitly requested, the Flutter app in `apps/mobile`.
-- Do not implement or modify `apps/api`, databases, migrations, authentication services, server APIs, or external integrations unless the user explicitly expands the scope.
-- Do not invent backend contracts. For demo features, use clearly local mock data, typed fixtures, component state, and/or browser storage. Keep mock boundaries easy to replace with real APIs later.
-- Never represent mock persistence, mock authentication, calculated sample data, or placeholder integrations as production behavior.
+- NAVFarm has moved past the frontend-demo stage. There is one maintainer, Rishi, covering all three surfaces: the NestJS backend (`apps/api`), the Next.js web app (`apps/web`), and the Flutter app (`apps/mobile`, when explicitly requested). There is no second maintainer and no separate backend owner. Concretely: `apps/api` is in scope for implementation work the same way `apps/web` and `apps/mobile` are — do not withhold, defer, or gate backend changes on the assumption that someone else will build or review them, and do not treat requests touching `apps/api` as out-of-scope by default.
+- Authentication and core operational persistence are real, not mocked: login calls `POST /auth/login` against the API, and batch, animal, and milk-production data read/write through real endpoints (e.g. `GET/POST /batch`, `POST /batch/:id/transaction`, `POST /milk-production`, `POST /animal`). Do not describe this as demo/mock behavior in new work or docs.
+- A few flows remain intentionally local-only and should stay that way until someone explicitly wires them up: batch-animal transfer, remove, and CSV import (`batch-animal-assignment-panel.tsx`) mutate local state only and discard on refresh; the piggery/dairy lifecycle stage catalogs (`DEFAULT_PIGGERY_STAGES`, `DEFAULT_DAIRY_STAGES`) are hardcoded reference arrays, and clicking a stage in either lifecycle stepper does not itself trigger a stage-transition API call. Treat these as known gaps, not demo conventions to preserve — call them out if you touch nearby code, but don't silently "fix" them into full API wiring unless asked.
+- **Piggery is currently the only fully built-out NOB/LOB domain.** Dairy has some real daily-operations wiring already (see above) but is not the current focus. Other supported domains from the docs (poultry, agriculture, aquaculture, beekeeping/insect farming, feed/processing) are intentionally not built out yet — they will be added later. Don't proactively build out a non-piggery domain's operational screens unless the user asks for that domain specifically; keep domain-agnostic scaffolding (NOB/LOB config, navigation, master data) generic so adding a new domain later stays additive.
+- Where a feature genuinely has no backend support yet (a new domain, a not-yet-built module), it's fine to prototype with local mock data/fixtures/component state — just keep the mock boundary obvious and easy to swap for a real API, and never present it as production behavior.
 
 ## Product Source of Truth
 
@@ -51,9 +51,9 @@
 ## Web Demo Conventions
 
 - The web app is Next.js 16 + React 19 under `apps/web` and normally runs at `http://localhost:3001` during local development.
-- The demo currently uses local browser state for authentication (`navfarm_auth_user`) and custom companies (`navfarm_custom_companies`); there is no real authentication or persistence layer.
+- Authentication is real (`POST /auth/login`); the session token/user is cached in browser storage the way any SPA does, not as a mock. Treat any remaining `navfarm_auth_user`/`navfarm_custom_companies`-style local-only state you find as a leftover to reconcile, not the intended pattern going forward.
 - Company workspaces use `/{company}/...`. The company selector must show company entities, not industries or LOBs. Each company is assigned a documented NOB; piggery, dairy, rearing, laying, hatching, slaughter, crops, seeds, etc. belong inside the company as LOBs.
-- Seed/demo NOB options must follow the docs: Poultry, Livestock, Agriculture, Aquaculture, Insect Farming, and Feed & Processing. New NOBs/LOBs should remain configuration-driven.
+- Seed/demo NOB options must follow the docs: Poultry, Livestock, Agriculture, Aquaculture, Insect Farming, and Feed & Processing. New NOBs/LOBs should remain configuration-driven. Piggery (under Livestock) is the only domain currently built out end-to-end; the rest are seeded as config/catalog options but intentionally not built out until requested (see Current Product Phase and Scope above).
 - Keep company-scoped navigation and UI reusable across industries. Prefer domain configuration and typed metadata over duplicating pages per company/LOB.
 - Preserve the existing visual language unless the user asks for a redesign: navy navigation, white/light-gray content surfaces, restrained red/blue accents, compact typography, and card-based layouts.
 - The frontend demo information architecture should cover: dashboard/overview, batches, daily operations, QC, QR traceability, resources and KPI schedules, financial/variance reports, and settings/onboarding/master data.

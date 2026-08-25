@@ -39,11 +39,7 @@ navfarm/
 
 ## Ownership
 
-Rishi leads NAVFarm's product development across the Next.js web application and Flutter mobile application, shaping the user experience and carrying features from implementation through day-to-day delivery.
-
-Arun leads the NestJS backend, including sockets, notifications, and backend production releases. He also supports Flutter production releases and coordinates backend changes with client releases.
-
-The team reviews shared contracts and integration changes together so that the web, mobile, and backend platforms continue to evolve as one product.
+Rishi leads NAVFarm's product development across the NestJS backend, the Next.js web application, and the Flutter mobile application, carrying features from implementation through day-to-day delivery and production releases.
 
 ## Prerequisites
 
@@ -246,7 +242,7 @@ pnpm nx show project web --json
 
 ### API
 
-Build with `pnpm nx build api`. Deploy the `apps/api/dist` output with a supported Node runtime, inject MySQL, Redis, R2, and application secrets from the hosting platform, expose the configured API port, and run database migrations as a separately controlled release step once migrations exist. Arun owns the backend production release.
+Build with `pnpm nx build api`. Deploy the `apps/api/dist` output with a supported Node runtime, inject MySQL, Redis, R2, and application secrets from the hosting platform, expose the configured API port, and run database migrations as a separately controlled release step once migrations exist. Rishi owns the backend production release.
 
 ### Web
 
@@ -254,9 +250,9 @@ Build with `pnpm nx build web`. Deploy the Next.js application independently wit
 
 ### Mobile
 
-Version, archive, sign, and publish Android and iOS applications through their respective store pipelines. Never put server credentials in the app bundle. Rishi owns application development; Arun supports Flutter production releases, signing, and backend-release coordination.
+Version, archive, sign, and publish Android and iOS applications through their respective store pipelines. Never put server credentials in the app bundle. Rishi owns application development, signing, and backend-release coordination.
 
-API, web, and mobile releases do not need to share a release cadence. Coordinate contract changes so deployed client versions remain compatible with the API.
+API, web, and mobile releases do not need to share a release cadence, but Rishi coordinates contract changes so deployed client versions remain compatible with the API.
 
 ## Troubleshooting
 
@@ -323,15 +319,10 @@ The web config pins Turbopack's root to this repository. If a warning returns, c
 Rishi:
 
 ```sh
+pnpm dev:api
 pnpm dev:web
 pnpm nx run mobile:pub-get
 pnpm dev:mobile
 ```
 
-Arun:
-
-```sh
-pnpm dev:api
-```
-
-Both maintainers should run `pnpm install` once after dependency or lockfile changes.
+Run `pnpm install` once after dependency or lockfile changes.

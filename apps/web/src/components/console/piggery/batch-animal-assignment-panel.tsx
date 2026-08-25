@@ -29,6 +29,7 @@ export interface AnimalAssignmentRow {
   ageDays: number;
   entryDate: string;
   penLocation: string;
+  locationId: string;
   weightKg: number;
   source: string;
   status: "Active" | "Transferred" | "Isolated" | "Culled";
@@ -105,11 +106,17 @@ export default function BatchAnimalAssignmentPanel() {
   const [regSaving, setRegSaving] = useState(false);
   const [regError, setRegError] = useState("");
 
-  // Transfer Animal Modal (unchanged — pen-relocation UI is out of scope for this fix)
+  // Transfer Animal Modal — real pen relocation via PUT /animal/:id { current_location_id }
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [selectedAnimalForTransfer, setSelectedAnimalForTransfer] = useState<AnimalAssignmentRow | null>(null);
-  const [targetPen, setTargetPen] = useState("");
+  const [targetLocationId, setTargetLocationId] = useState("");
   const [transferReason, setTransferReason] = useState("Stage Progression to Farrowing");
+  const [transferSaving, setTransferSaving] = useState(false);
+  const [transferError, setTransferError] = useState("");
+
+  // Removal — real unassign via PUT /animal/:id { current_batch_id: null }
+  const [removingAnimalId, setRemovingAnimalId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState("");
 
   // CSV Import Modal (unchanged — bulk import UI is out of scope for this fix)
   const [csvModalOpen, setCsvModalOpen] = useState(false);
@@ -180,6 +187,7 @@ export default function BatchAnimalAssignmentPanel() {
             ageDays,
             entryDate: a.entry_date || "—",
             penLocation: loc?.location_name || loc?.location_code || "—",
+            locationId: a.current_location_id || "",
             weightKg: Number(a.current_weight_kg) || 0,
             source: a.entry_type || "—",
             status,
@@ -313,27 +321,44 @@ export default function BatchAnimalAssignmentPanel() {
     }
   };
 
-  const handleConfirmTransfer = () => {
-    if (!selectedAnimalForTransfer || !targetPen) return;
-    const updated = animals.map((a) =>
-      a.id === selectedAnimalForTransfer.id
-        ? { ...a, penLocation: targetPen }
-        : a
-    );
-    setAnimals(updated);
-    setTransferModalOpen(false);
-    setToastMsg(t("baapAnimalMovedToast", { tag: selectedAnimalForTransfer.earTag, pen: targetPen, reason: transferReason }));
-    setSelectedAnimalForTransfer(null);
-    setTargetPen("");
-    setTimeout(() => setToastMsg(""), 3500);
+  const handleConfirmTransfer = async () => {
+    if (!selectedAnimalForTransfer || !targetLocationId) return;
+    setTransferSaving(true);
+    setTransferError("");
+    try {
+      await api.put(`/animal/${selectedAnimalForTransfer.id}`, { current_location_id: targetLocationId });
+      const destLabel = locations.find((l) => l.location_id === targetLocationId)?.location_name
+        || locations.find((l) => l.location_id === targetLocationId)?.location_code
+        || targetLocationId;
+      setToastMsg(t("baapAnimalMovedToast", { tag: selectedAnimalForTransfer.earTag, pen: destLabel, reason: transferReason }));
+      setTimeout(() => setToastMsg(""), 3500);
+      setTransferModalOpen(false);
+      setSelectedAnimalForTransfer(null);
+      setTargetLocationId("");
+      loadAssignedAnimals();
+    } catch (err: any) {
+      setTransferError(err?.message || t("baapErrMoveAnimal"));
+    } finally {
+      setTransferSaving(false);
+    }
   };
 
-  const handleRemoveAnimal = (animal: AnimalAssignmentRow) => {
+  const handleRemoveAnimal = async (animal: AnimalAssignmentRow) => {
     if (!confirm(t("baapConfirmRemoveAnimal", { tag: animal.earTag }))) return;
-    const updated = animals.filter((a) => a.id !== animal.id);
-    setAnimals(updated);
-    setToastMsg(t("baapAnimalRemovedToast", { tag: animal.earTag }));
-    setTimeout(() => setToastMsg(""), 3500);
+    setRemovingAnimalId(animal.id);
+    setRemoveError("");
+    try {
+      await api.put(`/animal/${animal.id}`, { current_batch_id: null });
+      setToastMsg(t("baapAnimalRemovedToast", { tag: animal.earTag }));
+      setTimeout(() => setToastMsg(""), 3500);
+      loadAssignedAnimals();
+      loadCandidateAnimals();
+    } catch (err: any) {
+      setRemoveError(err?.message || t("baapErrRemoveAnimal"));
+      setTimeout(() => setRemoveError(""), 4000);
+    } finally {
+      setRemovingAnimalId(null);
+    }
   };
 
   const handleImportCsv = () => {
@@ -354,6 +379,7 @@ export default function BatchAnimalAssignmentPanel() {
         ageDays: 290,
         entryDate: new Date().toISOString().slice(0, 10),
         penLocation: pen,
+        locationId: "",
         weightKg: 195.0,
         source: "Batch Importer CSV",
         status: "Active",
@@ -651,7 +677,8 @@ export default function BatchAnimalAssignmentPanel() {
                               size="sm"
                               onClick={() => {
                                 setSelectedAnimalForTransfer(animal);
-                                setTargetPen(animal.penLocation);
+                                setTargetLocationId(animal.locationId);
+                                setTransferError("");
                                 setTransferModalOpen(true);
                               }}
                               className="h-6 text-[10px] px-2 gap-1"
@@ -661,7 +688,8 @@ export default function BatchAnimalAssignmentPanel() {
                             </Button>
                             <button
                               onClick={() => handleRemoveAnimal(animal)}
-                              className="text-[var(--text-muted)] hover:text-rose-500 p-1 transition-colors"
+                              disabled={removingAnimalId === animal.id}
+                              className="text-[var(--text-muted)] hover:text-rose-500 p-1 transition-colors disabled:opacity-50"
                               title={t("baapUnassignAnimalTitle")}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -847,7 +875,8 @@ export default function BatchAnimalAssignmentPanel() {
                   variant="outline"
                   onClick={() => {
                     setSelectedAnimalForTransfer(a);
-                    setTargetPen(a.penLocation);
+                    setTargetLocationId(a.locationId);
+                    setTransferError("");
                     setTransferModalOpen(true);
                   }}
                   className="h-6 text-[10px] px-2"
@@ -870,6 +899,8 @@ export default function BatchAnimalAssignmentPanel() {
             {t("baapRemovalsDesc")}
           </p>
 
+          {removeError && <InlineAlert variant="danger">{removeError}</InlineAlert>}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
             {animals.map((a) => (
               <div key={a.id} className="p-3 rounded-[var(--radius-xs)] bg-[var(--surface-raised)] border border-[var(--border)] text-xs flex justify-between items-center">
@@ -881,9 +912,10 @@ export default function BatchAnimalAssignmentPanel() {
                   size="sm"
                   variant="destructive"
                   onClick={() => handleRemoveAnimal(a)}
+                  disabled={removingAnimalId === a.id}
                   className="h-6 text-[10px] px-2"
                 >
-                  {t("baapRemoveCullButton")}
+                  {removingAnimalId === a.id ? t("anpSaving") : t("baapRemoveCullButton")}
                 </Button>
               </div>
             ))}
@@ -903,26 +935,33 @@ export default function BatchAnimalAssignmentPanel() {
               <Button variant="outline" size="sm" onClick={() => setTransferModalOpen(false)}>
                 {t("baapCancelButton")}
               </Button>
-              <Button size="sm" onClick={handleConfirmTransfer} className="nf-btn-primary">
-                {t("baapRecordPenMovementButton")}
+              <Button size="sm" onClick={handleConfirmTransfer} disabled={transferSaving || !targetLocationId} className="nf-btn-primary">
+                {transferSaving ? t("anpSaving") : t("baapRecordPenMovementButton")}
               </Button>
             </>
           }
         >
           <div className="space-y-3 text-xs pt-1">
+            {transferError && <InlineAlert variant="danger">{transferError}</InlineAlert>}
+
             <p className="text-[var(--text-secondary)]">
               {t("baapCurrentLocationLabel")} <strong className="text-[var(--text-primary)]">{selectedAnimalForTransfer.penLocation}</strong>
             </p>
 
             <div>
               <label className="font-semibold block mb-1">{t("baapNewDestinationPenLabel")}</label>
-              <input
-                type="text"
-                value={targetPen}
-                onChange={(e) => setTargetPen(e.target.value)}
-                placeholder={t("baapDestinationPenPlaceholder")}
+              <select
+                value={targetLocationId}
+                onChange={(e) => setTargetLocationId(e.target.value)}
                 className="nf-input w-full"
-              />
+              >
+                <option value="">{t("baapDestinationPenPlaceholder")}</option>
+                {locations.map((l) => (
+                  <option key={l.location_id} value={l.location_id}>
+                    {l.location_name || l.location_code}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

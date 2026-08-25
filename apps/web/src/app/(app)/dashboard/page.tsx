@@ -45,7 +45,6 @@ import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { ConsolePage } from "../../../components/ui/console-page";
 import { StatRow, StatCard } from "../../../components/ui/stat-row";
-import DairyLifecycleStepper from "../../../components/console/dairy/dairy-lifecycle-stepper";
 import { resolveLobFamily } from "@/lib/lob";
 
 const CHART_COLORS = ["var(--accent)", "var(--success)", "var(--info)", "var(--warning)", "#8a6fd6", "#4fb0a5"];
@@ -1027,8 +1026,6 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-
-            {!isAllBatchesView && <DairyLifecycleStepper currentStageCode={activeDairyBatch?.current_stage_code || "EARLY_LAC"} />}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-4">

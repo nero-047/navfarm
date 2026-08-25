@@ -204,8 +204,6 @@ export default function OperationalBatchDataEntry() {
   const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
   const [saveErrorMsg, setSaveErrorMsg] = useState("");
 
-  const [activeStageId, setActiveStageId] = useState<number>(4);
-
   // Helper to map a batch to a specific lifecycle stage
   const resolvePiggeryStage = (b: any) => {
     const resolved = resolvePiggeryStageId(b.current_stage_code || b.stage_code || b.stage_name);
@@ -217,12 +215,6 @@ export default function OperationalBatchDataEntry() {
     };
   };
 
-  // Sync activeStageId whenever currentBatch or its stage changes
-  useEffect(() => {
-    if (currentBatch?.currentStageId) {
-      setActiveStageId(currentBatch.currentStageId);
-    }
-  }, [currentBatch?.id, currentBatch?.currentStageId]);
 
   // Load the batch's real animal roster once per batch, shared by every
   // "scope this row to specific animals" picker below.
@@ -291,7 +283,6 @@ export default function OperationalBatchDataEntry() {
         setBatches(mapped);
         if (mapped.length > 0) {
           setSelectedBatchId(mapped[0].id);
-          setActiveStageId(mapped[0].currentStageId || 4);
         }
         setBatchesLoading(false);
       })
@@ -338,7 +329,6 @@ export default function OperationalBatchDataEntry() {
                 : b
             )
           );
-          setActiveStageId(st.id);
         }
 
         const txs: any[] = batchData?.transactions ?? [];
@@ -895,11 +885,7 @@ export default function OperationalBatchDataEntry() {
                 </span>
                 <select
                   value={selectedBatchId}
-                  onChange={(e) => {
-                    setSelectedBatchId(e.target.value);
-                    const b = batches.find((item) => item.id === e.target.value);
-                    if (b) setActiveStageId(b.currentStageId || 4);
-                  }}
+                  onChange={(e) => setSelectedBatchId(e.target.value)}
                   className="max-w-[280px] sm:max-w-[360px] truncate rounded-[var(--radius-xs)] border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none"
                 >
                   {batches.map((b) => (
@@ -1037,11 +1023,11 @@ export default function OperationalBatchDataEntry() {
         </div>
       )}
 
-      {/* ── Interactive 8-Stage Lifecycle Stepper ── */}
-      <PiggeryLifecycleStepper
-        currentStageId={activeStageId || currentBatch?.currentStageId || 4}
-        onSelectStage={(stage) => setActiveStageId(stage.id)}
-      />
+      {/* 8-Stage Lifecycle Stepper — read-only here, reflecting the batch's real
+          current stage. Advancing a batch's actual stage is a deliberate action
+          done from the Batch Stages screen (real POST /batch/:id/transfer-stage
+          call), not from clicking a stage while logging daily data. */}
+      <PiggeryLifecycleStepper currentStageId={currentBatch?.currentStageId || 4} />
 
       {/* ── Date, Weather & Quick Action Bar ── */}
       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 flex flex-wrap items-center justify-between gap-4 shadow-2xs">
