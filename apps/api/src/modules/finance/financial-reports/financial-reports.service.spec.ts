@@ -221,7 +221,7 @@ describe('FinancialReportsService', () => {
   });
 
   describe('getBatchCostVarianceReport', () => {
-    it('returns variance rows with calculations', async () => {
+    it('groups variance rows (one per variance_type) into a per-batch summary', async () => {
       mockDbSelect.mockReturnValueOnce({
         from: jest.fn().mockReturnValue({
           innerJoin: jest.fn().mockReturnValue({
@@ -230,20 +230,34 @@ describe('FinancialReportsService', () => {
                 {
                   variance: {
                     variance_id: 'var-1',
-                    variance_date: '2026-06-30',
-                    standard_cost: '50000.0000',
-                    actual_cost: '52000.0000',
-                    price_variance: '1200.0000',
-                    usage_variance: '800.0000',
-                    output_variance: '0.0000',
-                    overhead_variance: '0.0000',
-                    total_variance: '2000.0000',
+                    variance_type: 'PRICE',
+                    item_id: 'item-1',
+                    std_value: '50000.000000',
+                    actual_value: '51200.000000',
+                    variance_amount: '1200.0000',
+                    is_favorable: false,
+                    created_at: '2026-06-30T00:00:00.000Z',
                   },
                   batch: {
                     batch_id: 'batch-1',
-                    batch_code: 'PIG-B-2026-01',
-                    batch_name: 'Fattening Batch 1',
-                    batch_type: 'STANDARD',
+                    batch_no: 'PIG-B-2026-01',
+                    costing_method: 'BIO_ASSET',
+                  },
+                },
+                {
+                  variance: {
+                    variance_id: 'var-2',
+                    variance_type: 'USAGE',
+                    item_id: 'item-1',
+                    std_value: '50000.000000',
+                    actual_value: '50800.000000',
+                    variance_amount: '800.0000',
+                    is_favorable: false,
+                    created_at: '2026-06-30T00:00:00.000Z',
+                  },
+                  batch: {
+                    batch_id: 'batch-1',
+                    batch_no: 'PIG-B-2026-01',
                     costing_method: 'BIO_ASSET',
                   },
                 },
@@ -256,12 +270,12 @@ describe('FinancialReportsService', () => {
       const res = await service.getBatchCostVarianceReport('tenant-1', 'comp-1');
 
       expect(res).toHaveLength(1);
-      expect(res[0].batch_code).toBe('PIG-B-2026-01');
-      expect(res[0].standard_cost).toBe(50000);
-      expect(res[0].actual_cost).toBe(52000);
+      expect(res[0].batch_id).toBe('batch-1');
+      expect(res[0].batch_no).toBe('PIG-B-2026-01');
+      expect(res[0].lines).toHaveLength(2);
+      expect(res[0].lines[0].variance_type).toBe('PRICE');
+      expect(res[0].lines[1].variance_type).toBe('USAGE');
       expect(res[0].total_variance).toBe(2000);
-      expect(res[0].variance_pct).toBe(4);
-      expect(res[0].is_favorable).toBe(false);
     });
   });
 });

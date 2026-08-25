@@ -434,8 +434,8 @@ export class FinancialReportsService {
 
   async getBatchCostVarianceReport(tenantId: string, companyId: string, batchId?: string) {
     const conditions: any[] = [
-      eq(schema.batchCostVariance.tenant_id, tenantId),
-      eq(schema.batchCostVariance.company_id, companyId),
+      eq(schema.batchHeader.tenant_id, tenantId),
+      eq(schema.batchHeader.company_id, companyId),
     ];
     if (batchId) {
       conditions.push(eq(schema.batchCostVariance.batch_id, batchId));
@@ -449,33 +449,56 @@ export class FinancialReportsService {
       .from(schema.batchCostVariance)
       .innerJoin(schema.batchHeader, eq(schema.batchCostVariance.batch_id, schema.batchHeader.batch_id))
       .where(and(...conditions))
-      .orderBy(schema.batchCostVariance.variance_date);
+      .orderBy(schema.batchCostVariance.created_at);
 
-    return rows.map(({ variance, batch }) => {
-      const stdCost = Number(variance.standard_cost) || 0;
-      const actCost = Number(variance.actual_cost) || 0;
-      const totalVar = Number(variance.total_variance) || 0;
-      const pct = stdCost > 0 ? (totalVar / stdCost) * 100 : 0;
+    // batch_cost_variance stores one row per variance_type (PRICE/USAGE/OUTPUT/OVERHEAD)
+    // per batch, not a single pre-aggregated row — group into a per-batch summary.
+    const byBatch = new Map<
+      string,
+      {
+        batch_id: string;
+        batch_no: string;
+        costing_method: string;
+        lines: Array<{
+          variance_id: string;
+          variance_type: string;
+          item_id: string | null;
+          std_value: number;
+          actual_value: number;
+          variance_amount: number;
+          is_favorable: boolean;
+          created_at: string;
+        }>;
+        total_variance: number;
+      }
+    >();
 
-      return {
+    for (const { variance, batch } of rows) {
+      const amount = Number(variance.variance_amount) || 0;
+      if (!byBatch.has(batch.batch_id)) {
+        byBatch.set(batch.batch_id, {
+          batch_id: batch.batch_id,
+          batch_no: batch.batch_no,
+          costing_method: batch.costing_method,
+          lines: [],
+          total_variance: 0,
+        });
+      }
+      const entry = byBatch.get(batch.batch_id)!;
+      entry.lines.push({
         variance_id: variance.variance_id,
-        batch_id: batch.batch_id,
-        batch_code: batch.batch_code,
-        batch_name: batch.batch_name,
-        batch_type: batch.batch_type,
-        costing_method: batch.costing_method,
-        variance_date: variance.variance_date,
-        standard_cost: stdCost,
-        actual_cost: actCost,
-        price_variance: Number(variance.price_variance) || 0,
-        usage_variance: Number(variance.usage_variance) || 0,
-        output_variance: Number(variance.output_variance) || 0,
-        overhead_variance: Number(variance.overhead_variance) || 0,
-        total_variance: totalVar,
-        variance_pct: Number(pct.toFixed(2)),
-        is_favorable: totalVar <= 0,
-      };
-    });
+        variance_type: variance.variance_type,
+        item_id: variance.item_id,
+        std_value: Number(variance.std_value) || 0,
+        actual_value: Number(variance.actual_value) || 0,
+        variance_amount: amount,
+        is_favorable: variance.is_favorable,
+        created_at: variance.created_at,
+      });
+      entry.total_variance += amount;
+    }
+
+    return Array.from(byBatch.values());
   }
 }
 

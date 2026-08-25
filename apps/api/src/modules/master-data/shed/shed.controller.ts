@@ -86,8 +86,7 @@ export class ShedController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.shedService.remove(id, tenantId, req.user);
     return {
-      success: true,
-      ...result
+      ...result,
     };
   }
 

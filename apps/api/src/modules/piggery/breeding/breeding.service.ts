@@ -12,6 +12,7 @@ import {
   CreateSemenCollectionDto,
   ConceptionResult,
 } from './dto/breeding.dto';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 function addDaysToDate(dateStr: string, days: number): string {
   const d = new Date(dateStr);
@@ -21,7 +22,10 @@ function addDaysToDate(dateStr: string, days: number): string {
 
 @Injectable()
 export class BreedingService {
-  constructor(private readonly cls: ClsService) { }
+  constructor(
+    private readonly cls: ClsService,
+    private readonly numberSeriesService: NumberSeriesService,
+  ) { }
 
   private get db(): MySql2Database<typeof schema> {
     const tenantDb = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
@@ -104,7 +108,6 @@ export class BreedingService {
     await this.db.insert(schema.breedingRecord).values(newRecord);
 
     return {
-      breeding_id: breedingId,
       ...newRecord,
       message: 'Mating event recorded successfully with auto-scheduled farrowing and pregnancy check dates.',
     };
@@ -275,6 +278,57 @@ export class BreedingService {
       })
       .where(eq(schema.animalRegister.animal_id, dto.sow_animal_id));
 
+    // Opt-in: create one animal_register row per live-born piglet, with sire/dam
+    // and breeding_tier auto-populated. Large litters may still stay aggregate-only
+    // and be tagged individually later — this doesn't replace that path, it adds one.
+    const registeredPigletIds: string[] = [];
+    if (dto.register_piglets && live > 0) {
+      let sireAnimalId = dto.sire_animal_id || null;
+      if (!sireAnimalId && dto.breeding_id) {
+        const [mating] = await this.db
+          .select({ boar_animal_id: schema.breedingRecord.boar_animal_id })
+          .from(schema.breedingRecord)
+          .where(eq(schema.breedingRecord.breeding_id, dto.breeding_id))
+          .limit(1);
+        sireAnimalId = mating?.boar_animal_id || null;
+      }
+
+      const pigletItemId = dto.item_id || sow.item_id;
+      for (let i = 0; i < live; i++) {
+        const pigletId = randomUUID();
+        const animalCode = await this.numberSeriesService.generateNext('ANIMAL_PIGGERY', tenantId, sow.company_id);
+        await this.db.insert(schema.animalRegister).values({
+          animal_id: pigletId,
+          tenant_id: tenantId,
+          company_id: sow.company_id,
+          nob_id: sow.nob_id,
+          lob_id: sow.lob_id,
+          animal_code: animalCode,
+          animal_type: 'PIGLET',
+          breed_id: sow.breed_id,
+          gender: 'F', // unknown at birth without sexing; defaults to F, correctable via update()
+          dob: dto.farrowing_date,
+          entry_type: 'BORN_ON_FARM',
+          entry_date: dto.farrowing_date,
+          source_batch_id: newRecord.batch_id,
+          item_id: pigletItemId,
+          sire_animal_id: sireAnimalId,
+          dam_animal_id: dto.sow_animal_id,
+          breeding_tier: sow.breeding_tier || null,
+          acquisition_cost: '0.0000',
+          total_opening_asset_value: '0.0000',
+          current_bio_asset_value: '0.0000',
+          book_value: '0.0000',
+          current_batch_id: newRecord.batch_id,
+          current_location_id: sow.current_location_id,
+          status: 'ACTIVE',
+          is_active: true,
+          created_by: userPayload?.userId || null,
+        });
+        registeredPigletIds.push(pigletId);
+      }
+    }
+
     // Check if parity limit reached for culling review
     let cullAlert = '';
     try {
@@ -294,9 +348,9 @@ export class BreedingService {
     }
 
     return {
-      farrow_id: farrowId,
       ...newRecord,
-      message: `Farrowing recorded: ${live} live piglets born. Sow parity incremented to ${parityNumber} and status set to LACTATING.${cullAlert}`,
+      registered_piglet_ids: registeredPigletIds,
+      message: `Farrowing recorded: ${live} live piglets born. Sow parity incremented to ${parityNumber} and status set to LACTATING.${cullAlert}${registeredPigletIds.length ? ` ${registeredPigletIds.length} piglets individually registered.` : ''}`,
     };
   }
 
@@ -451,7 +505,6 @@ export class BreedingService {
     await this.db.insert(schema.semenBatch).values(newRecord);
 
     return {
-      semen_batch_id: semenBatchId,
       ...newRecord,
       message: `Semen collection logged: ${dto.doses_collected} doses collected at computed unit cost of ${unitCostPerDose.toFixed(4)}/dose.`,
     };

@@ -54,7 +54,9 @@ export default function AnimalStageTransitionModal({
   const [saving, setSaving]             = useState(false);
   const [error, setError]               = useState("");
 
-  // When animal opens, auto-suggest next stage if configured on current stage
+  // When animal opens, auto-suggest next stage — prefer the server-computed
+  // suggested_next_stage_id (from stage_master.next_stage_id, resolved by
+  // computeStageOverdue() on the API side) and fall back to the client-side lookup.
   useEffect(() => {
     if (!animal || !open) return;
     setError("");
@@ -65,7 +67,9 @@ export default function AnimalStageTransitionModal({
     setRemarks("");
 
     const currentStage = stages.find((s) => s.stage_id === animal.current_stage_id);
-    if (currentStage?.next_stage_id) {
+    if (animal.suggested_next_stage_id) {
+      setToStageId(animal.suggested_next_stage_id);
+    } else if (currentStage?.next_stage_id) {
       setToStageId(currentStage.next_stage_id);
     } else {
       setToStageId("");
@@ -79,6 +83,12 @@ export default function AnimalStageTransitionModal({
   const daysInStage = Math.max(0, Math.floor((new Date(transitionDate).getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24)));
   const minDays = currentStage?.min_days_before_move || 0;
   const isPrematureMove = minDays > 0 && daysInStage < minDays;
+
+  // Server-computed overdue state (stage_master.typical_duration_days/auto_move_on_day) —
+  // "the stage's configured period has elapsed, prompt a transition."
+  const isStageOverdue = Boolean(animal.is_stage_overdue);
+  const stageDurationDays = animal.stage_duration_days ?? null;
+  const serverDaysInStage = animal.days_in_stage ?? daysInStage;
 
   const handleSubmit = async () => {
     if (!toStageId) {
@@ -149,6 +159,21 @@ export default function AnimalStageTransitionModal({
             </span>
           </div>
         </div>
+
+        {/* Stage-Duration Overdue Notice — stage_master.typical_duration_days/auto_move_on_day elapsed */}
+        {isStageOverdue && !isPrematureMove && (
+          <div className="rounded-[var(--radius-md)] border p-3 flex items-start gap-2 text-xs" style={S.warning}>
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Stage Period Elapsed</p>
+              <p className="mt-0.5">
+                This animal has been in &apos;{currentStage?.stage_name || animal.stage_name}&apos; for {serverDaysInStage} days
+                {stageDurationDays != null ? ` (configured duration: ${stageDurationDays}d)` : ""} — consider advancing it to the
+                next stage.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Premature Move Notice */}
         {isPrematureMove && (

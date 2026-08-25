@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Plus, Search, Loader2, Inbox, Eye, Trash2, Pill, AlertCircle, ChevronRight, Scan, ArrowRight,
+  Plus, Search, Loader2, Inbox, Eye, Trash2, Pill, AlertCircle, AlertTriangle, ChevronRight, Scan, ArrowRight,
 } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
@@ -141,6 +141,12 @@ export default function AnimalPanel() {
   const [transitionOpen, setTransitionOpen]     = useState(false);
   const [transitionAnimal, setTransitionAnimal] = useState<Row | null>(null);
 
+  // ── Stage-Duration Overdue: auto-prompt once per visit when the backend
+  // flags animals whose stage_master.typical_duration_days/auto_move_on_day
+  // has elapsed (see stage-overdue.util.ts / animal.service.ts enrichAnimal()).
+  const hasAutoPromptedOverdue = useRef(false);
+  const [overdueBannerDismissed, setOverdueBannerDismissed] = useState(false);
+
   // ── Create animal modal ─────────────────────────────────────────────────────
   const [createOpen, setCreateOpen]   = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
@@ -154,7 +160,7 @@ export default function AnimalPanel() {
 
   // ── Detail modal ────────────────────────────────────────────────────────────
   const [viewing, setViewing]     = useState<Row | null>(null);
-  const [detailTab, setDetailTab] = useState<"overview" | "medications" | "valuation">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "medications" | "valuation" | "lineage">("overview");
 
   // ── Medication log ──────────────────────────────────────────────────────────
   const [medLogs, setMedLogs]         = useState<Row[]>([]);
@@ -165,6 +171,11 @@ export default function AnimalPanel() {
   const [ledgerEntries, setLedgerEntries] = useState<Row[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerError, setLedgerError]     = useState("");
+
+  // ── Lineage (pedigree) ──────────────────────────────────────────────────────
+  const [lineage, setLineage]           = useState<{ ancestors: Row[]; descendants: Row[] } | null>(null);
+  const [lineageLoading, setLineageLoading] = useState(false);
+  const [lineageError, setLineageError]     = useState("");
 
   // ── Log dose modal ──────────────────────────────────────────────────────────
   const [doseOpen, setDoseOpen]       = useState(false);
@@ -208,6 +219,19 @@ export default function AnimalPanel() {
   };
 
   useEffect(() => { load(); }, [search, statusFilter, includeDisposed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const overdueAnimals = rows.filter((r) => r.is_stage_overdue);
+
+  // Auto-populate the transition modal once per visit for the most overdue animal —
+  // "if the stage period is done, automatically prompt to change the stage."
+  useEffect(() => {
+    if (hasAutoPromptedOverdue.current || overdueAnimals.length === 0 || transitionOpen) return;
+    hasAutoPromptedOverdue.current = true;
+    const mostOverdue = [...overdueAnimals].sort((a, b) => (b.days_in_stage || 0) - (a.days_in_stage || 0))[0];
+    setTransitionAnimal(mostOverdue);
+    setTransitionOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
 
   // Reference data — loaded once on mount
   useEffect(() => {
@@ -270,6 +294,21 @@ export default function AnimalPanel() {
     }
   };
 
+  // Lineage — loaded when opening the lineage tab
+  const loadLineage = async (animalId: string) => {
+    setLineageLoading(true);
+    setLineageError("");
+    try {
+      const res = await api.get(`/animal/${animalId}/lineage`);
+      const data = unwrap<Row>(res);
+      setLineage({ ancestors: data?.ancestors || [], descendants: data?.descendants || [] });
+    } catch (err: any) {
+      setLineageError(err?.message || "Failed to load lineage.");
+    } finally {
+      setLineageLoading(false);
+    }
+  };
+
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const openView = async (row: Row) => {
@@ -278,12 +317,14 @@ export default function AnimalPanel() {
     setDetailTab("overview");
     setMedLogs([]);
     setLedgerEntries([]);
+    setLineage(null);
   };
 
-  const handleDetailTabChange = (tab: "overview" | "medications" | "valuation") => {
+  const handleDetailTabChange = (tab: "overview" | "medications" | "valuation" | "lineage") => {
     setDetailTab(tab);
     if (tab === "medications" && viewing) loadMedLogs(viewing.animal_id);
     if (tab === "valuation" && viewing) loadBioAssetLedger(viewing.animal_id);
+    if (tab === "lineage" && viewing) loadLineage(viewing.animal_id);
   };
 
 
@@ -315,6 +356,7 @@ export default function AnimalPanel() {
         dob: createForm.dob || undefined,
         ear_tag: createForm.ear_tag || undefined,
         rfid_tag: createForm.rfid_tag || undefined,
+        breeding_tier: createForm.breeding_tier || undefined,
         source_receipt_id: createForm.source_receipt_id || undefined,
         source_batch_id: createForm.source_batch_id || undefined,
         notes: createForm.notes || undefined,
@@ -441,6 +483,34 @@ export default function AnimalPanel() {
       </div>
 
       {error && <div className="mb-4"><InlineAlert variant="danger">{error}</InlineAlert></div>}
+
+      {!overdueBannerDismissed && overdueAnimals.length > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border p-3 text-xs" style={S.warning}>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>{overdueAnimals.length}</strong> animal{overdueAnimals.length === 1 ? " has" : "s have"} exceeded its
+              configured stage duration and may be ready to advance.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const mostOverdue = [...overdueAnimals].sort((a, b) => (b.days_in_stage || 0) - (a.days_in_stage || 0))[0];
+                setTransitionAnimal(mostOverdue);
+                setTransitionOpen(true);
+              }}
+            >
+              Review
+            </Button>
+            <button onClick={() => setOverdueBannerDismissed(true)} className="text-xs font-semibold hover:underline" style={S.muted}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── List table ── */}
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
@@ -623,6 +693,18 @@ export default function AnimalPanel() {
             <input id="ca-rfid" type="text" className={inputCls} placeholder="RFID scan number (unique)" value={createForm.rfid_tag} onChange={(e) => setCreateForm((f) => ({ ...f, rfid_tag: e.target.value }))} />
           </div>
 
+          {/* Breeding-pyramid tier */}
+          <div>
+            <label className="nf-label" htmlFor="ca-breeding-tier">Breeding Tier</label>
+            <select id="ca-breeding-tier" className={inputCls} value={createForm.breeding_tier || ""} onChange={(e) => setCreateForm((f) => ({ ...f, breeding_tier: e.target.value }))}>
+              <option value="">— not set —</option>
+              <option value="GGP">GGP (Great-Grandparent / Nucleus)</option>
+              <option value="GP">GP (Grandparent)</option>
+              <option value="PS">PS (Parent Stock)</option>
+              <option value="COMMERCIAL">Commercial</option>
+            </select>
+          </div>
+
           {/* Source receipt — shown when PURCHASED */}
           {["PURCHASED_IMPORTED", "PURCHASED_LOCAL"].includes(createForm.entry_type) && (
             <div>
@@ -697,7 +779,7 @@ export default function AnimalPanel() {
         >
           {/* Tabs */}
           <div className="mb-5 flex gap-1 rounded-[var(--radius-sm)] p-1 text-sm" style={{ backgroundColor: "var(--surface-raised)" }}>
-            {(["overview", "medications", "valuation"] as const).map((tab) => (
+            {(["overview", "medications", "valuation", "lineage"] as const).map((tab) => (
               <button
                 key={tab}
                 id={`animal-detail-tab-${tab}`}
@@ -707,7 +789,7 @@ export default function AnimalPanel() {
                   ? { backgroundColor: "var(--surface)", color: "var(--text-primary)", boxShadow: "var(--shadow-sm)" }
                   : { color: "var(--text-secondary)" }}
               >
-                {tab === "overview" ? "Overview" : tab === "medications" ? "Medication Log" : "Valuation & Ledger"}
+                {tab === "overview" ? "Overview" : tab === "medications" ? "Medication Log" : tab === "valuation" ? "Valuation & Ledger" : "Lineage"}
               </button>
             ))}
           </div>
@@ -897,6 +979,61 @@ export default function AnimalPanel() {
                       ))}
                     </TableBody>
                   </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Lineage / Pedigree tab ── */}
+          {detailTab === "lineage" && (
+            <div>
+              {lineageError && <div className="mb-4"><InlineAlert variant="danger">{lineageError}</InlineAlert></div>}
+
+              {lineageLoading ? (
+                <div className="py-10 text-center">
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin" style={S.muted} />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-sm font-semibold" style={S.primary}>
+                      Ancestors ({lineage?.ancestors.length || 0})
+                    </p>
+                    {(!lineage || lineage.ancestors.length === 0) ? (
+                      <p className="text-xs" style={S.muted}>No sire/dam recorded.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {lineage.ancestors.map((a) => (
+                          <li key={a.animal_id} className="rounded-[var(--radius-sm)] border p-2 text-xs" style={S.raised}>
+                            <span className="font-mono font-semibold" style={S.primary}>{a.animal_code}</span>{" "}
+                            <span style={S.muted}>
+                              ({a.gender === "F" ? "Dam" : "Sire"}, gen {a.depth}
+                              {a.breeding_tier ? `, ${a.breeding_tier}` : ""})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-2 text-sm font-semibold" style={S.primary}>
+                      Descendants ({lineage?.descendants.length || 0})
+                    </p>
+                    {(!lineage || lineage.descendants.length === 0) ? (
+                      <p className="text-xs" style={S.muted}>No offspring recorded.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {lineage.descendants.map((d) => (
+                          <li key={d.animal_id} className="rounded-[var(--radius-sm)] border p-2 text-xs" style={S.raised}>
+                            <span className="font-mono font-semibold" style={S.primary}>{d.animal_code}</span>{" "}
+                            <span style={S.muted}>
+                              (gen {d.depth}{d.breeding_tier ? `, ${d.breeding_tier}` : ""})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

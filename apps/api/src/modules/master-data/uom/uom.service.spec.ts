@@ -6,7 +6,6 @@ import { ConflictException, BadRequestException, NotFoundException } from '@nest
 
 describe('UomService', () => {
   let service: UomService;
-  let clsService: ClsService;
   let auditLogService: AuditLogService;
 
   const mockDbSelect = jest.fn();
@@ -43,7 +42,6 @@ describe('UomService', () => {
     }).compile();
 
     service = module.get<UomService>(UomService);
-    clsService = module.get<ClsService>(ClsService);
     auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 

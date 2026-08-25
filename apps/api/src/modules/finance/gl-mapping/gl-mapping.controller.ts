@@ -86,8 +86,7 @@ export class GlMappingController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.glMappingService.remove(id, tenantId, req.user);
     return {
-      success: true,
-      ...result
+      ...result,
     };
   }
 

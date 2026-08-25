@@ -2,18 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { FeedFormulaService } from './feed-formula.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('FeedFormulaService', () => {
   let service: FeedFormulaService;
-  let clsService: ClsService;
-  let auditLogService: AuditLogService;
 
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
   const mockDbUpdate = jest.fn();
 
-  const mockTransaction = jest.fn((callback) => callback(mockDb));
+  const mockTransaction = jest.fn((callback: any): any => callback(mockDb));
 
   const mockDb = {
     select: mockDbSelect,
@@ -47,8 +45,6 @@ describe('FeedFormulaService', () => {
     }).compile();
 
     service = module.get<FeedFormulaService>(FeedFormulaService);
-    clsService = module.get<ClsService>(ClsService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   it('should be defined', () => {

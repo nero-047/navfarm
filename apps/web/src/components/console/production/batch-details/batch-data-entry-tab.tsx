@@ -21,6 +21,10 @@ import {
   Users,
   FileEdit,
   RotateCcw,
+  MapPin,
+  Pencil,
+  History,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/services/api-client";
@@ -34,6 +38,7 @@ interface BatchDataEntryTabProps {
   dataEntryData?: any;
   dataEntryLoading?: boolean;
   onSaveEntry: (payload: any) => Promise<void>;
+  onRefreshBatch?: () => Promise<void>;
   saving?: boolean;
 }
 
@@ -46,6 +51,7 @@ export function BatchDataEntryTab({
   dataEntryData,
   dataEntryLoading = false,
   onSaveEntry,
+  onRefreshBatch,
   saving = false,
 }: BatchDataEntryTabProps) {
   // Feed consumption state
@@ -91,6 +97,95 @@ export function BatchDataEntryTab({
 
   const [hasDraft, setHasDraft] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+
+  // Location lot + animal-wise entry: applies to the whole day's submission — pick a
+  // lot and/or a single animal to log today's entry against, instead of the batch as
+  // a whole. Backend already supports per-line lot_id/animal_id; this keeps the form
+  // tractable by scoping one submission to one lot/animal rather than mixing granularities.
+  const [selectedLotId, setSelectedLotId] = useState<string>("");
+  const [animalWiseMode, setAnimalWiseMode] = useState(false);
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>("");
+  const [batchAnimals, setBatchAnimals] = useState<any[]>([]);
+  const [loadingBatchAnimals, setLoadingBatchAnimals] = useState(false);
+
+  const activeLots = useMemo(() => (batch?.lots || []).filter((l: any) => l.status === "ACTIVE"), [batch?.lots]);
+
+  useEffect(() => {
+    if (!animalWiseMode || !batch?.batch_id || batchAnimals.length > 0) return;
+    let cancelled = false;
+    setLoadingBatchAnimals(true);
+    api
+      .get(`/animal?currentBatchId=${batch.batch_id}&limit=500`)
+      .then((res: any) => {
+        if (!cancelled) setBatchAnimals(res?.data ?? res ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setBatchAnimals([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBatchAnimals(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animalWiseMode, batch?.batch_id]);
+
+  // Posted entries for the selected date, editable while the batch is ACTIVE — editing
+  // reverses the original's ledger/GL impact and posts the correction as a new
+  // transaction (see batch.service.ts's updateTransaction()); the original stays
+  // visible here, marked superseded, rather than being rewritten.
+  const todaysTransactions = useMemo(() => {
+    return (batch?.transactions || [])
+      .filter((t: any) => t.transaction_date === currentDate)
+      .sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+  }, [batch?.transactions, currentDate]);
+
+  const [editingTx, setEditingTx] = useState<any | null>(null);
+  const [editQuantity, setEditQuantity] = useState("");
+  const [editRate, setEditRate] = useState("");
+  const [editRemarks, setEditRemarks] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  const openEditTransaction = (tx: any) => {
+    setEditingTx(tx);
+    setEditQuantity(tx.quantity != null ? String(Math.abs(Number(tx.quantity))) : "");
+    setEditRate(tx.rate != null ? String(Math.abs(Number(tx.rate))) : "");
+    setEditRemarks(tx.remarks || "");
+    setEditError("");
+  };
+
+  const submitEditTransaction = async () => {
+    if (!editingTx) return;
+    setSavingEdit(true);
+    setEditError("");
+    try {
+      await api.put(`/batch/${batch.batch_id}/transactions/${editingTx.transaction_id}`, {
+        transaction_date: editingTx.transaction_date,
+        transaction_type: editingTx.transaction_type,
+        item_id: editingTx.item_id || undefined,
+        resource_id: editingTx.resource_id || undefined,
+        lot_id: editingTx.lot_id || undefined,
+        animal_id: editingTx.animal_id || undefined,
+        quantity: editQuantity ? Number(editQuantity) : undefined,
+        uom: editingTx.uom || undefined,
+        rate: editRate ? Number(editRate) : undefined,
+        remarks: editRemarks || undefined,
+        spl_id: editingTx.spl_id || undefined,
+        parameter_id: editingTx.parameter_id || undefined,
+        output_type: editingTx.output_type || undefined,
+      });
+      setEditingTx(null);
+      setNotification("✓ Entry corrected — the original is preserved as superseded, ledger and GL reversed and re-posted.");
+      await onRefreshBatch?.();
+      setTimeout(() => setNotification(null), 5000);
+    } catch (err: any) {
+      setEditError(err?.message || "Failed to correct this entry.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   // Calculate 15 Days list starting from batch.start_date
   const daysList = useMemo(() => {
@@ -557,6 +652,10 @@ export function BatchDataEntryTab({
     setMortRows((prev) => prev.map((r) => (r.id === id ? { ...r, reason } : r)));
   };
 
+  const updateMortAnimal = (id: string, animal_id: string) => {
+    setMortRows((prev) => prev.map((r) => (r.id === id ? { ...r, animal_id } : r)));
+  };
+
   const addMortRow = () => {
     setMortRows((prev) => [...prev, { id: `mort-${Date.now()}`, reason: "Other", count: 1, remarks: "" }]);
   };
@@ -634,6 +733,7 @@ export function BatchDataEntryTab({
   // Submit Day Entry (Draft or Post)
   const handleSubmit = async (isDraft: boolean) => {
     try {
+      const animalId = animalWiseMode && selectedAnimalId ? selectedAnimalId : undefined;
       const payload = {
         date: currentDate,
         is_draft: isDraft,
@@ -649,6 +749,8 @@ export function BatchDataEntryTab({
           lot_no: f.lot_no,
           spl_id: f.spl_id,
           parameter_id: f.parameter_id,
+          location_lot_id: selectedLotId || undefined,
+          animal_id: animalId,
         })),
         medicine_lines: medRows.map((m) => ({
           item_id: m.item_id || undefined,
@@ -661,6 +763,8 @@ export function BatchDataEntryTab({
           spl_id: m.spl_id,
           parameter_id: m.parameter_id,
           remarks: m.remarks,
+          location_lot_id: selectedLotId || undefined,
+          animal_id: animalId,
         })),
         output_lines: outputRows.map((o) => ({
           item_id: o.item_id || undefined,
@@ -674,6 +778,7 @@ export function BatchDataEntryTab({
           spl_id: o.spl_id,
           parameter_id: o.parameter_id,
           remarks: o.remarks,
+          location_lot_id: selectedLotId || undefined,
         })),
         weight: {
           avg_weight: parseFloat(avgWeight) || undefined,
@@ -689,28 +794,37 @@ export function BatchDataEntryTab({
             reason: r.reason,
             remarks: r.remarks,
             spl_id: r.spl_id,
+            location_lot_id: selectedLotId || undefined,
+            // Per-row animal picker (r.animal_id) takes priority over the entry-level
+            // animal-wise selection, since mortality specifically needs to identify
+            // exactly which animal died — a batch-wide "animal-wise mode" pick is a
+            // less precise fallback for this one line type.
+            animal_id: r.animal_id || animalId,
           })),
-        overhead_lines: overheadRows.map((o) => ({
-          resource_name: o.name,
-          name: o.name,
-          quantity: 1,
-          rate: parseFloat(o.cost) || 0,
-          cost: o.cost,
-          uom: "DAY",
-          spl_id: o.spl_id,
-          parameter_id: o.parameter_id,
-        })),
-        resource_lines: resourceRows.map((res) => ({
-          resource_id: res.resource_id,
-          resource_name: res.resource_name,
-          quantity: parseFloat(res.hours) || 1,
-          hours: res.hours,
-          rate: parseFloat(res.rate) || 25,
-          uom: "HOURS",
-          spl_id: res.spl_id,
-          parameter_id: res.parameter_id,
-          remarks: res.remarks,
-        })),
+        // Overheads and resources/labour both post as transaction_type OVERHEAD on the
+        // backend (batch.service.ts's resource_lines handler) — there is no separate
+        // overhead_lines field on the API; sending one is rejected by the global
+        // ValidationPipe's forbidNonWhitelisted rule, so overhead rows are merged in here.
+        resource_lines: [
+          ...overheadRows.map((o) => ({
+            resource_name: o.name,
+            quantity: 1,
+            rate: parseFloat(o.cost) || 0,
+            uom: "DAY",
+            spl_id: o.spl_id,
+            parameter_id: o.parameter_id,
+          })),
+          ...resourceRows.map((res) => ({
+            resource_id: res.resource_id,
+            resource_name: res.resource_name,
+            quantity: parseFloat(res.hours) || 1,
+            rate: parseFloat(res.rate) || 25,
+            uom: "HOURS",
+            spl_id: res.spl_id,
+            parameter_id: res.parameter_id,
+            remarks: res.remarks,
+          })),
+        ],
         checkpoint_decision: milestoneLine
           ? {
               checkpoint_type: milestoneLine.parameter_name || "CHECKPOINT",
@@ -791,6 +905,60 @@ export function BatchDataEntryTab({
         </div>
       )}
 
+      {/* ── Location Lot & Animal-Wise Entry Scope ── */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-xs flex flex-wrap items-center gap-4">
+          {activeLots.length > 0 && (
+            <div className="flex items-center gap-2">
+              <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <label className="text-[11px] font-bold text-[var(--text-secondary)] whitespace-nowrap">Location Lot:</label>
+              <select
+                value={selectedLotId}
+                onChange={(e) => setSelectedLotId(e.target.value)}
+                className="px-2.5 py-1 text-xs font-bold text-[var(--text-primary)] bg-[var(--input-bg)] border border-[var(--input-border)] rounded-lg"
+              >
+                <option value="">Whole batch (all lots)</option>
+                {activeLots.map((lot: any) => (
+                  <option key={lot.lot_id} value={lot.lot_id}>
+                    {lot.lot_no} — {Math.round(Number(lot.current_quantity || 0))} head
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+            <label className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={animalWiseMode}
+                onChange={(e) => {
+                  setAnimalWiseMode(e.target.checked);
+                  if (!e.target.checked) setSelectedAnimalId("");
+                }}
+              />
+              Animal-wise entry
+            </label>
+            {animalWiseMode && (
+              <select
+                value={selectedAnimalId}
+                onChange={(e) => setSelectedAnimalId(e.target.value)}
+                disabled={loadingBatchAnimals}
+                className="px-2.5 py-1 text-xs font-bold text-[var(--text-primary)] bg-[var(--input-bg)] border border-[var(--input-border)] rounded-lg"
+              >
+                <option value="">
+                  {loadingBatchAnimals ? "Loading animals…" : "All animals (batch-wide)"}
+                </option>
+                {batchAnimals.map((a: any) => (
+                  <option key={a.animal_id} value={a.animal_id}>
+                    {a.animal_code} ({a.ear_tag || a.rfid_tag || a.animal_type})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+      </div>
+
       {/* ── 15-Day Date Navigator Pill Bar ── */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-xs">
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--border)] mb-2.5">
@@ -831,6 +999,134 @@ export function BatchDataEntryTab({
           ))}
         </div>
       </div>
+
+      {/* ── Posted Entries for This Date — editable while the batch is ACTIVE ── */}
+      {todaysTransactions.length > 0 && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs overflow-hidden">
+          <div className="p-3.5 border-b border-[var(--border)] bg-[var(--surface-raised)]/30 flex items-center gap-2">
+            <History className="w-3.5 h-3.5 text-indigo-500" />
+            <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">
+              Posted Entries — {currentDate}
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left min-w-[650px]">
+              <thead className="bg-[var(--surface-raised)]/50 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider border-b border-[var(--border)]">
+                <tr>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Remarks</th>
+                  <th className="px-3 py-2 text-right">Quantity</th>
+                  <th className="px-3 py-2 text-right">Rate</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {todaysTransactions.map((tx: any) => (
+                  <tr
+                    key={tx.transaction_id}
+                    className={tx.status === "SUPERSEDED" ? "opacity-50" : "hover:bg-[var(--surface-raised)]/20"}
+                  >
+                    <td className="px-3 py-2 font-bold text-[var(--text-primary)]">{tx.transaction_type}</td>
+                    <td className={`px-3 py-2 text-[var(--text-secondary)] ${tx.status === "SUPERSEDED" ? "line-through" : ""}`}>
+                      {tx.remarks || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono">{tx.quantity ?? "—"}</td>
+                    <td className="px-3 py-2 text-right font-mono">{tx.rate ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      {tx.status === "SUPERSEDED" ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Superseded</span>
+                      ) : tx.supersedes_transaction_id ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">Corrected</span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Posted</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {tx.status === "POSTED" && batch.status === "ACTIVE" && (
+                        <button
+                          onClick={() => openEditTransaction(tx)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
+                        >
+                          <Pencil className="w-3 h-3" /> Edit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Posted Entry Modal ── */}
+      {editingTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-[var(--border)] bg-[var(--surface-raised)]/30 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-[var(--text-primary)]">Correct Posted Entry</h3>
+                <p className="text-[11px] text-[var(--text-secondary)]">
+                  {editingTx.transaction_type} · {editingTx.transaction_date} — the original is kept as superseded; ledger and GL are reversed and re-posted.
+                </p>
+              </div>
+              <button onClick={() => setEditingTx(null)} className="p-1 rounded-lg hover:bg-[var(--surface-raised)] text-[var(--text-muted)]">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 text-xs">
+              {editError && (
+                <div className="rounded-lg border border-rose-300 bg-rose-50 dark:bg-rose-950/40 p-2.5 text-rose-700 dark:text-rose-300">
+                  {editError}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">
+                    Quantity {editingTx.uom ? `(${editingTx.uom})` : ""}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(e.target.value)}
+                    className="w-full px-3 py-2 font-mono text-xs font-bold text-[var(--text-primary)] bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-right"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">Rate</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editRate}
+                    onChange={(e) => setEditRate(e.target.value)}
+                    className="w-full px-3 py-2 font-mono text-xs font-bold text-[var(--text-primary)] bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-right"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">Remarks</label>
+                <input
+                  type="text"
+                  value={editRemarks}
+                  onChange={(e) => setEditRemarks(e.target.value)}
+                  className="w-full px-3 py-2 text-xs text-[var(--text-primary)] bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--surface-raised)]/30 flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditingTx(null)} className="text-xs h-8">
+                Cancel
+              </Button>
+              <Button onClick={submitEditTransaction} disabled={savingEdit} className="bg-[#1A3A5C] text-white text-xs h-8 font-black gap-1.5">
+                {savingEdit && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Post Correction
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Top Header Toolbar ── */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1465,6 +1761,26 @@ export function BatchDataEntryTab({
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
+
+                  {animalWiseMode && r.count === 1 && (
+                    <div className="col-span-12 pt-1.5 border-t border-[var(--border)] mt-1">
+                      <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">
+                        Attribute to registered animal (optional)
+                      </label>
+                      <select
+                        value={r.animal_id || ""}
+                        onChange={(e) => updateMortAnimal(r.id, e.target.value)}
+                        className="w-full mt-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-primary)] bg-[var(--input-bg)] border border-[var(--input-border)] rounded-lg"
+                      >
+                        <option value="">Not individually tagged</option>
+                        {batchAnimals.map((a: any) => (
+                          <option key={a.animal_id} value={a.animal_id}>
+                            {a.animal_code} ({a.ear_tag || a.rfid_tag || a.animal_type})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

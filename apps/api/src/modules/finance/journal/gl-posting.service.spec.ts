@@ -9,7 +9,10 @@ describe('GlPostingService', () => {
 
   const mockDbSelect = jest.fn();
   const mockDb = { select: mockDbSelect };
-  const mockJournalService = { createAndPostSystemJournal: jest.fn().mockResolvedValue({ journal_id: 'j-1' }) };
+  const mockJournalService = {
+    createAndPostSystemJournal: jest.fn().mockResolvedValue({ journal_id: 'j-1' }),
+    reverseJournalEntry: jest.fn().mockResolvedValue({ journal_id: 'j-reversal-1' }),
+  };
 
   const itemLookup = (row: any) => ({
     from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue(row ? [row] : []) }) }),
@@ -35,6 +38,7 @@ describe('GlPostingService', () => {
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockJournalService.createAndPostSystemJournal.mockClear();
+    mockJournalService.reverseJournalEntry.mockClear();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -105,5 +109,12 @@ describe('GlPostingService', () => {
 
     expect(mockDbSelect).toHaveBeenCalledTimes(1); // no item lookup for postBatchCostEntry
     expect(mockJournalService.createAndPostSystemJournal).toHaveBeenCalled();
+  });
+
+  it('reverseJournalEntry delegates to JournalService.reverseJournalEntry', async () => {
+    const result = await service.reverseJournalEntry('j-original-1', 'user-1');
+
+    expect(mockJournalService.reverseJournalEntry).toHaveBeenCalledWith('j-original-1', 'user-1');
+    expect(result).toEqual({ journal_id: 'j-reversal-1' });
   });
 });

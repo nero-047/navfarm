@@ -376,4 +376,75 @@ export class JournalService {
 
     return this.findOne(journalId);
   }
+
+  /**
+   * Reverses a POSTED journal by posting a new one with every line's debit/credit
+   * swapped — the original is never mutated, matching the ledger's append-only
+   * convention. Used by batch.service.ts's updateTransaction() to correct a
+   * posted daily entry's GL impact without rewriting history.
+   */
+  async reverseJournalEntry(originalJournalId: string, userId?: string) {
+    const original = await this.findOne(originalJournalId);
+    if (original.status !== 'POSTED') {
+      throw new BadRequestException(`Cannot reverse journal '${original.journal_no}' — it is ${original.status}, not POSTED.`);
+    }
+    if (original.reversal_of_journal_id) {
+      throw new BadRequestException('Cannot reverse a reversal journal entry.');
+    }
+
+    const journalId = randomUUID();
+    const postedTime = toMysqlTimestamp();
+
+    const journalNo = await this.db.transaction(async (tx) => {
+      const no = await this.generateJournalNo(original.tenant_id, original.company_id, tx);
+      await tx.insert(schema.journalHeader).values({
+        journal_id: journalId,
+        tenant_id: original.tenant_id,
+        company_id: original.company_id,
+        journal_no: no,
+        posting_date: original.posting_date,
+        source: 'SYSTEM',
+        source_document_type: original.source_document_type,
+        source_document_no: original.source_document_no,
+        source_ledger_id: original.source_ledger_id,
+        reversal_of_journal_id: originalJournalId,
+        description: `Reversal of ${original.journal_no}${original.description ? ` — ${original.description}` : ''}`,
+        status: 'POSTED',
+        total_debit: original.total_credit,
+        total_credit: original.total_debit,
+        posted_at: postedTime as any,
+        posted_by: userId || null,
+        created_by: userId || null,
+        updated_by: userId || null,
+      });
+      return no;
+    });
+
+    await this.db.insert(schema.journalLine).values(
+      original.lines.map((line, idx) => ({
+        line_id: randomUUID(),
+        journal_id: journalId,
+        line_no: idx + 1,
+        gl_account_id: line.gl_account_id,
+        cost_center_id: line.cost_center_id,
+        debit_amount: line.credit_amount,
+        credit_amount: line.debit_amount,
+        description: `Reversal — ${line.description || ''}`.trim(),
+        nob_id: line.nob_id,
+        lob_id: line.lob_id,
+      }))
+    );
+
+    await this.auditService.log({
+      tenantId: original.tenant_id,
+      companyId: original.company_id,
+      userId,
+      action: 'CREATE',
+      entityName: 'journal_header',
+      entityId: journalId,
+      newValues: { journal_no: journalNo, source: 'SYSTEM', reversal_of_journal_id: originalJournalId },
+    });
+
+    return this.findOne(journalId);
+  }
 }

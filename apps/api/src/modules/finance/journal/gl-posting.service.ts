@@ -195,4 +195,11 @@ export class GlPostingService {
       userId: params.userId,
     });
   }
+
+  /** Passthrough to journalService.reverseJournalEntry() — keeps callers (batch.service.ts)
+   * depending only on GlPostingService, matching how they already post via this class
+   * rather than JournalService directly. */
+  async reverseJournalEntry(originalJournalId: string, userId?: string) {
+    return this.journalService.reverseJournalEntry(originalJournalId, userId);
+  }
 }

@@ -86,8 +86,7 @@ export class SpeciesController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.breedService.removeSpecies(id, tenantId, req.user);
     return {
-      success: true,
-      ...result
+      ...result,
     };
   }
 

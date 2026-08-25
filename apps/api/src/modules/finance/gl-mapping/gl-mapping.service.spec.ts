@@ -2,12 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GlMappingService } from './gl-mapping.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 
 describe('GlMappingService', () => {
   let service: GlMappingService;
-  let clsService: ClsService;
-  let auditLogService: AuditLogService;
 
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
@@ -43,8 +41,6 @@ describe('GlMappingService', () => {
     }).compile();
 
     service = module.get<GlMappingService>(GlMappingService);
-    clsService = module.get<ClsService>(ClsService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   it('should be defined', () => {

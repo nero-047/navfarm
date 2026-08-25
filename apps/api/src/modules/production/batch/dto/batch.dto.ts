@@ -211,10 +211,59 @@ export class TransferStageDto {
   @IsOptional()
   to_location_id?: string;
 
+  @ApiProperty({ description: 'Set to transfer one location lot\'s stage independently of the rest of the batch, instead of the whole batch', required: false })
+  @IsUUID()
+  @IsOptional()
+  lot_id?: string;
+
   @ApiProperty({ description: 'Remarks', required: false })
   @IsString()
   @IsOptional()
   remarks?: string;
+}
+
+class SplitBatchLotLineDto {
+  @ApiProperty({ description: 'Destination location UUID for this lot' })
+  @IsUUID()
+  @IsNotEmpty()
+  location_id: string;
+
+  @ApiProperty({ description: 'Headcount assigned to this lot' })
+  @IsNumber()
+  @Min(0.0001)
+  quantity: number;
+
+  @ApiProperty({ description: 'Initial stage UUID for this lot — defaults to the batch\'s current stage', required: false })
+  @IsUUID()
+  @IsOptional()
+  stage_id?: string;
+
+  @ApiProperty({ description: 'Remarks', required: false })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+}
+
+export class SplitBatchLotsDto {
+  @ApiProperty({ description: 'One or more location lots to create, splitting the batch\'s unassigned headcount across them', type: [SplitBatchLotLineDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => SplitBatchLotLineDto)
+  lots: SplitBatchLotLineDto[];
+}
+
+export class MergeBatchLotsDto {
+  @ApiProperty({ description: 'Lot UUIDs to merge into the target lot' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('4', { each: true })
+  source_lot_ids: string[];
+
+  @ApiProperty({ description: 'Surviving lot UUID that absorbs the source lots\' headcount' })
+  @IsUUID()
+  @IsNotEmpty()
+  target_lot_id: string;
 }
 
 export class AddBatchTransactionDto {
@@ -238,6 +287,16 @@ export class AddBatchTransactionDto {
   @IsUUID()
   @IsOptional()
   resource_id?: string;
+
+  @ApiProperty({ description: 'Batch location lot UUID — set to post this transaction against one location lot rather than the whole batch', required: false })
+  @IsUUID()
+  @IsOptional()
+  lot_id?: string;
+
+  @ApiProperty({ description: 'Animal UUID — set to post this transaction against one individual animal rather than the whole batch/lot', required: false })
+  @IsUUID()
+  @IsOptional()
+  animal_id?: string;
 
   @ApiProperty({ description: 'Quantity (unsigned — sign is derived from transaction_type)', required: false })
   @IsNumber()
@@ -548,7 +607,9 @@ export class SingleBatchDailyEntryDto {
     quantity: number;
     uom?: string;
     rate?: number;
-    lot_no?: string;
+    lot_no?: string; // inventory stock lot (e.g. a feed bag batch) — unrelated to location_lot_id below
+    location_lot_id?: string; // batch_location_lot UUID — post against one physical lot rather than the whole batch
+    animal_id?: string; // post against one individual animal rather than the whole batch/lot
     spl_id?: string;
     parameter_id?: string;
   }>;
@@ -561,7 +622,9 @@ export class SingleBatchDailyEntryDto {
     quantity: number;
     uom?: string;
     rate?: number;
-    lot_no?: string;
+    lot_no?: string; // inventory stock lot — unrelated to location_lot_id below
+    location_lot_id?: string;
+    animal_id?: string;
     spl_id?: string;
     parameter_id?: string;
     remarks?: string;
@@ -586,6 +649,8 @@ export class SingleBatchDailyEntryDto {
     disease_id?: string;
     remarks?: string;
     spl_id?: string;
+    location_lot_id?: string;
+    animal_id?: string;
   }>;
 
   @ApiProperty({ description: 'Milestone / Pregnancy scan decision', required: false })
@@ -609,6 +674,8 @@ export class SingleBatchDailyEntryDto {
     auto_triggers_stage?: boolean;
     to_stage_code?: string;
     remarks?: string;
+    // Set to transfer one location lot's stage independently of the rest of the batch.
+    location_lot_id?: string;
   };
 
   @ApiProperty({ description: 'Output harvest lines (piglets, carcasses)', required: false })
@@ -626,6 +693,7 @@ export class SingleBatchDailyEntryDto {
     warehouse_id?: string;
     rate?: number;
     remarks?: string;
+    location_lot_id?: string;
   }>;
 
   @ApiProperty({ description: 'Resource / labour attendance lines', required: false })

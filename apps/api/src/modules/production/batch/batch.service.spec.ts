@@ -10,6 +10,8 @@ import { BadRequestException } from '@nestjs/common';
 describe('BatchService', () => {
   let service: BatchService;
   let numberSeriesService: NumberSeriesService;
+  let ledgerService: InventoryLedgerService;
+  let glPostingService: GlPostingService;
 
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
@@ -52,6 +54,8 @@ describe('BatchService', () => {
 
     service = module.get<BatchService>(BatchService);
     numberSeriesService = module.get<NumberSeriesService>(NumberSeriesService);
+    ledgerService = module.get<InventoryLedgerService>(InventoryLedgerService);
+    glPostingService = module.get<GlPostingService>(GlPostingService);
   });
 
   describe('create', () => {
@@ -544,6 +548,18 @@ describe('BatchService', () => {
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ opening_quantity: '30.0000' }]),
+            }),
+          }),
+        }) // getBatchHeadcount: batchHeader lookup
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        }) // getBatchHeadcount: active lots lookup (none -> falls back to opening_quantity)
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
               limit: jest.fn().mockResolvedValue([]),
             }),
           }),
@@ -851,6 +867,73 @@ describe('BatchService', () => {
       expect(insertedValues.actual_value).toBe('34');
       expect(insertedValues.expected_value).toBe('23');
       expect(insertedValues.title).toContain('Shed Temperature Above KPI');
+    });
+  });
+
+  describe('updateTransaction', () => {
+    const postedTx = {
+      transaction_id: 'tx-1',
+      batch_id: 'batch-1',
+      transaction_date: '2026-06-01',
+      transaction_type: 'OBSERVATION',
+      status: 'POSTED',
+      ledger_id: 'ledg-1',
+      journal_id: 'journal-1',
+      quantity: '22.0000',
+    };
+
+    it('reverses the original ledger and journal entries, marks it SUPERSEDED, and posts the correction', async () => {
+      (ledgerService as any).reverseLedgerEntry = jest.fn().mockResolvedValue({ ledger_id: 'ledg-reversal-1' });
+      (glPostingService as any).reverseJournalEntry = jest.fn().mockResolvedValue({ journal_id: 'journal-reversal-1' });
+
+      jest.spyOn(service, 'findOne').mockResolvedValue({ ...activeBatch } as any);
+      const addTransactionSpy = jest.spyOn(service, 'addTransaction').mockResolvedValue({} as any);
+
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([postedTx]) }),
+        }),
+      });
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      await service.updateTransaction(
+        'batch-1',
+        'tx-1',
+        { transaction_date: '2026-06-01', transaction_type: 'OBSERVATION', quantity: 25 } as any,
+        'tenant-123',
+        { userId: 'user-1' }
+      );
+
+      expect((ledgerService as any).reverseLedgerEntry).toHaveBeenCalledWith('ledg-1', 'user-1');
+      expect((glPostingService as any).reverseJournalEntry).toHaveBeenCalledWith('journal-1', 'user-1');
+      expect(addTransactionSpy).toHaveBeenCalledWith(
+        'batch-1',
+        expect.objectContaining({ quantity: 25 }),
+        'tenant-123',
+        { userId: 'user-1' },
+        expect.any(String), // pre-generated newTransactionId
+      );
+    });
+
+    it('rejects editing a transaction that is already SUPERSEDED', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({ ...activeBatch } as any);
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ ...postedTx, status: 'SUPERSEDED' }]) }),
+        }),
+      });
+
+      await expect(
+        service.updateTransaction('batch-1', 'tx-1', { transaction_date: '2026-06-01', transaction_type: 'OBSERVATION' } as any, 'tenant-123')
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects editing a transaction on a CLOSED batch', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({ ...activeBatch, status: 'CLOSED' } as any);
+
+      await expect(
+        service.updateTransaction('batch-1', 'tx-1', { transaction_date: '2026-06-01', transaction_type: 'OBSERVATION' } as any, 'tenant-123')
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

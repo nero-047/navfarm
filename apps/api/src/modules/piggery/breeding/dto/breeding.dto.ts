@@ -174,6 +174,18 @@ export class CreateFarrowingDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  register_piglets?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  sire_animal_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  item_id?: string;
 }
 
 export class UpdateWeaningDto {

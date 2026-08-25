@@ -25,6 +25,7 @@ const TABS = [
   { id: "overview", label: "Overview" },
   { id: "stage-schedulers", label: "Stage schedulers" },
   { id: "data-entry", label: "Data entry" },
+  { id: "locations", label: "Locations" },
   { id: "animal-assignment", label: "Animal assignment" },
   { id: "consumption", label: "Consumption" },
   { id: "mortality", label: "Mortality" },

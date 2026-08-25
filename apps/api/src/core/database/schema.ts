@@ -1527,6 +1527,10 @@ export const journalHeader = mysqlTable('journal_header', {
   source_document_type: varchar('source_document_type', { length: 30 }),
   source_document_no: varchar('source_document_no', { length: 50 }),
   source_ledger_id: varchar('source_ledger_id', { length: 36 }).references(() => inventoryLedger.ledger_id, { onDelete: 'restrict' }),
+  // Set on the reversing journal (not the original) — a new POSTED journal with every
+  // line's debit/credit swapped, per journal.service.ts's reverseJournalEntry(). The
+  // original journal is never mutated, matching the ledger's append-only convention.
+  reversal_of_journal_id: varchar('reversal_of_journal_id', { length: 36 }),
   description: text('description'),
   status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
   total_debit: decimal('total_debit', { precision: 18, scale: 4 }).default('0.0000').notNull(),
@@ -1764,6 +1768,44 @@ export const batchHeader = mysqlTable('batch_header', {
   uqBatchNo: uniqueIndex('uq_batch_header_tenant_company_no').on(table.tenant_id, table.company_id, table.batch_no),
 }));
 
+// A batch can be physically split across multiple locations (e.g. 1,000 piglets
+// spread across several sheds) while remaining one costing/reporting unit —
+// lots are the location-level child rows that roll up to batch_header. Daily
+// entries, mortality, and stage transfers can target a lot; batch_header's own
+// opening/closing_quantity stay batch-wide totals, current headcount is
+// SUM(current_quantity) across a batch's ACTIVE lots (computed in the service
+// layer, not stored — see batch_header.current_quantity's history of drift).
+export const batchLocationLot = mysqlTable('batch_location_lot', {
+  lot_id: varchar('lot_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  lot_no: varchar('lot_no', { length: 50 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).notNull().references(() => locationMaster.location_id, { onDelete: 'restrict' }),
+  // Nullable + independent of batch_header.stage_id — different lots of the same
+  // batch can be at different stages (e.g. Shed 3 further along than Shed 7).
+  stage_id: varchar('stage_id', { length: 36 }).references(() => stageMaster.stage_id, { onDelete: 'set null' }),
+  opening_quantity: decimal('opening_quantity', { precision: 18, scale: 4 }).notNull(),
+  current_quantity: decimal('current_quantity', { precision: 18, scale: 4 }).notNull(),
+  closing_quantity: decimal('closing_quantity', { precision: 18, scale: 4 }),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(), // ACTIVE, CLOSED, TRANSFERRED, MERGED
+  // Lightweight pointer, no FK — same convention as batch_header.renewed_from_batch_id.
+  merged_into_lot_id: varchar('merged_into_lot_id', { length: 36 }),
+  remarks: text('remarks'),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  uqLotNo: uniqueIndex('uq_batch_location_lot_tenant_company_no').on(table.tenant_id, table.company_id, table.lot_no),
+}));
+
+export const batchLocationLotRelations = relations(batchLocationLot, ({ one }) => ({
+  batch: one(batchHeader, { fields: [batchLocationLot.batch_id], references: [batchHeader.batch_id] }),
+  location: one(locationMaster, { fields: [batchLocationLot.location_id], references: [locationMaster.location_id] }),
+  stage: one(stageMaster, { fields: [batchLocationLot.stage_id], references: [stageMaster.stage_id] }),
+}));
+
 export const batchInputLine = mysqlTable('batch_input_line', {
   line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   batch_id: varchar('batch_id', { length: 36 }).notNull(),
@@ -1796,12 +1838,26 @@ export const batchTransaction = mysqlTable('batch_transaction', {
   transaction_type: varchar('transaction_type', { length: 20 }).notNull(), // CONSUMPTION, MORTALITY, OUTPUT, OVERHEAD, OBSERVATION
   item_id: varchar('item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'restrict' }),
   resource_id: varchar('resource_id', { length: 36 }).references(() => resourceMaster.resource_id, { onDelete: 'restrict' }),
+  // Nullable — a transaction can post at batch level (both null, legacy), lot
+  // level (lot_id set), or single-animal level (animal_id set).
+  lot_id: varchar('lot_id', { length: 36 }).references(() => batchLocationLot.lot_id, { onDelete: 'restrict' }),
+  animal_id: varchar('animal_id', { length: 36 }).references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
   quantity: decimal('quantity', { precision: 18, scale: 4 }),
   uom: varchar('uom', { length: 20 }),
   rate: decimal('rate', { precision: 18, scale: 6 }),
   amount: decimal('amount', { precision: 18, scale: 4 }),
   remarks: varchar('remarks', { length: 500 }),
   ledger_id: varchar('ledger_id', { length: 36 }).references(() => inventoryLedger.ledger_id, { onDelete: 'restrict' }),
+  // Captured for every transaction type that posts GL — including MORTALITY/OVERHEAD,
+  // which have no ledger_id (postBatchCostEntry has no inventory movement to hang off
+  // of) and previously had no way to trace back to the journal they created. Needed so
+  // updateTransaction() can reverse the correct journal regardless of transaction type.
+  journal_id: varchar('journal_id', { length: 36 }),
+  // POSTED (default) or SUPERSEDED — set to SUPERSEDED on the original row when
+  // updateTransaction() corrects it; the corrected row is a new POSTED transaction
+  // pointing back via supersedes_transaction_id. History is never mutated in place.
+  status: varchar('status', { length: 20 }).default('POSTED').notNull(),
+  supersedes_transaction_id: varchar('supersedes_transaction_id', { length: 36 }),
   created_by: varchar('created_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
 });
@@ -1809,6 +1865,7 @@ export const batchTransaction = mysqlTable('batch_transaction', {
 export const batchOutputLine = mysqlTable('batch_output_line', {
   line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  lot_id: varchar('lot_id', { length: 36 }).references(() => batchLocationLot.lot_id, { onDelete: 'restrict' }),
   item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
   output_type: varchar('output_type', { length: 20 }).default('MAIN').notNull(), // MAIN, BY_PRODUCT
   cost_split_pct: decimal('cost_split_pct', { precision: 6, scale: 2 }).notNull(),
@@ -1826,6 +1883,8 @@ export const batchOutputLine = mysqlTable('batch_output_line', {
 export const batchStageLog = mysqlTable('batch_stage_log', {
   log_id: varchar('log_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
+  // Set when the transition is for a single lot rather than the whole batch.
+  lot_id: varchar('lot_id', { length: 36 }).references(() => batchLocationLot.lot_id, { onDelete: 'restrict' }),
   from_stage_code: varchar('from_stage_code', { length: 50 }),
   to_stage_code: varchar('to_stage_code', { length: 50 }).notNull(),
   from_location_id: varchar('from_location_id', { length: 36 }),
@@ -2361,6 +2420,10 @@ export const inventoryLedger = mysqlTable('inventory_ledger', {
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   category_id: varchar('category_id', { length: 36 }).references(() => itemCategoryMaster.category_id, { onDelete: 'restrict' }),
+  // Set on the reversing entry (not the original) — see inventory-ledger.service.ts's
+  // reverseLedgerEntry(). The ledger stays append-only; nothing here is ever mutated
+  // except remaining_quantity bookkeeping on the specific layer being reversed.
+  reversal_of_ledger_id: varchar('reversal_of_ledger_id', { length: 36 }),
   created_by: varchar('created_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
 });
@@ -2503,11 +2566,15 @@ export const animalRegister = mysqlTable('animal_register', {
   ear_tag: varchar('ear_tag', { length: 50 }),
   sire_animal_id: varchar('sire_animal_id', { length: 36 }),
   dam_animal_id: varchar('dam_animal_id', { length: 36 }),
+  // Breeding-pyramid tier: GGP (nucleus) -> GP (grandparent) -> PS (parent stock) -> COMMERCIAL.
+  // Set at registration; farrowing-created piglets inherit the dam's tier (see breeding.service.ts).
+  breeding_tier: varchar('breeding_tier', { length: 10 }),
   acquisition_cost: decimal('acquisition_cost', { precision: 18, scale: 4 }).notNull(),
   landing_cost: decimal('landing_cost', { precision: 18, scale: 4 }),
   total_opening_asset_value: decimal('total_opening_asset_value', { precision: 18, scale: 4 }).notNull(), // CALC at create
   current_stage_id: varchar('current_stage_id', { length: 36 }),
   current_batch_id: varchar('current_batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  current_lot_id: varchar('current_lot_id', { length: 36 }).references(() => batchLocationLot.lot_id, { onDelete: 'set null' }),
   current_location_id: varchar('current_location_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   parity_count: int('parity_count').default(0).notNull(),
   total_piglets_born_live: int('total_piglets_born_live').default(0).notNull(),
@@ -2567,6 +2634,25 @@ export const animalMedicationLog = mysqlTable('animal_medication_log', {
   administered_by: varchar('administered_by', { length: 200 }), // free text — a vet/handler, not necessarily a system user
   notes: text('notes'),
   created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+});
+
+// Per-animal counterpart to today's batch-aggregate weight/condition entry
+// (batch_transaction transaction_type=OBSERVATION) — mirrors animal_medication_log's
+// shape exactly, same rationale: batch_transaction has no animal_id-only dimension
+// for a lightweight, high-frequency reading like a single weigh-in.
+export const animalObservationLog = mysqlTable('animal_observation_log', {
+  log_id: varchar('log_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  animal_id: varchar('animal_id', { length: 36 }).notNull().references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
+  batch_id: varchar('batch_id', { length: 36 }).references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  lot_id: varchar('lot_id', { length: 36 }).references(() => batchLocationLot.lot_id, { onDelete: 'restrict' }),
+  observation_date: date('observation_date', { mode: 'string' }).notNull(),
+  weight_kg: decimal('weight_kg', { precision: 10, scale: 3 }),
+  bcs_score: decimal('bcs_score', { precision: 3, scale: 1 }),
+  note: text('note'),
+  recorded_by: varchar('recorded_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
 });
 

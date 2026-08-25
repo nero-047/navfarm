@@ -86,8 +86,7 @@ export class FeedFormulaController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.feedFormulaService.remove(id, tenantId, req.user);
     return {
-      success: true,
-      ...result
+      ...result,
     };
   }
 

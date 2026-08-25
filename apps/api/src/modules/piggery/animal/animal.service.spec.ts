@@ -316,6 +316,12 @@ describe('AnimalService', () => {
           entry_date: '2026-01-01',
         })) // findOne
         .mockReturnValueOnce(found({
+          stage_id: 'st-gilt',
+          typical_duration_days: null,
+          auto_move_on_day: null,
+          next_stage_id: null,
+        })) // findOne's enrichAnimal() stage-overdue lookup
+        .mockReturnValueOnce(found({
           stage_id: 'st-flush',
           stage_code: 'FLUSH_SERVICE',
           stage_name: 'Flush and Service',
@@ -332,9 +338,14 @@ describe('AnimalService', () => {
         .mockReturnValueOnce(found({
           animal_id: 'a-1',
           current_stage_id: 'st-flush',
-          current_stage: 'Flush and Service',
           current_location_id: 'loc-2',
-        })); // findOne return
+        })) // findOne return
+        .mockReturnValueOnce(found({
+          stage_id: 'st-flush',
+          typical_duration_days: null,
+          auto_move_on_day: null,
+          next_stage_id: null,
+        })); // findOne return's enrichAnimal() stage-overdue lookup
 
       mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
 
@@ -350,7 +361,7 @@ describe('AnimalService', () => {
         { userId: 'user-1' }
       );
 
-      expect(res.current_stage).toBe('Flush and Service');
+      expect(res.current_stage_id).toBe('st-flush');
       expect(res.current_location_id).toBe('loc-2');
     });
 

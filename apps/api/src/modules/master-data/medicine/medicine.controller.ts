@@ -86,8 +86,7 @@ export class MedicineController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.medicineService.remove(id, tenantId, req.user);
     return {
-      success: true,
-      ...result
+      ...result,
     };
   }
 

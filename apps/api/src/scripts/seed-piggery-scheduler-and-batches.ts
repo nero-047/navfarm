@@ -322,19 +322,11 @@ export async function seedNewSchedulersAndBatches() {
           await db.insert(schema.batchBioAssetState).values({
             state_id: randomUUID(),
             batch_id: batId,
-            tenant_id: tenantId,
-            company_id: companyId,
-            bio_asset_stage: b.bioStage as any,
-            is_nca_accounted: true,
-            nca_capitalised_at: b.start,
-            nca_book_value: b.nbv,
-            initial_cost: b.initialBioCost,
-            accumulated_amortization: b.accumAmort,
-            monthly_amort_amount: b.monthlyAmort,
-            useful_life_months: 24,
-            remaining_months: 23,
+            stage: b.bioStage as any,
             current_quantity: b.qty,
-            uom: 'HEAD',
+            nca_book_value: b.nbv,
+            monthly_amortization_rate: b.monthlyAmort,
+            matured_at: b.bioStage === 'MATURE' ? b.start : null,
           });
         }
 
@@ -344,15 +336,13 @@ export async function seedNewSchedulersAndBatches() {
             {
               log_id: randomUUID(),
               batch_id: batId,
-              tenant_id: tenantId,
               from_stage_code: 'FLUSH_SERVICE',
               to_stage_code: 'DRY_SOW_GESTATION',
-              from_stage_id: stageByCode.get('FLUSH_SERVICE')?.stage_id,
-              to_stage_id: stage?.stage_id,
-              transition_date: dMinus44,
-              head_count: '30.0000',
+              from_location_id: null,
+              to_location_id: penMap.get(b.penCode) || defaultPenId!,
+              transferred_at: dMinus44,
+              transferred_by: userId,
               remarks: 'AI Conception confirmed — Transferred to Gestation Barn 01',
-              created_by: userId,
             },
           ]);
         }
@@ -367,8 +357,6 @@ export async function seedNewSchedulersAndBatches() {
             {
               transaction_id: randomUUID(),
               batch_id: batId,
-              tenant_id: tenantId,
-              company_id: companyId,
               transaction_date: todayStr,
               transaction_type: 'CONSUMPTION',
               item_id: itemMap.get('FEED-GEST-SOW'),
@@ -382,8 +370,6 @@ export async function seedNewSchedulersAndBatches() {
             {
               transaction_id: randomUUID(),
               batch_id: batId,
-              tenant_id: tenantId,
-              company_id: companyId,
               transaction_date: todayStr,
               transaction_type: 'OBSERVATION',
               quantity: '182.5000',
@@ -394,8 +380,6 @@ export async function seedNewSchedulersAndBatches() {
             {
               transaction_id: randomUUID(),
               batch_id: batId,
-              tenant_id: tenantId,
-              company_id: companyId,
               transaction_date: todayStr,
               transaction_type: 'OVERHEAD',
               quantity: '1.0000',
@@ -412,8 +396,6 @@ export async function seedNewSchedulersAndBatches() {
             {
               transaction_id: randomUUID(),
               batch_id: batId,
-              tenant_id: tenantId,
-              company_id: companyId,
               transaction_date: todayStr,
               transaction_type: 'CONSUMPTION',
               item_id: itemMap.get('FEED-CREEP-PRE'),
@@ -427,8 +409,6 @@ export async function seedNewSchedulersAndBatches() {
             {
               transaction_id: randomUUID(),
               batch_id: batId,
-              tenant_id: tenantId,
-              company_id: companyId,
               transaction_date: todayStr,
               transaction_type: 'CONSUMPTION',
               item_id: itemMap.get('VAC-PCV2-SWINE'),
@@ -442,8 +422,6 @@ export async function seedNewSchedulersAndBatches() {
             {
               transaction_id: randomUUID(),
               batch_id: batId,
-              tenant_id: tenantId,
-              company_id: companyId,
               transaction_date: todayStr,
               transaction_type: 'OBSERVATION',
               quantity: '18.4000',

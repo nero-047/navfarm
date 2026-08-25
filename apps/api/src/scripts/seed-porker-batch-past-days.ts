@@ -102,8 +102,6 @@ export async function seedPorkerBatchPastDays() {
       await db.insert(schema.batchTransaction).values({
         transaction_id: randomUUID(),
         batch_id: batchId,
-        tenant_id: tenantId,
-        company_id: companyId,
         transaction_date: dateStr,
         transaction_type: 'CONSUMPTION',
         item_id: feedItem.item_id,
@@ -125,8 +123,6 @@ export async function seedPorkerBatchPastDays() {
         await db.insert(schema.batchTransaction).values({
           transaction_id: randomUUID(),
           batch_id: batchId,
-          tenant_id: tenantId,
-          company_id: companyId,
           transaction_date: dateStr,
           transaction_type: 'CONSUMPTION',
           item_id: medIron.item_id,
@@ -148,8 +144,6 @@ export async function seedPorkerBatchPastDays() {
         await db.insert(schema.batchTransaction).values({
           transaction_id: randomUUID(),
           batch_id: batchId,
-          tenant_id: tenantId,
-          company_id: companyId,
           transaction_date: dateStr,
           transaction_type: 'CONSUMPTION',
           item_id: medIron.item_id,
@@ -171,8 +165,6 @@ export async function seedPorkerBatchPastDays() {
         await db.insert(schema.batchTransaction).values({
           transaction_id: randomUUID(),
           batch_id: batchId,
-          tenant_id: tenantId,
-          company_id: companyId,
           transaction_date: dateStr,
           transaction_type: 'CONSUMPTION',
           item_id: vacPcv2.item_id,
@@ -190,8 +182,6 @@ export async function seedPorkerBatchPastDays() {
         await db.insert(schema.batchTransaction).values({
           transaction_id: randomUUID(),
           batch_id: batchId,
-          tenant_id: tenantId,
-          company_id: companyId,
           transaction_date: dateStr,
           transaction_type: 'MORTALITY',
           quantity: dayMortality.toString(),
@@ -208,8 +198,6 @@ export async function seedPorkerBatchPastDays() {
       await db.insert(schema.batchTransaction).values({
         transaction_id: randomUUID(),
         batch_id: batchId,
-        tenant_id: tenantId,
-        company_id: companyId,
         transaction_date: dateStr,
         transaction_type: 'OBSERVATION',
         quantity: Number(currentWeight.toFixed(2)).toString(),
@@ -226,8 +214,6 @@ export async function seedPorkerBatchPastDays() {
       await db.insert(schema.batchTransaction).values({
         transaction_id: randomUUID(),
         batch_id: batchId,
-        tenant_id: tenantId,
-        company_id: companyId,
         transaction_date: dateStr,
         transaction_type: 'OVERHEAD',
         quantity: '1.0000',

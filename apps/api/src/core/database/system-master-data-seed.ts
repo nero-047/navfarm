@@ -299,6 +299,7 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
 }> = [
   { series_code: 'BATCH', series_name: 'Batch Number', document_type: 'BATCH', prefix: 'BATCH', separator: '-', seq_length: 6, reset_frequency: 'NEVER' },
   { series_code: 'ANIMAL_PIGGERY', series_name: 'Piggery Animal Code', document_type: 'ANIMAL', nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', prefix: 'PIG', date_format: 'YYYY', separator: '-', seq_length: 4, reset_frequency: 'YEARLY' },
+  { series_code: 'LOT', series_name: 'Batch Location Lot Number', document_type: 'BATCH_LOCATION_LOT', prefix: 'LOT', separator: '-', seq_length: 6, reset_frequency: 'NEVER' },
 ];
 
 /**

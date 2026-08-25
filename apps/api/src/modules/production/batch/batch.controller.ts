@@ -15,6 +15,8 @@ import {
   BulkDailyEntryDto,
   SingleBatchDailyEntryDto,
   UpdateBatchSchedulerLinesDto,
+  SplitBatchLotsDto,
+  MergeBatchLotsDto,
 } from './dto/batch.dto';
 
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -139,9 +141,9 @@ export class BatchController {
   @RequirePermission('PRODUCTION', 'BATCH', 'edit')
   @ApiOperation({ summary: 'Assign registered animals to this batch' })
   @ApiParam({ name: 'id', description: 'Batch UUID' })
-  async assignAnimals(@Param('id') id: string, @Body() body: { animal_ids: string[] }, @Req() req: any) {
+  async assignAnimals(@Param('id') id: string, @Body() body: { animal_ids: string[]; lot_id?: string }, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
-    const result = await this.batchService.assignAnimalsToBatch(id, body.animal_ids, tenantId, req.user);
+    const result = await this.batchService.assignAnimalsToBatch(id, body.animal_ids, tenantId, req.user, body.lot_id);
     return { success: true, message: 'Animals assigned to batch successfully.', data: result };
   }
 
@@ -169,6 +171,47 @@ export class BatchController {
     return { success: true, message: 'Animals registered and assigned successfully.', data: result };
   }
 
+  @Get(':id/lots')
+  @RequirePermission('PRODUCTION', 'BATCH', 'view')
+  @ApiOperation({ summary: 'List the location lots this batch is split across' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async getLots(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.getBatchLots(id, tenantId);
+    return { success: true, data: result };
+  }
+
+  @Post(':id/lots/split')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Split a batch\'s unassigned headcount across one or more location lots (e.g. 1,000 piglets across several sheds, still one batch)' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async splitLots(@Param('id') id: string, @Body() dto: SplitBatchLotsDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.splitBatchIntoLots(id, dto, tenantId, req.user);
+    return { success: true, message: 'Batch split into location lots successfully.', data: result };
+  }
+
+  @Post(':id/lots/merge')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Merge one or more location lots\' headcount into a target lot' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async mergeLots(@Param('id') id: string, @Body() dto: MergeBatchLotsDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.mergeLots(id, dto, tenantId, req.user);
+    return { success: true, message: 'Location lots merged successfully.', data: result };
+  }
+
+  @Post(':id/lots/:lotId/close')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Close a location lot' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiParam({ name: 'lotId', description: 'Lot UUID' })
+  async closeLot(@Param('id') id: string, @Param('lotId') lotId: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.closeLot(id, lotId, tenantId, req.user);
+    return { success: true, message: 'Lot closed successfully.', data: result };
+  }
+
   @Post(':id/transaction')
   @RequirePermission('PRODUCTION', 'BATCH', 'edit')
   @ApiOperation({ summary: 'Record a daily transaction against an ACTIVE Batch (consumption, mortality, output, overhead, observation)' })
@@ -177,6 +220,22 @@ export class BatchController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.batchService.addTransaction(id, dto, tenantId, req.user);
     return { success: true, message: 'Batch transaction recorded successfully.', data: result };
+  }
+
+  @Put(':id/transactions/:transactionId')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Correct a posted daily transaction — reverses its ledger/GL impact and posts the corrected values as a new transaction, keeping the original visible as superseded' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiParam({ name: 'transactionId', description: 'Transaction UUID to correct' })
+  async updateTransaction(
+    @Param('id') id: string,
+    @Param('transactionId') transactionId: string,
+    @Body() dto: AddBatchTransactionDto,
+    @Req() req: any
+  ) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.updateTransaction(id, transactionId, dto, tenantId, req.user);
+    return { success: true, message: 'Transaction corrected successfully.', data: result };
   }
 
   @Post(':id/close')

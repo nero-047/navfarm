@@ -7,6 +7,7 @@ const GENDERS = ['F', 'M'] as const;
 const ENTRY_TYPES = ['PURCHASED_IMPORTED', 'PURCHASED_LOCAL', 'BORN_ON_FARM', 'TRANSFERRED_IN'] as const;
 const STATUSES = ['ACTIVE', 'QUARANTINE', 'SICK', 'PREGNANT', 'LACTATING', 'DRY', 'CULLED', 'DEAD', 'SOLD', 'SLAUGHTERED'] as const;
 export const DISPOSAL_TYPES = ['SOLD', 'SLAUGHTERED', 'DIED', 'TRANSFERRED'] as const;
+const BREEDING_TIERS = ['GGP', 'GP', 'PS', 'COMMERCIAL'] as const;
 
 export class CreateAnimalDto {
   @ApiProperty({ description: 'Company UUID scope' })
@@ -89,6 +90,12 @@ export class CreateAnimalDto {
   @IsOptional()
   dam_animal_id?: string;
 
+  @ApiProperty({ description: 'Breeding-pyramid tier: GGP (nucleus), GP (grandparent), PS (parent stock), COMMERCIAL', enum: BREEDING_TIERS, required: false })
+  @IsString()
+  @IsIn(BREEDING_TIERS)
+  @IsOptional()
+  breeding_tier?: string;
+
   @ApiProperty({ description: 'Purchase price per animal' })
   @IsNumber()
   @IsNotEmpty()
@@ -161,6 +168,12 @@ export class UpdateAnimalDto {
   @IsUUID()
   @IsOptional()
   dam_animal_id?: string;
+
+  @ApiProperty({ enum: BREEDING_TIERS, required: false })
+  @IsString()
+  @IsIn(BREEDING_TIERS)
+  @IsOptional()
+  breeding_tier?: string;
 
   @ApiProperty({ required: false })
   @IsUUID()

@@ -389,6 +389,94 @@ export class InventoryLedgerService {
     return { shipment, receipt };
   }
 
+  /**
+   * Reverses a ledger entry by writing an equal-and-opposite row referencing the
+   * original — the ledger stays append-only, nothing is ever mutated except the
+   * remaining_quantity bookkeeping described below. Used by batch.service.ts's
+   * updateTransaction() to correct a posted daily entry without rewriting history.
+   *
+   * NEGATIVE (consumption) entries reverse to a new POSITIVE layer: the returned
+   * stock becomes a new, newest FIFO layer rather than restoring the exact original
+   * layers it drew from. This is deliberately simpler than rewinding the FIFO
+   * application chain — correct for quantity/value, and doesn't risk corrupting the
+   * original entries' inventory_application history.
+   *
+   * POSITIVE (receipt/output) entries only reverse if nothing has been consumed
+   * from them yet (remaining_quantity === quantity) — otherwise downstream FIFO
+   * consumption may already depend on that layer, and reversing would silently
+   * undercount stock that's already left the building.
+   */
+  async reverseLedgerEntry(originalLedgerId: string, userId?: string) {
+    const original = await this.findOne(originalLedgerId);
+    if (!original) {
+      throw new BadRequestException(`Ledger entry '${originalLedgerId}' not found.`);
+    }
+    if (original.reversal_of_ledger_id) {
+      throw new BadRequestException('Cannot reverse a reversal entry.');
+    }
+
+    const qty = Math.abs(Number(original.quantity));
+    const rate = Number(original.rate || 0);
+    const reversalId = randomUUID();
+
+    const baseValues = {
+      ledger_id: reversalId,
+      tenant_id: original.tenant_id,
+      company_id: original.company_id,
+      item_id: original.item_id,
+      item_code: original.item_code,
+      item_description: original.item_description,
+      document_type: original.document_type,
+      document_no: original.document_no,
+      document_line_id: original.document_line_id,
+      posting_date: original.posting_date,
+      transaction_type: `REVERSAL_${original.transaction_type}`.slice(0, 30),
+      uom: original.uom,
+      uom_conversion_factor: original.uom_conversion_factor,
+      batch_no: original.batch_no,
+      location_id: original.location_id,
+      warehouse_id: original.warehouse_id,
+      nob_id: original.nob_id,
+      lob_id: original.lob_id,
+      category_id: original.category_id,
+      reversal_of_ledger_id: originalLedgerId,
+      created_by: userId || null,
+    };
+
+    if (original.entry_type === 'NEGATIVE') {
+      await this.db.insert(schema.inventoryLedger).values({
+        ...baseValues,
+        entry_type: 'POSITIVE',
+        quantity: qty.toString(),
+        remaining_quantity: qty.toString(),
+        rate: rate.toString(),
+        amount: (qty * rate).toString(),
+      });
+    } else {
+      const remaining = Number(original.remaining_quantity || 0);
+      if (Math.abs(remaining - qty) > 0.0001) {
+        throw new BadRequestException(
+          `Cannot reverse this entry — ${(qty - remaining).toFixed(4)} ${original.uom} of it has already been consumed downstream.`
+        );
+      }
+      await this.db.transaction(async (tx) => {
+        await tx.insert(schema.inventoryLedger).values({
+          ...baseValues,
+          entry_type: 'NEGATIVE',
+          quantity: (-qty).toString(),
+          rate: rate.toString(),
+          amount: (-qty * rate).toString(),
+        });
+        await tx
+          .update(schema.inventoryLedger)
+          .set({ remaining_quantity: '0.0000' })
+          .where(eq(schema.inventoryLedger.ledger_id, originalLedgerId));
+      });
+    }
+
+    return this.findOne(reversalId);
+  }
+
   async findOne(ledgerId: string) {
     const [entry] = await this.db
       .select()

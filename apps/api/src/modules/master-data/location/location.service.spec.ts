@@ -6,7 +6,6 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('LocationService', () => {
   let service: LocationService;
-  let clsService: ClsService;
   let auditLogService: AuditLogService;
 
   const mockDbSelect = jest.fn();
@@ -43,7 +42,6 @@ describe('LocationService', () => {
     }).compile();
 
     service = module.get<LocationService>(LocationService);
-    clsService = module.get<ClsService>(ClsService);
     auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
@@ -67,6 +65,7 @@ describe('LocationService', () => {
             company_id: 'non-existent-comp',
             location_code: 'LOC01',
             location_name: 'Location 1',
+            location_address: 'Test Farm - Block A',
             location_level: 1,
             location_type: 'ROOM',
           },

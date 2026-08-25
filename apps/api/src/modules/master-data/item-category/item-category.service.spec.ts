@@ -2,12 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ItemCategoryService } from './item-category.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 
 describe('ItemCategoryService', () => {
   let service: ItemCategoryService;
-  let clsService: ClsService;
-  let auditLogService: AuditLogService;
 
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
@@ -43,8 +41,6 @@ describe('ItemCategoryService', () => {
     }).compile();
 
     service = module.get<ItemCategoryService>(ItemCategoryService);
-    clsService = module.get<ClsService>(ClsService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   it('should be defined', () => {

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BreedingService } from './breeding.service';
 import { ClsService } from 'nestjs-cls';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { MatingType, PregCheckMethod, ConceptionResult } from './dto/breeding.dto';
 
@@ -34,6 +35,7 @@ describe('BreedingService', () => {
       providers: [
         BreedingService,
         { provide: ClsService, useValue: { get: jest.fn().mockReturnValue(mockDb) } },
+        { provide: NumberSeriesService, useValue: { generateNext: jest.fn().mockResolvedValue('PIG-2026-0001') } },
       ],
     }).compile();
 

@@ -9,6 +9,7 @@ import { CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto, Tra
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { computeStageOverdue } from '../../production/stage/stage-overdue.util';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -208,6 +209,7 @@ export class AnimalService {
       ear_tag: dto.ear_tag || null,
       sire_animal_id: dto.sire_animal_id || null,
       dam_animal_id: dto.dam_animal_id || null,
+      breeding_tier: dto.breeding_tier || null,
       acquisition_cost: dto.acquisition_cost.toString(),
       landing_cost: dto.landing_cost?.toString() || null,
       total_opening_asset_value: totalOpeningAssetValue.toString(),
@@ -327,9 +329,41 @@ export class AnimalService {
       ...animal,
       breed_name: breed?.breed_name,
       stage_name: stage?.stage_name,
-      batch_code: batch?.batch_code,
+      batch_code: batch?.batch_no,
       hasActiveWithdrawal: activeWithdrawals.length > 0,
       activeWithdrawals,
+    };
+  }
+
+  /**
+   * Adds computed (never stored) age and stage-duration-overdue fields. Age is
+   * always derived live from dob — age_at_entry_weeks stays a static snapshot
+   * taken at entry, unrelated to this. "Days in stage" anchors to the animal's
+   * entry_date/created_at, the same approximation transitionStage()'s
+   * min_days_before_move check already uses — animal_register has no
+   * per-stage-entry timestamp column.
+   */
+  private async enrichAnimal(animal: typeof schema.animalRegister.$inferSelect) {
+    let ageDays: number | null = null;
+    if (animal.dob) {
+      const dob = new Date(animal.dob);
+      if (!Number.isNaN(dob.getTime())) {
+        ageDays = Math.floor((Date.now() - dob.getTime()) / 86400000);
+      }
+    }
+
+    let stageOverdue: ReturnType<typeof computeStageOverdue> = { days_in_stage: null, stage_duration_days: null, is_stage_overdue: false, suggested_next_stage_id: null };
+    if (animal.current_stage_id) {
+      const [stage] = await this.db.select().from(schema.stageMaster).where(eq(schema.stageMaster.stage_id, animal.current_stage_id)).limit(1);
+      stageOverdue = computeStageOverdue(stage, animal.entry_date ?? animal.created_at);
+    }
+
+    return {
+      ...animal,
+      age_days: ageDays,
+      age_weeks: ageDays != null ? Math.floor(ageDays / 7) : null,
+      age_months: ageDays != null ? Math.floor(ageDays / 30) : null,
+      ...stageOverdue,
     };
   }
 
@@ -344,7 +378,7 @@ export class AnimalService {
     if (!animal) {
       throw new NotFoundException(`Animal with ID '${id}' not found.`);
     }
-    return animal;
+    return this.enrichAnimal(animal);
   }
 
   async findAll(query: QueryAnimalDto, tenantId: string) {
@@ -370,12 +404,14 @@ export class AnimalService {
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
-    return this.db
+    const rows = await this.db
       .select()
       .from(schema.animalRegister)
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
+
+    return Promise.all(rows.map((row) => this.enrichAnimal(row)));
   }
 
   async update(id: string, dto: UpdateAnimalDto, tenantId: string, userPayload?: any) {
@@ -445,6 +481,7 @@ export class AnimalService {
     if (dto.ear_tag !== undefined) updates.ear_tag = dto.ear_tag;
     if (dto.sire_animal_id !== undefined) updates.sire_animal_id = dto.sire_animal_id;
     if (dto.dam_animal_id !== undefined) updates.dam_animal_id = dto.dam_animal_id;
+    if (dto.breeding_tier !== undefined) updates.breeding_tier = dto.breeding_tier;
     if (dto.current_stage_id !== undefined) updates.current_stage_id = dto.current_stage_id;
     if (dto.current_batch_id !== undefined) updates.current_batch_id = dto.current_batch_id;
     if (dto.current_location_id !== undefined) updates.current_location_id = dto.current_location_id;
@@ -583,8 +620,9 @@ export class AnimalService {
     }
 
     // 2. Minimum duration validation if moving from a stage that specifies min_days_before_move
+    let currentStage: typeof schema.stageMaster.$inferSelect | undefined;
     if (animal.current_stage_id) {
-      const [currentStage] = await this.db
+      [currentStage] = await this.db
         .select()
         .from(schema.stageMaster)
         .where(eq(schema.stageMaster.stage_id, animal.current_stage_id))
@@ -633,14 +671,13 @@ export class AnimalService {
     if (
       animal.gender === 'F' &&
       (destCode === 'WEANING' || destCode === 'DRY_SOW_GESTATION' || destCode === 'FLUSH_SERVICE') &&
-      animal.current_stage?.toUpperCase()?.includes('FARROW')
+      currentStage?.stage_code?.toUpperCase()?.includes('FARROW')
     ) {
       newParity += 1;
     }
 
     const updates = {
       current_stage_id: dto.to_stage_id,
-      current_stage: destStage.stage_name,
       current_location_id: dto.to_location_id !== undefined ? dto.to_location_id : animal.current_location_id,
       current_batch_id: dto.to_batch_id !== undefined ? dto.to_batch_id : animal.current_batch_id,
       parity_count: newParity,
@@ -662,7 +699,7 @@ export class AnimalService {
       entityId: id,
       oldValues: {
         current_stage_id: animal.current_stage_id,
-        current_stage: animal.current_stage,
+        current_stage_name: currentStage?.stage_name,
         current_location_id: animal.current_location_id,
         current_batch_id: animal.current_batch_id,
       },
@@ -675,6 +712,59 @@ export class AnimalService {
     });
 
     return this.findOne(id);
+  }
+
+  /**
+   * Walks sire_animal_id/dam_animal_id (ancestors) and the reverse (descendants —
+   * animals whose sire/dam is this one) — same recursive-walk shape qr-code.service.ts
+   * already uses for batch traceability via source_batch_id, applied to the animal
+   * pedigree columns that exist on animal_register but were never read before this.
+   * Depth-capped against a bad sire/dam loop rather than trusting the data is acyclic.
+   */
+  async getLineage(id: string, tenantId: string, maxDepth = 6) {
+    const root = await this.findOne(id);
+
+    const ancestors: any[] = [];
+    const walkAncestors = async (animalId: string | null | undefined, depth: number) => {
+      if (!animalId || depth > maxDepth) return;
+      const [parent] = await this.db
+        .select()
+        .from(schema.animalRegister)
+        .where(and(eq(schema.animalRegister.animal_id, animalId), eq(schema.animalRegister.tenant_id, tenantId)))
+        .limit(1);
+      if (!parent || ancestors.some((a) => a.animal_id === parent.animal_id)) return;
+      ancestors.push({ ...parent, depth });
+      await walkAncestors(parent.sire_animal_id, depth + 1);
+      await walkAncestors(parent.dam_animal_id, depth + 1);
+    };
+    await walkAncestors(root.sire_animal_id, 1);
+    await walkAncestors(root.dam_animal_id, 1);
+
+    const descendants: any[] = [];
+    const walkDescendants = async (animalId: string, depth: number) => {
+      if (depth > maxDepth) return;
+      const children = await this.db
+        .select()
+        .from(schema.animalRegister)
+        .where(
+          and(
+            eq(schema.animalRegister.tenant_id, tenantId),
+            or(eq(schema.animalRegister.sire_animal_id, animalId), eq(schema.animalRegister.dam_animal_id, animalId)),
+          )
+        );
+      for (const child of children) {
+        if (descendants.some((d) => d.animal_id === child.animal_id)) continue;
+        descendants.push({ ...child, depth });
+        await walkDescendants(child.animal_id, depth + 1);
+      }
+    };
+    await walkDescendants(id, 1);
+
+    return {
+      animal: root,
+      ancestors,
+      descendants,
+    };
   }
 }
 

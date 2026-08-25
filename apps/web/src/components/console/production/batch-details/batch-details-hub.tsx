@@ -6,6 +6,7 @@ import { BatchDataEntryTab } from "./batch-data-entry-tab";
 import { BatchStageSchedulersTab } from "./batch-stage-schedulers-tab";
 import { BatchOverviewTab } from "./batch-overview-tab";
 import { BatchAnimalAssignmentTab } from "./batch-animal-assignment-tab";
+import { BatchLocationsTab } from "./batch-locations-tab";
 import { BatchConsumptionTab } from "./batch-consumption-tab";
 import { BatchMortalityTab } from "./batch-mortality-tab";
 import { BatchTransferTab } from "./batch-transfer-tab";
@@ -31,6 +32,7 @@ interface BatchDetailsHubProps {
   onRecordQc: (line: any) => void;
   onGeneratePack: (line: any) => void;
   onRenewBatch?: () => void;
+  initialTab?: string;
 }
 
 export function BatchDetailsHub({
@@ -48,8 +50,9 @@ export function BatchDetailsHub({
   onRecordQc,
   onGeneratePack,
   onRenewBatch: _onRenewBatch,
+  initialTab,
 }: BatchDetailsHubProps) {
-  const [activeTab, setActiveTab] = useState<string>("overview");
+  const [activeTab, setActiveTab] = useState<string>(initialTab || "overview");
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [dataEntryData, setDataEntryData] = useState<any>(null);
   const [dataEntryLoading, setDataEntryLoading] = useState(false);
@@ -124,6 +127,7 @@ export function BatchDetailsHub({
           dataEntryData={dataEntryData}
           dataEntryLoading={dataEntryLoading}
           onSaveEntry={handleSaveEntry}
+          onRefreshBatch={onRefreshBatch}
           saving={saving}
         />
       )}
@@ -136,6 +140,10 @@ export function BatchDetailsHub({
           onRefreshBatch={onRefreshBatch}
           onTransferStage={onTransferStage}
         />
+      )}
+
+      {activeTab === "locations" && (
+        <BatchLocationsTab batch={batch} onRefreshBatch={onRefreshBatch} />
       )}
 
       {activeTab === "animal-assignment" && (

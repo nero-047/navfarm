@@ -139,8 +139,7 @@ export class UomController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.uomService.remove(id, tenantId, req.user);
     return {
-      success: true,
-      ...result
+      ...result,
     };
   }
 
@@ -208,8 +207,7 @@ export class UomController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.uomService.removeConversion(id, tenantId, req.user);
     return {
-      success: true,
-      ...result
+      ...result,
     };
   }
 }

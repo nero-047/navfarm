@@ -17,12 +17,16 @@ import {
   TransferStageDto,
   BulkDailyEntryDto,
   SingleBatchDailyEntryDto,
+  UpdateBatchSchedulerLinesDto,
+  SplitBatchLotsDto,
+  MergeBatchLotsDto,
 } from './dto/batch.dto';
 
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { InventoryLedgerService } from '../../inventory/inventory-ledger/inventory-ledger.service';
 import { GlPostingService } from '../../finance/journal/gl-posting.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { computeStageOverdue } from '../stage/stage-overdue.util';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -289,6 +293,37 @@ export class BatchService {
       .orderBy(schema.schedulerMaster.stage_code);
     const alerts = await this.db.select().from(schema.notificationAlertLog).where(eq(schema.notificationAlertLog.batch_id, id));
     const stageLog = await this.db.select().from(schema.batchStageLog).where(eq(schema.batchStageLog.batch_id, id));
+    const lots = await this.db
+      .select()
+      .from(schema.batchLocationLot)
+      .where(eq(schema.batchLocationLot.batch_id, id))
+      .orderBy(schema.batchLocationLot.lot_no);
+    const activeLots = lots.filter((l) => l.status === 'ACTIVE');
+    const currentHeadcount = activeLots.length > 0
+      ? activeLots.reduce((sum, l) => sum + Number(l.current_quantity), 0)
+      : Number(batch.opening_quantity);
+
+    // Stage-duration overdue: "days in stage" anchors to the most recent whole-batch
+    // transfer (lot_id null) if any, else the batch's own start_date.
+    let stageOverdue: ReturnType<typeof computeStageOverdue> = { days_in_stage: null, stage_duration_days: null, is_stage_overdue: false, suggested_next_stage_id: null };
+    if (batch.stage_id) {
+      const [stage] = await this.db.select().from(schema.stageMaster).where(eq(schema.stageMaster.stage_id, batch.stage_id)).limit(1);
+      const lastWholeBatchTransfer = stageLog
+        .filter((l) => !l.lot_id)
+        .sort((a, b) => new Date(b.transferred_at).getTime() - new Date(a.transferred_at).getTime())[0];
+      stageOverdue = computeStageOverdue(stage, lastWholeBatchTransfer?.transferred_at ?? batch.start_date);
+    }
+
+    const lotsWithStageStatus = await Promise.all(
+      activeLots.map(async (lot) => {
+        if (!lot.stage_id) return { ...lot, ...computeStageOverdue(null, null) };
+        const [lotStage] = await this.db.select().from(schema.stageMaster).where(eq(schema.stageMaster.stage_id, lot.stage_id)).limit(1);
+        const lastLotTransfer = stageLog
+          .filter((l) => l.lot_id === lot.lot_id)
+          .sort((a, b) => new Date(b.transferred_at).getTime() - new Date(a.transferred_at).getTime())[0];
+        return { ...lot, ...computeStageOverdue(lotStage, lastLotTransfer?.transferred_at ?? lot.created_at) };
+      })
+    );
 
     return {
       ...batch,
@@ -303,7 +338,230 @@ export class BatchService {
       stage_schedulers: stageSchedulers,
       alerts,
       stage_log: stageLog,
+      lots: lotsWithStageStatus.length > 0 ? lotsWithStageStatus : lots,
+      current_headcount: currentHeadcount,
+      ...stageOverdue,
     };
+  }
+
+  /**
+   * Delegates to the shared, tenant-configurable number series engine, same
+   * pattern as generateBatchNo() above. Tenants provisioned before location
+   * lots existed won't have a LOT series seeded (see SYSTEM_NO_SERIES_SEED) —
+   * self-heal by creating it on first use instead of requiring a separate
+   * backfill script.
+   */
+  private async generateLotNo(tenantId: string, companyId: string, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
+    try {
+      return await this.numberSeriesService.generateNext('LOT', tenantId, companyId, executor);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        await executor.insert(schema.noSeriesMaster).values({
+          series_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          series_code: 'LOT',
+          series_name: 'Batch Location Lot Number',
+          document_type: 'BATCH_LOCATION_LOT',
+          prefix: 'LOT',
+          separator: '-',
+          seq_length: 6,
+          current_seq: 0,
+          reset_frequency: 'NEVER',
+        });
+        return this.numberSeriesService.generateNext('LOT', tenantId, companyId, executor);
+      }
+      throw err;
+    }
+  }
+
+  async getBatchLots(batchId: string, tenantId: string) {
+    await this.findOne(batchId);
+    return this.db
+      .select()
+      .from(schema.batchLocationLot)
+      .where(and(eq(schema.batchLocationLot.batch_id, batchId), eq(schema.batchLocationLot.tenant_id, tenantId)))
+      .orderBy(schema.batchLocationLot.lot_no);
+  }
+
+  /**
+   * Current headcount: SUM(current_quantity) across ACTIVE lots when any exist
+   * for this batch, else opening_quantity — batches that were never split into
+   * lots behave exactly as before. Computed on read, not stored, to avoid
+   * reintroducing the class of drift bug batch_header.current_quantity had.
+   */
+  async getBatchHeadcount(batchId: string, tenantId: string): Promise<number> {
+    const [batch] = await this.db.select().from(schema.batchHeader).where(eq(schema.batchHeader.batch_id, batchId)).limit(1);
+    if (!batch) return 0;
+    const lots = await this.db
+      .select()
+      .from(schema.batchLocationLot)
+      .where(and(eq(schema.batchLocationLot.batch_id, batchId), eq(schema.batchLocationLot.status, 'ACTIVE')));
+    if (lots.length === 0) return Number(batch.opening_quantity);
+    return lots.reduce((sum, l) => sum + Number(l.current_quantity), 0);
+  }
+
+  /**
+   * Splits a batch's headcount across one or more location lots — usable at
+   * batch creation (first split) or any time after (peel part of the
+   * still-unassigned headcount into a new location). One batch, many physical
+   * locations, one costing/reporting unit — the "1,000 piglets across several
+   * sheds, still one batch" scenario.
+   */
+  async splitBatchIntoLots(batchId: string, dto: SplitBatchLotsDto, tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(batchId);
+    if (batch.status !== 'ACTIVE' && batch.status !== 'DRAFT') {
+      throw new BadRequestException(`Batch must be DRAFT or ACTIVE to split into location lots — it is currently ${batch.status}.`);
+    }
+    if (!dto.lots || dto.lots.length === 0) {
+      throw new BadRequestException('At least one lot is required to split a batch.');
+    }
+
+    const existingLots = await this.db
+      .select()
+      .from(schema.batchLocationLot)
+      .where(and(eq(schema.batchLocationLot.batch_id, batchId), eq(schema.batchLocationLot.status, 'ACTIVE')));
+    const alreadyLotted = existingLots.reduce((sum, l) => sum + Number(l.current_quantity), 0);
+    const unlottedAvailable = Number(batch.opening_quantity) - alreadyLotted;
+
+    const requestedTotal = dto.lots.reduce((sum, l) => sum + l.quantity, 0);
+    if (requestedTotal > unlottedAvailable + 0.001) {
+      throw new BadRequestException(
+        `Requested split quantity (${requestedTotal}) exceeds unassigned batch headcount (${unlottedAvailable}).`
+      );
+    }
+
+    for (const lotDto of dto.lots) {
+      const lotId = randomUUID();
+      const lotNo = await this.generateLotNo(tenantId, batch.company_id);
+      await this.db.insert(schema.batchLocationLot).values({
+        lot_id: lotId,
+        tenant_id: tenantId,
+        company_id: batch.company_id,
+        batch_id: batchId,
+        lot_no: lotNo,
+        location_id: lotDto.location_id,
+        stage_id: lotDto.stage_id || batch.stage_id || null,
+        opening_quantity: lotDto.quantity.toString(),
+        current_quantity: lotDto.quantity.toString(),
+        remarks: lotDto.remarks || null,
+        created_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      });
+    }
+
+    await this.auditService.log({
+      tenantId,
+      companyId: batch.company_id,
+      userId: userPayload?.userId,
+      action: 'SPLIT_LOTS',
+      entityName: 'batch_location_lot',
+      entityId: batchId,
+      newValues: { batch_id: batchId, lots: dto.lots },
+    });
+
+    return this.getBatchLots(batchId, tenantId);
+  }
+
+  /**
+   * Merges one or more source lots' remaining headcount into a target lot
+   * (e.g. consolidating two sheds back into one). Source lots are marked
+   * MERGED, not deleted — batch_transaction/animal_register rows already
+   * pointing at them stay valid history.
+   */
+  async mergeLots(batchId: string, dto: MergeBatchLotsDto, tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(batchId);
+
+    const [targetLot] = await this.db
+      .select()
+      .from(schema.batchLocationLot)
+      .where(and(eq(schema.batchLocationLot.lot_id, dto.target_lot_id), eq(schema.batchLocationLot.batch_id, batchId)))
+      .limit(1);
+    if (!targetLot) {
+      throw new NotFoundException(`Target lot '${dto.target_lot_id}' not found on this batch.`);
+    }
+    if (targetLot.status !== 'ACTIVE') {
+      throw new BadRequestException(`Target lot '${targetLot.lot_no}' is not ACTIVE.`);
+    }
+
+    let mergedQty = Number(targetLot.current_quantity);
+    for (const sourceLotId of dto.source_lot_ids) {
+      if (sourceLotId === dto.target_lot_id) continue;
+      const [sourceLot] = await this.db
+        .select()
+        .from(schema.batchLocationLot)
+        .where(and(eq(schema.batchLocationLot.lot_id, sourceLotId), eq(schema.batchLocationLot.batch_id, batchId)))
+        .limit(1);
+      if (!sourceLot || sourceLot.status !== 'ACTIVE') continue;
+
+      mergedQty += Number(sourceLot.current_quantity);
+
+      await this.db
+        .update(schema.batchLocationLot)
+        .set({
+          status: 'MERGED',
+          merged_into_lot_id: dto.target_lot_id,
+          closing_quantity: sourceLot.current_quantity,
+          updated_at: toMysqlTimestamp(),
+          updated_by: userPayload?.userId || null,
+        })
+        .where(eq(schema.batchLocationLot.lot_id, sourceLotId));
+
+      // Animals/registered stock in the merged lot move with it.
+      await this.db
+        .update(schema.animalRegister)
+        .set({
+          current_lot_id: dto.target_lot_id,
+          current_location_id: targetLot.location_id,
+          updated_by: userPayload?.userId || null,
+        })
+        .where(eq(schema.animalRegister.current_lot_id, sourceLotId));
+    }
+
+    await this.db
+      .update(schema.batchLocationLot)
+      .set({ current_quantity: mergedQty.toString(), updated_at: toMysqlTimestamp(), updated_by: userPayload?.userId || null })
+      .where(eq(schema.batchLocationLot.lot_id, dto.target_lot_id));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: batch.company_id,
+      userId: userPayload?.userId,
+      action: 'MERGE_LOTS',
+      entityName: 'batch_location_lot',
+      entityId: dto.target_lot_id,
+      newValues: { source_lot_ids: dto.source_lot_ids, target_lot_id: dto.target_lot_id },
+    });
+
+    return this.getBatchLots(batchId, tenantId);
+  }
+
+  async closeLot(batchId: string, lotId: string, tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(batchId);
+    const [lot] = await this.db
+      .select()
+      .from(schema.batchLocationLot)
+      .where(and(eq(schema.batchLocationLot.lot_id, lotId), eq(schema.batchLocationLot.batch_id, batchId)))
+      .limit(1);
+    if (!lot) {
+      throw new NotFoundException(`Lot '${lotId}' not found on this batch.`);
+    }
+
+    await this.db
+      .update(schema.batchLocationLot)
+      .set({ status: 'CLOSED', closing_quantity: lot.current_quantity, updated_at: toMysqlTimestamp(), updated_by: userPayload?.userId || null })
+      .where(eq(schema.batchLocationLot.lot_id, lotId));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: batch.company_id,
+      userId: userPayload?.userId,
+      action: 'CLOSE_LOT',
+      entityName: 'batch_location_lot',
+      entityId: lotId,
+    });
+
+    return this.getBatchLots(batchId, tenantId);
   }
 
   /**
@@ -317,6 +575,66 @@ export class BatchService {
   async transferStage(id: string, dto: TransferStageDto, tenantId: string, userPayload?: any) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
+
+    // Lot-scoped transfer: move one location lot's stage/location without touching
+    // the rest of the batch (stage schedulers stay batch-wide by design — see plan).
+    if (dto.lot_id) {
+      const [lot] = await this.db
+        .select()
+        .from(schema.batchLocationLot)
+        .where(and(eq(schema.batchLocationLot.lot_id, dto.lot_id), eq(schema.batchLocationLot.batch_id, id)))
+        .limit(1);
+      if (!lot) {
+        throw new NotFoundException(`Lot '${dto.lot_id}' not found on this batch.`);
+      }
+
+      const [matchedLotStage] = await this.db
+        .select({ stage_id: schema.stageMaster.stage_id })
+        .from(schema.stageMaster)
+        .where(
+          and(
+            eq(schema.stageMaster.lob_id, batch.lob_id),
+            eq(schema.stageMaster.stage_code, dto.to_stage_code.toUpperCase()),
+            eq(schema.stageMaster.is_active, true),
+            isNull(schema.stageMaster.deleted_at),
+          )
+        )
+        .limit(1);
+
+      await this.db
+        .update(schema.batchLocationLot)
+        .set({
+          stage_id: matchedLotStage?.stage_id || lot.stage_id,
+          location_id: dto.to_location_id || lot.location_id,
+          updated_by: userPayload?.userId || null,
+          updated_at: toMysqlTimestamp(),
+        })
+        .where(eq(schema.batchLocationLot.lot_id, dto.lot_id));
+
+      await this.db.insert(schema.batchStageLog).values({
+        log_id: randomUUID(),
+        batch_id: id,
+        lot_id: dto.lot_id,
+        from_stage_code: batch.current_stage_code || null,
+        to_stage_code: dto.to_stage_code,
+        from_location_id: lot.location_id,
+        to_location_id: dto.to_location_id || lot.location_id,
+        transferred_by: userPayload?.userId || null,
+        remarks: dto.remarks || null,
+      });
+
+      await this.auditService.log({
+        tenantId,
+        companyId: batch.company_id,
+        userId: userPayload?.userId,
+        action: 'TRANSFER_LOT_STAGE',
+        entityName: 'batch_location_lot',
+        entityId: dto.lot_id,
+        newValues: { to_stage_code: dto.to_stage_code, to_location_id: dto.to_location_id },
+      });
+
+      return this.findOne(id);
+    }
 
     // Opportunistic link to stage_master: if this LOB has a seeded stage matching
     // the given code, record it alongside current_stage_code.
@@ -549,7 +867,7 @@ export class BatchService {
     return opening > 0 ? (inputTotal + consumptionTotal) / opening : 0;
   }
 
-  async addTransaction(id: string, dto: AddBatchTransactionDto, tenantId: string, userPayload?: any) {
+  async addTransaction(id: string, dto: AddBatchTransactionDto, tenantId: string, userPayload?: any, overrideTransactionId?: string) {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
 
@@ -572,8 +890,9 @@ export class BatchService {
     }
     const bioAssetSubjectItemId = batch.input_lines[0]?.item_id;
 
-    const transactionId = randomUUID();
+    const transactionId = overrideTransactionId || randomUUID();
     let ledgerId: string | null = null;
+    let journalId: string | null = null;
     let amount = 0;
     let rate: number | null = dto.rate ?? null;
 
@@ -598,7 +917,8 @@ export class BatchService {
         batchNo: batch.batch_no,
         userId: userPayload?.userId,
       });
-      await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
+      const consumptionJournal = await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
+      journalId = consumptionJournal.journal_id;
       ledgerId = ledgerEntry.ledger_id;
       rate = Number(ledgerEntry.rate);
       amount = Number(ledgerEntry.amount); // negative
@@ -666,7 +986,8 @@ export class BatchService {
         batchNo: batch.batch_no,
         userId: userPayload?.userId,
       });
-      await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
+      const outputJournal = await this.glPostingService.postInventoryLedgerEntry(ledgerEntry, userPayload?.userId);
+      journalId = outputJournal.journal_id;
       ledgerId = ledgerEntry.ledger_id;
       rate = Number(ledgerEntry.rate);
       amount = Number(ledgerEntry.amount); // positive
@@ -728,7 +1049,7 @@ export class BatchService {
         const nbvShare = perUnitNca * dto.quantity;
         rate = perUnitNca;
         amount = -nbvShare;
-        await this.glPostingService.postBatchCostEntry({
+        const bioMortalityJournal = await this.glPostingService.postBatchCostEntry({
           tenantId,
           companyId: batch.company_id,
           transactionType: bioState!.stage === 'PREMATURE' ? 'BIO_MORTALITY_PREMATURE' : 'BIO_MORTALITY_MATURE',
@@ -742,6 +1063,7 @@ export class BatchService {
           stageId: batch.stage_id || undefined,
           userId: userPayload?.userId,
         });
+        journalId = bioMortalityJournal.journal_id;
         await this.db
           .update(schema.batchBioAssetState)
           .set({
@@ -773,7 +1095,7 @@ export class BatchService {
         const unitCost = await this.computeRunningUnitCost(batch);
         rate = unitCost;
         amount = -(dto.quantity * unitCost);
-        await this.glPostingService.postBatchCostEntry({
+        const mortalityJournal = await this.glPostingService.postBatchCostEntry({
           tenantId,
           companyId: batch.company_id,
           transactionType: 'MORTALITY',
@@ -787,6 +1109,7 @@ export class BatchService {
           stageId: batch.stage_id || undefined,
           userId: userPayload?.userId,
         });
+        journalId = mortalityJournal.journal_id;
       }
     } else if (dto.transaction_type === 'OVERHEAD') {
       if (!dto.quantity || !dto.rate) {
@@ -796,7 +1119,7 @@ export class BatchService {
       const bioTransactionType = isBioAsset
         ? (bioState!.stage === 'PREMATURE' ? 'BIO_OVERHEAD_PREMATURE' : 'BIO_OVERHEAD_MATURE')
         : 'OVERHEAD';
-      await this.glPostingService.postBatchCostEntry({
+      const overheadJournal = await this.glPostingService.postBatchCostEntry({
         tenantId,
         companyId: batch.company_id,
         transactionType: bioTransactionType,
@@ -810,6 +1133,7 @@ export class BatchService {
         stageId: batch.stage_id || undefined,
         userId: userPayload?.userId,
       });
+      journalId = overheadJournal.journal_id;
 
       if (isBioAsset && bioState!.stage === 'PREMATURE') {
         const capitalized = Math.abs(amount);
@@ -846,14 +1170,30 @@ export class BatchService {
       transaction_type: dto.transaction_type,
       item_id: dto.item_id || null,
       resource_id: dto.resource_id || null,
+      lot_id: dto.lot_id || null,
+      animal_id: dto.animal_id || null,
       quantity: dto.quantity?.toString() || null,
       uom: dto.uom || null,
       rate: rate?.toString() || null,
       amount: amount.toString(),
       remarks: dto.remarks || null,
       ledger_id: ledgerId,
+      journal_id: journalId,
       created_by: userPayload?.userId || null,
     });
+
+    // Mortality against a specific lot relieves that lot's headcount — cost/GL impact
+    // (above) stays batch-level regardless; this only tracks physical headcount per location.
+    if (dto.transaction_type === 'MORTALITY' && dto.lot_id && dto.quantity) {
+      const [lot] = await this.db.select().from(schema.batchLocationLot).where(eq(schema.batchLocationLot.lot_id, dto.lot_id)).limit(1);
+      if (lot) {
+        const newLotQty = Math.max(0, Number(lot.current_quantity) - dto.quantity);
+        await this.db
+          .update(schema.batchLocationLot)
+          .set({ current_quantity: newLotQty.toString(), updated_at: toMysqlTimestamp() })
+          .where(eq(schema.batchLocationLot.lot_id, dto.lot_id));
+      }
+    }
 
     if (batch.scheduler_id && dto.quantity !== undefined && dto.quantity !== null) {
       await this.evaluateKpi(batch, {
@@ -879,6 +1219,65 @@ export class BatchService {
     });
 
     return this.findOne(id);
+  }
+
+  /**
+   * Corrects a posted daily entry without rewriting history: reverses the original's
+   * ledger/GL impact (equal-and-opposite entries, per inventory-ledger.service.ts's
+   * reverseLedgerEntry() and journal.service.ts's reverseJournalEntry()), marks the
+   * original transaction SUPERSEDED, and posts the corrected values as a brand new
+   * transaction via addTransaction() — reusing its full CONSUMPTION/OUTPUT/MORTALITY/
+   * OVERHEAD branching and evaluateKpi() re-run rather than duplicating that logic.
+   * Only ACTIVE batches are editable — once CLOSED/CANCELLED, entries are final.
+   */
+  async updateTransaction(batchId: string, transactionId: string, dto: AddBatchTransactionDto, tenantId: string, userPayload?: any) {
+    const batch = await this.findOne(batchId);
+    this.assertStatus(batch, 'ACTIVE');
+
+    const [original] = await this.db
+      .select()
+      .from(schema.batchTransaction)
+      .where(and(eq(schema.batchTransaction.transaction_id, transactionId), eq(schema.batchTransaction.batch_id, batchId)))
+      .limit(1);
+    if (!original) {
+      throw new NotFoundException(`Transaction '${transactionId}' not found on this batch.`);
+    }
+    if (original.status !== 'POSTED') {
+      throw new BadRequestException(`Transaction is already ${original.status} and cannot be edited again.`);
+    }
+
+    if (original.ledger_id) {
+      await this.ledgerService.reverseLedgerEntry(original.ledger_id, userPayload?.userId);
+    }
+    if (original.journal_id) {
+      await this.glPostingService.reverseJournalEntry(original.journal_id, userPayload?.userId);
+    }
+
+    await this.db
+      .update(schema.batchTransaction)
+      .set({ status: 'SUPERSEDED' })
+      .where(eq(schema.batchTransaction.transaction_id, transactionId));
+
+    const newTransactionId = randomUUID();
+    await this.addTransaction(batchId, dto, tenantId, userPayload, newTransactionId);
+
+    await this.db
+      .update(schema.batchTransaction)
+      .set({ supersedes_transaction_id: transactionId })
+      .where(eq(schema.batchTransaction.transaction_id, newTransactionId));
+
+    await this.auditService.log({
+      tenantId,
+      companyId: batch.company_id,
+      userId: userPayload?.userId,
+      action: 'UPDATE',
+      entityName: 'batch_transaction',
+      entityId: newTransactionId,
+      oldValues: original,
+      newValues: { ...dto, supersedes_transaction_id: transactionId },
+    });
+
+    return this.findOne(batchId);
   }
 
   /**
@@ -1274,7 +1673,7 @@ export class BatchService {
       };
     });
 
-    let draft = null;
+    let draft: unknown = null;
     try {
       const [draftRow] = await this.db
         .select()
@@ -1342,6 +1741,8 @@ export class BatchService {
               remarks: line.lot_no ? `Lot: ${line.lot_no}` : undefined,
               spl_id: line.spl_id,
               parameter_id: line.parameter_id,
+              lot_id: line.location_lot_id,
+              animal_id: line.animal_id,
             },
             tenantId,
             userPayload
@@ -1356,6 +1757,8 @@ export class BatchService {
               quantity: Number(line.quantity),
               uom: line.uom || 'KG',
               remarks: `Feed Consumption: ${line.quantity} ${line.uom || 'KG'}${line.lot_no ? ` (Lot: ${line.lot_no})` : ''}`,
+              lot_id: line.location_lot_id,
+              animal_id: line.animal_id,
             },
             tenantId,
             userPayload
@@ -1383,6 +1786,8 @@ export class BatchService {
               remarks: remarksList.length > 0 ? remarksList.join(' - ') : undefined,
               spl_id: line.spl_id,
               parameter_id: line.parameter_id,
+              lot_id: line.location_lot_id,
+              animal_id: line.animal_id,
             },
             tenantId,
             userPayload
@@ -1396,6 +1801,8 @@ export class BatchService {
               quantity: Number(line.quantity),
               uom: line.uom || 'DOSES',
               remarks: `Medicine/Vaccine administration: ${line.quantity} ${line.uom || 'DOSES'}${remarksList.length > 0 ? ` (${remarksList.join(' - ')})` : ''}`,
+              lot_id: line.location_lot_id,
+              animal_id: line.animal_id,
             },
             tenantId,
             userPayload
@@ -1441,10 +1848,27 @@ export class BatchService {
             quantity: Number(mort.quantity),
             remarks: notes || undefined,
             spl_id: mort.spl_id,
+            lot_id: mort.location_lot_id,
+            animal_id: mort.animal_id,
           },
           tenantId,
           userPayload
         );
+
+        // A registered animal that died is disposed, not left dangling as ACTIVE.
+        if (mort.animal_id) {
+          await this.db
+            .update(schema.animalRegister)
+            .set({
+              status: 'DEAD',
+              is_active: false,
+              disposal_date: dto.date,
+              disposal_type: 'DIED',
+              updated_by: userPayload?.userId || null,
+              updated_at: toMysqlTimestamp(),
+            })
+            .where(eq(schema.animalRegister.animal_id, mort.animal_id));
+        }
       }
     }
 
@@ -1462,44 +1886,6 @@ export class BatchService {
         tenantId,
         userPayload
       );
-    }
-
-    // 6. Process Overheads
-    if (dto.overhead_lines && dto.overhead_lines.length > 0) {
-      for (const ovh of dto.overhead_lines) {
-        if (!ovh.quantity || Number(ovh.quantity) <= 0) continue;
-        const rate = Number(ovh.rate || 0);
-        if (rate > 0) {
-          await this.addTransaction(
-            id,
-            {
-              transaction_date: dto.date,
-              transaction_type: 'OVERHEAD',
-              resource_id: ovh.resource_id,
-              parameter_id: ovh.parameter_id,
-              quantity: Number(ovh.quantity),
-              rate,
-              uom: ovh.uom || 'UNITS',
-              remarks: ovh.resource_name || undefined,
-            },
-            tenantId,
-            userPayload
-          );
-        } else {
-          await this.addTransaction(
-            id,
-            {
-              transaction_date: dto.date,
-              transaction_type: 'OBSERVATION',
-              quantity: Number(ovh.quantity),
-              uom: ovh.uom || 'UNITS',
-              remarks: `Overhead log: ${ovh.resource_name || 'Barn Overhead'} (${ovh.quantity} ${ovh.uom || 'UNITS'})`,
-            },
-            tenantId,
-            userPayload
-          );
-        }
-      }
     }
 
     // 7. Process Output Harvest Lines (Live Born Piglets, Weaned Piglets, Market Porkers)
@@ -1526,6 +1912,7 @@ export class BatchService {
             spl_id: line.spl_id,
             parameter_id: line.parameter_id,
             output_type: line.output_type || 'MAIN',
+            lot_id: line.location_lot_id,
           },
           tenantId,
           userPayload
@@ -1566,6 +1953,7 @@ export class BatchService {
           quantity: Number(dto.transfer.head_count),
           uom: 'HEAD',
           remarks: `Stage Transfer: ${dto.transfer.head_count} head${dto.transfer.to_stage_code ? ` to ${dto.transfer.to_stage_code}` : ''}${dto.transfer.remarks ? ` — ${dto.transfer.remarks}` : ''}`,
+          lot_id: dto.transfer.location_lot_id,
         },
         tenantId,
         userPayload
@@ -1577,6 +1965,7 @@ export class BatchService {
           {
             to_stage_code: dto.transfer.to_stage_code,
             to_location_id: dto.transfer.to_location_id,
+            lot_id: dto.transfer.location_lot_id,
             remarks: dto.transfer.remarks || `Auto-triggered via daily data entry transfer on ${dto.date}`,
           },
           tenantId,
@@ -1671,10 +2060,18 @@ export class BatchService {
   /**
    * Assign individual registered animals to a batch
    */
-  async assignAnimalsToBatch(batchId: string, animalIds: string[], tenantId: string, userPayload?: any) {
+  async assignAnimalsToBatch(batchId: string, animalIds: string[], tenantId: string, userPayload?: any, lotId?: string) {
     const batch = await this.findOne(batchId);
     if (!animalIds || animalIds.length === 0) {
       throw new BadRequestException('No animal IDs provided for assignment.');
+    }
+
+    let lot: typeof schema.batchLocationLot.$inferSelect | undefined;
+    if (lotId) {
+      [lot] = await this.db.select().from(schema.batchLocationLot).where(and(eq(schema.batchLocationLot.lot_id, lotId), eq(schema.batchLocationLot.batch_id, batchId))).limit(1);
+      if (!lot) {
+        throw new NotFoundException(`Lot '${lotId}' not found on this batch.`);
+      }
     }
 
     for (const animalId of animalIds) {
@@ -1682,8 +2079,9 @@ export class BatchService {
         .update(schema.animalRegister)
         .set({
           current_batch_id: batchId,
-          current_stage_id: batch.stage_id || null,
-          current_location_id: batch.location_id || batch.shed_id || null,
+          current_stage_id: lot?.stage_id ?? batch.stage_id ?? null,
+          current_lot_id: lot?.lot_id ?? null,
+          current_location_id: lot?.location_id ?? batch.location_id ?? batch.shed_id ?? null,
           updated_by: userPayload?.userId || null,
         })
         .where(
@@ -1694,7 +2092,6 @@ export class BatchService {
         );
     }
 
-    // Refresh batch current_quantity
     const assignedCount = await this.db
       .select()
       .from(schema.animalRegister)
@@ -1704,13 +2101,6 @@ export class BatchService {
           eq(schema.animalRegister.is_active, true)
         )
       );
-
-    if (assignedCount.length > 0) {
-      await this.db
-        .update(schema.batchHeader)
-        .set({ current_quantity: String(assignedCount.length) } as any)
-        .where(eq(schema.batchHeader.batch_id, batchId));
-    }
 
     return { assigned: animalIds.length, total_assigned: assignedCount.length };
   }
@@ -1757,6 +2147,9 @@ export class BatchService {
     }
 
     const breedId = dto.breed_id || batch.breed_id;
+    if (!breedId) {
+      throw new BadRequestException('Unable to resolve a breed for bulk animal registration — provide breed_id or ensure the batch has one configured.');
+    }
     const animalType = dto.animal_type || (batch.costing_method === 'BIO_ASSET' ? 'SOW' : 'PORKER');
     const gender = dto.gender || (animalType === 'SOW' ? 'F' : 'M');
 
@@ -2730,7 +3123,8 @@ export class BatchService {
           default_qty_per_batch: null,
           item_id: null,
           resource_id: null,
-          cost_allocation_pct: '0.00',
+          company_id: null,
+          description: null,
           is_mandatory: false,
           is_active: true,
         };
@@ -2757,8 +3151,11 @@ export class BatchService {
     const weanTransferParam = await findOrCreateParam('TRANS_WEAN', 'Transfer Weaned Piglets to Nursery Batch', 'TRANSFER', 'HEAD');
     const gestTransferParam = await findOrCreateParam('TRANS_FARR', 'Transfer Sows to Farrowing Crate', 'TRANSFER', 'HEAD');
 
-    const animalCount = Number(batch.current_quantity ?? batch.opening_quantity ?? 30);
+    const animalCount = await this.getBatchHeadcount(batchId, tenantId);
     const currentStageCode = (batch.current_stage_code || 'DRY_SOW_GESTATION').toUpperCase();
+    // scheduler_master.nob_id is a required FK; batch.nob_id is nullable, so fall back to
+    // the same default system NOB sentinel used elsewhere (bulkRegisterAnimalsToBatch).
+    const resolvedNobId = batch.nob_id || '50000000-5000-5000-5000-000000000002';
 
     let activeStageSchedulerId: string | null = null;
 
@@ -2806,7 +3203,7 @@ export class BatchService {
           scheduler_id: schedulerId,
           tenant_id: tenantId,
           company_id: batch.company_id,
-          nob_id: batch.nob_id,
+          nob_id: resolvedNobId,
           lob_id: batch.lob_id,
           batch_id: batchId,
           stage_id: stageItem.stage_id,
@@ -3237,6 +3634,7 @@ export class BatchService {
    */
   async getBatchSchedulers(batchId: string, tenantId: string) {
     const batch = await this.findOne(batchId);
+    const animalCount = await this.getBatchHeadcount(batchId, tenantId);
 
     // Fetch all schedulers for this batch
     let schedulers = await this.db
@@ -3497,7 +3895,7 @@ export class BatchService {
 
     await this.auditService.log({
       tenantId,
-      companyId: scheduler.company_id,
+      companyId: scheduler.company_id ?? undefined,
       userId: userPayload?.userId,
       action: 'UPDATE_STAGE_SCHEDULER',
       entityName: 'scheduler_master',

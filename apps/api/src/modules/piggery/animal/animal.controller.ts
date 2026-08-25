@@ -87,6 +87,16 @@ export class AnimalController {
     const result = await this.animalService.getBioAssetLedger(id);
     return { success: true, message: 'Bio-asset ledger entries retrieved.', data: result };
   }
+
+  @Get(':id/lineage')
+  @RequirePermission('PIGGERY', 'ANIMAL', 'view')
+  @ApiOperation({ summary: 'Get an animal\'s pedigree — ancestors (sire/dam chain) and descendants' })
+  @ApiParam({ name: 'id', description: 'Animal UUID' })
+  async getLineage(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.animalService.getLineage(id, tenantId);
+    return { success: true, message: 'Lineage retrieved.', data: result };
+  }
 }
 
 

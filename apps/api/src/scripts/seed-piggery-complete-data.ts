@@ -194,8 +194,7 @@ export async function seedPiggeryData() {
         farm_code: 'FARM-APEX-01',
         farm_name: 'Apex Commercial Swine Complex',
         farm_type: 'LIVESTOCK',
-        total_area: '45.00',
-        area_unit: 'ACRE',
+        capacity: 5000,
         city: 'Karnal',
         state: 'Haryana',
         country: 'India',
@@ -221,8 +220,7 @@ export async function seedPiggeryData() {
           shed_code: sc.code,
           shed_name: sc.name,
           shed_type: sc.type,
-          capacity: '250.00',
-          capacity_uom: 'HEAD',
+          capacity: 250,
         });
       }
       shedMap.set(sc.code, sId!);
@@ -584,11 +582,8 @@ export async function seedPiggeryData() {
           disease_id: randomUUID(),
           tenant_id: tenantId,
           company_id: companyId,
-          nob_id: nobId,
-          lob_id: lobId,
           disease_code: d.code,
           disease_name: d.name,
-          severity: d.sev,
         });
       }
     }
@@ -1422,11 +1417,9 @@ export async function seedPiggeryData() {
           await db.insert(schema.batchStandard).values({
             standard_id: randomUUID(),
             batch_id: batId,
-            std_mortality_pct: '1.50',
-            std_fcr: '2.50',
-            std_adg_gpd: '750.00',
-            std_unit_cost: '12500.0000',
-            total_standard_cost: (Number(b.qty) * 12500).toFixed(4),
+            std_output_quantity: b.qty,
+            std_output_cost_per_unit: '12500.000000',
+            std_overhead_rate_per_unit: '500.000000',
           });
         }
 

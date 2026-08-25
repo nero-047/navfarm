@@ -2,12 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ItemService } from './item.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConflictException, BadRequestException } from '@nestjs/common';
 
 describe('ItemService', () => {
   let service: ItemService;
-  let clsService: ClsService;
-  let auditLogService: AuditLogService;
 
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
@@ -19,7 +17,7 @@ describe('ItemService', () => {
     insert: mockDbInsert,
     update: mockDbUpdate,
     delete: mockDbDelete,
-    transaction: jest.fn(async (cb) => cb(mockDb)),
+    transaction: jest.fn(async (cb: any): Promise<any> => cb(mockDb)),
   };
 
   beforeEach(async () => {
@@ -48,8 +46,6 @@ describe('ItemService', () => {
     }).compile();
 
     service = module.get<ItemService>(ItemService);
-    clsService = module.get<ClsService>(ClsService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   it('should be defined', () => {

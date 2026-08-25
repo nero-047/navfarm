@@ -281,6 +281,20 @@
       "when": 1787201527486,
       "tag": "0039_confused_hellion",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1787567980849,
+      "tag": "0040_curious_outlaw_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1787633584860,
+      "tag": "0041_common_mole_man",
+      "breakpoints": true
     }
   ]
 }

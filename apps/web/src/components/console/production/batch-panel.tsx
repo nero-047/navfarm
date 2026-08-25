@@ -72,6 +72,7 @@ export default function BatchPanel() {
   const [stdConsumptionLines, setStdConsumptionLines] = useState<Row[]>([emptyStdConsumptionLine()]);
 
   const [viewing, setViewing] = useState<Row | null>(null);
+  const [viewingInitialTab, setViewingInitialTab] = useState<string | undefined>(undefined);
   const [acting, setActing] = useState(false);
 
   const [closeModalOpen, setCloseModalOpen] = useState(false);
@@ -254,7 +255,7 @@ export default function BatchPanel() {
         }
       }
 
-      await api.post("/batch", {
+      const res = await api.post("/batch", {
         company_id: companyId,
         lob_id: header.lob_id,
         costing_method: header.costing_method,
@@ -269,8 +270,17 @@ export default function BatchPanel() {
         input_lines: cleanLines,
         standard,
       });
+      const created = unwrap<Row>(res);
       setModalOpen(false);
-      load();
+      await load();
+
+      // If this batch is physically spread across more than one location (e.g. 1,000
+      // piglets across several sheds), offer the Locations tab immediately so the split
+      // happens as part of the creation flow rather than being a separate, easy-to-miss step.
+      if (created?.batch_id && confirm("Batch created. Is this batch physically split across multiple locations (sheds/pens)?")) {
+        setViewingInitialTab("locations");
+        setViewing(created);
+      }
     } catch (err: any) {
       setFormError(err?.message || "Failed to save batch.");
     } finally {
@@ -281,6 +291,7 @@ export default function BatchPanel() {
   const openView = async (row: Row) => {
     try {
       const res = await api.get(`/batch/${row.batch_id}`);
+      setViewingInitialTab(undefined);
       setViewing(unwrap<Row>(res));
     } catch (err: any) {
       setError(err?.message || "Failed to load batch details.");
@@ -1339,6 +1350,7 @@ export default function BatchPanel() {
           onRecordQc={openRecordQc}
           onGeneratePack={openGeneratePack}
           onRenewBatch={renewAllowed ? openRenew : undefined}
+          initialTab={viewingInitialTab}
         />
 
         {renderActionModals()}
