@@ -9,7 +9,8 @@ import {
   ArrowRight,
   Layers,
 } from "lucide-react";
-import { DEFAULT_PIGGERY_STAGES, PiggeryStage } from "./piggery-lifecycle-stepper";
+import { PiggeryStage } from "./piggery-lifecycle-stepper";
+import { buildLifecycleStages } from "./build-lifecycle-stages";
 import { resolvePiggeryStageId } from "./resolve-piggery-stage";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -40,7 +41,11 @@ export default function PiggeryBatchStagesPanel() {
     [batches, selectedBatchId]
   );
 
-  const [stages, setStages] = useState<PiggeryStage[]>(DEFAULT_PIGGERY_STAGES);
+  // Starts empty and is filled from stage_master + this batch's stage_log.
+  // Seeding it with DEFAULT_PIGGERY_STAGES rendered eight fixed stages with
+  // 2025 dates for every batch before any data arrived.
+  const [stages, setStages] = useState<PiggeryStage[]>([]);
+  const [stageMaster, setStageMaster] = useState<any[]>([]);
   const [currentStageId, setCurrentStageId] = useState<number>(1);
 
   // Edit Stage Modal
@@ -64,6 +69,9 @@ export default function PiggeryBatchStagesPanel() {
       return;
     }
     setLoading(true);
+    api.get(`/stage?companyId=${companyId}&limit=200`)
+      .then((r: any) => setStageMaster(Array.isArray(r) ? r : (r?.data?.data ?? r?.data ?? [])))
+      .catch(() => setStageMaster([]));
     api.get(`/batch?companyId=${companyId}&status=ACTIVE&limit=50`)
       .then((res) => {
         const list: any[] = Array.isArray(res) ? res : (res?.data ?? []);
@@ -92,21 +100,34 @@ export default function PiggeryBatchStagesPanel() {
       });
   }, []);
 
-  // Update stages when currentBatch changes
+  // Build the selected batch's real lifecycle: every stage configured for the
+  // LOB, with completion taken from the batch's own stage_log rather than from
+  // a stage's position in the sequence. Deriving status from position marked
+  // Quarantine and Gilt Grower "Done" on a cohort that entered at Flush/AI.
   useEffect(() => {
     if (!currentBatch) return;
-    setCurrentStageId(currentBatch.currentStageId);
-    const mapped = DEFAULT_PIGGERY_STAGES.map((s) => ({
-      ...s,
-      status:
-        s.id < currentBatch.currentStageId
-          ? ("COMPLETED" as const)
-          : s.id === currentBatch.currentStageId
-          ? ("CURRENT" as const)
-          : ("UPCOMING" as const),
-    }));
-    setStages(mapped);
-  }, [currentBatch]);
+    let cancelled = false;
+
+    (async () => {
+      const details: any = await api.get(`/batch/${currentBatch.id}`).catch(() => null);
+      if (cancelled) return;
+      const batch = details?.data ?? details;
+      if (!batch || stageMaster.length === 0) {
+        setStages([]);
+        return;
+      }
+      const built = buildLifecycleStages({
+        stageMaster,
+        stageLog: Array.isArray(batch.stage_log) ? batch.stage_log : [],
+        batchStartDate: String(batch.start_date || currentBatch.startDate || "").slice(0, 10),
+        currentStageCode: batch.current_stage_code ?? currentBatch.currentStageCode ?? null,
+      });
+      setStages(built.stages);
+      setCurrentStageId(built.currentStageId);
+    })();
+
+    return () => { cancelled = true; };
+  }, [currentBatch, stageMaster]);
 
   const handleAdvanceStage = async () => {
     if (!currentBatch) return;

@@ -345,10 +345,15 @@ export class BatchService {
         item_code: schema.itemMaster.item_code,
         animal_ear_tag: schema.animalRegister.ear_tag,
         animal_code: schema.animalRegister.animal_code,
+        // Who logged it — the mortality/treatment registers show this, and
+        // without the join they had no recorder to display.
+        created_by: schema.batchTransaction.created_by,
+        created_by_name: schema.userMaster.full_name,
       })
       .from(schema.batchTransaction)
       .leftJoin(schema.itemMaster, eq(schema.batchTransaction.item_id, schema.itemMaster.item_id))
       .leftJoin(schema.animalRegister, eq(schema.batchTransaction.animal_id, schema.animalRegister.animal_id))
+      .leftJoin(schema.userMaster, eq(schema.batchTransaction.created_by, schema.userMaster.user_id))
       .where(eq(schema.batchTransaction.batch_id, id));
     const outputLines = await this.db.select().from(schema.batchOutputLine).where(eq(schema.batchOutputLine.batch_id, id));
     const attachments = await this.db
@@ -419,6 +424,29 @@ export class BatchService {
       )
       .limit(1);
 
+    // A code that matches nothing, for a LOB that HAS stages configured, is a
+    // caller mistake rather than a LOB without stage master data — the batch
+    // stages screen once posted its own display codes (ST-01..ST-08), writing
+    // "ST-05" into current_stage_code and leaving stage_id null. Accepting it
+    // silently is what let that corrupt a live batch, so refuse it instead.
+    if (!matchedStage) {
+      const configured = await this.db
+        .select({ stage_code: schema.stageMaster.stage_code })
+        .from(schema.stageMaster)
+        .where(
+          and(
+            eq(schema.stageMaster.lob_id, batch.lob_id),
+            eq(schema.stageMaster.is_active, true),
+            isNull(schema.stageMaster.deleted_at),
+          )
+        );
+      if (configured.length > 0) {
+        throw new BadRequestException(
+          `'${dto.to_stage_code}' is not a stage of this line of business. Valid stages: ${configured.map((c) => c.stage_code).join(', ')}.`,
+        );
+      }
+    }
+
     await this.db
       .update(schema.batchHeader)
       .set({
@@ -429,6 +457,40 @@ export class BatchService {
         updated_at: toMysqlTimestamp(),
       })
       .where(eq(schema.batchHeader.batch_id, id));
+
+    // Animals carry their own current_stage_id (animal_register), which the herd
+    // and bio-asset-by-stage reports read. Moving the batch without repointing
+    // them left every animal reporting the stage it was in before the transfer.
+    //
+    // Only the animals that were IN STEP with the batch move. An animal that has
+    // been deliberately diverged — a tail-ender held back at an earlier stage, or
+    // one pulled into a hospital pen — stays where it is, which is the whole
+    // point of tracking stage per animal rather than only per batch. Cascading
+    // unconditionally would silently drag those animals forward.
+    if (matchedStage?.stage_id) {
+      const inStep = await this.db
+        .select({ animal_id: schema.animalRegister.animal_id })
+        .from(schema.animalRegister)
+        .where(
+          and(
+            eq(schema.animalRegister.current_batch_id, id),
+            batch.stage_id
+              ? eq(schema.animalRegister.current_stage_id, batch.stage_id)
+              : isNull(schema.animalRegister.current_stage_id),
+          )
+        );
+
+      if (inStep.length > 0) {
+        await this.db
+          .update(schema.animalRegister)
+          .set({
+            current_stage_id: matchedStage.stage_id,
+            updated_by: userPayload?.userId || null,
+            updated_at: toMysqlTimestamp(),
+          })
+          .where(inArray(schema.animalRegister.animal_id, inStep.map((a) => a.animal_id)));
+      }
+    }
 
     await this.db.insert(schema.batchStageLog).values({
       log_id: randomUUID(),
@@ -466,12 +528,67 @@ export class BatchService {
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
-    return this.db
+    const rows = await this.db
       .select()
       .from(schema.batchHeader)
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
+
+    if (rows.length === 0) return rows;
+
+    /**
+     * Work-in-progress cost carried by each batch.
+     *
+     * batch_header.total_cost is only written when a batch is CLOSED, so an
+     * ACTIVE batch has none however much it has consumed. The console's WIP
+     * tile reads `wip_value`, which nothing returned — the figure was
+     * structurally zero rather than merely unposted. For an open batch this is
+     * what it has accumulated so far; for a closed one the posted total wins.
+     */
+    const batchIds = rows.map((r) => r.batch_id);
+    const costTx = await this.db
+      .select({
+        batch_id: schema.batchTransaction.batch_id,
+        transaction_type: schema.batchTransaction.transaction_type,
+        amount: schema.batchTransaction.amount,
+      })
+      .from(schema.batchTransaction)
+      .where(inArray(schema.batchTransaction.batch_id, batchIds));
+
+    const accrued = new Map<string, number>();
+    for (const tx of costTx) {
+      // Only cost-bearing movements. Mortality and observations are recorded
+      // against the batch but are not spend.
+      if (tx.transaction_type !== 'CONSUMPTION' && tx.transaction_type !== 'OVERHEAD') continue;
+      accrued.set(tx.batch_id, (accrued.get(tx.batch_id) ?? 0) + Number(tx.amount || 0));
+    }
+
+    // Breed and stage names, so list screens don't have to render a raw UUID
+    // or an em-dash where the breed belongs.
+    const breedIds = [...new Set(rows.map((r) => r.breed_id).filter((x): x is string => !!x))];
+    const stageIds = [...new Set(rows.map((r) => r.stage_id).filter((x): x is string => !!x))];
+    const breedNames = breedIds.length === 0 ? new Map<string, string>() : new Map(
+      (await this.db
+        .select({ breed_id: schema.breedMaster.breed_id, breed_name: schema.breedMaster.breed_name })
+        .from(schema.breedMaster)
+        .where(inArray(schema.breedMaster.breed_id, breedIds))
+      ).map((b) => [b.breed_id, b.breed_name])
+    );
+    const stageNames = stageIds.length === 0 ? new Map<string, string>() : new Map(
+      (await this.db
+        .select({ stage_id: schema.stageMaster.stage_id, stage_name: schema.stageMaster.stage_name })
+        .from(schema.stageMaster)
+        .where(inArray(schema.stageMaster.stage_id, stageIds))
+      ).map((st) => [st.stage_id, st.stage_name])
+    );
+
+    return rows.map((r) => ({
+      ...r,
+      wip_value: r.total_cost != null ? Number(r.total_cost) : (accrued.get(r.batch_id) ?? 0),
+      breed_name: r.breed_id ? breedNames.get(r.breed_id) ?? null : null,
+      stage_name: r.stage_id ? stageNames.get(r.stage_id) ?? null : null,
+    }));
   }
 
   private assertStatus(batch: { status: string }, expected: string) {
@@ -1277,6 +1394,51 @@ export class BatchService {
       return itemRows.find((x) => x.item_id === itemId)?.item_code ?? null;
     };
 
+    // Labour and utility parameters cost by the hour/unit of a resource rather
+    // than by an item, so their rate lives on resource_master.
+    const resourceIds = [...new Set(activeLines.map(({ parameter }) => parameter.resource_id).filter((x): x is string => !!x))];
+    const resourceRows = resourceIds.length
+      ? await this.db.select().from(schema.resourceMaster).where(inArray(schema.resourceMaster.resource_id, resourceIds))
+      : [];
+
+    // Items are priced in their own stock unit, which is not always the unit the
+    // schedule doses in — ivermectin is bought per 100 ml VIAL and given in ML.
+    const conversions = await this.db.select().from(schema.uomConversionMaster);
+
+    /**
+     * The money rate for a line, expressed in the line's own unit.
+     *
+     * Two things were wrong here. It fell back to
+     * parameter.default_qty_per_unit — a per-head quantity — so feed priced at
+     * 2.2/kg instead of 28/kg and six labour hours cost six rupees. And it
+     * ignored units entirely, so a vial price was charged per millilitre,
+     * costing a 40 ml deworming round Rs 11,200 instead of Rs 112.
+     */
+    const standardRate = (
+      parameter: { item_id: string | null; resource_id: string | null },
+      lineUom: string | null,
+    ) => {
+      if (parameter.item_id) {
+        const item = itemRows.find((x) => x.item_id === parameter.item_id);
+        if (item?.standard_cost == null) return null;
+        const cost = Number(item.standard_cost);
+        const stockUom = item.uom_primary;
+        if (!lineUom || !stockUom || lineUom === stockUom) return cost;
+        // One stock unit contains `conversion_factor` line units, so the price
+        // per line unit is the stock price divided by that factor.
+        const conv = conversions.find((c) => c.from_uom === stockUom && c.to_uom === lineUom);
+        if (conv && Number(conv.conversion_factor) > 0) return cost / Number(conv.conversion_factor);
+        const inverse = conversions.find((c) => c.from_uom === lineUom && c.to_uom === stockUom);
+        if (inverse && Number(inverse.conversion_factor) > 0) return cost * Number(inverse.conversion_factor);
+        return cost;
+      }
+      if (parameter.resource_id) {
+        const cost = resourceRows.find((x) => x.resource_id === parameter.resource_id)?.cost_rate;
+        return cost != null ? Number(cost) : null;
+      }
+      return null;
+    };
+
     const lines = activeLines.map(({ spl, parameter }) => {
       const alreadyEntered = sameDayTx
         .filter((t) => t.transaction_type === parameter.parameter_type
@@ -1284,7 +1446,7 @@ export class BatchService {
           && (parameter.resource_id ? t.resource_id === parameter.resource_id : true))
         .reduce((sum, t) => sum + Number(t.quantity || 0), 0);
 
-      const stdRate = spl.std_rate ?? parameter.default_qty_per_unit ?? null;
+      const stdRate = standardRate(parameter, spl.uom_override || parameter.default_uom || null);
 
       return {
         spl_id: spl.spl_id,
@@ -1301,7 +1463,7 @@ export class BatchService {
         period_label: spl.period_label,
         expected_qty: this.computeExpectedQty(spl, parameter, openingQty),
         already_entered_qty: alreadyEntered,
-        std_rate: stdRate ? Number(stdRate) : null,
+        std_rate: stdRate,
       };
     });
 

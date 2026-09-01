@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or } from 'drizzle-orm';
+import { eq, and, like, or, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -258,12 +258,68 @@ export class SchedulerService {
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
-    return this.db
+    const rows = await this.db
       .select()
       .from(schema.schedulerMaster)
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
+
+    if (rows.length === 0) return rows;
+
+    /**
+     * What each scheduler actually plans, and whether anything uses it.
+     *
+     * The list previously carried code, name, duration, active and locked —
+     * nothing about the thing you choose a scheduler *for*. Stage coverage in
+     * particular is the distinction between a plan that applies throughout and
+     * one scoped to a single stage, which is otherwise only visible by opening
+     * the scheduler and reading its lines.
+     */
+    const schedulerIds = rows.map((r) => r.scheduler_id);
+
+    const lines = await this.db
+      .select({
+        scheduler_id: schema.schedulerParameterLine.scheduler_id,
+        stage_code: schema.schedulerParameterLine.stage_code,
+      })
+      .from(schema.schedulerParameterLine)
+      .where(inArray(schema.schedulerParameterLine.scheduler_id, schedulerIds));
+
+    const batches = await this.db
+      .select({ scheduler_id: schema.batchHeader.scheduler_id })
+      .from(schema.batchHeader)
+      .where(inArray(schema.batchHeader.scheduler_id, schedulerIds));
+
+    const lineCount = new Map<string, number>();
+    const stages = new Map<string, string[]>();
+    // A line with no stage_code runs in every stage, which is a property of the
+    // scheduler worth surfacing rather than an absent value.
+    const unscoped = new Set<string>();
+    for (const line of lines) {
+      lineCount.set(line.scheduler_id, (lineCount.get(line.scheduler_id) ?? 0) + 1);
+      if (!line.stage_code) {
+        unscoped.add(line.scheduler_id);
+        continue;
+      }
+      const seen = stages.get(line.scheduler_id) ?? [];
+      if (!seen.includes(line.stage_code)) seen.push(line.stage_code);
+      stages.set(line.scheduler_id, seen);
+    }
+
+    const batchCount = new Map<string, number>();
+    for (const b of batches) {
+      if (!b.scheduler_id) continue;
+      batchCount.set(b.scheduler_id, (batchCount.get(b.scheduler_id) ?? 0) + 1);
+    }
+
+    return rows.map((r) => ({
+      ...r,
+      line_count: lineCount.get(r.scheduler_id) ?? 0,
+      stages_covered: stages.get(r.scheduler_id) ?? [],
+      applies_to_all_stages: unscoped.has(r.scheduler_id),
+      batch_count: batchCount.get(r.scheduler_id) ?? 0,
+    }));
   }
 
   async update(id: string, dto: UpdateSchedulerDto, tenantId: string, userPayload?: any) {

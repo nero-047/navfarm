@@ -75,6 +75,29 @@ export default function BatchPanel() {
   const [txForm, setTxForm] = useState<Row>(emptyTxForm());
 
   const [detailTab, setDetailTab] = useState<"overview" | "transactions" | "data-entry" | "curves">("overview");
+
+  // A batch split out of another can be merged back once the group is ready —
+  // every live animal returns to the parent and this child closes.
+  const [mergeTarget, setMergeTarget] = useState<any>(null);
+  const [mergeBusy, setMergeBusy] = useState(false);
+  const [mergeError, setMergeError] = useState("");
+
+  const confirmMerge = async () => {
+    if (!mergeTarget) return;
+    setMergeBusy(true);
+    setMergeError("");
+    try {
+      await api.post(`/batch-transfer/merge/${mergeTarget.batch_id}`, {
+        transfer_date: new Date().toISOString().slice(0, 10),
+      });
+      setMergeTarget(null);
+      load();
+    } catch (err: any) {
+      setMergeError(err?.message || "Could not merge the group back.");
+    } finally {
+      setMergeBusy(false);
+    }
+  };
   const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().slice(0, 10));
   const [dataEntryLoading, setDataEntryLoading] = useState(false);
   const [dataEntryError, setDataEntryError] = useState("");
@@ -831,7 +854,12 @@ export default function BatchPanel() {
               ) : (
                 pagedRows.map((row) => (
                   <TableRow key={row.batch_id}>
-                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.batch_no}</TableCell>
+                    <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>
+                      {row.batch_no}
+                      {row.parent_batch_id && (
+                        <span className="ml-1.5 text-[10px] font-medium" style={S.muted}>↳ split group</span>
+                      )}
+                    </TableCell>
                     <TableCell className="whitespace-nowrap" style={S.primary}>{row.start_date}</TableCell>
                     <TableCell className="whitespace-nowrap" style={S.sub}>{row.costing_method}</TableCell>
                     <TableCell className="whitespace-nowrap text-right" style={S.primary}>{row.opening_quantity} {row.uom}</TableCell>
@@ -840,6 +868,16 @@ export default function BatchPanel() {
                       <StatusBadge status={row.status} />
                     </TableCell>
                     <TableCell className="text-right">
+                      {row.parent_batch_id && row.status === "ACTIVE" && (
+                        <button
+                          onClick={() => { setMergeTarget(row); setMergeError(""); }}
+                          title="Merge this group back into the batch it was split from"
+                          className="mr-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition hover:bg-(--surface-raised)"
+                          style={S.accent}
+                        >
+                          Merge back
+                        </button>
+                      )}
                       <button onClick={() => openView(row)} title={t("blViewTitle")} className="rounded-lg p-1.5 transition hover:bg-(--surface-raised)" style={S.sub}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
@@ -2088,6 +2126,30 @@ export default function BatchPanel() {
               </div>
             </div>
           )}
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={!!mergeTarget}
+        onClose={() => setMergeTarget(null)}
+        title={`Merge ${mergeTarget?.batch_no ?? ""} back`}
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setMergeTarget(null)}>Cancel</Button>
+            <Button size="sm" className="nf-btn-primary" onClick={confirmMerge} disabled={mergeBusy}>
+              {mergeBusy ? "Merging…" : "Merge back"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2 text-xs">
+          {mergeError && <p className="text-[var(--danger)]">{mergeError}</p>}
+          <p style={S.sub}>
+            Every live animal in this group returns to the batch it was split from, and this
+            batch closes. Each animal keeps its own stage history — rejoining never rewrites
+            where an animal has been.
+          </p>
         </div>
       </Dialog>
     </div>

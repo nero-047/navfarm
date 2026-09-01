@@ -1,5 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsIn, IsNumber, IsDateString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 
 export const APPROVAL_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
 export const URGENCIES = ['HIGH', 'MEDIUM', 'LOW'] as const;
@@ -74,6 +85,15 @@ export class DecideApprovalDto {
 }
 
 export class QueryApprovalDto {
+  // The console appends the active company as `companyId`; the global pipe runs
+  // forbidNonWhitelisted, so an undeclared param 400s the whole list request and
+  // the page renders an empty state over data that exists. Accepted as an alias
+  // of company_id below.
+  @ApiProperty({ required: false, description: 'Active company scope (camelCase alias of company_id)' })
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsUUID()
@@ -108,4 +128,20 @@ export class QueryApprovalDto {
   @IsOptional()
   @IsDateString()
   to_date?: string;
+
+  // Every other list endpoint paginates; these three did not declare it, so a
+  // screen adding pagination would 400 the whole request.
+  @ApiProperty({ description: 'Results per page', default: 50, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @ApiProperty({ description: 'Pagination offset', default: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
 }

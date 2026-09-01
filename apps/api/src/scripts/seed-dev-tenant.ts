@@ -29,6 +29,9 @@ const host = process.env.DATABASE_HOST || 'localhost';
 const port = Number(process.env.DATABASE_PORT || 3306);
 const user = process.env.DATABASE_USERNAME || 'root';
 const password = process.env.DATABASE_PASSWORD || '';
+const ssl = process.env.DATABASE_SSL === 'true'
+  ? { minVersion: 'TLSv1.2' as const, rejectUnauthorized: true }
+  : undefined;
 const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
 
 const tenantCode = (process.env.DEV_TENANT_CODE || 'devco').toLowerCase();
@@ -53,7 +56,7 @@ function assertDatabaseName(value: string): string {
   return value;
 }
 
-async function seedDevTenant() {
+export async function seedDevTenant() {
   if (!/^[a-z0-9-]{3,30}$/.test(tenantCode)) {
     throw new Error(`DEV_TENANT_CODE '${tenantCode}' must be 3-30 lowercase letters/numbers/hyphens.`);
   }
@@ -64,7 +67,7 @@ async function seedDevTenant() {
     if (pw.length < 8) throw new Error(`${label} must be at least 8 characters.`);
   }
 
-  const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase });
+  const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase, ssl });
   const masterDb = drizzle(masterPool, { schema: master, mode: 'default' });
 
   try {
@@ -76,7 +79,7 @@ async function seedDevTenant() {
     const [plan] = await masterDb.select().from(master.planMaster).where(eq(master.planMaster.plan_id, 'PLAN_PRO')).limit(1);
     if (!plan) throw new Error("Plan 'PLAN_PRO' not found — run db-bootstrap first.");
 
-    let [existingTenant] = await masterDb
+    const [existingTenant] = await masterDb
       .select()
       .from(master.tenantMaster)
       .where(eq(master.tenantMaster.tenant_code, tenantCode))
@@ -88,11 +91,11 @@ async function seedDevTenant() {
     const dbName = assertDatabaseName(existingTenant?.db_name || `${defaultPrefix}${tenantCode}`);
     const tenantId = existingTenant?.tenant_id || randomUUID();
 
-    const server = await mysql.createConnection({ host, port, user, password });
+    const server = await mysql.createConnection({ host, port, user, password, ssl });
     await server.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
     await server.end();
 
-    const tenantPool = mysql.createPool({ host, port, user, password, database: dbName });
+    const tenantPool = mysql.createPool({ host, port, user, password, database: dbName, ssl });
     const tenantDb = drizzle(tenantPool, { schema: tenant, mode: 'default' });
 
     try {
@@ -339,8 +342,15 @@ async function seedDevTenant() {
       const defaultLangId = masterLangs.find((l) => l.is_system_default)?.lang_id || masterLangs[0]?.lang_id;
       const defaultCurrId = masterCurrs.find((c) => c.is_system_default)?.currency_id || masterCurrs[0]?.currency_id;
 
-      const COMPANY_1_ID = '00000000-0000-0000-0000-000000000000';
-      const COMPANY_2_ID = '00000000-0000-0000-0000-000000000001';
+      // Real random UUIDs, reused across reruns by looking up the existing
+      // company by code first — not the old hardcoded '...0000'/'...0001'
+      // pattern, which class-validator's @IsUUID() rejects for anything
+      // past the all-zeros nil UUID (its version nibble isn't 1-5), breaking
+      // every company-scoped endpoint for the second company.
+      const [existingApex] = await tenantDb.select().from(tenant.companyMaster).where(eq(tenant.companyMaster.company_code, 'APEXBREED')).limit(1);
+      const [existingHighland] = await tenantDb.select().from(tenant.companyMaster).where(eq(tenant.companyMaster.company_code, 'HIGHLAND')).limit(1);
+      const COMPANY_1_ID = existingApex?.company_id || randomUUID();
+      const COMPANY_2_ID = existingHighland?.company_id || randomUUID();
 
       const companyConfigs = [
         {
@@ -350,8 +360,11 @@ async function seedDevTenant() {
           industry: 'Swine Breeding & Genetics',
           farmCode: 'FARM-APEX-01',
           farmName: 'Apex Nucleus Breeding Farm',
+          farmCapacity: 165,
           shedCode: 'SHED-GEST-01',
           shedName: 'Breeding & Gestation Complex',
+          shedType: 'GESTATION',
+          shedCapacity: 71,
         },
         {
           id: COMPANY_2_ID,
@@ -360,8 +373,11 @@ async function seedDevTenant() {
           industry: 'Commercial Swine Farming',
           farmCode: 'FARM-HIGH-01',
           farmName: 'Highland Commercial Swine Complex',
-          shedCode: 'SHED-GROW-01',
+          farmCapacity: 360,
+          shedCode: 'SHED-NURS-01',
           shedName: 'Commercial Weaner Nursery Barn',
+          shedType: 'NURSERY',
+          shedCapacity: 100,
         },
       ];
 
@@ -448,6 +464,7 @@ async function seedDevTenant() {
             farm_code: cc.farmCode,
             farm_name: cc.farmName,
             farm_type: 'LIVESTOCK',
+            capacity: cc.farmCapacity,
           });
         }
         const [existingShed] = await tenantDb.select().from(tenant.shedMaster).where(eq(tenant.shedMaster.company_id, cc.id)).limit(1);
@@ -459,7 +476,8 @@ async function seedDevTenant() {
             farm_id: farmId,
             shed_code: cc.shedCode,
             shed_name: cc.shedName,
-            shed_type: 'GENERAL',
+            shed_type: cc.shedType,
+            capacity: cc.shedCapacity,
           });
         }
       }
@@ -471,7 +489,7 @@ async function seedDevTenant() {
       const comp2AdminUserId = randomUUID();
 
       // 1. Tenant Admin (Rajesh Varma)
-      let [existingTenantAdmin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'admin@apexagri.local')).limit(1);
+      const [existingTenantAdmin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'admin@apexagri.local')).limit(1);
       const tAdminId = existingTenantAdmin?.user_id || tenantAdminUserId;
       if (!existingTenantAdmin) {
         await tenantDb.insert(tenant.userMaster).values({
@@ -490,7 +508,7 @@ async function seedDevTenant() {
       }
 
       // 2. Company 1 Admin (Dr. Arjun Sharma)
-      let [existingComp1Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'arjun.sharma@apexagri.local')).limit(1);
+      const [existingComp1Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'arjun.sharma@apexagri.local')).limit(1);
       const c1AdminId = existingComp1Admin?.user_id || comp1AdminUserId;
       if (!existingComp1Admin) {
         await tenantDb.insert(tenant.userMaster).values({
@@ -509,7 +527,7 @@ async function seedDevTenant() {
       }
 
       // 3. Company 2 Admin (Vikram Singh)
-      let [existingComp2Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'vikram.singh@highlandpork.local')).limit(1);
+      const [existingComp2Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'vikram.singh@highlandpork.local')).limit(1);
       const c2AdminId = existingComp2Admin?.user_id || comp2AdminUserId;
       if (!existingComp2Admin) {
         await tenantDb.insert(tenant.userMaster).values({
@@ -535,7 +553,7 @@ async function seedDevTenant() {
         { userId: c2AdminId, companyId: COMPANY_2_ID, primary: true },
       ];
       for (const uc of userCompanyMap) {
-        let [existingUCA] = await tenantDb.select().from(tenant.userCompanyAssignments)
+        const [existingUCA] = await tenantDb.select().from(tenant.userCompanyAssignments)
           .where(and(eq(tenant.userCompanyAssignments.user_id, uc.userId), eq(tenant.userCompanyAssignments.company_id, uc.companyId)))
           .limit(1);
         if (!existingUCA) {
@@ -607,7 +625,9 @@ async function seedDevTenant() {
   }
 }
 
-void seedDevTenant().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  void seedDevTenant().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

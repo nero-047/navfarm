@@ -96,13 +96,30 @@ function clearSession() {
   clearSessionCookie();
 }
 
+// A hard navigation is the right default for a session that just died — it
+// drops every cached client-side store along with it. Exposed as an
+// overridable hook so a host that would rather route in-app can swap it.
+export const sessionNavigation = {
+  toLogin: () => window.location.replace('/login'),
+};
+
+function redirectToLogin() {
+  if (typeof window === 'undefined') return;
+  if (window.location.pathname.startsWith('/login')) return;
+  sessionNavigation.toLogin();
+}
+
 let refreshPromise: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
     const refreshToken = stored(AUTH_STORAGE.refreshToken);
-    if (!refreshToken) throw new ApiError('Your session has expired.', 401);
+    if (!refreshToken) {
+      clearSession();
+      redirectToLogin();
+      throw new ApiError('Your session has expired.', 401);
+    }
     const headers = new Headers({ 'Content-Type': 'application/json' });
     const tenantId = stored(AUTH_STORAGE.tenantId);
     if (tenantId) headers.set('x-tenant-id', tenantId);
@@ -114,6 +131,10 @@ async function refreshAccessToken(): Promise<string> {
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.access_token) {
       clearSession();
+      // The session is gone, so every page behind it can only render empty
+      // state. Send the browser to login instead of leaving a signed-out user
+      // looking at a dashboard of zeroes.
+      redirectToLogin();
       throw new ApiError(errorMessage(payload, 'Your session has expired.'), response.status, payload);
     }
     localStorage.setItem(AUTH_STORAGE.accessToken, payload.access_token);

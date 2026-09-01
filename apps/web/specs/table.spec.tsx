@@ -39,7 +39,7 @@ describe('Table primitives', () => {
     expect(screen.getByTestId('tbody').className).toContain('custom-body');
     expect(screen.getByTestId('row').className).toContain('custom-row');
     // Row still carries its own border/hover defaults alongside the caller's class.
-    expect(screen.getByTestId('row').className).toContain('border-(--row-border)');
+    expect(screen.getByTestId('row').className).toContain('border-[var(--row-border)]');
     expect(screen.getByTestId('cell').className).toContain('whitespace-nowrap');
   });
 

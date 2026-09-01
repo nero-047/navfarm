@@ -40,33 +40,54 @@ export default function PiggeryLifecycleStepper({
   onSelectStage?: (stage: PiggeryStage) => void;
 }) {
   const { t } = useLanguage();
-  const currentIdx = stages.findIndex((s) => s.id === currentStageId);
+  const currentIdx = stages.findIndex((s) => s.status === "CURRENT" || s.id === currentStageId);
   const activeIndex = currentIdx >= 0 ? currentIdx : 0;
-  const progressPercent = stages.length > 1 ? (activeIndex / (stages.length - 1)) * 100 : 0;
+
+  // The green run spans only the stages the batch genuinely walked: from the
+  // first one it entered to the one it is in now. Anchoring it at index 0
+  // painted a completed line straight through stages that were skipped — a
+  // sow cohort that starts at Flush/AI showed Quarantine and Gilt Grower as
+  // part of its history.
+  const firstDoneIdx = stages.findIndex((s) => s.status === "COMPLETED");
+  const step = stages.length > 1 ? 100 / (stages.length - 1) : 0;
+  const hasCompleted = firstDoneIdx >= 0;
+  const progressLeft = hasCompleted ? firstDoneIdx * step : activeIndex * step;
+  const progressWidth = hasCompleted ? Math.max(0, activeIndex - firstDoneIdx) * step : 0;
+
+  // 11 stages inside a fixed 780px track gave each column ~70px while the label
+  // was allowed 110px, so adjacent stage names overlapped. Scale the track with
+  // the number of stages instead.
+  const trackMinWidth = Math.max(780, stages.length * 108);
 
   return (
     <div className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-5 overflow-x-auto shadow-2xs">
-      <div className="min-w-[780px] relative">
+      <div className="relative" style={{ minWidth: `${trackMinWidth}px` }}>
         {/* Continuous Background Timeline Line */}
         <div className="absolute top-4 left-6 right-6 h-[3px] bg-[var(--border)] z-0 rounded-full" />
 
         {/* Dynamic Completed/Active Progress Line */}
         <div
-          className="absolute top-4 left-6 h-[3px] bg-[var(--success)] z-0 transition-all duration-500 rounded-full"
-          style={{ width: `calc(${progressPercent}% * 0.92)` }}
+          data-testid="stepper-progress"
+          className="absolute top-4 h-[3px] bg-[var(--success)] z-0 transition-all duration-500 rounded-full"
+          style={{ left: `${progressLeft}%`, width: `${progressWidth}%` }}
         />
 
         {/* Stages Grid - strictly top-aligned */}
         <div className="flex items-start justify-between relative z-10">
           {stages.map((stage) => {
-            const isCompleted = stage.id < currentStageId;
-            const isCurrent = stage.id === currentStageId;
+            // Completion comes from the stage's own status, not its position in
+            // the sequence. A batch that starts mid-lifecycle — a sow cohort
+            // entering at Flush/AI — never passed through Quarantine or Gilt
+            // Grower, but those sit earlier in the master order and so were
+            // rendered "Done" on every batch.
+            const isCurrent = stage.status === "CURRENT" || stage.id === currentStageId;
+            const isCompleted = !isCurrent && stage.status === "COMPLETED";
 
             return (
               <div
                 key={stage.id}
                 onClick={() => onSelectStage?.(stage)}
-                className={`flex flex-col items-center group flex-1 max-w-[120px] ${onSelectStage ? "cursor-pointer" : ""}`}
+                className={`flex min-w-0 flex-col items-center group flex-1 ${onSelectStage ? "cursor-pointer" : ""}`}
               >
                 {/* 1. Circle Indicator (strictly 32px height, top-aligned) */}
                 <div
@@ -90,7 +111,7 @@ export default function PiggeryLifecycleStepper({
                 {/* 2. Text Details below circle */}
                 <div className="mt-2.5 text-center flex flex-col items-center w-full">
                   <p
-                    className={`text-xs tracking-tight truncate max-w-[110px] ${
+                    className={`text-xs tracking-tight truncate w-full px-0.5 ${
                       isCurrent
                         ? "text-[var(--accent)] font-bold"
                         : isCompleted

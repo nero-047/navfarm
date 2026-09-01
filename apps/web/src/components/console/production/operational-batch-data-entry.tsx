@@ -19,7 +19,8 @@ import {
   FileText,
   Layers,
 } from "lucide-react";
-import PiggeryLifecycleStepper from "../piggery/piggery-lifecycle-stepper";
+import PiggeryLifecycleStepper, { type PiggeryStage } from "../piggery/piggery-lifecycle-stepper";
+import { buildLifecycleStages } from "../piggery/build-lifecycle-stages";
 import { resolvePiggeryStageId, computeStageDay } from "../piggery/resolve-piggery-stage";
 import { api } from "@/services/api-client";
 import { API_BASE_URL } from "@/lib/api-client";
@@ -95,6 +96,10 @@ interface BatchAttachment {
 
 interface BatchMeta {
   id: string;
+  /** Set when this batch was split out of another — a group held back while
+      the rest of the cohort moved on. Entry is per batch, and a split group
+      genuinely eats a different ration, so it is picked here like any other. */
+  parentBatchId?: string | null;
   code: string;
   name: string;
   breed: string;
@@ -124,6 +129,17 @@ export default function OperationalBatchDataEntry() {
 
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
+
+  // Real lifecycle for the selected batch, built from stage_master + this
+  // batch's stage_log. Without it the stepper fell back to a hardcoded eight
+  // stages with fixed 2025 dates that were identical for every batch.
+  const [lifecycle, setLifecycle] = useState<{ stages: PiggeryStage[]; currentStageId: number }>({ stages: [], currentStageId: 0 });
+
+  // Barn climate read from the batch's own OBSERVATION rows. It used to be the
+  // literal string "22.4 °C · 58% Humidity · 0.15 m/s Airflow" in the markup —
+  // the same reading on every batch, on every day, forever. Airflow is dropped
+  // rather than invented: nothing records it.
+  const [climate, setClimate] = useState<{ tempC?: number; humidityPct?: number; on?: string }>({});
 
   const currentBatch = useMemo(
     () => batches.find((b) => b.id === selectedBatchId) || batches[0],
@@ -207,10 +223,19 @@ export default function OperationalBatchDataEntry() {
   // Helper to map a batch to a specific lifecycle stage
   const resolvePiggeryStage = (b: any) => {
     const resolved = resolvePiggeryStageId(b.current_stage_code || b.stage_code || b.stage_name);
+    // Day-in-stage counts from the transfer that put the batch in this stage.
+    // Falling back to the batch start (as this used to) counted the cohort's
+    // whole life against the stage's standard length.
+    const log: any[] = Array.isArray(b.stage_log) ? b.stage_log : [];
+    const enteredCurrentStage = log
+      .filter((l) => l.to_stage_code === (b.current_stage_code || ''))
+      .map((l) => String(l.transferred_at || ''))
+      .sort()
+      .pop();
     return {
       id: resolved.id,
       name: resolved.name,
-      day: computeStageDay(b.start_date, resolved.standardDays),
+      day: computeStageDay(enteredCurrentStage || b.start_date, resolved.standardDays),
       totalDays: resolved.standardDays,
     };
   };
@@ -261,6 +286,7 @@ export default function OperationalBatchDataEntry() {
           const st = resolvePiggeryStage(b);
           return {
             id: b.batch_id,
+            parentBatchId: b.parent_batch_id ?? null,
             code: b.batch_no,
             name: b.remarks || b.batch_no,
             breed: b.breed_name || breedNameById.get(b.breed_id) || b.breed_code || "—",
@@ -306,8 +332,9 @@ export default function OperationalBatchDataEntry() {
         return { lines: [] };
       }),
       api.get(`/batch/${selectedBatchId}`).catch(() => null),
+      api.get(`/stage`).catch(() => []),
     ])
-      .then(([schedRes, batchRes]) => {
+      .then(([schedRes, batchRes, stageRes]) => {
         const schedData = schedRes?.data ?? schedRes;
         const lines: any[] = schedData?.lines ?? [];
         const batchData = batchRes?.data ?? batchRes;
@@ -328,6 +355,30 @@ export default function OperationalBatchDataEntry() {
                 }
                 : b
             )
+          );
+        }
+
+        // Latest temperature / humidity observation recorded against this batch.
+        const climateRows: any[] = (batchData?.transactions ?? [])
+          .filter((t: any) => t.transaction_type === "OBSERVATION" && (t.uom === "\u00b0C" || t.uom === "%"))
+          .sort((a: any, b: any) => String(b.transaction_date).localeCompare(String(a.transaction_date)));
+        const latestTemp = climateRows.find((t: any) => t.uom === "\u00b0C");
+        const latestHumidity = climateRows.find((t: any) => t.uom === "%");
+        setClimate({
+          tempC: latestTemp ? Number(latestTemp.quantity) : undefined,
+          humidityPct: latestHumidity ? Number(latestHumidity.quantity) : undefined,
+          on: latestTemp?.transaction_date || latestHumidity?.transaction_date,
+        });
+
+        const stageMaster: any[] = (stageRes as any)?.data ?? stageRes ?? [];
+        if (batchData?.batch_id && Array.isArray(stageMaster)) {
+          setLifecycle(
+            buildLifecycleStages({
+              stageMaster,
+              stageLog: Array.isArray(batchData.stage_log) ? batchData.stage_log : [],
+              batchStartDate: batchData.start_date,
+              currentStageCode: batchData.current_stage_code ?? null,
+            })
           );
         }
 
@@ -890,7 +941,7 @@ export default function OperationalBatchDataEntry() {
                 >
                   {batches.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.code} — {b.name} ({b.breed})
+                      {b.code}{b.parentBatchId ? " ↳ split group" : ""} — {b.name} ({b.breed})
                     </option>
                   ))}
                 </select>
@@ -1021,7 +1072,11 @@ export default function OperationalBatchDataEntry() {
           current stage. Advancing a batch's actual stage is a deliberate action
           done from the Batch Stages screen (real POST /batch/:id/transfer-stage
           call), not from clicking a stage while logging daily data. */}
-      <PiggeryLifecycleStepper currentStageId={currentBatch?.currentStageId || 4} />
+      {lifecycle.stages.length > 0 ? (
+        <PiggeryLifecycleStepper stages={lifecycle.stages} currentStageId={lifecycle.currentStageId} />
+      ) : (
+        <PiggeryLifecycleStepper currentStageId={currentBatch?.currentStageId || 0} />
+      )}
 
       {/* ── Date, Weather & Quick Action Bar ── */}
       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 flex flex-wrap items-center justify-between gap-4 shadow-2xs">
@@ -1042,7 +1097,19 @@ export default function OperationalBatchDataEntry() {
             <CloudSun className="w-4 h-4 text-amber-400" />
             <div>
               <span className="text-[10px] text-[var(--text-muted)]">{t("barnClimate")} </span>
-              <span className="font-semibold text-[var(--text-primary)]">22.4 °C</span> · 58% Humidity · 0.15 m/s Airflow
+              {climate.tempC == null && climate.humidityPct == null ? (
+                <span className="text-[var(--text-muted)]">No climate reading recorded</span>
+              ) : (
+                <>
+                  {climate.tempC != null && (
+                    <span className="font-semibold text-[var(--text-primary)]">{climate.tempC} °C</span>
+                  )}
+                  {climate.humidityPct != null && <> · {climate.humidityPct}% Humidity</>}
+                  {climate.on && (
+                    <span className="text-[10px] text-[var(--text-muted)]"> · {String(climate.on).slice(0, 10)}</span>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

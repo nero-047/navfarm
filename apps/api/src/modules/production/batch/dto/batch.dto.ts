@@ -1,18 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsUUID,
-  IsInt,
-  Min,
-  Max,
-  IsNumber,
-  IsDateString,
-  IsArray,
-  ValidateNested,
   ArrayMinSize,
+  ArrayNotEmpty,
+  IsArray,
+  IsDateString,
   IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -585,7 +586,71 @@ export class CreateBatchTransferDto {
   post_immediately?: boolean;
 }
 
+export class SplitBatchDto {
+  @ApiProperty({ description: 'Animals to hold back — the ones not ready to move on with the rest of the cohort', type: [String] })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  animal_ids: string[];
+
+  @ApiProperty({ description: 'Date the group was split out', example: '2026-09-01' })
+  @IsDateString()
+  @IsNotEmpty()
+  transfer_date: string;
+
+  @ApiProperty({ required: false, description: 'Stage the split group holds at. Defaults to the stage the parent is leaving; set it to send them back a stage (a failed pregnancy scan returns a sow to service).' })
+  @IsOptional()
+  @IsString()
+  hold_stage_code?: string;
+
+  @ApiProperty({ required: false, description: 'Pen the group moves to' })
+  @IsOptional()
+  @IsUUID()
+  to_location_id?: string;
+
+  @ApiProperty({ required: false, description: 'Batch number for the child. Derived from the parent when omitted.' })
+  @IsOptional()
+  @IsString()
+  child_batch_no?: string;
+
+  @ApiProperty({ required: false, example: 'PREGNANCY_FAILED' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class MergeBatchDto {
+  @ApiProperty({ description: 'Date the group rejoined the cohort', example: '2026-10-01' })
+  @IsDateString()
+  @IsNotEmpty()
+  transfer_date: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
 export class QueryBatchTransferDto {
+  // The console appends the active company as `companyId`; the global pipe runs
+  // forbidNonWhitelisted, so an undeclared param 400s the whole list request and
+  // the page renders an empty state over data that exists. Accepted as an alias
+  // of company_id below.
+  @ApiProperty({ required: false, description: 'Active company scope (camelCase alias of company_id)' })
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsUUID()
@@ -615,4 +680,20 @@ export class QueryBatchTransferDto {
   @IsOptional()
   @IsDateString()
   to_date?: string;
+
+  // Every other list endpoint paginates; these three did not declare it, so a
+  // screen adding pagination would 400 the whole request.
+  @ApiProperty({ description: 'Results per page', default: 50, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @ApiProperty({ description: 'Pagination offset', default: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
 }

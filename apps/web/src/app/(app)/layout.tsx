@@ -118,7 +118,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
     // into the wizard. Standard users never need this gate: by the time an
     // admin can invite one, the company they're being added to already exists
     // and (in normal use) is already set up.
-    if (storedUser.userType === "STANDARD_USER") {
+    if (storedUser.userType === "STANDARD_USER" || storedUser.userType === "OPERATIONAL_ADMIN") {
       setIsOnboarded(true);
       setCheckingOnboard(false);
       setReady(true);
@@ -165,8 +165,30 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
       setTimezones(tzList);
       setCountries(countryList);
       setNobs(nobList);
-    } catch {
-      setIsOnboarded(false);
+    } catch (err: any) {
+      // Never infer "not onboarded" from a failure. The wizard is destructive to
+      // show over a configured company — it hides the whole console behind a
+      // setup form — so it needs positive evidence that setup is incomplete,
+      // which only the success path above can give. Two failures used to land
+      // here and both rendered the wizard: a 403 for a role that cannot read
+      // /company/tenant/:id (an operator or supervisor), and a 400 for a stale
+      // session whose tenant no longer exists after the database was reseeded.
+      const status = err?.status ?? err?.response?.status;
+      const message = String(err?.message ?? '');
+
+      // A session pointing at a tenant that is gone is not recoverable by
+      // waiting — sign out and let them log in again rather than stranding
+      // them in a setup wizard for a company they are not even scoped to.
+      const staleSession =
+        status === 401 || message.includes('Tenant connection context') || message.includes('not found');
+
+      if (staleSession && status !== 403) {
+        clearSession();
+        router.replace('/');
+        return;
+      }
+
+      setIsOnboarded(true);
     } finally {
       setCheckingOnboard(false);
       setReady(true);
@@ -247,24 +269,24 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
     navItems = [
       { label: t("dashboard"),       href: "/dashboard",      icon: LayoutDashboard },
       { label: t("companies"),       href: "/companies",      icon: Building2 },
-      { label: t("masterData"),      href: "/master-data",    icon: Database },
+      { label: t("masterData"),      href: "/master-data",    icon: Database, activePrefix: "/master-data" },
       { label: t("teamManagement"),  href: "/users",          icon: Users },
       { label: t("auditLedger"),     href: "/audit",          icon: History },
-      { label: t("notifications"),   href: "/notifications",  icon: Bell },
+      { label: t("notifications"),   href: "/notifications",  icon: Bell, activePrefix: "/notifications" },
     ];
   } else if (activeScope === "COMPANY") {
     navItems = [
       { label: t("companyDashboard"), href: "/dashboard",      icon: LayoutDashboard },
       { label: t("operationalAreas"), href: "/operational-areas", icon: Layers },
       { label: t("company"),         href: "/companies",      icon: Building2 },
-      { label: t("masterData"),      href: "/master-data",    icon: Database },
-      { label: t("inventory"),       href: "/inventory/balance", icon: Boxes },
-      { label: t("finance"),         href: "/finance/journal", icon: Landmark },
-      { label: t("production"),      href: "/batches", icon: Wheat },
+      { label: t("masterData"),      href: "/master-data",    icon: Database, activePrefix: "/master-data" },
+      { label: t("inventory"),       href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
+      { label: t("finance"),         href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },
+      { label: t("production"),      href: "/batches", icon: Wheat, activePrefix: "/batches" },
       { label: t("animalHerdRegister"), href: "/livestock",     icon: Pill },
       { label: t("teamManagement"),  href: "/users",          icon: Users },
       { label: t("rolePermissions"), href: "/roles",          icon: ShieldAlert },
-      { label: t("notifications"),   href: "/notifications",  icon: Bell },
+      { label: t("notifications"),   href: "/notifications",  icon: Bell, activePrefix: "/notifications" },
     ];
   } else {
     /**
@@ -313,12 +335,12 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
           href: section.href,
         })),
       },
-      { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes },
-      { label: t("financeCosting"), href: "/finance/journal", icon: Landmark },
+      { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
+      { label: t("financeCosting"), href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },
       { label: t("navAlerts"), href: "/alerts", icon: AlertTriangle },
       { label: t("navTraceability"), href: "/traceability", icon: Package },
-      { label: t("approvals"), href: "/approvals", icon: CheckSquare },
-      { label: t("masterData"), href: "/master-data", icon: Database },
+      { label: t("approvals"), href: "/approvals", icon: CheckSquare, activePrefix: "/approvals" },
+      { label: t("masterData"), href: "/master-data", icon: Database, activePrefix: "/master-data" },
       {
         label: t("settings"),
         href: "/settings/area",

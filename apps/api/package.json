@@ -195,6 +195,27 @@
           "cwd": "apps/api",
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/setup-fresh-database.ts"
         }
+      },
+      "db-seed-demo": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-demo.ts",
+          "cwd": "apps/api"
+        }
+      },
+      "db-seed-piggery": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-piggery-complete-data.ts",
+          "cwd": "apps/api"
+        }
+      },
+      "db-seed-gaps": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-demo-gaps.ts",
+          "cwd": "apps/api"
+        }
       }
     }
   },

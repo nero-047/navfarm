@@ -19,10 +19,16 @@ const S = {
 
 function useMasterDataPageState() {
   const router = useRouter();
-  const [user, setUser] = useState<NavUser | null>(null);
-  const [ready, setReady] = useState(false);
+  // The session lives in localStorage, so it is available synchronously on the
+  // first render. Resolving it in an effect instead meant this shell mounted
+  // with user=null and ready=false, and the module index — which is static
+  // configuration and never depended on either — was registered as null for a
+  // commit before appearing. That is what made the sub-navigation visibly
+  // empty and refill on every page change.
+  const [user, setUser] = useState<NavUser | null>(() => getStoredUser());
+  const [ready, setReady] = useState(() => Boolean(getStoredUser()));
   const [companies, setCompanies] = useState<any[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(() => getActiveCompanyId() || "");
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -31,10 +37,10 @@ function useMasterDataPageState() {
       return;
     }
     setUser(stored);
+    setSelectedCompanyId(getActiveCompanyId() || "");
 
-    const activeComp = getActiveCompanyId() || "";
-    setSelectedCompanyId(activeComp);
-
+    // Only the company list is genuinely async, and only the Master Scope
+    // selector needs it — the index does not wait on it.
     const tenantId = getStoredTenantId() || stored.tenantId;
     if (tenantId) {
       api.get(`/company/tenant/${tenantId}`).then((res: any) => {

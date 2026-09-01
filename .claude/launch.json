@@ -9,7 +9,9 @@
     },
     {
       "name": "api",
-      "url": "http://localhost:2877"
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "dev:api"],
+      "port": 2877
     }
   ]
 }

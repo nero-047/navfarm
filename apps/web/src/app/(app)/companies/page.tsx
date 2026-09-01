@@ -7,7 +7,7 @@ import {
   Settings, Activity, Plus,
 } from "lucide-react";
 import { api } from "@/services/api-client";
-import { updateStoredUser, getActiveCompanyId, setActiveCompanyId } from "@/hooks/useAuth";
+import { updateStoredUser, getActiveCompanyId, getActiveWorkspaceScope, setActiveCompanyId } from "@/hooks/useAuth";
 import { useCompaniesPageData } from "@/components/console/companies/use-companies-page-data";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Drawer } from "@/components/ui/drawer";
@@ -53,10 +53,17 @@ export default function CompaniesIndexPage() {
     registration_no: "", tax_id: "",
   });
 
-  // Non-tenant-admins (and tenant admins who don't manage the directory)
-  // land straight on their own company's settings route.
+  // Who gets the tenant-wide directory: a tenant admin who is actually working
+  // at tenant scope. Branching on userType alone ignored the scope switcher, so
+  // a tenant admin who had deliberately narrowed to one company still saw every
+  // company in the tenant and an "Add Company" button, directly contradicting
+  // the scope shown in the sidebar.
+  const showsDirectory = user?.userType === "TENANT_ADMIN" && getActiveWorkspaceScope() === "TENANT";
+
+  // Everyone else — including a tenant admin scoped into a single company —
+  // lands straight on that company's own settings route.
   useEffect(() => {
-    if (loading || !user || user.userType === "TENANT_ADMIN") return;
+    if (loading || !user || showsDirectory) return;
     const activeId = getActiveCompanyId() || user.companyId || (user as any).company_id;
     const myCompany = companies.find((c: any) => c.company_id === activeId) || companies[0];
     if (myCompany) router.replace(`/companies/${myCompany.company_id}`);
@@ -80,8 +87,8 @@ export default function CompaniesIndexPage() {
 
   if (loading) return <LoadingState label={t("coLoadingCompanies")} />;
 
-  // ── Tenant-wide directory (Tenant Admin) ──
-  if (user?.userType === "TENANT_ADMIN") {
+  // ── Tenant-wide directory (Tenant Admin, at tenant scope) ──
+  if (showsDirectory) {
     return (
       <ConsolePage>
         <PageHeader

@@ -464,8 +464,6 @@ export class FinancialReportsService {
 
     const byBatch = new Map<string, {
       batch: typeof schema.batchHeader.$inferSelect;
-      standardCost: number;
-      actualCost: number;
       priceVariance: number;
       usageVariance: number;
       outputVariance: number;
@@ -479,8 +477,6 @@ export class FinancialReportsService {
       if (!entry) {
         entry = {
           batch,
-          standardCost: 0,
-          actualCost: 0,
           priceVariance: 0,
           usageVariance: 0,
           outputVariance: 0,
@@ -491,12 +487,12 @@ export class FinancialReportsService {
         byBatch.set(batch.batch_id, entry);
       }
 
-      const stdValue = Number(variance.std_value) || 0;
-      const actValue = Number(variance.actual_value) || 0;
+      // std_value / actual_value are NOT money on every row — PRICE holds a
+      // rate, USAGE a quantity, OUTPUT a head count, OVERHEAD an amount. Only
+      // variance_amount is currency on all four, so the cost columns are
+      // derived from the batch's own accumulated cost below instead of summed
+      // from these mixed units.
       const amount = Number(variance.variance_amount) || 0;
-
-      entry.standardCost += stdValue;
-      entry.actualCost += actValue;
       entry.totalVariance += amount;
       if (variance.created_at > entry.lastRecordedAt) entry.lastRecordedAt = variance.created_at;
 
@@ -509,15 +505,19 @@ export class FinancialReportsService {
     }
 
     return Array.from(byBatch.values()).map((entry) => {
-      const pct = entry.standardCost > 0 ? (entry.totalVariance / entry.standardCost) * 100 : 0;
+      // close() guarantees actual cost = standard output value + variances, so
+      // the standard cost is the actual cost net of what the variances explain.
+      const actualCost = Number(entry.batch.total_cost) || 0;
+      const standardCost = actualCost - entry.totalVariance;
+      const pct = standardCost > 0 ? (entry.totalVariance / standardCost) * 100 : 0;
 
       return {
         batch_id: entry.batch.batch_id,
         batch_no: entry.batch.batch_no,
         costing_method: entry.batch.costing_method,
         recorded_at: entry.lastRecordedAt,
-        standard_cost: entry.standardCost,
-        actual_cost: entry.actualCost,
+        standard_cost: standardCost,
+        actual_cost: actualCost,
         price_variance: entry.priceVariance,
         usage_variance: entry.usageVariance,
         output_variance: entry.outputVariance,

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsIn, IsInt, Min, IsNumber, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsIn, IsInt, Min, IsNumber, IsDateString, IsArray, ArrayNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -367,5 +367,13 @@ export class TransitionAnimalStageDto {
   @IsString()
   @IsOptional()
   remarks?: string;
+}
+
+export class BulkTransitionAnimalStageDto extends TransitionAnimalStageDto {
+  @ApiProperty({ description: 'Animals to move together — typically the tail-enders that a batch-level stage move deliberately left behind', type: [String] })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  animal_ids: string[];
 }
 

@@ -1,0 +1,1 @@
+ALTER TABLE `batch_header` ADD `parent_batch_id` varchar(36);

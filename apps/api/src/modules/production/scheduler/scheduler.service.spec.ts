@@ -23,6 +23,61 @@ describe('SchedulerService', () => {
     service = module.get<SchedulerService>(SchedulerService);
   });
 
+  describe('findAll', () => {
+    const listRows = (rows: any[]) => ({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({ offset: jest.fn().mockResolvedValue(rows) }),
+        }),
+      }),
+    });
+    const plainRows = (rows: any[]) => ({
+      from: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(rows) }),
+    });
+
+    it('reports the stages each scheduler covers so the list is scannable', async () => {
+      // The list showed only code, name, duration, status and locked — nothing
+      // about what a scheduler actually plans, which is the reason to pick one.
+      mockDbSelect
+        .mockReturnValueOnce(listRows([{ scheduler_id: 's1', scheduler_code: 'SCHED-A' }]))
+        .mockReturnValueOnce(plainRows([
+          { scheduler_id: 's1', stage_code: 'QUARANTINE' },
+          { scheduler_id: 's1', stage_code: 'DRY_SOW_GESTATION' },
+          { scheduler_id: 's1', stage_code: 'DRY_SOW_GESTATION' },
+          { scheduler_id: 's1', stage_code: null },
+        ]))
+        .mockReturnValueOnce(plainRows([{ scheduler_id: 's1' }, { scheduler_id: 's1' }]));
+
+      const [row] = await service.findAll({} as any, 'tenant-1');
+
+      expect(row.line_count).toBe(4);
+      expect(row.stages_covered).toEqual(['QUARANTINE', 'DRY_SOW_GESTATION']);
+      expect(row.applies_to_all_stages).toBe(true);
+      expect(row.batch_count).toBe(2);
+    });
+
+    it('marks a scheduler with no unscoped line as stage-specific', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(listRows([{ scheduler_id: 's2', scheduler_code: 'SCHED-B' }]))
+        .mockReturnValueOnce(plainRows([{ scheduler_id: 's2', stage_code: 'CB_GROWER' }]))
+        .mockReturnValueOnce(plainRows([]));
+
+      const [row] = await service.findAll({} as any, 'tenant-1');
+
+      expect(row.applies_to_all_stages).toBe(false);
+      expect(row.batch_count).toBe(0);
+    });
+
+    it('skips the enrichment queries entirely when nothing matched', async () => {
+      mockDbSelect.mockReturnValueOnce(listRows([]));
+
+      const rows = await service.findAll({} as any, 'tenant-1');
+
+      expect(rows).toEqual([]);
+      expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('suggestParameterLines', () => {
     it('returns [] without querying parameter_master when the breed has no lifecycle-stage data', async () => {
       mockDbSelect.mockReturnValueOnce({

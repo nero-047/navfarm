@@ -21,8 +21,12 @@ export type FinanceTabKey = (typeof FINANCE_SECTIONS)[number]["key"];
 
 function useFinancePageState() {
   const router = useRouter();
-  const [user, setUser] = useState<NavUser | null>(null);
-  const [ready, setReady] = useState(false);
+  // Session state comes from localStorage and is available on the first
+  // render. Resolving it in an effect left ready=false for a commit, which
+  // registered the module index as null and made the sub-navigation blank and
+  // refill on every page change.
+  const [user, setUser] = useState<NavUser | null>(() => getStoredUser());
+  const [ready, setReady] = useState(() => Boolean(getStoredUser()));
 
   useEffect(() => {
     const stored = getStoredUser();

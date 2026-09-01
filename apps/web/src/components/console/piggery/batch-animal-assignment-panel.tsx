@@ -89,6 +89,24 @@ export default function BatchAnimalAssignmentPanel() {
   const [breeds, setBreeds] = useState<Row[]>([]);
   const [items, setItems] = useState<Row[]>([]);
   const [locations, setLocations] = useState<Row[]>([]);
+  const [stages, setStages] = useState<Row[]>([]);
+
+  // Multi-select over the assigned list. A batch that is due to move on usually
+  // has a handful of animals that are not ready — the group actions below act
+  // on exactly that selection rather than one animal at a time.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [groupBusy, setGroupBusy] = useState(false);
+  const [groupError, setGroupError] = useState("");
+
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveStageId, setMoveStageId] = useState("");
+  const [moveLocationId, setMoveLocationId] = useState("");
+  const [moveReason, setMoveReason] = useState("");
+
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitStageCode, setSplitStageCode] = useState("");
+  const [splitLocationId, setSplitLocationId] = useState("");
+  const [splitReason, setSplitReason] = useState("PREGNANCY_FAILED");
   const [candidateAnimals, setCandidateAnimals] = useState<Row[]>([]);
 
   // Assign Existing Animal
@@ -217,6 +235,7 @@ export default function BatchAnimalAssignmentPanel() {
     const qs = companyId ? `?companyId=${companyId}&limit=500` : "?limit=500";
     api.get(`/setup/wizard/nobs${qs}`).then((r) => setNobs(unwrap<Row[]>(r) || [])).catch(() => undefined);
     api.get(`/location${qs}`).then((r) => setLocations(unwrap<Row[]>(r) || [])).catch(() => undefined);
+    api.get(`/stage${qs}`).then((r) => setStages(unwrap<Row[]>(r) || [])).catch(() => undefined);
     api.get(`/item${qs}`).then((r) => setItems(unwrap<Row[]>(r) || [])).catch(() => undefined);
   }, []);
 
@@ -318,6 +337,70 @@ export default function BatchAnimalAssignmentPanel() {
       setRegError(err?.message || t("anpErrRegisterAnimal"));
     } finally {
       setRegSaving(false);
+    }
+  };
+
+  const toggleSelected = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
+  /** Advance the selected animals to a stage — the tail-enders a batch-level
+      move deliberately left behind, moved together instead of one at a time. */
+  const handleBulkMove = async () => {
+    if (selectedIds.size === 0 || !moveStageId) return;
+    setGroupBusy(true);
+    setGroupError("");
+    try {
+      const res: any = await api.post("/animal/bulk-transition-stage", {
+        animal_ids: [...selectedIds],
+        to_stage_id: moveStageId,
+        to_location_id: moveLocationId || undefined,
+        transition_date: new Date().toISOString().slice(0, 10),
+        reason: moveReason || undefined,
+      });
+      const data = res?.data ?? res;
+      setToastMsg(
+        data?.failed?.length
+          ? `${data.moved} moved · ${data.failed.length} could not move`
+          : `${data?.moved ?? selectedIds.size} animal(s) moved.`,
+      );
+      setMoveOpen(false);
+      setSelectedIds(new Set());
+      loadAssignedAnimals();
+    } catch (err: any) {
+      setGroupError(err?.message || "Could not move the selected animals.");
+    } finally {
+      setGroupBusy(false);
+    }
+  };
+
+  /** Hold the selected animals back as their own batch while the rest of the
+      cohort moves on. The child keeps the parent's scheduler and records its
+      own stage, so data entry and records work against it unchanged. */
+  const handleSplit = async () => {
+    if (selectedIds.size === 0 || !currentBatch?.id) return;
+    setGroupBusy(true);
+    setGroupError("");
+    try {
+      const res: any = await api.post(`/batch-transfer/split/${currentBatch.id}`, {
+        animal_ids: [...selectedIds],
+        transfer_date: new Date().toISOString().slice(0, 10),
+        hold_stage_code: splitStageCode || undefined,
+        to_location_id: splitLocationId || undefined,
+        reason: splitReason || undefined,
+      });
+      const data = res?.data ?? res;
+      setToastMsg(`Split into ${data?.child?.batch_no ?? "a new group"}.`);
+      setSplitOpen(false);
+      setSelectedIds(new Set());
+      loadAssignedAnimals();
+    } catch (err: any) {
+      setGroupError(err?.message || "Could not split the selected animals.");
+    } finally {
+      setGroupBusy(false);
     }
   };
 
@@ -558,6 +641,25 @@ export default function BatchAnimalAssignmentPanel() {
       {/* ── TAB 1: ASSIGNED ANIMALS TABLE ── */}
       {activeTab === "assigned" && (
         <div className="space-y-4">
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3.5 py-2.5">
+              <span className="text-xs font-semibold text-[var(--text-primary)]">
+                {selectedIds.size} selected
+              </span>
+              <Button size="sm" variant="outline" onClick={() => { setGroupError(""); setMoveOpen(true); }}>
+                Move to stage…
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setGroupError(""); setSplitOpen(true); }}>
+                Hold back as split group…
+              </Button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="ml-auto text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                Clear
+              </button>
+            </div>
+          )}
           {/* Filter Bar */}
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
             <div className="flex items-center gap-3 flex-wrap flex-1">
@@ -611,6 +713,16 @@ export default function BatchAnimalAssignmentPanel() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--surface-raised)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                    <th className="px-3 py-2.5 font-bold">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all animals"
+                        checked={filtered.length > 0 && filtered.every((a) => selectedIds.has(a.id))}
+                        onChange={(e) =>
+                          setSelectedIds(e.target.checked ? new Set(filtered.map((a) => a.id)) : new Set())
+                        }
+                      />
+                    </th>
                     <th className="px-4 py-2.5 font-bold">{t("baapColHash")}</th>
                     <th className="px-4 py-2.5 font-bold">{t("baapColEarTagRfid")}</th>
                     <th className="px-4 py-2.5 font-bold">{t("baapColAnimalId")}</th>
@@ -626,13 +738,21 @@ export default function BatchAnimalAssignmentPanel() {
                 <tbody className="divide-y divide-[var(--border)]">
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-[var(--text-muted)]">
+                      <td colSpan={11} className="py-8 text-center text-[var(--text-muted)]">
                         {t("baapNoAnimalsFound", { code: currentBatch?.code || "" })}
                       </td>
                     </tr>
                   ) : (
                     filtered.map((animal, idx) => (
                       <tr key={animal.id} className="hover:bg-[var(--surface-raised)]/80 transition-colors">
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${animal.earTag}`}
+                            checked={selectedIds.has(animal.id)}
+                            onChange={() => toggleSelected(animal.id)}
+                          />
+                        </td>
                         <td className="px-4 py-2.5 text-[var(--text-muted)]">{idx + 1}</td>
                         <td className="px-4 py-2.5">
                           <span className="font-mono font-bold text-[var(--accent)] block">{animal.earTag}</span>
@@ -977,6 +1097,98 @@ export default function BatchAnimalAssignmentPanel() {
           </div>
         </Dialog>
       )}
+
+      {/* Advance a selected group to a stage — the tail-enders a batch-level
+          move left behind, moved together rather than one modal each. */}
+      <Dialog
+        open={moveOpen}
+        onClose={() => setMoveOpen(false)}
+        title={`Move ${selectedIds.size} animal(s) to a stage`}
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setMoveOpen(false)}>Cancel</Button>
+            <Button size="sm" className="nf-btn-primary" onClick={handleBulkMove} disabled={groupBusy || !moveStageId}>
+              {groupBusy ? "Moving…" : "Move animals"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {groupError && <p className="text-xs text-[var(--danger)]">{groupError}</p>}
+          <label className="block">
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Destination stage</span>
+            <select value={moveStageId} onChange={(e) => setMoveStageId(e.target.value)} className="nf-input-sm nf-select w-full">
+              <option value="">Select a stage…</option>
+              {stages.map((st: any) => (
+                <option key={st.stage_id} value={st.stage_id}>{st.stage_code} — {st.stage_name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Destination pen (optional)</span>
+            <select value={moveLocationId} onChange={(e) => setMoveLocationId(e.target.value)} className="nf-input-sm nf-select w-full">
+              <option value="">Leave where they are</option>
+              {locations.map((l: any) => (
+                <option key={l.location_id} value={l.location_id}>{l.location_code} — {l.location_name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Reason (overrides the minimum-days check)</span>
+            <input value={moveReason} onChange={(e) => setMoveReason(e.target.value)} className="nf-input-sm w-full" placeholder="e.g. Re-served and confirmed pregnant" />
+          </label>
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Animals short of their stage minimum are reported back and skipped; the rest still move.
+          </p>
+        </div>
+      </Dialog>
+
+      {/* Hold a group back as its own batch while the cohort moves on. */}
+      <Dialog
+        open={splitOpen}
+        onClose={() => setSplitOpen(false)}
+        title={`Hold ${selectedIds.size} animal(s) back as a split group`}
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setSplitOpen(false)}>Cancel</Button>
+            <Button size="sm" className="nf-btn-primary" onClick={handleSplit} disabled={groupBusy}>
+              {groupBusy ? "Splitting…" : "Create split group"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {groupError && <p className="text-xs text-[var(--danger)]">{groupError}</p>}
+          <p className="text-[11px] text-[var(--text-muted)]">
+            These animals become their own batch, keeping {currentBatch?.code || "the batch"}&rsquo;s schedule.
+            The rest of the cohort moves on without them. Merge them back from the batch list when they are ready.
+          </p>
+          <label className="block">
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Stage the group holds at</span>
+            <select value={splitStageCode} onChange={(e) => setSplitStageCode(e.target.value)} className="nf-input-sm nf-select w-full">
+              <option value="">Keep the batch&rsquo;s current stage</option>
+              {stages.map((st: any) => (
+                <option key={st.stage_id} value={st.stage_code}>{st.stage_code} — {st.stage_name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Pen (optional)</span>
+            <select value={splitLocationId} onChange={(e) => setSplitLocationId(e.target.value)} className="nf-input-sm nf-select w-full">
+              <option value="">Keep the batch&rsquo;s pen</option>
+              {locations.map((l: any) => (
+                <option key={l.location_id} value={l.location_id}>{l.location_code} — {l.location_name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Reason</span>
+            <input value={splitReason} onChange={(e) => setSplitReason(e.target.value)} className="nf-input-sm w-full" placeholder="e.g. PREGNANCY_FAILED" />
+          </label>
+        </div>
+      </Dialog>
 
       {/* ── MODAL: CSV EAR TAG IMPORT ── */}
       {csvModalOpen && (

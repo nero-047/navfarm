@@ -508,6 +508,11 @@ const breedLifecycleStage: MasterDataConfig = {
       key: "alert_severity", label: "Alert Severity", type: "select",
       options: ["INFO", "WARNING", "CRITICAL"].map((v) => ({ value: v, label: v })),
     },
+    // These two columns have existed on breed_lifecycle_stages since the schema
+    // was written but were never exposed, so there was no way to record a
+    // vaccination or medication plan for a breed at a stage at all.
+    { key: "vaccination_protocol", label: "Vaccination Protocol", type: "json", helpText: "Entries of { vaccine, day, route, dose } for this breed at this stage." },
+    { key: "medication_protocol", label: "Medication Protocol", type: "json", helpText: "Entries of { medicine, day, route, dose, withdrawal_days } for this breed at this stage." },
     { key: "notes", label: "Notes", type: "textarea", helpText: "Shown as a tooltip on the data entry screen." },
   ],
 };

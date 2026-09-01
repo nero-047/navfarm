@@ -36,11 +36,26 @@ export function resolvePiggeryStageId(rawCode: string | null | undefined): { id:
   return { id: 1, name: rawCode || DEFAULT_PIGGERY_STAGES[0].name, standardDays: DEFAULT_PIGGERY_STAGES[0].standardDays };
 }
 
-/** Elapsed day within the current stage, computed from the batch's real start_date — not a fabricated constant. */
-export function computeStageDay(startDate: string | null | undefined, totalDays: number): number {
-  if (!startDate) return 1;
-  const start = new Date(startDate);
+/**
+ * Elapsed day within the CURRENT stage.
+ *
+ * `stageStartDate` is the day the batch entered the stage it is in now — not
+ * the batch's own start_date. Passing the batch start counted the whole life of
+ * the cohort against the stage's standard length, so a sow 63 days into a
+ * 114-day gestation, whose batch began in quarantine 180 days earlier, was
+ * clamped to "Day 114 of 114" — reading as due to farrow today.
+ *
+ * `today` is injectable so this is testable on any date.
+ */
+export function computeStageDay(
+  stageStartDate: string | null | undefined,
+  totalDays: number,
+  today?: string,
+): number {
+  if (!stageStartDate) return 1;
+  const start = new Date(`${String(stageStartDate).slice(0, 10)}T00:00:00`);
   if (Number.isNaN(start.getTime())) return 1;
-  const elapsed = Math.floor((Date.now() - start.getTime()) / 86_400_000) + 1;
+  const now = today ? new Date(`${today.slice(0, 10)}T00:00:00`) : new Date();
+  const elapsed = Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1;
   return Math.min(Math.max(elapsed, 1), Math.max(totalDays, 1));
 }

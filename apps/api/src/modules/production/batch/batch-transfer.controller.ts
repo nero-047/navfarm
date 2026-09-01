@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { BatchTransferService } from './batch-transfer.service';
-import { CreateBatchTransferDto, QueryBatchTransferDto } from './dto/batch.dto';
+import { CreateBatchTransferDto, MergeBatchDto, QueryBatchTransferDto, SplitBatchDto } from './dto/batch.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -54,6 +54,26 @@ export class BatchTransferController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const data = await this.transferService.create(dto, tenantId, batchId, req.user);
     return { success: true, message: 'Transfer recorded successfully.', data };
+  }
+
+  @Post('split/:batchId')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Hold part of a cohort back as its own child batch when the rest moves on to the next stage' })
+  @ApiParam({ name: 'batchId', description: 'Parent batch UUID' })
+  async split(@Param('batchId') batchId: string, @Body() dto: SplitBatchDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.transferService.splitBatch(batchId, dto, tenantId, req.user);
+    return { success: true, message: `Split ${dto.animal_ids.length} animal(s) into ${result.child.batch_no}.`, data: result };
+  }
+
+  @Post('merge/:batchId')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'Merge a split group back into the cohort it came from and close the child batch' })
+  @ApiParam({ name: 'batchId', description: 'Child batch UUID' })
+  async merge(@Param('batchId') batchId: string, @Body() dto: MergeBatchDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.transferService.mergeBatch(batchId, dto, tenantId, req.user);
+    return { success: true, message: `${result.merged} animal(s) merged back.`, data: result };
   }
 
   @Post(':id/post')

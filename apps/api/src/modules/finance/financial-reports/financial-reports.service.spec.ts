@@ -226,6 +226,10 @@ describe('FinancialReportsService', () => {
         batch_id: 'batch-1',
         batch_no: 'PIG-B-2026-01',
         costing_method: 'BIO_ASSET',
+        // The cost columns come from the batch's own accumulated cost, not from
+        // summing std_value/actual_value — those hold a rate on a PRICE row and
+        // a quantity on a USAGE row, so adding them across types is meaningless.
+        total_cost: '52000.0000',
       };
 
       mockDbSelect.mockReturnValueOnce({
@@ -269,8 +273,8 @@ describe('FinancialReportsService', () => {
 
       expect(res).toHaveLength(1);
       expect(res[0].batch_no).toBe('PIG-B-2026-01');
-      expect(res[0].standard_cost).toBe(50000);
-      expect(res[0].actual_cost).toBe(52000);
+      expect(res[0].actual_cost).toBe(52000);          // the batch's actual accumulated cost
+      expect(res[0].standard_cost).toBe(50000);        // actual net of what the variances explain
       expect(res[0].price_variance).toBe(1200);
       expect(res[0].usage_variance).toBe(800);
       expect(res[0].total_variance).toBe(2000);

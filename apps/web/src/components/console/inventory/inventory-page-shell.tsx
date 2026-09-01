@@ -22,10 +22,14 @@ export type InventoryTabKey = (typeof INVENTORY_SECTIONS)[number]["key"];
 
 function useInventoryPageState() {
   const router = useRouter();
-  const [user, setUser] = useState<NavUser | null>(null);
-  const [ready, setReady] = useState(false);
-  const [scope, setScope] = useState("COMPANY");
-  const [activeLob, setActiveLobState] = useState("PIGGERY");
+  // Session state comes from localStorage and is available on the first
+  // render. Resolving it in an effect left ready=false for a commit, which
+  // registered the module index as null and made the sub-navigation blank and
+  // refill on every page change.
+  const [user, setUser] = useState<NavUser | null>(() => getStoredUser());
+  const [ready, setReady] = useState(() => Boolean(getStoredUser()));
+  const [scope, setScope] = useState(() => getActiveWorkspaceScope());
+  const [activeLob, setActiveLobState] = useState(() => getActiveLob());
 
   useEffect(() => {
     const stored = getStoredUser();

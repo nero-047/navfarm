@@ -6,27 +6,27 @@ describe('Button', () => {
   it('renders the default variant (source-ui "primary" maps here)', () => {
     render(<Button>Save</Button>);
     const button = screen.getByRole('button', { name: 'Save' });
-    expect(button.className).toContain('bg-(--accent)');
+    expect(button.className).toContain('bg-[var(--accent)]');
     expect(button.className).toContain('rounded-[var(--radius-pill)]');
   });
 
   it('renders the destructive variant (source-ui "danger" maps here)', () => {
     render(<Button variant="destructive">Delete</Button>);
     const button = screen.getByRole('button', { name: 'Delete' });
-    expect(button.className).toContain('bg-(--danger)');
+    expect(button.className).toContain('bg-[var(--danger)]');
   });
 
   it('renders the outline variant', () => {
     render(<Button variant="outline">Cancel</Button>);
     const button = screen.getByRole('button', { name: 'Cancel' });
-    expect(button.className).toContain('border-(--border)');
-    expect(button.className).toContain('bg-(--surface)');
+    expect(button.className).toContain('border-[var(--border)]');
+    expect(button.className).toContain('bg-[var(--surface)]');
   });
 
   it('renders the ghost variant', () => {
     render(<Button variant="ghost">Dismiss</Button>);
     const button = screen.getByRole('button', { name: 'Dismiss' });
-    expect(button.className).toContain('text-(--text-secondary)');
+    expect(button.className).toContain('text-[var(--text-secondary)]');
   });
 
   it('preserves disabled behavior and blocks click handlers', () => {

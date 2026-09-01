@@ -87,7 +87,8 @@ describe('AnimalService', () => {
         .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
         .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
         .mockReturnValueOnce(found({ item_id: 'item-1' }))
-        .mockReturnValueOnce(found({ animal_id: 'a-1', animal_code: 'PIG-2026-0001', total_opening_asset_value: '3057.57' }));
+        .mockReturnValueOnce(found({ lob_code: 'PIGGERY' })) // generateAnimalCode resolves the series prefix from the LOB
+        .mockReturnValueOnce(found({ animal_id: 'a-1', animal_code: 'PIG-2026-0001', total_opening_asset_value: '3057.57' })); // findOne
 
       const insertedRecords: any[] = [];
       mockDbInsert.mockReturnValue({ values: jest.fn().mockImplementation((v) => { insertedRecords.push(v); return Promise.resolve({}); }) });
@@ -352,6 +353,91 @@ describe('AnimalService', () => {
 
       expect(res.current_stage).toBe('Flush and Service');
       expect(res.current_location_id).toBe('loc-2');
+    });
+
+    it('increments parity_count when a sow moves from farrowing to weaning', async () => {
+      let captured: any = null;
+      mockDbSelect
+        .mockReturnValueOnce(found({
+          animal_id: 'a-2',
+          company_id: 'comp-1',
+          animal_code: 'PIG-2026-0002',
+          is_active: true,
+          gender: 'F',
+          current_stage_id: 'st-farrow',
+          current_location_id: 'loc-1',
+          parity_count: 2,
+          entry_date: '2026-01-01',
+        })) // findOne — no current_stage: animal_register has no such column
+        .mockReturnValueOnce(found({
+          stage_id: 'st-wean',
+          stage_code: 'WEANING',
+          stage_name: 'Weaning',
+        })) // destStage
+        .mockReturnValueOnce(found({
+          stage_id: 'st-farrow',
+          stage_code: 'FARROWING',
+          stage_name: 'Farrowing',
+          min_days_before_move: 1,
+        })) // currentStage
+        .mockReturnValueOnce(found({ animal_id: 'a-2', parity_count: 3 })); // findOne return
+
+      mockDbUpdate.mockReturnValue({
+        set: jest.fn((v: any) => {
+          captured = v;
+          return { where: jest.fn().mockResolvedValue({}) };
+        }),
+      });
+
+      await service.transitionStage(
+        'a-2',
+        { to_stage_id: 'st-wean', transition_date: '2026-06-01' },
+        'tenant-123',
+        { userId: 'user-1' }
+      );
+
+      expect(captured.parity_count).toBe(3);
+    });
+
+    it('moves every selected animal in one bulk call', async () => {
+      // Tail-enders left behind by a batch move are a routine group, not a
+      // one-off: moving them meant opening the modal once per animal.
+      const single = jest.spyOn(service, 'transitionStage').mockResolvedValue({ animal_id: 'ok' } as any);
+
+      const result = await service.bulkTransitionStage(
+        { animal_ids: ['a-1', 'a-2', 'a-3'], to_stage_id: 'st-flush', transition_date: '2026-09-01' } as any,
+        'tenant-123',
+        { userId: 'user-1' },
+      );
+
+      expect(single).toHaveBeenCalledTimes(3);
+      expect(result.moved).toBe(3);
+      expect(result.failed).toHaveLength(0);
+    });
+
+    it('reports the animals it could not move without blocking the rest', async () => {
+      // One animal short of its minimum days must not stop the others.
+      jest.spyOn(service, 'transitionStage')
+        .mockResolvedValueOnce({ animal_id: 'a-1' } as any)
+        .mockRejectedValueOnce(new BadRequestException('Minimum duration of 90 days required'))
+        .mockResolvedValueOnce({ animal_id: 'a-3' } as any);
+
+      const result = await service.bulkTransitionStage(
+        { animal_ids: ['a-1', 'a-2', 'a-3'], to_stage_id: 'st-flush', transition_date: '2026-09-01' } as any,
+        'tenant-123',
+        { userId: 'user-1' },
+      );
+
+      expect(result.moved).toBe(2);
+      expect(result.failed).toEqual([
+        { animal_id: 'a-2', reason: 'Minimum duration of 90 days required' },
+      ]);
+    });
+
+    it('rejects an empty selection rather than silently doing nothing', async () => {
+      await expect(
+        service.bulkTransitionStage({ animal_ids: [], to_stage_id: 'st-flush', transition_date: '2026-09-01' } as any, 'tenant-123'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('rejects transition of disposed animals', async () => {

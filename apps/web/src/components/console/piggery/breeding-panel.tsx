@@ -120,9 +120,9 @@ export function BreedingPanel() {
     setError(null);
     try {
       const [mRes, fRes, sRes, aRes] = await Promise.all([
-        api.get("/livestock/breeding/mating").catch(() => []),
-        api.get("/livestock/breeding/farrowing").catch(() => []),
-        api.get("/livestock/breeding/semen-collection").catch(() => []),
+        api.get("/piggery/breeding/mating").catch(() => []),
+        api.get("/piggery/breeding/farrowing").catch(() => []),
+        api.get("/piggery/breeding/semen-collection").catch(() => []),
         api.get("/animal").catch(() => []),
       ]);
       setMatings(unwrap<Row[]>(mRes) || []);
@@ -153,7 +153,7 @@ export function BreedingPanel() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.post("/livestock/breeding/mating", {
+      await api.post("/piggery/breeding/mating", {
         ...matingForm,
         semen_dose_qty: Number(matingForm.semen_dose_qty) || 1,
       });
@@ -174,7 +174,7 @@ export function BreedingPanel() {
     setError(null);
     try {
       await api.patch(
-        `/livestock/breeding/mating/${selectedMating.breeding_id}/preg-check`,
+        `/piggery/breeding/mating/${selectedMating.breeding_id}/preg-check`,
         pregCheckForm
       );
       setSuccess(t("brpSuccessPregCheckUpdated"));
@@ -192,7 +192,7 @@ export function BreedingPanel() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.post("/livestock/breeding/farrowing", {
+      await api.post("/piggery/breeding/farrowing", {
         ...farrowForm,
         piglets_born_live: Number(farrowForm.piglets_born_live) || 0,
         piglets_stillborn: Number(farrowForm.piglets_stillborn) || 0,
@@ -221,7 +221,7 @@ export function BreedingPanel() {
     setError(null);
     try {
       await api.patch(
-        `/livestock/breeding/farrowing/${selectedFarrow.farrow_id}/weaning`,
+        `/piggery/breeding/farrowing/${selectedFarrow.farrow_id}/weaning`,
         {
           ...weanForm,
           piglets_weaned: Number(weanForm.piglets_weaned) || 0,
@@ -246,7 +246,7 @@ export function BreedingPanel() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.post("/livestock/breeding/semen-collection", {
+      await api.post("/piggery/breeding/semen-collection", {
         ...semenForm,
         doses_collected: Number(semenForm.doses_collected) || 1,
         amortisation_period: Number(semenForm.amortisation_period) || 0,

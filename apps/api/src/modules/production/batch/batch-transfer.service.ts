@@ -4,7 +4,7 @@ import { eq, and, or, inArray, isNull, gte, lte, desc, sql, SQL } from 'drizzle-
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
-import { CreateBatchTransferDto, QueryBatchTransferDto } from './dto/batch.dto';
+import { CreateBatchTransferDto, MergeBatchDto, QueryBatchTransferDto, SplitBatchDto } from './dto/batch.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
@@ -207,6 +207,192 @@ export class BatchTransferService {
     return this.findOne(transferId, tenantId);
   }
 
+  /** Live members of a batch — the pool a split or merge can actually move. */
+  private async liveAnimalIds(batchId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ animal_id: schema.animalRegister.animal_id })
+      .from(schema.animalRegister)
+      .where(
+        and(
+          eq(schema.animalRegister.current_batch_id, batchId),
+          eq(schema.animalRegister.is_active, true),
+          sql`${schema.animalRegister.status} NOT IN ('DEAD','SOLD','CULLED','SLAUGHTERED')`,
+        )
+      );
+    return rows.map((r) => r.animal_id);
+  }
+
+  /**
+   * Split part of a cohort into a child batch.
+   *
+   * The case this exists for: a batch is due to move on, most of it is ready and
+   * some of it is not — sows that failed the day-35 scan, tail-enders short of
+   * weight. Holding the whole batch back penalises the ready animals; dragging
+   * the unready ones forward is simply false. So the ready animals advance with
+   * the parent and the remainder become a batch of their own, holding whatever
+   * stage and pen they are actually in.
+   *
+   * A child batch rather than a sub-group inside the parent because a batch
+   * already carries everything the group needs — its own stage, scheduler,
+   * location, data entry, records, costing and KPI all work against it with no
+   * change. parent_batch_id is the thread back, for reporting and for merge().
+   *
+   * The animal movement itself is a normal PARTIAL transfer: this does not
+   * repeat the repointing, value shift or ledger legs, it delegates them.
+   */
+  async splitBatch(
+    parentBatchId: string,
+    dto: SplitBatchDto,
+    tenantId: string,
+    userPayload?: { userId?: string },
+  ) {
+    const parent = await this.loadBatch(parentBatchId, tenantId, 'Source');
+
+    const animalIds = dto.animal_ids ?? [];
+    if (animalIds.length === 0) {
+      throw new BadRequestException('Select at least one animal to split out of the batch.');
+    }
+    if (parent.status !== 'ACTIVE') {
+      throw new BadRequestException(`Only an ACTIVE batch can be split (this one is ${parent.status}).`);
+    }
+
+    const childBatchId = randomUUID();
+    const childBatchNo = dto.child_batch_no || `${parent.batch_no}-S${String(Date.now()).slice(-4)}`;
+    // The group holds where the animals actually are: by default the stage the
+    // parent is leaving, or an explicit earlier stage when they have gone back
+    // (a failed scan returns a sow to service, not forward to farrowing).
+    const holdStageCode = dto.hold_stage_code || parent.current_stage_code;
+
+    // post() reads the destination batch's stage_id to set each moved animal's
+    // current_stage_id. Leaving it null when the group holds a different stage
+    // meant the child batch claimed one stage while its animals silently kept
+    // the parent's — the whole point of the split, lost.
+    let holdStageId = parent.stage_id;
+    if (dto.hold_stage_code && dto.hold_stage_code !== parent.current_stage_code) {
+      const [matched] = await this.db
+        .select({ stage_id: schema.stageMaster.stage_id })
+        .from(schema.stageMaster)
+        .where(
+          and(
+            eq(schema.stageMaster.lob_id, parent.lob_id),
+            eq(schema.stageMaster.stage_code, dto.hold_stage_code.toUpperCase()),
+            eq(schema.stageMaster.is_active, true),
+            isNull(schema.stageMaster.deleted_at),
+          )
+        )
+        .limit(1);
+      holdStageId = matched?.stage_id ?? null;
+    }
+
+    await this.db.insert(schema.batchHeader).values({
+      batch_id: childBatchId,
+      tenant_id: tenantId,
+      company_id: parent.company_id,
+      batch_no: childBatchNo,
+      nob_id: parent.nob_id,
+      lob_id: parent.lob_id,
+      breed_id: parent.breed_id,
+      scheduler_id: parent.scheduler_id,
+      costing_method: parent.costing_method,
+      operational_area_id: parent.operational_area_id,
+      shed_id: parent.shed_id,
+      location_id: dto.to_location_id || parent.location_id,
+      sub_location_id: dto.to_location_id || parent.sub_location_id,
+      current_stage_code: holdStageCode,
+      stage_id: holdStageId,
+      parent_batch_id: parentBatchId,
+      start_date: dto.transfer_date,
+      expected_end_date: parent.expected_end_date,
+      opening_quantity: animalIds.length.toFixed(4),
+      closing_quantity: animalIds.length.toFixed(4),
+      uom: parent.uom,
+      status: 'ACTIVE',
+      remarks: dto.remarks || `Split from ${parent.batch_no}${dto.reason ? ` — ${dto.reason}` : ''}.`,
+      created_by: userPayload?.userId || null,
+    });
+
+    await this.db.insert(schema.batchBioAssetState).values({
+      state_id: randomUUID(),
+      batch_id: childBatchId,
+      stage: 'MATURE',
+      current_quantity: animalIds.length.toFixed(4),
+      nca_book_value: '0.0000',
+    });
+
+    const transfer = await this.create(
+      {
+        company_id: parent.company_id,
+        to_batch_id: childBatchId,
+        transfer_date: dto.transfer_date,
+        transfer_type: 'PARTIAL',
+        animal_ids: animalIds,
+        reason: dto.reason,
+        remarks: dto.remarks,
+      } as CreateBatchTransferDto,
+      tenantId,
+      parentBatchId,
+      userPayload,
+    );
+
+    return {
+      child: { batch_id: childBatchId, batch_no: childBatchNo, parent_batch_id: parentBatchId, current_stage_code: holdStageCode },
+      transfer,
+    };
+  }
+
+  /**
+   * Merge a split group back into the cohort it came from.
+   *
+   * Every live animal still in the child moves home and the child closes. Their
+   * own stage history stays intact — the batch is the container, the animal is
+   * the record of truth, so rejoining never rewrites where an animal has been.
+   */
+  async mergeBatch(
+    childBatchId: string,
+    dto: MergeBatchDto,
+    tenantId: string,
+    userPayload?: { userId?: string },
+  ) {
+    const child = await this.loadBatch(childBatchId, tenantId, 'Source');
+
+    if (!child.parent_batch_id) {
+      throw new BadRequestException(`${child.batch_no} was not split out of another batch, so there is nothing to merge it into.`);
+    }
+
+    const animalIds = await this.liveAnimalIds(childBatchId);
+    if (animalIds.length === 0) {
+      throw new BadRequestException(`${child.batch_no} has no live animals left to merge.`);
+    }
+
+    const transfer = await this.create(
+      {
+        company_id: child.company_id,
+        to_batch_id: child.parent_batch_id,
+        transfer_date: dto.transfer_date,
+        transfer_type: 'PARTIAL',
+        animal_ids: animalIds,
+        reason: dto.reason || 'MERGED_BACK',
+        remarks: dto.remarks || `Merged back into the parent cohort from ${child.batch_no}.`,
+      } as CreateBatchTransferDto,
+      tenantId,
+      childBatchId,
+      userPayload,
+    );
+
+    await this.db
+      .update(schema.batchHeader)
+      .set({
+        status: 'CLOSED',
+        actual_end_date: dto.transfer_date,
+        closed_at: toMysqlTimestamp(),
+        closed_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      })
+      .where(eq(schema.batchHeader.batch_id, childBatchId));
+
+    return { merged: animalIds.length, into_batch_id: child.parent_batch_id, transfer };
+  }
+
   /**
    * Applies the movement. Everything here is idempotent-guarded by the DRAFT
    * check, so a double-submit cannot move the same animals twice.
@@ -241,6 +427,16 @@ export class BatchTransferService {
       );
     }
 
+    // The destination batch's stage. Animals carry their own current_stage_id
+    // (read by the herd and bio-asset-by-stage reports), so moving them into a
+    // batch sitting at a different stage has to move their stage with them —
+    // otherwise a pig transferred into farrowing still reports as gestating.
+    const [destBatch] = await this.db
+      .select({ stage_id: schema.batchHeader.stage_id })
+      .from(schema.batchHeader)
+      .where(eq(schema.batchHeader.batch_id, transfer.to_batch_id))
+      .limit(1);
+
     // 1. Repoint the animals. They stay ACTIVE and is_active — a transferred
     //    animal is still fully operable, just under a different batch.
     await this.db
@@ -248,6 +444,7 @@ export class BatchTransferService {
       .set({
         current_batch_id: transfer.to_batch_id,
         ...(toLocationId ? { current_location_id: toLocationId } : {}),
+        ...(destBatch?.stage_id ? { current_stage_id: destBatch.stage_id } : {}),
         updated_by: userPayload?.userId || null,
         updated_at: toMysqlTimestamp(),
       })

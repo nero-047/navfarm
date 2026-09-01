@@ -4,7 +4,7 @@ import { eq, and, or, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
-import { CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto, TransitionAnimalStageDto } from './dto/animal.dto';
+import { BulkTransitionAnimalStageDto, CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto, TransitionAnimalStageDto } from './dto/animal.dto';
 
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 
@@ -596,6 +596,46 @@ export class AnimalService {
       .orderBy(schema.bioAssetLedger.posting_date);
   }
 
+  /**
+   * Move a group of animals to a stage in one action.
+   *
+   * A batch-level stage move deliberately carries only the animals in step with
+   * the batch, which leaves the tail-enders behind by design. Advancing those
+   * afterwards meant one modal per animal — and roughly a tenth of any cohort
+   * are tail-enders, so that is the normal case, not an edge case.
+   *
+   * One animal failing its own validation (short of min_days_before_move, or
+   * already disposed) must not block the rest, so each is attempted
+   * independently and the refusals are reported back rather than thrown.
+   */
+  async bulkTransitionStage(
+    dto: BulkTransitionAnimalStageDto,
+    tenantId: string,
+    userPayload?: any,
+  ): Promise<{ moved: number; failed: Array<{ animal_id: string; reason: string }> }> {
+    const animalIds = dto.animal_ids ?? [];
+    if (animalIds.length === 0) {
+      throw new BadRequestException('Select at least one animal to move.');
+    }
+
+    const failed: Array<{ animal_id: string; reason: string }> = [];
+    let moved = 0;
+
+    for (const animalId of animalIds) {
+      try {
+        await this.transitionStage(animalId, dto, tenantId, userPayload);
+        moved += 1;
+      } catch (err) {
+        failed.push({
+          animal_id: animalId,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return { moved, failed };
+  }
+
   async transitionStage(id: string, dto: TransitionAnimalStageDto, tenantId: string, userPayload?: any) {
     const animal = await this.findOne(id);
     if (!animal.is_active) {
@@ -614,8 +654,9 @@ export class AnimalService {
     }
 
     // 2. Minimum duration validation if moving from a stage that specifies min_days_before_move
+    let currentStage: typeof schema.stageMaster.$inferSelect | undefined;
     if (animal.current_stage_id) {
-      const [currentStage] = await this.db
+      [currentStage] = await this.db
         .select()
         .from(schema.stageMaster)
         .where(eq(schema.stageMaster.stage_id, animal.current_stage_id))
@@ -664,14 +705,13 @@ export class AnimalService {
     if (
       animal.gender === 'F' &&
       (destCode === 'WEANING' || destCode === 'DRY_SOW_GESTATION' || destCode === 'FLUSH_SERVICE') &&
-      animal.current_stage?.toUpperCase()?.includes('FARROW')
+      currentStage?.stage_code?.toUpperCase()?.includes('FARROW')
     ) {
       newParity += 1;
     }
 
     const updates = {
       current_stage_id: dto.to_stage_id,
-      current_stage: destStage.stage_name,
       current_location_id: dto.to_location_id !== undefined ? dto.to_location_id : animal.current_location_id,
       current_batch_id: dto.to_batch_id !== undefined ? dto.to_batch_id : animal.current_batch_id,
       parity_count: newParity,
@@ -693,7 +733,6 @@ export class AnimalService {
       entityId: id,
       oldValues: {
         current_stage_id: animal.current_stage_id,
-        current_stage: animal.current_stage,
         current_location_id: animal.current_location_id,
         current_batch_id: animal.current_batch_id,
       },

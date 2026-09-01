@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Patch, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { AnimalService } from './animal.service';
-import { CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto, TransitionAnimalStageDto } from './dto/animal.dto';
+import { BulkTransitionAnimalStageDto, CreateAnimalDto, UpdateAnimalDto, DisposeAnimalDto, QueryAnimalDto, TransitionAnimalStageDto } from './dto/animal.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -57,6 +57,20 @@ export class AnimalController {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.animalService.update(id, dto, tenantId, req.user);
     return { success: true, message: 'Animal updated successfully.', data: result };
+  }
+
+  // Declared before ':id/transition-stage' is irrelevant here — the two differ
+  // in segment count — but keep it adjacent so the pair stays together.
+  @Post('bulk-transition-stage')
+  @RequirePermission('PIGGERY', 'ANIMAL', 'edit')
+  @ApiOperation({ summary: 'Move several animals to a stage at once — the tail-enders a batch-level stage move left behind' })
+  async bulkTransitionStage(@Body() dto: BulkTransitionAnimalStageDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.animalService.bulkTransitionStage(dto, tenantId, req.user);
+    const message = result.failed.length
+      ? `${result.moved} animal(s) moved, ${result.failed.length} could not be moved.`
+      : `${result.moved} animal(s) moved.`;
+    return { success: true, message, data: result };
   }
 
   @Post(':id/transition-stage')

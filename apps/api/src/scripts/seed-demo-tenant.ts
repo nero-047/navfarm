@@ -75,7 +75,7 @@ async function seedCompany(
   defaultLangId: string,
   defaultCurrId: string,
 ): Promise<{ companyId: string; adminEmail: string; adminPassword: string }> {
-  let [existing] = await tenantDb.select().from(tenant.companyMaster).where(eq(tenant.companyMaster.company_code, spec.code)).limit(1);
+  const [existing] = await tenantDb.select().from(tenant.companyMaster).where(eq(tenant.companyMaster.company_code, spec.code)).limit(1);
   const companyId = existing?.company_id || randomUUID();
 
   if (!existing) {

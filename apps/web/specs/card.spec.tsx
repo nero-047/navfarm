@@ -42,6 +42,6 @@ describe('Card', () => {
   it('sets a default text color so contents do not inherit ambient color', () => {
     render(<Card data-testid="card">content</Card>);
     const card = screen.getByTestId('card');
-    expect(card.className).toContain('text-(--text-primary)');
+    expect(card.className).toContain('text-[var(--text-primary)]');
   });
 });

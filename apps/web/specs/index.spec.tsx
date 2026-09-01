@@ -15,18 +15,18 @@ describe('Page', () => {
 
     render(<Page />);
 
-    expect(screen.getByText('Opening your workspace…')).toBeTruthy();
+    expect(screen.getByText('Farm')).toBeTruthy(); // the brand mark on the interstitial while the redirect resolves
     expect(replace).toHaveBeenCalledWith('/login');
   });
 
-  it('sends an authenticated user to the console', () => {
+  it('sends an authenticated user to the dashboard', () => {
     const replace = jest.fn();
     (useRouter as jest.Mock).mockReturnValue({ replace });
     localStorage.setItem('navfarm_auth_user', JSON.stringify({ email: 'demo@navfarm.com' }));
 
     render(<Page />);
 
-    expect(replace).toHaveBeenCalledWith('/console');
+    expect(replace).toHaveBeenCalledWith('/dashboard');
   });
 
   it('sends a system admin to the admin area', () => {

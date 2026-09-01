@@ -18,6 +18,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { useLanguage } from "@/hooks/useLanguage";
 
 import { api } from "@/services/api-client";
+import { stageWindows } from "./build-lifecycle-stages";
+import { apportionToAnimal } from "./apportion-to-animal";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { AnimalMultiSelect, splitEvenly, type AnimalOption } from "../production/animal-multi-select";
 
@@ -117,6 +119,44 @@ type TabKey = (typeof TAB_KEYS)[number];
 // inputs — called once unfiltered at fetch time to build the default view,
 // and again (with `txs` pre-filtered to one animal_id) to derive the
 // per-animal view, so per-animal filtering needs no backend round-trip.
+/**
+ * One profile per stage the batch actually occupied.
+ *
+ * The panel previously wrapped a single whole-life profile in an array, so its
+ * Stage filter offered exactly one option even for a batch that had moved
+ * through several — the screen disagreed with the lifecycle stepper beside it.
+ * Transactions are partitioned by the stage's date window, so each stage
+ * reports only its own feed, medication, mortality and output.
+ */
+function buildStageProfiles(b: any, txs: any[], stageLog: any[] = [], attachments: any[] = []): StageProfile[] {
+  const windows = stageWindows({
+    stageLog: (stageLog || []).map((l: any) => ({
+      from_stage_code: l.from_stage_code ?? null,
+      to_stage_code: l.to_stage_code,
+      transferred_at: String(l.transferred_at || ''),
+    })),
+    batchStartDate: String(b.start_date || '').slice(0, 10),
+    currentStageCode: b.current_stage_code ?? null,
+    batchEndDate: b.actual_end_date ? String(b.actual_end_date).slice(0, 10) : null,
+  });
+
+  if (windows.length <= 1) return [buildStageProfile(b, txs, stageLog, attachments)];
+
+  return windows.map((w, i) => {
+    const inWindow = (txs || []).filter((t: any) => {
+      const d = String(t.transaction_date || '').slice(0, 10);
+      return d >= w.from && d <= w.to;
+    });
+    const profile = buildStageProfile(
+      { ...b, current_stage_code: w.code, start_date: w.from, expected_end_date: w.to },
+      inWindow,
+      stageLog,
+      attachments,
+    );
+    return { ...profile, id: `st-${b.batch_id}-${i}` };
+  });
+}
+
 function buildStageProfile(b: any, txs: any[], stageLog: any[] = [], attachments: any[] = []): StageProfile {
   // Helper to detect medicine transactions vs feed
   const isMedicine = (t: any) => {
@@ -386,6 +426,10 @@ export default function StageWiseConsumptionOutputPanel() {
 
   // Animal filter — narrows every tab below to one animal's own transactions.
   const [selectedAnimalId, setSelectedAnimalId] = useState("");
+  // A cohort that was split has part of its history sitting on child batches.
+  // Reading the parent alone under-reports the original group, so this rolls the
+  // children back in for the whole-cohort view.
+  const [includeChildren, setIncludeChildren] = useState(false);
   const [batchAnimalOptions, setBatchAnimalOptions] = useState<AnimalOption[]>([]);
   const [batchAnimalOptionsLoading, setBatchAnimalOptionsLoading] = useState(false);
 
@@ -403,14 +447,40 @@ export default function StageWiseConsumptionOutputPanel() {
       .finally(() => setBatchAnimalOptionsLoading(false));
   }, [selectedBatchId]);
 
+  // Transactions of every batch split out of the selected one, keyed for the
+  // whole-cohort view. Children are found through parent_batch_id, which
+  // splitBatch() sets when it holds a group back.
+  const childBatchIds = useMemo(
+    () => Object.values(rawBatchMeta)
+      .filter((m: any) => m?.parent_batch_id === selectedBatchId)
+      .map((m: any) => m.batch_id),
+    [rawBatchMeta, selectedBatchId],
+  );
+
+  const cohortStage = useMemo(() => {
+    if (!includeChildren || childBatchIds.length === 0) return currentStage;
+    const rawB = rawBatchMeta[selectedBatchId];
+    if (!rawB) return currentStage;
+    const txs = [
+      ...(rawTxsByBatch[selectedBatchId] || []),
+      ...childBatchIds.flatMap((id) => rawTxsByBatch[id] || []),
+    ];
+    const profiles = buildStageProfiles(rawB, txs, rawB.stage_log || [], rawB.attachments || []);
+    return profiles[profiles.length - 1] ?? currentStage;
+  }, [includeChildren, childBatchIds, rawBatchMeta, rawTxsByBatch, selectedBatchId, currentStage]);
+
   const displayStage = useMemo(() => {
-    if (!selectedAnimalId) return currentStage;
+    if (!selectedAnimalId) return cohortStage;
     const rawB = rawBatchMeta[selectedBatchId];
     const rawTxs = rawTxsByBatch[selectedBatchId] || [];
-    if (!rawB) return currentStage;
-    const filteredTxs = rawTxs.filter((t: any) => t.animal_id === selectedAnimalId);
+    if (!rawB) return cohortStage;
+    // An animal's record is its own rows plus its share of the batch's. Keeping
+    // only explicitly-attributed rows showed nothing for an animal in a batch
+    // whose entry is recorded at batch level, which is almost all of it.
+    const headCount = batchAnimalOptions.length || Number(rawB.closing_quantity ?? rawB.opening_quantity) || 0;
+    const filteredTxs = apportionToAnimal(rawTxs as any[], selectedAnimalId, headCount);
     return buildStageProfile(rawB, filteredTxs, rawB.stage_log || [], rawB.attachments || []);
-  }, [selectedAnimalId, rawBatchMeta, rawTxsByBatch, selectedBatchId, currentStage]);
+  }, [selectedAnimalId, rawBatchMeta, rawTxsByBatch, selectedBatchId, cohortStage, batchAnimalOptions]);
 
   const sectionParam = searchParams.get("section");
   const activeTab: TabKey = (TAB_KEYS as readonly string[]).includes(sectionParam || "") ? (sectionParam as TabKey) : "feed";
@@ -469,7 +539,7 @@ export default function StageWiseConsumptionOutputPanel() {
               // them on the cached meta — the animal-filter recompute reads it.
               rawMeta[b.batch_id] = { ...b, stage_log: stageLog, attachments: atts };
 
-              const stageProfile = buildStageProfile(b, txs, stageLog, atts);
+              const stageProfiles = buildStageProfiles(b, txs, stageLog, atts);
 
               return {
                 id: b.batch_id,
@@ -477,8 +547,8 @@ export default function StageWiseConsumptionOutputPanel() {
                 name: b.remarks || b.batch_no,
                 breed: b.breed_name || b.breed_code || "—",
                 batchType: b.lob_name || "Piggery Production Batch",
-                startCount: stageProfile.startAnimals,
-                stages: [stageProfile],
+                startCount: stageProfiles[0]?.startAnimals ?? 0,
+                stages: stageProfiles,
               };
             } catch {
               return {
@@ -503,10 +573,13 @@ export default function StageWiseConsumptionOutputPanel() {
           const target = existingMatch || detailedBatches[0];
           if (!keepExisting) setSelectedBatchId(target.id);
           if (target.stages.length > 0) {
-            setSelectedStageId(target.stages[0].id);
+            // The stage the batch is in now is the one an operator wants first;
+            // the earlier stages are history they opt into.
+            const current = target.stages[target.stages.length - 1];
+            setSelectedStageId(current.id);
             if (!keepExisting) {
-              setDateFrom(target.stages[0].startDate);
-              setDateTo(target.stages[0].endDate);
+              setDateFrom(current.startDate);
+              setDateTo(current.endDate);
             }
           }
         }
@@ -674,7 +747,7 @@ export default function StageWiseConsumptionOutputPanel() {
             >
               {batches.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.code} — {b.name} ({b.breed})
+                  {b.code}{(rawBatchMeta as any)[b.id]?.parent_batch_id ? " ↳ split group" : ""} — {b.name} ({b.breed})
                 </option>
               ))}
             </select>
@@ -714,6 +787,21 @@ export default function StageWiseConsumptionOutputPanel() {
             </div>
           </div>
 
+          {childBatchIds.length > 0 && (
+            <div>
+              <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">Cohort</span>
+              <label className="nf-input-sm flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-xs">
+                <input
+                  type="checkbox"
+                  checked={includeChildren}
+                  onChange={(e) => setIncludeChildren(e.target.checked)}
+                />
+                <span className="text-[var(--text-secondary)]">
+                  Include {childBatchIds.length} split group{childBatchIds.length === 1 ? "" : "s"}
+                </span>
+              </label>
+            </div>
+          )}
           {batchAnimalOptions.length > 0 && (
             <div>
               <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block mb-1">{t("swAnimal")}</span>

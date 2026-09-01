@@ -55,6 +55,49 @@ type VaccinationItem = {
   status: "COMPLETED" | "SCHEDULED" | "OVERDUE";
 };
 
+// batch_transaction stores clinical detail in its free-text `remarks` column —
+// there is no post-mortem or prescription table behind these screens. The create
+// handlers below write these formats; these read them back, so the register shows
+// what was actually recorded instead of plausible-looking placeholders.
+function parseMortalityRemarks(remarks?: string | null) {
+  const text = (remarks || "").trim();
+  const pm = text.match(/\[PM:\s*([^\]]*)\]/i)?.[1]?.trim() || "";
+  const disposal = text.match(/\[DISPOSAL:\s*([^\]]*)\]/i)?.[1]?.trim() || "";
+  const head = text.replace(/\[(PM|DISPOSAL):[^\]]*\]/gi, "").trim();
+  const withPen = head.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  return {
+    cause: (withPen ? withPen[1] : head) || "—",
+    pen: withPen?.[2]?.trim() || "",
+    postMortem: pm,
+    disposal,
+  };
+}
+
+function parseTreatmentRemarks(remarks?: string | null) {
+  const text = (remarks || "").trim();
+  const m = text.match(/^(.*?)\s+—\s+(.*?)\s*\(([^()]*)\)\s*$/);
+  if (!m) return { medicine: "", diagnosis: text, dosage: "", route: "", vet: "", withdrawalDays: null as number | null };
+  const parts = m[3].split(",").map((part) => part.trim());
+  const vetPart = parts.find((part) => /^vet:/i.test(part));
+  const withdrawalPart = parts.find((part) => /^withdrawal\b/i.test(part));
+  const routePart = parts.find((part, i) => i > 0 && !/^(vet:|withdrawal\b)/i.test(part));
+  return {
+    medicine: m[1].trim(),
+    diagnosis: m[2].trim(),
+    dosage: parts[0] || "",
+    route: routePart || "",
+    vet: vetPart ? vetPart.replace(/^vet:\s*/i, "") : "",
+    withdrawalDays: withdrawalPart ? Number(withdrawalPart.replace(/[^\d.]/g, "")) || null : null,
+  };
+}
+
+function daysBetween(fromIso: string, toIso: string) {
+  const from = new Date(fromIso).getTime();
+  const to = new Date(toIso).getTime();
+  if (Number.isNaN(from) || Number.isNaN(to)) return null;
+  return Math.round((to - from) / 86_400_000);
+}
+
 export default function MortalityHealthPanel() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<"mortality" | "treatments" | "vaccines">("mortality");
@@ -63,8 +106,15 @@ export default function MortalityHealthPanel() {
   // ── Live Data State ──
   const [mortalityList, setMortalityList] = useState<MortalityRecord[]>([]);
   const [treatmentList, setTreatmentList] = useState<TreatmentRecord[]>([]);
-  const [vaccineList] = useState<VaccinationItem[]>([]);
+  // Was a const empty array with no setter — the Vaccination Protocols tab was
+  // hardcoded to show nothing. The plan lives on breed_lifecycle_stages
+  // (vaccination_protocol / medication_protocol), keyed by breed and stage.
+  const [vaccineList, setVaccineList] = useState<VaccinationItem[]>([]);
   const [batches, setBatches] = useState<{ id: string; no: string }[]>([]);
+  // Denominator for the mortality rate, and the pen hygiene dates behind the
+  // biosecurity card — both were fixed strings before.
+  const [openingHead, setOpeningHead] = useState(0);
+  const [pens, setPens] = useState<{ last_disinfected_date?: string | null }[]>([]);
 
   // ── Animal-scope filters/pickers ──
   const [mortalityAnimalFilter, setMortalityAnimalFilter] = useState("");
@@ -102,11 +152,54 @@ export default function MortalityHealthPanel() {
     }
     setLoading(true);
 
+    // Vaccination plan for this company's breeds, flattened out of the
+    // per-breed/per-stage protocol JSON.
+    api.get(`/breed-lifecycle-stage?companyId=${companyId}&limit=200`)
+      .then(async (res: any) => {
+        const rows: any[] = Array.isArray(res) ? res : (res?.data?.data ?? res?.data ?? []);
+        const [breeds, stages] = await Promise.all([
+          api.get(`/breed?companyId=${companyId}&limit=200`).catch(() => []),
+          api.get(`/stage?companyId=${companyId}&limit=200`).catch(() => []),
+        ]);
+        const breedName = new Map<string, string>(
+          (Array.isArray(breeds) ? breeds : (breeds as any)?.data ?? []).map((b: any) => [b.breed_id, b.breed_name || b.breed_code]),
+        );
+        const stageName = new Map<string, string>(
+          (Array.isArray(stages) ? stages : (stages as any)?.data ?? []).map((st: any) => [st.stage_id, st.stage_name || st.stage_code]),
+        );
+        const items: VaccinationItem[] = [];
+        for (const row of rows) {
+          const plan = row.vaccination_protocol;
+          const entries = Array.isArray(plan) ? plan : [];
+          for (const [i, e] of entries.entries()) {
+            items.push({
+              id: `${row.lifecycle_id}-${i}`,
+              vaccine_name: e.vaccine ?? "—",
+              target_disease: e.route ?? "—",
+              scheduled_date: e.day != null ? `Day ${e.day}` : "—",
+              target_stage: `${breedName.get(row.breed_id) ?? "—"} · ${stageName.get(row.stage_id) ?? "—"}`,
+              coverage_pct: 100,
+              status: "SCHEDULED",
+            });
+          }
+        }
+        setVaccineList(items);
+      })
+      .catch(() => setVaccineList([]));
+
+    api.get(`/location/occupancy?companyId=${companyId}`)
+      .then((res: any) => {
+        const list: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+        setPens(list);
+      })
+      .catch(() => setPens([]));
+
     api.get(`/batch?companyId=${companyId}&limit=50`)
       .then(async (res) => {
         const list: any[] = Array.isArray(res) ? res : (res?.data ?? []);
         const bList = list.map((b: any) => ({ id: b.batch_id, no: b.batch_no }));
         setBatches(bList);
+        setOpeningHead(list.reduce((sum: number, b: any) => sum + Number(b.opening_quantity || 0), 0));
         if (bList.length > 0) {
           setNewMortality((prev) => ({ ...prev, batch_no: bList[0].no }));
           setNewTreatment((prev) => ({ ...prev, batch_no: bList[0].no }));
@@ -123,18 +216,19 @@ export default function MortalityHealthPanel() {
               const txs: any[] = bDetails?.transactions || bDetails?.data?.transactions || [];
               txs.forEach((t: any) => {
                 if (t.transaction_type === "MORTALITY") {
+                  const parsed = parseMortalityRemarks(t.remarks);
                   mortalities.push({
                     id: t.transaction_id || `m-${Date.now()}`,
                     record_date: t.transaction_date || "",
                     batch_no: b.batch_no,
                     ear_tag: t.animal_ear_tag || t.animal_code || undefined,
                     animal_id: t.animal_id || undefined,
-                    pen_location: "Production Shed",
+                    pen_location: parsed.pen || "—",
                     head_count: Number(t.quantity || 1),
-                    cause_of_death: t.remarks || "Mortality Logged",
-                    post_mortem_notes: "Recorded in live transaction ledger.",
-                    disposal_method: "Incineration / Bio-Disposal",
-                    recorded_by: "Farm Attending Officer",
+                    cause_of_death: parsed.cause,
+                    post_mortem_notes: parsed.postMortem || "—",
+                    disposal_method: parsed.disposal || "—",
+                    recorded_by: t.created_by_name || "—",
                   });
                 } else if (
                   t.transaction_type === "CONSUMPTION" &&
@@ -150,19 +244,26 @@ export default function MortalityHealthPanel() {
                       t.remarks.toLowerCase().includes("ivermectin")
                     )))
                 ) {
+                  const parsed = parseTreatmentRemarks(t.remarks);
+                  const today = new Date().toISOString().slice(0, 10);
+                  const elapsed = t.transaction_date ? daysBetween(t.transaction_date, today) : null;
+                  // A case is only "active" while the recorded withdrawal period
+                  // is still running — it used to be hardcoded ACTIVE forever.
+                  const stillWithdrawing =
+                    parsed.withdrawalDays != null && elapsed != null && elapsed < parsed.withdrawalDays;
                   treatments.push({
                     id: t.transaction_id || `t-${Date.now()}`,
                     treatment_date: t.transaction_date || "",
                     ear_tag: t.animal_ear_tag || t.animal_code || "Batch Herd Cohort",
                     animal_id: t.animal_id || undefined,
                     batch_no: b.batch_no,
-                    diagnosis: t.remarks || "Clinical Protocol Administration",
-                    medicine_name: t.item_name || t.item_code || t.remarks || "Clinical Medication",
-                    dosage: `${t.quantity} ${t.uom || "ML"}`,
-                    route: "Intramuscular (IM) / Oral",
-                    withdrawal_days: 14,
-                    status: "ACTIVE",
-                    veterinarian: "Attending Veterinarian",
+                    diagnosis: parsed.diagnosis || t.remarks || "—",
+                    medicine_name: t.item_name || t.item_code || parsed.medicine || "—",
+                    dosage: parsed.dosage || `${t.quantity} ${t.uom || ""}`.trim(),
+                    route: parsed.route || "—",
+                    withdrawal_days: parsed.withdrawalDays ?? 0,
+                    status: stillWithdrawing ? "ACTIVE" : "RECOVERED",
+                    veterinarian: parsed.vet || "—",
                   });
                 }
               });
@@ -225,6 +326,19 @@ export default function MortalityHealthPanel() {
     // for a whole-batch (unattributed) entry.
     const qty = selectedAnimals.length > 0 ? selectedAnimals.length : Number(newMortality.head_count) || 1;
 
+    // Everything the dialog collects has to survive in `remarks` — there is no
+    // post-mortem table — and parseMortalityRemarks() reads this format back.
+    const mortalityRemarks = () => {
+      const pen = newMortality.pen_location?.trim();
+      const pm = newMortality.post_mortem_notes?.trim();
+      const disposal = newMortality.disposal_method?.trim();
+      return [
+        `${newMortality.cause_of_death}${pen ? ` (${pen})` : ""}`,
+        pm ? `[PM: ${pm}]` : "",
+        disposal ? `[DISPOSAL: ${disposal}]` : "",
+      ].filter(Boolean).join(" ");
+    };
+
     if (batchObj) {
       try {
         if (selectedAnimals.length > 0) {
@@ -234,7 +348,7 @@ export default function MortalityHealthPanel() {
               transaction_type: "MORTALITY",
               quantity: 1,
               amount: 0,
-              remarks: `${newMortality.cause_of_death} (${newMortality.pen_location || "Shed"})`,
+              remarks: mortalityRemarks(),
               animal_id: animalId,
             });
           }
@@ -244,7 +358,7 @@ export default function MortalityHealthPanel() {
             transaction_type: "MORTALITY",
             quantity: qty,
             amount: 0,
-            remarks: `${newMortality.cause_of_death} (${newMortality.pen_location || "Shed"})`,
+            remarks: mortalityRemarks(),
           });
         }
       } catch {}
@@ -260,12 +374,12 @@ export default function MortalityHealthPanel() {
       batch_no: newMortality.batch_no || (batchObj?.no ?? "BATCH-01"),
       ear_tag: earTagLabel,
       animal_id: selectedAnimals.length === 1 ? selectedAnimals[0] : undefined,
-      pen_location: newMortality.pen_location || "Barn 1",
+      pen_location: newMortality.pen_location || "—",
       head_count: qty,
-      cause_of_death: newMortality.cause_of_death || "Unknown",
-      post_mortem_notes: newMortality.post_mortem_notes || "Examined on site. Carcass disposed as per protocol.",
-      disposal_method: newMortality.disposal_method || "Incineration",
-      recorded_by: "Farm Attending Officer",
+      cause_of_death: newMortality.cause_of_death || "—",
+      post_mortem_notes: newMortality.post_mortem_notes || "—",
+      disposal_method: newMortality.disposal_method || "—",
+      recorded_by: "—",
     };
     setMortalityList([record, ...mortalityList]);
     setMortalityAnimalIds(new Set());
@@ -333,6 +447,20 @@ export default function MortalityHealthPanel() {
   const totalMortalityHeads = mortalityList.reduce((acc, m) => acc + m.head_count, 0);
   const activeTreatmentsCount = treatmentList.filter((t) => t.status === "ACTIVE").length;
 
+  // Every figure below used to be a constant in the markup.
+  const MORTALITY_STANDARD_PCT = 2;
+  const mortalityPct = openingHead > 0 ? (totalMortalityHeads / openingHead) * 100 : 0;
+  const mortalityWithinStandard = mortalityPct <= MORTALITY_STANDARD_PCT;
+  const protocolStepCount = vaccineList.length;
+  const BIOSECURITY_WINDOW_DAYS = 30;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const pensDisinfected = pens.filter((pen) => {
+    if (!pen.last_disinfected_date) return false;
+    const age = daysBetween(pen.last_disinfected_date, todayIso);
+    return age != null && age <= BIOSECURITY_WINDOW_DAYS;
+  }).length;
+  const biosecurityPct = pens.length > 0 ? Math.round((pensDisinfected / pens.length) * 100) : 0;
+
   const mortalityAnimalOptions = Array.from(
     new Map(mortalityList.filter((m) => m.animal_id).map((m) => [m.animal_id as string, m.ear_tag || (m.animal_id as string)])).entries()
   );
@@ -358,8 +486,14 @@ export default function MortalityHealthPanel() {
           icon={Skull}
           label={t("mhCumulativeMortality")}
           value={totalMortalityHeads}
-          unit={t("mhHeadPercent")}
-          sub={<span className="text-(--success)">{t("mhBelowStandardThreshold")}</span>}
+          unit={t("mhHeadPercent", { pct: mortalityPct.toFixed(2) })}
+          sub={
+            <span className={mortalityWithinStandard ? "text-(--success)" : "text-(--danger)"}>
+              {mortalityWithinStandard
+                ? t("mhBelowStandardThreshold", { std: MORTALITY_STANDARD_PCT.toFixed(1) })
+                : t("mhAboveStandardThreshold", { std: MORTALITY_STANDARD_PCT.toFixed(1) })}
+            </span>
+          }
         />
         <StatCard
           icon={HeartPulse}
@@ -370,15 +504,15 @@ export default function MortalityHealthPanel() {
         />
         <StatCard
           icon={ShieldCheck}
-          label={t("mhVaccinationCoverage")}
-          value="100%"
-          sub={<span className="text-(--success)">{t("mhFmdPrrsProtocolsCurrent")}</span>}
+          label={t("mhVaccinationProtocols")}
+          value={protocolStepCount}
+          sub={t("mhProtocolStepsConfigured", { count: protocolStepCount })}
         />
         <StatCard
           icon={Stethoscope}
           label={t("mhBiosecurityStandard")}
-          value={t("mhGradeA")}
-          sub={t("mhDisinfectionBarrierProtocolActive")}
+          value={`${biosecurityPct}%`}
+          sub={t("mhPensDisinfectedRecently", { done: pensDisinfected, total: pens.length, days: BIOSECURITY_WINDOW_DAYS })}
         />
       </StatRow>
 

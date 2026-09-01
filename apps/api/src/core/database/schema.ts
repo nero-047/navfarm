@@ -1806,6 +1806,17 @@ export const batchHeader = mysqlTable('batch_header', {
   // which tracks cost traceability. No FK constraint, same lightweight
   // pointer pattern as source_batch_id below.
   renewed_from_batch_id: varchar('renewed_from_batch_id', { length: 36 }),
+  // The cohort this batch was split out of.
+  //
+  // When part of a batch is not ready to move on with the rest — sows that
+  // failed a pregnancy scan, tail-enders short of weight — the ready animals
+  // advance with the parent and the remainder are split into a child batch that
+  // holds its own stage, schedule and pen. The child is a real batch, so data
+  // entry, records, costing and KPI all work against it unchanged; this link is
+  // what lets a report roll the two back together, and what "merge back" walks.
+  // Deliberately no FK, matching renewed_from_batch_id above: a parent may be
+  // closed and archived while the child is still running.
+  parent_batch_id: varchar('parent_batch_id', { length: 36 }),
   // Current physical stage (e.g. SETTER_ROOM -> HATCHER_ROOM) — free text,
   // LOB-defined rather than a fixed enum, since stages vary per LOB. Distinct
   // from shed_id/location_id above (the batch's starting assignment); this is

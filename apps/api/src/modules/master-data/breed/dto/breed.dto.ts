@@ -701,6 +701,15 @@ export class UpdateBreedLifecycleStageDto {
 }
 
 export class QueryBreedLifecycleStageDto {
+  // breed_lifecycle_stages is tenant-wide — it has no company_id column — but
+  // the master-data table appends companyId to every list request, and the
+  // global pipe runs forbidNonWhitelisted, so an undeclared param 400s the
+  // whole page. Accepted and ignored.
+  @ApiProperty({ description: 'Active company scope (accepted for UI consistency; these records are tenant-wide)', required: false })
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
   @ApiProperty({ description: 'Filter by breed UUID', required: false })
   @IsOptional()
   @IsUUID()

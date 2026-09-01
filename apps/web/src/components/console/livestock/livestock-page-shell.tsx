@@ -18,6 +18,10 @@ import { ShieldAlert } from "lucide-react";
  */
 export const LIVESTOCK_SECTIONS = [
   { key: "register", href: "/livestock", labelKey: "navLivestockRegister" },
+  // A page route, not the API path. The breeding controller lives at
+  // 'piggery/breeding'; the screen lives at /livestock/breeding. Conflating the
+  // two pointed this nav item at a route that does not exist and, because the
+  // href dropped out of the nav set, gave the highlight to /livestock instead.
   { key: "breeding", href: "/livestock/breeding", labelKey: "pigBreeding" },
   // Health sits in this family but renders through ProductionPageShell (it is
   // batch-and-animal shaped, not register-shaped), so it has no tab key here —

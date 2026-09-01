@@ -31,6 +31,15 @@ export interface AppShellNavItem {
   href: string;
   icon: ElementType;
   children?: AppShellNavChild[];
+  /**
+   * Path prefix that counts as "inside this module", for items whose href is a
+   * deep link rather than a module root. Inventory points at
+   * /inventory/balance and Finance at /finance/journal, so every other page of
+   * those modules is a sibling of the href, not a descendant — matching on the
+   * href alone left the entire sidebar unhighlighted on, say,
+   * /inventory/goods-receipt.
+   */
+  activePrefix?: string;
 }
 
 export interface AppShellProps {
@@ -183,7 +192,22 @@ function PrimaryNavContent({
             );
           }
 
-          const isDirectActive = !hasChildren && isHrefActive(item.href, pathname, searchParams, allNavHrefs);
+          // A parent that owns children is still the page you are on when the
+          // route is its own href (/batches with a "Batch List" child pointing
+          // at the same place). Excluding those meant any nav item with
+          // children could never take the active treatment, so the section you
+          // were in looked unselected.
+          //
+          // activePrefix is a plain containment test, deliberately outside
+          // isHrefActive's most-specific-wins logic: that logic would see the
+          // item's own deep-link href as a "deeper match" and rule the module
+          // item out on the very page it links to.
+          const currentPath = pathname.split("?")[0];
+          const isPrefixActive = item.activePrefix
+            ? currentPath === item.activePrefix || currentPath.startsWith(item.activePrefix + "/")
+            : false;
+          const isDirectActive =
+            isPrefixActive || isHrefActive(item.href, pathname, searchParams, allNavHrefs);
           const isExpanded = expandedItems[item.label] ?? (isChildActive || true);
 
           if (hasChildren) {
@@ -206,7 +230,7 @@ function PrimaryNavContent({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    {isDirectActive && (
+                    {(isDirectActive || isChildActive) && (
                       <span
                         className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r-full"
                         style={{ backgroundColor: "var(--sidebar-active-accent)" }}

@@ -8,6 +8,21 @@ import * as mysql from 'mysql2/promise';
 import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
 
+/**
+ * Upsert payload with the primary key stripped.
+ *
+ * These seeds generate a fresh UUID per row on every run and matched on the
+ * natural unique key (tz_code, iso2, ...). Spreading the whole row into the
+ * update set therefore rewrote the primary key of a row that already existed,
+ * which fails as soon as anything references it — re-running bootstrap died on
+ * timezone_master because user_master.timezone_pref_id points at it. The
+ * natural key is what identifies the row; the surrogate id must not move.
+ */
+function withoutId<T extends Record<string, unknown>>(row: T, idKey: keyof T): Partial<T> {
+  const { [idKey]: _omitted, ...rest } = row;
+  return rest as Partial<T>;
+}
+
 const SYSTEM_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 const SYSTEM_COMPANY_ID = '00000000-0000-0000-0000-000000000000';
 const ENGLISH_ID = '10000000-1000-1000-1000-100000000001';
@@ -32,7 +47,7 @@ function assertDatabaseName(value: string): string {
   return value;
 }
 
-async function bootstrap() {
+export async function bootstrap() {
   if (!adminPassword || adminPassword.length < 8) {
     throw new Error('SYSTEM_ADMIN_PASSWORD must be at least 8 characters long.');
   }
@@ -108,7 +123,7 @@ async function bootstrap() {
       await masterDb
         .insert(master.planMaster)
         .values(plan)
-        .onDuplicateKeyUpdate({ set: { ...plan } });
+        .onDuplicateKeyUpdate({ set: withoutId(plan, 'plan_id') });
     }
 
     const languages: Array<typeof master.languageMaster.$inferInsert> = [
@@ -136,11 +151,11 @@ async function bootstrap() {
       await masterDb
         .insert(master.languageMaster)
         .values(language)
-        .onDuplicateKeyUpdate({ set: { ...language } });
+        .onDuplicateKeyUpdate({ set: withoutId(language, 'lang_id') });
       await tenantDb
         .insert(tenant.languageMaster)
         .values(language)
-        .onDuplicateKeyUpdate({ set: { ...language } });
+        .onDuplicateKeyUpdate({ set: withoutId(language, 'lang_id') });
     }
 
     const currencies: Array<typeof master.currencyMaster.$inferInsert> = [
@@ -162,11 +177,11 @@ async function bootstrap() {
       await masterDb
         .insert(master.currencyMaster)
         .values(currency)
-        .onDuplicateKeyUpdate({ set: { ...currency } });
+        .onDuplicateKeyUpdate({ set: withoutId(currency, 'currency_id') });
       await tenantDb
         .insert(tenant.currencyMaster)
         .values(currency)
-        .onDuplicateKeyUpdate({ set: { ...currency } });
+        .onDuplicateKeyUpdate({ set: withoutId(currency, 'currency_id') });
     }
 
     // Starter set, same "small but real, expand via the API" pattern as languages/
@@ -193,8 +208,16 @@ async function bootstrap() {
     const tzIdByCode = new Map(timezones.map((tz) => [tz.tz_code, tz.tz_id!]));
 
     for (const tz of timezones) {
-      await masterDb.insert(master.timezoneMaster).values(tz).onDuplicateKeyUpdate({ set: { ...tz } });
-      await tenantDb.insert(tenant.timezoneMaster).values(tz).onDuplicateKeyUpdate({ set: { ...tz } });
+      await masterDb.insert(master.timezoneMaster).values(tz).onDuplicateKeyUpdate({ set: withoutId(tz, 'tz_id') });
+      await tenantDb.insert(tenant.timezoneMaster).values(tz).onDuplicateKeyUpdate({ set: withoutId(tz, 'tz_id') });
+    }
+
+    // Re-read the ids that actually landed. On a re-run the rows already exist
+    // and keep their original ids, so the freshly generated UUIDs above are not
+    // in the table — anything referencing them (country.default_tz_id) would
+    // point at nothing and fail the foreign key.
+    for (const row of await masterDb.select().from(master.timezoneMaster)) {
+      tzIdByCode.set(row.tz_code, row.tz_id);
     }
 
     const usdId = '20000000-2000-2000-2000-200000000002';
@@ -228,8 +251,14 @@ async function bootstrap() {
     const countryIdByIso2 = new Map(countries.map((c) => [c.iso2, c.country_id!]));
 
     for (const country of countries) {
-      await masterDb.insert(master.countryMaster).values(country).onDuplicateKeyUpdate({ set: { ...country } });
-      await tenantDb.insert(tenant.countryMaster).values(country).onDuplicateKeyUpdate({ set: { ...country } });
+      await masterDb.insert(master.countryMaster).values(country).onDuplicateKeyUpdate({ set: withoutId(country, 'country_id') });
+      await tenantDb.insert(tenant.countryMaster).values(country).onDuplicateKeyUpdate({ set: withoutId(country, 'country_id') });
+    }
+
+    // Same again — state_province.country_id has to reference the row that is
+    // really there, not the id this run happened to generate.
+    for (const row of await masterDb.select().from(master.countryMaster)) {
+      countryIdByIso2.set(row.iso2, row.country_id);
     }
 
     // India's states specifically — matching this codebase's existing India-centric
@@ -249,8 +278,8 @@ async function bootstrap() {
     }));
 
     for (const state of indiaStates) {
-      await masterDb.insert(master.stateProvince).values(state).onDuplicateKeyUpdate({ set: { ...state } });
-      await tenantDb.insert(tenant.stateProvince).values(state).onDuplicateKeyUpdate({ set: { ...state } });
+      await masterDb.insert(master.stateProvince).values(state).onDuplicateKeyUpdate({ set: withoutId(state, 'state_id') });
+      await tenantDb.insert(tenant.stateProvince).values(state).onDuplicateKeyUpdate({ set: withoutId(state, 'state_id') });
     }
 
     // The two methods actually implemented in batch.service.ts today — this table doesn't
@@ -275,8 +304,8 @@ async function bootstrap() {
       },
     ];
     for (const method of costingMethods) {
-      await masterDb.insert(master.costingMethodConfig).values(method).onDuplicateKeyUpdate({ set: { ...method } });
-      await tenantDb.insert(tenant.costingMethodConfig).values(method).onDuplicateKeyUpdate({ set: { ...method } });
+      await masterDb.insert(master.costingMethodConfig).values(method).onDuplicateKeyUpdate({ set: withoutId(method, 'method_code') });
+      await tenantDb.insert(tenant.costingMethodConfig).values(method).onDuplicateKeyUpdate({ set: withoutId(method, 'method_code') });
     }
 
     const setupSteps = [
@@ -539,7 +568,9 @@ async function bootstrap() {
   }
 }
 
-void bootstrap().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  void bootstrap().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

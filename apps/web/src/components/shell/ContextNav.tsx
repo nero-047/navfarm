@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ElementType,
   type ReactNode,
@@ -88,13 +89,48 @@ const ContextNavContext = createContext<ContextNavSetter | null>(null);
 export function useContextNav(model: ContextNavModel | null): void {
   const setModel = useContext(ContextNavContext);
 
+  // The page's current model, so a registered index always calls back into the
+  // page's latest handlers without having to re-register to pick them up.
+  const modelRef = useRef(model);
+  modelRef.current = model;
+
+  // Re-registration is driven by what the index actually renders, not by object
+  // identity. Pages build their model through a useMemo whose dependencies are
+  // not referentially stable — t() and tLabel() are rebuilt on every
+  // LanguageProvider render — so keying on identity meant setModel -> provider
+  // re-render -> a new model object -> setModel, without end. That loop is not
+  // a slow render: it exhausts the stack.
+  const signature = model
+    ? JSON.stringify([
+        model.label,
+        model.activeKey,
+        model.groups.map((group) => [
+          group.label,
+          group.items.map((item) => [item.key, item.label, item.disabled ?? false]),
+        ]),
+      ])
+    : null;
+
   useEffect(() => {
     if (!setModel) return;
-    setModel(model);
-    // Unregistering on the way out is what stops a module's index from
-    // outliving it and appearing over the next route.
+    const current = modelRef.current;
+    if (!current) {
+      setModel(null);
+      return;
+    }
+    // onSelect delegates through the ref so the registered index keeps working
+    // after the page re-renders with a new handler.
+    setModel({ ...current, onSelect: (key) => modelRef.current?.onSelect(key) });
+  }, [setModel, signature]);
+
+  // Only a route actually leaving should clear the index. Clearing it on every
+  // model change unmounted and rebuilt the whole module index on each
+  // selection, which is what made the sub-navigation visibly refresh between
+  // pages.
+  useEffect(() => {
+    if (!setModel) return;
     return () => setModel(null);
-  }, [setModel, model]);
+  }, [setModel]);
 }
 
 /**

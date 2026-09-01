@@ -53,6 +53,13 @@ export default function SchedulerPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  // Filters. The list previously offered a text search only, so finding "the
+  // gestation schedule for Landrace that a batch is actually using" meant
+  // reading every row.
+  const [filterStage, setFilterStage] = useState("");
+  const [filterBreed, setFilterBreed] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterUsage, setFilterUsage] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
@@ -100,8 +107,28 @@ export default function SchedulerPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  useEffect(() => { setPage(1); }, [search, pageSize]);
-  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [search, pageSize, filterStage, filterBreed, filterStatus, filterUsage]);
+  const stageOptions = Array.from(
+    new Set(rows.flatMap((r: any) => (r.stages_covered ?? []) as string[])),
+  ).sort();
+
+  const filteredRows = rows.filter((r: any) => {
+    if (filterStage) {
+      const covered: string[] = r.stages_covered ?? [];
+      // "All stages" means it carries at least one unscoped line, so it applies
+      // in whatever stage the batch is in — it matches every stage filter.
+      if (!r.applies_to_all_stages && !covered.includes(filterStage)) return false;
+    }
+    if (filterBreed && r.breed_id !== filterBreed) return false;
+    if (filterStatus === "ACTIVE" && r.is_active === false) return false;
+    if (filterStatus === "INACTIVE" && r.is_active !== false) return false;
+    if (filterStatus === "LOCKED" && !r.is_locked) return false;
+    if (filterStatus === "OPEN" && r.is_locked) return false;
+    if (filterUsage === "IN_USE" && !(r.batch_count > 0)) return false;
+    if (filterUsage === "UNUSED" && r.batch_count > 0) return false;
+    return true;
+  });
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -288,6 +315,26 @@ export default function SchedulerPanel() {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("schedSearchPlaceholder")} className="nf-input-sm pl-8 pr-3" style={S.input} />
           </div>
+          <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} className="nf-input-sm nf-select" style={S.input} aria-label="Filter by stage">
+            <option value="">All stages</option>
+            {stageOptions.map((code) => <option key={code} value={code}>{code.replace(/_/g, " ")}</option>)}
+          </select>
+          <select value={filterBreed} onChange={(e) => setFilterBreed(e.target.value)} className="nf-input-sm nf-select" style={S.input} aria-label="Filter by breed">
+            <option value="">All breeds</option>
+            {breeds.map((b: any) => <option key={b.breed_id} value={b.breed_id}>{b.breed_name || b.breed_code}</option>)}
+          </select>
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="nf-input-sm nf-select" style={S.input} aria-label="Filter by status">
+            <option value="">Any status</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+            <option value="LOCKED">Locked</option>
+            <option value="OPEN">Editable</option>
+          </select>
+          <select value={filterUsage} onChange={(e) => setFilterUsage(e.target.value)} className="nf-input-sm nf-select" style={S.input} aria-label="Filter by usage">
+            <option value="">Used or not</option>
+            <option value="IN_USE">In use by a batch</option>
+            <option value="UNUSED">Not used yet</option>
+          </select>
           <Button size="sm" onClick={openCreate} >
             <Plus className="h-3.5 w-3.5" /> {t("schedNewScheduler")}
           </Button>
@@ -306,6 +353,9 @@ export default function SchedulerPanel() {
                 <TableHead className="whitespace-nowrap">{t("schedColCode")}</TableHead>
                 <TableHead className="whitespace-nowrap">{t("schedColName")}</TableHead>
                 <TableHead className="whitespace-nowrap">{t("schedColDuration")}</TableHead>
+                <TableHead className="whitespace-nowrap">Stages covered</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Lines</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Used by</TableHead>
                 <TableHead className="whitespace-nowrap text-right">{t("schedColStatus")}</TableHead>
                 <TableHead className="whitespace-nowrap text-right">{t("schedColLocked")}</TableHead>
                 <TableHead className="text-right">{t("schedColActions")}</TableHead>
@@ -313,15 +363,27 @@ export default function SchedulerPanel() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("schedLoading")}</TableCell></tr>
+                <tr><TableCell colSpan={9} className="py-10 text-center" style={S.sub}><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("schedLoading")}</TableCell></tr>
               ) : rows.length === 0 ? (
-                <tr><TableCell colSpan={6} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("schedNoSchedulers")}</TableCell></tr>
+                <tr><TableCell colSpan={9} className="py-10 text-center" style={S.sub}><Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} /> {t("schedNoSchedulers")}</TableCell></tr>
               ) : (
                 pagedRows.map((row) => (
                   <TableRow key={row.scheduler_id}>
                     <TableCell className="whitespace-nowrap font-semibold" style={S.primary}>{row.scheduler_code}</TableCell>
                     <TableCell className="whitespace-nowrap" style={S.primary}>{row.scheduler_name}</TableCell>
                     <TableCell className="whitespace-nowrap" style={S.sub}>{row.duration_value} {row.duration_unit}{t("schedUnitPluralSuffix")}</TableCell>
+                    <TableCell className="max-w-[260px] truncate" style={S.sub} title={((row as any).stages_covered ?? []).join(", ")}>
+                      {(row as any).applies_to_all_stages && (((row as any).stages_covered ?? []).length === 0)
+                        ? "All stages"
+                        : [
+                            ...((row as any).stages_covered ?? []).map((c: string) => c.replace(/_/g, " ")),
+                            ...((row as any).applies_to_all_stages ? ["+ all-stage lines"] : []),
+                          ].join(", ") || "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.sub}>{(row as any).line_count ?? 0}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right" style={S.sub}>
+                      {(row as any).batch_count ? `${(row as any).batch_count} batch${(row as any).batch_count === 1 ? "" : "es"}` : "—"}
+                    </TableCell>
                     <TableCell className="whitespace-nowrap text-right">
                       {row.is_active === false ? (
                         <StatusBadge status="INACTIVE" label={t("schedStatusInactive")} />

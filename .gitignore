@@ -61,3 +61,6 @@ test-output
 .next
 out
 .claude-scratch/
+
+# Playwright MCP session artifacts (page snapshots, console logs)
+.playwright-mcp/

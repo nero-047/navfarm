@@ -606,7 +606,15 @@ export class AuthService {
 
     const REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60;
     const accessToken = this.jwtService.sign({ ...payload, type: 'access' }, { expiresIn: '15m' });
-    const refreshToken = this.jwtService.sign({ ...payload, type: 'refresh' }, { expiresIn: REFRESH_TTL_SECONDS });
+    // A per-session nonce. Without it the refresh payload is identical for a
+    // given user and JWT timestamps are only second-granular, so two logins
+    // within the same second produced a byte-identical token, an identical
+    // SHA-256, and a duplicate-key failure on user_session.uq_session_token_hash
+    // — a double-clicked "Sign in", or two devices at once, returned 500.
+    const refreshToken = this.jwtService.sign(
+      { ...payload, type: 'refresh', jti: crypto.randomUUID() },
+      { expiresIn: REFRESH_TTL_SECONDS },
+    );
 
     const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date(Date.now() + REFRESH_TTL_SECONDS * 1000);
