@@ -3,7 +3,7 @@ import { ClsService } from 'nestjs-cls';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, desc } from 'drizzle-orm';
 import * as schema from '../../../core/database/schema';
-import { CreateOperationalAreaDto, UpdateOperationalAreaDto, AssignUserToAreaDto, UpdateAreaSettingsDto, AssignAreaStaffDto, PreseedSource } from './dto/operational-area.dto';
+import { CreateOperationalAreaDto, UpdateOperationalAreaDto, UpdateAreaSettingsDto, AssignAreaStaffDto, PreseedSource } from './dto/operational-area.dto';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -183,41 +183,6 @@ export class OperationalAreaService {
     return { success: true, message: `Operational Area '${area.area_name}' deactivated.` };
   }
 
-  async assignUser(dto: AssignUserToAreaDto) {
-    const assignmentId = crypto.randomUUID();
-    await this.db.insert(schema.userOperationalAreaAssignment).values({
-      assignment_id: assignmentId,
-      user_id: dto.user_id,
-      area_id: dto.area_id,
-      company_id: dto.company_id,
-      is_primary: dto.is_primary ?? true,
-    });
-    return { success: true, assignmentId };
-  }
-
-  async getUserAssignedAreas(userId: string) {
-    return this.db
-      .select({
-        assignment_id: schema.userOperationalAreaAssignment.assignment_id,
-        area_id: schema.operationalAreaMaster.area_id,
-        area_code: schema.operationalAreaMaster.area_code,
-        area_name: schema.operationalAreaMaster.area_name,
-        company_id: schema.operationalAreaMaster.company_id,
-        lob_id: schema.operationalAreaMaster.lob_id,
-        nob_id: schema.operationalAreaMaster.nob_id,
-        is_primary: schema.userOperationalAreaAssignment.is_primary,
-      })
-      .from(schema.userOperationalAreaAssignment)
-      .innerJoin(
-        schema.operationalAreaMaster,
-        eq(schema.userOperationalAreaAssignment.area_id, schema.operationalAreaMaster.area_id)
-      )
-      .where(eq(schema.userOperationalAreaAssignment.user_id, userId));
-  }
-
-  /**
-   * Pre-seeds Company Master Data from Tenant Master Data templates
-   */
   async preseedCompanyMasterDataFromTenant(companyId: string) {
     // 1. Fetch company's active operational areas to know its LOBs
     const areas = await this.db

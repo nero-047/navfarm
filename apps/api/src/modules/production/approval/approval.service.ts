@@ -120,12 +120,21 @@ export class ApprovalService {
       );
     }
 
+    // The DTO advertises limit/offset and the pipe accepts them, so honour
+    // them — and bound the default, because an unbounded list grows forever as
+    // approvals accumulate. The tab badges come from counts(), not from
+    // measuring this page.
+    const limit = query.limit ?? 100;
+    const offset = query.offset ?? 0;
+
     return this.db
       .select(this.listShape())
       .from(schema.approvalRequest)
       .leftJoin(schema.batchHeader, eq(schema.batchHeader.batch_id, schema.approvalRequest.batch_id))
       .where(and(...conditions))
-      .orderBy(desc(schema.approvalRequest.submitted_at));
+      .orderBy(desc(schema.approvalRequest.submitted_at))
+      .limit(limit)
+      .offset(offset);
   }
 
   /** Pending/approved/rejected counts in one query, so the tab badges don't need three round trips. */

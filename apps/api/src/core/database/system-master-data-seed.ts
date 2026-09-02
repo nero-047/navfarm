@@ -122,6 +122,22 @@ export const SYSTEM_BREED_SEED: Array<{
  * company_id is left null (tenant-wide). item_type follows the values the
  * batch/inventory modules already recognize (RAW_MATERIAL / FINISHED_GOODS).
  */
+/**
+ * Lines of business the seed actually provisions master data for.
+ *
+ * Only piggery is in scope; the other fifteen have lob_master rows (they are
+ * the taxonomy) but no stages, screens or working flows, so seeding their
+ * items, breeds and parameters only produced noise in every picker. Their
+ * definitions stay in the constants below — enabling one later is an entry
+ * here, not a re-typing job.
+ */
+export const SEEDED_LOB_CODES = ['LVS_PIGGERY'] as const;
+
+/** Narrows any LOB-scoped seed constant to the lines of business in scope. */
+export function forSeededLobs<T extends { lob_code: string }>(rows: readonly T[]): T[] {
+  return rows.filter((row) => (SEEDED_LOB_CODES as readonly string[]).includes(row.lob_code));
+}
+
 export const SYSTEM_ITEM_SEED: Array<{
   nob_code: string;
   lob_code: string;

@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { OperationalAreaService } from './operational-area.service';
-import { CreateOperationalAreaDto, UpdateOperationalAreaDto, AssignUserToAreaDto, UpdateAreaSettingsDto, AssignAreaStaffDto } from './dto/operational-area.dto';
+import { CreateOperationalAreaDto, UpdateOperationalAreaDto, UpdateAreaSettingsDto, AssignAreaStaffDto } from './dto/operational-area.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -40,18 +40,6 @@ export class OperationalAreaController {
   @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'delete')
   async delete(@Param('id') id: string) {
     return this.areaService.delete(id);
-  }
-
-  @Post('assign-user')
-  @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'edit')
-  async assignUser(@Body() dto: AssignUserToAreaDto) {
-    return this.areaService.assignUser(dto);
-  }
-
-  @Get('user/:userId')
-  @RequirePermission('MASTER_DATA', 'OPERATIONAL_AREA', 'view')
-  async getUserAssignedAreas(@Param('userId') userId: string) {
-    return this.areaService.getUserAssignedAreas(userId);
   }
 
   @Post('preseed-company/:companyId')

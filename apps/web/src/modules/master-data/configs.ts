@@ -326,6 +326,45 @@ const uom: MasterDataConfig = {
   ],
 };
 
+/**
+ * Conversion factors are not decoration: batch data entry prices a line through
+ * them (see standardRate() in batch.service.ts), so a missing or wrong factor
+ * silently mis-prices consumption — medicine was being costed per vial as if it
+ * were per ml until a VIAL→ML factor of 100 was added. Until now the five API
+ * endpoints behind this had no screen at all.
+ */
+const uomConversion: MasterDataConfig = {
+  key: "uom-conversion",
+  label: "UOM Conversions",
+  description: "Multiplier factors between units — From × Factor = To. Used to price data entry.",
+  apiBase: "/uom/conversion",
+  idKey: "conversion_id",
+  group: "Inventory",
+  columns: [
+    { key: "from_uom", label: "From" },
+    { key: "to_uom", label: "To" },
+    { key: "conversion_factor", label: "Factor" },
+    { key: "effective_from", label: "Effective From" },
+    { key: "effective_to", label: "Effective To" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
+    {
+      key: "item_id", label: "Item", type: "select-entity",
+      entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"],
+      helpText: "Leave blank for a factor that applies to every item using these units.",
+    },
+    { key: "from_uom", label: "From UOM", type: "text", required: true, placeholder: "VIAL" },
+    { key: "to_uom", label: "To UOM", type: "text", required: true, placeholder: "ML" },
+    {
+      key: "conversion_factor", label: "Conversion Factor", type: "number", required: true,
+      placeholder: "100", helpText: "From × Factor = To. One vial of 100 ml is a factor of 100.",
+    },
+    { key: "effective_from", label: "Effective From", type: "date", required: true },
+    { key: "effective_to", label: "Effective To", type: "date", helpText: "Leave blank while the factor is open-ended." },
+  ],
+};
+
 const itemAttribute: MasterDataConfig = {
   key: "item-attribute",
   label: "Item Attributes",
@@ -841,7 +880,7 @@ export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   farm, warehouse, location, shed,
   stage, numberSeries,
   animal,
-  itemCategory, uom, item, itemAttribute,
+  itemCategory, uom, uomConversion, item, itemAttribute,
   species, breed, breedLifecycleStage, disease, medicine, feedFormula,
   supplier, customer, resource,
   glAccount, glMapping, costCenter,

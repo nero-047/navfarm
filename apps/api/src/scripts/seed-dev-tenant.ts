@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/mysql2/migrator';
 import * as mysql from 'mysql2/promise';
 import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
-import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED, SYSTEM_BREED_LIFECYCLE_SEED } from '../core/database/system-master-data-seed';
+import { forSeededLobs, SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED, SYSTEM_BREED_LIFECYCLE_SEED } from '../core/database/system-master-data-seed';
 import { STARTER_GL_ACCOUNTS, STARTER_GL_MAPPINGS, STARTER_WAREHOUSE } from '../modules/system/setup-wizard/seed/starter-master-data.seed-data';
 
 /**
@@ -143,7 +143,7 @@ export async function seedDevTenant() {
       const speciesIdByCode = new Map(speciesRows.map((s) => [s.species_code, s.species_id]));
 
       const existingBreedCodes = new Set((await tenantDb.select({ c: tenant.breedMaster.breed_code }).from(tenant.breedMaster)).map((r) => r.c));
-      for (const breed of SYSTEM_BREED_SEED) {
+      for (const breed of forSeededLobs(SYSTEM_BREED_SEED)) {
         if (existingBreedCodes.has(breed.breed_code)) continue;
         const nobId = nobIdByCode.get(breed.nob_code);
         const lobId = lobIdByCode.get(breed.lob_code);
@@ -175,7 +175,7 @@ export async function seedDevTenant() {
 
       const itemIdByCode = new Map<string, string>();
       for (const row of await tenantDb.select().from(tenant.itemMaster)) itemIdByCode.set(row.item_code, row.item_id);
-      for (const item of SYSTEM_ITEM_SEED) {
+      for (const item of forSeededLobs(SYSTEM_ITEM_SEED)) {
         if (itemIdByCode.has(item.item_code)) continue;
         const nobId = nobIdByCode.get(item.nob_code);
         const lobId = lobIdByCode.get(item.lob_code);
@@ -196,7 +196,7 @@ export async function seedDevTenant() {
       }
 
       const existingParameterCodes = new Set((await tenantDb.select({ c: tenant.parameterMaster.parameter_code }).from(tenant.parameterMaster)).map((r) => r.c));
-      for (const param of SYSTEM_PARAMETER_SEED) {
+      for (const param of forSeededLobs(SYSTEM_PARAMETER_SEED)) {
         if (existingParameterCodes.has(param.parameter_code)) continue;
         const nobId = nobIdByCode.get(param.nob_code);
         const lobId = lobIdByCode.get(param.lob_code);

@@ -149,6 +149,13 @@ export function ApprovalsPageShell({ activeTab }: { activeTab: ApprovalStatus })
   const companyId = getActiveCompanyId();
   const areaId = getActiveOperationalAreaId();
 
+  // Badges come from /approval/counts, not from measuring the loaded page —
+  // the list is paginated, so counting what happens to be on screen would
+  // under-report the moment there is more than one page of approvals.
+  const [counts, setCounts] = useState<Record<ApprovalStatus, number>>({
+    PENDING: 0, APPROVED: 0, REJECTED: 0,
+  });
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError("");
@@ -156,10 +163,19 @@ export function ApprovalsPageShell({ activeTab }: { activeTab: ApprovalStatus })
       const params = new URLSearchParams();
       if (companyId) params.set("company_id", companyId);
       if (areaId) params.set("operational_area_id", areaId);
-      // One unfiltered fetch rather than one per tab: the tab badges need all
-      // three counts anyway, and search filters across the same set.
-      const res = await api.get(`/approval?${params.toString()}`);
+      const [res, countRes] = await Promise.all([
+        api.get(`/approval?${params.toString()}`),
+        api.get(`/approval/counts?${params.toString()}`).catch(() => null),
+      ]);
       setApprovals((unwrap<ApiRow[]>(res) || []).map(fromApi));
+      const fetched = countRes ? unwrap<Partial<Record<ApprovalStatus, number>>>(countRes) : null;
+      if (fetched) {
+        setCounts({
+          PENDING: Number(fetched.PENDING ?? 0),
+          APPROVED: Number(fetched.APPROVED ?? 0),
+          REJECTED: Number(fetched.REJECTED ?? 0),
+        });
+      }
     } catch (err: any) {
       setLoadError(err?.message || t("apFailedToLoad"));
     } finally {
@@ -269,9 +285,9 @@ export function ApprovalsPageShell({ activeTab }: { activeTab: ApprovalStatus })
 
   if (!ready || !user) return null;
 
-  const pendingCount = approvals.filter((a) => a.status === "PENDING").length;
-  const approvedCount = approvals.filter((a) => a.status === "APPROVED").length;
-  const rejectedCount = approvals.filter((a) => a.status === "REJECTED").length;
+  const pendingCount = counts.PENDING;
+  const approvedCount = counts.APPROVED;
+  const rejectedCount = counts.REJECTED;
 
   const filteredList = approvals
     .filter((a) => a.status === activeTab)

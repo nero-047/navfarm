@@ -351,6 +351,13 @@
       "when": 1788281521412,
       "tag": "0049_chunky_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "5",
+      "when": 1788336392924,
+      "tag": "0050_perfect_the_stranger",
+      "breakpoints": true
     }
   ]
 }

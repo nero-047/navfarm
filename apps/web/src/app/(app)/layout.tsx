@@ -263,6 +263,25 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
   // One resolution point — nav labels must agree with what every page decides.
   const lobFamily = resolveLobFamily(activeLob);
 
+  // Defined once and used by both company and operational scope: the same page
+  // reached from two scopes must be called the same thing and offer the same
+  // children. See specs/nav-scope-consistency.spec.ts.
+  const batchChildren = [
+    { label: t("batchList"), href: "/batches" },
+    { label: t("batchStages"), href: "/batches/stages" },
+    { label: t("navBatchAnimals"), href: "/batches/animals" },
+    { label: t("navBatchEntry"), href: "/batches/entry" },
+    { label: t("navBatchRecords"), href: "/batches/records" },
+    { label: t("navBatchTransfers"), href: "/batches/transfers" },
+  ];
+  const livestockChildren = LIVESTOCK_SECTIONS.map((section) => ({
+    label:
+      section.key === "register" && lobFamily === "DAIRY"
+        ? t("dairyCowRegister")
+        : t(section.labelKey),
+    href: section.href,
+  }));
+
   let navItems: AppShellNavItem[] = [];
 
   if (activeScope === "TENANT") {
@@ -278,12 +297,12 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
     navItems = [
       { label: t("companyDashboard"), href: "/dashboard",      icon: LayoutDashboard },
       { label: t("operationalAreas"), href: "/operational-areas", icon: Layers },
-      { label: t("company"),         href: "/companies",      icon: Building2 },
+      { label: t("companies"),      href: "/companies",      icon: Building2 },
       { label: t("masterData"),      href: "/master-data",    icon: Database, activePrefix: "/master-data" },
-      { label: t("inventory"),       href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
-      { label: t("finance"),         href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },
-      { label: t("production"),      href: "/batches", icon: Wheat, activePrefix: "/batches" },
-      { label: t("animalHerdRegister"), href: "/livestock",     icon: Pill },
+      { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
+      { label: t("financeCosting"), href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },
+      { label: t("navBatches"), href: "/batches", icon: Wheat, activePrefix: "/batches", children: batchChildren },
+      { label: t("navLivestock"), href: "/livestock", icon: Pill, children: livestockChildren },
       { label: t("teamManagement"),  href: "/users",          icon: Users },
       { label: t("rolePermissions"), href: "/roles",          icon: ShieldAlert },
       { label: t("notifications"),   href: "/notifications",  icon: Bell, activePrefix: "/notifications" },
@@ -310,14 +329,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
         label: t("navBatches"),
         href: "/batches",
         icon: Layers,
-        children: [
-          { label: t("batchList"), href: "/batches" },
-          { label: t("batchStages"), href: "/batches/stages" },
-          { label: t("navBatchAnimals"), href: "/batches/animals" },
-          { label: t("navBatchEntry"), href: "/batches/entry" },
-          { label: t("navBatchRecords"), href: "/batches/records" },
-          { label: t("navBatchTransfers"), href: "/batches/transfers" },
-        ],
+        children: batchChildren,
       },
       { label: t("navSchedulers"), href: "/schedulers", icon: CalendarClock },
       {
@@ -327,13 +339,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
         // Rendered from the shell's own section list so the sidebar and the
         // routes can never drift apart. Dairy calls its register something
         // else, and that is the only per-LOB override.
-        children: LIVESTOCK_SECTIONS.map((section) => ({
-          label:
-            section.key === "register" && lobFamily === "DAIRY"
-              ? t("dairyCowRegister")
-              : t(section.labelKey),
-          href: section.href,
-        })),
+        children: livestockChildren,
       },
       { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
       { label: t("financeCosting"), href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },

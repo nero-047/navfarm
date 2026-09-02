@@ -62,23 +62,6 @@ export class UpdateOperationalAreaDto {
   is_active?: boolean;
 }
 
-export class AssignUserToAreaDto {
-  @IsString()
-  @IsNotEmpty()
-  user_id!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  area_id!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  company_id!: string;
-
-  @IsBoolean()
-  @IsOptional()
-  is_primary?: boolean = true;
-}
 
 /**
  * Area operating settings. Identity fields (name, code, farm, NOB/LOB) are

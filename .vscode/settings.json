@@ -1,0 +1,52 @@
+{
+  // This is an 8 GB machine and the workspace is a monorepo with ~1 GB of
+  // node_modules and a ~1.3 GB Next.js build cache. Without these excludes VS
+  // Code watches and indexes all of it, which is what pushes the editor past
+  // 6 GB on its own.
+
+  // Stop the file watcher walking build output and dependencies.
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/dist/**": true,
+    "**/out-tsc/**": true,
+    "**/.nx/**": true,
+    "**/build/**": true,
+    "**/.playwright-mcp/**": true,
+    "**/coverage/**": true,
+    "**/apps/mobile/{android,ios,linux,macos,windows,build}/**": true
+  },
+
+  // Keep the same directories out of search and quick-open.
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/dist": true,
+    "**/out-tsc": true,
+    "**/.nx": true,
+    "**/build": true,
+    "**/coverage": true,
+    "**/pnpm-lock.yaml": true
+  },
+
+  // The TS server defaults to a 3 GB ceiling. On 8 GB shared with a browser
+  // that is too generous; the projects here typecheck well inside 2 GB.
+  "typescript.tsserver.maxTsServerMemory": 2048,
+
+  // Don't fetch and index @types packages the repo hasn't asked for.
+  "typescript.disableAutomaticTypeAcquisition": true,
+
+  // Semantic highlighting re-walks the program on edit; the win is small next
+  // to what it costs on a file like translations.ts (~25k lines).
+  "editor.semanticHighlighting.enabled": false,
+
+  // Auto-imports scan every export in the workspace on each keystroke.
+  "typescript.preferences.includePackageJsonAutoImports": "off",
+  "javascript.preferences.includePackageJsonAutoImports": "off",
+
+  // Nx caches results here; nothing in it needs to be open or watched.
+  "files.exclude": {
+    "**/.nx/cache": true,
+    "**/.nx/workspace-data": true
+  }
+}

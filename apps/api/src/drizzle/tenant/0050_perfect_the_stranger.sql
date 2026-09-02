@@ -1,0 +1,1 @@
+DROP TABLE `nob_lob_extension_config`;

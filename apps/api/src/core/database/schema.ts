@@ -465,17 +465,6 @@ export const lobMaster = mysqlTable('lob_master', {
   extension_config: json('extension_config')
 });
 
-export const nobLobExtensionConfig = mysqlTable('nob_lob_extension_config', {
-  config_id: varchar('config_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
-  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'cascade' }),
-  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'cascade' }),
-  config_key: varchar('config_key', { length: 100 }).notNull(),
-  config_value: varchar('config_value', { length: 200 }).notNull(),
-  data_type: varchar('data_type', { length: 30 }).notNull(),
-  description: text('description'),
-  is_active: boolean('is_active').default(true).notNull()
-});
-
 // Extensible costing methods — "add new methods here, no code change" per spec. Additive
 // reference data only: nob_master.default_costing_method / lob_master.costing_method_allowed
 // and batch.service.ts's costing_method branches are untouched — they stay free-text/literal
@@ -864,9 +853,6 @@ export const locationMaster = mysqlTable('location_master', {
 // ==========================================
 // DRIZZLE SCHEMA RELATIONSHIPS
 // ==========================================
-
-
-
 
 export const companyMasterRelations = relations(companyMaster, ({ one, many }) => ({
   addresses: many(companyAddress),
@@ -3029,7 +3015,6 @@ export const semenBatchRelations = relations(semenBatch, ({ one }) => ({
   batch: one(batchHeader, { fields: [semenBatch.boar_batch_id], references: [batchHeader.batch_id] }),
   outputItem: one(itemMaster, { fields: [semenBatch.output_item_id], references: [itemMaster.item_id] }),
 }));
-
 
 /**
  * Per-operational-area operating configuration.
