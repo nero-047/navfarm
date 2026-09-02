@@ -1,0 +1,2 @@
+ALTER TABLE `batch_transaction` ADD `record_id` varchar(36);--> statement-breakpoint
+ALTER TABLE `batch_transaction` ADD CONSTRAINT `batch_transaction_record_id_farm_record_record_id_fk` FOREIGN KEY (`record_id`) REFERENCES `farm_record`(`record_id`) ON DELETE set null ON UPDATE no action;

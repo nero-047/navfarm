@@ -1901,6 +1901,11 @@ export const batchTransaction = mysqlTable('batch_transaction', {
   // batch (unchanged historical behaviour); set when a caller scoped the
   // entry to one or more specific animals in the batch.
   animal_id: varchar('animal_id', { length: 36 }).references(() => animalRegister.animal_id, { onDelete: 'set null' }),
+  // The farm_record this transaction was generated from. Nullable and SET NULL
+  // on delete: costing reads this table directly and must survive a record
+  // being voided — the column carries provenance, not a dependency.
+  record_id: varchar('record_id', { length: 36 })
+    .references(() => farmRecord.record_id, { onDelete: 'set null' }),
   created_by: varchar('created_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
 });
@@ -2092,6 +2097,90 @@ export const batchMortalityDetailRelations = relations(batchMortalityDetail, ({ 
 
 export const batchTreatmentDetailRelations = relations(batchTreatmentDetail, ({ one }) => ({
   transaction: one(batchTransaction, { fields: [batchTreatmentDetail.transaction_id], references: [batchTransaction.transaction_id] }),
+}));
+
+// ── Farm records ───────────────────────────────────────────────────────────
+// The object a person creates, reads and corrects. A batch_transaction is its
+// accounting consequence — still the costing substrate close(), WIP, variance
+// and the GL read, which never learn that records exist.
+//
+// An entry scoped to selected animals used to be N unrelated transaction rows
+// with no handle to edit as one thing. It is now one record with N members.
+//
+// Editing never mutates: a change writes the next version and marks the
+// previous one SUPERSEDED, so posted history is never rewritten.
+
+export const farmRecord = mysqlTable('farm_record', {
+  record_id: varchar('record_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull(),
+  /** The day the entry applies to — not the day it was typed. */
+  record_date: date('record_date', { mode: 'string' }).notNull(),
+  // CONSUMPTION | MORTALITY | OVERHEAD | OBSERVATION | WEIGHT_ENTRY | OUTPUT
+  record_type: varchar('record_type', { length: 20 }).notNull(),
+  // BATCH = the whole cohort; ANIMALS = the members in farm_record_animal.
+  scope: varchar('scope', { length: 10 }).notNull(),
+  /** Stage the batch was in on record_date, captured so later moves don't rewrite history. */
+  stage_code: varchar('stage_code', { length: 50 }),
+  item_id: varchar('item_id', { length: 36 }),
+  resource_id: varchar('resource_id', { length: 36 }),
+  quantity: decimal('quantity', { precision: 18, scale: 4 }),
+  uom: varchar('uom', { length: 20 }),
+  rate: decimal('rate', { precision: 18, scale: 6 }),
+  // Stored, not derived: a reversed record must keep the amount it actually
+  // posted even if the item's rate has since changed.
+  amount: decimal('amount', { precision: 18, scale: 4 }),
+  remarks: text('remarks'),
+  version: int('version').default(1).notNull(),
+  status: varchar('status', { length: 12 }).default('ACTIVE').notNull(), // ACTIVE | SUPERSEDED | VOID
+  supersedes_id: varchar('supersedes_id', { length: 36 }),
+  superseded_by_id: varchar('superseded_by_id', { length: 36 }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_by: varchar('updated_by', { length: 36 }),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  // Explicit and short: MySQL caps identifiers at 64 characters and Drizzle's
+  // derived names for this table exceed it.
+  companyFk: foreignKey({
+    columns: [table.company_id], foreignColumns: [companyMaster.company_id], name: 'fr_company_fk',
+  }).onDelete('restrict'),
+  batchFk: foreignKey({
+    columns: [table.batch_id], foreignColumns: [batchHeader.batch_id], name: 'fr_batch_fk',
+  }).onDelete('cascade'),
+  itemFk: foreignKey({
+    columns: [table.item_id], foreignColumns: [itemMaster.item_id], name: 'fr_item_fk',
+  }).onDelete('restrict'),
+  resourceFk: foreignKey({
+    columns: [table.resource_id], foreignColumns: [resourceMaster.resource_id], name: 'fr_resource_fk',
+  }).onDelete('restrict'),
+}));
+
+export const farmRecordAnimal = mysqlTable('farm_record_animal', {
+  line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  record_id: varchar('record_id', { length: 36 }).notNull(),
+  animal_id: varchar('animal_id', { length: 36 }).notNull(),
+}, (table) => ({
+  recordFk: foreignKey({
+    columns: [table.record_id], foreignColumns: [farmRecord.record_id], name: 'fra_record_fk',
+  }).onDelete('cascade'),
+  animalFk: foreignKey({
+    columns: [table.animal_id], foreignColumns: [animalRegister.animal_id], name: 'fra_animal_fk',
+  }).onDelete('restrict'),
+  // One animal appears at most once in a record.
+  uniqueMember: uniqueIndex('fra_record_animal_uq').on(table.record_id, table.animal_id),
+}));
+
+export const farmRecordRelations = relations(farmRecord, ({ one, many }) => ({
+  batch: one(batchHeader, { fields: [farmRecord.batch_id], references: [batchHeader.batch_id] }),
+  item: one(itemMaster, { fields: [farmRecord.item_id], references: [itemMaster.item_id] }),
+  animals: many(farmRecordAnimal),
+}));
+
+export const farmRecordAnimalRelations = relations(farmRecordAnimal, ({ one }) => ({
+  record: one(farmRecord, { fields: [farmRecordAnimal.record_id], references: [farmRecord.record_id] }),
+  animal: one(animalRegister, { fields: [farmRecordAnimal.animal_id], references: [animalRegister.animal_id] }),
 }));
 
 export const batchOutputLineRelations = relations(batchOutputLine, ({ one }) => ({
