@@ -272,7 +272,8 @@ async function run() {
     }
 
     // Scheduler with real parameter lines
-    const consumption = cfg.pigParamsOverride ?? pigParams;
+    // No tenant config declares an override, so this always resolved to pigParams.
+    const consumption = pigParams;
     const schedId = uid();
     await db.insert(tenant.schedulerMaster).values({
       scheduler_id: schedId, tenant_id: tenantId, company_id: companyId, nob_id: NOB, lob_id: LOB,

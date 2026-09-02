@@ -85,10 +85,7 @@ export class SupplierController {
   async remove(@Param('id') id: string, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.supplierService.remove(id, tenantId, req.user);
-    return {
-      success: true,
-      ...result
-    };
+    return result;
   }
 
   @Patch(':id/restore')

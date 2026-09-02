@@ -138,10 +138,7 @@ export class UomController {
   async remove(@Param('id') id: string, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.uomService.remove(id, tenantId, req.user);
-    return {
-      success: true,
-      ...result
-    };
+    return result;
   }
 
   @Patch(':id/restore')
@@ -207,9 +204,6 @@ export class UomController {
   async removeConversion(@Param('id') id: string, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.uomService.removeConversion(id, tenantId, req.user);
-    return {
-      success: true,
-      ...result
-    };
+    return result;
   }
 }

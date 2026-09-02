@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { and, eq, ne, isNull, like, or } from 'drizzle-orm';
+import { and, eq, ne, isNull, like, or, type SQL } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import * as masterSchema from '../../../core/database/master-schema';
@@ -323,7 +323,7 @@ export class CompanyService {
 
     // Validate unique code / name if modified
     if (tenantId && (dto.company_code || dto.company_name)) {
-      const codeOrName = [];
+      const codeOrName: SQL[] = [];
       if (dto.company_code) codeOrName.push(eq(schema.companyMaster.company_code, dto.company_code.toUpperCase()));
       if (dto.company_name) codeOrName.push(eq(schema.companyMaster.company_name, dto.company_name));
 

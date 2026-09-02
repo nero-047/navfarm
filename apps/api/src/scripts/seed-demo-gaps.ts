@@ -568,15 +568,17 @@ export async function seedDemoGaps() {
         const batches = await db.select().from(schema.batchHeader).where(eq(schema.batchHeader.company_id, c.company_id));
         for (const b of batches) {
           const qty = Number(b.opening_quantity);
+          // Named `entry_type` so it is greppable against the values the IAS 41
+          // roll-forward classifies — see bio-asset-entry-types.spec.ts.
           const rows = [
-            { type: 'ACQUISITION', date: b.start_date, qty, amount: qty * 26000, doc: `ACQ-${b.batch_no}` },
-            { type: 'APPRECIATION', date: '2026-08-01', qty: 0, amount: qty * 1200, doc: `APP-${b.batch_no}` },
-            { type: 'AMORTISATION', date: '2026-08-31', qty: 0, amount: -(qty * 450), doc: `AMT-${b.batch_no}` },
+            { entry_type: 'ACQUISITION', date: b.start_date, qty, amount: qty * 26000, doc: `ACQ-${b.batch_no}` },
+            { entry_type: 'FAIR_VALUE_ADJMT', date: '2026-08-01', qty: 0, amount: qty * 1200, doc: `APP-${b.batch_no}` },
+            { entry_type: 'AMORTIZATION', date: '2026-08-31', qty: 0, amount: -(qty * 450), doc: `AMT-${b.batch_no}` },
           ];
           for (const r of rows) {
             await db.insert(schema.bioAssetLedger).values({
               entry_id: randomUUID(), tenant_id: tenantId, company_id: c.company_id,
-              bio_asset_item_id: bio, entry_type: r.type, document_no: r.doc,
+              bio_asset_item_id: bio, entry_type: r.entry_type, document_no: r.doc,
               posting_date: r.date, asset_tracking_type: 'BATCH', batch_no: b.batch_no,
               stage: b.current_stage_code, status: 'POSTED', quantity: d4(r.qty),
               cost_amount: d4(r.amount), cost_amount_each_unit: qty ? d4(r.amount / qty) : '0.0000',
@@ -811,11 +813,14 @@ export async function seedDemoGaps() {
             const at = (frac: number) => onDay(start, Math.min(w.to, w.from + Math.round(span * frac)));
             const label = w.code.replace(/_/g, ' ').toLowerCase();
 
-            const rows: Array<{ type: string; item: string | null; qty: number; uom: string; rate: number; date: string; note: string }> = [
-              // Clinical detail (dose, route, vet, withdrawal) lives in the remark —
-              // this is the format the health register parses back out.
-              medItem ? { type: 'CONSUMPTION', item: medItem, qty: head * 2, uom: 'ML', rate: 3.4, date: at(0.2), note: `Ivermectin 1% — Routine strategic deworming during ${label} (${head * 2} ml, Subcutaneous, vet: Dr. A. Menon, withdrawal 28d)` } : null,
-              medItem ? { type: 'CONSUMPTION', item: medItem, qty: head, uom: 'ML', rate: 3.4, date: at(0.7), note: `Ivermectin 1% — Follow-up clinical treatment during ${label} (${head} ml, Subcutaneous, vet: Dr. A. Menon, withdrawal 28d)` } : null,
+            const rows: Array<{
+              type: string; item: string | null; qty: number; uom: string; rate: number; date: string; note: string;
+              treatment?: { diagnosis: string; route: string; withdrawal_days: number; vet: string };
+            }> = [
+              // Diagnosis, route, vet and withdrawal are columns on
+              // batch_treatment_detail now, written just below.
+              medItem ? { type: 'CONSUMPTION', item: medItem, qty: head * 2, uom: 'ML', rate: 3.4, date: at(0.2), note: `Routine strategic deworming during ${label}`, treatment: { diagnosis: 'Routine strategic deworming', route: 'SUBCUTANEOUS', withdrawal_days: 28, vet: 'Dr. A. Menon' } } : null,
+              medItem ? { type: 'CONSUMPTION', item: medItem, qty: head, uom: 'ML', rate: 3.4, date: at(0.7), note: `Follow-up clinical treatment during ${label}`, treatment: { diagnosis: 'Follow-up clinical treatment', route: 'SUBCUTANEOUS', withdrawal_days: 28, vet: 'Dr. A. Menon' } } : null,
               { type: 'OVERHEAD', item: null, qty: 6, uom: 'HRS', rate: 550, date: at(0.15), note: `Labour — daily stockperson hours, ${label}` },
               { type: 'OVERHEAD', item: null, qty: 4, uom: 'HRS', rate: 550, date: at(0.6), note: `Labour — pen washdown and biosecurity, ${label}` },
               { type: 'OVERHEAD', item: null, qty: 320, uom: 'KWH', rate: 9.2, date: at(0.35), note: `Electricity — ventilation and lighting, ${label}` },
@@ -834,11 +839,20 @@ export async function seedDemoGaps() {
                   eq(schema.batchTransaction.remarks, r.note),
                 )).limit(1);
               if (x) continue;
+              const txId = randomUUID();
               await db.insert(schema.batchTransaction).values({
-                transaction_id: randomUUID(), batch_id: b.batch_id, transaction_date: r.date,
+                transaction_id: txId, batch_id: b.batch_id, transaction_date: r.date,
                 transaction_type: r.type, item_id: r.item, quantity: d4(r.qty), uom: r.uom,
                 rate: r.rate.toFixed(6), amount: d4(r.qty * r.rate), remarks: r.note, created_by: by,
               });
+              if (r.treatment) {
+                await db.insert(schema.batchTreatmentDetail).values({
+                  detail_id: randomUUID(), transaction_id: txId,
+                  diagnosis: r.treatment.diagnosis, route: r.treatment.route,
+                  withdrawal_days: r.treatment.withdrawal_days, veterinarian: r.treatment.vet,
+                  created_by: by,
+                });
+              }
             }
           }
         }

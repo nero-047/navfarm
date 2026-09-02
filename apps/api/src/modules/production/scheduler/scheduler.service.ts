@@ -265,7 +265,9 @@ export class SchedulerService {
       .limit(limit)
       .offset(offset);
 
-    if (rows.length === 0) return rows;
+    // Returning the bare rows here widened findAll's type to a union missing
+    // line_count / stages_covered / batch_count — the very fields it adds.
+    if (rows.length === 0) return [];
 
     /**
      * What each scheduler actually plans, and whether anything uses it.

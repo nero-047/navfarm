@@ -358,7 +358,9 @@ export class AnimalService {
       ...animal,
       breed_name: breed?.breed_name,
       stage_name: stage?.stage_name,
-      batch_code: batch?.batch_code,
+      // batch_header's column is batch_no — `batch_code` does not exist on it,
+      // so this field was always undefined and the animal never showed its batch.
+      batch_no: batch?.batch_no,
       hasActiveWithdrawal: activeWithdrawals.length > 0,
       activeWithdrawals,
     };

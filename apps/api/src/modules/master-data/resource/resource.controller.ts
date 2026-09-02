@@ -93,10 +93,7 @@ export class ResourceController {
   async remove(@Param('id') id: string, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.resourceService.remove(id, tenantId, req.user);
-    return {
-      success: true,
-      ...result
-    };
+    return result;
   }
 
   @Patch(':id/restore')
@@ -185,9 +182,6 @@ export class ResourceController {
   async removeMaintenanceLog(@Param('logId') logId: string, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
     const result = await this.resourceService.removeMaintenanceLog(logId, tenantId, req.user);
-    return {
-      success: true,
-      ...result
-    };
+    return result;
   }
 }

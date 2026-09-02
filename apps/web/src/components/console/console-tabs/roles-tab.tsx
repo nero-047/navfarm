@@ -61,6 +61,8 @@ const DEFAULT_RESOURCES = [
   { module_code: "MASTER_DATA", resource: "COST_CENTER", name: "Cost Centers", nameKey: "rolCostCenters" },
   // NOTIFICATION
   { module_code: "NOTIFICATION", resource: "SETTINGS", name: "Notification Gateway Settings", nameKey: "rolNotificationGateway" },
+  { module_code: "MASTER_DATA", resource: "OPERATIONAL_AREA", name: "Operational Areas", nameKey: "operationalAreas" },
+  { module_code: "MASTER_DATA", resource: "BREED_LIFECYCLE_STAGE", name: "Breed Lifecycle Standards", nameKey: "rolBreedLifecycleStandards" },
   // PRODUCTION (Phase 5)
   { module_code: "PRODUCTION", resource: "BATCH", name: "Production Batches", nameKey: "dashProductionBatches" },
   // PRODUCTION (Phase 6)
@@ -70,6 +72,12 @@ const DEFAULT_RESOURCES = [
   { module_code: "PRODUCTION", resource: "QC_PARAMETER", name: "QC Parameters", nameKey: "navQcParameters" },
   { module_code: "PRODUCTION", resource: "QC", name: "QC Inspections", nameKey: "rolQcInspections" },
   { module_code: "PRODUCTION", resource: "QR_CODE", name: "Traceability Packs (QR)", nameKey: "rolTraceabilityPacks" },
+  { module_code: "PRODUCTION", resource: "STAGE", name: "Lifecycle Stages", nameKey: "batchStages" },
+  { module_code: "PRODUCTION", resource: "APPROVAL", name: "Approvals", nameKey: "approvals" },
+  // PIGGERY
+  { module_code: "PIGGERY", resource: "ANIMAL", name: "Animal Register", nameKey: "animalHerdRegister" },
+  // SYSTEM
+  { module_code: "SYSTEM", resource: "NUMBER_SERIES", name: "Number Series", nameKey: "rolNumberSeries" },
   // RBAC
   { module_code: "RBAC", resource: "ROLE", name: "User Roles & Team Management", nameKey: "rolUserRolesTeam" },
   { module_code: "RBAC", resource: "USER", name: "User Accounts", nameKey: "rolUserAccounts" },

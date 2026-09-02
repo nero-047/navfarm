@@ -271,7 +271,7 @@ describe('AnimalService', () => {
                         },
                         breed: { breed_name: 'Yorkshire' },
                         stage: { stage_name: 'Gilt' },
-                        batch: { batch_code: 'BATCH-01' },
+                        batch: { batch_no: 'BATCH-01' },
                       },
                     ]),
                   }),
@@ -311,7 +311,6 @@ describe('AnimalService', () => {
           is_active: true,
           gender: 'F',
           current_stage_id: 'st-gilt',
-          current_stage: 'Gilt Grower',
           current_location_id: 'loc-1',
           parity_count: 0,
           entry_date: '2026-01-01',
@@ -333,7 +332,6 @@ describe('AnimalService', () => {
         .mockReturnValueOnce(found({
           animal_id: 'a-1',
           current_stage_id: 'st-flush',
-          current_stage: 'Flush and Service',
           current_location_id: 'loc-2',
         })); // findOne return
 
@@ -351,7 +349,7 @@ describe('AnimalService', () => {
         { userId: 'user-1' }
       );
 
-      expect(res.current_stage).toBe('Flush and Service');
+      expect(res.current_stage_id).toBe('st-flush');
       expect(res.current_location_id).toBe('loc-2');
     });
 

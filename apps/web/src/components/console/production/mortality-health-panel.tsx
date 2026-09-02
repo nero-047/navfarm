@@ -55,10 +55,10 @@ type VaccinationItem = {
   status: "COMPLETED" | "SCHEDULED" | "OVERDUE";
 };
 
-// batch_transaction stores clinical detail in its free-text `remarks` column —
-// there is no post-mortem or prescription table behind these screens. The create
-// handlers below write these formats; these read them back, so the register shows
-// what was actually recorded instead of plausible-looking placeholders.
+// Clinical detail now lives in batch_mortality_detail / batch_treatment_detail
+// and arrives on the transaction as real fields. These parsers remain only for
+// rows recorded before those tables existed, where the detail was formatted into
+// `remarks` — new entries never take this path.
 function parseMortalityRemarks(remarks?: string | null) {
   const text = (remarks || "").trim();
   const pm = text.match(/\[PM:\s*([^\]]*)\]/i)?.[1]?.trim() || "";
@@ -90,6 +90,24 @@ function parseTreatmentRemarks(remarks?: string | null) {
     withdrawalDays: withdrawalPart ? Number(withdrawalPart.replace(/[^\d.]/g, "")) || null : null,
   };
 }
+
+// The dialog offers readable route labels; batch_treatment_detail stores the code.
+const VALID_ROUTE_CODES = new Set([
+  "IM", "IV", "SUBCUTANEOUS", "ORAL", "ORAL_IN_FEED", "ORAL_IN_WATER",
+  "TOPICAL", "INTRAMAMMARY", "INTRAUTERINE",
+]);
+
+const ROUTE_TO_CODE: Record<string, string> = {
+  "Intramuscular (IM)": "IM",
+  "Intravenous (IV)": "IV",
+  "Subcutaneous": "SUBCUTANEOUS",
+  "Oral": "ORAL",
+  "Oral (in feed)": "ORAL_IN_FEED",
+  "Oral (in water)": "ORAL_IN_WATER",
+  "Topical": "TOPICAL",
+  "Intramammary": "INTRAMAMMARY",
+  "Intrauterine": "INTRAUTERINE",
+};
 
 function daysBetween(fromIso: string, toIso: string) {
   const from = new Date(fromIso).getTime();
@@ -216,18 +234,20 @@ export default function MortalityHealthPanel() {
               const txs: any[] = bDetails?.transactions || bDetails?.data?.transactions || [];
               txs.forEach((t: any) => {
                 if (t.transaction_type === "MORTALITY") {
-                  const parsed = parseMortalityRemarks(t.remarks);
+                  // Structured columns win; the remarks parse only covers rows
+                  // written before batch_mortality_detail existed.
+                  const legacy = parseMortalityRemarks(t.remarks);
                   mortalities.push({
                     id: t.transaction_id || `m-${Date.now()}`,
                     record_date: t.transaction_date || "",
                     batch_no: b.batch_no,
                     ear_tag: t.animal_ear_tag || t.animal_code || undefined,
                     animal_id: t.animal_id || undefined,
-                    pen_location: parsed.pen || "—",
+                    pen_location: t.pen_location_name || legacy.pen || "—",
                     head_count: Number(t.quantity || 1),
-                    cause_of_death: parsed.cause,
-                    post_mortem_notes: parsed.postMortem || "—",
-                    disposal_method: parsed.disposal || "—",
+                    cause_of_death: t.cause_of_death || legacy.cause,
+                    post_mortem_notes: t.post_mortem_notes || legacy.postMortem || "—",
+                    disposal_method: t.disposal_method || legacy.disposal || "—",
                     recorded_by: t.created_by_name || "—",
                   });
                 } else if (
@@ -244,26 +264,27 @@ export default function MortalityHealthPanel() {
                       t.remarks.toLowerCase().includes("ivermectin")
                     )))
                 ) {
-                  const parsed = parseTreatmentRemarks(t.remarks);
+                  const legacy = parseTreatmentRemarks(t.remarks);
+                  const withdrawalDays = t.withdrawal_days ?? legacy.withdrawalDays;
                   const today = new Date().toISOString().slice(0, 10);
                   const elapsed = t.transaction_date ? daysBetween(t.transaction_date, today) : null;
                   // A case is only "active" while the recorded withdrawal period
                   // is still running — it used to be hardcoded ACTIVE forever.
                   const stillWithdrawing =
-                    parsed.withdrawalDays != null && elapsed != null && elapsed < parsed.withdrawalDays;
+                    withdrawalDays != null && elapsed != null && elapsed < withdrawalDays;
                   treatments.push({
                     id: t.transaction_id || `t-${Date.now()}`,
                     treatment_date: t.transaction_date || "",
                     ear_tag: t.animal_ear_tag || t.animal_code || "Batch Herd Cohort",
                     animal_id: t.animal_id || undefined,
                     batch_no: b.batch_no,
-                    diagnosis: parsed.diagnosis || t.remarks || "—",
-                    medicine_name: t.item_name || t.item_code || parsed.medicine || "—",
-                    dosage: parsed.dosage || `${t.quantity} ${t.uom || ""}`.trim(),
-                    route: parsed.route || "—",
-                    withdrawal_days: parsed.withdrawalDays ?? 0,
+                    diagnosis: t.diagnosis || legacy.diagnosis || t.remarks || "—",
+                    medicine_name: t.item_name || t.item_code || legacy.medicine || "—",
+                    dosage: legacy.dosage || `${t.quantity} ${t.uom || ""}`.trim(),
+                    route: t.route || legacy.route || "—",
+                    withdrawal_days: withdrawalDays ?? 0,
                     status: stillWithdrawing ? "ACTIVE" : "RECOVERED",
-                    veterinarian: parsed.vet || "—",
+                    veterinarian: t.veterinarian || legacy.vet || "—",
                   });
                 }
               });
@@ -326,18 +347,14 @@ export default function MortalityHealthPanel() {
     // for a whole-batch (unattributed) entry.
     const qty = selectedAnimals.length > 0 ? selectedAnimals.length : Number(newMortality.head_count) || 1;
 
-    // Everything the dialog collects has to survive in `remarks` — there is no
-    // post-mortem table — and parseMortalityRemarks() reads this format back.
-    const mortalityRemarks = () => {
-      const pen = newMortality.pen_location?.trim();
-      const pm = newMortality.post_mortem_notes?.trim();
-      const disposal = newMortality.disposal_method?.trim();
-      return [
-        `${newMortality.cause_of_death}${pen ? ` (${pen})` : ""}`,
-        pm ? `[PM: ${pm}]` : "",
-        disposal ? `[DISPOSAL: ${disposal}]` : "",
-      ].filter(Boolean).join(" ");
-    };
+    // Cause, findings and disposal go to batch_mortality_detail as real fields;
+    // `remarks` stays a plain note.
+    const mortalityDetail = () => ({
+      cause_of_death: newMortality.cause_of_death?.trim() || undefined,
+      post_mortem_notes: newMortality.post_mortem_notes?.trim() || undefined,
+      disposal_method: newMortality.disposal_method?.trim() || undefined,
+    });
+    const penNote = newMortality.pen_location?.trim();
 
     if (batchObj) {
       try {
@@ -348,7 +365,8 @@ export default function MortalityHealthPanel() {
               transaction_type: "MORTALITY",
               quantity: 1,
               amount: 0,
-              remarks: mortalityRemarks(),
+              remarks: penNote ? `Recorded in ${penNote}` : null,
+              mortality_detail: mortalityDetail(),
               animal_id: animalId,
             });
           }
@@ -358,7 +376,8 @@ export default function MortalityHealthPanel() {
             transaction_type: "MORTALITY",
             quantity: qty,
             amount: 0,
-            remarks: mortalityRemarks(),
+            remarks: penNote ? `Recorded in ${penNote}` : null,
+            mortality_detail: mortalityDetail(),
           });
         }
       } catch {}
@@ -395,6 +414,17 @@ export default function MortalityHealthPanel() {
     const route = newTreatment.route || "IM";
     const vet = newTreatment.veterinarian || "Dr. Sharma";
     const diagnosis = newTreatment.diagnosis || "General Clinical Observation";
+    // Prescription fields go to batch_treatment_detail as columns; `remarks`
+    // keeps the dose, which the transaction itself has no field for.
+    const treatmentDetail = {
+      diagnosis,
+      // The API only accepts known route codes; send nothing rather than a
+      // value it would reject and lose the whole entry over.
+      route: ROUTE_TO_CODE[route] ?? (VALID_ROUTE_CODES.has(route) ? route : undefined),
+      withdrawal_days: Number(newTreatment.withdrawal_days) || 0,
+      veterinarian: vet,
+    };
+    const treatmentNote = `${newTreatment.medicine_name} — ${dosage}`;
 
     if (batchObj) {
       try {
@@ -405,7 +435,8 @@ export default function MortalityHealthPanel() {
               transaction_type: "CONSUMPTION",
               quantity: 1,
               uom: "DOSES",
-              remarks: `${newTreatment.medicine_name} — ${diagnosis} (${dosage}, ${route}, vet: ${vet}, withdrawal ${newTreatment.withdrawal_days || 0}d)`,
+              remarks: treatmentNote,
+              treatment_detail: treatmentDetail,
               animal_id: animalId,
             });
           }
@@ -415,7 +446,8 @@ export default function MortalityHealthPanel() {
             transaction_type: "CONSUMPTION",
             quantity: 1,
             uom: "DOSES",
-            remarks: `${newTreatment.medicine_name} — ${diagnosis} (${dosage}, ${route}, vet: ${vet}, withdrawal ${newTreatment.withdrawal_days || 0}d)`,
+            remarks: treatmentNote,
+            treatment_detail: treatmentDetail,
           });
         }
       } catch { void 0; }

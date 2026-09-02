@@ -2042,6 +2042,70 @@ export const batchTransactionRelations = relations(batchTransaction, ({ one }) =
   item: one(itemMaster, { fields: [batchTransaction.item_id], references: [itemMaster.item_id] }),
   resource: one(resourceMaster, { fields: [batchTransaction.resource_id], references: [resourceMaster.resource_id] }),
   ledgerEntry: one(inventoryLedger, { fields: [batchTransaction.ledger_id], references: [inventoryLedger.ledger_id] }),
+  mortalityDetail: one(batchMortalityDetail, { fields: [batchTransaction.transaction_id], references: [batchMortalityDetail.transaction_id] }),
+  treatmentDetail: one(batchTreatmentDetail, { fields: [batchTransaction.transaction_id], references: [batchTreatmentDetail.transaction_id] }),
+}));
+
+// ── Clinical detail ────────────────────────────────────────────────────────
+// A death or a treatment is one batch_transaction (the quantity and the cost)
+// plus the clinical narrative that goes with it. That narrative used to be
+// packed into `remarks` as formatted free text and parsed back out by the UI,
+// which meant it could not be queried, reported on, or validated. These are
+// 1:1 extensions of the transaction, so an event is still a single row of
+// cost — nothing is duplicated, and a transaction with no clinical detail
+// (every historical row) simply has none.
+
+export const batchMortalityDetail = mysqlTable('batch_mortality_detail', {
+  detail_id: varchar('detail_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  transaction_id: varchar('transaction_id', { length: 36 }).notNull().unique(),
+  // Where it happened — the pen, not the batch's current pen, which may since
+  // have changed.
+  location_id: varchar('location_id', { length: 36 }),
+  cause_of_death: varchar('cause_of_death', { length: 200 }),
+  post_mortem_notes: text('post_mortem_notes'),
+  disposal_method: varchar('disposal_method', { length: 100 }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  // Explicit names — the derived ones exceed MySQL's 64-character limit.
+  txnFk: foreignKey({
+    columns: [table.transaction_id],
+    foreignColumns: [batchTransaction.transaction_id],
+    name: 'bmd_transaction_id_fk',
+  }).onDelete('cascade'),
+  locationFk: foreignKey({
+    columns: [table.location_id],
+    foreignColumns: [locationMaster.location_id],
+    name: 'bmd_location_id_fk',
+  }).onDelete('restrict'),
+}));
+
+export const batchTreatmentDetail = mysqlTable('batch_treatment_detail', {
+  detail_id: varchar('detail_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  transaction_id: varchar('transaction_id', { length: 36 }).notNull().unique(),
+  diagnosis: varchar('diagnosis', { length: 255 }),
+  route: varchar('route', { length: 50 }), // IM, SUBCUTANEOUS, ORAL_IN_FEED, TOPICAL …
+  // Days after this dose during which the animal may not enter the food chain.
+  // Drives the slaughter withdrawal check and "active case" counts.
+  withdrawal_days: int('withdrawal_days'),
+  veterinarian: varchar('veterinarian', { length: 150 }),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  txnFk: foreignKey({
+    columns: [table.transaction_id],
+    foreignColumns: [batchTransaction.transaction_id],
+    name: 'btd_transaction_id_fk',
+  }).onDelete('cascade'),
+}));
+
+export const batchMortalityDetailRelations = relations(batchMortalityDetail, ({ one }) => ({
+  transaction: one(batchTransaction, { fields: [batchMortalityDetail.transaction_id], references: [batchTransaction.transaction_id] }),
+  location: one(locationMaster, { fields: [batchMortalityDetail.location_id], references: [locationMaster.location_id] }),
+}));
+
+export const batchTreatmentDetailRelations = relations(batchTreatmentDetail, ({ one }) => ({
+  transaction: one(batchTransaction, { fields: [batchTreatmentDetail.transaction_id], references: [batchTransaction.transaction_id] }),
 }));
 
 export const batchOutputLineRelations = relations(batchOutputLine, ({ one }) => ({

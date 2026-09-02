@@ -217,6 +217,65 @@ export class TransferStageDto {
   remarks?: string;
 }
 
+const TREATMENT_ROUTES = ['IM', 'IV', 'SUBCUTANEOUS', 'ORAL', 'ORAL_IN_FEED', 'ORAL_IN_WATER', 'TOPICAL', 'INTRAMAMMARY', 'INTRAUTERINE'] as const;
+
+/**
+ * The clinical narrative behind a MORTALITY row. Kept as its own object rather
+ * than more columns on the transaction: it only applies to one transaction
+ * type, and it is written to batch_mortality_detail, not batch_transaction.
+ */
+export class MortalityDetailDto {
+  @ApiProperty({ description: 'Pen / location UUID where the death occurred — defaults to the batch location when omitted', required: false })
+  @IsUUID()
+  @IsOptional()
+  location_id?: string;
+
+  @ApiProperty({ description: 'Cause of death', example: 'Acute mortality', required: false })
+  @IsString()
+  @IsOptional()
+  cause_of_death?: string;
+
+  @ApiProperty({ description: 'Post-mortem / necropsy findings', required: false })
+  @IsString()
+  @IsOptional()
+  post_mortem_notes?: string;
+
+  @ApiProperty({ description: 'How the carcass was disposed of', example: 'Incineration (biosecure)', required: false })
+  @IsString()
+  @IsOptional()
+  disposal_method?: string;
+}
+
+/**
+ * The prescription behind a CONSUMPTION row that is a medicine or vaccine.
+ * withdrawal_days is the one that carries weight: it drives the slaughter
+ * withdrawal check and the active-case count.
+ */
+export class TreatmentDetailDto {
+  @ApiProperty({ description: 'Diagnosis or reason for the treatment', required: false })
+  @IsString()
+  @IsOptional()
+  diagnosis?: string;
+
+  @ApiProperty({ description: 'Route of administration', enum: TREATMENT_ROUTES, required: false })
+  @IsString()
+  @IsOptional()
+  @IsIn(TREATMENT_ROUTES)
+  route?: string;
+
+  @ApiProperty({ description: 'Withdrawal period in days — the animal may not enter the food chain until it elapses', required: false, example: 28 })
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  @IsOptional()
+  withdrawal_days?: number;
+
+  @ApiProperty({ description: 'Attending veterinarian', required: false })
+  @IsString()
+  @IsOptional()
+  veterinarian?: string;
+}
+
 export class AddBatchTransactionDto {
   @ApiProperty({ description: 'Transaction date', example: '2026-08-07' })
   @IsDateString()
@@ -294,6 +353,18 @@ export class AddBatchTransactionDto {
   @IsUUID()
   @IsOptional()
   animal_id?: string;
+
+  @ApiProperty({ description: 'Clinical detail for a MORTALITY row — cause, post-mortem findings, disposal, pen', required: false, type: MortalityDetailDto })
+  @ValidateNested()
+  @Type(() => MortalityDetailDto)
+  @IsOptional()
+  mortality_detail?: MortalityDetailDto;
+
+  @ApiProperty({ description: 'Prescription detail for a medicine/vaccine CONSUMPTION row — diagnosis, route, withdrawal period, vet', required: false, type: TreatmentDetailDto })
+  @ValidateNested()
+  @Type(() => TreatmentDetailDto)
+  @IsOptional()
+  treatment_detail?: TreatmentDetailDto;
 }
 
 export class BatchOutputLineInput {

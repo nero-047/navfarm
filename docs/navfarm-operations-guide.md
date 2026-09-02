@@ -376,10 +376,17 @@ made up of six posted variance rows, each with its own GL journal:
 
 Unit cost landed at ₹6,608.49/head, written back to the batch header.
 
-**The variance report only has data after a batch closes.** That is not a gap — variances are
-produced by `close()`, so a tenant with no closed standard batch legitimately has an empty
-report. The seed leaves `PIG-BAT-2026-0102` staged at slaughter weight and `ACTIVE`; closing it
-from the console is what fills the report. The seed banner says so.
+![Batch cost variance](images/scope-company-variance.png)
+
+Finance → **Batch Cost Variance** shows this per batch: standard against actual, the four
+variance types side by side, and the total with its percentage. Unfavourable amounts are
+positive throughout the costing engine, so the sign carries the meaning and the colour follows
+it.
+
+**The report only has data after a batch closes.** That is not a gap — variances are produced
+by `close()`, so a tenant with no closed standard batch legitimately has none, and the page says
+so rather than showing an error. The seed leaves `PIG-BAT-2026-0102` staged at slaughter weight
+and `ACTIVE`; closing it from the console is what fills the report.
 
 ---
 
@@ -399,18 +406,27 @@ Every figure on this page is computed:
 - **Biosecurity** — the share of pens whose `last_disinfected_date` is within 30 days, shown
   as `4 of 4 pens disinfected in 30 days`.
 
-**A caveat worth knowing.** There is no post-mortem or prescription table. `batch_transaction`
-stores clinical detail in its free-text `remarks`, in the format the create dialog writes and
-the register parses back:
+**Where clinical detail lives.** A death or a treatment is one `batch_transaction` — the
+quantity and the cost — plus a 1:1 row of clinical narrative:
 
-```
-Acute mortality (PEN-GROW-02) [PM: Sudden death, no prior clinical signs] [DISPOSAL: Incineration (biosecure)]
-Ivermectin 1% — Routine strategic deworming during cb grower (240 ml, Subcutaneous, vet: Dr. A. Menon, withdrawal 28d)
-```
+| Table | Columns |
+|---|---|
+| `batch_mortality_detail` | `location_id` (the pen), `cause_of_death`, `post_mortem_notes`, `disposal_method` |
+| `batch_treatment_detail` | `diagnosis`, `route`, `withdrawal_days`, `veterinarian` |
 
-The register shows the pen, cause, post-mortem finding, disposal method and recorder from what
-was actually recorded, and an em-dash where nothing was. If clinical records become a
-first-class requirement, this is the thing to normalise into its own table.
+Both key on `transaction_id` with a unique constraint and `ON DELETE CASCADE`, so an event is
+still a single row of cost, nothing is duplicated, and deleting the transaction takes its
+narrative with it. `POST /batch/:id/transaction` accepts them as `mortality_detail` /
+`treatment_detail`, validated **before** anything is written — a `treatment_detail` on an
+`OVERHEAD` row is rejected with nothing persisted, and `route` must be one of the nine
+recognised administration routes.
+
+`withdrawal_days` is the column that carries weight: it drives the active-case count and the
+slaughter withdrawal check, both of which were previously reading a number parsed out of prose.
+
+This replaced a scheme where the detail was formatted into `remarks` and parsed back by the
+console, which made it unqueryable and easy to lose. The register still parses that old format
+as a fallback so rows recorded before these tables keep displaying.
 
 ---
 
@@ -447,8 +463,8 @@ would actually use it. Screenshots in this document are from that walk.
 resulting variance rows, GL journals, inventory ledger entry and updated unit cost checked in
 the database and in the console.
 
-**Gates.** API 213/213 tests, web 71/71 tests, API lint 0 errors, web lint 87 errors (at or
-below the accepted 88 baseline, no new ones), web typecheck 0 errors.
+**Gates.** API 215/215 tests, web 75/75 tests, API lint 0 errors, API typecheck 0 errors, web
+typecheck 0 errors, web lint 87 errors (at the accepted baseline, none new).
 
 ### What this pass found and fixed
 
@@ -469,17 +485,25 @@ below the accepted 88 baseline, no new ones), web typecheck 0 errors.
 | Dead session | Left the user on a dashboard of zeroes with 14 console errors | Session cleared and redirected to `/login` |
 | Roles | Seeded permissions for module/resource pairs no controller guards | Rebuilt from the enforced pairs |
 | Auth | Concurrent logins returned `201 500 500` | Refresh tokens carry a `jti` |
+| Clinical records | Post-mortem and prescription detail were formatted into `remarks` and parsed back | `batch_mortality_detail` / `batch_treatment_detail`, validated before any write |
+| Variance report | API-only — no console page | Finance → Batch Cost Variance, in all 8 locales |
+| API typecheck | 48 errors, including 20 dead `success: true` literals overwritten by a spread and a `batch_code` field that does not exist on `batch_header` | 0 errors |
+| Animal lookup | `batch_code` was always `undefined` — the column is `batch_no` | Returns `batch_no` |
+| `findAll` return types | Early `return rows` widened the type so callers could not read `wip_value` / `line_count` | Always returns the enriched shape |
 
 ### Known gaps
 
-- **`GET /financial-reports/batch-cost-variance` has no console page.** The endpoint works and
-  returns correct figures; no web route consumes it. Adding one is a contained piece of work.
-- **No post-mortem / prescription tables.** Clinical detail lives in `batch_transaction.remarks`
-  (section 8).
-- **48 pre-existing TypeScript errors** under `tsc -p tsconfig.app.json` in the API, none in
-  code touched by this pass. They are concentrated in `reset-and-bootstrap-faltu.ts` (13) and a
-  KPI block in `batch.service.ts` (8). The API builds and runs; the `typecheck` target is not
-  clean.
+- **Only Piggery and Dairy have purpose-built screens.** `lob_master` ships 16 lines of
+  business across 6 natures of business, and `LOB_HAS_DEDICATED_PANELS` marks two of them as
+  having dedicated panels; the other fourteen fall back to the generic batch screens. Those
+  work — everything hangs off a batch — but a poultry or aquaculture operator gets no
+  species-specific vocabulary or KPIs.
+- **Mortality and treatment must belong to a batch.** The clinical detail tables extend
+  `batch_transaction`, so a death or treatment for an animal that is not currently in a batch
+  has nowhere to go. Every animal in the demo data is in a batch, so this is not yet reachable.
+- **The mortality dialog has no pen picker.** It takes free text and files it as the
+  transaction's remark; `batch_mortality_detail.location_id` falls back to the batch's current
+  location. Wiring the field to a real pen selector is a small change.
 - **Web lint baseline is 87–88 errors**, mostly `no-empty` on `catch {}` and
   `react-hooks/exhaustive-deps`. The gate is "no new errors", not zero.
 

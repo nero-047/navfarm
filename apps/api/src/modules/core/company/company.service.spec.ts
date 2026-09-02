@@ -7,8 +7,6 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('CompanyService', () => {
   let service: CompanyService;
-  let clsService: ClsService;
-  let auditLogService: AuditLogService;
 
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
@@ -48,8 +46,6 @@ describe('CompanyService', () => {
     }).compile();
 
     service = module.get<CompanyService>(CompanyService);
-    clsService = module.get<ClsService>(ClsService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   it('should be defined', () => {

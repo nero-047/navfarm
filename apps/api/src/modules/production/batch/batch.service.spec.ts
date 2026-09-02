@@ -290,6 +290,114 @@ describe('BatchService', () => {
     });
   });
 
+  describe('addTransaction — clinical detail', () => {
+    // The guards run before any write, so a mismatched detail must leave
+    // nothing behind — not a transaction row with an orphaned narrative.
+    it('refuses mortality_detail on a transaction that is not a death', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({ ...activeBatch, costing_method: 'STANDARD' } as any);
+
+      await expect(
+        service.addTransaction('batch-1', {
+          transaction_date: '2026-08-01',
+          transaction_type: 'CONSUMPTION',
+          quantity: 10,
+          mortality_detail: { cause_of_death: 'Lameness' },
+        } as any, 'tenant-123'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDbInsert).not.toHaveBeenCalled();
+    });
+
+    it('refuses treatment_detail on a transaction that does not issue medicine', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({ ...activeBatch, costing_method: 'STANDARD' } as any);
+
+      await expect(
+        service.addTransaction('batch-1', {
+          transaction_date: '2026-08-01',
+          transaction_type: 'OVERHEAD',
+          quantity: 4,
+          treatment_detail: { withdrawal_days: 28 },
+        } as any, 'tenant-123'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDbInsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addTransaction — bio-asset OUTPUT leaves a ledger movement', () => {
+    // Harvesting from a matured bio-asset herd reduces
+    // batch_bio_asset_state.nca_book_value. Without a matching bio_asset_ledger
+    // row the IAS 41 roll-forward shows the carrying value fall with nothing to
+    // explain it — every other bio-asset movement (acquisition, consumption,
+    // mortality, overhead, maturation, amortisation, fair value, disposal)
+    // writes one.
+    it('writes a bio_asset_ledger row when OUTPUT is recorded on a matured bio-asset batch', async () => {
+      const bioBatch = {
+        ...activeBatch,
+        batch_no: 'BATCH-000001',
+        costing_method: 'BIO_ASSET',
+        nob_id: 'nob-1',
+        input_lines: [{ item_id: 'item-piglet' }],
+        transactions: [],
+      };
+      jest.spyOn(service, 'findOne').mockResolvedValue(bioBatch as any);
+
+      mockDbSelect.mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([
+              {
+                state_id: 'state-1',
+                batch_id: 'batch-1',
+                stage: 'MATURE',
+                current_quantity: '10.0000',
+                nca_book_value: '50000.0000',
+              },
+            ]),
+          }),
+        }),
+      });
+
+      (service as any).ledgerService = {
+        writePositiveEntry: jest.fn().mockResolvedValue({
+          ledger_id: 'led-1', rate: '1200.000000', amount: '12000.0000',
+        }),
+      };
+      (service as any).glPostingService = {
+        postInventoryLedgerEntry: jest.fn().mockResolvedValue({}),
+        postBatchCostEntry: jest.fn().mockResolvedValue({ journal_id: 'j-1' }),
+      };
+
+      const inserted: Array<{ table: unknown; values: any }> = [];
+      mockDbInsert.mockImplementation((table: unknown) => ({
+        values: jest.fn((v: any) => { inserted.push({ table, values: v }); return Promise.resolve({}); }),
+      }));
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      await service.addTransaction(
+        'batch-1',
+        {
+          transaction_date: '2026-08-20',
+          transaction_type: 'OUTPUT',
+          item_id: 'item-weaner',
+          quantity: 10,
+          uom: 'HEAD',
+        } as any,
+        'tenant-123',
+        { userId: 'user-1' },
+      );
+
+      const ledgerRow = inserted.find((i) => i.table === schema.bioAssetLedger);
+      expect(ledgerRow).toBeDefined();
+      // TRANSFORMATION is the entry type the IAS 41 roll-forward maps to its
+      // harvest-transfers bucket, which is otherwise always zero.
+      expect(ledgerRow!.values.entry_type).toBe('TRANSFORMATION');
+      expect(ledgerRow!.values.batch_id).toBe('batch-1');
+      // The movement must equal the reduction in carrying value.
+      expect(Number(ledgerRow!.values.cost_amount)).toBe(-12000);
+    });
+  });
+
   describe('findAll', () => {
     it('reports accumulated cost as wip_value so the dashboard tile is not structurally zero', async () => {
       // The console's WIP tile reads b.wip_value. Nothing in the API ever
@@ -792,7 +900,6 @@ describe('BatchService', () => {
           nob_id: 'nob-1',
           lob_id: 'lob-1',
           company_id: 'comp-1',
-          breed: { breed_name: 'Large White Yorkshire' },
         } as any)
         .mockResolvedValueOnce({
           batch_id: 'b-1',
@@ -802,6 +909,13 @@ describe('BatchService', () => {
         } as any);
 
       mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ breed_name: 'Large White Yorkshire' }]),
+            }),
+          }),
+        }) // breed name lookup
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             innerJoin: jest.fn().mockReturnValue({

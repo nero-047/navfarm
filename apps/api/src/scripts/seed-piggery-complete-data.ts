@@ -768,8 +768,14 @@ export async function seedPiggeryData() {
             });
           }
           // Mortality Day 8
+          const mortTxId = randomUUID();
           await db.insert(schema.batchTransaction).values({
-            transaction_id: randomUUID(), batch_id: batId, transaction_date: '2026-07-22', transaction_type: 'MORTALITY', quantity: '1.0000', uom: 'HEAD', remarks: 'Acute mortality (PEN-GROW-02) [PM: Sudden death, no prior clinical signs] [DISPOSAL: Incineration (biosecure)]', created_by: c2AdminId,
+            transaction_id: mortTxId, batch_id: batId, transaction_date: '2026-07-22', transaction_type: 'MORTALITY', quantity: '1.0000', uom: 'HEAD', remarks: 'Single loss in the grower pen', created_by: c2AdminId,
+          });
+          await db.insert(schema.batchMortalityDetail).values({
+            detail_id: randomUUID(), transaction_id: mortTxId, location_id: penMap2.get('PEN-GROW-02') || null,
+            cause_of_death: 'Acute mortality', post_mortem_notes: 'Sudden death, no prior clinical signs',
+            disposal_method: 'Incineration (biosecure)', created_by: c2AdminId,
           });
           // 4 Weekly weigh-in logs
           const weighIns = [
@@ -832,7 +838,12 @@ export async function seedPiggeryData() {
     };
 
     type Leg = { stage: string; from: number; pen: string };
-    type Rec = { day: number; type: string; itemCode: string | null; qty: string; uom: string; rate: string; note: string };
+    type Clinical = { pen: string; cause: string; pm: string; disposal: string };
+    type Rec = {
+      day: number; type: string; itemCode: string | null; qty: string; uom: string; rate: string; note: string;
+      /** MORTALITY rows only — becomes a batch_mortality_detail row. */
+      clinical?: Clinical;
+    };
 
     const journeys: Array<{
       batchNo: string; companyId: string; start: string; createdBy: string;
@@ -852,7 +863,7 @@ export async function seedPiggeryData() {
           { day: 3,  type: 'CONSUMPTION', itemCode: 'FEED-GEST-SOW', qty: '60.0000', uom: 'KG', rate: '28.000000', note: 'Flush ration 3.0 kg/head — stimulating ovulation before service' },
           { day: 8,  type: 'CONSUMPTION', itemCode: 'FEED-GEST-SOW', qty: '60.0000', uom: 'KG', rate: '28.000000', note: 'Flush ration, final pre-service day' },
           { day: 35, type: 'CONSUMPTION', itemCode: 'FEED-GEST-SOW', qty: '44.0000', uom: 'KG', rate: '28.000000', note: 'Mid gestation ration 2.2 kg/head' },
-          { day: 46, type: 'MORTALITY',   itemCode: null,            qty: '1.0000',  uom: 'HEAD', rate: '0.000000', note: 'Gastric torsion (PEN-GEST-A1) [PM: Torsion confirmed on necropsy — within the 1% gestation limit] [DISPOSAL: Incineration (biosecure)]' },
+          { day: 46, type: 'MORTALITY',   itemCode: null,            qty: '1.0000',  uom: 'HEAD', rate: '0.000000', note: 'Sow lost mid-gestation', clinical: { pen: 'PEN-GEST-A1', cause: 'Gastric torsion', pm: 'Torsion confirmed on necropsy — within the 1% gestation limit', disposal: 'Incineration (biosecure)' } },
           { day: 60, type: 'CONSUMPTION', itemCode: 'FEED-GEST-SOW', qty: '44.0000', uom: 'KG', rate: '28.000000', note: 'Mid gestation ration 2.2 kg/head' },
         ],
       },
@@ -869,7 +880,7 @@ export async function seedPiggeryData() {
         ],
         records: [
           { day: 2,  type: 'CONSUMPTION', itemCode: 'FEED-LACT-SOW',  qty: '37.5000', uom: 'KG',  rate: '42.000000', note: 'Farrowing-day ration 1.5 kg/head' },
-          { day: 2,  type: 'MORTALITY',   itemCode: null,             qty: '3.0000',  uom: 'HEAD', rate: '0.000000',  note: 'Stillbirths at farrowing (PEN-FARR-01) [PM: Three stillborn piglets, sow unaffected] [DISPOSAL: Rendering]' },
+          { day: 2,  type: 'MORTALITY',   itemCode: null,             qty: '3.0000',  uom: 'HEAD', rate: '0.000000',  note: 'Stillbirths at farrowing', clinical: { pen: 'PEN-FARR-01', cause: 'Stillbirth', pm: 'Three stillborn piglets, sow unaffected', disposal: 'Rendering' } },
           { day: 6,  type: 'CONSUMPTION', itemCode: 'FEED-LACT-SOW',  qty: '100.0000', uom: 'KG', rate: '42.000000', note: 'Early lactation ration 4.0 kg/head' },
           { day: 18, type: 'CONSUMPTION', itemCode: 'FEED-LACT-SOW',  qty: '162.5000', uom: 'KG', rate: '42.000000', note: 'Peak lactation ration 6.5 kg/head' },
           { day: 28, type: 'CONSUMPTION', itemCode: 'FEED-CREEP-PRE', qty: '8.7500',  uom: 'KG',  rate: '55.000000', note: 'Piglet creep feed, pre-wean stepdown week' },
@@ -884,7 +895,7 @@ export async function seedPiggeryData() {
         ],
         records: [
           { day: 4,  type: 'CONSUMPTION', itemCode: 'FEED-WEAN-GROW', qty: '108.0000', uom: 'KG',  rate: '38.000000', note: 'Quarantine adaptation ration 0.9 kg/head' },
-          { day: 9,  type: 'MORTALITY',   itemCode: null,             qty: '2.0000',   uom: 'HEAD', rate: '0.000000',  note: 'Intake quarantine losses (PEN-QUAR-02) [PM: Post-transport stress, enteritis on necropsy] [DISPOSAL: Incineration (biosecure)]' },
+          { day: 9,  type: 'MORTALITY',   itemCode: null,             qty: '2.0000',   uom: 'HEAD', rate: '0.000000',  note: 'Intake quarantine losses', clinical: { pen: 'PEN-QUAR-02', cause: 'Post-transport enteritis', pm: 'Post-transport stress, enteritis on necropsy', disposal: 'Incineration (biosecure)' } },
           { day: 22, type: 'CONSUMPTION', itemCode: 'FEED-WEAN-GROW', qty: '141.6000', uom: 'KG',  rate: '38.000000', note: 'Nursery weaner adaptation ration 1.2 kg/head' },
           { day: 38, type: 'CONSUMPTION', itemCode: 'FEED-WEAN-GROW', qty: '212.4000', uom: 'KG',  rate: '38.000000', note: 'Early grower ration 1.8 kg/head' },
           { day: 45, type: 'OBSERVATION', itemCode: null,             qty: '48.5000',  uom: 'KG',  rate: '0.000000',  note: 'Weigh-bridge sample: mean body weight 48.5 kg, on curve for 60 kg exit' },
@@ -901,7 +912,7 @@ export async function seedPiggeryData() {
         records: [
           { day: 30,  type: 'CONSUMPTION', itemCode: 'FEED-FINISHER', qty: '250.0000', uom: 'KG',  rate: '41.000000', note: 'Finisher phase 1 ration 2.5 kg/head' },
           { day: 70,  type: 'CONSUMPTION', itemCode: 'FEED-FINISHER', qty: '290.0000', uom: 'KG',  rate: '41.000000', note: 'Finisher phase 2 ration 2.9 kg/head' },
-          { day: 95,  type: 'MORTALITY',   itemCode: null,            qty: '2.0000',   uom: 'HEAD', rate: '0.000000',  note: 'Lameness culls (PEN-FIN-03) [PM: Chronic joint infection, unfit for transport] [DISPOSAL: Rendering]' },
+          { day: 95,  type: 'MORTALITY',   itemCode: null,            qty: '2.0000',   uom: 'HEAD', rate: '0.000000',  note: 'Lameness culls', clinical: { pen: 'PEN-FIN-03', cause: 'Chronic lameness', pm: 'Chronic joint infection, unfit for transport', disposal: 'Rendering' } },
           { day: 120, type: 'CONSUMPTION', itemCode: 'FEED-FINISHER', qty: '320.0000', uom: 'KG',  rate: '41.000000', note: 'Market finishing ration 3.2 kg/head' },
           { day: 133, type: 'OBSERVATION', itemCode: null,            qty: '111.2000', uom: 'KG',  rate: '0.000000',  note: 'Pre-slaughter live weight check: mean 111.2 kg' },
         ],
@@ -952,8 +963,9 @@ export async function seedPiggeryData() {
             eq(schema.batchTransaction.remarks, r.note),
           )).limit(1);
         if (existingTx) continue;
+        const txId = randomUUID();
         await db.insert(schema.batchTransaction).values({
-          transaction_id: randomUUID(),
+          transaction_id: txId,
           batch_id: batch.batch_id,
           transaction_date: txDate,
           transaction_type: r.type,
@@ -965,6 +977,20 @@ export async function seedPiggeryData() {
           remarks: r.note,
           created_by: j.createdBy,
         });
+        // Cause, necropsy finding, disposal and pen are columns now, not a
+        // formatted string inside `remarks`.
+        const clinical = r.clinical;
+        if (clinical) {
+          await db.insert(schema.batchMortalityDetail).values({
+            detail_id: randomUUID(),
+            transaction_id: txId,
+            location_id: j.penMap.get(clinical.pen) || null,
+            cause_of_death: clinical.cause,
+            post_mortem_notes: clinical.pm,
+            disposal_method: clinical.disposal,
+            created_by: j.createdBy,
+          });
+        }
       }
     }
 

@@ -200,13 +200,8 @@ async function runResetAndBootstrapFaltu() {
       lob_id: lobId,
       item_code: item.item_code,
       item_name: item.item_name,
-      item_type: item.item_category || 'CONSUMABLE',
-      category: item.item_category || 'GENERAL',
-      uom_primary: item.base_uom || 'KG',
-      standard_cost: item.standard_cost ? String(item.standard_cost) : '0.00',
-      valuation_method: item.valuation_method || 'FIFO',
-      posting_group: item.item_category || 'GENERAL',
-      is_biological_asset: item.is_bio_asset ?? false,
+      item_type: item.item_type,
+      uom_primary: item.uom_primary,
       is_active: true,
     });
   }
@@ -245,7 +240,6 @@ async function runResetAndBootstrapFaltu() {
     password_hash: commonPasswordHash,
     full_name: 'Faltu Farms Group Admin',
     user_type: 'TENANT_ADMIN',
-    status: 'ACTIVE',
     is_active: true,
   });
 
@@ -286,7 +280,6 @@ async function runResetAndBootstrapFaltu() {
     password_hash: commonPasswordHash,
     full_name: '1st Fultu Admin',
     user_type: 'COMPANY_ADMIN',
-    status: 'ACTIVE',
     is_active: true,
   });
 
@@ -380,7 +373,6 @@ async function runResetAndBootstrapFaltu() {
     password_hash: commonPasswordHash,
     full_name: '2nd Faltu Admin',
     user_type: 'COMPANY_ADMIN',
-    status: 'ACTIVE',
     is_active: true,
   });
 
@@ -433,7 +425,6 @@ async function runResetAndBootstrapFaltu() {
     password_hash: commonPasswordHash,
     full_name: 'Piggery Area Manager',
     user_type: 'OPERATIONAL_ADMIN',
-    status: 'ACTIVE',
     is_active: true,
   });
   await tenantDb.insert(tenant.userCompanyAssignments).values({
@@ -460,7 +451,6 @@ async function runResetAndBootstrapFaltu() {
     password_hash: commonPasswordHash,
     full_name: 'Piggery Operator Staff',
     user_type: 'STANDARD_USER',
-    status: 'ACTIVE',
     is_active: true,
   });
   await tenantDb.insert(tenant.userCompanyAssignments).values({

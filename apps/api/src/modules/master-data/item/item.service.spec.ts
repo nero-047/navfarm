@@ -2,19 +2,19 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ItemService } from './item.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConflictException, BadRequestException } from '@nestjs/common';
 
 describe('ItemService', () => {
   let service: ItemService;
-  let clsService: ClsService;
-  let auditLogService: AuditLogService;
 
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
   const mockDbUpdate = jest.fn();
   const mockDbDelete = jest.fn();
 
-  const mockDb = {
+  // Annotated because `transaction` hands the callback this same object,
+  // which makes the type circular and otherwise implicitly `any`.
+  const mockDb: any = {
     select: mockDbSelect,
     insert: mockDbInsert,
     update: mockDbUpdate,
@@ -48,8 +48,6 @@ describe('ItemService', () => {
     }).compile();
 
     service = module.get<ItemService>(ItemService);
-    clsService = module.get<ClsService>(ClsService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   it('should be defined', () => {

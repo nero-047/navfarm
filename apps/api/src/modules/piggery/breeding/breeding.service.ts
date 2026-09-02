@@ -104,7 +104,6 @@ export class BreedingService {
     await this.db.insert(schema.breedingRecord).values(newRecord);
 
     return {
-      breeding_id: breedingId,
       ...newRecord,
       message: 'Mating event recorded successfully with auto-scheduled farrowing and pregnancy check dates.',
     };
@@ -276,7 +275,6 @@ export class BreedingService {
       .where(eq(schema.animalRegister.animal_id, dto.sow_animal_id));
 
     return {
-      farrow_id: farrowId,
       ...newRecord,
       message: `Farrowing recorded: ${live} live piglets born. Sow parity incremented to ${parityNumber} and status set to LACTATING.`,
     };
@@ -433,7 +431,6 @@ export class BreedingService {
     await this.db.insert(schema.semenBatch).values(newRecord);
 
     return {
-      semen_batch_id: semenBatchId,
       ...newRecord,
       message: `Semen collection logged: ${dto.doses_collected} doses collected at computed unit cost of ${unitCostPerDose.toFixed(4)}/dose.`,
     };

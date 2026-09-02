@@ -349,11 +349,25 @@ export class BatchService {
         // without the join they had no recorder to display.
         created_by: schema.batchTransaction.created_by,
         created_by_name: schema.userMaster.full_name,
+        // Clinical detail — null on every row that is not a death or a
+        // treatment, and on historical rows recorded before these tables.
+        pen_location_id: schema.batchMortalityDetail.location_id,
+        pen_location_name: schema.locationMaster.location_name,
+        cause_of_death: schema.batchMortalityDetail.cause_of_death,
+        post_mortem_notes: schema.batchMortalityDetail.post_mortem_notes,
+        disposal_method: schema.batchMortalityDetail.disposal_method,
+        diagnosis: schema.batchTreatmentDetail.diagnosis,
+        route: schema.batchTreatmentDetail.route,
+        withdrawal_days: schema.batchTreatmentDetail.withdrawal_days,
+        veterinarian: schema.batchTreatmentDetail.veterinarian,
       })
       .from(schema.batchTransaction)
       .leftJoin(schema.itemMaster, eq(schema.batchTransaction.item_id, schema.itemMaster.item_id))
       .leftJoin(schema.animalRegister, eq(schema.batchTransaction.animal_id, schema.animalRegister.animal_id))
       .leftJoin(schema.userMaster, eq(schema.batchTransaction.created_by, schema.userMaster.user_id))
+      .leftJoin(schema.batchMortalityDetail, eq(schema.batchTransaction.transaction_id, schema.batchMortalityDetail.transaction_id))
+      .leftJoin(schema.batchTreatmentDetail, eq(schema.batchTransaction.transaction_id, schema.batchTreatmentDetail.transaction_id))
+      .leftJoin(schema.locationMaster, eq(schema.batchMortalityDetail.location_id, schema.locationMaster.location_id))
       .where(eq(schema.batchTransaction.batch_id, id));
     const outputLines = await this.db.select().from(schema.batchOutputLine).where(eq(schema.batchOutputLine.batch_id, id));
     const attachments = await this.db
@@ -535,7 +549,10 @@ export class BatchService {
       .limit(limit)
       .offset(offset);
 
-    if (rows.length === 0) return rows;
+    // Returning the bare rows here widened findAll's type to a union whose
+    // other branch has no wip_value/breed_name/stage_name — callers then could
+    // not read the fields this method exists to add.
+    if (rows.length === 0) return [];
 
     /**
      * Work-in-progress cost carried by each batch.
@@ -793,6 +810,15 @@ export class BatchService {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'ACTIVE');
 
+    // Checked up front: clinical detail is written after the transaction row,
+    // so rejecting it later would leave a half-recorded event behind.
+    if (dto.mortality_detail && dto.transaction_type !== 'MORTALITY') {
+      throw new BadRequestException('mortality_detail can only be recorded on a MORTALITY transaction.');
+    }
+    if (dto.treatment_detail && dto.transaction_type !== 'CONSUMPTION') {
+      throw new BadRequestException('treatment_detail belongs on the CONSUMPTION row that issues the medicine or vaccine.');
+    }
+
     const isBioAsset = batch.costing_method === 'BIO_ASSET';
     let bioState: typeof schema.batchBioAssetState.$inferSelect | undefined;
     if (isBioAsset) {
@@ -961,11 +987,43 @@ export class BatchService {
       amount = Number(ledgerEntry.amount); // positive
 
       if (isBioAsset && bio) {
-        const newNca = Math.max(0, Number(bio.nca_book_value) - amount);
+        const openingNca = Number(bio.nca_book_value);
+        const newNca = Math.max(0, openingNca - amount);
         await this.db
           .update(schema.batchBioAssetState)
           .set({ nca_book_value: newNca.toString(), updated_at: toMysqlTimestamp() })
           .where(eq(schema.batchBioAssetState.batch_id, id));
+
+        // Every other bio-asset movement writes a ledger row; this one did not,
+        // so a harvest made the carrying value fall with nothing in
+        // bio_asset_ledger to explain it and the IAS 41 roll-forward's
+        // harvest-transfers bucket was structurally zero. The amount is the
+        // reduction that actually happened — not `amount` — because the clamp
+        // above caps it at the remaining book value.
+        const ncaReleased = openingNca - newNca;
+        // The asset whose value fell is the herd, not the item harvested out of it.
+        const herdItemId = batch.input_lines?.[0]?.item_id || bioAssetSubjectItemId;
+        if (herdItemId && ncaReleased > 0) {
+          await this.db.insert(schema.bioAssetLedger).values({
+            entry_id: randomUUID(),
+            tenant_id: tenantId,
+            company_id: batch.company_id,
+            bio_asset_item_id: herdItemId,
+            entry_type: 'TRANSFORMATION',
+            document_no: batch.batch_no,
+            batch_id: id,
+            batch_no: batch.batch_no,
+            posting_date: dto.transaction_date,
+            stage: bio.stage,
+            quantity: (-(dto.quantity ?? 0)).toString(),
+            cost_amount: (-ncaReleased).toString(),
+            cost_amount_each_unit: dto.quantity ? (ncaReleased / dto.quantity).toString() : '0',
+            costing_method: bio.stage === 'MATURE' ? 'AMORTIZED_COST' : 'COST_ACCUMULATION',
+            nob_id: batch.nob_id,
+            lob_id: batch.lob_id,
+            created_by: userPayload?.userId || null,
+          });
+        }
       }
 
       if (isByProductRemoval) {
@@ -1169,6 +1227,45 @@ export class BatchService {
       animal_id: dto.animal_id || null,
       created_by: userPayload?.userId || null,
     });
+
+    // Clinical detail rides alongside the transaction in its own table. It used
+    // to be formatted into `remarks` and parsed back out by the console, which
+    // made it unqueryable and easy to lose. Validation is by transaction type
+    // so a diagnosis can't be filed against a feed row.
+    if (dto.mortality_detail) {
+      const detail = dto.mortality_detail;
+      if (detail.location_id) {
+        const [pen] = await this.db
+          .select({ location_id: schema.locationMaster.location_id })
+          .from(schema.locationMaster)
+          .where(eq(schema.locationMaster.location_id, detail.location_id))
+          .limit(1);
+        if (!pen) throw new BadRequestException(`Location '${detail.location_id}' not found.`);
+      }
+      await this.db.insert(schema.batchMortalityDetail).values({
+        detail_id: randomUUID(),
+        transaction_id: transactionId,
+        // Fall back to where the batch is now — better than recording no pen at all.
+        location_id: detail.location_id || batch.location_id || null,
+        cause_of_death: detail.cause_of_death || null,
+        post_mortem_notes: detail.post_mortem_notes || null,
+        disposal_method: detail.disposal_method || null,
+        created_by: userPayload?.userId || null,
+      });
+    }
+
+    if (dto.treatment_detail) {
+      const detail = dto.treatment_detail;
+      await this.db.insert(schema.batchTreatmentDetail).values({
+        detail_id: randomUUID(),
+        transaction_id: transactionId,
+        diagnosis: detail.diagnosis || null,
+        route: detail.route || null,
+        withdrawal_days: detail.withdrawal_days ?? null,
+        veterinarian: detail.veterinarian || null,
+        created_by: userPayload?.userId || null,
+      });
+    }
 
     if (batch.scheduler_id && dto.quantity !== undefined && dto.quantity !== null) {
       await this.evaluateKpi(batch, {
@@ -2367,6 +2464,22 @@ export class BatchService {
     if (!batch.breed_id) {
       throw new BadRequestException('Batch must have a breed assigned to auto-generate a scheduler from breed lifecycle standards.');
     }
+    // scheduler_master.nob_id and lob_id are NOT NULL; a batch missing either
+    // would fail at insert time with a driver error instead of a clear message.
+    if (!batch.nob_id || !batch.lob_id) {
+      throw new BadRequestException('Batch must have both a nature and a line of business set before a scheduler can be generated for it.');
+    }
+    const nobId = batch.nob_id;
+    const lobId = batch.lob_id;
+
+    // findOne() returns breed_id, not a joined breed — read the name for the
+    // messages and the scheduler title below.
+    const [batchBreed] = await this.db
+      .select({ breed_name: schema.breedMaster.breed_name })
+      .from(schema.breedMaster)
+      .where(eq(schema.breedMaster.breed_id, batch.breed_id))
+      .limit(1);
+    const breedName = batchBreed?.breed_name ?? null;
 
     // 1. Fetch breed lifecycle stages
     const lifecycleRows = await this.db
@@ -2386,7 +2499,7 @@ export class BatchService {
       .orderBy(schema.breedLifecycleStages.period_from);
 
     if (lifecycleRows.length === 0) {
-      throw new BadRequestException(`No breed lifecycle standards found for breed '${batch.breed?.breed_name || batch.breed_id}'.`);
+      throw new BadRequestException(`No breed lifecycle standards found for breed '${breedName || batch.breed_id}'.`);
     }
 
     // 2. Fetch existing or create fallback parameter_master records
@@ -2400,15 +2513,17 @@ export class BatchService {
         )
       );
 
-    const findOrCreateParam = async (paramCode: string, paramName: string, paramType: string, defaultUom: string) => {
+    const findOrCreateParam = async (
+      paramCode: string, paramName: string, paramType: string, defaultUom: string,
+    ): Promise<typeof schema.parameterMaster.$inferSelect> => {
       let foundParam = existingParams.find(p => p.parameter_code === paramCode || (p.parameter_type === paramType && p.parameter_name === paramName));
       if (!foundParam) {
         const newId = randomUUID();
         await this.db.insert(schema.parameterMaster).values({
           parameter_id: newId,
           tenant_id: tenantId,
-          nob_id: batch.nob_id,
-          lob_id: batch.lob_id,
+          nob_id: nobId,
+          lob_id: lobId,
           parameter_code: paramCode,
           parameter_name: paramName,
           parameter_type: paramType,
@@ -2419,8 +2534,8 @@ export class BatchService {
         foundParam = {
           parameter_id: newId,
           tenant_id: tenantId,
-          nob_id: batch.nob_id,
-          lob_id: batch.lob_id,
+          nob_id: nobId,
+          lob_id: lobId,
           parameter_code: paramCode,
           parameter_name: paramName,
           parameter_type: paramType,
@@ -2428,11 +2543,12 @@ export class BatchService {
           qty_method: 'PER_UNIT',
           created_by: userPayload?.userId || null,
           created_at: new Date().toISOString(),
+          company_id: null,
+          description: null,
           default_qty_per_unit: null,
           default_qty_per_batch: null,
           item_id: null,
           resource_id: null,
-          cost_allocation_pct: '0.00',
           is_mandatory: false,
           is_active: true,
         };
@@ -2465,16 +2581,16 @@ export class BatchService {
       scheduler_id: schedulerId,
       tenant_id: tenantId,
       company_id: batch.company_id,
-      nob_id: batch.nob_id,
-      lob_id: batch.lob_id,
+      nob_id: nobId,
+      lob_id: lobId,
       scheduler_code: finalSchedCode,
-      scheduler_name: `Scheduler for Batch ${batch.batch_no} (${batch.breed?.breed_name || 'Breed Standards'})`,
+      scheduler_name: `Scheduler for Batch ${batch.batch_no} (${breedName || 'Breed Standards'})`,
       duration_value: totalDays,
       duration_unit: 'DAY',
       breed_id: batch.breed_id,
       batch_start_from: 'Batch Start Date',
       is_locked: true,
-      description: `Auto-generated from breed lifecycle standards for ${batch.breed?.breed_name || 'breed'}.`,
+      description: `Auto-generated from breed lifecycle standards for ${breedName || 'breed'}.`,
       created_by: userPayload?.userId || null,
     });
 
