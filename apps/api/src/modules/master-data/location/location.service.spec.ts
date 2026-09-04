@@ -19,6 +19,7 @@ describe('LocationService canonical hierarchy', () => {
     builder.where = jest.fn(() => builder);
     builder.orderBy = jest.fn(() => builder);
     builder.offset = jest.fn(() => builder);
+    builder.leftJoin = jest.fn(() => builder);
     builder.limit = jest.fn(async () => rows);
     builder.then = (resolve: (value: any[]) => unknown, reject: (reason: unknown) => unknown) =>
       Promise.resolve(rows).then(resolve, reject);
@@ -169,5 +170,83 @@ describe('LocationService canonical hierarchy', () => {
       company_id: 'missing-company', location_name: 'Main Farm', location_address: 'Farm Road',
       location_type: 'FARM', max_capacity: 100, capacity_uom: 'HEAD',
     }, 'tenant-1')).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects switching an existing location to SILO', async () => {
+    selectResults.push([{
+      location_id: 'loc-1', company_id: 'comp-1', location_type: 'STORE',
+      location_level: 1, parent_location_id: null,
+    }]);
+    await expect(service.update('loc-1', { location_type: 'SILO' }, 'tenant-1'))
+      .rejects.toThrow('Location Type cannot be changed');
+  });
+
+  it('rejects an area_unit that does not resolve in uom_master', async () => {
+    selectResults.push(
+      [{ location_id: 'loc-1', tenant_id: 'tenant-1', company_id: 'comp-1', location_type: 'FARM', parent_location_id: null, location_level: 1 }],
+      [farmType],
+      [], // area_unit UOM lookup finds nothing
+    );
+    await expect(service.update('loc-1', { area_unit: 'BOGUS' }, 'tenant-1'))
+      .rejects.toThrow(NotFoundException);
+  });
+
+  it('soft-deletes a location and writes an audit log entry', async () => {
+    selectResults.push(
+      [{ location_id: 'loc-1', tenant_id: 'tenant-1', company_id: 'comp-1', location_name: 'Pen 1', location_type: 'PEN' }],
+      [], // no active children blocking the delete
+    );
+
+    const result = await service.remove('loc-1', 'tenant-1', { userId: 'user-1' });
+
+    expect(txUpdate).toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'DELETE', entityName: 'location_master', entityId: 'loc-1',
+    }));
+    expect(result.success).toBe(true);
+  });
+
+  it('restores a soft-deleted location and clears deleted_at', async () => {
+    selectResults.push(
+      [{ location_id: 'loc-1', company_id: 'comp-1', location_type: 'PEN', deleted_at: '2026-01-01 00:00:00' }],
+      [{ location_id: 'loc-1', company_id: 'comp-1', location_type: 'PEN', deleted_at: null }],
+    );
+
+    const result = await service.restore('loc-1', 'tenant-1', { userId: 'user-1' });
+
+    expect(txUpdate).toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'RESTORE', entityName: 'location_master', entityId: 'loc-1',
+    }));
+    expect(result.deleted_at).toBeNull();
+  });
+
+  it('getLocationOccupancy aggregates headcounts, capacity utilization, and biosecurity status', async () => {
+    selectResults.push(
+      [{
+        location: {
+          location_id: 'loc-pen-1', location_code: 'PEN-01A', location_name: 'Pen 1A',
+          location_type: 'PEN', max_capacity: '20.0000', capacity_uom: 'HEAD', shed_id: null,
+          last_cleaned_date: null, last_disinfected_date: null,
+        },
+        farm: { farm_name: 'Main Farm' },
+        shed: { shed_name: 'Grower Shed 1' },
+      }],
+      [
+        { animal_id: 'a-1', current_location_id: 'loc-pen-1', status: 'ACTIVE' },
+        { animal_id: 'a-2', current_location_id: 'loc-pen-1', status: 'QUARANTINE' },
+      ],
+      [], // no active batches
+    );
+
+    const res = await service.getLocationOccupancy('tenant-1', 'comp-1');
+
+    expect(res).toHaveLength(1);
+    expect(res[0].location_code).toBe('PEN-01A');
+    expect(res[0].current_occupancy).toBe(2);
+    expect(res[0].max_capacity).toBe(20);
+    expect(res[0].utilization_pct).toBe(10); // 2 / 20 = 10%
+    expect(res[0].biosecurity_status).toBe('QUARANTINE_ACTIVE');
+    expect(res[0].sick_animal_count).toBe(1);
   });
 });
