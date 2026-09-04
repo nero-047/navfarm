@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
@@ -105,6 +105,51 @@ describe('LocationService canonical hierarchy', () => {
     expect(txInsert).toHaveBeenCalledTimes(2);
     expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(result.location_code).toBe('FARM-001');
+  });
+
+  it('retries once with a freshly computed sequence when the first insert collides on a duplicate location code', async () => {
+    selectResults.push(
+      [company], [farmType], [uom], [series],
+      [{ location_id: 'loc-1', location_code: 'FARM-002', location_type: 'FARM', location_level: 1 }],
+    );
+    numberSeries.generateNext
+      .mockResolvedValueOnce('FARM-001')
+      .mockResolvedValueOnce('FARM-002');
+
+    const dupErr = Object.assign(
+      new Error("Duplicate entry 'tenant-1-comp-1-FARM-001' for key 'uq_location_master_tenant_company_code'"),
+      { code: 'ER_DUP_ENTRY', errno: 1062 },
+    );
+    txInsert
+      .mockImplementationOnce(() => ({ values: jest.fn().mockResolvedValue({}) })) // legacy mirror, attempt 1
+      .mockImplementationOnce(() => ({ values: jest.fn().mockRejectedValue(dupErr) })) // location_master, attempt 1 -> collides
+      .mockImplementationOnce(() => ({ values: jest.fn().mockResolvedValue({}) })) // legacy mirror, attempt 2
+      .mockImplementationOnce(() => ({ values: jest.fn().mockResolvedValue({}) })); // location_master, attempt 2 -> succeeds
+
+    const result = await service.create({
+      company_id: 'comp-1', location_name: 'Main Farm', location_address: 'Farm Road',
+      location_type: 'FARM', max_capacity: 100, capacity_uom: 'HEAD',
+    }, 'tenant-1', { userId: 'user-1' });
+
+    expect(numberSeries.generateNext).toHaveBeenCalledTimes(2);
+    expect(db.transaction).toHaveBeenCalledTimes(2);
+    expect(txInsert).toHaveBeenCalledTimes(4);
+    const secondAttemptLocationInsert = (txInsert.mock.results[3].value.values as jest.Mock).mock.calls[0][0];
+    expect(secondAttemptLocationInsert.location_code).toBe('FARM-002');
+    expect(result.location_code).toBe('FARM-002');
+  });
+
+  it('rejects a generated code that would exceed 255 characters, without attempting any insert', async () => {
+    selectResults.push([company], [farmType], [uom], [series]);
+    numberSeries.generateNext.mockResolvedValue('FARM-' + '9'.repeat(252)); // 257 chars total
+
+    await expect(service.create({
+      company_id: 'comp-1', location_name: 'Main Farm', location_address: 'Farm Road',
+      location_type: 'FARM', max_capacity: 100, capacity_uom: 'HEAD',
+    }, 'tenant-1')).rejects.toThrow(BadRequestException);
+
+    expect(txInsert).not.toHaveBeenCalled();
+    expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 
   it('derives a shed level and legacy farm ancestry from its canonical parent, prefixed with the parent code', async () => {

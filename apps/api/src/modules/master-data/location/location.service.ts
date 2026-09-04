@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -130,6 +130,86 @@ export class LocationService {
     }, 0) + 1;
 
     return `${parent.location_code}/${type.code_prefix}-${String(nextSeq).padStart(series.seq_length, '0')}`;
+  }
+
+  /**
+   * Builds the location row (generating its code inside `tx`) and inserts it
+   * plus its legacy mirror. Split out from `create()` so the same attempt can
+   * be re-run once, unmodified, if the insert below collides on
+   * `uq_location_master_tenant_company_code` (see the retry in `create()`).
+   */
+  private async createLocationRecord(
+    tx: MySql2Database<typeof schema>,
+    params: {
+      seriesCode: string;
+      locationType: typeof schema.locationTypeMaster.$inferSelect;
+      tenantId: string;
+      companyId: string;
+      parent: typeof schema.locationMaster.$inferSelect | undefined;
+      locationId: string;
+      typeCode: string;
+      locationLevel: number;
+      dto: CreateLocationDto;
+      userPayload?: any;
+    },
+  ) {
+    const { seriesCode, locationType, tenantId, companyId, parent, locationId, typeCode, locationLevel, dto, userPayload } = params;
+
+    // Code generation happens inside this transaction, using tx as the lock
+    // executor, so the series row's SELECT ... FOR UPDATE (or, for a child
+    // location, the sibling count it guards) stays locked until the insert
+    // below commits — two concurrent creates cannot produce the same code.
+    const locationCode = await this.generateLocationCode(seriesCode, locationType, tenantId, companyId, parent, tx);
+
+    // location_code is varchar(255). A deep hierarchical tree (each level
+    // prepending "<parent code>/<TYPE>-<seq>") can in principle exceed that —
+    // reject cleanly here rather than let the insert below fail with a raw
+    // data-too-long driver error.
+    if (locationCode.length > 255) {
+      throw new BadRequestException(
+        `Location code would exceed 255 characters at this depth ('${locationCode}', ${locationCode.length} characters).`,
+      );
+    }
+
+    const location = {
+      location_id: locationId,
+      tenant_id: tenantId,
+      company_id: companyId,
+      nob_id: dto.nob_id || null,
+      lob_id: dto.lob_id || null,
+      farm_id: typeCode === 'FARM' ? locationId : parent ? (parent.location_type === 'FARM' ? parent.location_id : parent.farm_id) : null,
+      shed_id: typeCode === 'SHED' ? locationId : parent ? (parent.location_type === 'SHED' ? parent.location_id : parent.shed_id) : null,
+      warehouse_id: ['STORE', 'SILO'].includes(typeCode) ? locationId : parent ? (['STORE', 'SILO'].includes(parent.location_type) ? parent.location_id : parent.warehouse_id) : null,
+      location_code: locationCode,
+      location_name: dto.location_name,
+      location_address: dto.location_address,
+      location_level: locationLevel,
+      location_type: typeCode,
+      parent_location_id: dto.parent_location_id || null,
+      area_size: dto.area_size?.toString() || null,
+      area_unit: dto.area_unit || null,
+      max_capacity: dto.max_capacity?.toString() || null,
+      capacity_uom: dto.capacity_uom || null,
+      current_count: dto.current_count?.toString() || '0.00',
+      gps_latitude: dto.gps_latitude?.toString() || null,
+      gps_longitude: dto.gps_longitude?.toString() || null,
+      storage_type: dto.storage_type || null,
+      is_quarantine_zone: dto.is_quarantine_zone || false,
+      silo_capacity_kg: dto.silo_capacity_kg?.toString() || null,
+      silo_reorder_days: dto.silo_reorder_days ?? null,
+      downtime_days_required: dto.downtime_days_required ?? null,
+      is_active: true,
+      status: 'ACTIVE',
+      extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
+      created_by: userPayload?.userId || null,
+      updated_by: userPayload?.userId || null,
+    };
+
+    // Legacy rows are inserted first because location_master keeps temporary
+    // compatibility foreign keys to these records.
+    await this.insertLegacyMirror(tx, location);
+    await tx.insert(schema.locationMaster).values(location);
+    return location;
   }
 
   private async insertLegacyMirror(
@@ -332,53 +412,31 @@ export class LocationService {
     const seriesCode = await this.ensureCompanySeries(locationType, tenantId, companyId);
 
     const locationId = randomUUID();
-    const newLocation = await this.db.transaction(async (tx) => {
-      // Code generation happens inside this transaction, using tx as the lock
-      // executor, so the series row's SELECT ... FOR UPDATE (or, for a child
-      // location, the sibling count it guards) stays locked until the insert
-      // below commits — two concurrent creates cannot produce the same code.
-      const locationCode = await this.generateLocationCode(seriesCode, locationType, tenantId, companyId, parent, tx);
+    const attemptParams = { seriesCode, locationType, tenantId, companyId, parent, locationId, typeCode, locationLevel, dto, userPayload };
 
-      const location = {
-        location_id: locationId,
-        tenant_id: tenantId,
-        company_id: companyId,
-        nob_id: dto.nob_id || null,
-        lob_id: dto.lob_id || null,
-        farm_id: typeCode === 'FARM' ? locationId : parent ? (parent.location_type === 'FARM' ? parent.location_id : parent.farm_id) : null,
-        shed_id: typeCode === 'SHED' ? locationId : parent ? (parent.location_type === 'SHED' ? parent.location_id : parent.shed_id) : null,
-        warehouse_id: ['STORE', 'SILO'].includes(typeCode) ? locationId : parent ? (['STORE', 'SILO'].includes(parent.location_type) ? parent.location_id : parent.warehouse_id) : null,
-        location_code: locationCode,
-        location_name: dto.location_name,
-        location_address: dto.location_address,
-        location_level: locationLevel,
-        location_type: typeCode,
-        parent_location_id: dto.parent_location_id || null,
-        area_size: dto.area_size?.toString() || null,
-        area_unit: dto.area_unit || null,
-        max_capacity: dto.max_capacity?.toString() || null,
-        capacity_uom: dto.capacity_uom || null,
-        current_count: dto.current_count?.toString() || '0.00',
-        gps_latitude: dto.gps_latitude?.toString() || null,
-        gps_longitude: dto.gps_longitude?.toString() || null,
-        storage_type: dto.storage_type || null,
-        is_quarantine_zone: dto.is_quarantine_zone || false,
-        silo_capacity_kg: dto.silo_capacity_kg?.toString() || null,
-        silo_reorder_days: dto.silo_reorder_days ?? null,
-        downtime_days_required: dto.downtime_days_required ?? null,
-        is_active: true,
-        status: 'ACTIVE',
-        extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
-        created_by: userPayload?.userId || null,
-        updated_by: userPayload?.userId || null,
-      };
-
-      // Legacy rows are inserted first because location_master keeps temporary
-      // compatibility foreign keys to these records.
-      await this.insertLegacyMirror(tx, location);
-      await tx.insert(schema.locationMaster).values(location);
-      return location;
-    });
+    // uq_location_master_tenant_company_code is the guard against two
+    // concurrent creates computing the same generated code (see the locking
+    // doc on generateLocationCode). If that guard is ever wrong under real
+    // InnoDB concurrency, the duplicate insert surfaces here as a driver
+    // error (MySQL errno 1062 / ER_DUP_ENTRY) rather than a clean one. Retry
+    // once with a freshly computed sequence — the whole attempt (legacy
+    // mirror insert included) re-runs inside a brand-new transaction, so a
+    // failed first attempt is fully rolled back before the retry starts.
+    // Only if the retry also collides do we give up and surface it.
+    let newLocation: Awaited<ReturnType<typeof this.createLocationRecord>>;
+    try {
+      newLocation = await this.db.transaction((tx) => this.createLocationRecord(tx, attemptParams));
+    } catch (err) {
+      if ((err as { code?: string })?.code !== 'ER_DUP_ENTRY') throw err;
+      try {
+        newLocation = await this.db.transaction((tx) => this.createLocationRecord(tx, attemptParams));
+      } catch (retryErr) {
+        if ((retryErr as { code?: string })?.code === 'ER_DUP_ENTRY') {
+          throw new ConflictException('Location code collided with a concurrently created location; please retry.');
+        }
+        throw retryErr;
+      }
+    }
 
     await this.auditService.log({
       tenantId,
