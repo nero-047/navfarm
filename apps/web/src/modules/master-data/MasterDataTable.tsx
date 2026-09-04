@@ -12,6 +12,8 @@ import { getActiveCompanyId } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { MasterDataConfig, MasterDataField } from "./types";
 import { CollapsibleCard } from "./CollapsibleCard";
+import { LookupCard } from "./LookupCard";
+import { MASTER_DATA_CONFIGS } from "./configs";
 
 const PAGE_SIZE = 25;
 
@@ -112,6 +114,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [form, setForm] = useState<Row>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [entityReloadKey, setEntityReloadKey] = useState(0);
 
   const [confirmDelete, setConfirmDelete] = useState<Row | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -216,8 +219,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         setEntityOptions((prev) => ({ ...prev, [ep]: prev[ep] || [] }));
       }
     });
+    // entityReloadKey is included so a lookup card's inline "Add" (e.g. a
+    // new Item Category, Item Type or UOM) refetches this effect's
+    // non-dependent select-entity fields — category_id, item_type,
+    // uom_primary/uom_secondary all have no dependsOn, so this is the
+    // effect that actually powers those dropdowns, not the dependent-fields
+    // effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.key]);
+  }, [config.key, entityReloadKey]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -234,7 +243,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modalOpen, form, config.key]);
+  }, [modalOpen, form, config.key, entityReloadKey]);
 
   const openCreate = () => {
     setEditing(null);
@@ -644,6 +653,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               </CollapsibleCard>
             ));
           })()}
+
+          {MASTER_DATA_CONFIGS
+            .filter((c) => c.lookupFor?.includes(config.key))
+            .map((c) => (
+              <CollapsibleCard key={c.key} title={c.label} subtitle="Add one without leaving this form">
+                <LookupCard config={c} onCreated={() => setEntityReloadKey((k) => k + 1)} />
+              </CollapsibleCard>
+            ))}
         </div>
       </Drawer>
 
