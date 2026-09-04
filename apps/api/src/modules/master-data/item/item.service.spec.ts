@@ -3,7 +3,7 @@ import { ItemService } from './item.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('ItemService', () => {
   let service: ItemService;
@@ -59,6 +59,7 @@ describe('ItemService', () => {
     }).compile();
 
     service = module.get<ItemService>(ItemService);
+    jest.spyOn(service as any, 'ensureCompanyItemSeries').mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -140,5 +141,56 @@ describe('ItemService', () => {
 
       expect(mockGenerateNext).not.toHaveBeenCalled();
     });
+  });
+
+  it('does not allow the generated company-wide Item Code to be changed', async () => {
+    mockDbSelect
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([{ item_id: 'item-1', item_code: 'ITM-0001' }]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          leftJoin: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue([]) }),
+        }),
+      });
+
+    await expect(service.update('item-1', { item_code: 'RAW-0001' }, 'tenant-123'))
+      .rejects.toThrow(ConflictException);
+  });
+
+  it('initializes one company ITEM counter after the highest existing item code', async () => {
+    (service as any).ensureCompanyItemSeries.mockRestore();
+    mockDbSelect
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([{
+              series_name: 'Item Code', document_type: 'ITEM', prefix: 'ITM', date_format: null,
+              separator: '-', seq_length: 4, reset_frequency: 'NEVER',
+            }]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([{ code: 'ITM-0002' }, { code: 'ITM-0009' }]),
+        }),
+      });
+    const onDuplicateKeyUpdate = jest.fn().mockResolvedValue({});
+    const values = jest.fn().mockReturnValue({ onDuplicateKeyUpdate });
+    mockDbInsert.mockReturnValue({ values });
+
+    await (service as any).ensureCompanyItemSeries('tenant-123', 'comp-1');
+
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({
+      company_id: 'comp-1', series_code: 'ITEM', current_seq: 9,
+    }));
   });
 });

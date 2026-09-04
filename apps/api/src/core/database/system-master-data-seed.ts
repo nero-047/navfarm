@@ -50,6 +50,26 @@ export const SYSTEM_ITEM_TYPE_SEED: Array<{
   { type_code: 'OVERHEAD', type_name: 'Overhead', description: 'Non-physical cost item (labor, utilities) with no stock quantity.' },
 ];
 
+/**
+ * Location classifications from the client Location Master template. The
+ * semantic type code is stable; users may change the prefix used for future
+ * generated location identities without renaming existing locations.
+ */
+export const SYSTEM_LOCATION_TYPE_SEED: Array<{
+  type_code: string;
+  type_name: string;
+  code_prefix: string;
+  allowed_parent_types: string[];
+}> = [
+  { type_code: 'FARM', type_name: 'Farm', code_prefix: 'FARM', allowed_parent_types: [] },
+  { type_code: 'SHED', type_name: 'Shed / House', code_prefix: 'SHED', allowed_parent_types: ['FARM'] },
+  { type_code: 'PEN', type_name: 'Pen', code_prefix: 'PEN', allowed_parent_types: ['FARM', 'SHED'] },
+  { type_code: 'CAGE', type_name: 'Cage', code_prefix: 'CAGE', allowed_parent_types: ['FARM', 'SHED'] },
+  { type_code: 'STORE', type_name: 'Store', code_prefix: 'STORE', allowed_parent_types: ['FARM'] },
+  { type_code: 'QUARANTINE', type_name: 'Quarantine', code_prefix: 'QUAR', allowed_parent_types: ['FARM', 'SHED'] },
+  { type_code: 'SILO', type_name: 'Silo', code_prefix: 'SILO', allowed_parent_types: ['FARM'] },
+];
+
 export const SYSTEM_SPECIES_SEED: Array<{
   species_code: string;
   species_name: string;
@@ -337,6 +357,18 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
   { series_code: 'BATCH', series_name: 'Batch Number', document_type: 'BATCH', prefix: 'BATCH', separator: '-', seq_length: 6, reset_frequency: 'NEVER' },
   { series_code: 'ANIMAL_PIGGERY', series_name: 'Piggery Animal Code', document_type: 'ANIMAL', nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', prefix: 'PIG', date_format: 'YYYY', separator: '-', seq_length: 4, reset_frequency: 'YEARLY' },
   { series_code: 'ITEM', series_name: 'Item Code', document_type: 'ITEM', prefix: 'ITM', separator: '-', seq_length: 4, reset_frequency: 'NEVER' },
+  { series_code: 'SUPPLIER', series_name: 'Supplier Code', document_type: 'SUPPLIER', prefix: 'SUP', separator: '-', seq_length: 3, reset_frequency: 'NEVER' },
+  { series_code: 'CUSTOMER', series_name: 'Customer Code', document_type: 'CUSTOMER', prefix: 'CUS', separator: '-', seq_length: 3, reset_frequency: 'NEVER' },
+  { series_code: 'RESOURCE', series_name: 'Resource Code', document_type: 'RESOURCE', prefix: 'RES', separator: '-', seq_length: 3, reset_frequency: 'NEVER' },
+  ...SYSTEM_LOCATION_TYPE_SEED.map((type) => ({
+    series_code: `LOCATION_${type.type_code}`,
+    series_name: `${type.type_name} Location`,
+    document_type: 'LOCATION',
+    prefix: type.code_prefix,
+    separator: '-',
+    seq_length: 3,
+    reset_frequency: 'NEVER' as const,
+  })),
 ];
 
 /**

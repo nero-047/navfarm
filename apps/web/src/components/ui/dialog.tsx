@@ -16,6 +16,12 @@ interface DialogProps {
   children: ReactNode;
   footer?: ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  /**
+   * `modal` is the normal centred window. `page` keeps the same dialog
+   * semantics and pinned actions, but gives long forms a near-viewport work
+   * surface instead of squeezing them into a side sheet or a tall card.
+   */
+  presentation?: 'modal' | 'page';
   className?: string;
 }
 
@@ -26,7 +32,17 @@ const widths = {
   xl: 'max-w-5xl',
 };
 
-export function Dialog({ open, onClose, title, description, children, footer, maxWidth = 'md', className }: DialogProps) {
+export function Dialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  maxWidth = 'md',
+  presentation = 'modal',
+  className,
+}: DialogProps) {
   const { t } = useLanguage();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -45,9 +61,32 @@ export function Dialog({ open, onClose, title, description, children, footer, ma
   if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overflow-y-auto p-4 sm:p-6" role="presentation">
+    <div
+      className={cn(
+        'fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overflow-y-auto',
+        presentation === 'page' ? 'p-0 sm:p-6' : 'p-4 sm:p-6',
+      )}
+      role="presentation"
+      data-dialog-root
+    >
       <button type="button" aria-label={t("closeDialog")} onClick={onClose} className="absolute inset-0 cursor-default bg-[rgba(46,49,63,0.5)]" />
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={cn('relative my-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[var(--shadow-md)] outline-none sm:max-h-[calc(100dvh-3rem)]', widths[maxWidth], className)}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
+        data-dialog-panel
+        data-presentation={presentation}
+        className={cn(
+          'relative my-auto flex w-full flex-col overflow-hidden border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[var(--shadow-md)] outline-none',
+          presentation === 'page'
+            ? 'h-[100dvh] max-h-none max-w-none rounded-none border-0 sm:h-[calc(100dvh-3rem)] sm:max-w-[min(90rem,calc(100vw-3rem))] sm:rounded-[var(--radius-lg)] sm:border'
+            : cn('max-h-[calc(100dvh-2rem)] rounded-[var(--radius-lg)] sm:max-h-[calc(100dvh-3rem)]', widths[maxWidth]),
+          className,
+        )}
+      >
         <header className="flex shrink-0 items-start gap-4 border-b border-[var(--border-subtle)] px-5 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="nf-text-body-strong text-lg text-[var(--text-primary)]">{title}</h2>

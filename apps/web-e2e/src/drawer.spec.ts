@@ -362,30 +362,78 @@ test.describe('mobile and tablet presentation', () => {
 test.describe('migrated application forms', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test('master data create opens in a drawer with its fields and actions intact', async ({
+  test('master data create opens in a centred adaptive dialog with its fields and actions intact', async ({
     page,
   }) => {
-    await gotoConsole(page, { path: '/console/master-data' });
+    await gotoConsole(page, { path: '/master-data/location' });
 
     const add = page.locator(CONTENT).getByRole('button', { name: /^add /i });
     await add.click();
 
-    const drawer = page.locator(DRAWER_PANEL);
-    await expect(drawer).toBeVisible();
-    await expect(drawer).toHaveAttribute('aria-modal', 'true');
-    // The dense tier, because these configs run well past two fields.
-    expect(Math.round((await drawer.boundingBox())!.width)).toBe(720);
+    const dialog = page.locator('[data-dialog-panel]');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute('aria-modal', 'true');
+    await expect(dialog).toHaveAttribute('data-presentation', 'page');
+    const box = await dialog.boundingBox();
+    expect(box).not.toBeNull();
+    const pageDialogBox = Object.assign({ x: 0, width: 0, height: 0 }, box);
+    expect(Math.abs(pageDialogBox.x + pageDialogBox.width / 2 - 720)).toBeLessThan(2);
+    expect(pageDialogBox.width).toBeGreaterThan(1200);
+    expect(pageDialogBox.height).toBeGreaterThan(800);
+
+    // The template-backed fields live in the first card. Lookup masters that
+    // feed those fields remain available below without turning the form into
+    // separate Farm/Shed/Pen creation screens.
+    await expect(dialog.getByText('Details', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Location Types', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Units of Measure', { exact: true })).toBeVisible();
+    const generatedCode = dialog.locator('input[placeholder*="Generated when"]');
+    await expect(generatedCode).toBeDisabled();
+    await expect(generatedCode).toHaveAttribute('placeholder', /generated when/i);
 
     // The form still renders its fields, and the actions are in the pinned
     // footer rather than lost at the bottom of a long body.
-    await expect(drawer.locator('input, select, textarea').first()).toBeVisible();
-    const footer = page.locator(DRAWER_FOOTER);
+    await expect(dialog.locator('input, select, textarea').first()).toBeVisible();
+    const footer = dialog.locator('footer');
     await expect(footer.getByRole('button', { name: /create/i })).toBeVisible();
     await expect(footer.getByRole('button', { name: /cancel/i })).toBeVisible();
 
     // Cancel still closes without submitting anything.
     await footer.getByRole('button', { name: /cancel/i }).click();
-    await expect(page.locator(DRAWER_PANEL)).toHaveCount(0);
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('a compact master stays a centred modal rather than expanding to a page', async ({
+    page,
+  }) => {
+    await gotoConsole(page, { path: '/master-data/shed' });
+
+    await page.locator(CONTENT).getByRole('button', { name: /^add /i }).click();
+
+    const dialog = page.locator('[data-dialog-panel]');
+    await expect(dialog).toHaveAttribute('data-presentation', 'modal');
+    const box = await dialog.boundingBox();
+    expect(box).not.toBeNull();
+    const modalBox = Object.assign({ x: 0, width: 0 }, box);
+    expect(Math.abs(modalBox.x + modalBox.width / 2 - 720)).toBeLessThan(2);
+    expect(modalBox.width).toBeLessThanOrEqual(1024);
+  });
+
+  test('a dense master becomes a true full-page dialog on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoConsole(page, { path: '/master-data/location' });
+    await page.locator(CONTENT).getByRole('button', { name: /^add /i }).click();
+
+    const dialog = page.locator('[data-dialog-panel]');
+    await expect(dialog).toHaveAttribute('data-presentation', 'page');
+    const box = await dialog.boundingBox();
+    expect(box).not.toBeNull();
+    const mobileDialogBox = Object.assign({ x: -1, y: -1, width: 0, height: 0 }, box);
+    expect(Math.abs(mobileDialogBox.x)).toBeLessThan(1);
+    expect(Math.abs(mobileDialogBox.y)).toBeLessThan(1);
+    expect(Math.abs(mobileDialogBox.width - 390)).toBeLessThan(1);
+    expect(Math.abs(mobileDialogBox.height - 844)).toBeLessThan(1);
+    await expect(dialog.locator('footer')).toBeInViewport();
   });
 
   test('master data delete confirmation stays a dialog', async ({ page }) => {
@@ -395,9 +443,9 @@ test.describe('migrated application forms', () => {
     // destructive confirmation must not have become a drawer.
     const add = page.locator(CONTENT).getByRole('button', { name: /^add /i });
     await add.click();
-    await expect(page.locator(DRAWER_PANEL)).toHaveCount(1);
+    await expect(page.locator('[data-dialog-panel]')).toHaveCount(1);
     await page.keyboard.press('Escape');
-    await expect(page.locator(DRAWER_PANEL)).toHaveCount(0);
+    await expect(page.locator('[data-dialog-panel]')).toHaveCount(0);
   });
 
   test('the team invite form opens in a drawer and still submits from its form', async ({

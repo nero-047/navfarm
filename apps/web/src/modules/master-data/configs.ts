@@ -16,7 +16,6 @@ const farm: MasterDataConfig = {
   idKey: "farm_id",
   group: "Farm Operations",
   supportsNobLobFilter: true,
-  lookupFor: ["location"],
   columns: [
     { key: "farm_code", label: "Code" },
     { key: "farm_name", label: "Name" },
@@ -50,7 +49,6 @@ const warehouse: MasterDataConfig = {
   apiBase: "/warehouse",
   idKey: "warehouse_id",
   group: "Farm Operations",
-  lookupFor: ["location"],
   columns: [
     { key: "warehouse_code", label: "Code" },
     { key: "warehouse_name", label: "Name" },
@@ -68,10 +66,32 @@ const warehouse: MasterDataConfig = {
   ],
 };
 
+const locationType: MasterDataConfig = {
+  key: "location-type",
+  label: "Location Types",
+  description: "Location classifications, hierarchy rules and prefixes for generated location codes.",
+  apiBase: "/location-type",
+  idKey: "location_type_id",
+  group: "Farm Operations",
+  lookupFor: ["location"],
+  columns: [
+    { key: "type_code", label: "Code" },
+    { key: "type_name", label: "Name" },
+    { key: "code_prefix", label: "Prefix" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "type_code", label: "Type Code", type: "text", required: true, placeholder: "FARM" },
+    { key: "type_name", label: "Type Name", type: "text", required: true, placeholder: "Farm" },
+    { key: "code_prefix", label: "Code Prefix", type: "text", required: true, placeholder: "FARM", helpText: "Future locations use PREFIX-001, PREFIX-002, and so on." },
+    { key: "allowed_parent_types", label: "Allowed Parent Types", type: "text", showInLookup: true, placeholder: "FARM,SHED", helpText: "Comma-separated type codes. Leave blank for a root type." },
+  ],
+};
+
 const location: MasterDataConfig = {
   key: "location",
   label: "Locations",
-  description: "Hierarchical storage/operational locations — set exactly one parent (Farm, Shed, or Warehouse).",
+  description: "One hierarchy for farms, sheds, pens, cages, stores, quarantine areas and silos.",
   apiBase: "/location",
   idKey: "location_id",
   group: "Farm Operations",
@@ -84,30 +104,23 @@ const location: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "location_code", label: "Location Code", type: "text", required: true, placeholder: "LOC-A", section: "Identification" },
-    { key: "location_name", label: "Location Name", type: "text", required: true, placeholder: "Storage Area A", section: "Identification" },
-    { key: "location_address", label: "Location Address", type: "text", required: true, placeholder: "Porta Farm - ABC", section: "Identification" },
+    { key: "location_code", label: "Location Code", type: "text", readOnly: true, helpText: "Generated from the selected Location Type prefix and kept permanently." , section: "Details" },
+    { key: "location_name", label: "Location Name", type: "text", required: true, placeholder: "Porta Farm", section: "Details" },
+    { key: "location_address", label: "Location Address", type: "text", required: true, placeholder: "48 Peg, Bulawayo Road", section: "Details" },
     {
-      key: "location_type", label: "Location Type", type: "select", required: true, section: "Identification",
-      options: ["FARM", "SHED", "AREA", "SECTION", "ROOM", "AISLE", "SHELF", "PEN", "SILO"].map((v) => ({ value: v, label: v })),
+      key: "location_type", label: "Location Type", type: "select-entity", required: true,
+      entityEndpoint: "/location-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"], section: "Details",
     },
-    { key: "parent_location_id", label: "Parent Location (sub-location nesting)", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], section: "Identification" },
-    { key: "farm_id", label: "Parent: Farm", type: "select-entity", entityEndpoint: "/farm", entityValueKey: "farm_id", entityLabelKeys: ["farm_code", "farm_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent.", exclusiveWith: ["shed_id", "warehouse_id"], section: "Hierarchy" },
-    { key: "shed_id", label: "Parent: Shed", type: "select-entity", entityEndpoint: "/shed", entityValueKey: "shed_id", entityLabelKeys: ["shed_code", "shed_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent.", exclusiveWith: ["farm_id", "warehouse_id"], section: "Hierarchy" },
-    { key: "warehouse_id", label: "Parent: Warehouse", type: "select-entity", entityEndpoint: "/warehouse", entityValueKey: "warehouse_id", entityLabelKeys: ["warehouse_code", "warehouse_name"], helpText: "Set exactly one of Farm / Shed / Warehouse as this location's parent.", exclusiveWith: ["farm_id", "shed_id"], section: "Hierarchy" },
-    { key: "location_level", label: "Hierarchy Level", type: "number", hideInForm: true, helpText: "Auto-computed from Parent Location (root = 1, else parent's level + 1).", section: "Hierarchy" },
-    { key: "area_size", label: "Area Size", type: "number", step: "0.01", section: "Capacity" },
-    { key: "area_unit", label: "Area Unit", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Capacity" },
-    { key: "max_capacity", label: "Max Capacity", type: "number", step: "0.01", required: true, section: "Capacity" },
-    { key: "capacity_uom", label: "Capacity UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Capacity" },
-    { key: "current_count", label: "Current Count", type: "number", step: "0.01", section: "Capacity" },
-    { key: "silo_capacity_kg", label: "Silo Capacity (KG)", type: "number", step: "0.01", requiredWhen: { anyOf: [{ key: "location_type", equals: "SILO" }] }, helpText: "Required for SILO locations.", section: "Silo" },
-    { key: "silo_reorder_days", label: "Silo Reorder Days", type: "number", requiredWhen: { anyOf: [{ key: "location_type", equals: "SILO" }] }, helpText: "Required for SILO locations. Alerts when stock covers fewer than this many days.", section: "Silo" },
-    { key: "storage_type", label: "Storage Conditions", type: "text", section: "Silo" },
-    { key: "gps_latitude", label: "GPS Latitude", type: "number", step: "0.000001", section: "Site & Biosecurity" },
-    { key: "gps_longitude", label: "GPS Longitude", type: "number", step: "0.000001", section: "Site & Biosecurity" },
-    { key: "is_quarantine_zone", label: "Quarantine Zone", type: "boolean", section: "Site & Biosecurity" },
-    { key: "downtime_days_required", label: "Downtime Days Required", type: "number", helpText: "Mandatory empty days between batches at this location for biosecurity.", section: "Site & Biosecurity" },
+    { key: "parent_location_id", label: "Parent Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], helpText: "Leave blank only for a root Farm.", section: "Details" },
+    { key: "location_level", label: "Hierarchy Level", type: "number", hideInForm: true, helpText: "Computed from the parent location." },
+    { key: "area_size", label: "Area Size", type: "number", step: "0.01", section: "Details" },
+    { key: "area_unit", label: "Area UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Details" },
+    { key: "max_capacity", label: "Max Capacity", type: "number", step: "0.01", required: true, section: "Details" },
+    { key: "capacity_uom", label: "Capacity UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Details" },
+    { key: "storage_type", label: "Storage Location", type: "select", options: ["STORE", "SILO"].map((v) => ({ value: v, label: v })), section: "Details" },
+    { key: "silo_capacity_kg", label: "Silo Capacity (KG)", type: "number", step: "0.01", requiredWhen: { anyOf: [{ key: "location_type", equals: "SILO" }] }, helpText: "Required for SILO locations.", section: "Details" },
+    { key: "silo_reorder_days", label: "Silo Reorder Days", type: "number", requiredWhen: { anyOf: [{ key: "location_type", equals: "SILO" }] }, helpText: "Required for SILO locations.", section: "Details" },
+    { key: "downtime_days_required", label: "Downtime Days Required", type: "number", helpText: "Empty days required between batches for biosecurity.", section: "Details" },
   ],
 };
 
@@ -118,7 +131,6 @@ const shed: MasterDataConfig = {
   apiBase: "/shed",
   idKey: "shed_id",
   group: "Farm Operations",
-  isPrimary: true,
   supportsNobLobFilter: true,
   columns: [
     { key: "shed_code", label: "Code" },
@@ -709,7 +721,7 @@ const supplier: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "supplier_code", label: "Supplier Code", type: "text", required: true, placeholder: "SUP-001", section: "Identification" },
+    { key: "supplier_code", label: "Supplier Code", type: "text", readOnly: true, placeholder: "Generated as SUP-001", helpText: "Generated automatically from this company's Supplier sequence.", section: "Identification" },
     { key: "supplier_name", label: "Supplier Name", type: "text", required: true, placeholder: "Feed Ingredients Corp Ltd", section: "Identification" },
     {
       key: "vendor_type", label: "Vendor Type", type: "select", section: "Identification",
@@ -750,7 +762,7 @@ const customer: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "customer_code", label: "Customer Code", type: "text", required: true, placeholder: "CUST-001", section: "Identification" },
+    { key: "customer_code", label: "Customer Code", type: "text", readOnly: true, placeholder: "Generated as CUS-001", helpText: "Generated automatically from this company's Customer sequence.", section: "Identification" },
     { key: "customer_name", label: "Customer Name", type: "text", required: true, placeholder: "John Doe Wholesalers", section: "Identification" },
     { key: "email", label: "Email", type: "email", placeholder: "billing@johndoe.com", section: "Contact" },
     { key: "mobile", label: "Mobile", type: "text", required: true, placeholder: "+919876543210", section: "Contact" },
@@ -782,7 +794,7 @@ const resource: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "resource_code", label: "Resource Code", type: "text", required: true, placeholder: "LBR-01", section: "Identification" },
+    { key: "resource_code", label: "Resource Code", type: "text", readOnly: true, placeholder: "Generated as RES-001", helpText: "Generated automatically from this company's Resource sequence.", section: "Identification" },
     { key: "resource_name", label: "Resource Name", type: "text", required: true, placeholder: "Senior Laborer", section: "Identification" },
     {
       key: "resource_type", label: "Resource Type", type: "select", required: true, section: "Identification",
@@ -933,7 +945,7 @@ const costCenter: MasterDataConfig = {
 };
 
 export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
-  farm, warehouse, location, shed,
+  farm, warehouse, locationType, location, shed,
   stage, numberSeries,
   animal,
   itemCategory, itemType, uom, uomConversion, item, itemAttribute,

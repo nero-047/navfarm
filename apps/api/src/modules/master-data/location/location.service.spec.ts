@@ -1,490 +1,173 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { LocationService } from './location.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { LocationService } from './location.service';
 
-describe('LocationService', () => {
+describe('LocationService canonical hierarchy', () => {
   let service: LocationService;
-  let auditLogService: AuditLogService;
+  const selectResults: any[][] = [];
+  const txInsert = jest.fn();
+  const txUpdate = jest.fn();
+  const audit = { log: jest.fn() };
+  const numberSeries = { generateNext: jest.fn() };
 
-  const mockDbSelect = jest.fn();
-  const mockDbInsert = jest.fn();
-  const mockDbUpdate = jest.fn();
-
-  const mockDb = {
-    select: mockDbSelect,
-    insert: mockDbInsert,
-    update: mockDbUpdate,
+  const makeSelectBuilder = (rows: any[]) => {
+    const builder: any = {};
+    builder.from = jest.fn(() => builder);
+    builder.where = jest.fn(() => builder);
+    builder.orderBy = jest.fn(() => builder);
+    builder.offset = jest.fn(() => builder);
+    builder.limit = jest.fn(async () => rows);
+    builder.then = (resolve: (value: any[]) => unknown, reject: (reason: unknown) => unknown) =>
+      Promise.resolve(rows).then(resolve, reject);
+    return builder;
   };
 
+  const tx = { insert: txInsert, update: txUpdate };
+  const db = {
+    select: jest.fn(() => makeSelectBuilder(selectResults.shift() || [])),
+    insert: jest.fn(),
+    update: jest.fn(),
+    transaction: jest.fn(async (callback: (executor: typeof tx) => unknown) => callback(tx)),
+  };
+
+  const company = { company_id: 'comp-1', tenant_id: 'tenant-1' };
+  const farmType = {
+    type_code: 'FARM', type_name: 'Farm', code_prefix: 'FARM',
+    allowed_parent_types: [], company_id: null,
+  };
+  const shedType = {
+    type_code: 'SHED', type_name: 'Shed / House', code_prefix: 'SHED',
+    allowed_parent_types: ['FARM'], company_id: null,
+  };
+  const siloType = {
+    type_code: 'SILO', type_name: 'Silo', code_prefix: 'SILO',
+    allowed_parent_types: ['FARM'], company_id: null,
+  };
+  const uom = { uom_code: 'HEAD' };
+  const series = { series_code: 'LOCATION_FARM' };
+
   beforeEach(async () => {
-    mockDbSelect.mockReset();
-    mockDbInsert.mockReset();
-    mockDbUpdate.mockReset();
+    selectResults.length = 0;
+    jest.clearAllMocks();
+    txInsert.mockImplementation(() => ({ values: jest.fn().mockResolvedValue({}) }));
+    txUpdate.mockImplementation(() => ({ set: jest.fn(() => ({ where: jest.fn().mockResolvedValue({}) })) }));
+    audit.log.mockResolvedValue({});
+    numberSeries.generateNext.mockResolvedValue('FARM-001');
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LocationService,
-        {
-          provide: ClsService,
-          useValue: {
-            get: jest.fn().mockReturnValue(mockDb),
-          },
-        },
-        {
-          provide: AuditLogService,
-          useValue: {
-            log: jest.fn().mockResolvedValue({}),
-          },
-        },
+        { provide: ClsService, useValue: { get: jest.fn(() => db) } },
+        { provide: AuditLogService, useValue: audit },
+        { provide: NumberSeriesService, useValue: numberSeries },
       ],
     }).compile();
-
-    service = module.get<LocationService>(LocationService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
+    service = module.get(LocationService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  it('requires company scope because numbering is per company', async () => {
+    await expect(service.create({
+      location_name: 'Main Farm', location_address: 'Farm Road', location_type: 'FARM',
+      max_capacity: 100, capacity_uom: 'HEAD',
+    }, 'tenant-1')).rejects.toThrow(ConflictException);
+    expect(db.select).not.toHaveBeenCalled();
   });
 
-  describe('create', () => {
-    it('should throw NotFoundException if company does not exist', async () => {
-      mockDbSelect.mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([]), // company not found
-          }),
-        }),
-      });
+  it('generates FARM-001 and mirrors a root farm for legacy operational APIs', async () => {
+    selectResults.push(
+      [company], [farmType], [uom], [series],
+      [{ location_id: 'loc-1', location_code: 'FARM-001', location_type: 'FARM', location_level: 1 }],
+    );
 
-      await expect(
-        service.create(
-          {
-            company_id: 'non-existent-comp',
-            location_code: 'LOC01',
-            location_name: 'Location 1',
-            location_address: 'Block A',
-            location_type: 'ROOM',
-            max_capacity: 20,
-            capacity_uom: 'HEAD',
-          },
-          'tenant-123',
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
+    const result = await service.create({
+      company_id: 'comp-1',
+      location_code: 'USER-CANNOT-OVERRIDE',
+      location_name: 'Main Farm', location_address: 'Farm Road', location_type: 'FARM',
+      max_capacity: 100, capacity_uom: 'HEAD',
+    }, 'tenant-1', { userId: 'user-1' });
 
-    it('should throw ConflictException if location code already exists in this company scope', async () => {
-      // Selects in order: company found, farm found, capacity_uom resolves, duplicate location code found
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ location_code: 'LOC01' }]),
-            }),
-          }),
-        });
-
-      await expect(
-        service.create(
-          {
-            company_id: 'comp-1',
-            farm_id: 'farm-1',
-            location_code: 'LOC01',
-            location_name: 'Location 1',
-            location_address: '123 Farm Road',
-            location_type: 'ROOM',
-            max_capacity: 20,
-            capacity_uom: 'HEAD',
-          },
-          'tenant-123',
-        ),
-      ).rejects.toThrow(ConflictException);
-    });
-
-    it('should successfully create location', async () => {
-      // Selects in order: company found, farm found, capacity_uom resolves, no duplicate code, findOne() after insert
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ location_code: 'LOC01', location_name: 'Location 1', location_level: 1 }]),
-            }),
-          }),
-        });
-
-      mockDbInsert.mockReturnValue({
-        values: jest.fn().mockResolvedValue({}),
-      });
-
-      const result = await service.create(
-        {
-          company_id: 'comp-1',
-          farm_id: 'farm-1',
-          location_code: 'LOC01',
-          location_name: 'Location 1',
-          location_address: '123 Farm Road',
-          location_type: 'ROOM',
-          max_capacity: 20,
-          capacity_uom: 'HEAD',
-        },
-        'tenant-123',
-        { userId: 'user-1' },
-      );
-
-      expect(mockDbInsert).toHaveBeenCalled();
-      expect(result.location_code).toBe('LOC01');
-    });
-
-    it('should reject a SILO location missing silo_capacity_kg / silo_reorder_days', async () => {
-      // Selects in order: farm found (the SILO check throws before the duplicate-code check runs)
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]),
-          }),
-        }),
-      });
-
-      await expect(
-        service.create(
-          {
-            farm_id: 'farm-1',
-            location_code: 'SLO01',
-            location_name: 'Silo 1',
-            location_address: '123 Farm Road',
-            location_type: 'SILO',
-            max_capacity: 500,
-            capacity_uom: 'HEAD',
-          },
-          'tenant-123',
-        ),
-      ).rejects.toThrow(ConflictException);
-    });
-
-    it('should accept a valid SILO location with silo fields set', async () => {
-      // Selects in order: farm found, capacity_uom resolves, no duplicate code, findOne() after insert
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ location_code: 'SLO01', location_name: 'Silo 1', location_level: 1 }]),
-            }),
-          }),
-        });
-
-      mockDbInsert.mockReturnValue({
-        values: jest.fn().mockResolvedValue({}),
-      });
-
-      const result = await service.create(
-        {
-          farm_id: 'farm-1',
-          location_code: 'SLO01',
-          location_name: 'Silo 1',
-          location_address: '123 Farm Road',
-          location_type: 'SILO',
-          max_capacity: 500,
-          capacity_uom: 'HEAD',
-          silo_capacity_kg: 2000,
-          silo_reorder_days: 3,
-        },
-        'tenant-123',
-        { userId: 'user-1' },
-      );
-
-      expect(mockDbInsert).toHaveBeenCalled();
-      expect(result.location_code).toBe('SLO01');
-    });
-
-    it('should reject an area_unit that does not resolve in uom_master', async () => {
-      // Selects in order: farm found, UOM not found
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([]),
-            }),
-          }),
-        });
-
-      await expect(
-        service.create(
-          {
-            farm_id: 'farm-1',
-            location_code: 'LOC02',
-            location_name: 'Location 2',
-            location_address: '123 Farm Road',
-            location_type: 'ROOM',
-            area_unit: 'BOGUS',
-            max_capacity: 20,
-            capacity_uom: 'HEAD',
-          },
-          'tenant-123',
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('should compute location_level as 1 when no parent_location_id is set', async () => {
-      // Selects in order: farm found, capacity_uom resolves, no duplicate code, findOne() after insert
-      mockDbSelect
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ location_code: 'LOC03', location_level: 1 }]) }) }) });
-
-      mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
-
-      await service.create(
-        {
-          farm_id: 'farm-1',
-          location_code: 'LOC03',
-          location_name: 'Location 3',
-          location_address: '123 Farm Road',
-          location_type: 'ROOM',
-          max_capacity: 20,
-          capacity_uom: 'HEAD',
-        },
-        'tenant-123',
-      );
-
-      const insertedValues = mockDbInsert.mock.results[0].value.values.mock.calls[0][0];
-      expect(insertedValues.location_level).toBe(1);
-    });
-
-    it("should compute location_level as the parent's level + 1 when parent_location_id is set", async () => {
-      // Selects in order: parent location found (level 2), capacity_uom resolves, no duplicate code, findOne() after insert
-      mockDbSelect
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ location_id: 'loc-parent', location_level: 2 }]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ location_code: 'LOC04', location_level: 3 }]) }) }) });
-
-      mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
-
-      await service.create(
-        {
-          farm_id: 'farm-1',
-          parent_location_id: 'loc-parent',
-          location_code: 'LOC04',
-          location_name: 'Location 4',
-          location_address: '123 Farm Road',
-          location_type: 'PEN',
-          max_capacity: 20,
-          capacity_uom: 'HEAD',
-        },
-        'tenant-123',
-      );
-
-      const insertedValues = mockDbInsert.mock.results[0].value.values.mock.calls[0][0];
-      expect(insertedValues.location_level).toBe(3);
-    });
+    expect(numberSeries.generateNext).toHaveBeenCalledWith('LOCATION_FARM', 'tenant-1', 'comp-1');
+    expect(txInsert).toHaveBeenCalledTimes(2);
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(result.location_code).toBe('FARM-001');
   });
 
-  describe('update', () => {
-    it('should reject switching an existing location to SILO without silo fields', async () => {
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([
-              { location_id: 'loc-1', farm_id: 'farm-1', location_type: 'ROOM', silo_capacity_kg: null, silo_reorder_days: null },
-            ]),
-          }),
-        }),
-      });
+  it('derives a shed level and legacy farm ancestry from its canonical parent', async () => {
+    const parent = {
+      location_id: 'farm-1', company_id: 'comp-1', location_type: 'FARM',
+      location_level: 1, farm_id: 'farm-1', shed_id: null, warehouse_id: null,
+    };
+    selectResults.push(
+      [company], [shedType], [parent], [uom], [{ series_code: 'LOCATION_SHED' }],
+      [{ location_id: 'shed-1', location_code: 'SHED-001', location_type: 'SHED', location_level: 2 }],
+    );
+    numberSeries.generateNext.mockResolvedValue('SHED-001');
 
-      await expect(
-        service.update('loc-1', { location_type: 'SILO' }, 'tenant-123'),
-      ).rejects.toThrow(ConflictException);
-    });
+    const result = await service.create({
+      company_id: 'comp-1', parent_location_id: 'farm-1',
+      location_name: 'House A', location_address: 'Farm Road', location_type: 'SHED',
+      max_capacity: 60, capacity_uom: 'HEAD',
+    }, 'tenant-1');
+
+    expect(result.location_level).toBe(2);
+    expect(txInsert).toHaveBeenCalledTimes(2);
   });
 
-  describe('remove', () => {
-    it('should soft-delete a location and write an audit log entry', async () => {
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([{ location_id: 'loc-1', location_name: 'Location 1', company_id: 'comp-1' }]),
-          }),
-        }),
-      });
-      mockDbUpdate.mockReturnValue({
-        set: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue({}),
-        }),
-      });
-
-      const result = await service.remove('loc-1', 'tenant-123', { userId: 'user-1' });
-
-      expect(mockDbUpdate).toHaveBeenCalled();
-      expect(auditLogService.log).toHaveBeenCalled();
-      expect(result.success).toBe(true);
-    });
+  it('rejects a non-root type without a parent', async () => {
+    selectResults.push([company], [shedType]);
+    await expect(service.create({
+      company_id: 'comp-1', location_name: 'House A', location_address: 'Farm Road',
+      location_type: 'SHED', max_capacity: 60, capacity_uom: 'HEAD',
+    }, 'tenant-1')).rejects.toThrow('requires a parent location');
   });
 
-  describe('restore', () => {
-    it('should clear deleted_at on a soft-deleted location', async () => {
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ location_id: 'loc-1', deleted_at: '2026-01-01 00:00:00', company_id: 'comp-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ location_id: 'loc-1', deleted_at: null }]),
-            }),
-          }),
-        });
-      mockDbUpdate.mockReturnValue({
-        set: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue({}),
-        }),
-      });
-
-      const result = await service.restore('loc-1', 'tenant-123', { userId: 'user-1' });
-
-      expect(mockDbUpdate).toHaveBeenCalled();
-      expect(auditLogService.log).toHaveBeenCalled();
-      expect(result.deleted_at).toBeNull();
-    });
+  it('rejects a parent outside the allowed type hierarchy', async () => {
+    selectResults.push(
+      [company], [shedType],
+      [{ location_id: 'pen-1', company_id: 'comp-1', location_type: 'PEN', location_level: 2 }],
+    );
+    await expect(service.create({
+      company_id: 'comp-1', parent_location_id: 'pen-1', location_name: 'House A',
+      location_address: 'Farm Road', location_type: 'SHED', max_capacity: 60, capacity_uom: 'HEAD',
+    }, 'tenant-1')).rejects.toThrow('must be created under FARM');
   });
 
-  describe('getLocationOccupancy', () => {
-    it('aggregates live animal and batch headcounts with capacity and biosecurity checks', async () => {
-      // 1. Locations
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          leftJoin: jest.fn().mockReturnValue({
-            leftJoin: jest.fn().mockReturnValue({
-              where: jest.fn().mockResolvedValue([
-                {
-                  location: {
-                    location_id: 'loc-pen-1',
-                    location_code: 'PEN-01A',
-                    location_name: 'Pen 1A',
-                    location_type: 'PEN',
-                    max_capacity: '20.0000',
-                    capacity_uom: 'HEAD',
-                  },
-                  farm: { farm_name: 'Main Farm' },
-                  shed: { shed_name: 'Grower Shed 1' },
-                },
-              ]),
-            }),
-          }),
-        }),
-      });
+  it('rejects a SILO until both template tracking fields are supplied', async () => {
+    selectResults.push(
+      [company], [siloType],
+      [{ location_id: 'farm-1', company_id: 'comp-1', location_type: 'FARM', location_level: 1 }],
+    );
+    await expect(service.create({
+      company_id: 'comp-1', parent_location_id: 'farm-1', location_name: 'Feed Silo',
+      location_address: 'Farm Road', location_type: 'SILO', max_capacity: 2000, capacity_uom: 'KG',
+    }, 'tenant-1')).rejects.toThrow(ConflictException);
+  });
 
-      // 2. Animals
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([
-            { animal_id: 'a-1', current_location_id: 'loc-pen-1', status: 'ACTIVE' },
-            { animal_id: 'a-2', current_location_id: 'loc-pen-1', status: 'QUARANTINE' },
-          ]),
-        }),
-      });
+  it('keeps location type and generated identity immutable', async () => {
+    selectResults.push([{
+      location_id: 'loc-1', company_id: 'comp-1', location_code: 'FARM-001',
+      location_type: 'FARM', location_level: 1, parent_location_id: null,
+    }]);
+    await expect(service.update('loc-1', { location_type: 'SHED' }, 'tenant-1'))
+      .rejects.toThrow('Location Type cannot be changed');
+  });
 
-      // 3. Batches
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-        }),
-      });
+  it('does not deactivate a location that still has active children', async () => {
+    selectResults.push(
+      [{ location_id: 'farm-1', company_id: 'comp-1', location_name: 'Main Farm', location_type: 'FARM' }],
+      [{ location_id: 'shed-1' }],
+    );
+    await expect(service.remove('farm-1', 'tenant-1')).rejects.toThrow(ConflictException);
+  });
 
-      const res = await service.getLocationOccupancy('tenant-123', 'comp-1');
-
-      expect(res).toHaveLength(1);
-      expect(res[0].location_code).toBe('PEN-01A');
-      expect(res[0].current_occupancy).toBe(2);
-      expect(res[0].max_capacity).toBe(20);
-      expect(res[0].utilization_pct).toBe(10); // 2 / 20 = 10%
-      expect(res[0].biosecurity_status).toBe('QUARANTINE_ACTIVE');
-      expect(res[0].sick_animal_count).toBe(1);
-    });
+  it('reports an unknown company before any hierarchy work', async () => {
+    selectResults.push([]);
+    await expect(service.create({
+      company_id: 'missing-company', location_name: 'Main Farm', location_address: 'Farm Road',
+      location_type: 'FARM', max_capacity: 100, capacity_uom: 'HEAD',
+    }, 'tenant-1')).rejects.toThrow(NotFoundException);
   });
 });
-

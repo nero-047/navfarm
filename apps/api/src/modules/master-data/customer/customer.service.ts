@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
+import { eq, and, like, or, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateCustomerDto, UpdateCustomerDto, QueryCustomerDto } from './dto/customer.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +17,7 @@ export class CustomerService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -38,30 +40,26 @@ export class CustomerService {
       throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
     }
 
-    // 2. Check duplicate customer code within the company scope
-    const existing = await this.db
-      .select()
-      .from(schema.customerMaster)
-      .where(
-        and(
+    await this.numberSeriesService.ensureCompanySeries(
+      tenantId,
+      dto.company_id,
+      { seriesCode: 'CUSTOMER', seriesName: 'Customer Code', documentType: 'CUSTOMER', prefix: 'CUS', seqLength: 3 },
+      async () => {
+        const rows = await this.db.select({ code: schema.customerMaster.customer_code }).from(schema.customerMaster).where(and(
           eq(schema.customerMaster.tenant_id, tenantId),
           eq(schema.customerMaster.company_id, dto.company_id),
-          eq(schema.customerMaster.customer_code, dto.customer_code.toUpperCase()),
-          isNull(schema.customerMaster.deleted_at)
-        )
-      )
-      .limit(1);
-
-    if (existing.length > 0) {
-      throw new ConflictException(`Customer with code '${dto.customer_code}' already exists in this company.`);
-    }
+        ));
+        return rows.map((row) => row.code);
+      },
+    );
+    const customerCode = await this.numberSeriesService.generateNext('CUSTOMER', tenantId, dto.company_id);
 
     const customerId = randomUUID();
     const newCustomer = {
       customer_id: customerId,
       tenant_id: tenantId,
       company_id: dto.company_id,
-      customer_code: dto.customer_code.toUpperCase(),
+      customer_code: customerCode,
       customer_name: dto.customer_name,
       email: dto.email || null,
       mobile: dto.mobile,
@@ -145,23 +143,7 @@ export class CustomerService {
     const customer = await this.findOne(id);
 
     if (dto.customer_code && dto.customer_code.toUpperCase() !== customer.customer_code) {
-      const existing = await this.db
-        .select()
-        .from(schema.customerMaster)
-        .where(
-          and(
-            eq(schema.customerMaster.tenant_id, tenantId),
-            eq(schema.customerMaster.company_id, customer.company_id),
-            eq(schema.customerMaster.customer_code, dto.customer_code.toUpperCase()),
-            ne(schema.customerMaster.customer_id, id),
-            isNull(schema.customerMaster.deleted_at)
-          )
-        )
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new ConflictException(`Customer with code '${dto.customer_code}' already exists in this company.`);
-      }
+      throw new ConflictException('Customer Code is generated from the company-wide CUSTOMER sequence and cannot be changed.');
     }
 
     const updates: any = {
@@ -169,7 +151,6 @@ export class CustomerService {
       updated_at: toMysqlTimestamp(),
     };
 
-    if (dto.customer_code !== undefined) updates.customer_code = dto.customer_code.toUpperCase();
     if (dto.customer_name !== undefined) updates.customer_name = dto.customer_name;
     if (dto.email !== undefined) updates.email = dto.email;
     if (dto.mobile !== undefined) updates.mobile = dto.mobile;

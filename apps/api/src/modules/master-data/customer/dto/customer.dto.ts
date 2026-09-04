@@ -8,10 +8,10 @@ export class CreateCustomerDto {
   @IsNotEmpty()
   company_id: string;
 
-  @ApiProperty({ description: 'Unique code representing the customer', example: 'CUST-001' })
+  @ApiProperty({ description: 'Legacy input only; the API generates CUS-001, CUS-002, etc. per company', example: 'CUS-001', required: false })
   @IsString()
-  @IsNotEmpty()
-  customer_code: string;
+  @IsOptional()
+  customer_code?: string;
 
   @ApiProperty({ description: 'Full name of the customer', example: 'John Doe Wholesalers' })
   @IsString()

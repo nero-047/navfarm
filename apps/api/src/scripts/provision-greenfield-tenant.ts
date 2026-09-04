@@ -18,7 +18,7 @@ import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
 import {
   SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED,
-  SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED,
+  SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED, SYSTEM_LOCATION_TYPE_SEED,
 } from '../core/database/system-master-data-seed';
 
 const host = process.env.DATABASE_HOST || 'localhost';
@@ -96,6 +96,7 @@ async function run() {
 
   // ── System master data ──────────────────────────────────────────────────
   await db.insert(tenant.uomMaster).values(SYSTEM_UOM_SEED.map((u) => ({ ...u, tenant_id: tenantId })));
+  await db.insert(tenant.locationTypeMaster).values(SYSTEM_LOCATION_TYPE_SEED.map((type) => ({ ...type, tenant_id: tenantId, is_system: true })));
   await db.insert(tenant.speciesMaster).values(SYSTEM_SPECIES_SEED.map((s) => ({ ...s, tenant_id: tenantId })));
   const speciesByCode = new Map((await db.select().from(tenant.speciesMaster)).map((s) => [s.species_code, s.species_id]));
 

@@ -69,8 +69,9 @@ export class LocationController {
   @RequirePermission('MASTER_DATA', 'LOCATION', 'view')
   @ApiOperation({ summary: 'Fetch details of a single Location by UUID' })
   @ApiParam({ name: 'id', description: 'Location UUID' })
-  async findOne(@Param('id') id: string) {
-    const result = await this.locationService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.locationService.findOne(id, tenantId);
     return {
       success: true,
       message: 'Location details retrieved.',

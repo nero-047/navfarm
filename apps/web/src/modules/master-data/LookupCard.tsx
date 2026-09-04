@@ -31,7 +31,7 @@ export function LookupCard({
   // UOM's uom_type) have a required select field - leaving it out would let
   // the form report "complete" without it and 400 on save.
   const fields = config.fields.filter(
-    (f) => !f.hideInForm && f.required && (f.type === "text" || f.type === "textarea" || f.type === "number" || f.type === "select"),
+    (f) => !f.hideInForm && (f.required || f.showInLookup) && (f.type === "text" || f.type === "textarea" || f.type === "number" || f.type === "select"),
   );
 
   const add = async () => {
@@ -50,7 +50,7 @@ export function LookupCard({
     }
   };
 
-  const complete = fields.every((f) => String(form[f.key] ?? "").trim() !== "");
+  const complete = fields.filter((f) => f.required).every((f) => String(form[f.key] ?? "").trim() !== "");
 
   return (
     <div className="grid gap-3">

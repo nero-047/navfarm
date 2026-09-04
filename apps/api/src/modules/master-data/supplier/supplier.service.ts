@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
+import { eq, and, like, or, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateSupplierDto, UpdateSupplierDto, QuerySupplierDto } from './dto/supplier.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { EncryptionService } from '../../system/encryption/encryption.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -18,6 +19,7 @@ export class SupplierService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly encryptionService: EncryptionService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -64,33 +66,29 @@ export class SupplierService {
       throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
     }
 
-    // 2. Check duplicate supplier code within the company scope
-    const existing = await this.db
-      .select()
-      .from(schema.supplierMaster)
-      .where(
-        and(
-          eq(schema.supplierMaster.tenant_id, tenantId),
-          eq(schema.supplierMaster.company_id, dto.company_id),
-          eq(schema.supplierMaster.supplier_code, dto.supplier_code.toUpperCase()),
-          isNull(schema.supplierMaster.deleted_at)
-        )
-      )
-      .limit(1);
-
-    if (existing.length > 0) {
-      throw new ConflictException(`Supplier with code '${dto.supplier_code}' already exists in this company.`);
-    }
-
     const vendorType = dto.vendor_type || 'GENERAL';
     this.assertVendorTypeRequirements(vendorType, dto.health_cert_url, dto.breeding_farm_code);
+
+    await this.numberSeriesService.ensureCompanySeries(
+      tenantId,
+      dto.company_id,
+      { seriesCode: 'SUPPLIER', seriesName: 'Supplier Code', documentType: 'SUPPLIER', prefix: 'SUP', seqLength: 3 },
+      async () => {
+        const rows = await this.db.select({ code: schema.supplierMaster.supplier_code }).from(schema.supplierMaster).where(and(
+          eq(schema.supplierMaster.tenant_id, tenantId),
+          eq(schema.supplierMaster.company_id, dto.company_id),
+        ));
+        return rows.map((row) => row.code);
+      },
+    );
+    const supplierCode = await this.numberSeriesService.generateNext('SUPPLIER', tenantId, dto.company_id);
 
     const supplierId = randomUUID();
     const newSupplier = {
       supplier_id: supplierId,
       tenant_id: tenantId,
       company_id: dto.company_id,
-      supplier_code: dto.supplier_code.toUpperCase(),
+      supplier_code: supplierCode,
       supplier_name: dto.supplier_name,
       email: dto.email || null,
       phone: dto.phone || null,
@@ -189,23 +187,7 @@ export class SupplierService {
     const supplier = await this.findOne(id);
 
     if (dto.supplier_code && dto.supplier_code.toUpperCase() !== supplier.supplier_code) {
-      const existing = await this.db
-        .select()
-        .from(schema.supplierMaster)
-        .where(
-          and(
-            eq(schema.supplierMaster.tenant_id, tenantId),
-            eq(schema.supplierMaster.company_id, supplier.company_id),
-            eq(schema.supplierMaster.supplier_code, dto.supplier_code.toUpperCase()),
-            ne(schema.supplierMaster.supplier_id, id),
-            isNull(schema.supplierMaster.deleted_at)
-          )
-        )
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new ConflictException(`Supplier with code '${dto.supplier_code}' already exists in this company.`);
-      }
+      throw new ConflictException('Supplier Code is generated from the company-wide SUPPLIER sequence and cannot be changed.');
     }
 
     // Re-validate COND rules against the effective (post-update) values, same "dto value if
@@ -220,7 +202,6 @@ export class SupplierService {
       updated_at: toMysqlTimestamp(),
     };
 
-    if (dto.supplier_code !== undefined) updates.supplier_code = dto.supplier_code.toUpperCase();
     if (dto.supplier_name !== undefined) updates.supplier_name = dto.supplier_name;
     if (dto.email !== undefined) updates.email = dto.email;
     if (dto.phone !== undefined) updates.phone = dto.phone;

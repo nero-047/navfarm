@@ -106,6 +106,19 @@ export async function gotoConsole(
     routes = [],
   }: ConsoleSessionOptions = {},
 ): Promise<void> {
+  // The middleware performs a presence-only check before the page (and its
+  // local-storage session) can load. Keep the test session aligned with the
+  // real login flow by supplying the non-sensitive marker cookie too.
+  await page.context().addCookies([
+    {
+      name: 'navfarm_session',
+      value: '1',
+      domain: 'localhost',
+      path: '/',
+      sameSite: 'Lax',
+    },
+  ]);
+
   // Registered first so the specific handlers below take precedence:
   // Playwright matches the most recently registered route first.
   await page.route('**/api/v1/**', (route) => route.fulfill({ status: 200, json: [] }));

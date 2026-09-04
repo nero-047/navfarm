@@ -18,10 +18,10 @@ export class CreateResourceDto {
   @IsOptional()
   lob_id?: string;
 
-  @ApiProperty({ description: 'Unique code representing the resource', example: 'LBR-01' })
+  @ApiProperty({ description: 'Legacy input only; the API generates RES-001, RES-002, etc. per company', example: 'RES-001', required: false })
   @IsString()
-  @IsNotEmpty()
-  resource_code: string;
+  @IsOptional()
+  resource_code?: string;
 
   @ApiProperty({ description: 'Full name/description of the resource', example: 'Senior Laborer' })
   @IsString()

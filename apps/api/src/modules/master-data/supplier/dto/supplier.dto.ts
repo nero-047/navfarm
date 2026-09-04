@@ -10,10 +10,10 @@ export class CreateSupplierDto {
   @IsNotEmpty()
   company_id: string;
 
-  @ApiProperty({ description: 'Unique code representing the supplier', example: 'SUP-001' })
+  @ApiProperty({ description: 'Legacy input only; the API generates SUP-001, SUP-002, etc. per company', example: 'SUP-001', required: false })
   @IsString()
-  @IsNotEmpty()
-  supplier_code: string;
+  @IsOptional()
+  supplier_code?: string;
 
   @ApiProperty({ description: 'Full legal name of the supplier', example: 'Feed Ingredients Corp Ltd' })
   @IsString()

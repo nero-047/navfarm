@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
+import { eq, and, like, or, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -26,6 +26,51 @@ export class ItemService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /**
+   * Each company owns exactly one ITEM counter, shared by every Item Type.
+   * Older tenants only have the tenant-wide template row, so create the
+   * company counter lazily and continue after the highest existing matching
+   * code instead of restarting at one.
+   */
+  private async ensureCompanyItemSeries(tenantId: string, companyId: string | null) {
+    if (!companyId) return;
+    const [existing] = await this.db.select().from(schema.noSeriesMaster).where(and(
+      eq(schema.noSeriesMaster.tenant_id, tenantId),
+      eq(schema.noSeriesMaster.company_id, companyId),
+      eq(schema.noSeriesMaster.series_code, 'ITEM'),
+      isNull(schema.noSeriesMaster.deleted_at),
+    )).limit(1);
+    if (existing) return;
+
+    const [template] = await this.db.select().from(schema.noSeriesMaster).where(and(
+      eq(schema.noSeriesMaster.tenant_id, tenantId),
+      isNull(schema.noSeriesMaster.company_id),
+      eq(schema.noSeriesMaster.series_code, 'ITEM'),
+      isNull(schema.noSeriesMaster.deleted_at),
+    )).limit(1);
+    if (!template) throw new NotFoundException("Number series 'ITEM' is not configured for this tenant.");
+
+    const codes = await this.db.select({ code: schema.itemMaster.item_code }).from(schema.itemMaster).where(and(
+      eq(schema.itemMaster.tenant_id, tenantId),
+      eq(schema.itemMaster.company_id, companyId),
+    ));
+    const prefix = template.prefix || 'ITM';
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapedPrefix}${template.separator || '-'}(\\d+)$`, 'i');
+    const currentSeq = codes.reduce((max, row) => {
+      const match = row.code.match(pattern);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+    await this.db.insert(schema.noSeriesMaster).values({
+      series_id: randomUUID(), tenant_id: tenantId, company_id: companyId,
+      series_code: 'ITEM', series_name: template.series_name, document_type: template.document_type,
+      prefix: template.prefix, date_format: template.date_format, separator: template.separator,
+      seq_length: template.seq_length, current_seq: currentSeq,
+      reset_frequency: template.reset_frequency, allow_manual: false,
+    }).onDuplicateKeyUpdate({ set: { series_name: template.series_name } });
   }
 
   /** withdrawal_days is mandatory for MEDICINE/VACCINE item types per spec. */
@@ -84,8 +129,8 @@ export class ItemService {
     this.assertStandardCost(dto.valuation_method, dto.standard_cost);
     this.assertTrackingSeries(dto.is_lot_tracked, dto.is_serial_tracked, dto.tracking_series_id);
 
-    // 3. Auto-generate the item code from the 'ITEM' number series — uniqueness is
-    // guaranteed by the series' own row lock, no separate duplicate check needed.
+    // 3. One company-wide ITEM sequence is shared by all Item Types.
+    await this.ensureCompanyItemSeries(tenantId, companyId);
     const itemCode = await this.numberSeriesService.generateNext('ITEM', tenantId, companyId);
 
     const itemId = randomUUID();
@@ -270,28 +315,7 @@ export class ItemService {
     }
 
     if (dto.item_code && dto.item_code.toUpperCase() !== item.item_code) {
-      const duplicateConditions = [
-        eq(schema.itemMaster.tenant_id, tenantId),
-        eq(schema.itemMaster.item_code, dto.item_code.toUpperCase()),
-        ne(schema.itemMaster.item_id, id),
-        isNull(schema.itemMaster.deleted_at),
-      ];
-      const targetCompanyId = item.company_id;
-      if (targetCompanyId) {
-        duplicateConditions.push(eq(schema.itemMaster.company_id, targetCompanyId));
-      } else {
-        duplicateConditions.push(isNull(schema.itemMaster.company_id));
-      }
-
-      const existing = await this.db
-        .select()
-        .from(schema.itemMaster)
-        .where(and(...duplicateConditions))
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new ConflictException(`Item with code '${dto.item_code}' already exists in this scope.`);
-      }
+      throw new ConflictException('Item Code is generated from the company-wide ITEM sequence and cannot be changed.');
     }
 
     const effectiveItemType = dto.item_type ?? item.item_type;
@@ -312,7 +336,6 @@ export class ItemService {
       updated_at: toMysqlTimestamp(),
     };
 
-    if (dto.item_code !== undefined) updates.item_code = dto.item_code.toUpperCase();
     if (dto.item_name !== undefined) updates.item_name = dto.item_name;
     if (dto.item_type !== undefined) updates.item_type = dto.item_type;
     if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;

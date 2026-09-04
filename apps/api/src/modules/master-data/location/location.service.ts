@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
+import { eq, and, like, or, isNull, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateLocationDto, UpdateLocationDto, QueryLocationDto } from './dto/location.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +17,7 @@ export class LocationService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -26,13 +28,162 @@ export class LocationService {
     return tenantDb;
   }
 
-  /** A location anchors to exactly one direct parent: a Farm, a Shed, or a Warehouse. */
-  private assertExactlyOneParent(farmId?: string | null, shedId?: string | null, warehouseId?: string | null) {
-    const setCount = [farmId, shedId, warehouseId].filter(Boolean).length;
-    if (setCount !== 1) {
-      throw new ConflictException(
-        'A location must have exactly one parent: set exactly one of farm_id, shed_id, or warehouse_id.'
-      );
+  private async resolveLocationType(typeCode: string, tenantId: string, companyId?: string | null) {
+    const conditions = [
+      eq(schema.locationTypeMaster.tenant_id, tenantId),
+      eq(schema.locationTypeMaster.type_code, typeCode.toUpperCase()),
+      eq(schema.locationTypeMaster.is_active, true),
+      isNull(schema.locationTypeMaster.deleted_at),
+    ];
+    conditions.push(companyId
+      ? or(eq(schema.locationTypeMaster.company_id, companyId), isNull(schema.locationTypeMaster.company_id))!
+      : isNull(schema.locationTypeMaster.company_id));
+    const [type] = await this.db.select().from(schema.locationTypeMaster).where(and(...conditions))
+      .orderBy(sql`${schema.locationTypeMaster.company_id} IS NULL`).limit(1);
+    if (!type) throw new NotFoundException(`Location Type '${typeCode}' not found.`);
+    return type;
+  }
+
+  private allowedParentTypes(value: unknown): string[] {
+    if (Array.isArray(value)) return value.map(String);
+    if (typeof value === 'string') {
+      try { return JSON.parse(value); } catch { return []; }
+    }
+    return [];
+  }
+
+  private async ensureCompanySeries(type: typeof schema.locationTypeMaster.$inferSelect, tenantId: string, companyId?: string | null) {
+    const seriesCode = `LOCATION_${type.type_code}`;
+    if (!companyId) return seriesCode;
+    const [series] = await this.db.select().from(schema.noSeriesMaster).where(and(
+      eq(schema.noSeriesMaster.tenant_id, tenantId),
+      eq(schema.noSeriesMaster.company_id, companyId),
+      eq(schema.noSeriesMaster.series_code, seriesCode),
+      isNull(schema.noSeriesMaster.deleted_at),
+    )).limit(1);
+    if (!series) {
+      const existingCodes = await this.db.select({ code: schema.locationMaster.location_code })
+        .from(schema.locationMaster).where(and(
+          eq(schema.locationMaster.tenant_id, tenantId),
+          eq(schema.locationMaster.company_id, companyId),
+          eq(schema.locationMaster.location_type, type.type_code),
+        ));
+      const prefixPattern = new RegExp(`^${type.code_prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d+)$`, 'i');
+      const currentSeq = existingCodes.reduce((max, row) => {
+        const match = row.code.match(prefixPattern);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0);
+      await this.db.insert(schema.noSeriesMaster).values({
+        series_id: randomUUID(), tenant_id: tenantId, company_id: companyId,
+        series_code: seriesCode, series_name: `${type.type_name} Location`,
+        document_type: 'LOCATION', prefix: type.code_prefix, separator: '-',
+        seq_length: 3, current_seq: currentSeq, reset_frequency: 'NEVER', allow_manual: false,
+      });
+    }
+    return seriesCode;
+  }
+
+  private async insertLegacyMirror(
+    executor: any,
+    location: typeof schema.locationMaster.$inferInsert,
+  ) {
+    const common = {
+      tenant_id: location.tenant_id,
+      company_id: location.company_id!,
+      is_active: true,
+      status: 'ACTIVE',
+      created_by: location.created_by,
+      updated_by: location.updated_by,
+    };
+
+    if (location.location_type === 'FARM') {
+      await executor.insert(schema.farmMaster).values({
+        ...common,
+        farm_id: location.location_id,
+        farm_code: location.location_code,
+        farm_name: location.location_name,
+        farm_type: 'GENERAL',
+        nob_id: location.nob_id,
+        lob_id: location.lob_id,
+        capacity: Math.round(Number(location.max_capacity || 0)),
+        address_line1: location.location_address,
+      });
+    } else if (location.location_type === 'SHED') {
+      await executor.insert(schema.shedMaster).values({
+        ...common,
+        shed_id: location.location_id,
+        farm_id: location.farm_id!,
+        shed_code: location.location_code,
+        shed_name: location.location_name,
+        shed_type: 'GENERAL',
+        nob_id: location.nob_id,
+        lob_id: location.lob_id,
+        capacity: Math.round(Number(location.max_capacity || 0)),
+      });
+    } else if (location.location_type === 'STORE' || location.location_type === 'SILO') {
+      await executor.insert(schema.warehouseMaster).values({
+        ...common,
+        warehouse_id: location.location_id,
+        farm_id: location.farm_id,
+        warehouse_code: location.location_code,
+        warehouse_name: location.location_name,
+        warehouse_type: location.location_type === 'SILO' ? 'SILO' : 'GENERAL',
+      });
+    }
+  }
+
+  private async updateLegacyMirror(
+    executor: any,
+    location: typeof schema.locationMaster.$inferSelect,
+    effective: Record<string, any>,
+  ) {
+    const common = {
+      is_active: effective.is_active,
+      status: effective.status,
+      deleted_at: effective.deleted_at,
+      updated_by: effective.updated_by,
+      updated_at: effective.updated_at,
+    };
+    if (location.location_type === 'FARM') {
+      await executor.update(schema.farmMaster).set({
+        ...common,
+        farm_name: effective.location_name,
+        nob_id: effective.nob_id,
+        lob_id: effective.lob_id,
+        capacity: Math.round(Number(effective.max_capacity || 0)),
+        address_line1: effective.location_address,
+      }).where(eq(schema.farmMaster.farm_id, location.location_id));
+    } else if (location.location_type === 'SHED') {
+      await executor.update(schema.shedMaster).set({
+        ...common,
+        farm_id: effective.farm_id,
+        shed_name: effective.location_name,
+        nob_id: effective.nob_id,
+        lob_id: effective.lob_id,
+        capacity: Math.round(Number(effective.max_capacity || 0)),
+      }).where(eq(schema.shedMaster.shed_id, location.location_id));
+    } else if (location.location_type === 'STORE' || location.location_type === 'SILO') {
+      await executor.update(schema.warehouseMaster).set({
+        ...common,
+        farm_id: effective.farm_id,
+        warehouse_name: effective.location_name,
+      }).where(eq(schema.warehouseMaster.warehouse_id, location.location_id));
+    }
+  }
+
+  private async assertNoHierarchyCycle(id: string, parentId: string, tenantId: string) {
+    let cursor: string | null = parentId;
+    const visited = new Set<string>();
+    while (cursor) {
+      if (cursor === id) throw new ConflictException('A location cannot be moved under one of its descendants.');
+      if (visited.has(cursor)) throw new ConflictException('The selected parent belongs to an invalid hierarchy cycle.');
+      visited.add(cursor);
+      const [row] = await this.db.select({ parent_location_id: schema.locationMaster.parent_location_id })
+        .from(schema.locationMaster).where(and(
+          eq(schema.locationMaster.location_id, cursor),
+          eq(schema.locationMaster.tenant_id, tenantId),
+        )).limit(1);
+      cursor = row?.parent_location_id || null;
     }
   }
 
@@ -76,64 +227,49 @@ export class LocationService {
   }
 
   async create(dto: CreateLocationDto, tenantId: string, userPayload?: any) {
-    // 1. Verify company exists (if provided)
-    if (dto.company_id) {
-      const [company] = await this.db
-        .select()
-        .from(schema.companyMaster)
-        .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-        .limit(1);
+    if (!dto.company_id) {
+      throw new ConflictException('A company is required to create a location and allocate its code sequence.');
+    }
+    const [company] = await this.db
+      .select()
+      .from(schema.companyMaster)
+      .where(and(
+        eq(schema.companyMaster.company_id, dto.company_id),
+        eq(schema.companyMaster.tenant_id, tenantId),
+        isNull(schema.companyMaster.deleted_at),
+      ))
+      .limit(1);
 
-      if (!company) {
-        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
-      }
+    if (!company) {
+      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
     }
 
-    // 2. Verify parent location exists (if provided) and compute this location's hierarchy level.
-    // Depth is structural (root under a farm/shed/warehouse = 1, each nested parent_location_id
-    // = parent's level + 1) — not something a user picks, so it's always computed here rather
-    // than accepted from the DTO.
+    const companyId = dto.company_id;
+    const locationType = await this.resolveLocationType(dto.location_type, tenantId, companyId);
+    const allowedParentTypes = this.allowedParentTypes(locationType.allowed_parent_types);
+
+    // parent_location_id is the single canonical hierarchy. Legacy ancestry
+    // columns are derived below only to keep older operational flows working.
     let locationLevel = 1;
+    let parent: typeof schema.locationMaster.$inferSelect | undefined;
+    if (allowedParentTypes.length === 0 && dto.parent_location_id) {
+      throw new ConflictException(`${locationType.type_name} is a root location and cannot have a parent.`);
+    }
     if (dto.parent_location_id) {
-      const parent = await this.findOne(dto.parent_location_id);
+      [parent] = await this.db.select().from(schema.locationMaster).where(and(
+        eq(schema.locationMaster.location_id, dto.parent_location_id),
+        eq(schema.locationMaster.tenant_id, tenantId),
+        eq(schema.locationMaster.company_id, companyId),
+        isNull(schema.locationMaster.deleted_at),
+      )).limit(1);
+      if (!parent) throw new NotFoundException(`Parent Location '${dto.parent_location_id}' not found.`);
+      if (!allowedParentTypes.includes(parent.location_type)) {
+        throw new ConflictException(`${locationType.type_name} must be created under ${allowedParentTypes.join(' or ')}.`);
+      }
       locationLevel = parent.location_level + 1;
     }
-
-    // 3. Exactly one of farm/shed/warehouse must be this location's parent
-    this.assertExactlyOneParent(dto.farm_id, dto.shed_id, dto.warehouse_id);
-
-    if (dto.farm_id) {
-      const [farm] = await this.db
-        .select()
-        .from(schema.farmMaster)
-        .where(and(eq(schema.farmMaster.farm_id, dto.farm_id), isNull(schema.farmMaster.deleted_at)))
-        .limit(1);
-      if (!farm) {
-        throw new NotFoundException(`Farm with ID '${dto.farm_id}' not found.`);
-      }
-    }
-
-    if (dto.shed_id) {
-      const [shed] = await this.db
-        .select()
-        .from(schema.shedMaster)
-        .where(and(eq(schema.shedMaster.shed_id, dto.shed_id), isNull(schema.shedMaster.deleted_at)))
-        .limit(1);
-      if (!shed) {
-        throw new NotFoundException(`Shed with ID '${dto.shed_id}' not found.`);
-      }
-    }
-
-    if (dto.warehouse_id) {
-      const [warehouse] = await this.db
-        .select()
-        .from(schema.warehouseMaster)
-        .where(and(eq(schema.warehouseMaster.warehouse_id, dto.warehouse_id), isNull(schema.warehouseMaster.deleted_at)))
-        .limit(1);
-
-      if (!warehouse) {
-        throw new NotFoundException(`Warehouse with ID '${dto.warehouse_id}' not found.`);
-      }
+    if (allowedParentTypes.length > 0 && !parent) {
+      throw new ConflictException(`${locationType.type_name} requires a parent location.`);
     }
 
     // 4. SILO locations must carry silo tracking fields
@@ -143,39 +279,20 @@ export class LocationService {
     await this.assertUomExists(dto.area_unit, tenantId, dto.company_id);
     await this.assertUomExists(dto.capacity_uom, tenantId, dto.company_id);
 
-    // 6. Check duplicate location code
-    const duplicateConditions = [
-      eq(schema.locationMaster.tenant_id, tenantId),
-      eq(schema.locationMaster.location_code, dto.location_code.toUpperCase()),
-      isNull(schema.locationMaster.deleted_at),
-    ];
-    if (dto.company_id) {
-      duplicateConditions.push(eq(schema.locationMaster.company_id, dto.company_id));
-    } else {
-      duplicateConditions.push(isNull(schema.locationMaster.company_id));
-    }
-
-    const existing = await this.db
-      .select()
-      .from(schema.locationMaster)
-      .where(and(...duplicateConditions))
-      .limit(1);
-
-    if (existing.length > 0) {
-      throw new ConflictException(`Location with code '${dto.location_code}' already exists in this scope.`);
-    }
+    const seriesCode = await this.ensureCompanySeries(locationType, tenantId, companyId);
+    const locationCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
 
     const locationId = randomUUID();
     const newLocation = {
       location_id: locationId,
       tenant_id: tenantId,
-      company_id: dto.company_id || null,
+      company_id: companyId,
       nob_id: dto.nob_id || null,
       lob_id: dto.lob_id || null,
-      farm_id: dto.farm_id || null,
-      shed_id: dto.shed_id || null,
-      warehouse_id: dto.warehouse_id || null,
-      location_code: dto.location_code.toUpperCase(),
+      farm_id: dto.location_type === 'FARM' ? locationId : parent ? (parent.location_type === 'FARM' ? parent.location_id : parent.farm_id) : null,
+      shed_id: dto.location_type === 'SHED' ? locationId : parent ? (parent.location_type === 'SHED' ? parent.location_id : parent.shed_id) : null,
+      warehouse_id: ['STORE', 'SILO'].includes(dto.location_type) ? locationId : parent ? (['STORE', 'SILO'].includes(parent.location_type) ? parent.location_id : parent.warehouse_id) : null,
+      location_code: locationCode,
       location_name: dto.location_name,
       location_address: dto.location_address,
       location_level: locationLevel,
@@ -200,7 +317,12 @@ export class LocationService {
       updated_by: userPayload?.userId || null,
     };
 
-    await this.db.insert(schema.locationMaster).values(newLocation);
+    await this.db.transaction(async (tx) => {
+      // Legacy rows are inserted first because location_master keeps temporary
+      // compatibility foreign keys to these records.
+      await this.insertLegacyMirror(tx, newLocation);
+      await tx.insert(schema.locationMaster).values(newLocation);
+    });
 
     await this.auditService.log({
       tenantId,
@@ -212,14 +334,18 @@ export class LocationService {
       newValues: newLocation,
     });
 
-    return this.findOne(locationId);
+    return this.findOne(locationId, tenantId);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, tenantId: string) {
     const [location] = await this.db
       .select()
       .from(schema.locationMaster)
-      .where(and(eq(schema.locationMaster.location_id, id), isNull(schema.locationMaster.deleted_at)))
+      .where(and(
+        eq(schema.locationMaster.location_id, id),
+        eq(schema.locationMaster.tenant_id, tenantId),
+        isNull(schema.locationMaster.deleted_at),
+      ))
       .limit(1);
 
     if (!location) {
@@ -290,7 +416,14 @@ export class LocationService {
   }
 
   async update(id: string, dto: UpdateLocationDto, tenantId: string, userPayload?: any) {
-    const location = await this.findOne(id);
+    const location = await this.findOne(id, tenantId);
+
+    if (dto.location_type !== undefined && dto.location_type !== location.location_type) {
+      throw new ConflictException('Location Type cannot be changed after a location is created. Create a new location instead.');
+    }
+    if (dto.company_id !== undefined && dto.company_id !== location.company_id) {
+      throw new ConflictException('A location cannot be moved to another company after its code is allocated.');
+    }
 
     if (dto.company_id) {
       const [company] = await this.db
@@ -304,56 +437,37 @@ export class LocationService {
       }
     }
 
+    const effectiveLocationType = dto.location_type !== undefined ? dto.location_type : location.location_type;
+    const effectiveCompanyId = dto.company_id !== undefined ? dto.company_id : location.company_id;
+    const locationType = await this.resolveLocationType(effectiveLocationType, tenantId, effectiveCompanyId);
+    const allowedParentTypes = this.allowedParentTypes(locationType.allowed_parent_types);
+    const effectiveParentId = dto.parent_location_id !== undefined ? dto.parent_location_id : location.parent_location_id;
+    let parent: typeof schema.locationMaster.$inferSelect | undefined;
     let newLocationLevel: number | undefined;
-    if (dto.parent_location_id !== undefined) {
-      const parent = await this.findOne(dto.parent_location_id);
+    if (effectiveParentId) {
+      if (effectiveParentId === id) throw new ConflictException('A location cannot be its own parent.');
+      [parent] = await this.db.select().from(schema.locationMaster).where(and(
+        eq(schema.locationMaster.location_id, effectiveParentId),
+        eq(schema.locationMaster.tenant_id, tenantId),
+        effectiveCompanyId
+          ? eq(schema.locationMaster.company_id, effectiveCompanyId)
+          : isNull(schema.locationMaster.company_id),
+        isNull(schema.locationMaster.deleted_at),
+      )).limit(1);
+      if (!parent) throw new NotFoundException(`Parent Location '${effectiveParentId}' not found.`);
+      if (!allowedParentTypes.includes(parent.location_type)) {
+        throw new ConflictException(`${locationType.type_name} must be placed under ${allowedParentTypes.join(' or ')}.`);
+      }
+      await this.assertNoHierarchyCycle(id, effectiveParentId, tenantId);
       newLocationLevel = parent.location_level + 1;
-    }
-
-    // Exactly one of farm/shed/warehouse must be the parent — validate against the
-    // effective values (dto's if this update touches it, otherwise the existing row's).
-    const effectiveFarmId = dto.farm_id !== undefined ? dto.farm_id : location.farm_id;
-    const effectiveShedId = dto.shed_id !== undefined ? dto.shed_id : location.shed_id;
-    const effectiveWarehouseId = dto.warehouse_id !== undefined ? dto.warehouse_id : location.warehouse_id;
-    this.assertExactlyOneParent(effectiveFarmId, effectiveShedId, effectiveWarehouseId);
-
-    if (dto.farm_id) {
-      const [farm] = await this.db
-        .select()
-        .from(schema.farmMaster)
-        .where(and(eq(schema.farmMaster.farm_id, dto.farm_id), isNull(schema.farmMaster.deleted_at)))
-        .limit(1);
-      if (!farm) {
-        throw new NotFoundException(`Farm with ID '${dto.farm_id}' not found.`);
-      }
-    }
-
-    if (dto.shed_id) {
-      const [shed] = await this.db
-        .select()
-        .from(schema.shedMaster)
-        .where(and(eq(schema.shedMaster.shed_id, dto.shed_id), isNull(schema.shedMaster.deleted_at)))
-        .limit(1);
-      if (!shed) {
-        throw new NotFoundException(`Shed with ID '${dto.shed_id}' not found.`);
-      }
-    }
-
-    if (dto.warehouse_id) {
-      const [warehouse] = await this.db
-        .select()
-        .from(schema.warehouseMaster)
-        .where(and(eq(schema.warehouseMaster.warehouse_id, dto.warehouse_id), isNull(schema.warehouseMaster.deleted_at)))
-        .limit(1);
-
-      if (!warehouse) {
-        throw new NotFoundException(`Warehouse with ID '${dto.warehouse_id}' not found.`);
-      }
+    } else if (allowedParentTypes.length > 0) {
+      throw new ConflictException(`${locationType.type_name} requires a parent location.`);
+    } else {
+      newLocationLevel = 1;
     }
 
     // SILO locations must carry silo tracking fields — validate against effective values so a
     // partial update that doesn't touch these fields doesn't spuriously fail.
-    const effectiveLocationType = dto.location_type !== undefined ? dto.location_type : location.location_type;
     const effectiveSiloCapacity = dto.silo_capacity_kg !== undefined ? dto.silo_capacity_kg : location.silo_capacity_kg;
     const effectiveSiloReorderDays = dto.silo_reorder_days !== undefined ? dto.silo_reorder_days : location.silo_reorder_days;
     this.assertSiloFieldsWhenSilo(effectiveLocationType, effectiveSiloCapacity as any, effectiveSiloReorderDays as any);
@@ -365,49 +479,21 @@ export class LocationService {
       await this.assertUomExists(dto.capacity_uom, tenantId, dto.company_id !== undefined ? dto.company_id : location.company_id);
     }
 
-    if (dto.location_code && dto.location_code.toUpperCase() !== location.location_code) {
-      const duplicateConditions = [
-        eq(schema.locationMaster.tenant_id, tenantId),
-        eq(schema.locationMaster.location_code, dto.location_code.toUpperCase()),
-        ne(schema.locationMaster.location_id, id),
-        isNull(schema.locationMaster.deleted_at),
-      ];
-      const targetCompanyId = dto.company_id || location.company_id;
-      if (targetCompanyId) {
-        duplicateConditions.push(eq(schema.locationMaster.company_id, targetCompanyId));
-      } else {
-        duplicateConditions.push(isNull(schema.locationMaster.company_id));
-      }
-
-      const existing = await this.db
-        .select()
-        .from(schema.locationMaster)
-        .where(and(...duplicateConditions))
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new ConflictException(`Location with code '${dto.location_code}' already exists in this scope.`);
-      }
-    }
-
     const updates: any = {
       updated_by: userPayload?.userId || null,
       updated_at: toMysqlTimestamp(),
     };
 
-    if (dto.company_id !== undefined) updates.company_id = dto.company_id;
     if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
     if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
-    if (dto.farm_id !== undefined) updates.farm_id = dto.farm_id;
-    if (dto.shed_id !== undefined) updates.shed_id = dto.shed_id;
-    if (dto.warehouse_id !== undefined) updates.warehouse_id = dto.warehouse_id;
-    if (dto.location_code !== undefined) updates.location_code = dto.location_code.toUpperCase();
     if (dto.location_name !== undefined) updates.location_name = dto.location_name;
     if (dto.location_address !== undefined) updates.location_address = dto.location_address;
-    if (dto.location_type !== undefined) updates.location_type = dto.location_type;
     if (dto.parent_location_id !== undefined) {
       updates.parent_location_id = dto.parent_location_id;
       updates.location_level = newLocationLevel;
+      updates.farm_id = location.location_type === 'FARM' ? id : parent ? (parent.location_type === 'FARM' ? parent.location_id : parent.farm_id) : null;
+      updates.shed_id = location.location_type === 'SHED' ? id : parent ? (parent.location_type === 'SHED' ? parent.location_id : parent.shed_id) : null;
+      updates.warehouse_id = ['STORE', 'SILO'].includes(location.location_type) ? id : parent ? (['STORE', 'SILO'].includes(parent.location_type) ? parent.location_id : parent.warehouse_id) : null;
     }
     if (dto.area_size !== undefined) updates.area_size = dto.area_size?.toString() || null;
     if (dto.area_unit !== undefined) updates.area_unit = dto.area_unit;
@@ -425,10 +511,11 @@ export class LocationService {
     if (dto.status !== undefined) updates.status = dto.status;
     if (dto.extension_config !== undefined) updates.extension_config = JSON.stringify(dto.extension_config);
 
-    await this.db
-      .update(schema.locationMaster)
-      .set(updates)
-      .where(eq(schema.locationMaster.location_id, id));
+    const effective = { ...location, ...updates };
+    await this.db.transaction(async (tx) => {
+      await tx.update(schema.locationMaster).set(updates).where(eq(schema.locationMaster.location_id, id));
+      await this.updateLegacyMirror(tx, location, effective);
+    });
 
     await this.auditService.log({
       tenantId,
@@ -441,22 +528,33 @@ export class LocationService {
       newValues: updates,
     });
 
-    return this.findOne(id);
+    return this.findOne(id, tenantId);
   }
 
   async remove(id: string, tenantId: string, userPayload?: any) {
-    const location = await this.findOne(id);
+    const location = await this.findOne(id, tenantId);
     const deletedTime = toMysqlTimestamp();
 
-    await this.db
-      .update(schema.locationMaster)
-      .set({
+    const [child] = await this.db.select({ location_id: schema.locationMaster.location_id })
+      .from(schema.locationMaster).where(and(
+        eq(schema.locationMaster.parent_location_id, id),
+        eq(schema.locationMaster.tenant_id, tenantId),
+        eq(schema.locationMaster.is_active, true),
+        isNull(schema.locationMaster.deleted_at),
+      )).limit(1);
+    if (child) throw new ConflictException('Deactivate or move this location\'s child locations first.');
+
+    const updates = {
         is_active: false,
         status: 'INACTIVE',
         deleted_at: deletedTime as any,
         updated_by: userPayload?.userId || null,
-      })
-      .where(eq(schema.locationMaster.location_id, id));
+        updated_at: deletedTime,
+    };
+    await this.db.transaction(async (tx) => {
+      await tx.update(schema.locationMaster).set(updates).where(eq(schema.locationMaster.location_id, id));
+      await this.updateLegacyMirror(tx, location, { ...location, ...updates });
+    });
 
     await this.auditService.log({
       tenantId,
@@ -476,7 +574,10 @@ export class LocationService {
     const [location] = await this.db
       .select()
       .from(schema.locationMaster)
-      .where(eq(schema.locationMaster.location_id, id))
+      .where(and(
+        eq(schema.locationMaster.location_id, id),
+        eq(schema.locationMaster.tenant_id, tenantId),
+      ))
       .limit(1);
 
     if (!location) {
@@ -487,16 +588,17 @@ export class LocationService {
       return location;
     }
 
-    await this.db
-      .update(schema.locationMaster)
-      .set({
+    const updates = {
         is_active: true,
         status: 'ACTIVE',
         deleted_at: null,
         updated_by: userPayload?.userId || null,
         updated_at: toMysqlTimestamp(),
-      })
-      .where(eq(schema.locationMaster.location_id, id));
+    };
+    await this.db.transaction(async (tx) => {
+      await tx.update(schema.locationMaster).set(updates).where(eq(schema.locationMaster.location_id, id));
+      await this.updateLegacyMirror(tx, location, { ...location, ...updates });
+    });
 
     await this.auditService.log({
       tenantId,
@@ -508,7 +610,7 @@ export class LocationService {
       newValues: { status: 'ACTIVE', deleted_at: null },
     });
 
-    return this.findOne(id);
+    return this.findOne(id, tenantId);
   }
 
   async getLocationOccupancy(tenantId: string, companyId?: string) {
@@ -628,4 +730,3 @@ export class LocationService {
     });
   }
 }
-

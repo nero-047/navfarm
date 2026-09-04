@@ -3,6 +3,7 @@ import { ResourceService } from './resource.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 describe('ResourceService', () => {
   let service: ResourceService;
@@ -10,6 +11,8 @@ describe('ResourceService', () => {
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
   const mockDbUpdate = jest.fn();
+  const mockEnsureCompanySeries = jest.fn();
+  const mockGenerateNext = jest.fn();
 
   const mockDb = {
     select: mockDbSelect,
@@ -21,6 +24,8 @@ describe('ResourceService', () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
+    mockEnsureCompanySeries.mockReset().mockResolvedValue(undefined);
+    mockGenerateNext.mockReset().mockResolvedValue('RES-001');
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -35,6 +40,13 @@ describe('ResourceService', () => {
           provide: AuditLogService,
           useValue: {
             log: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: NumberSeriesService,
+          useValue: {
+            ensureCompanySeries: mockEnsureCompanySeries,
+            generateNext: mockGenerateNext,
           },
         },
       ],
@@ -70,9 +82,7 @@ describe('ResourceService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ConflictException if resource code already exists in this company', async () => {
-      // First select: finds company
-      // Second select: finds duplicate resource code
+    it('should create a resource with the per-company generated code', async () => {
       mockDbSelect
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
@@ -84,44 +94,7 @@ describe('ResourceService', () => {
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ resource_code: 'LBR-01' }]),
-            }),
-          }),
-        });
-
-      await expect(
-        service.create(
-          {
-            company_id: 'comp-1',
-            resource_code: 'LBR-01',
-            resource_name: 'Senior Laborer',
-            resource_type: 'LABOR',
-          },
-          'tenant-123',
-        ),
-      ).rejects.toThrow(ConflictException);
-    });
-
-    it('should successfully create resource', async () => {
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ resource_code: 'LBR-01', resource_name: 'Senior Laborer' }]),
+              limit: jest.fn().mockResolvedValue([{ resource_code: 'RES-001', resource_name: 'Senior Laborer' }]),
             }),
           }),
         });
@@ -133,7 +106,6 @@ describe('ResourceService', () => {
       const result = await service.create(
         {
           company_id: 'comp-1',
-          resource_code: 'LBR-01',
           resource_name: 'Senior Laborer',
           resource_type: 'LABOR',
         },
@@ -142,7 +114,24 @@ describe('ResourceService', () => {
       );
 
       expect(mockDbInsert).toHaveBeenCalled();
-      expect(result.resource_code).toBe('LBR-01');
+      expect(mockEnsureCompanySeries).toHaveBeenCalledWith(
+        'tenant-123',
+        'comp-1',
+        expect.objectContaining({ seriesCode: 'RESOURCE', prefix: 'RES', seqLength: 3 }),
+        expect.any(Function),
+      );
+      expect(mockGenerateNext).toHaveBeenCalledWith('RESOURCE', 'tenant-123', 'comp-1');
+      expect(result.resource_code).toBe('RES-001');
+    });
+  });
+
+  describe('update', () => {
+    it('should reject changes to the generated resource code', async () => {
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ resource_id: 'r-1', company_id: 'comp-1', resource_code: 'RES-001' }]) }) }),
+      });
+
+      await expect(service.update('r-1', { resource_code: 'RES-099' }, 'tenant-123')).rejects.toThrow(ConflictException);
     });
   });
 });

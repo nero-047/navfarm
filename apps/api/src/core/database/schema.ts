@@ -817,15 +817,39 @@ export const shedMaster = mysqlTable('shed_master', {
   extension_config: json('extension_config')
 });
 
+// User-maintainable location classifications. The code is semantic (FARM,
+// SHED, PEN, ...); code_prefix controls the immutable sequential identity of
+// locations created with that classification (FARM-001, SHED-001, ...).
+export const locationTypeMaster = mysqlTable('location_type_master', {
+  location_type_id: varchar('location_type_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }), // null = tenant-wide
+  type_code: varchar('type_code', { length: 30 }).notNull(),
+  type_name: varchar('type_name', { length: 100 }).notNull(),
+  code_prefix: varchar('code_prefix', { length: 20 }).notNull(),
+  allowed_parent_types: json('allowed_parent_types').$type<string[]>().notNull(),
+  is_system: boolean('is_system').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => ({
+  uqLocationTypeCode: uniqueIndex('uq_location_type_tenant_company_code').on(
+    table.tenant_id, table.company_id, table.type_code
+  ),
+}));
+
 export const locationMaster = mysqlTable('location_master', {
   location_id: varchar('location_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
-  // Exactly one of farm_id / shed_id / warehouse_id should be set — this location's
-  // direct parent. Enforced at the service layer, not the DB (MySQL has no clean way
-  // to express "exactly one of three nullable columns" as a constraint).
+  // Compatibility ancestry for operational modules that still use the legacy
+  // Farm/Shed/Warehouse tables. parent_location_id is the canonical hierarchy.
   farm_id: varchar('farm_id', { length: 36 }),
   shed_id: varchar('shed_id', { length: 36 }),
   warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),

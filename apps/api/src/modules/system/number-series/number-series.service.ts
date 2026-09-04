@@ -32,6 +32,71 @@ export class NumberSeriesService {
   }
 
   /**
+   * Materialise an independent company counter from a tenant template. This is
+   * used by company-owned master records whose identities must never share a
+   * counter with another company. `loadExistingCodes` lets the caller expose
+   * its own master table without coupling this system service to every domain.
+   *
+   * The fallback keeps upgraded tenants working before the seed command is
+   * rerun; new tenants receive the same definition from SYSTEM_NO_SERIES_SEED.
+   */
+  async ensureCompanySeries(
+    tenantId: string,
+    companyId: string,
+    defaults: {
+      seriesCode: string;
+      seriesName: string;
+      documentType: string;
+      prefix: string;
+      separator?: string;
+      seqLength: number;
+    },
+    loadExistingCodes: () => Promise<Array<string | null | undefined>>,
+  ): Promise<void> {
+    const [existing] = await this.db.select().from(schema.noSeriesMaster).where(and(
+      eq(schema.noSeriesMaster.tenant_id, tenantId),
+      eq(schema.noSeriesMaster.company_id, companyId),
+      eq(schema.noSeriesMaster.series_code, defaults.seriesCode),
+      isNull(schema.noSeriesMaster.deleted_at),
+    )).limit(1);
+    if (existing) return;
+
+    const [template] = await this.db.select().from(schema.noSeriesMaster).where(and(
+      eq(schema.noSeriesMaster.tenant_id, tenantId),
+      isNull(schema.noSeriesMaster.company_id),
+      eq(schema.noSeriesMaster.series_code, defaults.seriesCode),
+      isNull(schema.noSeriesMaster.deleted_at),
+    )).limit(1);
+
+    const prefix = template?.prefix || defaults.prefix;
+    const separator = template?.separator || defaults.separator || '-';
+    const existingCodes = await loadExistingCodes();
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedSeparator = separator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapedPrefix}${escapedSeparator}(\\d+)$`, 'i');
+    const currentSeq = existingCodes.reduce((max, code) => {
+      const match = code?.match(pattern);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+    await this.db.insert(schema.noSeriesMaster).values({
+      series_id: randomUUID(),
+      tenant_id: tenantId,
+      company_id: companyId,
+      series_code: defaults.seriesCode,
+      series_name: template?.series_name || defaults.seriesName,
+      document_type: template?.document_type || defaults.documentType,
+      prefix,
+      date_format: template?.date_format || null,
+      separator,
+      seq_length: template?.seq_length || defaults.seqLength,
+      current_seq: currentSeq,
+      reset_frequency: template?.reset_frequency || 'NEVER',
+      allow_manual: false,
+    }).onDuplicateKeyUpdate({ set: { series_name: template?.series_name || defaults.seriesName } });
+  }
+
+  /**
    * Concurrency-safe next-code generation: locks the single series row
    * (SELECT ... FOR UPDATE), resets current_seq if the reset_frequency period
    * has rolled over, increments, formats, and persists in one statement.

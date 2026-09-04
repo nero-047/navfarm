@@ -1,5 +1,24 @@
 # Master Data Console (Demo Slice) — Implementation Plan
 
+> **Implementation addendum — 2026-09-05 (newer than the scope notes below):** The user directly
+> approved implementing the unified Location master now. `location_master` is the canonical list
+> and hierarchy for Farm, Shed/House, Pen, Cage, Store, Quarantine and Silo. Existing
+> `farm_master`, `shed_master` and `warehouse_master` records are migrated and retained as a
+> compatibility bridge for operational APIs; they are not separate creation choices in the
+> sidebar. Location Type is a maintainable lookup with a per-company prefix/counter and immutable
+> generated codes (`FARM-001`, `SHED-001`, etc.). Item uses one per-company `ITEM` counter across
+> all Item Types. Dense forms use the near-full-page Business Central dialog; compact forms remain
+> centred modals. `Triple-C_Report Field_Template_V0.1.xlsx` is explicitly future report scope,
+> not a current master-data implementation source. These decisions supersede the older deferment
+> statements in this historical plan.
+>
+> **Additional code-series decision — 2026-09-05:** Supplier, Customer and Resource each use an
+> independent per-company counter: `SUP-001`, `CUS-001` and `RES-001`. Their codes are generated
+> on create and immutable afterward. Existing manual codes remain unchanged; a lazily created
+> company series resumes after the highest existing code that already matches its configured
+> prefix. Semantic catalog codes (UOM, breed, species, stage, reason, etc.) remain user-defined
+> because they identify business classifications rather than numbered records.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
 **Goal:** Consolidate the master-data sub-sidebar to one entry per real-world entity, and turn the add/edit dialog into Business-Central-style collapsible cards where a lookup (category, item type, UOM) can be created inline and immediately selected above.

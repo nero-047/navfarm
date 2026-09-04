@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, isNotNull, ne, lte } from 'drizzle-orm';
+import { eq, and, like, or, isNull, isNotNull, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -12,6 +12,7 @@ import {
   UpdateMaintenanceLogDto
 } from './dto/resource.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -22,6 +23,7 @@ export class ResourceService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -46,23 +48,19 @@ export class ResourceService {
       throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
     }
 
-    // 2. Check duplicate resource code within the company scope
-    const existing = await this.db
-      .select()
-      .from(schema.resourceMaster)
-      .where(
-        and(
+    await this.numberSeriesService.ensureCompanySeries(
+      tenantId,
+      dto.company_id,
+      { seriesCode: 'RESOURCE', seriesName: 'Resource Code', documentType: 'RESOURCE', prefix: 'RES', seqLength: 3 },
+      async () => {
+        const rows = await this.db.select({ code: schema.resourceMaster.resource_code }).from(schema.resourceMaster).where(and(
           eq(schema.resourceMaster.tenant_id, tenantId),
           eq(schema.resourceMaster.company_id, dto.company_id),
-          eq(schema.resourceMaster.resource_code, dto.resource_code.toUpperCase()),
-          isNull(schema.resourceMaster.deleted_at)
-        )
-      )
-      .limit(1);
-
-    if (existing.length > 0) {
-      throw new ConflictException(`Resource with code '${dto.resource_code}' already exists in this company.`);
-    }
+        ));
+        return rows.map((row) => row.code);
+      },
+    );
+    const resourceCode = await this.numberSeriesService.generateNext('RESOURCE', tenantId, dto.company_id);
 
     const resourceId = randomUUID();
     const newResource = {
@@ -71,7 +69,7 @@ export class ResourceService {
       company_id: dto.company_id,
       nob_id: dto.nob_id || null,
       lob_id: dto.lob_id || null,
-      resource_code: dto.resource_code.toUpperCase(),
+      resource_code: resourceCode,
       resource_name: dto.resource_name,
       resource_type: dto.resource_type,
       resource_sub_type: dto.resource_sub_type || null,
@@ -181,23 +179,7 @@ export class ResourceService {
     const resource = await this.findOne(id);
 
     if (dto.resource_code && dto.resource_code.toUpperCase() !== resource.resource_code) {
-      const existing = await this.db
-        .select()
-        .from(schema.resourceMaster)
-        .where(
-          and(
-            eq(schema.resourceMaster.tenant_id, tenantId),
-            eq(schema.resourceMaster.company_id, resource.company_id),
-            eq(schema.resourceMaster.resource_code, dto.resource_code.toUpperCase()),
-            ne(schema.resourceMaster.resource_id, id),
-            isNull(schema.resourceMaster.deleted_at)
-          )
-        )
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new ConflictException(`Resource with code '${dto.resource_code}' already exists in this company.`);
-      }
+      throw new ConflictException('Resource Code is generated from the company-wide RESOURCE sequence and cannot be changed.');
     }
 
     const updates: any = {
@@ -207,7 +189,6 @@ export class ResourceService {
 
     if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
     if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
-    if (dto.resource_code !== undefined) updates.resource_code = dto.resource_code.toUpperCase();
     if (dto.resource_name !== undefined) updates.resource_name = dto.resource_name;
     if (dto.resource_type !== undefined) updates.resource_type = dto.resource_type;
     if (dto.resource_sub_type !== undefined) updates.resource_sub_type = dto.resource_sub_type;

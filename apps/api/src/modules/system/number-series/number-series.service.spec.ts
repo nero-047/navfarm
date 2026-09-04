@@ -114,6 +114,71 @@ describe('NumberSeriesService', () => {
     });
   });
 
+  describe('ensureCompanySeries', () => {
+    it('creates a company counter after the highest matching existing code', async () => {
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{
+                series_name: 'Customer Code', document_type: 'CUSTOMER', prefix: 'CUS',
+                separator: '-', seq_length: 3, date_format: null, reset_frequency: 'NEVER',
+              }]),
+            }),
+          }),
+        });
+
+      let insertedValues: any;
+      mockDbInsert.mockReturnValue({
+        values: jest.fn().mockImplementation((values) => {
+          insertedValues = values;
+          return { onDuplicateKeyUpdate: jest.fn().mockResolvedValue({}) };
+        }),
+      });
+
+      await service.ensureCompanySeries(
+        'tenant-123',
+        'comp-1',
+        { seriesCode: 'CUSTOMER', seriesName: 'Customer Code', documentType: 'CUSTOMER', prefix: 'CUS', seqLength: 3 },
+        async () => ['CUS-002', 'LEGACY-A', 'cus-017'],
+      );
+
+      expect(insertedValues).toEqual(expect.objectContaining({
+        tenant_id: 'tenant-123', company_id: 'comp-1', series_code: 'CUSTOMER', current_seq: 17,
+      }));
+    });
+
+    it('uses the built-in definition when an upgraded tenant has no template yet', async () => {
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }),
+        });
+
+      let insertedValues: any;
+      mockDbInsert.mockReturnValue({
+        values: jest.fn().mockImplementation((values) => {
+          insertedValues = values;
+          return { onDuplicateKeyUpdate: jest.fn().mockResolvedValue({}) };
+        }),
+      });
+
+      await service.ensureCompanySeries(
+        'tenant-123',
+        'comp-1',
+        { seriesCode: 'RESOURCE', seriesName: 'Resource Code', documentType: 'RESOURCE', prefix: 'RES', seqLength: 3 },
+        async () => [],
+      );
+
+      expect(insertedValues).toEqual(expect.objectContaining({ prefix: 'RES', seq_length: 3, current_seq: 0 }));
+    });
+  });
+
   describe('create', () => {
     it('rejects a duplicate series_code in the same scope', async () => {
       mockDbSelect.mockReturnValueOnce({

@@ -71,6 +71,8 @@ export interface MasterDataField {
   filterOnly?: boolean;
   /** Excluded from the create/edit form (e.g. company_id, auto-injected) */
   hideInForm?: boolean;
+  /** Visible for context but never editable or included in a save payload. */
+  readOnly?: boolean;
   /** Excluded from the list table */
   hideInTable?: boolean;
   /** Column width hint for number inputs supporting decimals */
@@ -93,6 +95,8 @@ export interface MasterDataField {
   exclusiveWith?: string[];
   /** Card this field belongs to. Fields with no section land in the first card. */
   section?: string;
+  /** Show this optional field in the compact inline lookup creator. */
+  showInLookup?: boolean;
 }
 
 export interface MasterDataConfig {

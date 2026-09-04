@@ -3,7 +3,7 @@ import { nxE2EPreset } from '@nx/playwright/preset';
 import { workspaceRoot } from '@nx/devkit';
 
 // For CI, you may want to set BASE_URL to the deployed application.
-const baseURL = process.env['BASE_URL'] || 'http://localhost:3000';
+const baseURL = process.env['BASE_URL'] || 'http://localhost:3002';
 
 /**
  * Read environment variables from file.
@@ -42,13 +42,17 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'pnpm exec nx run web:dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
-    cwd: workspaceRoot,
-  },
+  /* Run the local dev server unless the caller has already supplied one. The
+     explicit escape hatch avoids Nx waiting on a separate continuous target
+     when a developer is already running the app on port 3002. */
+  webServer: process.env['PLAYWRIGHT_SKIP_WEBSERVER']
+    ? undefined
+    : {
+        command: 'pnpm exec nx run web:dev -- --port=3002',
+        url: 'http://localhost:3002',
+        reuseExistingServer: true,
+        cwd: workspaceRoot,
+      },
   projects: [
     {
       name: 'chromium',

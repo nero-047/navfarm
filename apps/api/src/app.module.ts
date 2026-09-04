@@ -25,6 +25,7 @@ import { BreedModule } from './modules/master-data/breed/breed.module';
 import { FarmModule } from './modules/master-data/farm/farm.module';
 import { WarehouseModule } from './modules/master-data/warehouse/warehouse.module';
 import { LocationModule } from './modules/master-data/location/location.module';
+import { LocationTypeModule } from './modules/master-data/location-type/location-type.module';
 import { ShedModule } from './modules/master-data/shed/shed.module';
 import { ItemCategoryModule } from './modules/master-data/item-category/item-category.module';
 import { ItemTypeModule } from './modules/master-data/item-type/item-type.module';
@@ -105,6 +106,7 @@ import { SystemController } from './system/system.controller';
     FarmModule,
     WarehouseModule,
     LocationModule,
+    LocationTypeModule,
     ShedModule,
     ItemCategoryModule,
     ItemTypeModule,

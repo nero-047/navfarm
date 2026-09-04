@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Search, Loader2, Inbox } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
-import { Drawer } from "@/components/ui/drawer";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -115,6 +114,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [entityReloadKey, setEntityReloadKey] = useState(0);
+  const lastEntityReloadKeyRef = useRef(entityReloadKey);
 
   const [confirmDelete, setConfirmDelete] = useState<Row | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -127,6 +127,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const formFields = config.fields.filter((f) => !f.hideInForm);
   const visibleFields = editing ? formFields.filter((f) => !f.createOnly) : formFields;
   const columns = config.columns || config.fields.filter((f) => !f.hideInTable).slice(0, 5);
+  const lookupConfigs = MASTER_DATA_CONFIGS.filter((c) => c.lookupFor?.includes(config.key));
+  const sectionCount = new Set(visibleFields.map((f) => f.section || "Identification")).size;
+  // Business Central-style adaptive presentation: compact masters remain a
+  // centred modal, while a dense or multi-card master gets a near-full-page
+  // dialog with its own scrolling body and pinned actions.
+  const usePageDialog = visibleFields.length > 10 || sectionCount > 3 || lookupConfigs.length > 2;
 
   const load = async () => {
     setLoading(true);
@@ -180,7 +186,6 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.key, search, nobFilter, lobFilter]);
 
   useEffect(() => { setPage(1); }, [config.key, search, nobFilter, lobFilter, pageSize]);
@@ -195,7 +200,6 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     if (companyId) params.set("companyId", companyId);
     params.set("limit", "500");
     api.get(`/setup/wizard/nobs?${params.toString()}`).then((r) => setNobFilterOptions(unwrap<Row[]>(r) || [])).catch(() => setNobFilterOptions([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.key]);
 
   useEffect(() => {
@@ -225,15 +229,31 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     // uom_primary/uom_secondary all have no dependsOn, so this is the
     // effect that actually powers those dropdowns, not the dependent-fields
     // effect below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.key, entityReloadKey]);
 
   useEffect(() => {
     if (!modalOpen) return;
     const dependentFields = config.fields.filter((f) => f.type === "select-entity" && f.dependsOn);
+    // entityReloadKey changing means a lookup card just created a row that a
+    // dependent dropdown here may need to see. The early return below skips
+    // endpoints already cached in entityOptions, which would otherwise make
+    // entityReloadKey a no-op dependency - so on a genuine key change, clear
+    // this effect's cached endpoints first to force a real refetch.
+    const reloadKeyChanged = lastEntityReloadKeyRef.current !== entityReloadKey;
+    lastEntityReloadKeyRef.current = entityReloadKey;
+    if (reloadKeyChanged) {
+      const eps = new Set(dependentFields.map((f) => resolveEndpoint(f, form)).filter((ep): ep is string => !!ep));
+      if (eps.size) {
+        setEntityOptions((prev) => {
+          const next = { ...prev };
+          eps.forEach((ep) => { delete next[ep]; });
+          return next;
+        });
+      }
+    }
     dependentFields.forEach(async (f) => {
       const ep = resolveEndpoint(f, form);
-      if (!ep || entityOptions[ep]) return;
+      if (!ep || (!reloadKeyChanged && entityOptions[ep])) return;
       try {
         const res = await api.get(ep);
         const list = unwrap<Row[]>(res);
@@ -242,7 +262,6 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         setEntityOptions((prev) => ({ ...prev, [ep]: [] }));
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalOpen, form, config.key, entityReloadKey]);
 
   const openCreate = () => {
@@ -303,7 +322,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
       const payload: Row = {};
       for (const f of visibleFields) {
-        if (f.filterOnly) continue;
+        if (f.filterOnly || f.readOnly) continue;
         let v = form[f.key];
         if (v === "" || v === undefined) continue;
         if (f.type === "number") v = Number(v);
@@ -429,9 +448,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         step={f.step}
         value={value}
         onChange={(e) => setField(f.key, e.target.value)}
-        placeholder={f.placeholder}
-        className={inputCls}
-        style={S.input}
+        placeholder={f.readOnly && !editing ? "Generated when this record is created" : f.placeholder}
+        disabled={f.readOnly}
+        className={`${inputCls} disabled:cursor-not-allowed disabled:opacity-70`}
+        style={f.readOnly ? { ...S.input, backgroundColor: "var(--surface-raised)" } : S.input}
       />
     );
   };
@@ -597,17 +617,16 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         )}
       </div>
 
-      {/* A record create/edit form, which is the drawer case in the taxonomy
-          (plan Phase 5): these configs run to a dozen fields, well past the
-          0–2 a dialog is for. Nothing inside changed — the same fields, the
-          same `handleSave`, the same validation and the same requests. Only
-          the surface moved, from a centred modal to a work panel beside the
-          table it edits, with the actions pinned below a scrolling body. */}
-      <Drawer
+      {/* Master forms open in a centred window. Dense, sectioned forms use a
+          near-full-page presentation like Business Central, while compact
+          masters keep a conventional modal. Both retain one scrolling body,
+          a pinned action footer, focus trapping and Escape handling. */}
+      <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
         title={editing ? t("editItem", { name: tLabel(config.label.replace(/s$/, "")) }) : t("addItem", { name: tLabel(config.label.replace(/s$/, "")) })}
-        size="lg"
+        maxWidth={sectionCount > 1 ? "xl" : "lg"}
+        presentation={usePageDialog ? "page" : "modal"}
         footer={
           <>
             <button onClick={() => setModalOpen(false)} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-medium" style={S.surface}>
@@ -654,15 +673,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             ));
           })()}
 
-          {MASTER_DATA_CONFIGS
-            .filter((c) => c.lookupFor?.includes(config.key))
-            .map((c) => (
+          {lookupConfigs.map((c) => (
               <CollapsibleCard key={c.key} title={c.label} subtitle="Add one without leaving this form">
                 <LookupCard config={c} onCreated={() => setEntityReloadKey((k) => k + 1)} />
               </CollapsibleCard>
             ))}
         </div>
-      </Drawer>
+      </Dialog>
 
       <Dialog
         open={!!confirmDelete}

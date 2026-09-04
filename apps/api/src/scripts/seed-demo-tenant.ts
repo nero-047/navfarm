@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/mysql2/migrator';
 import * as mysql from 'mysql2/promise';
 import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
-import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED } from '../core/database/system-master-data-seed';
+import { SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_LOCATION_TYPE_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED } from '../core/database/system-master-data-seed';
 import { STARTER_GL_ACCOUNTS, STARTER_GL_MAPPINGS } from '../modules/system/setup-wizard/seed/starter-master-data.seed-data';
 
 /**
@@ -334,6 +334,11 @@ async function seedDemoTenant() {
       }
 
       const existingSeriesCodes = new Set((await tenantDb.select({ c: tenant.noSeriesMaster.series_code }).from(tenant.noSeriesMaster)).map((r) => r.c));
+      const existingLocationTypeCodes = new Set((await tenantDb.select({ c: tenant.locationTypeMaster.type_code }).from(tenant.locationTypeMaster)).map((r) => r.c));
+      for (const locationType of SYSTEM_LOCATION_TYPE_SEED) {
+        if (existingLocationTypeCodes.has(locationType.type_code)) continue;
+        await tenantDb.insert(tenant.locationTypeMaster).values({ ...locationType, tenant_id: tenantId, is_system: true });
+      }
       for (const series of SYSTEM_NO_SERIES_SEED) {
         if (existingSeriesCodes.has(series.series_code)) continue;
         const seriesNobId = series.nob_code ? nobIdByCode.get(series.nob_code) : undefined;
