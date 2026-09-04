@@ -145,9 +145,9 @@ export class SupplierService {
   }
 
   async findAll(query: QuerySupplierDto, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.supplierMaster.tenant_id, tenantId),
-      isNull(schema.supplierMaster.deleted_at),
     ];
 
     if (query.companyId) {

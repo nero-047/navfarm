@@ -108,9 +108,9 @@ export class BreedService {
   }
 
   async findAllSpecies(query: QuerySpeciesDto, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.speciesMaster.tenant_id, tenantId),
-      isNull(schema.speciesMaster.deleted_at),
     ];
 
     if (query.companyId) {
@@ -369,9 +369,9 @@ export class BreedService {
   }
 
   async findAllBreeds(query: QueryBreedDto, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.breedMaster.tenant_id, tenantId),
-      isNull(schema.breedMaster.deleted_at),
     ];
 
     if (query.companyId) {

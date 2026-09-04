@@ -120,9 +120,9 @@ export class CostCenterService {
   }
 
   async findAll(query: QueryCostCenterDto, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.costCenterMaster.tenant_id, tenantId),
-      isNull(schema.costCenterMaster.deleted_at),
     ];
 
     if (query.companyId) {

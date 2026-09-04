@@ -89,12 +89,14 @@ export class LocationService {
       }
     }
 
-    // 2. Verify parent location exists (if provided)
+    // 2. Verify parent location exists (if provided) and compute this location's hierarchy level.
+    // Depth is structural (root under a farm/shed/warehouse = 1, each nested parent_location_id
+    // = parent's level + 1) — not something a user picks, so it's always computed here rather
+    // than accepted from the DTO.
+    let locationLevel = 1;
     if (dto.parent_location_id) {
       const parent = await this.findOne(dto.parent_location_id);
-      if (!parent) {
-        throw new NotFoundException(`Parent location with ID '${dto.parent_location_id}' not found.`);
-      }
+      locationLevel = parent.location_level + 1;
     }
 
     // 3. Exactly one of farm/shed/warehouse must be this location's parent
@@ -176,7 +178,7 @@ export class LocationService {
       location_code: dto.location_code.toUpperCase(),
       location_name: dto.location_name,
       location_address: dto.location_address,
-      location_level: dto.location_level,
+      location_level: locationLevel,
       location_type: dto.location_type,
       parent_location_id: dto.parent_location_id || null,
       area_size: dto.area_size?.toString() || null,
@@ -228,9 +230,11 @@ export class LocationService {
   }
 
   async findAll(query: QueryLocationDto, tenantId: string) {
+    // No isNull(deleted_at) filter here — remove() sets both is_active=false and deleted_at, and
+    // the list view is meant to show both states (Active/Inactive toggle) so a blocked location
+    // can be found again and restored, rather than vanishing from the list entirely.
     const conditions: any[] = [
       eq(schema.locationMaster.tenant_id, tenantId),
-      isNull(schema.locationMaster.deleted_at),
     ];
 
     if (query.companyId) {
@@ -300,8 +304,10 @@ export class LocationService {
       }
     }
 
-    if (dto.parent_location_id) {
-      await this.findOne(dto.parent_location_id);
+    let newLocationLevel: number | undefined;
+    if (dto.parent_location_id !== undefined) {
+      const parent = await this.findOne(dto.parent_location_id);
+      newLocationLevel = parent.location_level + 1;
     }
 
     // Exactly one of farm/shed/warehouse must be the parent — validate against the
@@ -398,9 +404,11 @@ export class LocationService {
     if (dto.location_code !== undefined) updates.location_code = dto.location_code.toUpperCase();
     if (dto.location_name !== undefined) updates.location_name = dto.location_name;
     if (dto.location_address !== undefined) updates.location_address = dto.location_address;
-    if (dto.location_level !== undefined) updates.location_level = dto.location_level;
     if (dto.location_type !== undefined) updates.location_type = dto.location_type;
-    if (dto.parent_location_id !== undefined) updates.parent_location_id = dto.parent_location_id;
+    if (dto.parent_location_id !== undefined) {
+      updates.parent_location_id = dto.parent_location_id;
+      updates.location_level = newLocationLevel;
+    }
     if (dto.area_size !== undefined) updates.area_size = dto.area_size?.toString() || null;
     if (dto.area_unit !== undefined) updates.area_unit = dto.area_unit;
     if (dto.max_capacity !== undefined) updates.max_capacity = dto.max_capacity?.toString() || null;

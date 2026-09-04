@@ -213,9 +213,9 @@ export class GlMappingService {
   }
 
   async findAll(query: QueryGlMappingDto, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.glMappingMaster.tenant_id, tenantId),
-      isNull(schema.glMappingMaster.deleted_at),
     ];
 
     if (query.companyId) {

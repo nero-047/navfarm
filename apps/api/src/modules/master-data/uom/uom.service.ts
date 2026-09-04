@@ -132,9 +132,9 @@ export class UomService {
   }
 
   async findAll(query: QueryUomDto, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.uomMaster.tenant_id, tenantId),
-      isNull(schema.uomMaster.deleted_at),
     ];
 
     if (query.companyId) {
@@ -406,9 +406,9 @@ export class UomService {
   }
 
   async findAllConversions(query: { itemId?: string; companyId?: string; limit?: number; offset?: number }, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.uomConversionMaster.tenant_id, tenantId),
-      isNull(schema.uomConversionMaster.deleted_at),
     ];
 
     if (query.companyId) {

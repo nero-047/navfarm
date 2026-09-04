@@ -48,11 +48,6 @@ export class CreateLocationDto {
   @IsNotEmpty()
   location_address: string;
 
-  @ApiProperty({ description: 'Hierarchy level in hierarchy tree', default: 1 })
-  @IsInt()
-  @Min(1)
-  location_level: number;
-
   @ApiProperty({ description: 'Location classification type', example: 'ROOM', enum: ['FARM', 'SHED', 'AREA', 'SECTION', 'ROOM', 'AISLE', 'SHELF', 'PEN', 'SILO'] })
   @IsString()
   @IsNotEmpty()
@@ -73,15 +68,14 @@ export class CreateLocationDto {
   @IsOptional()
   area_unit?: string;
 
-  @ApiProperty({ description: 'Maximum storage or bird/animal capacity limit', required: false })
+  @ApiProperty({ description: 'Maximum storage or bird/animal capacity limit' })
   @IsNumber()
-  @IsOptional()
-  max_capacity?: number;
+  max_capacity: number;
 
-  @ApiProperty({ description: 'Capacity unit representation', required: false })
+  @ApiProperty({ description: 'Capacity unit representation' })
   @IsString()
-  @IsOptional()
-  capacity_uom?: string;
+  @IsNotEmpty()
+  capacity_uom: string;
 
   @ApiProperty({ description: 'Current count representation', required: false })
   @IsNumber()
@@ -176,12 +170,6 @@ export class UpdateLocationDto {
   @IsString()
   @IsOptional()
   location_address?: string;
-
-  @ApiProperty({ required: false })
-  @IsInt()
-  @Min(1)
-  @IsOptional()
-  location_level?: number;
 
   @ApiProperty({ required: false })
   @IsString()

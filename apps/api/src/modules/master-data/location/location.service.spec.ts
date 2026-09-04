@@ -66,8 +66,9 @@ describe('LocationService', () => {
             location_code: 'LOC01',
             location_name: 'Location 1',
             location_address: 'Block A',
-            location_level: 1,
             location_type: 'ROOM',
+            max_capacity: 20,
+            capacity_uom: 'HEAD',
           },
           'tenant-123',
         ),
@@ -75,7 +76,7 @@ describe('LocationService', () => {
     });
 
     it('should throw ConflictException if location code already exists in this company scope', async () => {
-      // Selects in order: company found, farm found, duplicate location code found
+      // Selects in order: company found, farm found, capacity_uom resolves, duplicate location code found
       mockDbSelect
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
@@ -88,6 +89,13 @@ describe('LocationService', () => {
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
               limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]),
             }),
           }),
         })
@@ -107,8 +115,9 @@ describe('LocationService', () => {
             location_code: 'LOC01',
             location_name: 'Location 1',
             location_address: '123 Farm Road',
-            location_level: 1,
             location_type: 'ROOM',
+            max_capacity: 20,
+            capacity_uom: 'HEAD',
           },
           'tenant-123',
         ),
@@ -116,7 +125,7 @@ describe('LocationService', () => {
     });
 
     it('should successfully create location', async () => {
-      // Selects in order: company found, farm found, no duplicate code, findOne() after insert
+      // Selects in order: company found, farm found, capacity_uom resolves, no duplicate code, findOne() after insert
       mockDbSelect
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
@@ -135,6 +144,13 @@ describe('LocationService', () => {
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
               limit: jest.fn().mockResolvedValue([]),
             }),
           }),
@@ -142,7 +158,7 @@ describe('LocationService', () => {
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ location_code: 'LOC01', location_name: 'Location 1' }]),
+              limit: jest.fn().mockResolvedValue([{ location_code: 'LOC01', location_name: 'Location 1', location_level: 1 }]),
             }),
           }),
         });
@@ -158,8 +174,9 @@ describe('LocationService', () => {
           location_code: 'LOC01',
           location_name: 'Location 1',
           location_address: '123 Farm Road',
-          location_level: 1,
           location_type: 'ROOM',
+          max_capacity: 20,
+          capacity_uom: 'HEAD',
         },
         'tenant-123',
         { userId: 'user-1' },
@@ -186,8 +203,9 @@ describe('LocationService', () => {
             location_code: 'SLO01',
             location_name: 'Silo 1',
             location_address: '123 Farm Road',
-            location_level: 3,
             location_type: 'SILO',
+            max_capacity: 500,
+            capacity_uom: 'HEAD',
           },
           'tenant-123',
         ),
@@ -195,12 +213,19 @@ describe('LocationService', () => {
     });
 
     it('should accept a valid SILO location with silo fields set', async () => {
-      // Selects in order: farm found, no duplicate code, findOne() after insert
+      // Selects in order: farm found, capacity_uom resolves, no duplicate code, findOne() after insert
       mockDbSelect
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
               limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]),
             }),
           }),
         })
@@ -214,7 +239,7 @@ describe('LocationService', () => {
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ location_code: 'SLO01', location_name: 'Silo 1' }]),
+              limit: jest.fn().mockResolvedValue([{ location_code: 'SLO01', location_name: 'Silo 1', location_level: 1 }]),
             }),
           }),
         });
@@ -229,8 +254,9 @@ describe('LocationService', () => {
           location_code: 'SLO01',
           location_name: 'Silo 1',
           location_address: '123 Farm Road',
-          location_level: 3,
           location_type: 'SILO',
+          max_capacity: 500,
+          capacity_uom: 'HEAD',
           silo_capacity_kg: 2000,
           silo_reorder_days: 3,
         },
@@ -267,13 +293,70 @@ describe('LocationService', () => {
             location_code: 'LOC02',
             location_name: 'Location 2',
             location_address: '123 Farm Road',
-            location_level: 1,
             location_type: 'ROOM',
             area_unit: 'BOGUS',
+            max_capacity: 20,
+            capacity_uom: 'HEAD',
           },
           'tenant-123',
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should compute location_level as 1 when no parent_location_id is set', async () => {
+      // Selects in order: farm found, capacity_uom resolves, no duplicate code, findOne() after insert
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ location_code: 'LOC03', location_level: 1 }]) }) }) });
+
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
+
+      await service.create(
+        {
+          farm_id: 'farm-1',
+          location_code: 'LOC03',
+          location_name: 'Location 3',
+          location_address: '123 Farm Road',
+          location_type: 'ROOM',
+          max_capacity: 20,
+          capacity_uom: 'HEAD',
+        },
+        'tenant-123',
+      );
+
+      const insertedValues = mockDbInsert.mock.results[0].value.values.mock.calls[0][0];
+      expect(insertedValues.location_level).toBe(1);
+    });
+
+    it("should compute location_level as the parent's level + 1 when parent_location_id is set", async () => {
+      // Selects in order: parent location found (level 2), capacity_uom resolves, no duplicate code, findOne() after insert
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ location_id: 'loc-parent', location_level: 2 }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ farm_id: 'farm-1' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ uom_code: 'HEAD' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ location_code: 'LOC04', location_level: 3 }]) }) }) });
+
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
+
+      await service.create(
+        {
+          farm_id: 'farm-1',
+          parent_location_id: 'loc-parent',
+          location_code: 'LOC04',
+          location_name: 'Location 4',
+          location_address: '123 Farm Road',
+          location_type: 'PEN',
+          max_capacity: 20,
+          capacity_uom: 'HEAD',
+        },
+        'tenant-123',
+      );
+
+      const insertedValues = mockDbInsert.mock.results[0].value.values.mock.calls[0][0];
+      expect(insertedValues.location_level).toBe(3);
     });
   });
 

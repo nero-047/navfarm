@@ -114,9 +114,9 @@ export class MedicineService {
   }
 
   async findAll(query: QueryMedicineDto, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.medicineMaster.tenant_id, tenantId),
-      isNull(schema.medicineMaster.deleted_at),
     ];
 
     if (query.companyId) {

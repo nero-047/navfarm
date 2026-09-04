@@ -109,9 +109,9 @@ export class FarmService {
   }
 
   async findAll(query: QueryFarmDto, tenantId: string) {
+    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.farmMaster.tenant_id, tenantId),
-      isNull(schema.farmMaster.deleted_at),
     ];
 
     if (query.companyId) {
