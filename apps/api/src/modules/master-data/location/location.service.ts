@@ -246,6 +246,7 @@ export class LocationService {
 
     const companyId = dto.company_id;
     const locationType = await this.resolveLocationType(dto.location_type, tenantId, companyId);
+    const typeCode = locationType.type_code;
     const allowedParentTypes = this.allowedParentTypes(locationType.allowed_parent_types);
 
     // parent_location_id is the single canonical hierarchy. Legacy ancestry
@@ -273,7 +274,7 @@ export class LocationService {
     }
 
     // 4. SILO locations must carry silo tracking fields
-    this.assertSiloFieldsWhenSilo(dto.location_type, dto.silo_capacity_kg, dto.silo_reorder_days);
+    this.assertSiloFieldsWhenSilo(typeCode, dto.silo_capacity_kg, dto.silo_reorder_days);
 
     // 5. area_unit / capacity_uom must resolve to a real UOM
     await this.assertUomExists(dto.area_unit, tenantId, dto.company_id);
@@ -289,14 +290,14 @@ export class LocationService {
       company_id: companyId,
       nob_id: dto.nob_id || null,
       lob_id: dto.lob_id || null,
-      farm_id: dto.location_type === 'FARM' ? locationId : parent ? (parent.location_type === 'FARM' ? parent.location_id : parent.farm_id) : null,
-      shed_id: dto.location_type === 'SHED' ? locationId : parent ? (parent.location_type === 'SHED' ? parent.location_id : parent.shed_id) : null,
-      warehouse_id: ['STORE', 'SILO'].includes(dto.location_type) ? locationId : parent ? (['STORE', 'SILO'].includes(parent.location_type) ? parent.location_id : parent.warehouse_id) : null,
+      farm_id: typeCode === 'FARM' ? locationId : parent ? (parent.location_type === 'FARM' ? parent.location_id : parent.farm_id) : null,
+      shed_id: typeCode === 'SHED' ? locationId : parent ? (parent.location_type === 'SHED' ? parent.location_id : parent.shed_id) : null,
+      warehouse_id: ['STORE', 'SILO'].includes(typeCode) ? locationId : parent ? (['STORE', 'SILO'].includes(parent.location_type) ? parent.location_id : parent.warehouse_id) : null,
       location_code: locationCode,
       location_name: dto.location_name,
       location_address: dto.location_address,
       location_level: locationLevel,
-      location_type: dto.location_type,
+      location_type: typeCode,
       parent_location_id: dto.parent_location_id || null,
       area_size: dto.area_size?.toString() || null,
       area_unit: dto.area_unit || null,
