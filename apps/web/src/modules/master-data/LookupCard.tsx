@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/services/api-client";
+import { getActiveCompanyId } from "@/hooks/useAuth";
 import type { MasterDataConfig } from "./types";
 
 // `Row` is a local alias in MasterDataTable.tsx and is not exported from
@@ -37,7 +38,9 @@ export function LookupCard({
     setBusy(true);
     setError("");
     try {
-      await api.post(config.apiBase, form);
+      const cid = getActiveCompanyId();
+      const body = cid && config.fields.some((f) => f.key === "company_id") ? { ...form, company_id: cid } : form;
+      await api.post(config.apiBase, body);
       setForm({});
       onCreated();
     } catch (e: any) {
