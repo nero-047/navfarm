@@ -52,7 +52,7 @@ describe('LocationService canonical hierarchy', () => {
   };
   const siloType = {
     type_code: 'SILO', type_name: 'Silo', code_prefix: 'SILO',
-    allowed_parent_types: ['FARM'], company_id: null,
+    allowed_parent_types: ['FARM', 'SHED'], company_id: null,
   };
   const uom = { uom_code: 'HEAD' };
   const series = { series_code: 'LOCATION_FARM' };
@@ -161,6 +161,27 @@ describe('LocationService canonical hierarchy', () => {
       company_id: 'comp-1', parent_location_id: 'farm-1', location_name: 'Feed Silo',
       location_address: 'Farm Road', location_type: 'SILO', max_capacity: 2000, capacity_uom: 'KG',
     }, 'tenant-1')).rejects.toThrow(ConflictException);
+  });
+
+  it('creates a SILO under a SHED parent (BBP-1 hierarchy: Farm -> House -> Pen -> Silo), with a hierarchical composite code', async () => {
+    const parent = {
+      location_id: 'shed-1', company_id: 'comp-1', location_type: 'SHED', location_code: 'FARM-001/SHED-001',
+      location_level: 2, farm_id: 'farm-1', shed_id: 'shed-1', warehouse_id: null,
+    };
+    selectResults.push(
+      [company], [siloType], [parent], [uom], [{ series_code: 'LOCATION_SILO' }],
+      [], // no existing SILO siblings under this shed yet
+      [{ location_id: 'silo-1', location_code: 'FARM-001/SHED-001/SILO-001', location_type: 'SILO', location_level: 3 }],
+    );
+
+    const result = await service.create({
+      company_id: 'comp-1', parent_location_id: 'shed-1',
+      location_name: 'Feed Silo 1', location_address: 'Farm Road', location_type: 'SILO',
+      max_capacity: 2000, capacity_uom: 'KG', silo_capacity_kg: 2000, silo_reorder_days: 7,
+    }, 'tenant-1');
+
+    expect(result.location_level).toBe(3);
+    expect(result.location_code).toBe('FARM-001/SHED-001/SILO-001');
   });
 
   it('keeps location type and generated identity immutable', async () => {

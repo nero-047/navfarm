@@ -414,6 +414,13 @@
       "when": 1788560965584,
       "tag": "0058_perpetual_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "5",
+      "when": 1788561325870,
+      "tag": "0059_silo_allowed_parent_types_add_shed",
+      "breakpoints": true
     }
   ]
 }
