@@ -73,11 +73,10 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
       label: t("moduleSections", { module: t("masterData") }),
       groups: MASTER_DATA_GROUPS.map((group) => ({
         label: tLabel(group),
-        items: MASTER_DATA_CONFIGS.filter((c) => c.group === group).map((c) => ({
-          key: c.key,
-          label: tLabel(c.label),
-        })),
-      })),
+        items: MASTER_DATA_CONFIGS
+          .filter((c) => c.group === group && c.isPrimary)
+          .map((c) => ({ key: c.key, label: tLabel(c.label) })),
+      })).filter((g) => g.items.length > 0),
       activeKey,
       onSelect: (key) => router.push(`/master-data/${key}`),
     };

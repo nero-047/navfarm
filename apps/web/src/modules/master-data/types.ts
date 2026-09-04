@@ -112,4 +112,15 @@ export interface MasterDataConfig {
    * Conversions), so the table doesn't offer a Restore action that would 404.
    */
   supportsRestore?: boolean;
+  /**
+   * Shown in the master-data sub-sidebar. A master that is only a lookup for
+   * another master (item category, UOM) is not primary — it is reached
+   * through the card in its parent's dialog, not through its own nav entry.
+   */
+  isPrimary?: boolean;
+  /**
+   * Keys of the primary masters whose dialog renders this master as an
+   * inline card. Order here is the order the cards appear.
+   */
+  lookupFor?: string[];
 }

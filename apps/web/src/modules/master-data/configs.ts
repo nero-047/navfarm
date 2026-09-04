@@ -73,6 +73,7 @@ const location: MasterDataConfig = {
   apiBase: "/location",
   idKey: "location_id",
   group: "Farm Operations",
+  isPrimary: true,
   columns: [
     { key: "location_code", label: "Code" },
     { key: "location_name", label: "Name" },
@@ -146,6 +147,7 @@ const stage: MasterDataConfig = {
   apiBase: "/stage",
   idKey: "stage_id",
   group: "Production",
+  isPrimary: true,
   supportsNobLobFilter: true,
   supportsRestore: false,
   columns: [
@@ -230,6 +232,7 @@ const animal: MasterDataConfig = {
   apiBase: "/animal",
   idKey: "animal_id",
   group: "Piggery",
+  isPrimary: true,
   supportsRestore: false,
   columns: [
     { key: "animal_code", label: "Code" },
@@ -291,6 +294,7 @@ const itemCategory: MasterDataConfig = {
   apiBase: "/item-category",
   idKey: "category_id",
   group: "Inventory",
+  lookupFor: ["item"],
   columns: [
     { key: "category_code", label: "Code" },
     { key: "category_name", label: "Name" },
@@ -310,6 +314,7 @@ const itemType: MasterDataConfig = {
   apiBase: "/item-type",
   idKey: "item_type_id",
   group: "Inventory",
+  lookupFor: ["item"],
   columns: [
     { key: "type_code", label: "Code" },
     { key: "type_name", label: "Name" },
@@ -329,6 +334,7 @@ const uom: MasterDataConfig = {
   apiBase: "/uom",
   idKey: "uom_id",
   group: "Inventory",
+  lookupFor: ["item"],
   columns: [
     { key: "uom_code", label: "Code" },
     { key: "uom_name", label: "Name" },
@@ -427,6 +433,7 @@ const item: MasterDataConfig = {
   apiBase: "/item",
   idKey: "item_id",
   group: "Inventory",
+  isPrimary: true,
   columns: [
     { key: "item_code", label: "Code" },
     { key: "item_name", label: "Name" },
@@ -497,6 +504,7 @@ const breed: MasterDataConfig = {
   apiBase: "/breed",
   idKey: "breed_id",
   group: "Livestock & Health",
+  isPrimary: true,
   supportsNobLobFilter: true,
   columns: [
     { key: "breed_code", label: "Code" },
@@ -681,6 +689,7 @@ const supplier: MasterDataConfig = {
   apiBase: "/supplier",
   idKey: "supplier_id",
   group: "Business Partners",
+  isPrimary: true,
   columns: [
     { key: "supplier_code", label: "Code" },
     { key: "supplier_name", label: "Name" },
@@ -721,6 +730,7 @@ const customer: MasterDataConfig = {
   apiBase: "/customer",
   idKey: "customer_id",
   group: "Business Partners",
+  isPrimary: true,
   columns: [
     { key: "customer_code", label: "Code" },
     { key: "customer_name", label: "Name" },
@@ -750,6 +760,7 @@ const resource: MasterDataConfig = {
   apiBase: "/resource",
   idKey: "resource_id",
   group: "Business Partners",
+  isPrimary: true,
   supportsNobLobFilter: true,
   columns: [
     { key: "resource_code", label: "Code" },
@@ -802,6 +813,7 @@ const glAccount: MasterDataConfig = {
   apiBase: "/gl-account",
   idKey: "account_id",
   group: "Finance",
+  isPrimary: true,
   columns: [
     { key: "account_code", label: "Code" },
     { key: "account_name", label: "Name" },
