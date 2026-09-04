@@ -199,13 +199,46 @@ receipt, goods issue, stock transfer and stock adjustment. Animals are keyed on 
 A silo holds feed, which is stock, so it must be a warehouse to hold anything and a location to
 sit under a House.
 
-**Decision: keep both, make the link generated and mandatory.** Creating a SILO location
-auto-creates its warehouse and locks the pair; neither is editable alone; a guard test asserts
-one-to-one. Re-keying inventory from warehouse to location is the better model and the wrong
-time — it would open the exact subsystem the reversal engine is about to modify.
+**Superseded on 2026-09-05.** This section originally proposed keeping `warehouse_master` and a
+`SILO` location as a generated, locked pair — deferring the unified model as "the better model
+and the wrong time". The user approved the unified model instead, and it was implemented:
 
-Silo master gains the fields BBP §7 requires: BFT alert level (KG), Sunday reference stock, and
-feed item.
+- **`location_master` is canonical** for Farm, Shed/House, Pen, Cage, Store, Quarantine and Silo.
+- **`location_type_master`** (migration `0055`) makes the hierarchy data rather than code:
+  `type_code`, a per-company `code_prefix`, and `allowed_parent_types` as JSON. This is the same
+  move `stage_master` already makes for the lifecycle — a new level is a row, not a release.
+- **`farm_master`, `shed_master` and `warehouse_master` are retained as a compatibility bridge**
+  for operational APIs that still key on them. They are deliberately no longer creation choices
+  in the console.
+
+This satisfies BBP §1.2's four levels without hardcoding them, and generalises past the BBP:
+Cage, Store and Quarantine are expressible without a schema change.
+
+Silo-type locations gain the fields BBP §7 requires: BFT alert level (KG), Sunday reference
+stock, and feed item.
+
+### 7.1 External ERP reference, on every master
+
+**Decided 2026-09-05.** Business Central is not connected and is not in scope, but the *capability*
+is required, so it is built now and left available across **all** masters rather than retrofitted
+per master later.
+
+The problem it solves is concrete. BBP §1.2 states that **Farm Code IS the D365BC Cost Centre
+Dimension** — Triple C's farms are `MUL`, `PRT`, `GRS`, `RCH` — validated against
+`GET /dimensionValues`, and *"if not found: setup blocked"*. The console now generates immutable
+per-company codes (`FARM-001`, `SUP-001`, `CUS-001`, `RES-001`), which would match no dimension
+value in BC. Generated codes and external identity are therefore two different things and get two
+different fields:
+
+- **The master's own code** stays generated and immutable — stable, collision-free, and never
+  reused.
+- **An external ERP reference** carries the counterpart's identifier in the other system. For a
+  farm-type location that is the BC cost-centre dimension value (`GRS`); for an item it is the BC
+  item number; and so on.
+
+Nothing reads the reference until an integration exists. It is a column, an optional field on the
+master form, and nothing more — but it means connecting BC later is a mapping exercise rather than
+a migration of every primary key the business already prints on paper.
 
 ---
 
