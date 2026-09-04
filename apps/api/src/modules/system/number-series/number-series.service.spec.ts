@@ -114,6 +114,44 @@ describe('NumberSeriesService', () => {
     });
   });
 
+  describe('lockSeries', () => {
+    const mockLockedSelect = (row: any) => {
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({
+                for: jest.fn().mockResolvedValue(row ? [row] : []),
+              }),
+            }),
+          }),
+        }),
+      });
+    };
+
+    it('returns the locked row without incrementing it', async () => {
+      mockLockedSelect({ series_id: 'series-1', current_seq: 4, seq_length: 3, is_active: true });
+
+      const series = await service.lockSeries('LOCATION_SHED', 'tenant-123', 'comp-1');
+
+      expect(series.series_id).toBe('series-1');
+      expect(series.current_seq).toBe(4); // untouched — this is a lock, not a generator
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the series does not exist in scope', async () => {
+      mockLockedSelect(null);
+
+      await expect(service.lockSeries('BOGUS', 'tenant-123', null)).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException when the series is inactive', async () => {
+      mockLockedSelect({ series_id: 'series-1', current_seq: 0, seq_length: 3, is_active: false });
+
+      await expect(service.lockSeries('X', 'tenant-123', null)).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('ensureCompanySeries', () => {
     it('creates a company counter after the highest matching existing code', async () => {
       mockDbSelect

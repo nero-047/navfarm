@@ -164,6 +164,50 @@ export class NumberSeriesService {
     return formattedCode;
   }
 
+  /**
+   * Locks the series row (SELECT ... FOR UPDATE) without incrementing it.
+   * For callers whose sequence number isn't the row's own current_seq — e.g.
+   * hierarchical location codes, which count siblings under a specific
+   * parent rather than a company-wide counter — this gives the same
+   * concurrency guard generateNext() gives (two concurrent creates of the
+   * same series serialize on this row) while leaving current_seq /
+   * last_generated_code untouched. Pass `executor` (a transaction handle)
+   * so the lock is held until the caller's insert commits.
+   */
+  async lockSeries(
+    seriesCode: string,
+    tenantId: string,
+    companyId?: string | null,
+    executor: MySql2Database<typeof schema> = this.db,
+  ): Promise<typeof schema.noSeriesMaster.$inferSelect> {
+    const conditions = [
+      eq(schema.noSeriesMaster.tenant_id, tenantId),
+      eq(schema.noSeriesMaster.series_code, seriesCode),
+      isNull(schema.noSeriesMaster.deleted_at),
+    ];
+    conditions.push(
+      companyId
+        ? or(eq(schema.noSeriesMaster.company_id, companyId), isNull(schema.noSeriesMaster.company_id))!
+        : isNull(schema.noSeriesMaster.company_id)
+    );
+
+    const [series] = await executor
+      .select()
+      .from(schema.noSeriesMaster)
+      .where(and(...conditions))
+      .orderBy(sql`${schema.noSeriesMaster.company_id} IS NULL`)
+      .limit(1)
+      .for('update');
+
+    if (!series) {
+      throw new NotFoundException(`Number series '${seriesCode}' not found for this tenant/company scope.`);
+    }
+    if (!series.is_active) {
+      throw new BadRequestException(`Number series '${seriesCode}' is inactive.`);
+    }
+    return series;
+  }
+
   async create(dto: CreateNumberSeriesDto, tenantId: string, userPayload?: any) {
     const duplicateConditions = [
       eq(schema.noSeriesMaster.tenant_id, tenantId),

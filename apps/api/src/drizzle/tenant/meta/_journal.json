@@ -407,6 +407,13 @@
       "when": 1788559636948,
       "tag": "0057_noisy_otto_octavius",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "5",
+      "when": 1788560965584,
+      "tag": "0058_perpetual_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }

@@ -734,7 +734,7 @@ export const farmMaster = mysqlTable('farm_master', {
   farm_id: varchar('farm_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  farm_code: varchar('farm_code', { length: 50 }).notNull(),
+  farm_code: varchar('farm_code', { length: 255 }).notNull(),
   farm_name: varchar('farm_name', { length: 100 }).notNull(),
   farm_type: varchar('farm_type', { length: 50 }).notNull(), // BREEDER, COMMERCIAL_LAYERS, COMMERCIAL_BROILERS, HATCHERY, REARING, DAIRY, etc.
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
@@ -790,7 +790,7 @@ export const warehouseMaster = mysqlTable('warehouse_master', {
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   farm_id: varchar('farm_id', { length: 36 }).references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
-  warehouse_code: varchar('warehouse_code', { length: 50 }).notNull(),
+  warehouse_code: varchar('warehouse_code', { length: 255 }).notNull(),
   warehouse_name: varchar('warehouse_name', { length: 100 }).notNull(),
   warehouse_type: varchar('warehouse_type', { length: 50 }).notNull(), // COLD_STORAGE, SILO, GENERAL, INGREDIENTS, MEDICINE, etc.
   is_active: boolean('is_active').default(true).notNull(),
@@ -808,7 +808,7 @@ export const shedMaster = mysqlTable('shed_master', {
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   farm_id: varchar('farm_id', { length: 36 }).notNull().references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
-  shed_code: varchar('shed_code', { length: 50 }).notNull(),
+  shed_code: varchar('shed_code', { length: 255 }).notNull(),
   shed_name: varchar('shed_name', { length: 100 }).notNull(),
   shed_type: varchar('shed_type', { length: 50 }).notNull(), // OPEN_SIDED, ENVIRONMENTALLY_CONTROLLED, SEMI_EC
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
@@ -860,7 +860,7 @@ export const locationMaster = mysqlTable('location_master', {
   farm_id: varchar('farm_id', { length: 36 }),
   shed_id: varchar('shed_id', { length: 36 }),
   warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
-  location_code: varchar('location_code', { length: 50 }).notNull(),
+  location_code: varchar('location_code', { length: 255 }).notNull(),
   location_name: varchar('location_name', { length: 200 }).notNull(),
   location_address: varchar('location_address', { length: 500 }),
   location_level: int('location_level').notNull(),

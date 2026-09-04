@@ -11,7 +11,7 @@ describe('LocationService canonical hierarchy', () => {
   const txInsert = jest.fn();
   const txUpdate = jest.fn();
   const audit = { log: jest.fn() };
-  const numberSeries = { generateNext: jest.fn() };
+  const numberSeries = { generateNext: jest.fn(), lockSeries: jest.fn() };
 
   const makeSelectBuilder = (rows: any[]) => {
     const builder: any = {};
@@ -26,7 +26,14 @@ describe('LocationService canonical hierarchy', () => {
     return builder;
   };
 
-  const tx = { insert: txInsert, update: txUpdate };
+  // tx.select shares the same selectResults queue as db.select — both represent
+  // the same sequential stream of SELECTs the real code issues, whichever
+  // connection (pool vs. transaction) actually executes them.
+  const tx = {
+    insert: txInsert,
+    update: txUpdate,
+    select: jest.fn(() => makeSelectBuilder(selectResults.shift() || [])),
+  };
   const db = {
     select: jest.fn(() => makeSelectBuilder(selectResults.shift() || [])),
     insert: jest.fn(),
@@ -57,6 +64,7 @@ describe('LocationService canonical hierarchy', () => {
     txUpdate.mockImplementation(() => ({ set: jest.fn(() => ({ where: jest.fn().mockResolvedValue({}) })) }));
     audit.log.mockResolvedValue({});
     numberSeries.generateNext.mockResolvedValue('FARM-001');
+    numberSeries.lockSeries.mockResolvedValue({ series_id: 'series-1', seq_length: 3 });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -90,22 +98,25 @@ describe('LocationService canonical hierarchy', () => {
       max_capacity: 100, capacity_uom: 'HEAD',
     }, 'tenant-1', { userId: 'user-1' });
 
-    expect(numberSeries.generateNext).toHaveBeenCalledWith('LOCATION_FARM', 'tenant-1', 'comp-1');
+    // Root-level generation is unchanged: generateNext still receives the
+    // series code / tenant / company, now also the tx executor it runs
+    // inside so the row lock is held until the insert below it commits.
+    expect(numberSeries.generateNext).toHaveBeenCalledWith('LOCATION_FARM', 'tenant-1', 'comp-1', tx);
     expect(txInsert).toHaveBeenCalledTimes(2);
     expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(result.location_code).toBe('FARM-001');
   });
 
-  it('derives a shed level and legacy farm ancestry from its canonical parent', async () => {
+  it('derives a shed level and legacy farm ancestry from its canonical parent, prefixed with the parent code', async () => {
     const parent = {
-      location_id: 'farm-1', company_id: 'comp-1', location_type: 'FARM',
+      location_id: 'farm-1', company_id: 'comp-1', location_type: 'FARM', location_code: 'FARM-001',
       location_level: 1, farm_id: 'farm-1', shed_id: null, warehouse_id: null,
     };
     selectResults.push(
       [company], [shedType], [parent], [uom], [{ series_code: 'LOCATION_SHED' }],
-      [{ location_id: 'shed-1', location_code: 'SHED-001', location_type: 'SHED', location_level: 2 }],
+      [], // no existing SHED siblings under this parent yet
+      [{ location_id: 'shed-1', location_code: 'FARM-001/SHED-001', location_type: 'SHED', location_level: 2 }],
     );
-    numberSeries.generateNext.mockResolvedValue('SHED-001');
 
     const result = await service.create({
       company_id: 'comp-1', parent_location_id: 'farm-1',
@@ -113,8 +124,13 @@ describe('LocationService canonical hierarchy', () => {
       max_capacity: 60, capacity_uom: 'HEAD',
     }, 'tenant-1');
 
+    expect(numberSeries.lockSeries).toHaveBeenCalledWith('LOCATION_SHED', 'tenant-1', 'comp-1', tx);
     expect(result.location_level).toBe(2);
     expect(txInsert).toHaveBeenCalledTimes(2);
+    // Second insert call is location_master itself (legacy mirror goes first);
+    // confirm the code actually written carries the parent's code as its prefix.
+    const locationMasterInsertArgs = (txInsert.mock.results[1].value.values as jest.Mock).mock.calls[0][0];
+    expect(locationMasterInsertArgs.location_code).toBe('FARM-001/SHED-001');
   });
 
   it('rejects a non-root type without a parent', async () => {
@@ -248,5 +264,84 @@ describe('LocationService canonical hierarchy', () => {
     expect(res[0].utilization_pct).toBe(10); // 2 / 20 = 10%
     expect(res[0].biosecurity_status).toBe('QUARANTINE_ACTIVE');
     expect(res[0].sick_animal_count).toBe(1);
+  });
+});
+
+describe('hierarchical location codes', () => {
+  // Unit-level tests for LocationService.generateLocationCode (private) — the
+  // rule: a code carries its ancestry, so the code alone tells you where a
+  // location sits. A root location keeps the flat per-company counter; a
+  // child location is `<parent code>/<TYPE>-<seq>`, and <seq> counts only
+  // the siblings sharing that exact parent, never a company-wide total.
+  let service: LocationService;
+  const numberSeries = { generateNext: jest.fn(), lockSeries: jest.fn() };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    numberSeries.lockSeries.mockResolvedValue({ series_id: 'series-1', seq_length: 3 });
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        LocationService,
+        { provide: ClsService, useValue: { get: jest.fn() } },
+        { provide: AuditLogService, useValue: { log: jest.fn() } },
+        { provide: NumberSeriesService, useValue: numberSeries },
+      ],
+    }).compile();
+    service = module.get(LocationService);
+  });
+
+  /** Builds a fake tx executor whose only role here is answering the sibling-count SELECT. */
+  const makeExecutor = (siblingCodes: string[] = []) => ({
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({
+        where: jest.fn(() => Promise.resolve(siblingCodes.map((code) => ({ code })))),
+      })),
+    })),
+  });
+
+  const gen = (opts: {
+    typePrefix: string;
+    parent: { location_code: string } | null;
+    siblingCodes?: string[];
+  }) => {
+    const type = { type_code: opts.typePrefix, code_prefix: opts.typePrefix } as any;
+    const parent = opts.parent ? { location_id: 'parent-1', location_code: opts.parent.location_code } as any : undefined;
+    if (!parent) numberSeries.generateNext.mockResolvedValue(`${opts.typePrefix}-001`);
+    const executor = makeExecutor(opts.siblingCodes) as any;
+    return (service as any).generateLocationCode('SERIES_CODE', type, 'tenant-1', 'comp-1', parent, executor);
+  };
+
+  it('generates a root code from the type prefix', async () => {
+    // no parent -> PREFIX-NNN, via the existing flat per-company counter
+    await expect(gen({ typePrefix: 'FARM', parent: null })).resolves.toBe('FARM-001');
+  });
+
+  it('prefixes a child code with its parent code', async () => {
+    await expect(gen({ typePrefix: 'SHED', parent: { location_code: 'FARM-001' } }))
+      .resolves.toBe('FARM-001/SHED-001');
+  });
+
+  it('counts siblings within the parent, not globally', async () => {
+    // FARM-001 already has two sheds -> its third shed is SHED-003 there.
+    await expect(gen({
+      typePrefix: 'SHED', parent: { location_code: 'FARM-001' },
+      siblingCodes: ['FARM-001/SHED-001', 'FARM-001/SHED-002'],
+    })).resolves.toBe('FARM-001/SHED-003');
+
+    // FARM-002 has no sheds of its own yet -> its first is SHED-001 there,
+    // not SHED-003 (which a global counter would have produced).
+    await expect(gen({ typePrefix: 'SHED', parent: { location_code: 'FARM-002' } }))
+      .resolves.toBe('FARM-002/SHED-001');
+  });
+
+  it('nests to a third level', async () => {
+    await expect(gen({ typePrefix: 'PEN', parent: { location_code: 'FARM-001/SHED-001' } }))
+      .resolves.toBe('FARM-001/SHED-001/PEN-001');
+  });
+
+  it('nests to a fourth level', async () => {
+    await expect(gen({ typePrefix: 'SLO', parent: { location_code: 'FARM-001/SHED-001/PEN-001' } }))
+      .resolves.toBe('FARM-001/SHED-001/PEN-001/SLO-001');
   });
 });

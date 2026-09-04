@@ -83,6 +83,55 @@ export class LocationService {
     return seriesCode;
   }
 
+  /**
+   * A root location keeps the existing flat per-company counter, unchanged.
+   * A location with a parent gets a hierarchical code instead:
+   * `<parent code>/<TYPE>-<seq>` — the code carries its own ancestry, so
+   * "the first shed of farm 1" is readable from the code alone. <seq> counts
+   * only the siblings that share this exact parent, NOT a company-wide
+   * counter: farm 2's first shed is FARM-002/SHED-001, never SHED-003.
+   *
+   * The series row is still locked (numberSeriesService.lockSeries) so two
+   * concurrent creates of this type serialize on it — the same guard
+   * generateNext() gives root codes — but the sequence number itself comes
+   * from counting siblings under `parent`, not the row's current_seq. Pass
+   * the active transaction as `executor` so the lock survives until the
+   * insert this code is used for commits (mirrors batch.service.ts's
+   * generateBatchNo()).
+   */
+  private async generateLocationCode(
+    seriesCode: string,
+    type: typeof schema.locationTypeMaster.$inferSelect,
+    tenantId: string,
+    companyId: string,
+    parent: typeof schema.locationMaster.$inferSelect | undefined,
+    executor: MySql2Database<typeof schema>,
+  ): Promise<string> {
+    if (!parent) {
+      return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, executor);
+    }
+
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId, executor);
+
+    const siblings = await executor
+      .select({ code: schema.locationMaster.location_code })
+      .from(schema.locationMaster)
+      .where(and(
+        eq(schema.locationMaster.tenant_id, tenantId),
+        eq(schema.locationMaster.parent_location_id, parent.location_id),
+        eq(schema.locationMaster.location_type, type.type_code),
+      ));
+
+    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapeRegex(parent.location_code)}/${escapeRegex(type.code_prefix)}-(\\d+)$`, 'i');
+    const nextSeq = siblings.reduce((max, row) => {
+      const match = row.code?.match(pattern);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0) + 1;
+
+    return `${parent.location_code}/${type.code_prefix}-${String(nextSeq).padStart(series.seq_length, '0')}`;
+  }
+
   private async insertLegacyMirror(
     executor: any,
     location: typeof schema.locationMaster.$inferInsert,
@@ -281,48 +330,54 @@ export class LocationService {
     await this.assertUomExists(dto.capacity_uom, tenantId, dto.company_id);
 
     const seriesCode = await this.ensureCompanySeries(locationType, tenantId, companyId);
-    const locationCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
 
     const locationId = randomUUID();
-    const newLocation = {
-      location_id: locationId,
-      tenant_id: tenantId,
-      company_id: companyId,
-      nob_id: dto.nob_id || null,
-      lob_id: dto.lob_id || null,
-      farm_id: typeCode === 'FARM' ? locationId : parent ? (parent.location_type === 'FARM' ? parent.location_id : parent.farm_id) : null,
-      shed_id: typeCode === 'SHED' ? locationId : parent ? (parent.location_type === 'SHED' ? parent.location_id : parent.shed_id) : null,
-      warehouse_id: ['STORE', 'SILO'].includes(typeCode) ? locationId : parent ? (['STORE', 'SILO'].includes(parent.location_type) ? parent.location_id : parent.warehouse_id) : null,
-      location_code: locationCode,
-      location_name: dto.location_name,
-      location_address: dto.location_address,
-      location_level: locationLevel,
-      location_type: typeCode,
-      parent_location_id: dto.parent_location_id || null,
-      area_size: dto.area_size?.toString() || null,
-      area_unit: dto.area_unit || null,
-      max_capacity: dto.max_capacity?.toString() || null,
-      capacity_uom: dto.capacity_uom || null,
-      current_count: dto.current_count?.toString() || '0.00',
-      gps_latitude: dto.gps_latitude?.toString() || null,
-      gps_longitude: dto.gps_longitude?.toString() || null,
-      storage_type: dto.storage_type || null,
-      is_quarantine_zone: dto.is_quarantine_zone || false,
-      silo_capacity_kg: dto.silo_capacity_kg?.toString() || null,
-      silo_reorder_days: dto.silo_reorder_days ?? null,
-      downtime_days_required: dto.downtime_days_required ?? null,
-      is_active: true,
-      status: 'ACTIVE',
-      extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
-      created_by: userPayload?.userId || null,
-      updated_by: userPayload?.userId || null,
-    };
+    const newLocation = await this.db.transaction(async (tx) => {
+      // Code generation happens inside this transaction, using tx as the lock
+      // executor, so the series row's SELECT ... FOR UPDATE (or, for a child
+      // location, the sibling count it guards) stays locked until the insert
+      // below commits — two concurrent creates cannot produce the same code.
+      const locationCode = await this.generateLocationCode(seriesCode, locationType, tenantId, companyId, parent, tx);
 
-    await this.db.transaction(async (tx) => {
+      const location = {
+        location_id: locationId,
+        tenant_id: tenantId,
+        company_id: companyId,
+        nob_id: dto.nob_id || null,
+        lob_id: dto.lob_id || null,
+        farm_id: typeCode === 'FARM' ? locationId : parent ? (parent.location_type === 'FARM' ? parent.location_id : parent.farm_id) : null,
+        shed_id: typeCode === 'SHED' ? locationId : parent ? (parent.location_type === 'SHED' ? parent.location_id : parent.shed_id) : null,
+        warehouse_id: ['STORE', 'SILO'].includes(typeCode) ? locationId : parent ? (['STORE', 'SILO'].includes(parent.location_type) ? parent.location_id : parent.warehouse_id) : null,
+        location_code: locationCode,
+        location_name: dto.location_name,
+        location_address: dto.location_address,
+        location_level: locationLevel,
+        location_type: typeCode,
+        parent_location_id: dto.parent_location_id || null,
+        area_size: dto.area_size?.toString() || null,
+        area_unit: dto.area_unit || null,
+        max_capacity: dto.max_capacity?.toString() || null,
+        capacity_uom: dto.capacity_uom || null,
+        current_count: dto.current_count?.toString() || '0.00',
+        gps_latitude: dto.gps_latitude?.toString() || null,
+        gps_longitude: dto.gps_longitude?.toString() || null,
+        storage_type: dto.storage_type || null,
+        is_quarantine_zone: dto.is_quarantine_zone || false,
+        silo_capacity_kg: dto.silo_capacity_kg?.toString() || null,
+        silo_reorder_days: dto.silo_reorder_days ?? null,
+        downtime_days_required: dto.downtime_days_required ?? null,
+        is_active: true,
+        status: 'ACTIVE',
+        extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
+        created_by: userPayload?.userId || null,
+        updated_by: userPayload?.userId || null,
+      };
+
       // Legacy rows are inserted first because location_master keeps temporary
       // compatibility foreign keys to these records.
-      await this.insertLegacyMirror(tx, newLocation);
-      await tx.insert(schema.locationMaster).values(newLocation);
+      await this.insertLegacyMirror(tx, location);
+      await tx.insert(schema.locationMaster).values(location);
+      return location;
     });
 
     await this.auditService.log({
