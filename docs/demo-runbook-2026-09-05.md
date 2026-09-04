@@ -19,6 +19,15 @@ none has been seen on screen. The click-through pass converts ⚠️ to ✅ — 
    Wait for `NAVFarm API: http://localhost:2877/api/v1` before opening the browser. The web app
    silently renders an empty console if the API is not up yet.
 
+   **If the API never finishes starting, check for a second copy first.** Nx serialises the
+   `serve` target, so starting it twice makes the second one print
+   `Waiting for api:serve:development in another nx process` and hang forever behind the first.
+   This happened during the build tonight and looks identical to a broken API. Fix:
+   ```bash
+   pkill -f "nx serve api"
+   ```
+   then start exactly one. Confirm with `lsof -ti:2877` — you want one process, not none and not two.
+
 2. **Sign in** at http://localhost:3002 as the tenant admin.
 
 3. **Open the console once and click through your path** before anyone is watching. First render
