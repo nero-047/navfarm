@@ -24,6 +24,20 @@ const DISPOSAL_STATUS_MAP: Record<string, string | undefined> = {
   TRANSFERRED: undefined,
 };
 
+// BBP §6: "teat count < 15 is a hard block at selection" — regardless of TSI score. There is no
+// dedicated gilt-selection endpoint in this codebase yet, so this guards every path that can set
+// no_of_teats on a GILT (create and update) rather than a selection action that does not exist.
+const MIN_GILT_TEATS = 15;
+
+function assertGiltTeatCount(animalType: string | undefined, noOfTeats: number | undefined | null): void {
+  if (animalType !== 'GILT' || noOfTeats === undefined || noOfTeats === null) return;
+  if (noOfTeats < MIN_GILT_TEATS) {
+    throw new BadRequestException(
+      `Teat count ${noOfTeats} is below the minimum of ${MIN_GILT_TEATS} — this gilt cannot be selected regardless of TSI score.`,
+    );
+  }
+}
+
 @Injectable()
 export class AnimalService {
   constructor(
@@ -131,6 +145,8 @@ export class AnimalService {
   }
 
   async create(dto: CreateAnimalDto, tenantId: string, userPayload?: any) {
+    assertGiltTeatCount(dto.animal_type, dto.no_of_teats);
+
     await this.assertExists(
       this.db.select().from(schema.companyMaster).where(eq(schema.companyMaster.company_id, dto.company_id)),
       'Company', dto.company_id,
@@ -250,6 +266,10 @@ export class AnimalService {
       current_location_id: dto.current_location_id || null,
       productive_life_start: dto.productive_life_start || null,
       status: dto.status || 'ACTIVE',
+      no_of_teats: dto.no_of_teats ?? null,
+      tsi: dto.tsi?.toString() ?? null,
+      grading: dto.grading || null,
+      serial_number: dto.serial_number || null,
       notes: dto.notes || null,
       is_active: true,
       created_by: userPayload?.userId || null,
@@ -414,6 +434,8 @@ export class AnimalService {
   async update(id: string, dto: UpdateAnimalDto, tenantId: string, userPayload?: any) {
     const animal = await this.findOne(id);
 
+    assertGiltTeatCount(animal.animal_type, dto.no_of_teats);
+
     if (dto.breed_id) {
       await this.assertExists(
         this.db.select().from(schema.breedMaster).where(eq(schema.breedMaster.breed_id, dto.breed_id)),
@@ -492,6 +514,10 @@ export class AnimalService {
     if (dto.productive_life_start !== undefined) updates.productive_life_start = dto.productive_life_start;
     if (dto.expected_cull_date !== undefined) updates.expected_cull_date = dto.expected_cull_date;
     if (dto.status !== undefined) updates.status = dto.status;
+    if (dto.no_of_teats !== undefined) updates.no_of_teats = dto.no_of_teats;
+    if (dto.tsi !== undefined) updates.tsi = dto.tsi?.toString() ?? null;
+    if (dto.grading !== undefined) updates.grading = dto.grading;
+    if (dto.serial_number !== undefined) updates.serial_number = dto.serial_number;
     if (dto.notes !== undefined) updates.notes = dto.notes;
 
     await this.db

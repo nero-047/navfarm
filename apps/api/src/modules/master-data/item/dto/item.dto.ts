@@ -173,6 +173,21 @@ export class CreateItemDto {
   @IsOptional()
   item_image_url?: string;
 
+  @ApiProperty({ description: 'GL account this item posts inventory value to', required: false })
+  @IsUUID()
+  @IsOptional()
+  inventory_gl_account?: string;
+
+  @ApiProperty({ description: 'GL account this item posts cost of goods sold to', required: false })
+  @IsUUID()
+  @IsOptional()
+  cogs_gl_account?: string;
+
+  @ApiProperty({ description: 'Blocked items stay visible/historical but cannot be transacted', default: false, required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_blocked?: boolean;
+
   @ApiProperty({ description: 'Flexible custom config configurations in JSON format', required: false })
   @IsOptional()
   extension_config?: any;
@@ -343,6 +358,21 @@ export class UpdateItemDto {
   @IsString()
   @IsOptional()
   item_image_url?: string;
+
+  @ApiProperty({ description: 'GL account this item posts inventory value to', required: false })
+  @IsUUID()
+  @IsOptional()
+  inventory_gl_account?: string;
+
+  @ApiProperty({ description: 'GL account this item posts cost of goods sold to', required: false })
+  @IsUUID()
+  @IsOptional()
+  cogs_gl_account?: string;
+
+  @ApiProperty({ description: 'Blocked items stay visible/historical but cannot be transacted', required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_blocked?: boolean;
 
   @ApiProperty({ required: false })
   @IsBoolean()

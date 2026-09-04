@@ -114,6 +114,26 @@ export class CreateResourceDto {
   @IsOptional()
   maintenance_vendor?: string;
 
+  @ApiProperty({ description: 'GL account this resource posts cost to', required: false })
+  @IsUUID()
+  @IsOptional()
+  gl_cost_account?: string;
+
+  @ApiProperty({ description: 'Department this resource belongs to', required: false })
+  @IsString()
+  @IsOptional()
+  department?: string;
+
+  @ApiProperty({ description: 'Cost element/classification for costing reports', required: false })
+  @IsString()
+  @IsOptional()
+  cost_element?: string;
+
+  @ApiProperty({ description: 'License/certification expiry date (labor resources only)', required: false })
+  @IsDateString()
+  @IsOptional()
+  license_expiry?: string;
+
   @ApiProperty({ description: 'Flexible custom config configurations in JSON format', required: false })
   @IsOptional()
   extension_config?: any;
@@ -225,6 +245,26 @@ export class UpdateResourceDto {
   @IsString()
   @IsOptional()
   maintenance_vendor?: string;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  gl_cost_account?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  department?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  cost_element?: string;
+
+  @ApiProperty({ required: false })
+  @IsDateString()
+  @IsOptional()
+  license_expiry?: string;
 
   @ApiProperty({ required: false })
   @IsBoolean()

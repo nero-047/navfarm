@@ -138,6 +138,56 @@ describe('AnimalService', () => {
     });
   });
 
+  // BBP §6: "teat count < 15 is a hard block at selection" — regardless of TSI score. There is
+  // no dedicated gilt-selection endpoint in this codebase yet, so the guard sits on every path
+  // that can carry no_of_teats onto a GILT: create() and update().
+  describe('teat count guard (BBP §6)', () => {
+    it('refuses to update a gilt with a teat count below 15, regardless of TSI', async () => {
+      mockDbSelect.mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', animal_type: 'GILT' }));
+
+      await expect(
+        service.update('a-1', { no_of_teats: 14, tsi: 99.9 }, 'tenant-123'),
+      ).rejects.toThrow(/teat/i);
+    });
+
+    it('allows updating a gilt whose teat count is 15 or above', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', animal_type: 'GILT' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1', no_of_teats: 15 }));
+
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      await expect(
+        service.update('a-1', { no_of_teats: 15 }, 'tenant-123'),
+      ).resolves.toBeDefined();
+    });
+
+    it('does not apply the teat-count block to non-gilt animal types', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', animal_type: 'SOW' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1', no_of_teats: 10 }));
+
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      await expect(
+        service.update('a-1', { no_of_teats: 10 }, 'tenant-123'),
+      ).resolves.toBeDefined();
+    });
+
+    it('refuses to create a gilt with a teat count below 15', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }));
+
+      await expect(
+        service.create({ ...baseDto, animal_type: 'GILT', no_of_teats: 14 } as any, 'tenant-123'),
+      ).rejects.toThrow(/teat/i);
+    });
+  });
+
   describe('dispose', () => {
     it('computes gain_loss_on_disposal when book_value is set', async () => {
       mockDbSelect

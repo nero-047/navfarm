@@ -231,6 +231,11 @@ export class CreateBreedDto {
   @IsOptional()
   description?: string;
 
+  @ApiProperty({ description: 'Blocked breeds stay visible/historical but cannot be used on new animals', default: false, required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_blocked?: boolean;
+
   @ApiProperty({ description: 'Company UUID scope (null means global)', required: false })
   @IsUUID()
   @IsOptional()
@@ -396,6 +401,11 @@ export class UpdateBreedDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiProperty({ required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_blocked?: boolean;
 
   @ApiProperty({ required: false })
   @IsBoolean()

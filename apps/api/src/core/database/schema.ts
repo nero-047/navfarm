@@ -598,6 +598,11 @@ export const itemMaster = mysqlTable('item_master', {
   is_qr_enabled: boolean('is_qr_enabled').default(false).notNull(),
   qr_trigger_event: varchar('qr_trigger_event', { length: 30 }),
   item_image_url: varchar('item_image_url', { length: 500 }),
+  // Master Template parity (P2) — GL posting accounts and a hold flag distinct from
+  // is_active/status: a blocked item stays visible/historical but cannot be transacted.
+  inventory_gl_account: varchar('inventory_gl_account', { length: 36 }),
+  cogs_gl_account: varchar('cogs_gl_account', { length: 36 }),
+  is_blocked: boolean('is_blocked').default(false).notNull(),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -713,6 +718,8 @@ export const breedMaster = mysqlTable('breed_master', {
   vaccination_schedule: json('vaccination_schedule'),
   age_labels: json('age_labels'),
   description: text('description'),
+  // Master Template parity (P2) — a hold flag distinct from is_active/status.
+  is_blocked: boolean('is_blocked').default(false).notNull(),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -1246,6 +1253,11 @@ export const resourceMaster = mysqlTable('resource_master', {
   next_maintenance_date: date('next_maintenance_date', { mode: 'string' }),
   maintenance_cost_per_service: decimal('maintenance_cost_per_service', { precision: 18, scale: 4 }),
   maintenance_vendor: varchar('maintenance_vendor', { length: 200 }),
+  // Master Template parity (P2).
+  gl_cost_account: varchar('gl_cost_account', { length: 36 }),
+  department: varchar('department', { length: 100 }),
+  cost_element: varchar('cost_element', { length: 50 }),
+  license_expiry: date('license_expiry', { mode: 'string' }),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -2815,6 +2827,12 @@ export const animalRegister = mysqlTable('animal_register', {
   amortisation_monthly: decimal('amortisation_monthly', { precision: 18, scale: 4 }),
   productive_life_start: date('productive_life_start', { mode: 'string' }),
   expected_cull_date: date('expected_cull_date', { mode: 'string' }),
+  // Master Template parity (P2) — BBP §6: no_of_teats < 15 is a hard block on gilt
+  // selection regardless of TSI score, enforced in animal.service.ts.
+  no_of_teats: int('no_of_teats'),
+  tsi: decimal('tsi', { precision: 10, scale: 2 }),
+  grading: varchar('grading', { length: 20 }),
+  serial_number: varchar('serial_number', { length: 50 }),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(), // ACTIVE, QUARANTINE, SICK, PREGNANT, LACTATING, DRY, CULLED, DEAD, SOLD, SLAUGHTERED
   disposal_date: date('disposal_date', { mode: 'string' }),
   disposal_type: varchar('disposal_type', { length: 20 }), // SOLD, SLAUGHTERED, DIED, TRANSFERRED

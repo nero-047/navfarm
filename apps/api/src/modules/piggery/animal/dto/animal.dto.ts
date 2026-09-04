@@ -141,6 +141,27 @@ export class CreateAnimalDto {
   @IsIn(STATUSES)
   status?: string;
 
+  @ApiProperty({ description: 'Teat count — BBP: below 15 is a hard block on gilt selection regardless of TSI score', required: false })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  no_of_teats?: number;
+
+  @ApiProperty({ description: 'Total Sow Index score', required: false })
+  @IsNumber()
+  @IsOptional()
+  tsi?: number;
+
+  @ApiProperty({ description: 'Conformation/quality grading', required: false })
+  @IsString()
+  @IsOptional()
+  grading?: string;
+
+  @ApiProperty({ description: 'Serial number (asset tag), distinct from RFID/ear tag', required: false })
+  @IsString()
+  @IsOptional()
+  serial_number?: string;
+
   @ApiProperty({ description: 'Notes', required: false })
   @IsString()
   @IsOptional()
@@ -251,6 +272,27 @@ export class UpdateAnimalDto {
   @IsOptional()
   @IsIn(STATUSES)
   status?: string;
+
+  @ApiProperty({ description: 'Teat count — BBP: below 15 is a hard block on gilt selection regardless of TSI score', required: false })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  no_of_teats?: number;
+
+  @ApiProperty({ description: 'Total Sow Index score', required: false })
+  @IsNumber()
+  @IsOptional()
+  tsi?: number;
+
+  @ApiProperty({ description: 'Conformation/quality grading', required: false })
+  @IsString()
+  @IsOptional()
+  grading?: string;
+
+  @ApiProperty({ description: 'Serial number (asset tag), distinct from RFID/ear tag', required: false })
+  @IsString()
+  @IsOptional()
+  serial_number?: string;
 
   @ApiProperty({ required: false })
   @IsString()
