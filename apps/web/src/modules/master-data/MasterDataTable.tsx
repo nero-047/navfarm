@@ -11,6 +11,7 @@ import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/compon
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { MasterDataConfig, MasterDataField } from "./types";
+import { CollapsibleCard } from "./CollapsibleCard";
 
 const PAGE_SIZE = 25;
 
@@ -616,17 +617,33 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       >
         <div className="flex flex-col gap-4">
           {formError && <InlineAlert>{formError}</InlineAlert>}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {visibleFields.map((f) => (
-              <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
-                <label className="nf-text-label" style={S.sub}>
-                  {tLabel(f.label)}{isFieldRequired(f, form) && <span style={{ color: "var(--danger)" }}> *</span>}
-                </label>
-                {renderField(f)}
-                {f.helpText && <p className="text-[11px]" style={S.muted}>{f.helpText}</p>}
-              </div>
-            ))}
-          </div>
+          {(() => {
+            const DEFAULT = "Identification";
+            const order: string[] = [];
+            const bySection = new Map<string, typeof visibleFields>();
+            for (const f of visibleFields) {
+              const s = f.section || DEFAULT;
+              if (!bySection.has(s)) { bySection.set(s, []); order.push(s); }
+              bySection.get(s)!.push(f);
+            }
+            // A master with no sections configured renders one card, which looks the
+            // same as today's flat form once expanded.
+            return order.map((s, i) => (
+              <CollapsibleCard key={s} title={s} defaultOpen={i === 0}>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {bySection.get(s)!.map((f) => (
+                    <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
+                      <label className="nf-text-label" style={S.sub}>
+                        {tLabel(f.label)}{isFieldRequired(f, form) && <span style={{ color: "var(--danger)" }}> *</span>}
+                      </label>
+                      {renderField(f)}
+                      {f.helpText && <p className="text-[11px]" style={S.muted}>{f.helpText}</p>}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleCard>
+            ));
+          })()}
         </div>
       </Drawer>
 

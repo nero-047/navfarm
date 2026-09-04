@@ -91,6 +91,8 @@ export interface MasterDataField {
    * enforces can't be violated from the form itself.
    */
   exclusiveWith?: string[];
+  /** Card this field belongs to. Fields with no section land in the first card. */
+  section?: string;
 }
 
 export interface MasterDataConfig {
