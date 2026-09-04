@@ -14,11 +14,26 @@ export interface SelectOption {
   label: string;
 }
 
+/** One condition for `requiredWhen`: matches when `key`'s current form value equals `equals`
+ * (or one of `equals`, if an array), or — when `equals` is omitted — simply has any non-empty
+ * value. */
+export interface RequiredCondition {
+  key: string;
+  equals?: string | boolean | Array<string | boolean>;
+}
+
 export interface MasterDataField {
   key: string;
   label: string;
   type: FieldType;
   required?: boolean;
+  /**
+   * Marks this field conditionally required — required only when at least one of `anyOf`'s
+   * conditions currently matches the form's live values (e.g. `standard_cost` required only
+   * when `valuation_method` is `STANDARD`). Shown with the same asterisk as `required`, and
+   * enforced client-side on save; the API enforces the same rule independently.
+   */
+  requiredWhen?: { anyOf: RequiredCondition[] };
   placeholder?: string;
   helpText?: string;
   /** Static dropdown options, for type: "select" */
@@ -90,4 +105,11 @@ export interface MasterDataConfig {
   group: string;
   /** Show a Nature of Business / Line of Business filter pair in the list toolbar (for entities whose table carries nob_id/lob_id). */
   supportsNobLobFilter?: boolean;
+  /**
+   * Whether `apiBase` exposes `PATCH /:id/restore` to un-block a soft-deleted row. Defaults to
+   * true (the pattern nearly every master-data controller follows) — set false for the handful
+   * that don't (e.g. Stage, Number Series, Animal Register, Breed Lifecycle Stages, UOM
+   * Conversions), so the table doesn't offer a Restore action that would 404.
+   */
+  supportsRestore?: boolean;
 }

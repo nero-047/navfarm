@@ -43,7 +43,7 @@ type Grant = {
 const MASTER_DATA_RESOURCES = [
   'BREED', 'BREED_LIFECYCLE_STAGE', 'COST_CENTER', 'CUSTOMER', 'DISEASE', 'FARM',
   'FEED_FORMULA', 'GL_ACCOUNT', 'GL_MAPPING', 'ITEM', 'ITEM_ATTRIBUTE',
-  'ITEM_CATEGORY', 'LOCATION', 'MEDICINE', 'OPERATIONAL_AREA', 'RESOURCE',
+  'ITEM_CATEGORY', 'ITEM_TYPE', 'LOCATION', 'MEDICINE', 'OPERATIONAL_AREA', 'RESOURCE',
   'SHED', 'SPECIES', 'SUPPLIER', 'UOM', 'WAREHOUSE',
 ];
 
@@ -132,7 +132,7 @@ export async function seedDefaultCompanyRoles(
     row(accountantRoleId, { module: 'FINANCE', resource: 'JOURNAL', view: true, create: true, edit: true, approve: true }),
     row(accountantRoleId, { module: 'FINANCE', resource: 'REPORTS', view: true }),
     ...INVENTORY_RESOURCES.map((r) => row(accountantRoleId, { module: 'INVENTORY', resource: r, view: true })),
-    ...['GL_ACCOUNT', 'GL_MAPPING', 'COST_CENTER', 'ITEM', 'ITEM_CATEGORY', 'UOM', 'SUPPLIER', 'CUSTOMER', 'WAREHOUSE']
+    ...['GL_ACCOUNT', 'GL_MAPPING', 'COST_CENTER', 'ITEM', 'ITEM_CATEGORY', 'ITEM_TYPE', 'UOM', 'SUPPLIER', 'CUSTOMER', 'WAREHOUSE']
       .map((r) => row(accountantRoleId, { module: 'MASTER_DATA', resource: r, view: true, create: true, edit: true })),
     row(accountantRoleId, { module: 'PRODUCTION', resource: 'BATCH', view: true }),
     row(accountantRoleId, { module: 'AUDIT', resource: 'LOGS', view: true }),

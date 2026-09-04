@@ -529,6 +529,32 @@ export const itemCategoryMaster = mysqlTable('item_category_master', {
   }).onDelete('restrict')
 }));
 
+// Item Type classification (RAW_MATERIAL / CONSUMABLE / MEDICINE / ...) as a real, tenant-editable
+// master — item_master.item_type stores its type_code (a plain string, same pattern as
+// item_master.valuation_method against costing_method_config), not an FK, so existing rows and
+// business logic that branches on the literal string are unaffected.
+export const itemTypeMaster = mysqlTable('item_type_master', {
+  item_type_id: varchar('item_type_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }), // null means global tenant-wide type
+  type_code: varchar('type_code', { length: 30 }).notNull(),
+  type_name: varchar('type_name', { length: 100 }).notNull(),
+  description: text('description'),
+  is_system: boolean('is_system').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+  extension_config: json('extension_config')
+}, (table) => ({
+  uqTypeCode: uniqueIndex('uq_item_type_master_tenant_company_code').on(
+    table.tenant_id, table.company_id, table.type_code
+  ),
+}));
+
 export const itemMaster = mysqlTable('item_master', {
   item_id: varchar('item_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
@@ -552,12 +578,16 @@ export const itemMaster = mysqlTable('item_master', {
   standard_cost: decimal('standard_cost', { precision: 18, scale: 6 }),
   is_lot_tracked: boolean('is_lot_tracked').default(false).notNull(),
   is_serial_tracked: boolean('is_serial_tracked').default(false).notNull(),
+  // Lot/serial number series for this item's tracking numbers — separate from item_code's
+  // own 'ITEM' series (item.service.ts).
+  tracking_series_id: varchar('tracking_series_id', { length: 36 }).references(() => noSeriesMaster.series_id, { onDelete: 'set null' }),
   is_biological_asset: boolean('is_biological_asset').default(false).notNull(),
   is_biological_costing_method: varchar('is_biological_costing_method', { length: 30 }),
   is_inventoriable: boolean('is_inventoriable').default(true).notNull(),
   min_stock_level: decimal('min_stock_level', { precision: 18, scale: 4 }),
   max_stock_level: decimal('max_stock_level', { precision: 18, scale: 4 }),
   reorder_level: decimal('reorder_level', { precision: 18, scale: 4 }),
+  lead_time_days: int('lead_time_days'),
   shelf_life_days: int('shelf_life_days'),
   storage_temp_min: decimal('storage_temp_min', { precision: 6, scale: 2 }),
   storage_temp_max: decimal('storage_temp_max', { precision: 6, scale: 2 }),
@@ -567,6 +597,7 @@ export const itemMaster = mysqlTable('item_master', {
   withdrawal_days: int('withdrawal_days'),
   is_qr_enabled: boolean('is_qr_enabled').default(false).notNull(),
   qr_trigger_event: varchar('qr_trigger_event', { length: 30 }),
+  item_image_url: varchar('item_image_url', { length: 500 }),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),

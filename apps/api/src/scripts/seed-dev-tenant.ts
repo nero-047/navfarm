@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/mysql2/migrator';
 import * as mysql from 'mysql2/promise';
 import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
-import { forSeededLobs, SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED, SYSTEM_BREED_LIFECYCLE_SEED } from '../core/database/system-master-data-seed';
+import { forSeededLobs, SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_ITEM_TYPE_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED, SYSTEM_BREED_LIFECYCLE_SEED } from '../core/database/system-master-data-seed';
 import { STARTER_GL_ACCOUNTS, STARTER_GL_MAPPINGS, STARTER_WAREHOUSE } from '../modules/system/setup-wizard/seed/starter-master-data.seed-data';
 
 /**
@@ -129,6 +129,10 @@ export async function seedDevTenant() {
       const [existingSpecies] = await tenantDb.select().from(tenant.speciesMaster).limit(1);
       if (!existingSpecies) {
         await tenantDb.insert(tenant.speciesMaster).values(SYSTEM_SPECIES_SEED.map((s) => ({ ...s, tenant_id: tenantId })));
+      }
+      const [existingItemType] = await tenantDb.select().from(tenant.itemTypeMaster).limit(1);
+      if (!existingItemType) {
+        await tenantDb.insert(tenant.itemTypeMaster).values(SYSTEM_ITEM_TYPE_SEED.map((t) => ({ ...t, tenant_id: tenantId, is_system: true })));
       }
 
       // Default breeds/items/parameters per NOB/LOB, visible tenant-wide

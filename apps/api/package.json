@@ -164,6 +164,13 @@
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-dev-demo-data.ts"
         }
       },
+      "db-seed-item-master-demo": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-item-master-demo.ts"
+        }
+      },
       "db-seed-demo-tenant": {
         "executor": "nx:run-commands",
         "options": {

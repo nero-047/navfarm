@@ -147,6 +147,7 @@ const stage: MasterDataConfig = {
   idKey: "stage_id",
   group: "Production",
   supportsNobLobFilter: true,
+  supportsRestore: false,
   columns: [
     { key: "stage_sequence", label: "#" },
     { key: "stage_code", label: "Code" },
@@ -192,6 +193,7 @@ const numberSeries: MasterDataConfig = {
   apiBase: "/number-series",
   idKey: "series_id",
   group: "Production",
+  supportsRestore: false,
   columns: [
     { key: "series_code", label: "Code" },
     { key: "series_name", label: "Name" },
@@ -228,6 +230,7 @@ const animal: MasterDataConfig = {
   apiBase: "/animal",
   idKey: "animal_id",
   group: "Piggery",
+  supportsRestore: false,
   columns: [
     { key: "animal_code", label: "Code" },
     { key: "animal_type", label: "Type" },
@@ -300,6 +303,25 @@ const itemCategory: MasterDataConfig = {
   ],
 };
 
+const itemType: MasterDataConfig = {
+  key: "item-type",
+  label: "Item Types",
+  description: "Item type classification (RAW_MATERIAL, CONSUMABLE, MEDICINE, ...) used by the Items master.",
+  apiBase: "/item-type",
+  idKey: "item_type_id",
+  group: "Inventory",
+  columns: [
+    { key: "type_code", label: "Code" },
+    { key: "type_name", label: "Name" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "type_code", label: "Type Code", type: "text", required: true, placeholder: "RAW_MATERIAL" },
+    { key: "type_name", label: "Type Name", type: "text", required: true, placeholder: "Raw Material" },
+    { key: "description", label: "Description", type: "textarea" },
+  ],
+};
+
 const uom: MasterDataConfig = {
   key: "uom",
   label: "Units of Measure",
@@ -340,6 +362,7 @@ const uomConversion: MasterDataConfig = {
   apiBase: "/uom/conversion",
   idKey: "conversion_id",
   group: "Inventory",
+  supportsRestore: false,
   columns: [
     { key: "from_uom", label: "From" },
     { key: "to_uom", label: "To" },
@@ -412,26 +435,33 @@ const item: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "item_code", label: "Item Code", type: "text", required: true, placeholder: "ITEM-001" },
+    { key: "item_code", label: "Item Code", type: "text", hideInForm: true, helpText: "Auto-generated (ITM-SEQ)." },
     { key: "item_name", label: "Item Name", type: "text", required: true, placeholder: "Cobb Broiler Chicks" },
-    { key: "item_type", label: "Item Type", type: "text", required: true, placeholder: "RAW_MATERIAL" },
+    { key: "item_type", label: "Item Type", type: "select-entity", required: true, entityEndpoint: "/item-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"] },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this item is used across all business verticals." },
     { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this item is used across all LOBs under the selected NOB." },
     { key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
+    { key: "sub_category", label: "Sub Category", type: "text", placeholder: "Grower", helpText: "Free-text subcategory (e.g. Starter/Grower/Finisher/Layer). For a structured, reusable subcategory list, create it as a child of the chosen Category instead." },
     { key: "uom_primary", label: "Primary UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "uom_secondary", label: "Secondary UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
-    { key: "valuation_method", label: "Valuation Method", type: "select", options: ["FIFO", "LIFO", "WEIGHTED_AVG", "STANDARD"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })) },
-    { key: "standard_cost", label: "Standard Cost", type: "number", step: "0.01" },
+    { key: "uom_conversion_factor", label: "UOM Conversion Factor", type: "number", step: "0.000001", helpText: "Optional. 1 secondary unit = this many primary units (e.g. 1 BAG = 50 KG -> 50)." },
+    { key: "valuation_method", label: "Valuation Method", type: "select-entity", entityEndpoint: "/costing-method", entityValueKey: "method_code", entityLabelKeys: ["method_code", "method_name"], helpText: "Leave blank to inherit the LOB default." },
+    { key: "standard_cost", label: "Standard Cost", type: "number", step: "0.01", requiredWhen: { anyOf: [{ key: "valuation_method", equals: "STANDARD" }] }, helpText: "Required when Valuation Method is STANDARD." },
     { key: "is_lot_tracked", label: "Lot Tracked", type: "boolean" },
     { key: "is_serial_tracked", label: "Serial Tracked", type: "boolean" },
+    { key: "tracking_series_id", label: "Tracking No. Series", type: "select-entity", entityEndpoint: "/number-series", entityValueKey: "series_id", entityLabelKeys: ["series_code", "series_name"], requiredWhen: { anyOf: [{ key: "is_lot_tracked", equals: true }, { key: "is_serial_tracked", equals: true }] }, helpText: "Required when Lot Tracked or Serial Tracked is on — used to generate this item's tracking numbers." },
     { key: "is_biological_asset", label: "Biological Asset", type: "boolean" },
     { key: "is_inventoriable", label: "Inventoriable", type: "boolean" },
     { key: "min_stock_level", label: "Min Stock Level", type: "number", step: "0.01" },
     { key: "max_stock_level", label: "Max Stock Level", type: "number", step: "0.01" },
     { key: "reorder_level", label: "Reorder Level", type: "number", step: "0.01" },
+    { key: "lead_time_days", label: "Lead Time (days)", type: "number", helpText: "Procurement lead time, for feed/stock forecast planning." },
     { key: "shelf_life_days", label: "Shelf Life (days)", type: "number" },
-    { key: "withdrawal_days", label: "Withdrawal Period (days)", type: "number", helpText: "Required for MEDICINE/VACCINE items — minimum days after last administration before an animal treated with this item may be slaughtered." },
+    { key: "storage_temp_min", label: "Storage Temp Min (°C)", type: "number", step: "0.01" },
+    { key: "storage_temp_max", label: "Storage Temp Max (°C)", type: "number", step: "0.01" },
+    { key: "withdrawal_days", label: "Withdrawal Period (days)", type: "number", requiredWhen: { anyOf: [{ key: "item_type", equals: ["MEDICINE", "VACCINE"] }] }, helpText: "Required for MEDICINE/VACCINE items — minimum days after last administration before an animal treated with this item may be slaughtered." },
     { key: "is_qr_enabled", label: "QR Tracking Enabled", type: "boolean" },
+    { key: "item_image_url", label: "Item Image URL", type: "text", placeholder: "https://cdn.navfarm.io/items/..." },
     {
       key: "attributes", label: "Attribute Values (JSON array)", type: "json",
       jsonListKeys: ["attribute_id", "attribute_value"],
@@ -515,6 +545,7 @@ const breedLifecycleStage: MasterDataConfig = {
   apiBase: "/breed-lifecycle-stage",
   idKey: "lifecycle_id",
   group: "Livestock & Health",
+  supportsRestore: false,
   columns: [
     { key: "calc_unit", label: "Unit" },
     { key: "period_from", label: "From" },
@@ -880,7 +911,7 @@ export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   farm, warehouse, location, shed,
   stage, numberSeries,
   animal,
-  itemCategory, uom, uomConversion, item, itemAttribute,
+  itemCategory, itemType, uom, uomConversion, item, itemAttribute,
   species, breed, breedLifecycleStage, disease, medicine, feedFormula,
   supplier, customer, resource,
   glAccount, glMapping, costCenter,

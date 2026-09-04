@@ -43,6 +43,20 @@ function parentKeys(f: MasterDataField): string[] {
   return Array.isArray(f.dependsOn) ? f.dependsOn : [f.dependsOn];
 }
 
+/** Whether `f` is required right now — statically, or via `requiredWhen` against the live form values. */
+function isFieldRequired(f: MasterDataField, form: Row): boolean {
+  if (f.required) return true;
+  if (!f.requiredWhen) return false;
+  return f.requiredWhen.anyOf.some((cond) => {
+    const depValue = form[cond.key];
+    if (cond.equals !== undefined) {
+      const list = Array.isArray(cond.equals) ? cond.equals : [cond.equals];
+      return list.includes(depValue);
+    }
+    return depValue !== undefined && depValue !== "" && depValue !== false && depValue !== null;
+  });
+}
+
 /**
  * Resolves a select-entity field's actual endpoint.
  * - "path" mode (default, single parent): substitutes "{value}" with the parent's current
@@ -100,6 +114,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const [confirmDelete, setConfirmDelete] = useState<Row | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
@@ -267,6 +282,15 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     setSaving(true);
     setFormError("");
     try {
+      for (const f of visibleFields) {
+        if (f.filterOnly) continue;
+        const v = form[f.key];
+        const isEmpty = v === "" || v === undefined || v === null;
+        if (isEmpty && isFieldRequired(f, form)) {
+          throw new Error(`"${tLabel(f.label)}" is required.`);
+        }
+      }
+
       const payload: Row = {};
       for (const f of visibleFields) {
         if (f.filterOnly) continue;
@@ -310,6 +334,26 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       setError(err?.message || t("mdFailedToDelete"));
     } finally {
       setDeleting(false);
+    }
+  };
+
+  /** Toggle switch in the Status column, for entities that support restore — flips a row
+   * between Active/Inactive in one click, no confirmation step (unlike the trash-icon delete
+   * flow), since it's trivially reversible by clicking again. */
+  const handleToggleActive = async (row: Row) => {
+    const id = row[config.idKey];
+    setTogglingId(id);
+    try {
+      if (row.is_active === false) {
+        await api.patch(`${config.apiBase}/${id}/restore`);
+      } else {
+        await api.delete(`${config.apiBase}/${id}`);
+      }
+      load();
+    } catch (err: any) {
+      setError(err?.message || t("mdFailedToSave"));
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -486,23 +530,47 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                         <TableCell key={c.key} className="whitespace-nowrap" style={S.primary}>{displayValue(row, c.key, t("mdYes"), t("mdNo"))}</TableCell>
                       ))}
                       <TableCell className="text-right">
-                        <span
-                          className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                          style={inactive
-                            ? { color: "var(--text-muted)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }
-                            : { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" }}
-                        >
-                          {inactive ? t("statusInactive") : t("statusActive")}
-                        </span>
+                        {(config.supportsRestore ?? true) ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-[10px] font-semibold" style={{ color: inactive ? "var(--text-muted)" : "var(--success)" }}>
+                              {inactive ? t("statusInactive") : t("statusActive")}
+                            </span>
+                            <button
+                              role="switch"
+                              aria-checked={!inactive}
+                              onClick={() => handleToggleActive(row)}
+                              disabled={togglingId === row[config.idKey]}
+                              title={inactive ? t("restore") : t("deactivate")}
+                              className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition disabled:opacity-50"
+                              style={{ backgroundColor: inactive ? "var(--border)" : "var(--success)" }}
+                            >
+                              <span
+                                className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform"
+                                style={{ transform: inactive ? "translateX(0.2rem)" : "translateX(1.15rem)" }}
+                              />
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                            style={inactive
+                              ? { color: "var(--text-muted)", borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }
+                              : { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" }}
+                          >
+                            {inactive ? t("statusInactive") : t("statusActive")}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button onClick={() => openEdit(row)} title={t("edit")} className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button onClick={() => setConfirmDelete(row)} title={t("deactivate")} className="rounded-lg p-1.5 transition hover:bg-[var(--danger-muted)]" style={{ color: "var(--danger)" }}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {!(config.supportsRestore ?? true) && (
+                            <button onClick={() => setConfirmDelete(row)} title={t("deactivate")} className="rounded-lg p-1.5 transition hover:bg-[var(--danger-muted)]" style={{ color: "var(--danger)" }}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -552,7 +620,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             {visibleFields.map((f) => (
               <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
                 <label className="nf-text-label" style={S.sub}>
-                  {tLabel(f.label)}{f.required && <span style={{ color: "var(--danger)" }}> *</span>}
+                  {tLabel(f.label)}{isFieldRequired(f, form) && <span style={{ color: "var(--danger)" }}> *</span>}
                 </label>
                 {renderField(f)}
                 {f.helpText && <p className="text-[11px]" style={S.muted}>{f.helpText}</p>}

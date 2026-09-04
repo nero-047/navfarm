@@ -27,6 +27,7 @@ import { WarehouseModule } from './modules/master-data/warehouse/warehouse.modul
 import { LocationModule } from './modules/master-data/location/location.module';
 import { ShedModule } from './modules/master-data/shed/shed.module';
 import { ItemCategoryModule } from './modules/master-data/item-category/item-category.module';
+import { ItemTypeModule } from './modules/master-data/item-type/item-type.module';
 import { ItemModule } from './modules/master-data/item/item.module';
 import { ItemAttributeModule } from './modules/master-data/item-attribute/item-attribute.module';
 import { SupplierModule } from './modules/master-data/supplier/supplier.module';
@@ -106,6 +107,7 @@ import { SystemController } from './system/system.controller';
     LocationModule,
     ShedModule,
     ItemCategoryModule,
+    ItemTypeModule,
     ItemModule,
     ItemAttributeModule,
     SupplierModule,

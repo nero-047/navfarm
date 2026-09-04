@@ -29,6 +29,27 @@ export const SYSTEM_UOM_SEED: Array<{
   { uom_code: 'DAY', uom_name: 'Day', uom_type: 'TIME', decimal_places: 0, is_base_uom: false },
 ];
 
+// Real codes already in use across the seeded demo data (RAW_MATERIAL, CONSUMABLE, FEED,
+// LIVESTOCK, FINISHED_GOODS) plus MEDICINE/VACCINE (item.service.ts's withdrawal_days check
+// branches on these two literal strings), rounded out with the spec's remaining documented
+// types (SEMI_FINISHED, BY_PRODUCT, OVERHEAD) that aren't in use yet.
+export const SYSTEM_ITEM_TYPE_SEED: Array<{
+  type_code: string;
+  type_name: string;
+  description?: string;
+}> = [
+  { type_code: 'RAW_MATERIAL', type_name: 'Raw Material', description: 'Unprocessed input consumed in production (feed ingredients, chemicals, etc.).' },
+  { type_code: 'CONSUMABLE', type_name: 'Consumable', description: 'General consumable stock — not a raw material line item.' },
+  { type_code: 'FEED', type_name: 'Feed', description: 'Formulated animal feed.' },
+  { type_code: 'MEDICINE', type_name: 'Medicine', description: 'Medicine — requires withdrawal_days before a treated animal may be slaughtered.' },
+  { type_code: 'VACCINE', type_name: 'Vaccine', description: 'Vaccine — requires withdrawal_days before a treated animal may be slaughtered.' },
+  { type_code: 'LIVESTOCK', type_name: 'Livestock', description: 'Living biological asset (animal) tracked as inventory.' },
+  { type_code: 'SEMI_FINISHED', type_name: 'Semi-Finished Good', description: 'Partially processed output, consumed further downstream.' },
+  { type_code: 'FINISHED_GOODS', type_name: 'Finished Goods', description: 'Final saleable output.' },
+  { type_code: 'BY_PRODUCT', type_name: 'By-Product', description: 'Secondary output generated alongside the main product.' },
+  { type_code: 'OVERHEAD', type_name: 'Overhead', description: 'Non-physical cost item (labor, utilities) with no stock quantity.' },
+];
+
 export const SYSTEM_SPECIES_SEED: Array<{
   species_code: string;
   species_name: string;
@@ -315,6 +336,7 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
 }> = [
   { series_code: 'BATCH', series_name: 'Batch Number', document_type: 'BATCH', prefix: 'BATCH', separator: '-', seq_length: 6, reset_frequency: 'NEVER' },
   { series_code: 'ANIMAL_PIGGERY', series_name: 'Piggery Animal Code', document_type: 'ANIMAL', nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', prefix: 'PIG', date_format: 'YYYY', separator: '-', seq_length: 4, reset_frequency: 'YEARLY' },
+  { series_code: 'ITEM', series_name: 'Item Code', document_type: 'ITEM', prefix: 'ITM', separator: '-', seq_length: 4, reset_frequency: 'NEVER' },
 ];
 
 /**

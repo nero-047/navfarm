@@ -6,6 +6,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateItemDto, UpdateItemDto, QueryItemDto } from './dto/item.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +17,7 @@ export class ItemService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -30,6 +32,20 @@ export class ItemService {
   private assertWithdrawalDays(itemType: string, withdrawalDays?: number | null) {
     if ((itemType === 'MEDICINE' || itemType === 'VACCINE') && withdrawalDays == null) {
       throw new BadRequestException(`${itemType} items require withdrawal_days to be set.`);
+    }
+  }
+
+  /** standard_cost is mandatory when valuation_method is STANDARD, per spec. */
+  private assertStandardCost(valuationMethod?: string | null, standardCost?: number | null) {
+    if (valuationMethod === 'STANDARD' && standardCost == null) {
+      throw new BadRequestException('standard_cost is required when valuation_method is STANDARD.');
+    }
+  }
+
+  /** tracking_series_id is mandatory when the item is lot- or serial-tracked, per spec. */
+  private assertTrackingSeries(isLotTracked?: boolean | null, isSerialTracked?: boolean | null, trackingSeriesId?: string | null) {
+    if ((isLotTracked || isSerialTracked) && !trackingSeriesId) {
+      throw new BadRequestException('tracking_series_id is required when is_lot_tracked or is_serial_tracked is true.');
     }
   }
 
@@ -64,29 +80,13 @@ export class ItemService {
       categoryName = category.category_name;
     }
 
-    // 3. Verify duplicate code
-    const duplicateConditions = [
-      eq(schema.itemMaster.tenant_id, tenantId),
-      eq(schema.itemMaster.item_code, dto.item_code.toUpperCase()),
-      isNull(schema.itemMaster.deleted_at),
-    ];
-    if (companyId) {
-      duplicateConditions.push(eq(schema.itemMaster.company_id, companyId));
-    } else {
-      duplicateConditions.push(isNull(schema.itemMaster.company_id));
-    }
-
-    const existing = await this.db
-      .select()
-      .from(schema.itemMaster)
-      .where(and(...duplicateConditions))
-      .limit(1);
-
-    if (existing.length > 0) {
-      throw new ConflictException(`Item with code '${dto.item_code}' already exists in this scope.`);
-    }
-
     this.assertWithdrawalDays(dto.item_type, dto.withdrawal_days);
+    this.assertStandardCost(dto.valuation_method, dto.standard_cost);
+    this.assertTrackingSeries(dto.is_lot_tracked, dto.is_serial_tracked, dto.tracking_series_id);
+
+    // 3. Auto-generate the item code from the 'ITEM' number series — uniqueness is
+    // guaranteed by the series' own row lock, no separate duplicate check needed.
+    const itemCode = await this.numberSeriesService.generateNext('ITEM', tenantId, companyId);
 
     const itemId = randomUUID();
     const newItem = {
@@ -94,7 +94,7 @@ export class ItemService {
       tenant_id: tenantId,
       company_id: companyId,
       category_id: dto.category_id || null,
-      item_code: dto.item_code.toUpperCase(),
+      item_code: itemCode,
       item_name: dto.item_name,
       item_type: dto.item_type,
       nob_id: dto.nob_id,
@@ -109,18 +109,21 @@ export class ItemService {
       standard_cost: dto.standard_cost?.toString() || null,
       is_lot_tracked: dto.is_lot_tracked || false,
       is_serial_tracked: dto.is_serial_tracked || false,
+      tracking_series_id: dto.tracking_series_id || null,
       is_biological_asset: dto.is_biological_asset || false,
       is_biological_costing_method: dto.is_biological_costing_method || null,
       is_inventoriable: dto.is_inventoriable ?? true,
       min_stock_level: dto.min_stock_level?.toString() || null,
       max_stock_level: dto.max_stock_level?.toString() || null,
       reorder_level: dto.reorder_level?.toString() || null,
+      lead_time_days: dto.lead_time_days ?? null,
       shelf_life_days: dto.shelf_life_days ?? null,
       storage_temp_min: dto.storage_temp_min?.toString() || null,
       storage_temp_max: dto.storage_temp_max?.toString() || null,
       withdrawal_days: dto.withdrawal_days ?? null,
       is_qr_enabled: dto.is_qr_enabled || false,
       qr_trigger_event: dto.qr_trigger_event || null,
+      item_image_url: dto.item_image_url || null,
       is_active: true,
       status: 'ACTIVE',
       extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
@@ -201,9 +204,11 @@ export class ItemService {
   }
 
   async findAll(query: QueryItemDto, tenantId: string) {
+    // No isNull(deleted_at) filter here — remove() sets both is_active=false and deleted_at, and
+    // the list view is meant to show both states (Active/Inactive badge) so a blocked item can be
+    // found again and restored, rather than vanishing from the list entirely.
     const conditions: any[] = [
       eq(schema.itemMaster.tenant_id, tenantId),
-      isNull(schema.itemMaster.deleted_at),
     ];
 
     if (query.companyId) {
@@ -293,6 +298,15 @@ export class ItemService {
     const effectiveWithdrawalDays = dto.withdrawal_days !== undefined ? dto.withdrawal_days : item.withdrawal_days;
     this.assertWithdrawalDays(effectiveItemType, effectiveWithdrawalDays);
 
+    const effectiveValuationMethod = dto.valuation_method !== undefined ? dto.valuation_method : item.valuation_method;
+    const effectiveStandardCost = dto.standard_cost !== undefined ? dto.standard_cost : (item.standard_cost != null ? Number(item.standard_cost) : null);
+    this.assertStandardCost(effectiveValuationMethod, effectiveStandardCost);
+
+    const effectiveIsLotTracked = dto.is_lot_tracked !== undefined ? dto.is_lot_tracked : item.is_lot_tracked;
+    const effectiveIsSerialTracked = dto.is_serial_tracked !== undefined ? dto.is_serial_tracked : item.is_serial_tracked;
+    const effectiveTrackingSeriesId = dto.tracking_series_id !== undefined ? dto.tracking_series_id : item.tracking_series_id;
+    this.assertTrackingSeries(effectiveIsLotTracked, effectiveIsSerialTracked, effectiveTrackingSeriesId);
+
     const updates: any = {
       updated_by: userPayload?.userId || null,
       updated_at: toMysqlTimestamp(),
@@ -314,18 +328,21 @@ export class ItemService {
     if (dto.standard_cost !== undefined) updates.standard_cost = dto.standard_cost?.toString() || null;
     if (dto.is_lot_tracked !== undefined) updates.is_lot_tracked = dto.is_lot_tracked;
     if (dto.is_serial_tracked !== undefined) updates.is_serial_tracked = dto.is_serial_tracked;
+    if (dto.tracking_series_id !== undefined) updates.tracking_series_id = dto.tracking_series_id;
     if (dto.is_biological_asset !== undefined) updates.is_biological_asset = dto.is_biological_asset;
     if (dto.is_biological_costing_method !== undefined) updates.is_biological_costing_method = dto.is_biological_costing_method;
     if (dto.is_inventoriable !== undefined) updates.is_inventoriable = dto.is_inventoriable;
     if (dto.min_stock_level !== undefined) updates.min_stock_level = dto.min_stock_level?.toString() || null;
     if (dto.max_stock_level !== undefined) updates.max_stock_level = dto.max_stock_level?.toString() || null;
     if (dto.reorder_level !== undefined) updates.reorder_level = dto.reorder_level?.toString() || null;
+    if (dto.lead_time_days !== undefined) updates.lead_time_days = dto.lead_time_days;
     if (dto.shelf_life_days !== undefined) updates.shelf_life_days = dto.shelf_life_days;
     if (dto.storage_temp_min !== undefined) updates.storage_temp_min = dto.storage_temp_min?.toString() || null;
     if (dto.storage_temp_max !== undefined) updates.storage_temp_max = dto.storage_temp_max?.toString() || null;
     if (dto.withdrawal_days !== undefined) updates.withdrawal_days = dto.withdrawal_days;
     if (dto.is_qr_enabled !== undefined) updates.is_qr_enabled = dto.is_qr_enabled;
     if (dto.qr_trigger_event !== undefined) updates.qr_trigger_event = dto.qr_trigger_event;
+    if (dto.item_image_url !== undefined) updates.item_image_url = dto.item_image_url;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;
     if (dto.extension_config !== undefined) updates.extension_config = JSON.stringify(dto.extension_config);

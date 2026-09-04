@@ -20,17 +20,12 @@ export class CreateItemDto {
   @IsOptional()
   company_id?: string;
 
-  @ApiProperty({ description: 'Unique code representing the item', example: 'ITEM-001' })
-  @IsString()
-  @IsNotEmpty()
-  item_code: string;
-
   @ApiProperty({ description: 'Full descriptive name of the item', example: 'Cobb Broiler Chicks' })
   @IsString()
   @IsNotEmpty()
   item_name: string;
 
-  @ApiProperty({ description: 'Item type classification', example: 'RAW_MATERIAL' })
+  @ApiProperty({ description: 'Item type classification — code from item_type_master (GET /item-type)', example: 'RAW_MATERIAL' })
   @IsString()
   @IsNotEmpty()
   item_type: string;
@@ -75,7 +70,7 @@ export class CreateItemDto {
   @IsOptional()
   uom_conversion_factor?: number;
 
-  @ApiProperty({ description: 'Valuation method model', required: false, example: 'FIFO', enum: ['FIFO', 'LIFO', 'WEIGHTED_AVG', 'STANDARD'] })
+  @ApiProperty({ description: 'Valuation method model — code from costing_method_config (GET /costing-method)', required: false, example: 'FIFO', enum: ['STANDARD', 'FIFO', 'BIO_ASSET', 'AVG'] })
   @IsString()
   @IsOptional()
   valuation_method?: string;
@@ -99,6 +94,11 @@ export class CreateItemDto {
   @IsBoolean()
   @IsOptional()
   is_serial_tracked?: boolean;
+
+  @ApiProperty({ description: 'Number Series UUID used to generate this item\'s lot/serial tracking numbers', required: false })
+  @IsUUID()
+  @IsOptional()
+  tracking_series_id?: string;
 
   @ApiProperty({ description: 'Is item classified as a biological asset', default: false, required: false })
   @IsBoolean()
@@ -129,6 +129,12 @@ export class CreateItemDto {
   @IsNumber()
   @IsOptional()
   reorder_level?: number;
+
+  @ApiProperty({ description: 'Procurement lead time in days, for feed/stock forecast planning', required: false })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  lead_time_days?: number;
 
   @ApiProperty({ description: 'Expected shelf life in days', required: false })
   @IsInt()
@@ -161,6 +167,11 @@ export class CreateItemDto {
   @IsString()
   @IsOptional()
   qr_trigger_event?: string;
+
+  @ApiProperty({ description: 'Item image URL', required: false })
+  @IsString()
+  @IsOptional()
+  item_image_url?: string;
 
   @ApiProperty({ description: 'Flexible custom config configurations in JSON format', required: false })
   @IsOptional()
@@ -230,7 +241,7 @@ export class UpdateItemDto {
   @IsOptional()
   uom_conversion_factor?: number;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, enum: ['STANDARD', 'FIFO', 'BIO_ASSET', 'AVG'] })
   @IsString()
   @IsOptional()
   valuation_method?: string;
@@ -254,6 +265,11 @@ export class UpdateItemDto {
   @IsBoolean()
   @IsOptional()
   is_serial_tracked?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  tracking_series_id?: string;
 
   @ApiProperty({ required: false })
   @IsBoolean()
@@ -289,6 +305,12 @@ export class UpdateItemDto {
   @IsInt()
   @Min(0)
   @IsOptional()
+  lead_time_days?: number;
+
+  @ApiProperty({ required: false })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
   shelf_life_days?: number;
 
   @ApiProperty({ required: false })
@@ -316,6 +338,11 @@ export class UpdateItemDto {
   @IsString()
   @IsOptional()
   qr_trigger_event?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  item_image_url?: string;
 
   @ApiProperty({ required: false })
   @IsBoolean()

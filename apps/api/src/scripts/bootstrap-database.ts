@@ -282,9 +282,11 @@ export async function bootstrap() {
       await tenantDb.insert(tenant.stateProvince).values(state).onDuplicateKeyUpdate({ set: withoutId(state, 'state_id') });
     }
 
-    // The two methods actually implemented in batch.service.ts today — this table doesn't
-    // change or re-validate that code, it just gives the literal strings it already branches
-    // on ('STANDARD' / 'BIO_ASSET') a real, authoritative row to point at.
+    // STANDARD / BIO_ASSET are the two methods actually implemented in batch.service.ts —
+    // this table doesn't change or re-validate that code, it just gives the literal strings
+    // it already branches on a real, authoritative row to point at. FIFO / AVG are item-level
+    // inventory valuation methods (item_master.valuation_method) — not batch costing methods,
+    // batch.service.ts does not branch on them.
     const costingMethods: Array<typeof master.costingMethodConfig.$inferInsert> = [
       {
         method_code: 'STANDARD',
@@ -300,6 +302,20 @@ export async function bootstrap() {
         bio_asset_support: true,
         fair_value_option: true,
         amort_option: true,
+        is_system: true,
+      },
+      {
+        method_code: 'FIFO',
+        method_name: 'First In First Out',
+        variance_auto: 'NO',
+        layer_tracking: true,
+        is_system: true,
+      },
+      {
+        method_code: 'AVG',
+        method_name: 'Weighted Average Costing',
+        variance_auto: 'NO',
+        layer_tracking: false,
         is_system: true,
       },
     ];

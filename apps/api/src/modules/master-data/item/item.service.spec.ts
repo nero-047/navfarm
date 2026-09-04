@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ItemService } from './item.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, BadRequestException } from '@nestjs/common';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { BadRequestException } from '@nestjs/common';
 
 describe('ItemService', () => {
   let service: ItemService;
@@ -22,12 +23,16 @@ describe('ItemService', () => {
     transaction: jest.fn(async (cb) => cb(mockDb)),
   };
 
+  const mockGenerateNext = jest.fn();
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
     mockDbDelete.mockReset();
     mockDb.transaction.mockClear();
+    mockGenerateNext.mockReset();
+    mockGenerateNext.mockResolvedValue('ITM-0001');
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,6 +49,12 @@ describe('ItemService', () => {
             log: jest.fn().mockResolvedValue({}),
           },
         },
+        {
+          provide: NumberSeriesService,
+          useValue: {
+            generateNext: mockGenerateNext,
+          },
+        },
       ],
     }).compile();
 
@@ -55,10 +66,7 @@ describe('ItemService', () => {
   });
 
   describe('create', () => {
-    it('should throw ConflictException if item code already exists in this scope', async () => {
-      // First select: check company exists (mock returns [{ company_id: 'comp-1' }])
-      // Second select: check category exists (mock returns [{ category_id: 'cat-1' }])
-      // Third select: check duplicate code (mock returns duplicate chick item)
+    it('should auto-generate item_code from the ITEM number series and create within a transaction', async () => {
       mockDbSelect
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
@@ -77,54 +85,7 @@ describe('ItemService', () => {
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ item_code: 'ITEM-001' }]),
-            }),
-          }),
-        });
-
-      await expect(
-        service.create(
-          {
-            company_id: 'comp-1',
-            item_code: 'ITEM-001',
-            item_name: 'Item 1',
-            item_type: 'RAW_MATERIAL',
-            nob_id: 'nob-1',
-            category_id: 'cat-1',
-            uom_primary: 'PCS',
-          },
-          'tenant-123',
-        ),
-      ).rejects.toThrow(ConflictException);
-    });
-
-    it('should successfully create item within a transaction', async () => {
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ category_id: 'cat-1', category_name: 'Chicks' }]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([]), // no duplicates
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ item_id: 'item-1', item_code: 'ITEM-001' }]),
+              limit: jest.fn().mockResolvedValue([{ item_id: 'item-1', item_code: 'ITM-0001' }]),
             }),
           }),
         })
@@ -144,7 +105,6 @@ describe('ItemService', () => {
       const result = await service.create(
         {
           company_id: 'comp-1',
-          item_code: 'ITEM-001',
           item_name: 'Item 1',
           item_type: 'RAW_MATERIAL',
           nob_id: 'nob-1',
@@ -155,8 +115,9 @@ describe('ItemService', () => {
         { userId: 'user-1' },
       );
 
+      expect(mockGenerateNext).toHaveBeenCalledWith('ITEM', 'tenant-123', 'comp-1');
       expect(mockDb.transaction).toHaveBeenCalled();
-      expect(result.item_code).toBe('ITEM-001');
+      expect(result.item_code).toBe('ITM-0001');
     });
 
     it('should reject a MEDICINE item with no withdrawal_days', async () => {
@@ -168,7 +129,6 @@ describe('ItemService', () => {
         service.create(
           {
             company_id: 'comp-1',
-            item_code: 'MED-001',
             item_name: 'Amoxicillin',
             item_type: 'MEDICINE',
             nob_id: 'nob-1',
@@ -177,6 +137,8 @@ describe('ItemService', () => {
           'tenant-123',
         ),
       ).rejects.toThrow(BadRequestException);
+
+      expect(mockGenerateNext).not.toHaveBeenCalled();
     });
   });
 });
