@@ -70,6 +70,9 @@ correction is an approval workflow, not a permission check. The matrix is delete
 | Running codebase | Factual for *what is*, not for *what should be* | Every claim in §1 above was measured against it. |
 | 2026-09-02 records design | Superseded except as noted in §2 | Its measurements of FIFO/bio-asset behaviour remain valid. |
 | ChatGPT page-spec pack | **No authority** | Speculative. Its 126-route map describes procurement and sales subsystems that do not exist and are not in scope. Used only as a cross-check. |
+| `rak docs/` spreadsheets and PDFs | **No authority** | Confirmed by the user on 2026-09-04 as half-finished working documents. Retained for reference only. Never cite them as a requirement, and never seed master data from them — the 47 reason codes and 32 KPI parameters must come from the BBP or from Triple C directly. |
+
+**Authority order:** BBP-1 → the user's direct instruction → the running codebase → nothing else.
 
 ---
 
