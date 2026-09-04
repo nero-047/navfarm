@@ -118,8 +118,8 @@ const shed: MasterDataConfig = {
   apiBase: "/shed",
   idKey: "shed_id",
   group: "Farm Operations",
+  isPrimary: true,
   supportsNobLobFilter: true,
-  lookupFor: ["location"],
   columns: [
     { key: "shed_code", label: "Code" },
     { key: "shed_name", label: "Name" },
@@ -372,8 +372,8 @@ const uomConversion: MasterDataConfig = {
   apiBase: "/uom/conversion",
   idKey: "conversion_id",
   group: "Inventory",
+  isPrimary: true,
   supportsRestore: false,
-  lookupFor: ["item"],
   columns: [
     { key: "from_uom", label: "From" },
     { key: "to_uom", label: "To" },
@@ -560,8 +560,8 @@ const breedLifecycleStage: MasterDataConfig = {
   apiBase: "/breed-lifecycle-stage",
   idKey: "lifecycle_id",
   group: "Livestock & Health",
+  isPrimary: true,
   supportsRestore: false,
-  lookupFor: ["breed"],
   columns: [
     { key: "calc_unit", label: "Unit" },
     { key: "period_from", label: "From" },
