@@ -103,7 +103,7 @@ export class LocationTypeService {
   }
 
   async findAll(query: QueryLocationTypeDto, tenantId: string) {
-    const conditions: any[] = [eq(schema.locationTypeMaster.tenant_id, tenantId)];
+    const conditions: any[] = [eq(schema.locationTypeMaster.tenant_id, tenantId), isNull(schema.locationTypeMaster.deleted_at)];
     if (query.companyId) conditions.push(or(eq(schema.locationTypeMaster.company_id, query.companyId), isNull(schema.locationTypeMaster.company_id))!);
     if (query.isActive !== undefined) conditions.push(eq(schema.locationTypeMaster.is_active, query.isActive));
     if (query.search) conditions.push(or(like(schema.locationTypeMaster.type_code, `%${query.search}%`), like(schema.locationTypeMaster.type_name, `%${query.search}%`))!);
