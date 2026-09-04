@@ -125,7 +125,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const companyId = getActiveCompanyId();
   const formFields = config.fields.filter((f) => !f.hideInForm);
-  const visibleFields = editing ? formFields.filter((f) => !f.createOnly) : formFields;
+  const visibleFields = editing ? formFields.filter((f) => !f.createOnly) : formFields.filter((f) => !f.editOnly);
   const columns = config.columns || config.fields.filter((f) => !f.hideInTable).slice(0, 5);
   const lookupConfigs = MASTER_DATA_CONFIGS.filter((c) => c.lookupFor?.includes(config.key));
   const sectionCount = new Set(visibleFields.map((f) => f.section || "Identification")).size;

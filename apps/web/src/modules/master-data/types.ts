@@ -87,6 +87,12 @@ export interface MasterDataField {
   /** Only sent on create — omit from the edit form/payload (e.g. the API's update endpoint doesn't accept this field). */
   createOnly?: boolean;
   /**
+   * Only shown once editing — omit from the create form/payload (e.g. a value the service
+   * computes on create, such as an animal's opening bio-asset value, that the API's create
+   * endpoint doesn't accept but its update endpoint does).
+   */
+  editOnly?: boolean;
+  /**
    * Key(s) of other field(s) in this form that must be left empty when this one is set (e.g.
    * a location's farm_id/shed_id/warehouse_id, where exactly one may be chosen) — setting this
    * field to a non-empty value clears each listed field, so the mutual-exclusivity the backend
