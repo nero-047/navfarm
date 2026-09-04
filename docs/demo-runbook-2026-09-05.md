@@ -24,7 +24,12 @@ none has been seen on screen. The click-through pass converts ⚠️ to ✅ — 
 3. **Open the console once and click through your path** before anyone is watching. First render
    after a restart compiles on demand and is slower than every subsequent one.
 
-4. **Close other applications.** This machine has 8 GB and both dev servers plus a browser will
+4. **Confirm which database you are pointing at.** Migrations 0055–0058 are applied to the local
+   MySQL tenant databases. They are **not** applied to the TiDB target in the commented-out `.env`
+   block. If you switch to TiDB, run `pnpm nx run api:db-migrate-all-tenants` against it first or
+   the console will fail on the new columns.
+
+5. **Close other applications.** This machine has 8 GB and both dev servers plus a browser will
    push it into swap. A stutter mid-demo is a memory problem, not a code problem.
 
 ---
@@ -73,7 +78,13 @@ Adding a location: the **Location Type** is itself a lookup you can add inline, 
 Category. Types carry a code prefix, and codes are generated hierarchically — a shed inside farm 1
 becomes `FARM-001/SHED-001`, so the code alone says which farm it belongs to.
 
-*(Hierarchical codes land in P3 — confirm the format in pre-flight before demoing this claim.)*
+**Demo a FRESH Farm → Shed → Pen chain, not a seeded one.** The seeded farms use
+`FARM-APEX-01`-style codes that do not match the generated pattern, so a child added to a seeded
+farm starts at `SHED-001` even where siblings already exist. Nothing breaks; it just reads oddly.
+Create a new farm live and build under it.
+
+**Silos sit under houses**, per BBP §1.2 — the blueprint's own example is `GRS-W2B-SILO1`, farm →
+house → silo. That combination was rejected until this morning and is now allowed.
 
 ### 5. Any other master ⚠️
 Every primary master uses the same dialog shape. Breed, Resource, Supplier, Customer, Stage,
