@@ -254,8 +254,12 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api } from "@/lib/api";
-import type { MasterDataConfig, Row } from "./types";
+import { api } from "@/services/api-client";
+import type { MasterDataConfig } from "./types";
+
+// `Row` is a local alias in MasterDataTable.tsx and is not exported from
+// types.ts, so it is redeclared here rather than imported.
+type Row = Record<string, any>;
 
 /**
  * A lookup master rendered inside its parent's dialog. Saves immediately, as
