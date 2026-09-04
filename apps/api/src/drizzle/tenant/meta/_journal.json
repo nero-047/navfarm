@@ -393,6 +393,13 @@
       "when": 1788550301740,
       "tag": "0055_loving_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "5",
+      "when": 1788558540947,
+      "tag": "0056_location_master_legacy_collision_report",
+      "breakpoints": true
     }
   ]
 }
