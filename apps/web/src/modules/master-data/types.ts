@@ -7,7 +7,8 @@ export type FieldType =
   | "date"
   | "select"
   | "select-entity"
-  | "json";
+  | "json"
+  | "string-list";
 
 export interface SelectOption {
   value: string;

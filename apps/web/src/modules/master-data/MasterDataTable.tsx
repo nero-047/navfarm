@@ -96,6 +96,25 @@ function displayValue(row: Row, key: string, yesLabel: string, noLabel: string):
   return String(v);
 }
 
+/**
+ * Normalizes a "string-list" field's stored value into chip-editor state. Handles the
+ * already-parsed-array shape the API returns, a JSON-encoded string (in case a raw value ever
+ * round-trips through text), and anything else (null, a JSON string rather than an array, or
+ * invalid JSON) by falling back to an empty list rather than throwing.
+ */
+function parseStringList(v: any): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x));
+  if (typeof v === "string" && v.trim() !== "") {
+    try {
+      const parsed = JSON.parse(v);
+      return Array.isArray(parsed) ? parsed.map((x) => String(x)) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export default function MasterDataTable({ config }: { config: MasterDataConfig }) {
   const { t, tLabel } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
@@ -112,6 +131,8 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [form, setForm] = useState<Row>({});
+  // Pending, not-yet-added input text for each "string-list" field's chip editor, keyed by field key.
+  const [chipDrafts, setChipDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [entityReloadKey, setEntityReloadKey] = useState(0);
@@ -257,9 +278,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const openCreate = () => {
     setEditing(null);
     const initial: Row = {};
-    formFields.forEach((f) => { initial[f.key] = f.type === "boolean" ? false : ""; });
+    formFields.forEach((f) => { initial[f.key] = f.type === "boolean" ? false : f.type === "string-list" ? [] : ""; });
     setForm(initial);
     setFormError("");
+    setChipDrafts({});
     setModalOpen(true);
   };
 
@@ -268,6 +290,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     const initial: Row = {};
     formFields.filter((f) => !f.createOnly).forEach((f) => {
       let v = row[f.key];
+      if (f.type === "string-list") {
+        initial[f.key] = parseStringList(v);
+        return;
+      }
       if (f.type === "json" && v && typeof v !== "string") {
         if (f.jsonListKeys && Array.isArray(v)) {
           v = v.map((entry: Row) => {
@@ -282,6 +308,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     });
     setForm(initial);
     setFormError("");
+    setChipDrafts({});
     setModalOpen(true);
   };
 
@@ -396,6 +423,65 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           />
           {tLabel(f.label)}
         </label>
+      );
+    }
+    if (f.type === "string-list") {
+      const list: string[] = Array.isArray(value) ? value : [];
+      const draft = chipDrafts[f.key] ?? "";
+      const addChip = () => {
+        const trimmed = draft.trim();
+        if (!trimmed) return;
+        if (!list.includes(trimmed)) setField(f.key, [...list, trimmed]);
+        setChipDrafts((prev) => ({ ...prev, [f.key]: "" }));
+      };
+      const removeChip = (idx: number) => setField(f.key, list.filter((_, i) => i !== idx));
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              {...accessibility}
+              type="text"
+              value={draft}
+              onChange={(e) => setChipDrafts((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); addChip(); }
+              }}
+              placeholder={f.placeholder}
+              className={inputCls}
+              style={S.input}
+            />
+            <button
+              type="button"
+              onClick={addChip}
+              className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold"
+              style={S.surface}
+            >
+              {t("mdAdd")}
+            </button>
+          </div>
+          {list.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {list.map((val, idx) => (
+                <span
+                  key={`${val}-${idx}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+                  style={S.surface}
+                >
+                  {val}
+                  <button
+                    type="button"
+                    onClick={() => removeChip(idx)}
+                    aria-label={`Remove ${val}`}
+                    className="leading-none"
+                    style={S.muted}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       );
     }
     if (f.type === "textarea" || f.type === "json") {
@@ -669,7 +755,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               <CollapsibleCard key={s} title={s} defaultOpen={i === 0}>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {bySection.get(s)!.map((f) => (
-                    <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
+                    <div key={f.key} className={f.type === "textarea" || f.type === "json" || f.type === "string-list" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
                       <label htmlFor={`master-${config.key}-${f.key}`} className="nf-text-label" style={S.sub}>
                         {tLabel(f.label)}{isFieldRequired(f, form) && <span style={{ color: "var(--danger)" }}> *</span>}
                       </label>

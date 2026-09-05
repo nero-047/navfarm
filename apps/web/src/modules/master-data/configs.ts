@@ -457,7 +457,7 @@ const itemAttribute: MasterDataConfig = {
       key: "data_type", label: "Value Type", type: "select", required: true,
       options: ["STRING", "NUMBER", "BOOLEAN", "LIST"].map((v) => ({ value: v, label: v })),
     },
-    { key: "list_values", label: "List Options (JSON array)", type: "json", helpText: 'Only used when Value Type = LIST. Example: ["Grade A","Grade B"]' },
+    { key: "list_values", label: "List Options", type: "string-list", placeholder: "Grade A", helpText: "Add each allowed value, then Enter or Add.", visibleWhen: { anyOf: [{ key: "data_type", equals: "LIST" }] } },
     { key: "unit", label: "Unit Label", type: "text", placeholder: "PCT" },
     { key: "is_mandatory", label: "Mandatory on every item in scope", type: "boolean" },
     { key: "affects_costing", label: "Affects Costing", type: "boolean" },
