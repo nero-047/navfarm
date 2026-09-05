@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 
@@ -23,14 +23,12 @@ export interface ResolvedNobLob {
  * sites need to.
  *
  * Precedence:
- *   1. A value already present on the incoming DTO always wins — a caller
- *      that still supplies nob_id/lob_id is trusted over any derivation.
- *      Only kicks in when the DTO supplies *neither* field; a partially
- *      filled DTO (one of the two given) is left exactly as given rather
- *      than guessing the other half.
- *   2. Else, if every one of the company's active operational areas agrees
+ *   1. The validated active area's NOB/LOB. Explicit conflicting values or
+ *      a different company are rejected, not silently persisted.
+ *   2. Outside area scope, an explicit DTO selection wins.
+ *   3. Else, if every one of the company's active operational areas agrees
  *      on a single NOB (and separately, a single LOB), use it.
- *   3. Else null. A tenant whose operational areas span multiple LOBs must
+ *   4. Else null. A tenant whose operational areas span multiple LOBs must
  *      never be blocked from creating a record — the taxonomy being
  *      ambiguous is not the record's fault.
  */
@@ -54,6 +52,17 @@ export class NobLobResolutionService {
     const explicitNob = explicit?.nob_id ?? null;
     const explicitLob = explicit?.lob_id ?? null;
 
+    const area = this.cls.get<ResolvedNobLob & { company_id: string }>('activeOperationalArea');
+    if (area) {
+      if (companyId !== area.company_id) {
+        throw new BadRequestException('Master company must match the active operational area.');
+      }
+      if ((explicitNob && explicitNob !== area.nob_id) || (explicitLob && explicitLob !== area.lob_id)) {
+        throw new BadRequestException('NOB/LOB must match the active operational area.');
+      }
+      return { nob_id: area.nob_id, lob_id: area.lob_id };
+    }
+
     if (explicitNob || explicitLob) {
       return { nob_id: explicitNob, lob_id: explicitLob };
     }
@@ -76,6 +85,7 @@ export class NobLobResolutionService {
         eq(schema.operationalAreaMaster.tenant_id, tenantId),
         eq(schema.operationalAreaMaster.company_id, companyId),
         eq(schema.operationalAreaMaster.is_active, true),
+        isNull(schema.operationalAreaMaster.deleted_at),
       ));
 
     if (areas.length === 0) {

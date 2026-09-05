@@ -118,8 +118,8 @@ const location: MasterDataConfig = {
     { key: "max_capacity", label: "Max Capacity", type: "number", step: "0.01", required: true, section: "Identification" },
     { key: "capacity_uom", label: "Capacity UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Identification" },
     { key: "storage_type", label: "Storage Location", type: "select", options: ["STORE", "SILO"].map((v) => ({ value: v, label: v })), section: "Identification" },
-    { key: "silo_capacity_kg", label: "Silo Capacity (KG)", type: "number", step: "0.01", requiredWhen: { anyOf: [{ key: "location_type", equals: "SILO" }] }, helpText: "Required for SILO locations.", section: "Identification" },
-    { key: "silo_reorder_days", label: "Silo Reorder Days", type: "number", requiredWhen: { anyOf: [{ key: "location_type", equals: "SILO" }] }, helpText: "Required for SILO locations.", section: "Identification" },
+    { key: "silo_capacity_kg", label: "Silo Capacity (KG)", type: "number", step: "0.01", visibleWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, requiredWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, helpText: "Required when Storage Location is SILO.", section: "Identification" },
+    { key: "silo_reorder_days", label: "Silo Reorder Days", type: "number", visibleWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, requiredWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, helpText: "Required when Storage Location is SILO.", section: "Identification" },
     { key: "downtime_days_required", label: "Downtime Days Required", type: "number", helpText: "Empty days required between batches for biosecurity.", section: "Identification" },
   ],
 };
@@ -174,6 +174,8 @@ const stage: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], section: "Identification" },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", section: "Identification" },
     { key: "stage_code", label: "Stage Code", type: "text", required: true, placeholder: "QUARANTINE", section: "Identification" },
     { key: "stage_name", label: "Stage Name", type: "text", required: true, placeholder: "Quarantine", section: "Identification" },
     {
@@ -219,6 +221,8 @@ const numberSeries: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank for a series shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id" },
     { key: "series_code", label: "Series Code", type: "text", required: true, placeholder: "BATCH" },
     { key: "series_name", label: "Series Name", type: "text", required: true, placeholder: "Batch Number" },
     { key: "document_type", label: "Document Type", type: "text", required: true, placeholder: "BATCH" },
@@ -256,6 +260,8 @@ const animal: MasterDataConfig = {
   fields: [
     { key: "animal_code", label: "Animal Code", type: "text", hideInForm: true, helpText: "Auto-generated (PIG-YYYY-SEQ).", section: "Identification" },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], section: "Identification" },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", section: "Identification" },
     {
       key: "animal_type", label: "Animal Type", type: "select", required: true, section: "Identification",
       options: ["SOW", "BOAR", "GILT", "PIGLET", "COMMERCIAL_PIG"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
@@ -470,7 +476,9 @@ const item: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "item_code", label: "Item Code", type: "text", hideInForm: true, helpText: "Auto-generated (ITM-SEQ).", section: "Identification" },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this item is used across all business verticals.", section: "Classification" },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this item is used across all LOBs under the selected NOB.", section: "Classification" },
+    { key: "item_code", label: "Item Code", type: "text", readOnly: true, helpText: "Assigned from the Item number series unless manual entry is selected.", section: "Identification" },
     { key: "item_name", label: "Item Name", type: "text", required: true, placeholder: "Cobb Broiler Chicks", section: "Identification" },
     { key: "item_type", label: "Item Type", type: "select-entity", required: true, entityEndpoint: "/item-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"], section: "Identification" },
     { key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"], section: "Identification" },
@@ -495,8 +503,8 @@ const item: MasterDataConfig = {
     { key: "withdrawal_days", label: "Withdrawal Period (days)", type: "number", requiredWhen: { anyOf: [{ key: "item_type", equals: ["MEDICINE", "VACCINE"] }] }, helpText: "Required for MEDICINE/VACCINE items — minimum days after last administration before an animal treated with this item may be slaughtered." },
     { key: "is_qr_enabled", label: "QR Tracking Enabled", type: "boolean" },
     { key: "item_image_url", label: "Item Image URL", type: "text", placeholder: "https://cdn.navfarm.io/items/..." },
-    { key: "inventory_gl_account", label: "Inventory GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts inventory value to.", section: "Accounting" },
-    { key: "cogs_gl_account", label: "COGS GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts cost of goods sold to.", section: "Accounting" },
+    { key: "inventory_gl_account", label: "Inventory GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts inventory value to.", section: "Accounting" },
+    { key: "cogs_gl_account", label: "COGS GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts cost of goods sold to.", section: "Accounting" },
     { key: "is_blocked", label: "Blocked", type: "boolean", helpText: "A blocked item stays visible/historical but cannot be transacted.", section: "Accounting" },
     {
       key: "attributes", label: "Attribute Values (JSON array)", type: "json",
@@ -543,7 +551,10 @@ const breed: MasterDataConfig = {
     { key: "avg_fcr", label: "Avg FCR" },
   ],
   fields: [
+    { key: "location_id", label: "Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], section: "Identification", helpText: "Generated breed codes include this location's code. Leave blank to enter a manual code." },
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], section: "Identification" },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this breed applies to all LOBs under the selected NOB.", section: "Identification" },
     { key: "breed_code", label: "Breed Code", type: "text", required: true, placeholder: "COBB500", section: "Identification" },
     { key: "breed_name", label: "Breed Name", type: "text", required: true, placeholder: "Cobb 500 Broiler", section: "Identification" },
     { key: "species_id", label: "Species", type: "select-entity", required: true, entityEndpoint: "/species", entityValueKey: "species_id", entityLabelKeys: ["species_code", "species_name"], section: "Identification" },
@@ -802,6 +813,8 @@ const resource: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this resource is shared across all business verticals.", section: "Identification" },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this resource is shared across all LOBs under the selected NOB.", section: "Identification" },
     { key: "resource_code", label: "Resource Code", type: "text", readOnly: true, placeholder: "Generated as RES-001", helpText: "Generated automatically from this company's Resource sequence.", section: "Identification" },
     { key: "resource_name", label: "Resource Name", type: "text", required: true, placeholder: "Senior Laborer", section: "Identification" },
     {
@@ -821,7 +834,7 @@ const resource: MasterDataConfig = {
     { key: "unit", label: "Cost UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Capacity & Cost" },
     { key: "cost_rate", label: "Cost Rate", type: "number", step: "0.01", section: "Capacity & Cost" },
     { key: "cost_element", label: "Cost Element", type: "text", placeholder: "DIRECT_LABOR", helpText: "GL cost classification, e.g. DIRECT_LABOR / INDIRECT_LABOR / EQUIPMENT_HIRE / FUEL / MAINTENANCE.", section: "Capacity & Cost" },
-    { key: "gl_cost_account", label: "GL Cost Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this resource posts cost to.", section: "Capacity & Cost" },
+    { key: "gl_cost_account", label: "GL Cost Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this resource posts cost to.", section: "Capacity & Cost" },
     { key: "asset_code", label: "Asset Code", type: "text", placeholder: "ASSET-PELLETISER-01", helpText: "Equipment/vehicle only.", section: "Asset" },
     { key: "asset_make", label: "Asset Make", type: "text", section: "Asset" },
     { key: "asset_model", label: "Asset Model", type: "text", section: "Asset" },
@@ -844,7 +857,7 @@ const glAccount: MasterDataConfig = {
   label: "GL Accounts",
   description: "Chart of Accounts.",
   apiBase: "/gl-account",
-  idKey: "account_id",
+  idKey: "gl_account_id",
   group: "Finance",
   isPrimary: true,
   columns: [
@@ -860,7 +873,7 @@ const glAccount: MasterDataConfig = {
       key: "account_type", label: "Account Type", type: "select", required: true, section: "Identification",
       options: ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"].map((v) => ({ value: v, label: v })),
     },
-    { key: "parent_account_id", label: "Parent Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"], section: "Hierarchy" },
+    { key: "parent_account_id", label: "Parent Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], section: "Hierarchy" },
     { key: "is_sub_account", label: "Sub-Account", type: "boolean", section: "Hierarchy" },
     { key: "is_reconciliation", label: "Reconciliation Account", type: "boolean", section: "Hierarchy" },
   ],
@@ -924,8 +937,8 @@ const glMapping: MasterDataConfig = {
         { value: "BIO_DISPOSAL_SOLD", label: "Bio-Asset — Disposal (Sold)" },
       ],
     },
-    { key: "debit_gl_account_id", label: "Debit GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"] },
-    { key: "credit_gl_account_id", label: "Credit GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "account_id", entityLabelKeys: ["account_code", "account_name"] },
+    { key: "debit_gl_account_id", label: "Debit GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"] },
+    { key: "credit_gl_account_id", label: "Credit GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"] },
   ],
 };
 

@@ -7,6 +7,7 @@ describe('NobLobResolutionService', () => {
 
   const mockDbSelect = jest.fn();
   const mockDb = { select: mockDbSelect };
+  let activeArea: { company_id: string; nob_id: string; lob_id: string } | undefined;
 
   const areasReturning = (rows: Array<{ nob_id: string | null; lob_id: string | null }>) => ({
     from: jest.fn().mockReturnValue({
@@ -16,11 +17,12 @@ describe('NobLobResolutionService', () => {
 
   beforeEach(async () => {
     mockDbSelect.mockReset();
+    activeArea = undefined;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NobLobResolutionService,
-        { provide: ClsService, useValue: { get: jest.fn().mockReturnValue(mockDb) } },
+        { provide: ClsService, useValue: { get: jest.fn((key: string) => key === 'tenantDb' ? mockDb : activeArea) } },
       ],
     }).compile();
 
@@ -78,5 +80,27 @@ describe('NobLobResolutionService', () => {
     const result = await service.resolve('tenant-1', null, {});
     expect(result).toEqual({ nob_id: null, lob_id: null });
     expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('uses the validated active area without inferring from other company areas', async () => {
+    activeArea = { company_id: 'comp-1', nob_id: 'livestock', lob_id: 'piggery' };
+    expect(await service.resolve('tenant-1', 'comp-1')).toEqual({ nob_id: 'livestock', lob_id: 'piggery' });
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('fills missing context from the area when an explicit selection agrees', async () => {
+    activeArea = { company_id: 'comp-1', nob_id: 'livestock', lob_id: 'piggery' };
+    expect(await service.resolve('tenant-1', 'comp-1', { nob_id: 'livestock' }))
+      .toEqual({ nob_id: 'livestock', lob_id: 'piggery' });
+  });
+
+  it('rejects a different LOB in an operational-area request', async () => {
+    activeArea = { company_id: 'comp-1', nob_id: 'livestock', lob_id: 'piggery' };
+    await expect(service.resolve('tenant-1', 'comp-1', { lob_id: 'dairy' })).rejects.toThrow('NOB/LOB must match');
+  });
+
+  it.each([null, 'comp-2'])('rejects master company %s when an area is active', async (company) => {
+    activeArea = { company_id: 'comp-1', nob_id: 'livestock', lob_id: 'piggery' };
+    await expect(service.resolve('tenant-1', company)).rejects.toThrow('Master company must match');
   });
 });

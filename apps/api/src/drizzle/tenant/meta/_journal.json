@@ -435,6 +435,20 @@
       "when": 1788597536362,
       "tag": "0061_funny_crystal",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "5",
+      "when": 1788603691520,
+      "tag": "0062_regular_captain_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "5",
+      "when": 1788604380918,
+      "tag": "0063_medical_patch",
+      "breakpoints": true
     }
   ]
 }

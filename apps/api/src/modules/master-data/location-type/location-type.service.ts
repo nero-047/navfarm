@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { and, eq, isNull, like, ne, or, sql } from 'drizzle-orm';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { ClsService } from 'nestjs-cls';
@@ -27,9 +28,7 @@ export class LocationTypeService {
       isNull(schema.locationTypeMaster.deleted_at),
     ];
     if (excludeId) conditions.push(ne(schema.locationTypeMaster.location_type_id, excludeId));
-    if (companyId) {
-      conditions.push(or(eq(schema.locationTypeMaster.company_id, companyId), isNull(schema.locationTypeMaster.company_id))!);
-    }
+    conditions.push(companyCondition(schema.locationTypeMaster.company_id, companyId));
     const [duplicate] = await this.db.select({ id: schema.locationTypeMaster.location_type_id })
       .from(schema.locationTypeMaster).where(and(...conditions)).limit(1);
     if (duplicate) throw new ConflictException(`Location prefix '${prefix}' is already used by another type in this scope.`);
@@ -44,9 +43,7 @@ export class LocationTypeService {
         eq(schema.locationTypeMaster.is_active, true),
         isNull(schema.locationTypeMaster.deleted_at),
       ];
-      conditions.push(companyId
-        ? or(eq(schema.locationTypeMaster.company_id, companyId), isNull(schema.locationTypeMaster.company_id))!
-        : isNull(schema.locationTypeMaster.company_id));
+      conditions.push(companyCondition(schema.locationTypeMaster.company_id, companyId));
       const [parent] = await this.db.select({ id: schema.locationTypeMaster.location_type_id })
         .from(schema.locationTypeMaster).where(and(...conditions)).limit(1);
       if (!parent) throw new NotFoundException(`Allowed parent Location Type '${parentType}' does not exist.`);
@@ -104,7 +101,7 @@ export class LocationTypeService {
 
   async findAll(query: QueryLocationTypeDto, tenantId: string) {
     const conditions: any[] = [eq(schema.locationTypeMaster.tenant_id, tenantId), isNull(schema.locationTypeMaster.deleted_at)];
-    if (query.companyId) conditions.push(or(eq(schema.locationTypeMaster.company_id, query.companyId), isNull(schema.locationTypeMaster.company_id))!);
+    conditions.push(...masterScopeConditions(this.cls, schema.locationTypeMaster, query.companyId));
     if (query.isActive !== undefined) conditions.push(eq(schema.locationTypeMaster.is_active, query.isActive));
     if (query.search) conditions.push(or(like(schema.locationTypeMaster.type_code, `%${query.search}%`), like(schema.locationTypeMaster.type_name, `%${query.search}%`))!);
     const rows = await this.db.select().from(schema.locationTypeMaster).where(and(...conditions))

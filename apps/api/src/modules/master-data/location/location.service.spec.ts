@@ -93,7 +93,6 @@ describe('LocationService canonical hierarchy', () => {
 
     const result = await service.create({
       company_id: 'comp-1',
-      location_code: 'USER-CANNOT-OVERRIDE',
       location_name: 'Main Farm', location_address: 'Farm Road', location_type: 'FARM',
       max_capacity: 100, capacity_uom: 'HEAD',
     }, 'tenant-1', { userId: 'user-1' });

@@ -1,3 +1,4 @@
+import { masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
@@ -158,14 +159,7 @@ export class UomService {
       eq(schema.uomMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(
-        or(
-          eq(schema.uomMaster.company_id, query.companyId),
-          isNull(schema.uomMaster.company_id) // Global tenant-wide UOMs are visible everywhere
-        )
-      );
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.uomMaster, query.companyId));
     if (query.uomType) {
       conditions.push(eq(schema.uomMaster.uom_type, query.uomType));
     }
@@ -432,14 +426,7 @@ export class UomService {
       eq(schema.uomConversionMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(
-        or(
-          eq(schema.uomConversionMaster.company_id, query.companyId),
-          isNull(schema.uomConversionMaster.company_id)
-        )
-      );
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.uomConversionMaster, query.companyId));
     if (query.itemId) {
       conditions.push(
         or(
@@ -620,4 +607,3 @@ export class UomService {
     };
   }
 }
-

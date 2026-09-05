@@ -1,3 +1,4 @@
+import { masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, or, like } from 'drizzle-orm';
@@ -424,7 +425,7 @@ export class AnimalService {
     const conditions: any[] = [eq(schema.animalRegister.tenant_id, tenantId)];
 
     if (!query.includeDisposed) conditions.push(eq(schema.animalRegister.is_active, true));
-    if (query.companyId) conditions.push(eq(schema.animalRegister.company_id, query.companyId));
+    conditions.push(...masterScopeConditions(this.cls, schema.animalRegister, query.companyId));
     if (query.breedId) conditions.push(eq(schema.animalRegister.breed_id, query.breedId));
     if (query.animalType) conditions.push(eq(schema.animalRegister.animal_type, query.animalType));
     if (query.status) conditions.push(eq(schema.animalRegister.status, query.status));
@@ -795,5 +796,4 @@ export class AnimalService {
     return this.findOne(id);
   }
 }
-
 

@@ -1,6 +1,7 @@
+import { companyCondition, MASTER_TABLES, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, sql } from 'drizzle-orm';
+import { eq, and, like, or, isNull, sql, getTableColumns } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -34,7 +35,7 @@ export class NumberSeriesService {
   }
 
   /**
-   * Materialise an independent company counter from a tenant template. This is
+   * Materialise an independent counter from built-in defaults. This is
    * used by company-owned master records whose identities must never share a
    * counter with another company. `loadExistingCodes` lets the caller expose
    * its own master table without coupling this system service to every domain.
@@ -44,7 +45,7 @@ export class NumberSeriesService {
    */
   async ensureCompanySeries(
     tenantId: string,
-    companyId: string,
+    companyId: string | null | undefined,
     defaults: {
       seriesCode: string;
       seriesName: string;
@@ -57,21 +58,15 @@ export class NumberSeriesService {
   ): Promise<void> {
     const [existing] = await this.db.select().from(schema.noSeriesMaster).where(and(
       eq(schema.noSeriesMaster.tenant_id, tenantId),
-      eq(schema.noSeriesMaster.company_id, companyId),
+      companyCondition(schema.noSeriesMaster.company_id, companyId),
       eq(schema.noSeriesMaster.series_code, defaults.seriesCode),
       isNull(schema.noSeriesMaster.deleted_at),
     )).limit(1);
     if (existing) return;
 
-    const [template] = await this.db.select().from(schema.noSeriesMaster).where(and(
-      eq(schema.noSeriesMaster.tenant_id, tenantId),
-      isNull(schema.noSeriesMaster.company_id),
-      eq(schema.noSeriesMaster.series_code, defaults.seriesCode),
-      isNull(schema.noSeriesMaster.deleted_at),
-    )).limit(1);
-
-    const prefix = template?.prefix || defaults.prefix;
-    const separator = template?.separator || defaults.separator || '-';
+    // Existing companies must not observe later changes to tenant drafts.
+    const prefix = defaults.prefix;
+    const separator = defaults.separator || '-';
     const existingCodes = await loadExistingCodes();
     const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedSeparator = separator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -86,16 +81,16 @@ export class NumberSeriesService {
       tenant_id: tenantId,
       company_id: companyId,
       series_code: defaults.seriesCode,
-      series_name: template?.series_name || defaults.seriesName,
-      document_type: template?.document_type || defaults.documentType,
+      series_name: defaults.seriesName,
+      document_type: defaults.documentType,
       prefix,
-      date_format: template?.date_format || null,
+      date_format: null,
       separator,
-      seq_length: template?.seq_length || defaults.seqLength,
+      seq_length: defaults.seqLength,
       current_seq: currentSeq,
-      reset_frequency: template?.reset_frequency || 'NEVER',
+      reset_frequency: 'NEVER',
       allow_manual: false,
-    }).onDuplicateKeyUpdate({ set: { series_name: template?.series_name || defaults.seriesName } });
+    }).onDuplicateKeyUpdate({ set: { series_name: defaults.seriesName } });
   }
 
   /**
@@ -109,19 +104,19 @@ export class NumberSeriesService {
     seriesCode: string,
     tenantId: string,
     companyId?: string | null,
-    executor: MySql2Database<typeof schema> = this.db,
+    executor?: MySql2Database<typeof schema>,
   ): Promise<string> {
+    if (!executor) {
+      return this.db.transaction((tx) => this.generateNext(seriesCode, tenantId, companyId, tx));
+    }
     const conditions = [
       eq(schema.noSeriesMaster.tenant_id, tenantId),
       eq(schema.noSeriesMaster.series_code, seriesCode),
       isNull(schema.noSeriesMaster.deleted_at),
     ];
-    // A company-specific row (if a company overrode the tenant-wide default) wins over
-    // the shared one — same wildcard convention findAll() below uses for filtering.
+    // Templates and company counters are independent after company creation.
     conditions.push(
-      companyId
-        ? or(eq(schema.noSeriesMaster.company_id, companyId), isNull(schema.noSeriesMaster.company_id))!
-        : isNull(schema.noSeriesMaster.company_id)
+      companyCondition(schema.noSeriesMaster.company_id, companyId)
     );
 
     const [series] = await executor
@@ -197,9 +192,7 @@ export class NumberSeriesService {
         isNull(schema.noSeriesMaster.deleted_at),
       ];
       conditions.push(
-        companyId
-          ? or(eq(schema.noSeriesMaster.company_id, companyId), isNull(schema.noSeriesMaster.company_id))!
-          : isNull(schema.noSeriesMaster.company_id)
+        companyCondition(schema.noSeriesMaster.company_id, companyId)
       );
       const [row] = await executor
         .select({ series_id: schema.noSeriesMaster.series_id })
@@ -218,6 +211,35 @@ export class NumberSeriesService {
     if (await seriesExists(masterSeriesCode)) return masterSeriesCode;
 
     return null;
+  }
+
+  async resolveCodeSettings(master: string, type: string | undefined, tenantId: string, companyId?: string | null) {
+    if (!/^[A-Z][A-Z_]{0,49}$/.test(master)) throw new BadRequestException('Invalid master code.');
+    const code = await this.resolveSeriesFor(master, type, tenantId, companyId);
+    if (!code) return { generated: false, allowManual: true };
+    const [row] = await this.db.select().from(schema.noSeriesMaster).where(and(
+      eq(schema.noSeriesMaster.tenant_id, tenantId), eq(schema.noSeriesMaster.series_code, code),
+      eq(schema.noSeriesMaster.is_active, true), isNull(schema.noSeriesMaster.deleted_at),
+      companyCondition(schema.noSeriesMaster.company_id, companyId),
+    )).orderBy(sql`${schema.noSeriesMaster.company_id} IS NULL`).limit(1);
+    return row ? { generated: true, allowManual: row.allow_manual, seriesCode: row.series_code, prefix: row.prefix } : { generated: false, allowManual: true };
+  }
+
+  /** Validate an explicit manual identity without consuming the series. */
+  async manualCode(master: string, supplied: string, tenantId: string, companyId?: string | null, type?: string) {
+    const settings = await this.resolveCodeSettings(master, type, tenantId, companyId);
+    if (settings.generated && !settings.allowManual) throw new BadRequestException('This number series does not allow manual entry.');
+    const code = supplied.trim().toUpperCase();
+    const table = MASTER_TABLES[master.toLowerCase().replaceAll('_', '-')];
+    const columns = getTableColumns(table);
+    const column = columns[`${master.toLowerCase()}_code`];
+    const width = Number(column.getSQLType().match(/\((\d+)\)/)?.[1] || 255);
+    if (!code || code.length > width) throw new BadRequestException(`Code must contain 1 to ${width} characters.`);
+    const [duplicate] = await this.db.select().from(table).where(and(
+      eq(columns.tenant_id, tenantId), companyCondition(columns.company_id, companyId), eq(column, code),
+    )).limit(1);
+    if (duplicate) throw new ConflictException(`Code '${code}' already exists in this scope.`);
+    return code;
   }
 
   /**
@@ -242,9 +264,7 @@ export class NumberSeriesService {
       isNull(schema.noSeriesMaster.deleted_at),
     ];
     conditions.push(
-      companyId
-        ? or(eq(schema.noSeriesMaster.company_id, companyId), isNull(schema.noSeriesMaster.company_id))!
-        : isNull(schema.noSeriesMaster.company_id)
+      companyCondition(schema.noSeriesMaster.company_id, companyId)
     );
 
     const [series] = await executor
@@ -345,9 +365,7 @@ export class NumberSeriesService {
       eq(schema.noSeriesMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(or(eq(schema.noSeriesMaster.company_id, query.companyId), isNull(schema.noSeriesMaster.company_id)));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.noSeriesMaster, query.companyId));
     if (query.documentType) conditions.push(eq(schema.noSeriesMaster.document_type, query.documentType));
     if (query.isActive !== undefined) conditions.push(eq(schema.noSeriesMaster.is_active, query.isActive));
     if (query.search) {

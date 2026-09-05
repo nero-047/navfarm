@@ -5,8 +5,8 @@ import { Type } from 'class-transformer';
 export class CreateMedicineDto {
   @ApiProperty({ description: 'Company UUID scope ownership', example: 'company-uuid-here' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Item Master UUID link', example: 'item-uuid-here' })
   @IsUUID()

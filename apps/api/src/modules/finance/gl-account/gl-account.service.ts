@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
@@ -43,14 +44,16 @@ export class GlAccountService {
 
   async create(dto: CreateGlAccountDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     // 2. Verify parent account exists if specified
@@ -85,7 +88,7 @@ export class GlAccountService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'gl_account_master',
@@ -109,7 +112,7 @@ export class GlAccountService {
       .where(
         and(
           eq(schema.glAccountMaster.tenant_id, tenantId),
-          eq(schema.glAccountMaster.company_id, dto.company_id),
+          companyCondition(schema.glAccountMaster.company_id, dto.company_id),
           eq(schema.glAccountMaster.account_code, dto.account_code),
           isNull(schema.glAccountMaster.deleted_at)
         )
@@ -124,7 +127,7 @@ export class GlAccountService {
     const newAccount = {
       gl_account_id: glAccountId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       account_code: dto.account_code,
       account_name: dto.account_name,
       account_type: dto.account_type,
@@ -142,7 +145,7 @@ export class GlAccountService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'gl_account_master',
@@ -203,7 +206,7 @@ export class GlAccountService {
     const newAccount = {
       gl_account_id: glAccountId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       account_code: accountCode,
       account_name: dto.account_name,
       account_type: dto.account_type,
@@ -241,9 +244,7 @@ export class GlAccountService {
       eq(schema.glAccountMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.glAccountMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.glAccountMaster, query.companyId));
     if (query.accountType) {
       conditions.push(eq(schema.glAccountMaster.account_type, query.accountType));
     }
@@ -283,7 +284,7 @@ export class GlAccountService {
         .where(
           and(
             eq(schema.glAccountMaster.tenant_id, tenantId),
-            eq(schema.glAccountMaster.company_id, account.company_id),
+            companyCondition(schema.glAccountMaster.company_id, account.company_id),
             eq(schema.glAccountMaster.account_code, dto.account_code),
             ne(schema.glAccountMaster.gl_account_id, id),
             isNull(schema.glAccountMaster.deleted_at)
@@ -339,7 +340,7 @@ export class GlAccountService {
 
     await this.auditService.log({
       tenantId,
-      companyId: account.company_id,
+      companyId: account.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'gl_account_master',
@@ -384,7 +385,7 @@ export class GlAccountService {
 
     await this.auditService.log({
       tenantId,
-      companyId: account.company_id,
+      companyId: account.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'gl_account_master',
@@ -442,7 +443,7 @@ export class GlAccountService {
 
     await this.auditService.log({
       tenantId,
-      companyId: account.company_id,
+      companyId: account.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'gl_account_master',

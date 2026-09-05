@@ -1,3 +1,4 @@
+import { masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
@@ -139,14 +140,7 @@ export class ItemTypeService {
       eq(schema.itemTypeMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(
-        or(
-          eq(schema.itemTypeMaster.company_id, query.companyId),
-          isNull(schema.itemTypeMaster.company_id)
-        )
-      );
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.itemTypeMaster, query.companyId));
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.itemTypeMaster.is_active, query.isActive));
     }

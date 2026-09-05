@@ -5,8 +5,8 @@ import { Type } from 'class-transformer';
 export class CreateDiseaseDto {
   @ApiProperty({ description: 'Company UUID scope ownership', example: 'company-uuid-here' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Unique code representing the disease definition. Optional when a number series is configured for diseases — the code is generated then.', required: false, example: 'DIS-ND' })
   @IsString()

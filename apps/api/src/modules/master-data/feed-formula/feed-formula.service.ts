@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
@@ -50,14 +51,16 @@ export class FeedFormulaService {
     }
 
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     // 2. Verify target item exists
@@ -81,7 +84,7 @@ export class FeedFormulaService {
       .where(
         and(
           eq(schema.feedFormulaMaster.tenant_id, tenantId),
-          eq(schema.feedFormulaMaster.company_id, dto.company_id),
+          companyCondition(schema.feedFormulaMaster.company_id, dto.company_id),
           eq(schema.feedFormulaMaster.formula_code, formulaCode),
           isNull(schema.feedFormulaMaster.deleted_at)
         )
@@ -112,7 +115,7 @@ export class FeedFormulaService {
       const newFormula = {
         formula_id: formulaId,
         tenant_id: tenantId,
-        company_id: dto.company_id,
+        company_id: dto.company_id || null,
         formula_code: formulaCode,
         formula_name: dto.formula_name,
         target_item_id: dto.target_item_id,
@@ -132,7 +135,7 @@ export class FeedFormulaService {
       const newIngredients = dto.ingredients.map((ingr) => ({
         ingredient_id: randomUUID(),
         tenant_id: tenantId,
-        company_id: dto.company_id,
+        company_id: dto.company_id || null,
         formula_id: formulaId,
         item_id: ingr.item_id,
         quantity: ingr.quantity.toString(),
@@ -154,7 +157,7 @@ export class FeedFormulaService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'feed_formula_master',
@@ -199,9 +202,7 @@ export class FeedFormulaService {
       eq(schema.feedFormulaMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.feedFormulaMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.feedFormulaMaster, query.companyId));
     if (query.targetItemId) {
       conditions.push(eq(schema.feedFormulaMaster.target_item_id, query.targetItemId));
     }
@@ -238,7 +239,7 @@ export class FeedFormulaService {
         .where(
           and(
             eq(schema.feedFormulaMaster.tenant_id, tenantId),
-            eq(schema.feedFormulaMaster.company_id, formula.company_id),
+            companyCondition(schema.feedFormulaMaster.company_id, formula.company_id),
             eq(schema.feedFormulaMaster.formula_code, dto.formula_code.toUpperCase()),
             ne(schema.feedFormulaMaster.formula_id, id),
             isNull(schema.feedFormulaMaster.deleted_at)
@@ -285,7 +286,7 @@ export class FeedFormulaService {
 
     await this.auditService.log({
       tenantId,
-      companyId: formula.company_id,
+      companyId: formula.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'feed_formula_master',
@@ -327,7 +328,7 @@ export class FeedFormulaService {
 
     await this.auditService.log({
       tenantId,
-      companyId: formula.company_id,
+      companyId: formula.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'feed_formula_master',
@@ -382,7 +383,7 @@ export class FeedFormulaService {
 
     await this.auditService.log({
       tenantId,
-      companyId: formula.company_id,
+      companyId: formula.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'feed_formula_master',

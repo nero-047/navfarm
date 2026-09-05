@@ -5,8 +5,8 @@ import { Type } from 'class-transformer';
 export class CreateGlMappingDto {
   @ApiProperty({ description: 'Company UUID scope ownership', example: 'company-uuid-here' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Optional Item Category UUID link for scoped category mapping rules', required: false })
   @IsUUID()

@@ -17,6 +17,7 @@ describe('BreedService', () => {
     select: mockDbSelect,
     insert: mockDbInsert,
     update: mockDbUpdate,
+    transaction: jest.fn((work: (tx: any) => Promise<any>): Promise<any> => work(mockDb)),
   };
 
   const numberSeries = {
@@ -248,25 +249,27 @@ describe('BreedService', () => {
       expect(insertedValues.avg_litter_size_born).toBe('11.5');
     });
 
-    it('generates the breed code via a breed_type series when one is configured', async () => {
-      numberSeries.resolveSeriesFor.mockResolvedValue('BREED_BROILER');
-      numberSeries.lockSeries.mockResolvedValue({ allow_manual: false });
-      numberSeries.generateNext.mockResolvedValue('BRD-001');
+    it.each([
+      ['FARM-001', [], 'FARM-001/SOW-001'],
+      ['FARM-001', [{ code: 'FARM-001/SOW-001' }, { code: 'FARM-001/SOW-003' }], 'FARM-001/SOW-004'],
+      ['FARM-002', [], 'FARM-002/SOW-001'],
+    ])('generates a type code under location %s', async (parentCode, siblings, expected) => {
+      numberSeries.resolveSeriesFor.mockResolvedValue('BREED_SOW');
+      numberSeries.lockSeries.mockResolvedValue({ allow_manual: false, prefix: 'SOW', seq_length: 3 });
+      const returning = (rows: any[]) => ({ from: () => ({ where: () => Object.assign(Promise.resolve(rows), { limit: async () => rows }) }) });
       mockDbSelect
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ species_id: 'spec-1', species_name: 'Chicken' }]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) }) // no duplicate
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ breed_code: 'BRD-001', breed_name: 'Cobb 500' }]) }) }) });
-
+        .mockReturnValueOnce(returning([{ species_id: 'pig', species_name: 'Pig' }]))
+        .mockReturnValueOnce(returning([{ location_code: parentCode }]))
+        .mockReturnValueOnce(returning(siblings as any[]))
+        .mockReturnValueOnce(returning([]))
+        .mockReturnValueOnce(returning([{ breed_code: expected }]));
       mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
-
-      const result = await service.createBreed(
-        { nob_id: 'nob-1', breed_name: 'Cobb 500', species_id: 'spec-1', breed_type: 'BROILER' },
-        'tenant-123',
-      );
-
-      expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('BREED', 'BROILER', 'tenant-123', null);
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('BREED_BROILER', 'tenant-123', null);
-      expect(result.breed_code).toBe('BRD-001');
+      const result = await service.createBreed({
+        nob_id: 'livestock', breed_name: 'Yorkshire', species_id: 'pig', breed_type: 'SOW', location_id: 'location',
+      }, 'tenant');
+      expect(result.breed_code).toBe(expected);
+      expect(numberSeries.lockSeries).toHaveBeenCalledWith('BREED_SOW', 'tenant', null, mockDb);
+      expect(numberSeries.generateNext).not.toHaveBeenCalled();
     });
 
     it('rejects when neither a series nor a manual breed_code is supplied', async () => {

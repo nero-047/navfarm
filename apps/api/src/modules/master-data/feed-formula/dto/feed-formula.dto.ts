@@ -35,8 +35,8 @@ export class CreateFormulaIngredientDto {
 export class CreateFeedFormulaDto {
   @ApiProperty({ description: 'Company UUID scope ownership', example: 'company-uuid-here' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Unique code representing the formula recipe/BOM. Optional when a number series is configured for feed formulas — the code is generated then.', required: false, example: 'FORM-BR-STARTER' })
   @IsString()

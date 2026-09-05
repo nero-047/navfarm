@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/services/api-client";
-import { getActiveCompanyId } from "@/hooks/useAuth";
+import { getActiveCompanyId, getActiveWorkspaceScope } from "@/hooks/useAuth";
 import type { MasterDataConfig, MasterDataField } from "./types";
+import { useCodeSeries } from "./useCodeSeries";
 
 // `Row` is a local alias in MasterDataTable.tsx and is not exported from
 // types.ts, so it is redeclared here rather than imported.
@@ -18,10 +19,10 @@ function LookupEntitySelect({ field, value, onChange }: {
   const [options, setOptions] = useState<Row[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const companyId = getActiveCompanyId();
+  const companyId = getActiveWorkspaceScope() === "TENANT" ? null : getActiveCompanyId();
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams({ limit: "200" });
+    const params = new URLSearchParams({ limit: "200", isActive: "true" });
     if (companyId) params.set("companyId", companyId);
     setLoading(true);
     setError("");
@@ -53,10 +54,11 @@ function LookupEntitySelect({ field, value, onChange }: {
  * the item dialog is then cancelled.
  */
 export function LookupCard({
-  config, onCreated,
+  config, onCreated, onManage,
 }: {
   config: MasterDataConfig;
   onCreated: () => void;
+  onManage: () => void;
 }) {
   const [form, setForm] = useState<Row>({});
   const [busy, setBusy] = useState(false);
@@ -64,15 +66,16 @@ export function LookupCard({
 
   // Include every required creation field: recipes need item/UOM selectors
   // and ingredients as well as their code and name.
-  const fields = config.fields.filter(
-    (f) => !f.hideInForm && !f.readOnly && !f.editOnly && !f.filterOnly && (f.required || f.showInLookup),
+  const numbering = useCodeSeries(config.key, form);
+  const fields = config.fields.filter((f) => f.required || f.showInLookup).map(numbering.field).filter(
+    (f) => !f.hideInForm && !f.readOnly && !f.editOnly && !f.filterOnly && !(getActiveWorkspaceScope() === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)),
   );
 
   const add = async () => {
     setBusy(true);
     setError("");
     try {
-      const cid = getActiveCompanyId();
+      const cid = getActiveWorkspaceScope() === "TENANT" ? null : getActiveCompanyId();
       const body: Row = {};
       for (const field of fields) {
         const value = form[field.key];
@@ -100,6 +103,11 @@ export function LookupCard({
 
   return (
     <div className="grid gap-3">
+      {numbering.canChoose && <label className="grid gap-1 text-sm">Code Entry
+        <select aria-label="Code Entry" className="nf-input nf-select" value={numbering.mode} onChange={(e) => numbering.chooseMode(e.target.value as "serial" | "manual")}>
+          <option value="serial">Follow number series</option><option value="manual">Enter manually</option>
+        </select>
+      </label>}
       <div className="grid gap-3 sm:grid-cols-2">
         {fields.map((f) => (
           <label key={f.key} className="grid gap-1">
@@ -139,13 +147,14 @@ export function LookupCard({
       {error ? (
         <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>
       ) : null}
+      {numbering.error && <p className="text-xs text-(--danger)">{numbering.error}</p>}
       <div className="flex items-center gap-3 flex-wrap">
-        <Button type="button" size="sm" onClick={add} disabled={busy || !complete}>
+        <Button type="button" size="sm" onClick={add} disabled={busy || !complete || numbering.loading || !!numbering.error}>
           {busy ? "Adding…" : `Add ${config.label}`}
         </Button>
-        <a href={`/master-data/${config.key}`} target="_blank" rel="noopener noreferrer" className="text-xs underline text-(--text-secondary)">
-          Manage {config.label} (new tab)
-        </a>
+        <button type="button" onClick={onManage} className="text-xs underline text-(--text-secondary)">
+          Manage {config.label}
+        </button>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, isNull, ne } from 'drizzle-orm';
@@ -28,14 +29,16 @@ export class GlMappingService {
 
   async create(dto: CreateGlMappingDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     // 2. Verify item category exists if specified
@@ -120,7 +123,7 @@ export class GlMappingService {
     // 5. Verify no duplicate mapping rule exists for the same dimensions within the company scope
     const queryConditions = [
       eq(schema.glMappingMaster.tenant_id, tenantId),
-      eq(schema.glMappingMaster.company_id, dto.company_id),
+      companyCondition(schema.glMappingMaster.company_id, dto.company_id),
       eq(schema.glMappingMaster.transaction_type, dto.transaction_type.toUpperCase()),
       isNull(schema.glMappingMaster.deleted_at),
     ];
@@ -166,7 +169,7 @@ export class GlMappingService {
     const newMapping = {
       mapping_id: mappingId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       item_category_id: dto.item_category_id || null,
       nob_id: dto.nob_id || null,
       lob_id: dto.lob_id || null,
@@ -187,7 +190,7 @@ export class GlMappingService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'gl_mapping_master',
@@ -218,9 +221,7 @@ export class GlMappingService {
       eq(schema.glMappingMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.glMappingMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.glMappingMaster, query.companyId));
     if (query.itemCategoryId) {
       conditions.push(eq(schema.glMappingMaster.item_category_id, query.itemCategoryId));
     }
@@ -351,7 +352,7 @@ export class GlMappingService {
 
       const queryConditions = [
         eq(schema.glMappingMaster.tenant_id, tenantId),
-        eq(schema.glMappingMaster.company_id, mapping.company_id),
+        companyCondition(schema.glMappingMaster.company_id, mapping.company_id),
         eq(schema.glMappingMaster.transaction_type, transType.toUpperCase()),
         ne(schema.glMappingMaster.mapping_id, id),
         isNull(schema.glMappingMaster.deleted_at),
@@ -420,7 +421,7 @@ export class GlMappingService {
 
     await this.auditService.log({
       tenantId,
-      companyId: mapping.company_id,
+      companyId: mapping.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'gl_mapping_master',
@@ -448,7 +449,7 @@ export class GlMappingService {
 
     await this.auditService.log({
       tenantId,
-      companyId: mapping.company_id,
+      companyId: mapping.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'gl_mapping_master',
@@ -488,7 +489,7 @@ export class GlMappingService {
 
     await this.auditService.log({
       tenantId,
-      companyId: mapping.company_id,
+      companyId: mapping.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'gl_mapping_master',

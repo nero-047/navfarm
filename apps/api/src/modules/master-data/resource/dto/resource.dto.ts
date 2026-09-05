@@ -5,8 +5,8 @@ import { Type } from 'class-transformer';
 export class CreateResourceDto {
   @ApiProperty({ description: 'Company UUID scope ownership' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
   @IsString()

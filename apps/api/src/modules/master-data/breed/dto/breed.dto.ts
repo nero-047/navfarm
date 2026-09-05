@@ -82,6 +82,10 @@ export class QuerySpeciesDto {
 // ==========================================
 
 export class CreateBreedDto {
+  @ApiProperty({ description: 'Location where this breed is kept; used as the generated code parent.', required: false })
+  @IsUUID()
+  @IsOptional()
+  location_id?: string;
   @ApiProperty({ description: 'Nature of Business UUID scope. Omit to derive it from the company\'s operational areas.', required: false, example: '50000000-5000-5000-5000-000000000001' })
   @IsString()
   @IsOptional()
@@ -253,6 +257,10 @@ export class CreateBreedDto {
 }
 
 export class UpdateBreedDto {
+  @ApiProperty({ description: 'Location where this breed is kept. Existing codes are not renumbered.', required: false })
+  @IsUUID()
+  @IsOptional()
+  location_id?: string | null;
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()

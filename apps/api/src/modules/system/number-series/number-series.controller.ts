@@ -31,6 +31,13 @@ export class NumberSeriesController {
     return { success: true, message: 'Number series retrieved successfully.', data: result };
   }
 
+  @Get('resolve')
+  @RequirePermission('SYSTEM', 'NUMBER_SERIES', 'view')
+  async resolveCodeSettings(@Query('master') master: string, @Query('type') type: string | undefined, @Req() req: any) {
+    const companyId = req.headers['x-workspace-scope'] === 'TENANT' ? null : (req.headers['x-active-company-id'] || req.user?.companyId);
+    return this.numberSeriesService.resolveCodeSettings(master, type, req.user?.tenantId || req.tenantId, companyId);
+  }
+
   @Get(':id')
   @RequirePermission('SYSTEM', 'NUMBER_SERIES', 'view')
   @ApiOperation({ summary: 'Fetch a single Number Series' })

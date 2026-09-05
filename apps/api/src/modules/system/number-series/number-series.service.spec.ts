@@ -16,6 +16,7 @@ describe('NumberSeriesService', () => {
     select: mockDbSelect,
     insert: mockDbInsert,
     update: mockDbUpdate,
+    transaction: jest.fn((work: (tx: any) => Promise<any>): Promise<any> => work(mockDb)),
   };
 
   const nobLobResolution = {
@@ -45,6 +46,28 @@ describe('NumberSeriesService', () => {
     }).compile();
 
     service = module.get<NumberSeriesService>(NumberSeriesService);
+  });
+
+  describe('manualCode', () => {
+    it('normalizes a manual code without incrementing its number series', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: true, allowManual: true });
+      mockDbSelect.mockReturnValue({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) });
+      await expect(service.manualCode('ITEM', ' custom-01 ', 'tenant', 'company')).resolves.toBe('CUSTOM-01');
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('rejects manual entry when the series forbids it', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: true, allowManual: false });
+      await expect(service.manualCode('ITEM', 'CUSTOM', 'tenant', 'company')).rejects.toThrow(BadRequestException);
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
+    it('rejects an existing identity without consuming a number', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: false, allowManual: true });
+      mockDbSelect.mockReturnValue({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ item_id: 'existing' }]) }) }) });
+      await expect(service.manualCode('ITEM', 'CUSTOM', 'tenant', 'company')).rejects.toThrow(ConflictException);
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
   });
 
   describe('generateNext', () => {

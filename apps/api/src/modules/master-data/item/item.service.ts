@@ -1,3 +1,4 @@
+import { masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull } from 'drizzle-orm';
@@ -144,7 +145,9 @@ export class ItemService {
 
     // 3. One company-wide ITEM sequence is shared by all Item Types.
     await this.ensureCompanyItemSeries(tenantId, companyId);
-    const itemCode = await this.numberSeriesService.generateNext('ITEM', tenantId, companyId);
+    const itemCode = dto.item_code?.trim()
+      ? await this.numberSeriesService.manualCode('ITEM', dto.item_code, tenantId, companyId)
+      : await this.numberSeriesService.generateNext('ITEM', tenantId, companyId);
 
     const itemId = randomUUID();
     const newItem = {
@@ -269,14 +272,7 @@ export class ItemService {
       eq(schema.itemMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(
-        or(
-          eq(schema.itemMaster.company_id, query.companyId),
-          isNull(schema.itemMaster.company_id)
-        )
-      );
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.itemMaster, query.companyId));
     if (query.categoryId) {
       conditions.push(eq(schema.itemMaster.category_id, query.categoryId));
     }

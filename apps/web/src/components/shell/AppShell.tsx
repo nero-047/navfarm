@@ -516,17 +516,15 @@ export function AppShell(props: AppShellProps) {
             off-canvas drawer, so opening the hamburger on a module route
             could never reveal it. This is the same `contextNav` node
             rendered a second time, `lg:hidden` so it only exists in the
-            mobile drawer and never doubles up on desktop, and `aria-hidden`
-            so assistive tech keeps exactly one copy of the landmark — the
-            one in the workspace region, which is present at every viewport
-            width. Selecting a section here still has to close the drawer,
+            mobile drawer and never doubles up on desktop. The open drawer's
+            links must remain available to assistive technology. Selecting a
+            section here still has to close the drawer,
             which the page's own `onSelect` has no way to do, so it is done
             by catching the click as it bubbles rather than by changing
             ContextNav's provider contract. */}
         {contextNav && (
           <div
             className="lg:hidden"
-            aria-hidden="true"
             onClick={(event) => {
               const target = event.target as HTMLElement;
               if (target.closest("[data-context-nav-item], [data-menu-item]")) {

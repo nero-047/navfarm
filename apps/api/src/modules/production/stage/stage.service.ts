@@ -1,3 +1,4 @@
+import { masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull } from 'drizzle-orm';
@@ -194,11 +195,7 @@ export class StageService {
       eq(schema.stageMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(
-        or(eq(schema.stageMaster.company_id, query.companyId), isNull(schema.stageMaster.company_id))
-      );
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.stageMaster, query.companyId));
     if (query.nobId) conditions.push(eq(schema.stageMaster.nob_id, query.nobId));
     if (query.lobId) conditions.push(eq(schema.stageMaster.lob_id, query.lobId));
     if (query.stageCategory) conditions.push(eq(schema.stageMaster.stage_category, query.stageCategory));

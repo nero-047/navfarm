@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
@@ -28,14 +29,16 @@ export class MedicineService {
 
   async create(dto: CreateMedicineDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     // 2. Verify item exists and is active
@@ -56,7 +59,7 @@ export class MedicineService {
       .where(
         and(
           eq(schema.medicineMaster.tenant_id, tenantId),
-          eq(schema.medicineMaster.company_id, dto.company_id),
+          companyCondition(schema.medicineMaster.company_id, dto.company_id),
           eq(schema.medicineMaster.item_id, dto.item_id),
           isNull(schema.medicineMaster.deleted_at)
         )
@@ -71,7 +74,7 @@ export class MedicineService {
     const newMedicine = {
       medicine_id: medicineId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       item_id: dto.item_id,
       composition: dto.composition || null,
       dosage_guideline: dto.dosage_guideline || null,
@@ -88,7 +91,7 @@ export class MedicineService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'medicine_master',
@@ -119,9 +122,7 @@ export class MedicineService {
       eq(schema.medicineMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.medicineMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.medicineMaster, query.companyId));
     if (query.itemId) {
       conditions.push(eq(schema.medicineMaster.item_id, query.itemId));
     }
@@ -170,7 +171,7 @@ export class MedicineService {
         .where(
           and(
             eq(schema.medicineMaster.tenant_id, tenantId),
-            eq(schema.medicineMaster.company_id, medicine.company_id),
+            companyCondition(schema.medicineMaster.company_id, medicine.company_id),
             eq(schema.medicineMaster.item_id, dto.item_id),
             ne(schema.medicineMaster.medicine_id, id),
             isNull(schema.medicineMaster.deleted_at)
@@ -204,7 +205,7 @@ export class MedicineService {
 
     await this.auditService.log({
       tenantId,
-      companyId: medicine.company_id,
+      companyId: medicine.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'medicine_master',
@@ -232,7 +233,7 @@ export class MedicineService {
 
     await this.auditService.log({
       tenantId,
-      companyId: medicine.company_id,
+      companyId: medicine.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'medicine_master',
@@ -272,7 +273,7 @@ export class MedicineService {
 
     await this.auditService.log({
       tenantId,
-      companyId: medicine.company_id,
+      companyId: medicine.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'medicine_master',

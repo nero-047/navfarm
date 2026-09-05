@@ -34,6 +34,8 @@ export interface MasterDataField {
    * enforced client-side on save; the API enforces the same rule independently.
    */
   requiredWhen?: { anyOf: RequiredCondition[] };
+  /** Render and submit only while at least one condition matches. */
+  visibleWhen?: { anyOf: RequiredCondition[] };
   placeholder?: string;
   helpText?: string;
   /** Static dropdown options, for type: "select" */

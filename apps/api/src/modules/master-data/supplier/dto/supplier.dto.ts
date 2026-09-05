@@ -7,8 +7,8 @@ const VENDOR_TYPES = ['ANIMAL_SUPPLIER', 'BREEDING_FARM', 'SEMEN_SUPPLIER', 'FEE
 export class CreateSupplierDto {
   @ApiProperty({ description: 'Company UUID scope ownership', example: 'company-uuid-here' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Legacy input only; the API generates SUP-001, SUP-002, etc. per company', example: 'SUP-001', required: false })
   @IsString()

@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull } from 'drizzle-orm';
@@ -30,14 +31,16 @@ export class CustomerService {
 
   async create(dto: CreateCustomerDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     await this.numberSeriesService.ensureCompanySeries(
@@ -47,18 +50,20 @@ export class CustomerService {
       async () => {
         const rows = await this.db.select({ code: schema.customerMaster.customer_code }).from(schema.customerMaster).where(and(
           eq(schema.customerMaster.tenant_id, tenantId),
-          eq(schema.customerMaster.company_id, dto.company_id),
+          companyCondition(schema.customerMaster.company_id, dto.company_id),
         ));
         return rows.map((row) => row.code);
       },
     );
-    const customerCode = await this.numberSeriesService.generateNext('CUSTOMER', tenantId, dto.company_id);
+    const customerCode = dto.customer_code?.trim()
+      ? await this.numberSeriesService.manualCode('CUSTOMER', dto.customer_code, tenantId, dto.company_id)
+      : await this.numberSeriesService.generateNext('CUSTOMER', tenantId, dto.company_id);
 
     const customerId = randomUUID();
     const newCustomer = {
       customer_id: customerId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       customer_code: customerCode,
       customer_name: dto.customer_name,
       email: dto.email || null,
@@ -81,7 +86,7 @@ export class CustomerService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'customer_master',
@@ -112,9 +117,7 @@ export class CustomerService {
       eq(schema.customerMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.customerMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.customerMaster, query.companyId));
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.customerMaster.is_active, query.isActive));
     }
@@ -172,7 +175,7 @@ export class CustomerService {
 
     await this.auditService.log({
       tenantId,
-      companyId: customer.company_id,
+      companyId: customer.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'customer_master',
@@ -200,7 +203,7 @@ export class CustomerService {
 
     await this.auditService.log({
       tenantId,
-      companyId: customer.company_id,
+      companyId: customer.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'customer_master',
@@ -240,7 +243,7 @@ export class CustomerService {
 
     await this.auditService.log({
       tenantId,
-      companyId: customer.company_id,
+      companyId: customer.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'customer_master',

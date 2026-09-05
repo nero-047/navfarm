@@ -1,6 +1,8 @@
+import { masterScopeConditions } from '../../../common/master-data-scope';
+import { generateCompositeCode } from '../../system/number-series/composite-code.util';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
+import { eq, and, like, or, isNull, ne, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -41,19 +43,33 @@ export class BreedService {
   }
 
   /** Resolves by breed_type first (e.g. BREED_BROILER), then the master-alone BREED series, else manual. */
-  private async resolveBreedCode(dto: CreateBreedDto, tenantId: string, companyId: string | null): Promise<string> {
-    const seriesCode = await this.numberSeriesService.resolveSeriesFor('BREED', dto.breed_type, tenantId, companyId);
+  private async resolveBreedCode(dto: CreateBreedDto, tenantId: string, companyId: string | null, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
+    const seriesCode = dto.location_id ? await this.numberSeriesService.resolveSeriesFor('BREED', dto.breed_type, tenantId, companyId, executor) : null;
     if (!seriesCode) {
       if (!dto.breed_code) {
-        throw new BadRequestException('breed_code is required — no number series is configured for breeds.');
+        throw new BadRequestException('breed_code is required without a location and configured breed series.');
       }
       return dto.breed_code.toUpperCase();
     }
-    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId);
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId, executor);
     if (series.allow_manual && dto.breed_code) {
       return dto.breed_code.toUpperCase();
     }
-    return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
+    const [location] = await executor.select().from(schema.locationMaster).where(and(
+      eq(schema.locationMaster.location_id, dto.location_id!), eq(schema.locationMaster.tenant_id, tenantId),
+      companyId ? eq(schema.locationMaster.company_id, companyId) : isNull(schema.locationMaster.company_id),
+      eq(schema.locationMaster.is_active, true), isNull(schema.locationMaster.deleted_at),
+    )).limit(1);
+    if (!location) throw new BadRequestException('Select an active location in this company.');
+    const code = await generateCompositeCode({
+      parentCode: location.location_code, prefix: series.prefix || dto.breed_type, seqLength: series.seq_length,
+      fetchSiblingCodes: () => executor.select({ code: schema.breedMaster.breed_code }).from(schema.breedMaster).where(and(
+        eq(schema.breedMaster.tenant_id, tenantId), eq(schema.breedMaster.location_id, dto.location_id!),
+        companyId ? eq(schema.breedMaster.company_id, companyId) : isNull(schema.breedMaster.company_id),
+      )),
+    });
+    if (code.length > 255) throw new BadRequestException('Generated breed code exceeds 255 characters. Shorten the location code or breed prefix.');
+    return code;
   }
 
   // ========================================================
@@ -133,14 +149,7 @@ export class BreedService {
       eq(schema.speciesMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(
-        or(
-          eq(schema.speciesMaster.company_id, query.companyId),
-          isNull(schema.speciesMaster.company_id)
-        )
-      );
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.speciesMaster, query.companyId));
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.speciesMaster.is_active, query.isActive));
     }
@@ -317,7 +326,8 @@ export class BreedService {
 
     // Resolve the breed code — a series (breed_type first, then BREED alone) if
     // one is configured, else the user-supplied code.
-    const breedCode = await this.resolveBreedCode(dto, tenantId, companyId);
+    const newBreed = await this.db.transaction(async (tx) => {
+    const breedCode = await this.resolveBreedCode(dto, tenantId, companyId, tx);
 
     // Verify duplicate breed code in company scope
     const duplicateConditions = [
@@ -331,7 +341,7 @@ export class BreedService {
       duplicateConditions.push(isNull(schema.breedMaster.company_id));
     }
 
-    const existing = await this.db
+    const existing = await tx
       .select()
       .from(schema.breedMaster)
       .where(and(...duplicateConditions))
@@ -344,6 +354,7 @@ export class BreedService {
     const breedId = randomUUID();
     const newBreed = {
       breed_id: breedId,
+      location_id: dto.location_id || null,
       tenant_id: tenantId,
       company_id: companyId,
       nob_id: nobId,
@@ -383,7 +394,9 @@ export class BreedService {
       updated_by: userPayload?.userId || null,
     };
 
-    await this.db.insert(schema.breedMaster).values(newBreed);
+    await tx.insert(schema.breedMaster).values(newBreed);
+    return newBreed;
+    });
 
     await this.auditService.log({
       tenantId,
@@ -391,11 +404,11 @@ export class BreedService {
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'breed_master',
-      entityId: breedId,
+      entityId: newBreed.breed_id,
       newValues: newBreed,
     });
 
-    return this.findOneBreed(breedId);
+    return this.findOneBreed(newBreed.breed_id);
   }
 
   async findOneBreed(id: string) {
@@ -418,14 +431,7 @@ export class BreedService {
       eq(schema.breedMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(
-        or(
-          eq(schema.breedMaster.company_id, query.companyId),
-          isNull(schema.breedMaster.company_id)
-        )
-      );
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.breedMaster, query.companyId));
     if (query.speciesId) {
       conditions.push(eq(schema.breedMaster.species_id, query.speciesId));
     }
@@ -500,6 +506,7 @@ export class BreedService {
       updated_at: toMysqlTimestamp(),
     };
 
+    if (dto.location_id !== undefined) updates.location_id = dto.location_id;
     if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
     if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
     if (dto.breed_code !== undefined) updates.breed_code = dto.breed_code.toUpperCase();
@@ -710,6 +717,11 @@ export class BreedService {
 
   async findAllLifecycleStages(query: QueryBreedLifecycleStageDto, tenantId: string) {
     const conditions: any[] = [eq(schema.breedLifecycleStages.tenant_id, tenantId)];
+    const scopeConditions = masterScopeConditions(this.cls, schema.breedMaster);
+    if (scopeConditions.length) {
+      conditions.push(inArray(schema.breedLifecycleStages.breed_id,
+        this.db.select({ id: schema.breedMaster.breed_id }).from(schema.breedMaster).where(and(...scopeConditions))));
+    }
 
     if (query.breedId) conditions.push(eq(schema.breedLifecycleStages.breed_id, query.breedId));
     if (query.stageId) conditions.push(eq(schema.breedLifecycleStages.stage_id, query.stageId));

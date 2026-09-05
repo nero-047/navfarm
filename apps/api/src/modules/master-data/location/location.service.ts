@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, sql } from 'drizzle-orm';
@@ -36,9 +37,7 @@ export class LocationService {
       eq(schema.locationTypeMaster.is_active, true),
       isNull(schema.locationTypeMaster.deleted_at),
     ];
-    conditions.push(companyId
-      ? or(eq(schema.locationTypeMaster.company_id, companyId), isNull(schema.locationTypeMaster.company_id))!
-      : isNull(schema.locationTypeMaster.company_id));
+    conditions.push(companyCondition(schema.locationTypeMaster.company_id, companyId));
     const [type] = await this.db.select().from(schema.locationTypeMaster).where(and(...conditions))
       .orderBy(sql`${schema.locationTypeMaster.company_id} IS NULL`).limit(1);
     if (!type) throw new NotFoundException(`Location Type '${typeCode}' not found.`);
@@ -156,7 +155,9 @@ export class LocationService {
     // executor, so the series row's SELECT ... FOR UPDATE (or, for a child
     // location, the sibling count it guards) stays locked until the insert
     // below commits — two concurrent creates cannot produce the same code.
-    const locationCode = await this.generateLocationCode(seriesCode, locationType, tenantId, companyId, parent, tx);
+    const locationCode = dto.location_code?.trim()
+      ? await this.numberSeriesService.manualCode('LOCATION', dto.location_code, tenantId, companyId, typeCode)
+      : await this.generateLocationCode(seriesCode, locationType, tenantId, companyId, parent, tx);
 
     // location_code is varchar(255). A deep hierarchical tree (each level
     // prepending "<parent code>/<TYPE>-<seq>") can in principle exceed that —
@@ -326,7 +327,7 @@ export class LocationService {
     }
   }
 
-  /** Validates a UOM code exists (tenant + company-or-global scope) before it's stored on a location. */
+  /** Validates the UOM belongs to the same template/company scope. */
   private async assertUomExists(uomCode: string | null | undefined, tenantId: string, companyId?: string | null) {
     if (!uomCode) return;
 
@@ -335,11 +336,7 @@ export class LocationService {
       eq(schema.uomMaster.uom_code, uomCode.toUpperCase()),
       isNull(schema.uomMaster.deleted_at),
     ];
-    if (companyId) {
-      conditions.push(or(eq(schema.uomMaster.company_id, companyId), isNull(schema.uomMaster.company_id))!);
-    } else {
-      conditions.push(isNull(schema.uomMaster.company_id));
-    }
+    conditions.push(companyCondition(schema.uomMaster.company_id, companyId));
 
     const [uom] = await this.db
       .select()
@@ -400,7 +397,12 @@ export class LocationService {
     }
 
     // 4. SILO locations must carry silo tracking fields
-    this.assertSiloFieldsWhenSilo(typeCode, dto.silo_capacity_kg, dto.silo_reorder_days);
+    if (!dto.storage_type && typeCode === 'SILO') dto.storage_type = 'SILO';
+    this.assertSiloFieldsWhenSilo(dto.storage_type, dto.silo_capacity_kg, dto.silo_reorder_days);
+    if (dto.storage_type !== 'SILO') {
+      dto.silo_capacity_kg = undefined;
+      dto.silo_reorder_days = undefined;
+    }
 
     // 5. area_unit / capacity_uom must resolve to a real UOM
     await this.assertUomExists(dto.area_unit, tenantId, dto.company_id);
@@ -474,14 +476,7 @@ export class LocationService {
       eq(schema.locationMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(
-        or(
-          eq(schema.locationMaster.company_id, query.companyId),
-          isNull(schema.locationMaster.company_id)
-        )
-      );
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.locationMaster, query.companyId));
     if (query.nobId) {
       conditions.push(eq(schema.locationMaster.nob_id, query.nobId));
     }
@@ -581,7 +576,8 @@ export class LocationService {
     // partial update that doesn't touch these fields doesn't spuriously fail.
     const effectiveSiloCapacity = dto.silo_capacity_kg !== undefined ? dto.silo_capacity_kg : location.silo_capacity_kg;
     const effectiveSiloReorderDays = dto.silo_reorder_days !== undefined ? dto.silo_reorder_days : location.silo_reorder_days;
-    this.assertSiloFieldsWhenSilo(effectiveLocationType, effectiveSiloCapacity as any, effectiveSiloReorderDays as any);
+    const effectiveStorage = dto.storage_type !== undefined ? dto.storage_type : location.storage_type || (effectiveLocationType === 'SILO' ? 'SILO' : null);
+    this.assertSiloFieldsWhenSilo(effectiveStorage, effectiveSiloCapacity as any, effectiveSiloReorderDays as any);
 
     if (dto.area_unit !== undefined) {
       await this.assertUomExists(dto.area_unit, tenantId, dto.company_id !== undefined ? dto.company_id : location.company_id);
@@ -617,6 +613,10 @@ export class LocationService {
     if (dto.is_quarantine_zone !== undefined) updates.is_quarantine_zone = dto.is_quarantine_zone;
     if (dto.silo_capacity_kg !== undefined) updates.silo_capacity_kg = dto.silo_capacity_kg?.toString() || null;
     if (dto.silo_reorder_days !== undefined) updates.silo_reorder_days = dto.silo_reorder_days;
+    if (effectiveStorage !== 'SILO') {
+      updates.silo_capacity_kg = null;
+      updates.silo_reorder_days = null;
+    }
     if (dto.downtime_days_required !== undefined) updates.downtime_days_required = dto.downtime_days_required;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;

@@ -5,8 +5,8 @@ import { Type } from 'class-transformer';
 export class CreateGlAccountDto {
   @ApiProperty({ description: 'Company UUID scope ownership', example: 'company-uuid-here' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Unique account code. Optional when a number series is configured for GL accounts — the code is generated then.', required: false, example: '101000' })
   @IsString()

@@ -7,12 +7,13 @@ import { Dialog } from "@/components/ui/dialog";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { getActiveCompanyId } from "@/hooks/useAuth";
+import { getActiveCompanyId, getActiveWorkspaceScope } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { MasterDataConfig, MasterDataField } from "./types";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { LookupCard } from "./LookupCard";
 import { MASTER_DATA_CONFIGS } from "./configs";
+import { useCodeSeries } from "./useCodeSeries";
 
 const PAGE_SIZE = 25;
 
@@ -114,6 +115,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [entityReloadKey, setEntityReloadKey] = useState(0);
+  const [lookupManager, setLookupManager] = useState<MasterDataConfig | null>(null);
   const lastEntityReloadKeyRef = useRef(entityReloadKey);
 
   const [confirmDelete, setConfirmDelete] = useState<Row | null>(null);
@@ -123,9 +125,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
-  const companyId = getActiveCompanyId();
-  const formFields = config.fields.filter((f) => !f.hideInForm);
-  const visibleFields = editing ? formFields.filter((f) => !f.createOnly) : formFields.filter((f) => !f.editOnly);
+  const workspaceScope = getActiveWorkspaceScope();
+  const companyId = workspaceScope === "TENANT" ? null : getActiveCompanyId();
+  const numbering = useCodeSeries(config.key, form, modalOpen && !editing);
+  const formFields = config.fields.map(numbering.field).filter((f) => !f.hideInForm && !(workspaceScope === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)));
+  const visibleFields = (editing ? formFields.filter((f) => !f.createOnly) : formFields.filter((f) => !f.editOnly))
+    .filter((f) => !f.visibleWhen || isFieldRequired({ ...f, required: false, requiredWhen: f.visibleWhen }, form));
   const columns = config.columns || config.fields.filter((f) => !f.hideInTable).slice(0, 5);
   const lookupConfigs = MASTER_DATA_CONFIGS.filter((c) => c.lookupFor?.includes(config.key));
   const sectionCount = new Set(visibleFields.map((f) => f.section || "Identification")).size;
@@ -146,37 +151,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       params.set("limit", "200");
       const res = await api.get(`${config.apiBase}?${params.toString()}`);
       const list = unwrap<Row[]>(res);
-      let finalRows = Array.isArray(list) ? list : [];
-
-      // If in Operational Scope, enforce LOB domain isolation
-      const activeScope = typeof window !== "undefined" ? localStorage.getItem("active_workspace_scope") : "COMPANY";
-      const activeLob = typeof window !== "undefined" ? (localStorage.getItem("active_lob") || "PIGGERY") : "PIGGERY";
-
-      if (activeScope === "OPERATIONAL") {
-        if (activeLob === "PIGGERY") {
-          finalRows = finalRows.filter((r) => {
-            const text = `${r.item_name || ""} ${r.item_code || ""} ${r.breed_name || ""} ${r.breed_code || ""} ${r.shed_name || ""} ${r.shed_code || ""} ${r.formula_name || ""} ${r.disease_name || ""} ${r.parameter_name || ""} ${r.qc_parameter_name || ""}`.toLowerCase();
-            const nonPiggery = [
-              "broiler", "layer", "poultry", "chick", "pullet", "egg", "bird", "duck", "plt-", "plt_",
-              "dairy", "cow", "bovine", "milk", "calf", "heifer", "silage", "tmr", "dry-", "dry_",
-              "fish", "shrimp", "prawn", "fingerling", "paddy", "wheat", "cotton", "crop", "bee", "honey"
-            ];
-            return !nonPiggery.some((kw) => text.includes(kw));
-          });
-        } else if (activeLob === "DAIRY") {
-          finalRows = finalRows.filter((r) => {
-            const text = `${r.item_name || ""} ${r.item_code || ""} ${r.breed_name || ""} ${r.breed_code || ""} ${r.shed_name || ""} ${r.shed_code || ""} ${r.formula_name || ""} ${r.disease_name || ""} ${r.parameter_name || ""} ${r.qc_parameter_name || ""}`.toLowerCase();
-            const nonDairy = [
-              "sow", "pig", "boar", "gilt", "piglet", "swine",
-              "broiler", "layer", "poultry", "chick", "pullet", "egg", "bird", "duck", "plt-", "plt_",
-              "fish", "shrimp", "prawn", "paddy", "wheat", "cotton", "crop", "bee", "honey"
-            ];
-            return !nonDairy.some((kw) => text.includes(kw));
-          });
-        }
-      }
-
-      setRows(finalRows);
+      setRows(Array.isArray(list) ? list : []);
     } catch (err: any) {
       setError(err?.message || t("mdFailedToLoad"));
     } finally {
@@ -193,7 +168,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
-    if (!config.supportsNobLobFilter) return;
+    if (!config.supportsNobLobFilter || workspaceScope === "OPERATIONAL") return;
     setNobFilter("");
     setLobFilter("");
     const params = new URLSearchParams();
@@ -308,6 +283,11 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const setField = (key: string, value: any) => setForm((prev) => {
     const next = { ...prev, [key]: value };
+    if (config.key === "location" && key === "location_type" && value === "SILO") next.storage_type = "SILO";
+    if (config.key === "location" && key === "storage_type" && value !== "SILO") {
+      next.silo_capacity_kg = "";
+      next.silo_reorder_days = "";
+    }
     config.fields.forEach((f) => {
       if (parentKeys(f).includes(key) && next[f.key]) next[f.key] = "";
     });
@@ -399,10 +379,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const renderField = (f: MasterDataField) => {
     const value = form[f.key] ?? "";
+    const accessibility = { id: `master-${config.key}-${f.key}`, "aria-label": tLabel(f.label), "aria-required": isFieldRequired(f, form) };
     if (f.type === "boolean") {
       return (
         <label className="flex items-center gap-2 py-2 text-sm" style={S.primary}>
           <input
+            {...accessibility}
             type="checkbox"
             checked={!!value}
             onChange={(e) => setField(f.key, e.target.checked)}
@@ -415,6 +397,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     if (f.type === "textarea" || f.type === "json") {
       return (
         <textarea
+          {...accessibility}
           value={value}
           onChange={(e) => setField(f.key, e.target.value)}
           placeholder={f.placeholder}
@@ -426,7 +409,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     }
     if (f.type === "select") {
       return (
-        <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
+        <select {...accessibility} value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input}>
           <option value="">{t("selectPlaceholder")}</option>
           {f.options?.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -443,7 +426,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       const disabled = f.dependsOnMode !== "query" && parents.length > 0 && !resolvedEp;
       const parentLabel = parents.map((k) => tLabel(config.fields.find((pf) => pf.key === k)?.label || k)).join(" & ");
       return (
-        <select value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={disabled}>
+        <select {...accessibility} value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={disabled}>
           <option value="">{disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder")}</option>
           {options.map((o) => (
             <option key={o[f.entityValueKey || "id"]} value={o[f.entityValueKey || "id"]}>
@@ -455,6 +438,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     }
     return (
       <input
+        {...accessibility}
         type={f.type === "number" ? "number" : f.type === "email" ? "email" : f.type === "date" ? "date" : "text"}
         step={f.step}
         value={value}
@@ -482,11 +466,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           on the left (apple.design.md §23). */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          {config.supportsNobLobFilter && (
+          {config.supportsNobLobFilter && workspaceScope !== "OPERATIONAL" && (
             <>
               <select
+                aria-label="Filter by nature of business"
                 value={nobFilter}
-                onChange={(e) => setNobFilter(e.target.value)}
+                onChange={(e) => { setNobFilter(e.target.value); setLobFilter(""); }}
                 className="nf-input-sm nf-select"
                 style={S.input}
               >
@@ -496,6 +481,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 ))}
               </select>
               <select
+                aria-label="Filter by line of business"
                 value={lobFilter}
                 onChange={(e) => setLobFilter(e.target.value)}
                 className="nf-input-sm nf-select"
@@ -645,7 +631,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             </button>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || numbering.loading || !!numbering.error}
               className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               style={{ backgroundColor: "var(--accent)" }}
             >
@@ -656,6 +642,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       >
         <div className="flex flex-col gap-4">
           {formError && <InlineAlert>{formError}</InlineAlert>}
+          {numbering.error && <InlineAlert>{numbering.error}</InlineAlert>}
+          {numbering.canChoose && <label className="grid gap-1 text-sm">Code Entry
+            <select aria-label="Code Entry" className="nf-input nf-select" value={numbering.mode} onChange={(e) => numbering.chooseMode(e.target.value as "serial" | "manual")}>
+              <option value="serial">Follow number series</option><option value="manual">Enter manually</option>
+            </select>
+          </label>}
           {(() => {
             const DEFAULT = "Identification";
             const order: string[] = [];
@@ -667,12 +659,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             }
             // A master with no sections configured renders one card, which looks the
             // same as today's flat form once expanded.
+            const identificationIndex = order.indexOf(DEFAULT);
+            if (identificationIndex > 0) order.unshift(...order.splice(identificationIndex, 1));
             return order.map((s, i) => (
               <CollapsibleCard key={s} title={s} defaultOpen={i === 0}>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {bySection.get(s)!.map((f) => (
                     <div key={f.key} className={f.type === "textarea" || f.type === "json" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
-                      <label className="nf-text-label" style={S.sub}>
+                      <label htmlFor={`master-${config.key}-${f.key}`} className="nf-text-label" style={S.sub}>
                         {tLabel(f.label)}{isFieldRequired(f, form) && <span style={{ color: "var(--danger)" }}> *</span>}
                       </label>
                       {renderField(f)}
@@ -686,10 +680,15 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
           {lookupConfigs.map((c) => (
               <CollapsibleCard key={c.key} title={c.label} subtitle="Add one without leaving this form">
-                <LookupCard config={c} onCreated={() => setEntityReloadKey((k) => k + 1)} />
+                <LookupCard config={c} onCreated={() => setEntityReloadKey((k) => k + 1)} onManage={() => setLookupManager(c)} />
               </CollapsibleCard>
             ))}
         </div>
+      </Dialog>
+
+      <Dialog open={!!lookupManager} title={`Manage ${lookupManager?.label || ""}`} maxWidth="xl"
+        onClose={() => { setLookupManager(null); setEntityReloadKey((k) => k + 1); }}>
+        {lookupManager && <MasterDataTable key={lookupManager.key} config={lookupManager} />}
       </Dialog>
 
       <Dialog

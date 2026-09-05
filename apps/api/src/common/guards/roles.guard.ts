@@ -1,7 +1,9 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { PATH_METADATA } from '@nestjs/common/constants';
+import { enforceMasterRequest } from '../master-data-scope';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../core/database/schema';
 import { REQUIRE_PERMISSION_KEY, RequiredPermission } from '../decorators/require-permission.decorator';
@@ -33,6 +35,9 @@ export class RolesGuard implements CanActivate {
     // @RequirePermission — the client-supplied active-company/area headers are
     // otherwise never validated against what the user is actually assigned to.
     await this.enforceScope(request, user);
+    const controller = context.getClass();
+    const controllerPath = controller ? Reflect.getMetadata(PATH_METADATA, controller) as string | undefined : undefined;
+    if (typeof controllerPath === 'string') await enforceMasterRequest(this.cls, request, controllerPath);
 
     const requiredPermission = this.reflector.getAllAndOverride<RequiredPermission>(
       REQUIRE_PERMISSION_KEY,
@@ -104,10 +109,8 @@ export class RolesGuard implements CanActivate {
    * are otherwise trusted at face value by every downstream handler.
    */
   private async enforceScope(request: any, user: any): Promise<void> {
-    if (user.userType === 'SYSTEM_ADMIN') return;
-
     const activeCompanyId = request.headers['x-active-company-id'] as string | undefined;
-    if (activeCompanyId) {
+    if (activeCompanyId && user.userType !== 'SYSTEM_ADMIN') {
       if (user.userType === 'TENANT_ADMIN') {
         const [company] = await this.db
           .select({ tenant_id: schema.companyMaster.tenant_id })
@@ -136,7 +139,7 @@ export class RolesGuard implements CanActivate {
     }
 
     const activeAreaId = request.headers['x-active-operational-area-id'] as string | undefined;
-    if (activeAreaId && user.userType !== 'TENANT_ADMIN' && user.userType !== 'COMPANY_ADMIN') {
+    if (activeAreaId && !['SYSTEM_ADMIN', 'TENANT_ADMIN', 'COMPANY_ADMIN'].includes(user.userType)) {
       const [assignment] = await this.db
         .select({ id: schema.userOperationalAreaAssignment.assignment_id })
         .from(schema.userOperationalAreaAssignment)
@@ -150,6 +153,26 @@ export class RolesGuard implements CanActivate {
       if (!assignment) {
         throw new ForbiddenException('Not authorized for this operational area.');
       }
+    }
+
+    if (activeAreaId) {
+      // An assignment alone does not prove that an area belongs to the active
+      // company. Resolve and validate it before exposing context to services.
+      const [area] = await this.db.select({
+        area_id: schema.operationalAreaMaster.area_id,
+        company_id: schema.operationalAreaMaster.company_id,
+        nob_id: schema.operationalAreaMaster.nob_id,
+        lob_id: schema.operationalAreaMaster.lob_id,
+      }).from(schema.operationalAreaMaster).where(and(
+        eq(schema.operationalAreaMaster.area_id, activeAreaId),
+        eq(schema.operationalAreaMaster.tenant_id, request.tenantId || user.tenantId),
+        eq(schema.operationalAreaMaster.is_active, true),
+        isNull(schema.operationalAreaMaster.deleted_at),
+      )).limit(1);
+      if (!area || !activeCompanyId || area.company_id !== activeCompanyId) {
+        throw new ForbiddenException('Operational area does not belong to the active company.');
+      }
+      this.cls.set('activeOperationalArea', area);
     }
   }
 }

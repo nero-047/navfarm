@@ -5,8 +5,8 @@ import { Type } from 'class-transformer';
 export class CreateCostCenterDto {
   @ApiProperty({ description: 'Company UUID scope ownership', example: 'company-uuid-here' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Unique dimension code. Optional when a number series is configured for cost centers — the code is generated then.', required: false, example: 'DEPT-ADMIN' })
   @IsString()

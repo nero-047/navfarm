@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
@@ -51,14 +52,16 @@ export class DiseaseService {
 
   async create(dto: CreateDiseaseDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     // 2. Resolve the disease code — a series if one is configured, else the user-supplied code.
@@ -71,7 +74,7 @@ export class DiseaseService {
       .where(
         and(
           eq(schema.diseaseMaster.tenant_id, tenantId),
-          eq(schema.diseaseMaster.company_id, dto.company_id),
+          companyCondition(schema.diseaseMaster.company_id, dto.company_id),
           eq(schema.diseaseMaster.disease_code, diseaseCode),
           isNull(schema.diseaseMaster.deleted_at)
         )
@@ -86,7 +89,7 @@ export class DiseaseService {
     const newDisease = {
       disease_id: diseaseId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       disease_code: diseaseCode,
       disease_name: dto.disease_name,
       scientific_name: dto.scientific_name || null,
@@ -103,7 +106,7 @@ export class DiseaseService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'disease_master',
@@ -134,9 +137,7 @@ export class DiseaseService {
       eq(schema.diseaseMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.diseaseMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.diseaseMaster, query.companyId));
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.diseaseMaster.is_active, query.isActive));
     }
@@ -171,7 +172,7 @@ export class DiseaseService {
         .where(
           and(
             eq(schema.diseaseMaster.tenant_id, tenantId),
-            eq(schema.diseaseMaster.company_id, disease.company_id),
+            companyCondition(schema.diseaseMaster.company_id, disease.company_id),
             eq(schema.diseaseMaster.disease_code, dto.disease_code.toUpperCase()),
             ne(schema.diseaseMaster.disease_id, id),
             isNull(schema.diseaseMaster.deleted_at)
@@ -205,7 +206,7 @@ export class DiseaseService {
 
     await this.auditService.log({
       tenantId,
-      companyId: disease.company_id,
+      companyId: disease.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'disease_master',
@@ -233,7 +234,7 @@ export class DiseaseService {
 
     await this.auditService.log({
       tenantId,
-      companyId: disease.company_id,
+      companyId: disease.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'disease_master',
@@ -273,7 +274,7 @@ export class DiseaseService {
 
     await this.auditService.log({
       tenantId,
-      companyId: disease.company_id,
+      companyId: disease.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'disease_master',

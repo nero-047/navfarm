@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
@@ -43,14 +44,16 @@ export class CostCenterService {
 
   async create(dto: CreateCostCenterDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     // 2. Verify parent cost center if specified
@@ -85,7 +88,7 @@ export class CostCenterService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'cost_center_master',
@@ -108,7 +111,7 @@ export class CostCenterService {
       .where(
         and(
           eq(schema.costCenterMaster.tenant_id, tenantId),
-          eq(schema.costCenterMaster.company_id, dto.company_id),
+          companyCondition(schema.costCenterMaster.company_id, dto.company_id),
           eq(schema.costCenterMaster.cost_center_code, dto.cost_center_code.toUpperCase()),
           isNull(schema.costCenterMaster.deleted_at)
         )
@@ -123,7 +126,7 @@ export class CostCenterService {
     const newCC = {
       cost_center_id: costCenterId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       cost_center_code: dto.cost_center_code.toUpperCase(),
       cost_center_name: dto.cost_center_name,
       cost_center_type: dto.cost_center_type,
@@ -139,7 +142,7 @@ export class CostCenterService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'cost_center_master',
@@ -200,7 +203,7 @@ export class CostCenterService {
     const newCC = {
       cost_center_id: costCenterId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       cost_center_code: costCenterCode,
       cost_center_name: dto.cost_center_name,
       cost_center_type: dto.cost_center_type,
@@ -236,9 +239,7 @@ export class CostCenterService {
       eq(schema.costCenterMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.costCenterMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.costCenterMaster, query.companyId));
     if (query.costCenterType) {
       conditions.push(eq(schema.costCenterMaster.cost_center_type, query.costCenterType));
     }
@@ -278,7 +279,7 @@ export class CostCenterService {
         .where(
           and(
             eq(schema.costCenterMaster.tenant_id, tenantId),
-            eq(schema.costCenterMaster.company_id, cc.company_id),
+            companyCondition(schema.costCenterMaster.company_id, cc.company_id),
             eq(schema.costCenterMaster.cost_center_code, dto.cost_center_code.toUpperCase()),
             ne(schema.costCenterMaster.cost_center_id, id),
             isNull(schema.costCenterMaster.deleted_at)
@@ -332,7 +333,7 @@ export class CostCenterService {
 
     await this.auditService.log({
       tenantId,
-      companyId: cc.company_id,
+      companyId: cc.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'cost_center_master',
@@ -377,7 +378,7 @@ export class CostCenterService {
 
     await this.auditService.log({
       tenantId,
-      companyId: cc.company_id,
+      companyId: cc.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'cost_center_master',
@@ -435,7 +436,7 @@ export class CostCenterService {
 
     await this.auditService.log({
       tenantId,
-      companyId: cc.company_id,
+      companyId: cc.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'cost_center_master',

@@ -16,6 +16,7 @@ import {
   primaryKey,
   foreignKey,
   uniqueIndex,
+  AnyMySqlColumn,
 } from 'drizzle-orm/mysql-core';
 import { relations } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -700,7 +701,8 @@ export const breedMaster = mysqlTable('breed_master', {
   company_id: varchar('company_id', { length: 36 }),
   nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
-  breed_code: varchar('breed_code', { length: 50 }).notNull(),
+  location_id: varchar('location_id', { length: 36 }).references((): AnyMySqlColumn => locationMaster.location_id, { onDelete: 'restrict' }),
+  breed_code: varchar('breed_code', { length: 255 }).notNull(),
   breed_name: varchar('breed_name', { length: 100 }).notNull(),
   species_id: varchar('species_id', { length: 36 }).references(() => speciesMaster.species_id, { onDelete: 'restrict' }),
   species: varchar('species', { length: 100 }), // Legacy text field (nullable now)
@@ -1165,7 +1167,7 @@ export const shedMasterRelations = relations(shedMaster, ({ one }) => ({
 export const supplierMaster = mysqlTable('supplier_master', {
   supplier_id: varchar('supplier_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   supplier_code: varchar('supplier_code', { length: 50 }).notNull(),
   supplier_name: varchar('supplier_name', { length: 150 }).notNull(),
   email: varchar('email', { length: 200 }),
@@ -1208,7 +1210,7 @@ export const supplierMasterRelations = relations(supplierMaster, ({ one }) => ({
 export const customerMaster = mysqlTable('customer_master', {
   customer_id: varchar('customer_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   customer_code: varchar('customer_code', { length: 50 }).notNull(),
   customer_name: varchar('customer_name', { length: 150 }).notNull(),
   email: varchar('email', { length: 200 }),
@@ -1240,7 +1242,7 @@ export const customerMasterRelations = relations(customerMaster, ({ one }) => ({
 export const resourceMaster = mysqlTable('resource_master', {
   resource_id: varchar('resource_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   resource_code: varchar('resource_code', { length: 50 }).notNull(),
   resource_name: varchar('resource_name', { length: 150 }).notNull(),
   resource_type: varchar('resource_type', { length: 30 }).notNull(), // LABOR, EQUIPMENT, VEHICLE
@@ -1343,7 +1345,7 @@ export const resourceMaintenanceLogRelations = relations(resourceMaintenanceLog,
 export const diseaseMaster = mysqlTable('disease_master', {
   disease_id: varchar('disease_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   disease_code: varchar('disease_code', { length: 50 }).notNull(),
   disease_name: varchar('disease_name', { length: 150 }).notNull(),
   scientific_name: varchar('scientific_name', { length: 150 }),
@@ -1369,7 +1371,7 @@ export const diseaseMasterRelations = relations(diseaseMaster, ({ one }) => ({
 export const medicineMaster = mysqlTable('medicine_master', {
   medicine_id: varchar('medicine_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'cascade' }),
   composition: varchar('composition', { length: 255 }),
   dosage_guideline: text('dosage_guideline'),
@@ -1399,7 +1401,7 @@ export const medicineMasterRelations = relations(medicineMaster, ({ one }) => ({
 export const feedFormulaMaster = mysqlTable('feed_formula_master', {
   formula_id: varchar('formula_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   formula_code: varchar('formula_code', { length: 50 }).notNull(),
   formula_name: varchar('formula_name', { length: 150 }).notNull(),
   target_item_id: varchar('target_item_id', { length: 36 }).notNull(),
@@ -1430,7 +1432,7 @@ export const feedFormulaMaster = mysqlTable('feed_formula_master', {
 export const feedFormulaIngredients = mysqlTable('feed_formula_ingredients', {
   ingredient_id: varchar('ingredient_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   formula_id: varchar('formula_id', { length: 36 }).notNull(),
   item_id: varchar('item_id', { length: 36 }).notNull(), // raw ingredient item
   quantity: decimal('quantity', { precision: 18, scale: 4 }).notNull(),
@@ -1493,7 +1495,7 @@ export const feedFormulaIngredientsRelations = relations(feedFormulaIngredients,
 export const glAccountMaster = mysqlTable('gl_account_master', {
   gl_account_id: varchar('gl_account_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   account_code: varchar('account_code', { length: 255 }).notNull(),
   account_name: varchar('account_name', { length: 150 }).notNull(),
   account_type: varchar('account_type', { length: 50 }).notNull(), // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
@@ -1542,7 +1544,7 @@ export const glAccountMasterRelations = relations(glAccountMaster, ({ one, many 
 export const glMappingMaster = mysqlTable('gl_mapping_master', {
   mapping_id: varchar('mapping_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   item_category_id: varchar('item_category_id', { length: 36 }),
   // Additive lookup-key dimensions — the spec's full 6-dimensional gl_posting_setup model
   // (nob_id, lob_id, stage_id, transaction_type, posting_group/item_category, valuation_method).
@@ -1630,7 +1632,7 @@ export const glMappingMasterRelations = relations(glMappingMaster, ({ one }) => 
 export const costCenterMaster = mysqlTable('cost_center_master', {
   cost_center_id: varchar('cost_center_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }),
   cost_center_code: varchar('cost_center_code', { length: 255 }).notNull(),
   cost_center_name: varchar('cost_center_name', { length: 150 }).notNull(),
   cost_center_type: varchar('cost_center_type', { length: 50 }).notNull(), // DEPARTMENT, FARM, WAREHOUSE, PROJECT, OTHER

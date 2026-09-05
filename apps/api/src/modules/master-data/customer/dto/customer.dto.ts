@@ -5,8 +5,8 @@ import { Type } from 'class-transformer';
 export class CreateCustomerDto {
   @ApiProperty({ description: 'Company UUID scope ownership', example: 'company-uuid-here' })
   @IsUUID()
-  @IsNotEmpty()
-  company_id: string;
+  @IsOptional()
+  company_id?: string;
 
   @ApiProperty({ description: 'Legacy input only; the API generates CUS-001, CUS-002, etc. per company', example: 'CUS-001', required: false })
   @IsString()

@@ -7,6 +7,7 @@ import * as schema from '../../../core/database/schema';
 import * as masterSchema from '../../../core/database/master-schema';
 import { MASTER_CONNECTION } from '../../../core/database/database.module';
 import { Step1ProfileDto } from './dto/step1-profile.dto';
+import { copyCompanyMasterTemplates } from '../../core/company/copy-master-templates';
 import { Step2AddressDto } from './dto/step2-address.dto';
 import { Step3ContactDto } from './dto/step3-contact.dto';
 import { Step7FiscalDto } from './dto/step7-fiscal.dto';
@@ -153,6 +154,8 @@ export class SetupWizardService implements OnModuleInit {
             country_id: NIL_UUID,
             onboarding_status: 'PENDING',
           });
+
+        await copyCompanyMasterTemplates(tx, dto.tenant_id, companyId);
 
         [company] = await tx
           .select()

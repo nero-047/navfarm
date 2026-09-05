@@ -1,3 +1,4 @@
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull } from 'drizzle-orm';
@@ -56,14 +57,16 @@ export class SupplierService {
 
   async create(dto: CreateSupplierDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     const vendorType = dto.vendor_type || 'GENERAL';
@@ -76,18 +79,20 @@ export class SupplierService {
       async () => {
         const rows = await this.db.select({ code: schema.supplierMaster.supplier_code }).from(schema.supplierMaster).where(and(
           eq(schema.supplierMaster.tenant_id, tenantId),
-          eq(schema.supplierMaster.company_id, dto.company_id),
+          companyCondition(schema.supplierMaster.company_id, dto.company_id),
         ));
         return rows.map((row) => row.code);
       },
     );
-    const supplierCode = await this.numberSeriesService.generateNext('SUPPLIER', tenantId, dto.company_id);
+    const supplierCode = dto.supplier_code?.trim()
+      ? await this.numberSeriesService.manualCode('SUPPLIER', dto.supplier_code, tenantId, dto.company_id)
+      : await this.numberSeriesService.generateNext('SUPPLIER', tenantId, dto.company_id);
 
     const supplierId = randomUUID();
     const newSupplier = {
       supplier_id: supplierId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       supplier_code: supplierCode,
       supplier_name: dto.supplier_name,
       email: dto.email || null,
@@ -117,7 +122,7 @@ export class SupplierService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'supplier_master',
@@ -148,9 +153,7 @@ export class SupplierService {
       eq(schema.supplierMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.supplierMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.supplierMaster, query.companyId));
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.supplierMaster.is_active, query.isActive));
     }
@@ -229,7 +232,7 @@ export class SupplierService {
 
     await this.auditService.log({
       tenantId,
-      companyId: supplier.company_id,
+      companyId: supplier.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'supplier_master',
@@ -266,7 +269,7 @@ export class SupplierService {
 
     await this.auditService.log({
       tenantId,
-      companyId: supplier.company_id,
+      companyId: supplier.company_id || undefined,
       userId: userPayload?.userId,
       action: 'APPROVE',
       entityName: 'supplier_master',
@@ -293,7 +296,7 @@ export class SupplierService {
 
     await this.auditService.log({
       tenantId,
-      companyId: supplier.company_id,
+      companyId: supplier.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'supplier_master',
@@ -333,7 +336,7 @@ export class SupplierService {
 
     await this.auditService.log({
       tenantId,
-      companyId: supplier.company_id,
+      companyId: supplier.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'supplier_master',

@@ -173,6 +173,7 @@ function ContextNavList({ model }: { model: ContextNavModel }) {
                 <li key={item.key}>
                   <button
                     type="button"
+                    aria-label={item.label}
                     data-context-nav-item
                     data-testid={`context-nav-item-${item.key}`}
                     // Not `aria-selected`: this is a navigation landmark, not a

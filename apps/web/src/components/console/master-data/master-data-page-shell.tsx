@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getStoredUser, NavUser, getActiveCompanyId, setActiveCompanyId, getStoredTenantId } from "@/hooks/useAuth";
+import { getStoredUser, NavUser, getActiveCompanyId, getActiveWorkspaceScope, getActiveOperationalAreaId } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { MASTER_DATA_CONFIGS, MASTER_DATA_GROUPS, getConfig } from "@/modules/master-data/configs";
 import type { MasterDataConfig } from "@/modules/master-data/types";
@@ -11,8 +11,8 @@ import { useContextNav, type ContextNavModel } from "@/components/shell/ContextN
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ConsolePage } from "@/components/ui/console-page";
 import { Tabs } from "@/components/ui/tabs";
-import { ShieldAlert, Download, Building2, RefreshCw } from "lucide-react";
-import { api } from "@/services/api-client";
+import { ShieldAlert } from "lucide-react";
+
 
 const S = {
   sub: { color: "var(--text-secondary)" },
@@ -28,8 +28,7 @@ function useMasterDataPageState() {
   // empty and refill on every page change.
   const [user, setUser] = useState<NavUser | null>(() => getStoredUser());
   const [ready, setReady] = useState(() => Boolean(getStoredUser()));
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(() => getActiveCompanyId() || "");
+  const scopeKey = `${getActiveWorkspaceScope()}-${getActiveCompanyId() || ""}-${getActiveOperationalAreaId() || ""}`;
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -38,17 +37,6 @@ function useMasterDataPageState() {
       return;
     }
     setUser(stored);
-    setSelectedCompanyId(getActiveCompanyId() || "");
-
-    // Only the company list is genuinely async, and only the Master Scope
-    // selector needs it — the index does not wait on it.
-    const tenantId = getStoredTenantId() || stored.tenantId;
-    if (tenantId) {
-      api.get(`/company/tenant/${tenantId}`).then((res: any) => {
-        if (Array.isArray(res)) setCompanies(res);
-      }).catch(() => void 0);
-    }
-
     setReady(true);
   }, [router]);
 
@@ -58,15 +46,13 @@ function useMasterDataPageState() {
     user?.userType === "TENANT_ADMIN" ||
     user?.userType === "OPERATIONAL_ADMIN";
 
-  return { ready, user, mayView, companies, selectedCompanyId, setSelectedCompanyId };
+  return { ready, user, mayView, scopeKey };
 }
 
 export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
   const router = useRouter();
   const { t, tLabel } = useLanguage();
-  const { ready, user, mayView, companies, selectedCompanyId, setSelectedCompanyId } = useMasterDataPageState();
-  const [preseedLoading, setPreseedLoading] = useState(false);
-  const [preseedMsg, setPreseedMsg] = useState("");
+  const { ready, user, mayView, scopeKey } = useMasterDataPageState();
   const activeConfig: MasterDataConfig = getConfig(activeKey) || MASTER_DATA_CONFIGS.find((c) => c.isPrimary)!;
   const parentConfig = (activeConfig.tabOf && getConfig(activeConfig.tabOf)) || activeConfig;
   const tabConfigs = MASTER_DATA_CONFIGS.filter((c) => c.tabOf === parentConfig.key);
@@ -88,22 +74,6 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
   }, [ready, mayView, parentKey, t, tLabel, router]);
 
   useContextNav(contextNav);
-
-  const handlePreseedCompany = async () => {
-    const compId = selectedCompanyId || getActiveCompanyId();
-    if (!compId) return;
-    setPreseedLoading(true);
-    setPreseedMsg("");
-    try {
-      await api.post(`/operational-area/preseed-company/${compId}`, {});
-      setPreseedMsg(t("mdPreseedSuccess"));
-      setTimeout(() => setPreseedMsg(""), 4000);
-    } catch (e: any) {
-      setPreseedMsg(e?.message || t("mdPreseedFailed"));
-    } finally {
-      setPreseedLoading(false);
-    }
-  };
 
   if (!ready || !user) return null;
 
@@ -133,55 +103,7 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
           description={activeConfig.description ? tLabel(activeConfig.description) : undefined}
         />
 
-        {/* Tenant Admin Company Selector or Company Pre-seed trigger */}
-        <div className="flex items-center gap-2 pb-3 flex-wrap">
-          {user.userType === "TENANT_ADMIN" && companies.length > 0 && (
-            <div className="flex min-w-0 max-w-full items-center gap-2 bg-(--surface) border border-(--border) px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs">
-              <Building2 className="w-3.5 h-3.5 text-blue-400" />
-              <span className="text-[10px] uppercase font-bold text-(--text-muted)">{t("mdMasterScope")}</span>
-              <select
-                value={selectedCompanyId}
-                onChange={(e) => {
-                  setSelectedCompanyId(e.target.value);
-                  if (e.target.value) setActiveCompanyId(e.target.value);
-                }}
-                className="min-w-0 bg-transparent text-xs font-semibold text-(--text-primary) focus:outline-none"
-              >
-                <option value="">{t("mdTenantGlobalCatalog")}</option>
-                {companies.map((c) => (
-                  <option key={c.company_id} value={c.company_id}>
-                    {c.company_name} {t("mdCompanyRecordsSuffix")}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {user.userType === "COMPANY_ADMIN" && (
-            <button
-              onClick={handlePreseedCompany}
-              disabled={preseedLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) hover:bg-(--surface) text-xs font-semibold text-(--text-secondary) shadow-2xs transition-all disabled:opacity-50"
-            >
-              {preseedLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 text-(--accent)" />}
-              {t("mdPreseedButton")}
-            </button>
-          )}
-        </div>
       </div>
-
-      {preseedMsg && (
-        <div
-          className="p-3 rounded-[var(--radius-sm)] border text-xs font-semibold"
-          style={{
-            backgroundColor: "var(--success-muted)",
-            borderColor: "rgba(47, 125, 91, 0.3)",
-            color: "var(--success)",
-          }}
-        >
-          {preseedMsg}
-        </div>
-      )}
 
       {tabConfigs.length > 0 && (
         <Tabs
@@ -195,7 +117,7 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
         />
       )}
       <div id="master-data-sheet" role={tabConfigs.length ? "tabpanel" : undefined} aria-label={tLabel(activeConfig.tabLabel || activeConfig.label)}>
-        <MasterDataTable key={`${activeConfig.key}-${selectedCompanyId}`} config={activeConfig} />
+        <MasterDataTable key={`${activeConfig.key}-${scopeKey}`} config={activeConfig} />
       </div>
     </ConsolePage>
   );

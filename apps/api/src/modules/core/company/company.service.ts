@@ -9,6 +9,7 @@ import { CreateCompanyDto, UpdateCompanyDto, QueryCompanyDto } from './dto/compa
 import * as crypto from 'crypto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { seedDefaultCompanyRoles } from '../role/default-role-seed';
+import { copyCompanyMasterTemplates } from './copy-master-templates';
 
 const toMysqlTimestamp = (date: Date = new Date()) =>
   date.toISOString().slice(0, 19).replace('T', ' ');
@@ -171,6 +172,7 @@ export class CompanyService {
       });
 
       // Seed the four starter roles (SUPER_ADMIN/MANAGER/ACCOUNTANT/OPERATOR)
+      await copyCompanyMasterTemplates(tx, tenantId, companyId);
       const { superAdminRoleId: roleId } = await seedDefaultCompanyRoles(tx, companyId);
 
       if (userPayload?.userId) {

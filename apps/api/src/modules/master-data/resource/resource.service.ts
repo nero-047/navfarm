@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, isNotNull, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -40,14 +41,16 @@ export class ResourceService {
 
   async create(dto: CreateResourceDto, tenantId: string, userPayload?: any) {
     // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
+    if (dto.company_id) {
+      const [company] = await this.db
+        .select()
+        .from(schema.companyMaster)
+        .where(and(companyCondition(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
+        .limit(1);
 
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      if (!company) {
+        throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
+      }
     }
 
     await this.numberSeriesService.ensureCompanySeries(
@@ -57,12 +60,14 @@ export class ResourceService {
       async () => {
         const rows = await this.db.select({ code: schema.resourceMaster.resource_code }).from(schema.resourceMaster).where(and(
           eq(schema.resourceMaster.tenant_id, tenantId),
-          eq(schema.resourceMaster.company_id, dto.company_id),
+          companyCondition(schema.resourceMaster.company_id, dto.company_id),
         ));
         return rows.map((row) => row.code);
       },
     );
-    const resourceCode = await this.numberSeriesService.generateNext('RESOURCE', tenantId, dto.company_id);
+    const resourceCode = dto.resource_code?.trim()
+      ? await this.numberSeriesService.manualCode('RESOURCE', dto.resource_code, tenantId, dto.company_id)
+      : await this.numberSeriesService.generateNext('RESOURCE', tenantId, dto.company_id);
 
     // NOB/LOB are no longer asked on the form — derive them from the company's
     // operational areas (an explicit dto value, if a caller still sends one,
@@ -77,7 +82,7 @@ export class ResourceService {
     const newResource = {
       resource_id: resourceId,
       tenant_id: tenantId,
-      company_id: dto.company_id,
+      company_id: dto.company_id || null,
       nob_id: resolvedNobLob.nob_id,
       lob_id: resolvedNobLob.lob_id,
       resource_code: resourceCode,
@@ -110,7 +115,7 @@ export class ResourceService {
 
     await this.auditService.log({
       tenantId,
-      companyId: dto.company_id,
+      companyId: dto.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'resource_master',
@@ -141,9 +146,7 @@ export class ResourceService {
       eq(schema.resourceMaster.tenant_id, tenantId),
     ];
 
-    if (query.companyId) {
-      conditions.push(eq(schema.resourceMaster.company_id, query.companyId));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.resourceMaster, query.companyId));
     if (query.resourceType) {
       conditions.push(eq(schema.resourceMaster.resource_type, query.resourceType));
     }
@@ -229,7 +232,7 @@ export class ResourceService {
 
     await this.auditService.log({
       tenantId,
-      companyId: resource.company_id,
+      companyId: resource.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'resource_master',
@@ -257,7 +260,7 @@ export class ResourceService {
 
     await this.auditService.log({
       tenantId,
-      companyId: resource.company_id,
+      companyId: resource.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'resource_master',
@@ -297,7 +300,7 @@ export class ResourceService {
 
     await this.auditService.log({
       tenantId,
-      companyId: resource.company_id,
+      companyId: resource.company_id || undefined,
       userId: userPayload?.userId,
       action: 'RESTORE',
       entityName: 'resource_master',
@@ -312,6 +315,7 @@ export class ResourceService {
 
   async createMaintenanceLog(resourceId: string, dto: CreateMaintenanceLogDto, tenantId: string, userPayload?: any) {
     const resource = await this.findOne(resourceId);
+    if (!resource.company_id) throw new BadRequestException('Maintenance is recorded against a company resource, not a tenant template.');
 
     const logId = randomUUID();
     const newLog = {
@@ -354,7 +358,7 @@ export class ResourceService {
 
     await this.auditService.log({
       tenantId,
-      companyId: resource.company_id,
+      companyId: resource.company_id || undefined,
       userId: userPayload?.userId,
       action: 'CREATE',
       entityName: 'resource_maintenance_log',
@@ -417,7 +421,7 @@ export class ResourceService {
 
     await this.auditService.log({
       tenantId,
-      companyId: log.company_id,
+      companyId: log.company_id || undefined,
       userId: userPayload?.userId,
       action: 'UPDATE',
       entityName: 'resource_maintenance_log',
@@ -444,7 +448,7 @@ export class ResourceService {
 
     await this.auditService.log({
       tenantId,
-      companyId: log.company_id,
+      companyId: log.company_id || undefined,
       userId: userPayload?.userId,
       action: 'DELETE',
       entityName: 'resource_maintenance_log',

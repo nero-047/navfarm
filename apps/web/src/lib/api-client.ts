@@ -157,9 +157,15 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (tenantId) headers.set('x-tenant-id', tenantId);
   const activeCompanyId = stored('active_company_id');
-  if (activeCompanyId) headers.set('x-active-company-id', activeCompanyId);
+  let userType: string | undefined;
+  try { userType = JSON.parse(stored(AUTH_STORAGE.user) || '{}').userType; } catch { /* Authentication handles an invalid stored session. */ }
+  const workspaceScope = stored('active_workspace_scope') || (userType === 'TENANT_ADMIN' ? 'TENANT' : ['OPERATIONAL_ADMIN', 'STANDARD_USER'].includes(userType || '') ? 'OPERATIONAL' : 'COMPANY');
+  if (workspaceScope) headers.set('x-workspace-scope', workspaceScope);
+  if (activeCompanyId && workspaceScope !== 'TENANT') headers.set('x-active-company-id', activeCompanyId);
+  else headers.delete('x-active-company-id');
   const activeAreaId = stored('active_operational_area_id');
-  if (activeAreaId) headers.set('x-active-operational-area-id', activeAreaId);
+  if (activeAreaId && (!workspaceScope || workspaceScope === 'OPERATIONAL')) headers.set('x-active-operational-area-id', activeAreaId);
+  else headers.delete('x-active-operational-area-id');
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,

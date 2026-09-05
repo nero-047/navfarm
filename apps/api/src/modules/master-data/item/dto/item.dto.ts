@@ -15,6 +15,11 @@ export class ItemAttributeValueInput {
 }
 
 export class CreateItemDto {
+  @ApiProperty({ required: false, description: 'Manual code when the number series permits it; otherwise generated.' })
+  @IsString()
+  @IsOptional()
+  item_code?: string;
+
   @ApiProperty({ description: 'Company UUID scope', required: false })
   @IsUUID()
   @IsOptional()
