@@ -560,7 +560,11 @@ const breed: MasterDataConfig = {
     { key: "species_id", label: "Species", type: "select-entity", required: true, entityEndpoint: "/species", entityValueKey: "species_id", entityLabelKeys: ["species_code", "species_name"], section: "Identification" },
     {
       key: "breed_type", label: "Breed Type", type: "select", required: true, section: "Identification",
-      options: ["BROILER", "LAYER", "BREEDER", "DUAL_PURPOSE", "DAIRY", "BEEF", "MEAT", "TREE", "FISH"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+      // Piggery is the only line of business in scope, so the poultry, aquaculture
+      // and agri types (BROILER, LAYER, DAIRY, BEEF, TREE, FISH) are not offered —
+      // a pig farm being asked to choose "Tree" or "Layer" is the LOB taxonomy
+      // leaking into the form. MEAT is what all existing breeds already use.
+      options: ["MEAT", "BREEDER", "DUAL_PURPOSE"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
     },
     { key: "description", label: "Description", type: "textarea", section: "Identification" },
     { key: "avg_growth_rate_g_day", label: "Avg Growth Rate (g/day)", type: "number", step: "0.01", section: "Growth & Performance" },
