@@ -9,6 +9,7 @@ import { BulkTransitionAnimalStageDto, CreateAnimalDto, UpdateAnimalDto, Dispose
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -44,6 +45,7 @@ export class AnimalService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly numberSeriesService: NumberSeriesService,
+    private readonly nobLobResolution: NobLobResolutionService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -151,13 +153,31 @@ export class AnimalService {
       this.db.select().from(schema.companyMaster).where(eq(schema.companyMaster.company_id, dto.company_id)),
       'Company', dto.company_id,
     );
+
+    // NOB/LOB are no longer asked on the form — derive them from the company's
+    // operational areas (an explicit dto value, if a caller still sends one,
+    // wins). animal_register.nob_id/lob_id are NOT NULL, so an ambiguous
+    // company (operational areas split across LOBs) surfaces a clear error
+    // here rather than a raw DB constraint failure.
+    const resolved = await this.nobLobResolution.resolve(tenantId, dto.company_id, {
+      nob_id: dto.nob_id,
+      lob_id: dto.lob_id,
+    });
+    if (!resolved.nob_id || !resolved.lob_id) {
+      throw new BadRequestException(
+        "Cannot determine this animal's Nature of Business / Line of Business — this company's operational areas span multiple business verticals. Specify nob_id and lob_id explicitly.",
+      );
+    }
+    const nobId = resolved.nob_id;
+    const lobId = resolved.lob_id;
+
     await this.assertExists(
-      this.db.select().from(schema.nobMaster).where(eq(schema.nobMaster.nob_id, dto.nob_id)),
-      'NOB', dto.nob_id,
+      this.db.select().from(schema.nobMaster).where(eq(schema.nobMaster.nob_id, nobId)),
+      'NOB', nobId,
     );
     await this.assertExists(
-      this.db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, dto.lob_id)),
-      'LOB', dto.lob_id,
+      this.db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, lobId)),
+      'LOB', lobId,
     );
     await this.assertExists(
       this.db.select().from(schema.breedMaster).where(eq(schema.breedMaster.breed_id, dto.breed_id)),
@@ -232,15 +252,15 @@ export class AnimalService {
     }
 
     const animalId = randomUUID();
-    const animalCode = await this.generateAnimalCode(dto.lob_id, tenantId, dto.company_id);
+    const animalCode = await this.generateAnimalCode(lobId, tenantId, dto.company_id);
     const totalOpeningAssetValue = dto.acquisition_cost + (dto.landing_cost || 0);
 
     const newAnimal = {
       animal_id: animalId,
       tenant_id: tenantId,
       company_id: dto.company_id,
-      nob_id: dto.nob_id,
-      lob_id: dto.lob_id,
+      nob_id: nobId,
+      lob_id: lobId,
       animal_code: animalCode,
       animal_type: dto.animal_type,
       breed_id: dto.breed_id,

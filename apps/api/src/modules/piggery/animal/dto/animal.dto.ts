@@ -30,15 +30,15 @@ export class CreateAnimalDto {
   @IsNotEmpty()
   company_id: string;
 
-  @ApiProperty({ description: 'Nature of Business UUID scope' })
+  @ApiProperty({ description: 'Nature of Business UUID scope. Omit to derive it from the company\'s operational areas.', required: false })
   @IsString()
-  @IsNotEmpty()
-  nob_id: string;
+  @IsOptional()
+  nob_id?: string;
 
-  @ApiProperty({ description: 'Line of Business UUID scope' })
+  @ApiProperty({ description: 'Line of Business UUID scope. Omit to derive it from the company\'s operational areas.', required: false })
   @IsString()
-  @IsNotEmpty()
-  lob_id: string;
+  @IsOptional()
+  lob_id?: string;
 
   @ApiProperty({ description: 'Animal type', enum: ANIMAL_TYPES })
   @IsString()

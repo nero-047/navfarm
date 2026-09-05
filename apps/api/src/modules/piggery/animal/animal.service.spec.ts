@@ -3,6 +3,7 @@ import { AnimalService } from './animal.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('AnimalService', () => {
@@ -35,10 +36,22 @@ describe('AnimalService', () => {
     landing_cost: 200,
   };
 
+  const nobLobResolution = {
+    resolve: jest.fn(async (_tenantId: string, _companyId: any, explicit: any) => ({
+      nob_id: explicit?.nob_id ?? null,
+      lob_id: explicit?.lob_id ?? null,
+    })),
+  };
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
+    nobLobResolution.resolve.mockReset();
+    nobLobResolution.resolve.mockImplementation(async (_tenantId: string, _companyId: any, explicit: any) => ({
+      nob_id: explicit?.nob_id ?? null,
+      lob_id: explicit?.lob_id ?? null,
+    }));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,6 +59,7 @@ describe('AnimalService', () => {
         { provide: ClsService, useValue: { get: jest.fn().mockReturnValue(mockDb) } },
         { provide: AuditLogService, useValue: { log: jest.fn().mockResolvedValue({}) } },
         { provide: NumberSeriesService, useValue: { generateNext: jest.fn().mockResolvedValue('PIG-2026-0001') } },
+        { provide: NobLobResolutionService, useValue: nobLobResolution },
       ],
     }).compile();
 

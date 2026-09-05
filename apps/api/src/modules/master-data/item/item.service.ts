@@ -7,6 +7,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateItemDto, UpdateItemDto, QueryItemDto } from './dto/item.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -18,6 +19,7 @@ export class ItemService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly numberSeriesService: NumberSeriesService,
+    private readonly nobLobResolution: NobLobResolutionService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -129,6 +131,17 @@ export class ItemService {
     this.assertStandardCost(dto.valuation_method, dto.standard_cost);
     this.assertTrackingSeries(dto.is_lot_tracked, dto.is_serial_tracked, dto.tracking_series_id);
 
+    // NOB/LOB are no longer asked on the form — derive them from the company's
+    // operational areas (an explicit dto value, if a caller still sends one,
+    // wins). item_master.nob_id/lob_id are nullable, so an ambiguous company
+    // (operational areas split across LOBs) simply stores null rather than
+    // blocking the create — a farm must never be blocked from adding an item
+    // because the taxonomy is ambiguous.
+    const resolvedNobLob = await this.nobLobResolution.resolve(tenantId, companyId, {
+      nob_id: dto.nob_id,
+      lob_id: dto.lob_id,
+    });
+
     // 3. One company-wide ITEM sequence is shared by all Item Types.
     await this.ensureCompanyItemSeries(tenantId, companyId);
     const itemCode = await this.numberSeriesService.generateNext('ITEM', tenantId, companyId);
@@ -142,8 +155,8 @@ export class ItemService {
       item_code: itemCode,
       item_name: dto.item_name,
       item_type: dto.item_type,
-      nob_id: dto.nob_id,
-      lob_id: dto.lob_id || null,
+      nob_id: resolvedNobLob.nob_id,
+      lob_id: resolvedNobLob.lob_id,
       category: categoryName,
       sub_category: dto.sub_category || null,
       uom_primary: dto.uom_primary,

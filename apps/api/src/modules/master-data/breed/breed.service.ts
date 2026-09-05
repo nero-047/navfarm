@@ -17,6 +17,7 @@ import {
 } from './dto/breed.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -28,6 +29,7 @@ export class BreedService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly numberSeriesService: NumberSeriesService,
+    private readonly nobLobResolution: NobLobResolutionService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -296,6 +298,23 @@ export class BreedService {
     // Verify species exists
     const species = await this.findOneSpecies(dto.species_id);
 
+    // NOB/LOB are no longer asked on the form — derive them from the company's
+    // operational areas (an explicit dto value, if a caller still sends one,
+    // wins). breed_master.nob_id is NOT NULL (lob_id is nullable), so an
+    // ambiguous company surfaces a clear error for nob_id rather than a raw
+    // DB constraint failure; lob_id simply stores null.
+    const resolvedNobLob = await this.nobLobResolution.resolve(tenantId, companyId, {
+      nob_id: dto.nob_id,
+      lob_id: dto.lob_id,
+    });
+    if (!resolvedNobLob.nob_id) {
+      throw new BadRequestException(
+        "Cannot determine this breed's Nature of Business — this company's operational areas span multiple business verticals. Specify nob_id explicitly.",
+      );
+    }
+    const nobId = resolvedNobLob.nob_id;
+    const lobId = resolvedNobLob.lob_id;
+
     // Resolve the breed code — a series (breed_type first, then BREED alone) if
     // one is configured, else the user-supplied code.
     const breedCode = await this.resolveBreedCode(dto, tenantId, companyId);
@@ -327,8 +346,8 @@ export class BreedService {
       breed_id: breedId,
       tenant_id: tenantId,
       company_id: companyId,
-      nob_id: dto.nob_id,
-      lob_id: dto.lob_id || null,
+      nob_id: nobId,
+      lob_id: lobId,
       breed_code: breedCode,
       breed_name: dto.breed_name,
       species_id: dto.species_id,

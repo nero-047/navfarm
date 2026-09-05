@@ -4,9 +4,10 @@ import { BreedController } from './breed.controller';
 import { SpeciesController } from './species.controller';
 import { BreedLifecycleStageController } from './breed-lifecycle-stage.controller';
 import { NumberSeriesModule } from '../../system/number-series/number-series.module';
+import { OperationalAreaModule } from '../../core/operational-area/operational-area.module';
 
 @Module({
-  imports: [NumberSeriesModule],
+  imports: [NumberSeriesModule, OperationalAreaModule],
   controllers: [BreedController, SpeciesController, BreedLifecycleStageController],
   providers: [BreedService],
   exports: [BreedService],

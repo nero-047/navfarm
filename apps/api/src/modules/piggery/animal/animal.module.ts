@@ -4,9 +4,10 @@ import { AnimalController } from './animal.controller';
 import { AnimalMedicationLogService } from './animal-medication-log.service';
 import { AnimalMedicationLogController } from './animal-medication-log.controller';
 import { NumberSeriesModule } from '../../system/number-series/number-series.module';
+import { OperationalAreaModule } from '../../core/operational-area/operational-area.module';
 
 @Module({
-  imports: [NumberSeriesModule],
+  imports: [NumberSeriesModule, OperationalAreaModule],
   controllers: [AnimalController, AnimalMedicationLogController],
   providers: [AnimalService, AnimalMedicationLogService],
   exports: [AnimalService, AnimalMedicationLogService],

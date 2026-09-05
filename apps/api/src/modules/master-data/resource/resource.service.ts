@@ -13,6 +13,7 @@ import {
 } from './dto/resource.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -24,6 +25,7 @@ export class ResourceService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly numberSeriesService: NumberSeriesService,
+    private readonly nobLobResolution: NobLobResolutionService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -62,13 +64,22 @@ export class ResourceService {
     );
     const resourceCode = await this.numberSeriesService.generateNext('RESOURCE', tenantId, dto.company_id);
 
+    // NOB/LOB are no longer asked on the form — derive them from the company's
+    // operational areas (an explicit dto value, if a caller still sends one,
+    // wins). resource_master.nob_id/lob_id are nullable, so an ambiguous
+    // company simply stores null rather than blocking the create.
+    const resolvedNobLob = await this.nobLobResolution.resolve(tenantId, dto.company_id, {
+      nob_id: dto.nob_id,
+      lob_id: dto.lob_id,
+    });
+
     const resourceId = randomUUID();
     const newResource = {
       resource_id: resourceId,
       tenant_id: tenantId,
       company_id: dto.company_id,
-      nob_id: dto.nob_id || null,
-      lob_id: dto.lob_id || null,
+      nob_id: resolvedNobLob.nob_id,
+      lob_id: resolvedNobLob.lob_id,
       resource_code: resourceCode,
       resource_name: dto.resource_name,
       resource_type: dto.resource_type,

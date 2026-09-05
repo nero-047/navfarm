@@ -3,6 +3,7 @@ import { BreedService } from './breed.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('BreedService', () => {
@@ -24,6 +25,13 @@ describe('BreedService', () => {
     lockSeries: jest.fn(),
   };
 
+  const nobLobResolution = {
+    resolve: jest.fn(async (_tenantId: string, _companyId: any, explicit: any) => ({
+      nob_id: explicit?.nob_id ?? null,
+      lob_id: explicit?.lob_id ?? null,
+    })),
+  };
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
@@ -32,6 +40,11 @@ describe('BreedService', () => {
     numberSeries.generateNext.mockReset();
     numberSeries.lockSeries.mockReset();
     numberSeries.resolveSeriesFor.mockResolvedValue(null); // default: manual, as today
+    nobLobResolution.resolve.mockReset();
+    nobLobResolution.resolve.mockImplementation(async (_tenantId: string, _companyId: any, explicit: any) => ({
+      nob_id: explicit?.nob_id ?? null,
+      lob_id: explicit?.lob_id ?? null,
+    }));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -49,6 +62,7 @@ describe('BreedService', () => {
           },
         },
         { provide: NumberSeriesService, useValue: numberSeries },
+        { provide: NobLobResolutionService, useValue: nobLobResolution },
       ],
     }).compile();
 

@@ -12,15 +12,15 @@ export class CreateStageDto {
   @IsOptional()
   company_id?: string;
 
-  @ApiProperty({ description: 'Nature of Business UUID scope' })
+  @ApiProperty({ description: 'Nature of Business UUID scope. Omit to derive it from the company\'s operational areas.', required: false })
   @IsString()
-  @IsNotEmpty()
-  nob_id: string;
+  @IsOptional()
+  nob_id?: string;
 
-  @ApiProperty({ description: 'Line of Business UUID scope' })
+  @ApiProperty({ description: 'Line of Business UUID scope. Omit to derive it from the company\'s operational areas.', required: false })
   @IsString()
-  @IsNotEmpty()
-  lob_id: string;
+  @IsOptional()
+  lob_id?: string;
 
   @ApiProperty({ description: 'Unique stage code per LOB. Optional when a number series is configured for stages — the code is generated then.', required: false, example: 'QUARANTINE' })
   @IsString()

@@ -7,6 +7,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateStageDto, UpdateStageDto, QueryStageDto } from './dto/stage.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 
 @Injectable()
 export class StageService {
@@ -14,6 +15,7 @@ export class StageService {
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
     private readonly numberSeriesService: NumberSeriesService,
+    private readonly nobLobResolution: NobLobResolutionService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -59,22 +61,40 @@ export class StageService {
   }
 
   async create(dto: CreateStageDto, tenantId: string, userPayload?: any) {
+    // NOB/LOB are no longer asked on the form — derive them from the company's
+    // operational areas (an explicit dto value, if a caller still sends one,
+    // wins). stage_master.nob_id/lob_id are NOT NULL, so an ambiguous company
+    // (operational areas split across LOBs) surfaces a clear error here
+    // instead of a raw DB constraint failure — unlike item/resource/number-series,
+    // a stage genuinely cannot exist without knowing which LOB it belongs to.
+    const resolved = await this.nobLobResolution.resolve(tenantId, dto.company_id, {
+      nob_id: dto.nob_id,
+      lob_id: dto.lob_id,
+    });
+    if (!resolved.nob_id || !resolved.lob_id) {
+      throw new BadRequestException(
+        "Cannot determine this stage's Nature of Business / Line of Business — this company's operational areas span multiple business verticals. Specify nob_id and lob_id explicitly.",
+      );
+    }
+    const nobId = resolved.nob_id;
+    const lobId = resolved.lob_id;
+
     const [nob] = await this.db
       .select()
       .from(schema.nobMaster)
-      .where(eq(schema.nobMaster.nob_id, dto.nob_id))
+      .where(eq(schema.nobMaster.nob_id, nobId))
       .limit(1);
     if (!nob) {
-      throw new NotFoundException(`NOB with ID '${dto.nob_id}' not found.`);
+      throw new NotFoundException(`NOB with ID '${nobId}' not found.`);
     }
 
     const [lob] = await this.db
       .select()
       .from(schema.lobMaster)
-      .where(eq(schema.lobMaster.lob_id, dto.lob_id))
+      .where(eq(schema.lobMaster.lob_id, lobId))
       .limit(1);
     if (!lob) {
-      throw new NotFoundException(`LOB with ID '${dto.lob_id}' not found.`);
+      throw new NotFoundException(`LOB with ID '${lobId}' not found.`);
     }
 
     this.assertAutoMoveDayWhenAutoByDay(dto.transition_trigger, dto.auto_move_on_day);
@@ -88,7 +108,7 @@ export class StageService {
 
     const duplicateConditions = [
       eq(schema.stageMaster.tenant_id, tenantId),
-      eq(schema.stageMaster.lob_id, dto.lob_id),
+      eq(schema.stageMaster.lob_id, lobId),
       eq(schema.stageMaster.stage_code, stageCode),
       isNull(schema.stageMaster.deleted_at),
     ];
@@ -113,8 +133,8 @@ export class StageService {
       stage_id: stageId,
       tenant_id: tenantId,
       company_id: dto.company_id || null,
-      nob_id: dto.nob_id,
-      lob_id: dto.lob_id,
+      nob_id: nobId,
+      lob_id: lobId,
       stage_code: stageCode,
       stage_name: dto.stage_name,
       stage_category: dto.stage_category,

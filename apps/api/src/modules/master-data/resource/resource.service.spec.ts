@@ -4,6 +4,7 @@ import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 
 describe('ResourceService', () => {
   let service: ResourceService;
@@ -20,12 +21,24 @@ describe('ResourceService', () => {
     update: mockDbUpdate,
   };
 
+  const nobLobResolution = {
+    resolve: jest.fn(async (_tenantId: string, _companyId: any, explicit: any) => ({
+      nob_id: explicit?.nob_id ?? null,
+      lob_id: explicit?.lob_id ?? null,
+    })),
+  };
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
     mockEnsureCompanySeries.mockReset().mockResolvedValue(undefined);
     mockGenerateNext.mockReset().mockResolvedValue('RES-001');
+    nobLobResolution.resolve.mockReset();
+    nobLobResolution.resolve.mockImplementation(async (_tenantId: string, _companyId: any, explicit: any) => ({
+      nob_id: explicit?.nob_id ?? null,
+      lob_id: explicit?.lob_id ?? null,
+    }));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -49,6 +62,7 @@ describe('ResourceService', () => {
             generateNext: mockGenerateNext,
           },
         },
+        { provide: NobLobResolutionService, useValue: nobLobResolution },
       ],
     }).compile();
 

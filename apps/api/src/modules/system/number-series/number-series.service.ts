@@ -6,6 +6,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateNumberSeriesDto, UpdateNumberSeriesDto, QueryNumberSeriesDto } from './dto/number-series.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -21,6 +22,7 @@ export class NumberSeriesService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly nobLobResolution: NobLobResolutionService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -277,13 +279,22 @@ export class NumberSeriesService {
       throw new ConflictException(`Number series '${dto.series_code}' already exists in this scope.`);
     }
 
+    // NOB/LOB are no longer asked on the form — derive them from the company's
+    // operational areas (an explicit dto value, if a caller still sends one,
+    // wins). no_series_master.nob_id/lob_id are nullable, so an ambiguous
+    // company simply stores null rather than blocking the create.
+    const resolvedNobLob = await this.nobLobResolution.resolve(tenantId, dto.company_id, {
+      nob_id: dto.nob_id,
+      lob_id: dto.lob_id,
+    });
+
     const seriesId = randomUUID();
     const newSeries = {
       series_id: seriesId,
       tenant_id: tenantId,
       company_id: dto.company_id || null,
-      nob_id: dto.nob_id || null,
-      lob_id: dto.lob_id || null,
+      nob_id: resolvedNobLob.nob_id,
+      lob_id: resolvedNobLob.lob_id,
       series_code: dto.series_code.toUpperCase(),
       series_name: dto.series_name,
       document_type: dto.document_type,

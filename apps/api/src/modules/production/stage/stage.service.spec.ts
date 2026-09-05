@@ -3,6 +3,7 @@ import { StageService } from './stage.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('StageService', () => {
@@ -24,6 +25,16 @@ describe('StageService', () => {
     lockSeries: jest.fn(),
   };
 
+  // Echoes exactly what's given, same as the real service does when a caller
+  // supplies both fields — the derive-from-company path has its own tests in
+  // nob-lob-resolution.service.spec.ts.
+  const nobLobResolution = {
+    resolve: jest.fn(async (_tenantId: string, _companyId: any, explicit: any) => ({
+      nob_id: explicit?.nob_id ?? null,
+      lob_id: explicit?.lob_id ?? null,
+    })),
+  };
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
@@ -32,6 +43,11 @@ describe('StageService', () => {
     numberSeries.generateNext.mockReset();
     numberSeries.lockSeries.mockReset();
     numberSeries.resolveSeriesFor.mockResolvedValue(null); // default: manual, as today
+    nobLobResolution.resolve.mockReset();
+    nobLobResolution.resolve.mockImplementation(async (_tenantId: string, _companyId: any, explicit: any) => ({
+      nob_id: explicit?.nob_id ?? null,
+      lob_id: explicit?.lob_id ?? null,
+    }));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -45,6 +61,7 @@ describe('StageService', () => {
           useValue: { log: jest.fn().mockResolvedValue({}) },
         },
         { provide: NumberSeriesService, useValue: numberSeries },
+        { provide: NobLobResolutionService, useValue: nobLobResolution },
       ],
     }).compile();
 
@@ -197,6 +214,25 @@ describe('StageService', () => {
       expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('STAGE', 'PRE_PRODUCTIVE', 'tenant-123', undefined);
       expect(numberSeries.generateNext).toHaveBeenCalledWith('STAGE_PRE_PRODUCTIVE', 'tenant-123', undefined);
       expect(result.stage_code).toBe('STG-001');
+    });
+
+    it('rejects with a clear error when NOB/LOB cannot be derived and none was supplied', async () => {
+      nobLobResolution.resolve.mockResolvedValue({ nob_id: 'nob-1', lob_id: null });
+
+      await expect(
+        service.create(
+          {
+            stage_code: 'QUARANTINE',
+            stage_name: 'Quarantine',
+            stage_category: 'PRE_PRODUCTIVE',
+            stage_sequence: 1,
+            transition_trigger: 'MANUAL',
+          } as any,
+          'tenant-123',
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDbSelect).not.toHaveBeenCalled();
     });
 
     it('rejects when neither a series nor a manual stage_code is supplied', async () => {
