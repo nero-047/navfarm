@@ -32,4 +32,33 @@ describe('master workspace scope', () => {
   it('rejects tenant scope for a company admin', async () => {
     await expect(enforceMasterRequest(clsFor({}), { user: { userType: 'COMPANY_ADMIN' }, headers: { 'x-workspace-scope': 'TENANT' } }, 'item')).rejects.toThrow('Tenant templates');
   });
+
+  /**
+   * Guards run BEFORE the ValidationPipe, so this code sees the raw body: an
+   * @IsUUID() decorator has not run yet. A malformed reference used to go
+   * straight into eq(column, value) and surface as ER_OPERAND_COLUMNS — a 500
+   * carrying the SQL statement, rather than a 400 naming the bad field.
+   */
+  describe('malformed master references', () => {
+    const requestWith = (body: Record<string, unknown>) => ({
+      user: { userType: 'COMPANY_ADMIN', tenantId: 'tenant', companyId: 'company' },
+      headers: { 'x-workspace-scope': 'COMPANY', 'x-active-company-id': 'company' },
+      method: 'POST',
+      body,
+    });
+    const store = () => {
+      const map = new Map();
+      return { get: (k: string) => map.get(k), set: (k: string, v: unknown) => map.set(k, v) } as unknown as ClsService;
+    };
+
+    it.each([
+      ['an array', [1, 'a3f1e2d4-0000-4000-8000-000000000000']],
+      ['an object', { id: 'a3f1e2d4-0000-4000-8000-000000000000' }],
+      ['a number', 42],
+    ])('rejects %s as a foreign key with 400, not a database error', async (_label, value) => {
+      await expect(
+        enforceMasterRequest(store(), requestWith({ breed_id: value }), 'animal'),
+      ).rejects.toThrow(/single identifier/i);
+    });
+  });
 });

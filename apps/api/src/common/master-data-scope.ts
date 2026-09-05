@@ -72,7 +72,14 @@ export async function enforceMasterRequest(cls: ClsService, request: any, contro
   }
   const db = cls.get<MySql2Database<typeof schema>>('tenantDb');
   const columns = getTableColumns(table) as Record<string, AnyMySqlColumn>;
-  const checkRecord = async (target: AnyMySqlTable, column: AnyMySqlColumn, value: string) => {
+  const checkRecord = async (target: AnyMySqlTable, column: AnyMySqlColumn, value: unknown, field?: string) => {
+    // This runs inside a guard, which NestJS executes BEFORE the ValidationPipe —
+    // so @IsUUID() has not run and `value` is whatever the caller sent. Passing a
+    // non-scalar to eq() builds `col = 1, 'uuid'`, which MySQL rejects with
+    // ER_OPERAND_COLUMNS: a 500 carrying the SQL, instead of a 400 naming the field.
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new BadRequestException(`'${field ?? column.name}' must be a single identifier.`);
+    }
     const constraints = masterScopeConditions(cls, target);
     const targetColumns = getTableColumns(target) as Record<string, AnyMySqlColumn>;
     if (targetColumns.tenant_id) constraints.push(eq(targetColumns.tenant_id, scope.tenantId));
@@ -109,17 +116,17 @@ export async function enforceMasterRequest(cls: ClsService, request: any, contro
     if (!Object.values(MASTER_TABLES).includes(reference.foreignTable)) continue;
     for (let i = 0; i < reference.columns.length; i++) {
       const value = body[reference.columns[i].name];
-      if (value) await checkRecord(reference.foreignTable, reference.foreignColumns[i], value);
+      if (value) await checkRecord(reference.foreignTable, reference.foreignColumns[i], value, reference.columns[i].name);
     }
   }
   if (table === schema.itemMaster && Array.isArray(body.attributes)) {
     for (const attribute of body.attributes) {
-      if (attribute.attribute_id) await checkRecord(schema.itemAttributeMaster, schema.itemAttributeMaster.attribute_id, attribute.attribute_id);
+      if (attribute.attribute_id) await checkRecord(schema.itemAttributeMaster, schema.itemAttributeMaster.attribute_id, attribute.attribute_id, 'attributes[].attribute_id');
     }
   }
   if (table === schema.feedFormulaMaster && Array.isArray(body.ingredients)) {
     for (const ingredient of body.ingredients) {
-      if (ingredient.item_id) await checkRecord(schema.itemMaster, schema.itemMaster.item_id, ingredient.item_id);
+      if (ingredient.item_id) await checkRecord(schema.itemMaster, schema.itemMaster.item_id, ingredient.item_id, 'ingredients[].item_id');
     }
   }
 }
