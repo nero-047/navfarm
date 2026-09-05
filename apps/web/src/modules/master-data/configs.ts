@@ -491,8 +491,26 @@ const item: MasterDataConfig = {
     { key: "item_code", label: "Item Code", type: "text", readOnly: true, helpText: "Assigned from the Item number series unless manual entry is selected.", section: "Identification" },
     { key: "item_name", label: "Item Name", type: "text", required: true, placeholder: "Cobb Broiler Chicks", section: "Identification" },
     { key: "item_type", label: "Item Type", type: "select-entity", required: true, entityEndpoint: "/item-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"], section: "Identification" },
-    { key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"], section: "Identification" },
-    { key: "sub_category", label: "Sub Category", type: "text", placeholder: "Grower", helpText: "Free-text subcategory (e.g. Starter/Grower/Finisher/Layer). For a structured, reusable subcategory list, create it as a child of the chosen Category instead." },
+    {
+      // Depends on Item Type via the query mechanism, not path substitution — a
+      // category is not nested under a type in the URL, it's filtered by it.
+      // With no Item Type chosen yet, queryParams omits the param and this lists
+      // every category unfiltered rather than blocking the fetch — deliberately:
+      // most existing categories predate item_type and have none set, so a
+      // block-until-typed rule would empty this picker for them today. See
+      // resolveEndpoint()'s doc comment above for the general mechanism.
+      key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"],
+      dependsOn: "item_type", dependsOnMode: "query", queryParams: { item_type: "itemType" }, section: "Identification",
+    },
+    {
+      // A sub-category is just a category whose parent_category_id is the chosen
+      // Category (no separate table) — filtered the same way, by parentCategoryId.
+      // sub_category stays the free-text column it always was; this field now
+      // writes the chosen category's category_code into it instead of typed text.
+      key: "sub_category", label: "Sub Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_code", entityLabelKeys: ["category_code", "category_name"],
+      dependsOn: "category_id", dependsOnMode: "query", queryParams: { category_id: "parentCategoryId" },
+      helpText: "Optional. Lists categories whose parent is the selected Category above — create one there first if the subcategory you need doesn't exist yet.",
+    },
     // Left unfiltered: an item's primary/secondary UOM legitimately spans every
     // uom_type — KG for feed, LITER for medicine, BAG or HEAD for others — there is
     // no single obviously-correct type to narrow this picker to.

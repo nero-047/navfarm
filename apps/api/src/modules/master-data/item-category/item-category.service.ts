@@ -241,6 +241,9 @@ export class ItemCategoryService {
     if (query.parentCategoryId) {
       conditions.push(eq(schema.itemCategoryMaster.parent_category_id, query.parentCategoryId));
     }
+    if (query.itemType) {
+      conditions.push(eq(schema.itemCategoryMaster.item_type, query.itemType));
+    }
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.itemCategoryMaster.is_active, query.isActive));
     }

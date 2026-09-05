@@ -80,6 +80,11 @@ export class QueryItemCategoryDto {
   @IsUUID()
   parentCategoryId?: string;
 
+  @ApiProperty({ description: 'Filter by item type (e.g. CONSUMABLE, RAW_MATERIAL)', required: false })
+  @IsOptional()
+  @IsString()
+  itemType?: string;
+
   @ApiProperty({ description: 'Filter by active status', required: false })
   @IsOptional()
   @IsBoolean()
