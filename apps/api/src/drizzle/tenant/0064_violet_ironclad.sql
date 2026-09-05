@@ -1,0 +1,1 @@
+ALTER TABLE `animal_register` ADD `ear_tag_image_url` varchar(500);

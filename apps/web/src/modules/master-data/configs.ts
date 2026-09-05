@@ -275,6 +275,7 @@ const animal: MasterDataConfig = {
     { key: "serial_number", label: "Serial Number", type: "text", helpText: "Asset tag from item_lot_serials, distinct from RFID/ear tag.", section: "Identification" },
     { key: "rfid_tag", label: "RFID Tag", type: "text", helpText: "Unique if set.", section: "Identification" },
     { key: "ear_tag", label: "Ear Tag (Visual)", type: "text", section: "Identification" },
+    { key: "ear_tag_image_url", label: "Ear Tag Image URL", type: "text", placeholder: "https://cdn.navfarm.io/ear-tags/...", helpText: "Paste an image URL for now; direct file upload to Cloudflare R2 is planned for later.", section: "Identification" },
     { key: "sire_animal_id", label: "Sire (Father)", type: "select-entity", entityEndpoint: "/animal", entityValueKey: "animal_id", entityLabelKeys: ["animal_code"], section: "Lineage" },
     { key: "dam_animal_id", label: "Dam (Mother)", type: "select-entity", entityEndpoint: "/animal", entityValueKey: "animal_id", entityLabelKeys: ["animal_code"], section: "Lineage" },
     {

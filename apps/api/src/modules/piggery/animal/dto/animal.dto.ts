@@ -95,6 +95,11 @@ export class CreateAnimalDto {
   @IsOptional()
   ear_tag?: string;
 
+  @ApiProperty({ description: 'URL to a photo of the ear tag — file upload will move to Cloudflare R2 later', required: false })
+  @IsString()
+  @IsOptional()
+  ear_tag_image_url?: string;
+
   @ApiProperty({ description: 'Father boar UUID — self-referential', required: false })
   @IsUUID()
   @IsOptional()
@@ -188,6 +193,11 @@ export class UpdateAnimalDto {
   @IsString()
   @IsOptional()
   ear_tag?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  ear_tag_image_url?: string;
 
   @ApiProperty({ required: false })
   @IsUUID()

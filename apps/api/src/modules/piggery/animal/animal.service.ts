@@ -274,6 +274,7 @@ export class AnimalService {
       item_id: dto.item_id,
       rfid_tag: dto.rfid_tag || null,
       ear_tag: dto.ear_tag || null,
+      ear_tag_image_url: dto.ear_tag_image_url || null,
       sire_animal_id: dto.sire_animal_id || null,
       dam_animal_id: dto.dam_animal_id || null,
       acquisition_cost: dto.acquisition_cost.toString(),
@@ -519,6 +520,7 @@ export class AnimalService {
     if (dto.dob !== undefined) updates.dob = dto.dob;
     if (dto.rfid_tag !== undefined) updates.rfid_tag = dto.rfid_tag;
     if (dto.ear_tag !== undefined) updates.ear_tag = dto.ear_tag;
+    if (dto.ear_tag_image_url !== undefined) updates.ear_tag_image_url = dto.ear_tag_image_url;
     if (dto.sire_animal_id !== undefined) updates.sire_animal_id = dto.sire_animal_id;
     if (dto.dam_animal_id !== undefined) updates.dam_animal_id = dto.dam_animal_id;
     if (dto.current_stage_id !== undefined) updates.current_stage_id = dto.current_stage_id;

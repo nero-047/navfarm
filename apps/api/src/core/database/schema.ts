@@ -2827,6 +2827,7 @@ export const animalRegister = mysqlTable('animal_register', {
   item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
   rfid_tag: varchar('rfid_tag', { length: 50 }),
   ear_tag: varchar('ear_tag', { length: 50 }),
+  ear_tag_image_url: varchar('ear_tag_image_url', { length: 500 }), // URL only for now; direct upload moves to Cloudflare R2 later
   sire_animal_id: varchar('sire_animal_id', { length: 36 }),
   dam_animal_id: varchar('dam_animal_id', { length: 36 }),
   acquisition_cost: decimal('acquisition_cost', { precision: 18, scale: 4 }).notNull(),
