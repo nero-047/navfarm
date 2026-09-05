@@ -198,7 +198,11 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         // costing-method) and is honored by every findAll that carries the
         // isActive query param.
         params.set("isActive", "true");
-        const res = await api.get(`${ep}?${params.toString()}`);
+        // ep may already carry a query string (e.g. "/item?itemType=LIVING_ASSET"),
+        // so append rather than assume — the same rule the dependent-field effect
+        // below uses. Hardcoding "?" produced "/item?itemType=X?companyId=..." and
+        // the filter value silently swallowed the rest of the query.
+        const res = await api.get(`${ep}${ep.includes("?") ? "&" : "?"}${params.toString()}`);
         const list = unwrap<Row[]>(res);
         setEntityOptions((prev) => ({ ...prev, [ep]: Array.isArray(list) ? list : [] }));
       } catch {

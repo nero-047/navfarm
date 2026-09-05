@@ -284,7 +284,11 @@ const animal: MasterDataConfig = {
     { key: "entry_date", label: "Entry Date", type: "date", required: true, section: "Acquisition" },
     { key: "source_receipt_id", label: "Source Goods Receipt", type: "select-entity", entityEndpoint: "/goods-receipt", entityValueKey: "receipt_id", entityLabelKeys: ["receipt_no"], helpText: "Required for PURCHASED_IMPORTED / PURCHASED_LOCAL entries.", section: "Acquisition" },
     { key: "source_batch_id", label: "Source Batch", type: "select-entity", entityEndpoint: "/batch", entityValueKey: "batch_id", entityLabelKeys: ["batch_no"], helpText: "Required for BORN_ON_FARM entries.", section: "Acquisition" },
-    { key: "item_id", label: "Item (Living Asset)", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"], section: "Acquisition" },
+    // Filtered to LIVING_ASSET: the field is the animal's inventory identity, and
+    // an unfiltered /item offered feed and grain here — "Maize grain" was a valid
+    // choice for what a pig is. The picker appends isActive=true, and its URL
+    // builder handles the existing query string.
+    { key: "item_id", label: "Item (Living Asset)", type: "select-entity", required: true, entityEndpoint: "/item?itemType=LIVING_ASSET", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"], section: "Acquisition" },
     { key: "acquisition_cost", label: "Acquisition Cost", type: "number", step: "0.01", required: true, section: "Acquisition" },
     { key: "landing_cost", label: "Landing Cost", type: "number", step: "0.01", helpText: "Transport/import duty/quarantine charges for imported animals.", section: "Acquisition" },
     { key: "total_opening_asset_value", label: "Total Opening Asset Value", type: "number", hideInForm: true, section: "Acquisition" },
