@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/services/api-client";
 import { getActiveCompanyId, getActiveWorkspaceScope } from "@/hooks/useAuth";
 import type { MasterDataConfig, MasterDataField } from "./types";
+import { singularLabel } from "./labels";
 import { useCodeSeries } from "./useCodeSeries";
 
 // `Row` is a local alias in MasterDataTable.tsx and is not exported from
@@ -150,7 +151,7 @@ export function LookupCard({
       {numbering.error && <p className="text-xs text-(--danger)">{numbering.error}</p>}
       <div className="flex items-center gap-3 flex-wrap">
         <Button type="button" size="sm" onClick={add} disabled={busy || !complete || numbering.loading || !!numbering.error}>
-          {busy ? "Adding…" : `Add ${config.label}`}
+          {busy ? "Adding…" : `Add ${singularLabel(config)}`}
         </Button>
         <button type="button" onClick={onManage} className="text-xs underline text-(--text-secondary)">
           Manage {config.label}

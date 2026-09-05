@@ -207,6 +207,7 @@ const stage: MasterDataConfig = {
 const numberSeries: MasterDataConfig = {
   key: "number-series",
   label: "Number Series",
+  singular: "Number Series",
   description: "Concurrency-safe business-code generators (e.g. \"BATCH\" → BATCH-000001) — other modules call these by series code instead of counting rows themselves.",
   apiBase: "/number-series",
   idKey: "series_id",
@@ -369,6 +370,7 @@ const itemType: MasterDataConfig = {
 const uom: MasterDataConfig = {
   key: "uom",
   label: "Units of Measure",
+  singular: "Unit of Measure",
   description: "Measurement units used across items and transactions.",
   apiBase: "/uom",
   idKey: "uom_id",
@@ -554,6 +556,7 @@ const item: MasterDataConfig = {
 const species: MasterDataConfig = {
   key: "species",
   label: "Species",
+  singular: "Species",
   description: "Base species catalog used by breeds (e.g. Chicken, Cattle).",
   apiBase: "/species",
   idKey: "species_id",

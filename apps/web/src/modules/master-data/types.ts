@@ -110,7 +110,16 @@ export interface MasterDataField {
 
 export interface MasterDataConfig {
   key: string;
+  /** Plural — the list heading and sidebar entry, e.g. "Item Categories". */
   label: string;
+  /**
+   * Singular form for "Add X" / "Edit X", when `label` is not simply the
+   * singular plus an `s` (or `y` → `ies`). English plurals that are their own
+   * singular ("Number Series", "Species") and heads that are not the last word
+   * ("Units of Measure") must declare it — otherwise `singularLabel()` guesses,
+   * and guessing produced "Add Number Serie".
+   */
+  singular?: string;
   description?: string;
   apiBase: string;
   idKey: string;

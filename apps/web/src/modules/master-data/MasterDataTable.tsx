@@ -11,6 +11,7 @@ import { getActiveCompanyId, getActiveWorkspaceScope } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { MasterDataConfig, MasterDataField } from "./types";
 import { CollapsibleCard } from "./CollapsibleCard";
+import { singularLabel } from "./labels";
 import { LookupCard } from "./LookupCard";
 import { MASTER_DATA_CONFIGS } from "./configs";
 import { useCodeSeries } from "./useCodeSeries";
@@ -608,7 +609,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
             style={{ backgroundColor: "var(--accent)" }}
           >
-            <Plus className="h-3.5 w-3.5" /> {t("addItem", { name: tLabel(config.label.replace(/s$/, "")) })}
+            <Plus className="h-3.5 w-3.5" /> {t("addItem", { name: tLabel(singularLabel(config)) })}
           </button>
         </div>
       </div>
@@ -715,7 +716,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       <Dialog
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title={editing ? t("editItem", { name: tLabel(config.label.replace(/s$/, "")) }) : t("addItem", { name: tLabel(config.label.replace(/s$/, "")) })}
+        title={editing ? t("editItem", { name: tLabel(singularLabel(config)) }) : t("addItem", { name: tLabel(singularLabel(config)) })}
         maxWidth={sectionCount > 1 ? "xl" : "lg"}
         presentation={usePageDialog ? "page" : "modal"}
         footer={
