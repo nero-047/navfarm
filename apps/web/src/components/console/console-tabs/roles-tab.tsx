@@ -48,6 +48,7 @@ const DEFAULT_RESOURCES = [
   { module_code: "MASTER_DATA", resource: "SHED", name: "Sheds", nameKey: "rolSheds" },
   { module_code: "MASTER_DATA", resource: "LOCATION", name: "Locations", nameKey: "rolLocations" },
   { module_code: "MASTER_DATA", resource: "ITEM_CATEGORY", name: "Item Categories", nameKey: "rolItemCategories" },
+  { module_code: "MASTER_DATA", resource: "ITEM_TYPE", name: "Item Types", nameKey: "rolItemTypes" },
   { module_code: "MASTER_DATA", resource: "ITEM", name: "Items", nameKey: "rolItems" },
   { module_code: "MASTER_DATA", resource: "ITEM_ATTRIBUTE", name: "Item Attributes", nameKey: "rolItemAttributes" },
   { module_code: "MASTER_DATA", resource: "SUPPLIER", name: "Suppliers", nameKey: "gSuppliers" },
