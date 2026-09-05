@@ -100,9 +100,8 @@ async function run() {
     // Resolve (or plan to create) the two top-level categories. "Feed" reuses
     // the existing FEED/"Pig Feed" category already referenced by these items
     // — renaming it isn't requested, so category_name is left alone and only
-    // item_type is (re)assigned. "Medicine" does not exist anywhere in this
-    // tenant (verified: no category named Medicine, Apex-scoped or global) so
-    // it must be created new — this is one of the two unconfirmed calls.
+    // item_type is (re)assigned. Medicines reuse the existing HEALTH category
+    // for the same reason — see the note above that lookup.
     const [feedRows] = await connection.query<CategoryRow[]>(
       "SELECT * FROM item_category_master WHERE company_id = ? AND category_code = 'FEED' AND deleted_at IS NULL LIMIT 1",
       [companyId],
@@ -110,8 +109,13 @@ async function run() {
     if (feedRows.length !== 1) throw new Error("Expected an existing 'FEED' category for Apex to reuse as the Feed category.");
     const feedCategory = feedRows[0];
 
+    // Reuse the existing HEALTH / "Animal Health" category rather than creating a
+    // separate "Medicine" one. Those three items already live in HEALTH, so
+    // creating Medicine would move them out and leave HEALTH with zero items —
+    // an orphan, and inconsistent with how FEED is reused above. "Animal Health"
+    // is also the more accurate label: IRON is a supplement, not a medicine.
     const [medicineRows] = await connection.query<CategoryRow[]>(
-      "SELECT * FROM item_category_master WHERE company_id = ? AND category_name = 'Medicine' AND deleted_at IS NULL LIMIT 1",
+      "SELECT * FROM item_category_master WHERE company_id = ? AND category_code = 'HEALTH' AND deleted_at IS NULL LIMIT 1",
       [companyId],
     );
     const existingMedicineCategory = medicineRows[0] as CategoryRow | undefined;
@@ -143,7 +147,7 @@ async function run() {
     const neededSubNames = Array.from(new Set(ITEM_PLANS.map((p) => p.target_sub_category_name).filter((n): n is string => !!n)));
     for (const name of neededSubNames) {
       const parentId = name === 'Vaccine' ? medicineCategoryId : feedCategory.category_id;
-      const parentLabel = name === 'Vaccine' ? 'Medicine' : `'${feedCategory.category_code}'`;
+      const parentLabel = name === 'Vaccine' ? `'${existingMedicineCategory?.category_code ?? 'HEALTH'}'` : `'${feedCategory.category_code}'`;
       let existingChild: CategoryRow | undefined;
       if (name !== 'Vaccine' || existingMedicineCategory) {
         const [rows] = await connection.query<CategoryRow[]>(
@@ -166,7 +170,7 @@ async function run() {
     for (const plan of ITEM_PLANS) {
       const row = itemByCode.get(plan.item_code)!;
       const targetCategoryId = plan.target_category_key === 'FEED' ? feedCategory.category_id : medicineCategoryId;
-      const targetCategoryLabel = plan.target_category_key === 'FEED' ? feedCategory.category_name : 'Medicine';
+      const targetCategoryLabel = plan.target_category_key === 'FEED' ? feedCategory.category_name : (existingMedicineCategory?.category_name ?? 'Medicine');
       const targetSubCode = plan.target_sub_category_name ? SUB_CATEGORY_CODE[plan.target_sub_category_name] : null;
 
       console.log(`${row.item_code}  "${row.item_name}"  (${row.item_id})`);
