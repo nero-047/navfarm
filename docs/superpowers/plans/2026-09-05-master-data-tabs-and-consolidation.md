@@ -1,5 +1,39 @@
 # Master Data: sidebar consolidation and per-sheet tabs
 
+## Continuation status — 5 September 2026
+
+The user confirmed the reduced sidebar during this continuation. T1 and T2 are
+implemented: twelve primary masters, Item Attributes under Items, Lifecycle
+Stages under Breeds, and UOM Conversions under Units of Measure. Each sheet uses
+its existing route, list and Add/Edit dialog. The page heading describes the
+selected sheet; its parent remains highlighted in the sidebar. Refresh and Back
+preserve the sheet because tab selection is encoded in the route.
+
+The source workbooks were checked directly. Animal Register's Breeding Record
+sheet says it is for a later stage; the Stage workbook's second sheet is Example.
+Neither becomes a new master surface. Triple-C reporting remains deferred.
+
+One necessary correction to the plan: Feed Formulas cannot use the old compact
+lookup creator, which silently omitted required entity selectors and ingredients.
+The inline creator now includes those fields and converts numbers and JSON before
+submission. Lookup cards also link to their full management pages in a new tab,
+so moving Diseases/Feed Formulas does not remove access to their lists and edits.
+Customers remains intentionally reachable through `/master-data/customer`.
+
+Verification: desktop (1440px) and mobile (390px) browser tests cover all three
+tab groups, page headers, refresh, dialogs, the twelve-entry sidebar and the
+Customers route. An intercepted formula submission test checks its required
+payload, including numeric quantity and parsed ingredients; it does not write
+test records to the live database. Live Item Attributes listing and dialog were
+also inspected using the existing authenticated session. Web/web-e2e typechecks
+pass; web lint remains at the existing 83 errors elsewhere.
+
+The older A1 data-foundation programme remains separate unfinished work. Its
+reason-code list needs client input. Its instructions to deliberately leave a
+test failing, delete duplicate records, and remove Dairy must be reassessed
+against current requirements before execution. The live Preseed cloning issue
+described at the end of this plan is still outstanding.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development.
 
 **Goal:** Make the Master Data sidebar list the seven client template masters plus the masters the BBP mandates, and give each master one tab per sheet in its template — each tab a full surface with its own list and Add dialog.

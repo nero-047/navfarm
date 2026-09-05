@@ -130,6 +130,10 @@ export interface MasterDataConfig {
    * through the card in its parent's dialog, not through its own nav entry.
    */
   isPrimary?: boolean;
+  /** Primary master whose workbook contains this independently editable sheet. */
+  tabOf?: string;
+  /** Short label for this sheet in its master's tab bar. */
+  tabLabel?: string;
   /**
    * Keys of the primary masters whose dialog renders this master as an
    * inline card. Order here is the order the cards appear.

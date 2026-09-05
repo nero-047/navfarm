@@ -589,6 +589,13 @@ body {
     display: none;
   }
 
+  /* Except inside the mobile drawer, where there is no selector to collapse
+     into — the drawer is the menu, so the grouped index renders in full. The
+     rule above matches the drawer's copy too, which silently hid it. */
+  [data-shell-region='primary-nav'] [data-context-nav][data-grouped='true'] {
+    display: block;
+  }
+
   [data-context-nav-trigger] {
     display: flex;
     align-items: center;

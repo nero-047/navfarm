@@ -363,6 +363,7 @@ const uom: MasterDataConfig = {
   apiBase: "/uom",
   idKey: "uom_id",
   group: "Inventory",
+  isPrimary: true,
   lookupFor: ["item", "location", "resource"],
   columns: [
     { key: "uom_code", label: "Code" },
@@ -397,7 +398,8 @@ const uomConversion: MasterDataConfig = {
   apiBase: "/uom/conversion",
   idKey: "conversion_id",
   group: "Inventory",
-  isPrimary: true,
+  tabOf: "uom",
+  tabLabel: "UOM Conversions",
   supportsRestore: false,
   columns: [
     { key: "from_uom", label: "From" },
@@ -432,7 +434,8 @@ const itemAttribute: MasterDataConfig = {
   idKey: "attribute_id",
   group: "Inventory",
   supportsNobLobFilter: true,
-  lookupFor: ["item"],
+  tabOf: "item",
+  tabLabel: "Item Attributes",
   columns: [
     { key: "attribute_code", label: "Code" },
     { key: "attribute_name", label: "Name" },
@@ -591,7 +594,8 @@ const breedLifecycleStage: MasterDataConfig = {
   apiBase: "/breed-lifecycle-stage",
   idKey: "lifecycle_id",
   group: "Livestock & Health",
-  isPrimary: true,
+  tabOf: "breed",
+  tabLabel: "Lifecycle Stages",
   supportsRestore: false,
   columns: [
     { key: "calc_unit", label: "Unit" },
@@ -641,7 +645,7 @@ const disease: MasterDataConfig = {
   apiBase: "/disease",
   idKey: "disease_id",
   group: "Livestock & Health",
-  isPrimary: true,
+  lookupFor: ["medicine"],
   columns: [
     { key: "disease_code", label: "Code" },
     { key: "disease_name", label: "Name" },
@@ -695,7 +699,7 @@ const feedFormula: MasterDataConfig = {
   apiBase: "/feed-formula",
   idKey: "formula_id",
   group: "Livestock & Health",
-  isPrimary: true,
+  lookupFor: ["item"],
   columns: [
     { key: "formula_code", label: "Code" },
     { key: "formula_name", label: "Name" },
@@ -772,7 +776,7 @@ const customer: MasterDataConfig = {
   apiBase: "/customer",
   idKey: "customer_id",
   group: "Business Partners",
-  isPrimary: true,
+  // Intentionally reachable by its existing URL until Sales enters scope.
   columns: [
     { key: "customer_code", label: "Code" },
     { key: "customer_name", label: "Name" },
@@ -949,6 +953,7 @@ const costCenter: MasterDataConfig = {
   apiBase: "/cost-center",
   idKey: "cost_center_id",
   group: "Finance",
+  isPrimary: true,
   lookupFor: ["gl-account"],
   columns: [
     { key: "cost_center_code", label: "Code" },

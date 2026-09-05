@@ -1,14 +1,51 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
-import type { MasterDataConfig } from "./types";
+import type { MasterDataConfig, MasterDataField } from "./types";
 
 // `Row` is a local alias in MasterDataTable.tsx and is not exported from
 // types.ts, so it is redeclared here rather than imported.
 type Row = Record<string, any>;
+
+function LookupEntitySelect({ field, value, onChange }: {
+  field: MasterDataField;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [options, setOptions] = useState<Row[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const companyId = getActiveCompanyId();
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams({ limit: "200" });
+    if (companyId) params.set("companyId", companyId);
+    setLoading(true);
+    setError("");
+    api.get(`${field.entityEndpoint}?${params}`).then((res: any) => {
+      if (!cancelled) setOptions(Array.isArray(res) ? res : res?.data || []);
+    }).catch((err: Error) => {
+      if (!cancelled) setError(err.message || "Could not load options");
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [field.entityEndpoint, companyId]);
+  return (
+    <>
+      <select aria-label={field.label} className="nf-input nf-select" value={value} disabled={loading || !!error} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{loading ? "Loading…" : "Select…"}</option>
+        {options.map((row) => (
+          <option key={row[field.entityValueKey || "id"]} value={row[field.entityValueKey || "id"]}>
+            {(field.entityLabelKeys || []).map((key) => row[key]).filter(Boolean).join(" — ") || row[field.entityValueKey || "id"]}
+          </option>
+        ))}
+      </select>
+      {error && <span className="text-xs text-(--danger)">{error}</span>}
+    </>
+  );
+}
 
 /**
  * A lookup master rendered inside its parent's dialog. Saves immediately, as
@@ -25,13 +62,10 @@ export function LookupCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // Only the required, directly-typed fields. A lookup's own nested entity
-  // pickers are out of scope here - it stays a small, fast form. "select" is
-  // included (alongside text/textarea/number) because some lookups (e.g.
-  // UOM's uom_type) have a required select field - leaving it out would let
-  // the form report "complete" without it and 400 on save.
+  // Include every required creation field: recipes need item/UOM selectors
+  // and ingredients as well as their code and name.
   const fields = config.fields.filter(
-    (f) => !f.hideInForm && (f.required || f.showInLookup) && (f.type === "text" || f.type === "textarea" || f.type === "number" || f.type === "select"),
+    (f) => !f.hideInForm && !f.readOnly && !f.editOnly && !f.filterOnly && (f.required || f.showInLookup),
   );
 
   const add = async () => {
@@ -39,7 +73,19 @@ export function LookupCard({
     setError("");
     try {
       const cid = getActiveCompanyId();
-      const body = cid && config.fields.some((f) => f.key === "company_id") ? { ...form, company_id: cid } : form;
+      const body: Row = {};
+      for (const field of fields) {
+        const value = form[field.key];
+        if (value === undefined || value === "") continue;
+        if (field.type === "json") {
+          try { body[field.key] = JSON.parse(value); }
+          catch { throw new Error(`${field.label} must contain valid JSON.`); }
+        } else if (field.type === "number") {
+          body[field.key] = Number(value);
+          if (!Number.isFinite(body[field.key])) throw new Error(`${field.label} must be a number.`);
+        } else body[field.key] = value;
+      }
+      if (cid && config.fields.some((f) => f.key === "company_id")) body.company_id = cid;
       await api.post(config.apiBase, body);
       setForm({});
       onCreated();
@@ -58,7 +104,13 @@ export function LookupCard({
         {fields.map((f) => (
           <label key={f.key} className="grid gap-1">
             <span className="text-xs font-medium">{f.label}</span>
-            {f.type === "select" ? (
+            {f.type === "select-entity" ? (
+              <LookupEntitySelect field={f} value={String(form[f.key] ?? "")} onChange={(value) => setForm((p) => ({ ...p, [f.key]: value }))} />
+            ) : f.type === "json" || f.type === "textarea" ? (
+              <textarea className="nf-input" rows={4} value={String(form[f.key] ?? "")} onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))} />
+            ) : f.type === "boolean" ? (
+              <input type="checkbox" checked={!!form[f.key]} onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.checked }))} />
+            ) : f.type === "select" ? (
               <select
                 value={String(form[f.key] ?? "")}
                 onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
@@ -72,21 +124,28 @@ export function LookupCard({
               </select>
             ) : (
               <Input
+                aria-label={f.label}
+                type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "email" ? "email" : "text"}
+                step={f.step}
                 value={String(form[f.key] ?? "")}
                 placeholder={f.placeholder}
                 onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
               />
             )}
+            {f.helpText && <span className="text-xs text-(--text-muted)">{f.helpText}</span>}
           </label>
         ))}
       </div>
       {error ? (
         <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>
       ) : null}
-      <div>
+      <div className="flex items-center gap-3 flex-wrap">
         <Button type="button" size="sm" onClick={add} disabled={busy || !complete}>
           {busy ? "Adding…" : `Add ${config.label}`}
         </Button>
+        <a href={`/master-data/${config.key}`} target="_blank" rel="noopener noreferrer" className="text-xs underline text-(--text-secondary)">
+          Manage {config.label} (new tab)
+        </a>
       </div>
     </div>
   );

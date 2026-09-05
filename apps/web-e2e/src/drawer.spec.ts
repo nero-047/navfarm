@@ -384,7 +384,7 @@ test.describe('migrated application forms', () => {
     // The template-backed fields live in the first card. Lookup masters that
     // feed those fields remain available below without turning the form into
     // separate Farm/Shed/Pen creation screens.
-    await expect(dialog.getByText('Details', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Identification', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Location Types', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Units of Measure', { exact: true })).toBeVisible();
     const generatedCode = dialog.locator('input[placeholder*="Generated when"]');

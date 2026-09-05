@@ -10,6 +10,7 @@ import MasterDataTable from "@/modules/master-data/MasterDataTable";
 import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ConsolePage } from "@/components/ui/console-page";
+import { Tabs } from "@/components/ui/tabs";
 import { ShieldAlert, Download, Building2, RefreshCw } from "lucide-react";
 import { api } from "@/services/api-client";
 
@@ -66,6 +67,10 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
   const { ready, user, mayView, companies, selectedCompanyId, setSelectedCompanyId } = useMasterDataPageState();
   const [preseedLoading, setPreseedLoading] = useState(false);
   const [preseedMsg, setPreseedMsg] = useState("");
+  const activeConfig: MasterDataConfig = getConfig(activeKey) || MASTER_DATA_CONFIGS.find((c) => c.isPrimary)!;
+  const parentConfig = (activeConfig.tabOf && getConfig(activeConfig.tabOf)) || activeConfig;
+  const tabConfigs = MASTER_DATA_CONFIGS.filter((c) => c.tabOf === parentConfig.key);
+  const parentKey = parentConfig.key;
 
   const contextNav = useMemo<ContextNavModel | null>(() => {
     if (!ready || !mayView) return null;
@@ -77,10 +82,10 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
           .filter((c) => c.group === group && c.isPrimary)
           .map((c) => ({ key: c.key, label: tLabel(c.label) })),
       })).filter((g) => g.items.length > 0),
-      activeKey,
+      activeKey: parentKey,
       onSelect: (key) => router.push(`/master-data/${key}`),
     };
-  }, [ready, mayView, activeKey, t, tLabel, router]);
+  }, [ready, mayView, parentKey, t, tLabel, router]);
 
   useContextNav(contextNav);
 
@@ -120,11 +125,9 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
     );
   }
 
-  const activeConfig: MasterDataConfig = getConfig(activeKey) || MASTER_DATA_CONFIGS[0];
-
   return (
     <ConsolePage>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 min-w-0">
         <PageHeader
           title={tLabel(activeConfig.label)}
           description={activeConfig.description ? tLabel(activeConfig.description) : undefined}
@@ -133,7 +136,7 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
         {/* Tenant Admin Company Selector or Company Pre-seed trigger */}
         <div className="flex items-center gap-2 pb-3 flex-wrap">
           {user.userType === "TENANT_ADMIN" && companies.length > 0 && (
-            <div className="flex items-center gap-2 bg-(--surface) border border-(--border) px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs">
+            <div className="flex min-w-0 max-w-full items-center gap-2 bg-(--surface) border border-(--border) px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs">
               <Building2 className="w-3.5 h-3.5 text-blue-400" />
               <span className="text-[10px] uppercase font-bold text-(--text-muted)">{t("mdMasterScope")}</span>
               <select
@@ -142,7 +145,7 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
                   setSelectedCompanyId(e.target.value);
                   if (e.target.value) setActiveCompanyId(e.target.value);
                 }}
-                className="bg-transparent text-xs font-semibold text-(--text-primary) focus:outline-none"
+                className="min-w-0 bg-transparent text-xs font-semibold text-(--text-primary) focus:outline-none"
               >
                 <option value="">{t("mdTenantGlobalCatalog")}</option>
                 {companies.map((c) => (
@@ -180,7 +183,20 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
         </div>
       )}
 
-      <MasterDataTable key={`${activeConfig.key}-${selectedCompanyId}`} config={activeConfig} />
+      {tabConfigs.length > 0 && (
+        <Tabs
+          panelId="master-data-sheet"
+          items={[parentConfig, ...tabConfigs].map((config) => ({
+            value: config.key,
+            label: tLabel(config.tabLabel || config.label),
+          }))}
+          value={activeConfig.key}
+          onChange={(key) => router.push(`/master-data/${key}`)}
+        />
+      )}
+      <div id="master-data-sheet" role={tabConfigs.length ? "tabpanel" : undefined} aria-label={tLabel(activeConfig.tabLabel || activeConfig.label)}>
+        <MasterDataTable key={`${activeConfig.key}-${selectedCompanyId}`} config={activeConfig} />
+      </div>
     </ConsolePage>
   );
 }

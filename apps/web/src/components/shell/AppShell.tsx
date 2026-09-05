@@ -509,6 +509,35 @@ export function AppShell(props: AppShellProps) {
           onItemClick={close}
         />
 
+        {/* The module sub-navigation (e.g. Master Data's sections) normally
+            lives outside this drawer entirely, in the workspace region below
+            (~line 547), which is enough on desktop where that region is
+            always visible. Below 1024px that region is off to the side of the
+            off-canvas drawer, so opening the hamburger on a module route
+            could never reveal it. This is the same `contextNav` node
+            rendered a second time, `lg:hidden` so it only exists in the
+            mobile drawer and never doubles up on desktop, and `aria-hidden`
+            so assistive tech keeps exactly one copy of the landmark — the
+            one in the workspace region, which is present at every viewport
+            width. Selecting a section here still has to close the drawer,
+            which the page's own `onSelect` has no way to do, so it is done
+            by catching the click as it bubbles rather than by changing
+            ContextNav's provider contract. */}
+        {contextNav && (
+          <div
+            className="lg:hidden"
+            aria-hidden="true"
+            onClick={(event) => {
+              const target = event.target as HTMLElement;
+              if (target.closest("[data-context-nav-item], [data-menu-item]")) {
+                close();
+              }
+            }}
+          >
+            {contextNav}
+          </div>
+        )}
+
         {/* No account footer here. Identity and Sign out are account actions,
             not navigation, and they live behind the header avatar — see
             ProfilePopover. The rail carries navigation only. */}
