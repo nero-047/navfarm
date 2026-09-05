@@ -258,7 +258,7 @@ const animal: MasterDataConfig = {
     { key: "status", label: "Status" },
   ],
   fields: [
-    { key: "animal_code", label: "Animal Code", type: "text", hideInForm: true, helpText: "Auto-generated (PIG-YYYY-SEQ).", section: "Identification" },
+    { key: "animal_code", label: "Animal Code", type: "text", readOnly: true, helpText: "Auto-generated from No. Series ANIMAL_PIGGERY. Format: PIG-YYYY-SEQ.", section: "Identification" },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], section: "Identification" },
     { key: "lob_id", label: "Line of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", section: "Identification" },

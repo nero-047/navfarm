@@ -107,6 +107,25 @@ describe('NumberSeriesService', () => {
       expect(setArg.last_generated_code).toBe('BATCH-000005');
     });
 
+    it('inserts the date segment between prefix and sequence when date_format is set', async () => {
+      mockLockedSelect({
+        series_id: 'series-1',
+        current_seq: 20,
+        seq_length: 4,
+        prefix: 'PIG',
+        date_format: 'YYYY',
+        separator: '-',
+        reset_frequency: 'NEVER',
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      });
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      const code = await service.generateNext('ANIMAL_PIGGERY', 'tenant-123', 'comp-1');
+
+      expect(code).toBe(`PIG-${new Date().getFullYear()}-0021`);
+    });
+
     it('resets current_seq to 0 before incrementing when the YEARLY period has rolled over', async () => {
       const lastYear = new Date();
       lastYear.setFullYear(lastYear.getFullYear() - 1);
