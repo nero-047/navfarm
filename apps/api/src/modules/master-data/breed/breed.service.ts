@@ -121,6 +121,9 @@ export class BreedService {
         )
       );
     }
+    if (query.isActive !== undefined) {
+      conditions.push(eq(schema.speciesMaster.is_active, query.isActive));
+    }
     if (query.search) {
       conditions.push(
         or(

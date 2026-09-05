@@ -12,6 +12,7 @@ import {
   IsArray,
   ValidateNested,
   ArrayMinSize,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -147,6 +148,12 @@ export class QueryGoodsReceiptDto {
   @IsOptional()
   @IsUUID()
   warehouseId?: string;
+
+  @ApiProperty({ description: 'Goods receipts have no is_active flag — findAll already excludes soft-deleted rows unconditionally. Declared so pickers can send the same isActive param every other list endpoint accepts without a 400.', required: false })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isActive?: boolean;
 
   @ApiProperty({ description: 'Search receipt no. or external reference', required: false })
   @IsOptional()

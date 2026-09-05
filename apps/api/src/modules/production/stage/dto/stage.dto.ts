@@ -235,6 +235,12 @@ export class QueryStageDto {
   @IsString()
   stageCategory?: string;
 
+  @ApiProperty({ description: 'Filter by active status', required: false })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isActive?: boolean;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

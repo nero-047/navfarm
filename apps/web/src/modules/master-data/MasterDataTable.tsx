@@ -216,6 +216,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         const params = new URLSearchParams();
         if (companyId) params.set("companyId", companyId);
         params.set("limit", "500");
+        // A picker must only offer rows the API will actually accept — unlike
+        // the list page, which deliberately shows Active/Inactive rows so a
+        // blocked one can be found and restored. isActive=true is a no-op on
+        // endpoints that already always filter to active (e.g. NOB/LOB,
+        // costing-method) and is honored by every findAll that carries the
+        // isActive query param.
+        params.set("isActive", "true");
         const res = await api.get(`${ep}?${params.toString()}`);
         const list = unwrap<Row[]>(res);
         setEntityOptions((prev) => ({ ...prev, [ep]: Array.isArray(list) ? list : [] }));
@@ -255,7 +262,11 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       const ep = resolveEndpoint(f, form);
       if (!ep || (!reloadKeyChanged && entityOptions[ep])) return;
       try {
-        const res = await api.get(ep);
+        // Same active-only rule as the non-dependent effect above — a picker
+        // must not offer a row the API will reject. ep may already carry a
+        // query string (dependsOnMode "query"), so append rather than assume.
+        const activeOnlyEp = `${ep}${ep.includes("?") ? "&" : "?"}isActive=true`;
+        const res = await api.get(activeOnlyEp);
         const list = unwrap<Row[]>(res);
         setEntityOptions((prev) => ({ ...prev, [ep]: Array.isArray(list) ? list : [] }));
       } catch {

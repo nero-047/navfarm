@@ -160,6 +160,7 @@ export class StageService {
     if (query.nobId) conditions.push(eq(schema.stageMaster.nob_id, query.nobId));
     if (query.lobId) conditions.push(eq(schema.stageMaster.lob_id, query.lobId));
     if (query.stageCategory) conditions.push(eq(schema.stageMaster.stage_category, query.stageCategory));
+    if (query.isActive !== undefined) conditions.push(eq(schema.stageMaster.is_active, query.isActive));
     if (query.search) {
       conditions.push(
         or(

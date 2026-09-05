@@ -364,6 +364,12 @@ export class QueryAnimalDto {
   @IsBoolean()
   includeDisposed?: boolean;
 
+  @ApiProperty({ description: 'Filter by active status (findAll already excludes disposed animals unless includeDisposed is set; declared so pickers can send the same isActive param every other list endpoint accepts without a 400)', required: false })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isActive?: boolean;
+
   @ApiProperty({ required: false, default: 50 })
   @IsOptional()
   @Type(() => Number)

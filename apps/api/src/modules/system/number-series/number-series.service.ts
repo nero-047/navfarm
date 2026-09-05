@@ -284,6 +284,7 @@ export class NumberSeriesService {
       conditions.push(or(eq(schema.noSeriesMaster.company_id, query.companyId), isNull(schema.noSeriesMaster.company_id)));
     }
     if (query.documentType) conditions.push(eq(schema.noSeriesMaster.document_type, query.documentType));
+    if (query.isActive !== undefined) conditions.push(eq(schema.noSeriesMaster.is_active, query.isActive));
     if (query.search) {
       conditions.push(
         or(

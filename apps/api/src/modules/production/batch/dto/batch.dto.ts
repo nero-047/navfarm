@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   ArrayNotEmpty,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -436,6 +437,12 @@ export class QueryBatchDto {
   @IsOptional()
   @IsString()
   lobId?: string;
+
+  @ApiProperty({ description: 'Batches have no is_active flag — findAll already excludes soft-deleted rows unconditionally. Declared so pickers can send the same isActive param every other list endpoint accepts without a 400.', required: false })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isActive?: boolean;
 
   @ApiProperty({ description: 'Search batch no.', required: false })
   @IsOptional()
