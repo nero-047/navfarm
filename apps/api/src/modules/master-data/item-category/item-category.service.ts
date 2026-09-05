@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -6,6 +6,8 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateItemCategoryDto, UpdateItemCategoryDto, QueryItemCategoryDto } from './dto/item-category.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { generateCompositeCode } from '../../system/number-series/composite-code.util';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +18,7 @@ export class ItemCategoryService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -43,11 +46,54 @@ export class ItemCategoryService {
     }
 
     // 2. Verify parent category exists (if provided)
-    if (dto.parent_category_id) {
-      await this.findOne(dto.parent_category_id);
+    const parent = dto.parent_category_id ? await this.findOne(dto.parent_category_id) : undefined;
+
+    // 3. Item categories carry no type dimension of their own — resolve the master-alone series.
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('ITEM_CATEGORY', null, tenantId, companyId);
+
+    if (!seriesCode) {
+      return this.createManual(dto, tenantId, companyId, userPayload);
     }
 
-    // 3. Check duplicate category code
+    const categoryId = randomUUID();
+    const attempt = () => this.db.transaction((tx) => this.createAutoRecord(tx, {
+      dto, tenantId, companyId, seriesCode, parent, categoryId, userPayload,
+    }));
+
+    let newCategory: Awaited<ReturnType<typeof this.createAutoRecord>>;
+    try {
+      newCategory = await attempt();
+    } catch (err) {
+      if ((err as { code?: string })?.code !== 'ER_DUP_ENTRY') throw err;
+      try {
+        newCategory = await attempt();
+      } catch (retryErr) {
+        if ((retryErr as { code?: string })?.code === 'ER_DUP_ENTRY') {
+          throw new ConflictException('Category code collided with a concurrently created category; please retry.');
+        }
+        throw retryErr;
+      }
+    }
+
+    await this.auditService.log({
+      tenantId,
+      companyId: companyId || undefined,
+      userId: userPayload?.userId,
+      action: 'CREATE',
+      entityName: 'item_category_master',
+      entityId: categoryId,
+      newValues: newCategory,
+    });
+
+    return this.findOne(categoryId);
+  }
+
+  /** No series configured for ITEM_CATEGORY — manual entry, exactly as before this feature existed. */
+  private async createManual(dto: CreateItemCategoryDto, tenantId: string, companyId: string | null, userPayload?: any) {
+    if (!dto.category_code) {
+      throw new BadRequestException('category_code is required — no number series is configured for item categories.');
+    }
+
     const duplicateConditions = [
       eq(schema.itemCategoryMaster.tenant_id, tenantId),
       eq(schema.itemCategoryMaster.category_code, dto.category_code.toUpperCase()),
@@ -97,6 +143,75 @@ export class ItemCategoryService {
     });
 
     return this.findOne(categoryId);
+  }
+
+  /**
+   * Builds and inserts the category row (generating its code inside `tx`), for
+   * the case a series IS configured. Split out so create()'s retry can re-run
+   * the whole attempt, unmodified, if the insert collides on
+   * uq_item_category_master_tenant_company_code — mirrors location.service.ts.
+   */
+  private async createAutoRecord(
+    tx: MySql2Database<typeof schema>,
+    params: {
+      dto: CreateItemCategoryDto;
+      tenantId: string;
+      companyId: string | null;
+      seriesCode: string;
+      parent: typeof schema.itemCategoryMaster.$inferSelect | undefined;
+      categoryId: string;
+      userPayload?: any;
+    },
+  ) {
+    const { dto, tenantId, companyId, seriesCode, parent, categoryId, userPayload } = params;
+
+    // Locks the series row for the duration of code generation + this insert —
+    // also the row that carries allow_manual, so a user-supplied code can win
+    // when the series explicitly permits it.
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId, tx);
+
+    let categoryCode: string;
+    if (series.allow_manual && dto.category_code) {
+      categoryCode = dto.category_code.toUpperCase();
+    } else if (parent) {
+      categoryCode = await generateCompositeCode({
+        parentCode: parent.category_code,
+        prefix: series.prefix || seriesCode,
+        seqLength: series.seq_length,
+        fetchSiblingCodes: () => tx
+          .select({ code: schema.itemCategoryMaster.category_code })
+          .from(schema.itemCategoryMaster)
+          .where(and(
+            eq(schema.itemCategoryMaster.tenant_id, tenantId),
+            eq(schema.itemCategoryMaster.parent_category_id, parent.category_id),
+          )),
+      });
+    } else {
+      categoryCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, tx);
+    }
+
+    if (categoryCode.length > 255) {
+      throw new BadRequestException(
+        `Category code would exceed 255 characters ('${categoryCode}', ${categoryCode.length} characters).`,
+      );
+    }
+
+    const newCategory = {
+      category_id: categoryId,
+      tenant_id: tenantId,
+      company_id: companyId,
+      category_code: categoryCode,
+      category_name: dto.category_name,
+      parent_category_id: dto.parent_category_id || null,
+      is_active: true,
+      status: 'ACTIVE',
+      extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
+      created_by: userPayload?.userId || null,
+      updated_by: userPayload?.userId || null,
+    };
+
+    await tx.insert(schema.itemCategoryMaster).values(newCategory);
+    return newCategory;
   }
 
   async findOne(id: string) {

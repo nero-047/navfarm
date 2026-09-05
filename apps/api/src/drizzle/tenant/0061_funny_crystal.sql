@@ -1,0 +1,3 @@
+ALTER TABLE `cost_center_master` ADD CONSTRAINT `uq_cost_center_master_tenant_company_code` UNIQUE(`tenant_id`,`company_id`,`cost_center_code`);--> statement-breakpoint
+ALTER TABLE `gl_account_master` ADD CONSTRAINT `uq_gl_account_master_tenant_company_code` UNIQUE(`tenant_id`,`company_id`,`account_code`);--> statement-breakpoint
+ALTER TABLE `item_category_master` ADD CONSTRAINT `uq_item_category_master_tenant_company_code` UNIQUE(`tenant_id`,`company_id`,`category_code`);

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -6,6 +6,8 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateCostCenterDto, UpdateCostCenterDto, QueryCostCenterDto } from './dto/cost-center.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { generateCompositeCode } from '../../system/number-series/composite-code.util';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +18,7 @@ export class CostCenterService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -24,6 +27,18 @@ export class CostCenterService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  private async findParentCostCenter(parentCostCenterId: string) {
+    const [parent] = await this.db
+      .select()
+      .from(schema.costCenterMaster)
+      .where(and(eq(schema.costCenterMaster.cost_center_id, parentCostCenterId), isNull(schema.costCenterMaster.deleted_at)))
+      .limit(1);
+    if (!parent) {
+      throw new NotFoundException(`Parent Cost Center with ID '${parentCostCenterId}' not found.`);
+    }
+    return parent;
   }
 
   async create(dto: CreateCostCenterDto, tenantId: string, userPayload?: any) {
@@ -38,7 +53,55 @@ export class CostCenterService {
       throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
     }
 
-    // 2. Check unique code within company scope
+    // 2. Verify parent cost center if specified
+    const parent = dto.parent_cost_center_id ? await this.findParentCostCenter(dto.parent_cost_center_id) : undefined;
+
+    // 3. Resolve a series for this cost_center_type, falling back to the master-alone series.
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('COST_CENTER', dto.cost_center_type, tenantId, dto.company_id);
+
+    if (!seriesCode) {
+      return this.createManual(dto, tenantId, userPayload);
+    }
+
+    const costCenterId = randomUUID();
+    const attempt = () => this.db.transaction((tx) => this.createAutoRecord(tx, {
+      dto, tenantId, seriesCode, parent, costCenterId, userPayload,
+    }));
+
+    let newCC: Awaited<ReturnType<typeof this.createAutoRecord>>;
+    try {
+      newCC = await attempt();
+    } catch (err) {
+      if ((err as { code?: string })?.code !== 'ER_DUP_ENTRY') throw err;
+      try {
+        newCC = await attempt();
+      } catch (retryErr) {
+        if ((retryErr as { code?: string })?.code === 'ER_DUP_ENTRY') {
+          throw new ConflictException('Cost Center code collided with a concurrently created cost center; please retry.');
+        }
+        throw retryErr;
+      }
+    }
+
+    await this.auditService.log({
+      tenantId,
+      companyId: dto.company_id,
+      userId: userPayload?.userId,
+      action: 'CREATE',
+      entityName: 'cost_center_master',
+      entityId: costCenterId,
+      newValues: newCC,
+    });
+
+    return this.findOne(costCenterId);
+  }
+
+  /** No series configured for COST_CENTER[_<type>] — manual entry, exactly as before this feature existed. */
+  private async createManual(dto: CreateCostCenterDto, tenantId: string, userPayload?: any) {
+    if (!dto.cost_center_code) {
+      throw new BadRequestException('cost_center_code is required — no number series is configured for cost centers.');
+    }
+
     const existing = await this.db
       .select()
       .from(schema.costCenterMaster)
@@ -54,24 +117,6 @@ export class CostCenterService {
 
     if (existing.length > 0) {
       throw new ConflictException(`Cost Center with code '${dto.cost_center_code}' already exists in this company.`);
-    }
-
-    // 3. Verify parent cost center if specified
-    if (dto.parent_cost_center_id) {
-      const [parent] = await this.db
-        .select()
-        .from(schema.costCenterMaster)
-        .where(
-          and(
-            eq(schema.costCenterMaster.cost_center_id, dto.parent_cost_center_id),
-            isNull(schema.costCenterMaster.deleted_at)
-          )
-        )
-        .limit(1);
-
-      if (!parent) {
-        throw new NotFoundException(`Parent Cost Center with ID '${dto.parent_cost_center_id}' not found.`);
-      }
     }
 
     const costCenterId = randomUUID();
@@ -103,6 +148,72 @@ export class CostCenterService {
     });
 
     return this.findOne(costCenterId);
+  }
+
+  /**
+   * Builds and inserts the cost center row (generating its code inside `tx`),
+   * for the case a series IS configured. Split out so create()'s retry can
+   * re-run the whole attempt, unmodified, if the insert collides on
+   * uq_cost_center_master_tenant_company_code.
+   */
+  private async createAutoRecord(
+    tx: MySql2Database<typeof schema>,
+    params: {
+      dto: CreateCostCenterDto;
+      tenantId: string;
+      seriesCode: string;
+      parent: typeof schema.costCenterMaster.$inferSelect | undefined;
+      costCenterId: string;
+      userPayload?: any;
+    },
+  ) {
+    const { dto, tenantId, seriesCode, parent, costCenterId, userPayload } = params;
+
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, dto.company_id, tx);
+
+    let costCenterCode: string;
+    if (series.allow_manual && dto.cost_center_code) {
+      costCenterCode = dto.cost_center_code.toUpperCase();
+    } else if (parent) {
+      costCenterCode = await generateCompositeCode({
+        parentCode: parent.cost_center_code,
+        prefix: series.prefix || seriesCode,
+        seqLength: series.seq_length,
+        fetchSiblingCodes: () => tx
+          .select({ code: schema.costCenterMaster.cost_center_code })
+          .from(schema.costCenterMaster)
+          .where(and(
+            eq(schema.costCenterMaster.tenant_id, tenantId),
+            eq(schema.costCenterMaster.parent_cost_center_id, parent.cost_center_id),
+          )),
+      });
+    } else {
+      costCenterCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id, tx);
+    }
+
+    if (costCenterCode.length > 255) {
+      throw new BadRequestException(
+        `Cost Center code would exceed 255 characters ('${costCenterCode}', ${costCenterCode.length} characters).`,
+      );
+    }
+
+    const newCC = {
+      cost_center_id: costCenterId,
+      tenant_id: tenantId,
+      company_id: dto.company_id,
+      cost_center_code: costCenterCode,
+      cost_center_name: dto.cost_center_name,
+      cost_center_type: dto.cost_center_type,
+      parent_cost_center_id: dto.parent_cost_center_id || null,
+      is_active: true,
+      status: 'ACTIVE',
+      extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
+      created_by: userPayload?.userId || null,
+      updated_by: userPayload?.userId || null,
+    };
+
+    await tx.insert(schema.costCenterMaster).values(newCC);
+    return newCC;
   }
 
   async findOne(id: string) {

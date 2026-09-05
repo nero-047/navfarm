@@ -8,10 +8,10 @@ export class CreateItemCategoryDto {
   @IsOptional()
   company_id?: string;
 
-  @ApiProperty({ description: 'Unique category code', example: 'FEED' })
+  @ApiProperty({ description: 'Unique category code. Optional when a number series is configured for item categories — the code is generated then.', required: false, example: 'FEED' })
   @IsString()
-  @IsNotEmpty()
-  category_code: string;
+  @IsOptional()
+  category_code?: string;
 
   @ApiProperty({ description: 'Descriptive name of the category', example: 'Animal Feed Products' })
   @IsString()

@@ -428,6 +428,13 @@
       "when": 1788597160826,
       "tag": "0060_thin_dark_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "5",
+      "when": 1788597536362,
+      "tag": "0061_funny_crystal",
+      "breakpoints": true
     }
   ]
 }

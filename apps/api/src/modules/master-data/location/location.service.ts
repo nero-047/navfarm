@@ -7,6 +7,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateLocationDto, UpdateLocationDto, QueryLocationDto } from './dto/location.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { generateCompositeCode } from '../../system/number-series/composite-code.util';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -113,23 +114,19 @@ export class LocationService {
 
     const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId, executor);
 
-    const siblings = await executor
-      .select({ code: schema.locationMaster.location_code })
-      .from(schema.locationMaster)
-      .where(and(
-        eq(schema.locationMaster.tenant_id, tenantId),
-        eq(schema.locationMaster.parent_location_id, parent.location_id),
-        eq(schema.locationMaster.location_type, type.type_code),
-      ));
-
-    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`^${escapeRegex(parent.location_code)}/${escapeRegex(type.code_prefix)}-(\\d+)$`, 'i');
-    const nextSeq = siblings.reduce((max, row) => {
-      const match = row.code?.match(pattern);
-      return match ? Math.max(max, Number(match[1])) : max;
-    }, 0) + 1;
-
-    return `${parent.location_code}/${type.code_prefix}-${String(nextSeq).padStart(series.seq_length, '0')}`;
+    return generateCompositeCode({
+      parentCode: parent.location_code,
+      prefix: type.code_prefix,
+      seqLength: series.seq_length,
+      fetchSiblingCodes: () => executor
+        .select({ code: schema.locationMaster.location_code })
+        .from(schema.locationMaster)
+        .where(and(
+          eq(schema.locationMaster.tenant_id, tenantId),
+          eq(schema.locationMaster.parent_location_id, parent.location_id),
+          eq(schema.locationMaster.location_type, type.type_code),
+        )),
+    });
   }
 
   /**

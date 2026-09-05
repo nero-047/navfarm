@@ -8,10 +8,10 @@ export class CreateCostCenterDto {
   @IsNotEmpty()
   company_id: string;
 
-  @ApiProperty({ description: 'Unique dimension code', example: 'DEPT-ADMIN' })
+  @ApiProperty({ description: 'Unique dimension code. Optional when a number series is configured for cost centers — the code is generated then.', required: false, example: 'DEPT-ADMIN' })
   @IsString()
-  @IsNotEmpty()
-  cost_center_code: string;
+  @IsOptional()
+  cost_center_code?: string;
 
   @ApiProperty({ description: 'Common name of the cost center', example: 'Administrative Department' })
   @IsString()

@@ -8,10 +8,10 @@ export class CreateGlAccountDto {
   @IsNotEmpty()
   company_id: string;
 
-  @ApiProperty({ description: 'Unique account code (number/string)', example: '101000' })
+  @ApiProperty({ description: 'Unique account code. Optional when a number series is configured for GL accounts — the code is generated then.', required: false, example: '101000' })
   @IsString()
-  @IsNotEmpty()
-  account_code: string;
+  @IsOptional()
+  account_code?: string;
 
   @ApiProperty({ description: 'Account descriptor name', example: 'Cash at Bank' })
   @IsString()

@@ -526,7 +526,13 @@ export const itemCategoryMaster = mysqlTable('item_category_master', {
     columns: [table.parent_category_id],
     foreignColumns: [table.category_id],
     name: 'item_cat_master_parent_cat_id_fk'
-  }).onDelete('restrict')
+  }).onDelete('restrict'),
+  // Not partial (soft-deleted rows still count) — mirrors location_master's
+  // uq_location_master_tenant_company_code, the guard the C2 composite-code
+  // generator's duplicate-key retry (item-category.service.ts) reacts to.
+  uqCategoryCode: uniqueIndex('uq_item_category_master_tenant_company_code').on(
+    table.tenant_id, table.company_id, table.category_code
+  ),
 }));
 
 // Item Type classification (RAW_MATERIAL / CONSUMABLE / MEDICINE / ...) as a real, tenant-editable
@@ -1512,7 +1518,10 @@ export const glAccountMaster = mysqlTable('gl_account_master', {
     columns: [table.parent_account_id],
     foreignColumns: [table.gl_account_id],
     name: 'gl_account_parent_id_fk'
-  }).onDelete('restrict')
+  }).onDelete('restrict'),
+  uqAccountCode: uniqueIndex('uq_gl_account_master_tenant_company_code').on(
+    table.tenant_id, table.company_id, table.account_code
+  ),
 }));
 
 export const glAccountMasterRelations = relations(glAccountMaster, ({ one, many }) => ({
@@ -1644,7 +1653,10 @@ export const costCenterMaster = mysqlTable('cost_center_master', {
     columns: [table.parent_cost_center_id],
     foreignColumns: [table.cost_center_id],
     name: 'cost_center_parent_id_fk'
-  }).onDelete('restrict')
+  }).onDelete('restrict'),
+  uqCostCenterCode: uniqueIndex('uq_cost_center_master_tenant_company_code').on(
+    table.tenant_id, table.company_id, table.cost_center_code
+  ),
 }));
 
 export const costCenterMasterRelations = relations(costCenterMaster, ({ one, many }) => ({
