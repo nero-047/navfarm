@@ -1,137 +1,155 @@
-# Demo Runbook — 5 September 2026, 20:00
+# Demo Runbook — NAVFarm Master Data
 
-**Status legend:** ✅ verified by review and tests · ⚠️ built and reviewed, **not yet watched running** · ❌ known not to work
+**Status legend:** ✅ watched working in the running app · ⚠️ built, reviewed and tested but not yet
+watched · ❌ known broken
 
-Nothing below carries ✅ for *visual* behaviour yet. Every item is code-reviewed and test-covered;
-none has been seen on screen. The click-through pass converts ⚠️ to ✅ — do it before you present.
+Everything marked ✅ below was verified by driving the actual console on 2026-09-05 — filling forms,
+pressing buttons, reading the network panel. Not by reading code.
 
 ---
 
-## Pre-flight, ~20 minutes before
+## ⛔ Do this before you present
 
-1. **Start both servers.** API on 2877, web on 3002.
-   ```bash
-   pnpm run dev:api
-   ```
-   ```bash
-   pnpm run dev:web
-   ```
-   Wait for `NAVFarm API: http://localhost:2877/api/v1` before opening the browser. The web app
-   silently renders an empty console if the API is not up yet.
+**1. Restore the Units of Measure.** Every UOM in the tenant is soft-deleted (`deleted_at`
+2026-09-04 09:44). Until they are back, **Locations and Items cannot be saved** — Capacity UOM and
+Primary UOM are required fields and their dropdowns are empty.
 
-   **If the API never finishes starting, check for a second copy first.** Nx serialises the
-   `serve` target, so starting it twice makes the second one print
-   `Waiting for api:serve:development in another nx process` and hang forever behind the first.
-   This happened during the build tonight and looks identical to a broken API. Fix:
-   ```bash
-   pkill -f "nx serve api"
-   ```
-   then start exactly one. Confirm with `lsof -ti:2877` — you want one process, not none and not two.
+Master Data → **Units of Measure** → click **Restore** on each row. Thirteen clicks, no SQL. The
+list deliberately shows inactive rows so exactly this is possible.
 
-2. **Sign in** at http://localhost:3002 as the tenant admin.
+**2. Delete the junk location.** Code `BB`, name `uhvb`, type FARM. It sorts to the top of the
+Locations list and is the first thing anyone sees.
 
-3. **Open the console once and click through your path** before anyone is watching. First render
-   after a restart compiles on demand and is slower than every subsequent one.
+**3. Start the servers and wait for the API.**
+```bash
+pnpm run dev:api
+```
+```bash
+pnpm run dev:web
+```
+Wait for `NAVFarm API: http://localhost:2877/api/v1`. The console renders an empty shell if the API
+is not up.
 
-4. **Confirm which database you are pointing at.** Migrations 0055–0058 are applied to the local
-   MySQL tenant databases. They are **not** applied to the TiDB target in the commented-out `.env`
-   block. If you switch to TiDB, run `pnpm nx run api:db-migrate-all-tenants` against it first or
-   the console will fail on the new columns.
+**If the API never finishes starting, check for a second copy.** Nx serialises the `serve` target,
+so a second one prints `Waiting for api:serve:development in another nx process` and hangs forever
+behind the first — indistinguishable from a broken API. `lsof -ti:2877` should show exactly one
+process. (Do not use `pkill -f "nx serve api"`; it matches more than you intend.)
 
-5. **Close other applications.** This machine has 8 GB and both dev servers plus a browser will
-   push it into swap. A stutter mid-demo is a memory problem, not a code problem.
+**4. Click your path once** before anyone is watching. First render after a restart compiles on
+demand.
 
 ---
 
 ## The path
 
-### 1. Master Data landing ⚠️
-Click **Master Data** in the main nav. It lands on the first primary master.
+### 1. Master Data landing ✅
+The **Master Data** nav link lands on the first master with nothing broken. (This was a bug until
+this morning — it redirected to Farms, which is no longer in the sidebar.)
 
-*This was broken until this morning* — it redirected to Farms, which is no longer in the sidebar,
-so nothing was highlighted. Fixed in `12aa823`. Worth clicking once in pre-flight to confirm.
+### 2. The sidebar — twelve masters ✅
+Locations · Stages · Number Series · Animal Register · Units of Measure · Items · Breeds ·
+Medicines · Suppliers · Resources · GL Accounts · Cost Centers.
 
-### 2. The sidebar ⚠️
-The sub-sidebar lists **primary masters only** — one entry per real-world entity. Lookups
-(Item Category, UOM, Species, Location Type…) are no longer separate entries; they live inside
-their parent's dialog.
+Seven come from the client's own templates. Five more are named in **BBP §1** under different
+words — Supplier is *Vendor*, GL Accounts is *COA from D365BC*, Cost Centers is
+*Dimensions/Cost Centres*, Number Series is *No Series* — plus Medicines, which **BBP §5 Block 2**
+requires for the withdrawal check.
 
-If asked "where is Item Category?" — the answer is the story: *you add one where you need one,
-without leaving the form.*
+If asked where Item Categories went: *you add one where you need one, without leaving the form.*
 
-### 3. Item → the inline lookup ⚠️ **← the moment worth demoing**
+### 3. Sheets become tabs ✅
+Each master's workbook sheet is a tab with its own list and its own Add:
 
-1. Open **Item**, click **Add**
-2. The dialog opens as collapsible cards — Identification, Units & Valuation, Classification
-3. Note the **Category** dropdown's current options
-4. Expand the **Item Categories** card near the bottom
-5. Enter a code and name — **`CAT-BEDDING` / "Bedding & Litter Materials"**
-6. Click **Add Item Category**
-7. Scroll back up — **the new category is in the Category dropdown**. Select it.
-8. Complete the required fields, **Save**
+- **Items** → Items · Item Attributes
+- **Breeds** → Breeds · Lifecycle Stages
+- **Units of Measure** → Units of Measure · UOM Conversions
 
-**Do not rush step 6→7.** There is no loading indicator while the dropdown refetches. Pause a
-beat before opening it.
+Single-sheet masters (Locations, Resources, Stages, Animal Register) correctly show **no tab bar**.
+Tab selection is in the route, so refresh and Back keep your place.
 
-**Safe category codes** — these seven already exist, so avoid them: `CAT-RAW-GRAINS`,
-`CAT-PROTEIN-SUPP`, `CAT-FEED-PREMIX`, `CAT-SWINE-FEEDS`, `CAT-VET-MEDS`, `CAT-VET-VACCINES`,
-`CAT-BIO-BREEDING`. A duplicate gives a clean visible error rather than a silent second row — not
-fatal, but not the story you want.
+### 4. Item → the inline lookup ✅ **← the moment worth demoing**
 
-Note the service **uppercases** category codes. Type lowercase and it stores uppercase.
+1. **Items** → **Add Item**
+2. The dialog opens as cards: Identification, Classification, Units & Valuation, Accounting — then
+   **Item Categories**, **Item Types**, **Units of Measure**, **Feed Formulas**, each labelled
+   *"Add one without leaving this form"*
+3. Note the Category dropdown's options
+4. Expand **Item Categories**, enter a code and name, click **Add Item Categories**
+5. Scroll up — **the new category is in the dropdown**. Select it.
 
-### 4. Location → the hierarchy ⚠️
-Open **Location**. One list, every location, with a **Type** column — farm, shed, pen, silo.
+*Verified: adding a category took the dropdown from 9 options to 10, selectable immediately,
+without closing the dialog.*
 
-Adding a location: the **Location Type** is itself a lookup you can add inline, exactly like
-Category. Types carry a code prefix, and codes are generated hierarchically — a shed inside farm 1
-becomes `FARM-001/SHED-001`, so the code alone says which farm it belongs to.
+**Do not rush step 4 → 5.** There is no spinner while the dropdown refetches. Pause a beat.
 
-**Demo a FRESH Farm → Shed → Pen chain, not a seeded one.** The seeded farms use
-`FARM-APEX-01`-style codes that do not match the generated pattern, so a child added to a seeded
-farm starts at `SHED-001` even where siblings already exist. Nothing breaks; it just reads oddly.
-Create a new farm live and build under it.
+**Codes already taken** — avoid: `CAT-RAW-GRAINS`, `CAT-PROTEIN-SUPP`, `CAT-FEED-PREMIX`,
+`CAT-SWINE-FEEDS`, `CAT-VET-MEDS`, `CAT-VET-VACCINES`, `CAT-BIO-BREEDING`, and `CAT-CLEANING`
+(added during verification). **`CAT-BEDDING` / "Bedding & Litter Materials" is free and plausible.**
 
-**Silos sit under houses**, per BBP §1.2 — the blueprint's own example is `GRS-W2B-SILO1`, farm →
-house → silo. That combination was rejected until this morning and is now allowed.
+A duplicate code gives a clean visible error rather than a silent second row. Note the service
+**uppercases** the code.
 
-### 5. Any other master ⚠️
-Every primary master uses the same dialog shape. Breed, Resource, Supplier, Customer, Stage,
-Animal Register, GL Account, Medicine, Disease, Feed Formula, Number Series.
+### 5. Location — one list, typed rows ✅
+**Locations** shows every location in one list with a **Type** column — FARM, SHED, PEN, STORE —
+and a **Level** column. Farms, sheds and warehouses were migrated into it; warehouses appear as
+STORE.
 
-If asked for one I have not named, it still opens and still saves — the pattern is configuration,
-not per-page code.
+Location Type is itself an inline lookup you can add without leaving the form, and it carries
+**Allowed Parent Types**, so the hierarchy is data you can edit rather than code.
+
+### 6. Location codes ⚠️
+Codes are generated hierarchically: a farm is `FARM-001`, a shed inside it `FARM-001/SHED-001`, so
+the code alone says which farm it belongs to. The counter is **per parent** — farm 2's first shed
+is `FARM-002/SHED-001`, not `SHED-003`.
+
+**Not yet watched end to end** — the save path was blocked by the UOM issue above. Confirm this
+yourself in pre-flight once UOMs are restored: create a farm, then a shed inside it, and check the
+shed's code.
+
+**Demo a fresh chain, not the seeded one.** Seeded farms use `FARM-APEX-01`-style codes that do not
+match the generated pattern, so a child of a seeded farm starts at `SHED-001` regardless of
+siblings. Nothing breaks; it just reads oddly.
+
+**Silos sit under houses**, per BBP §1.2 — the blueprint's own example is `GRS-W2B-SILO1`. That
+combination was rejected until this morning and now works.
+
+### 7. Small screens ✅
+Collapse the window or use a phone. The hamburger opens the drawer and **the twelve master sections
+are in it**, grouped, with the current one highlighted. Tapping one navigates and closes the drawer.
+Desktop shows one nav, never two.
+
+*This was the reported bug. The drawer copy had been added but a pre-existing rule hid it; fixed and
+verified at 375px and 1440px.*
 
 ---
 
 ## If something fails
 
-- **A field 400s on save** — every field was verified against its API contract field-by-field, so
-  this should not happen. If it does, cancel the dialog and move to another master; the failure is
-  contained to one form.
-- **The dropdown does not refresh after an inline add** — close and reopen the dialog. The value
-  was saved; only the display is stale.
-- **A page renders empty** — the API is not running or has crashed. Check the terminal.
-- **The whole thing stutters** — memory. Close a browser tab.
+- **A save 400s or 404s** — most likely a required lookup whose rows are inactive. Check the field's
+  dropdown is not empty.
+- **A dropdown does not refresh after an inline add** — close and reopen the dialog. The record
+  saved; only the display is stale.
+- **A page renders empty** — the API is down. Check the terminal.
+- **Stutter** — memory. This machine has 8 GB; close a browser tab.
 
 ---
 
 ## Do not demo
 
-- **Procurement or Sales.** They do not exist. No purchase order, no GRN, no sales order, no
-  invoice. If asked, the honest answer is that they are a separate programme, not a missing screen.
-- **Reports.** No `/reports` browsing surface. Financial reports exist as endpoints only.
-- **Anything D365 Business Central.** No integration exists. Every master now carries a place for
-  an external ERP reference so connecting it later is a mapping exercise — that is the honest
-  statement, and it is a strength, not a gap.
+- **Procurement and Sales.** They do not exist — no purchase order, GRN, sales order or invoice. The
+  honest answer is that they are a separate programme, not a missing screen.
+- **Reports.** No browsing surface; financial reports are endpoints only.
+- **D365 Business Central.** No integration. Every master now carries a place for an external ERP
+  reference, so connecting it later is a mapping exercise — that is a strength, say it that way.
 - **The other fifteen lines of business.** Taxonomy only, by decision.
-- **Daily data entry, posting, correction.** Designed and specced, not built. That is the next
-  phase, not today's.
+- **Daily data entry, posting and correction.** Designed and specced, not built.
+- **The Preseed button** (company-admin only, so you should not see it as tenant admin). It clones
+  tenant rows into company scope while the list returns both, so items appear twice.
 
 ---
 
 ## If asked "what's next"
 
-Phase B: draft/POST DAY/day-lock and reversal, built to BBP §5 — the head-count balance rule,
-mandatory ONCE events, and the silo balance gate. Then the reversal workflow, then the seven entry
-blocks. Roughly 19–24 days to the first production-usable state.
+Phase B: draft → POST DAY → day lock → reversal, built to BBP §5 — the head-count balance rule,
+mandatory ONCE events, and the silo balance gate. Then the reversal approval workflow, then the
+seven entry blocks. Roughly 19–24 developer-days to the first production-usable state.
