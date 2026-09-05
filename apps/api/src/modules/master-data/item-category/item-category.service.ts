@@ -241,6 +241,12 @@ export class ItemCategoryService {
     if (query.parentCategoryId) {
       conditions.push(eq(schema.itemCategoryMaster.parent_category_id, query.parentCategoryId));
     }
+    // A category picker should offer categories, not sub-categories. Without
+    // this the Item form's Category dropdown listed FEED-STARTER and
+    // MED-VACCINE alongside their own parents.
+    if (query.rootOnly) {
+      conditions.push(isNull(schema.itemCategoryMaster.parent_category_id));
+    }
     if (query.itemType) {
       conditions.push(eq(schema.itemCategoryMaster.item_type, query.itemType));
     }

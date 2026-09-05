@@ -499,7 +499,11 @@ const item: MasterDataConfig = {
       // most existing categories predate item_type and have none set, so a
       // block-until-typed rule would empty this picker for them today. See
       // resolveEndpoint()'s doc comment above for the general mechanism.
-      key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"],
+      // rootOnly: a Category picker must offer categories, not sub-categories —
+      // without it the list showed FEED-STARTER and MED-VACCINE next to their
+      // own parents. Sub-categories are reached through the Sub Category field
+      // below, which filters to children of whatever is chosen here.
+      key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category?rootOnly=true", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"],
       dependsOn: "item_type", dependsOnMode: "query", queryParams: { item_type: "itemType" }, section: "Identification",
     },
     {

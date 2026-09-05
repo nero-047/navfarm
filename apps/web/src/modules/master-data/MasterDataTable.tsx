@@ -80,7 +80,11 @@ function resolveEndpoint(f: MasterDataField, form: Row): string | null {
       if (val && paramName) params.set(paramName, val);
     }
     const qs = params.toString();
-    return qs ? `${f.entityEndpoint}?${qs}` : f.entityEndpoint;
+    // entityEndpoint may already carry a query string (e.g.
+    // "/item-category?rootOnly=true"), so append rather than assume — the same
+    // rule the option-fetch effects use. Hardcoding "?" here would produce
+    // "...?rootOnly=true?itemType=X" and the first value would swallow the rest.
+    return qs ? `${f.entityEndpoint}${f.entityEndpoint.includes("?") ? "&" : "?"}${qs}` : f.entityEndpoint;
   }
 
   const parentVal = form[parents[0]];

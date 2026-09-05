@@ -91,6 +91,15 @@ export class QueryItemCategoryDto {
   @Type(() => Boolean)
   isActive?: boolean;
 
+  @ApiProperty({
+    description: 'Only top-level categories (no parent). Used by the Item form so the Category picker offers categories, not sub-categories.',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  rootOnly?: boolean;
+
   @ApiProperty({ description: 'Search category code or name', required: false })
   @IsOptional()
   @IsString()
