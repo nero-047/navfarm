@@ -124,6 +124,7 @@ export class ItemCategoryService {
       category_code: dto.category_code.toUpperCase(),
       category_name: dto.category_name,
       parent_category_id: dto.parent_category_id || null,
+      item_type: dto.item_type || null,
       is_active: true,
       status: 'ACTIVE',
       extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
@@ -204,6 +205,7 @@ export class ItemCategoryService {
       category_code: categoryCode,
       category_name: dto.category_name,
       parent_category_id: dto.parent_category_id || null,
+      item_type: dto.item_type || null,
       is_active: true,
       status: 'ACTIVE',
       extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
@@ -303,6 +305,7 @@ export class ItemCategoryService {
     };
 
     if (dto.parent_category_id !== undefined) updates.parent_category_id = dto.parent_category_id;
+    if (dto.item_type !== undefined) updates.item_type = dto.item_type;
     if (dto.category_code !== undefined) updates.category_code = dto.category_code.toUpperCase();
     if (dto.category_name !== undefined) updates.category_name = dto.category_name;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;

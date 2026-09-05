@@ -1,0 +1,1 @@
+ALTER TABLE `item_category_master` ADD `item_type` varchar(30);

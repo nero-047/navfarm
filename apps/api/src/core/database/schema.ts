@@ -514,6 +514,11 @@ export const itemCategoryMaster = mysqlTable('item_category_master', {
   category_code: varchar('category_code', { length: 255 }).notNull(),
   category_name: varchar('category_name', { length: 100 }).notNull(),
   parent_category_id: varchar('parent_category_id', { length: 36 }),
+  // Nullable — links a category to the item_type it belongs under (same string
+  // values as item_master.item_type, e.g. 'CONSUMABLE'). Existing categories
+  // predate this link and have none; a null item_type means "not yet assigned
+  // to a type" rather than "belongs to every type".
+  item_type: varchar('item_type', { length: 30 }),
   is_active: boolean('is_active').default(true).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   created_by: varchar('created_by', { length: 36 }),

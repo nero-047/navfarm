@@ -332,11 +332,16 @@ const itemCategory: MasterDataConfig = {
   columns: [
     { key: "category_code", label: "Code" },
     { key: "category_name", label: "Name" },
+    { key: "item_type", label: "Item Type" },
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "category_code", label: "Category Code", type: "text", required: true, placeholder: "FEED" },
     { key: "category_name", label: "Category Name", type: "text", required: true, placeholder: "Animal Feed Products" },
+    {
+      key: "item_type", label: "Item Type", type: "select-entity", entityEndpoint: "/item-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"],
+      helpText: "Assigns this category to an Item Type so it shows up in the Item form's Category picker once that type is chosen. Leave blank for a category not yet classified.",
+    },
     { key: "parent_category_id", label: "Parent Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
   ],
 };

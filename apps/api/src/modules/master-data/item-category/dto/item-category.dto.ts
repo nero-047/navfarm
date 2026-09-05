@@ -23,6 +23,11 @@ export class CreateItemCategoryDto {
   @IsOptional()
   parent_category_id?: string;
 
+  @ApiProperty({ description: 'Item Type this category belongs to (e.g. CONSUMABLE, RAW_MATERIAL)', required: false })
+  @IsString()
+  @IsOptional()
+  item_type?: string;
+
   @ApiProperty({ description: 'Flexible custom config configurations in JSON format', required: false })
   @IsOptional()
   extension_config?: any;
@@ -43,6 +48,11 @@ export class UpdateItemCategoryDto {
   @IsUUID()
   @IsOptional()
   parent_category_id?: string;
+
+  @ApiProperty({ description: 'Item Type this category belongs to (e.g. CONSUMABLE, RAW_MATERIAL)', required: false })
+  @IsString()
+  @IsOptional()
+  item_type?: string;
 
   @ApiProperty({ required: false })
   @IsBoolean()
