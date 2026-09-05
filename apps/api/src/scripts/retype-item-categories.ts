@@ -68,7 +68,6 @@ interface ItemRow extends mysql.RowDataPacket {
   item_name: string;
   item_type: string;
   category_id: string | null;
-  category: string | null;
   sub_category: string | null;
   company_id: string | null;
 }
@@ -89,7 +88,7 @@ async function run() {
     console.log(`Company: ${COMPANY_CODE} (${companyId}) in ${TENANT_DB}\n`);
 
     const [items] = await connection.query<ItemRow[]>(
-      'SELECT item_id, item_code, item_name, item_type, category_id, category, sub_category, company_id FROM item_master WHERE company_id = ? AND item_code IN (?)',
+      'SELECT item_id, item_code, item_name, item_type, category_id, sub_category, company_id FROM item_master WHERE company_id = ? AND item_code IN (?)',
       [companyId, ITEM_PLANS.map((p) => p.item_code)],
     );
     if (items.length !== ITEM_PLANS.length) {

@@ -114,7 +114,6 @@ export class ItemService {
     }
 
     // 2. Verify category exists (if provided)
-    let categoryName = dto.category || null;
     if (dto.category_id) {
       const [category] = await this.db
         .select()
@@ -125,7 +124,6 @@ export class ItemService {
       if (!category) {
         throw new NotFoundException(`Item Category with ID '${dto.category_id}' not found.`);
       }
-      categoryName = category.category_name;
     }
 
     this.assertWithdrawalDays(dto.item_type, dto.withdrawal_days);
@@ -160,7 +158,6 @@ export class ItemService {
       item_type: dto.item_type,
       nob_id: resolvedNobLob.nob_id,
       lob_id: resolvedNobLob.lob_id,
-      category: categoryName,
       sub_category: dto.sub_category || null,
       uom_primary: dto.uom_primary,
       uom_secondary: dto.uom_secondary || null,
@@ -350,7 +347,6 @@ export class ItemService {
     if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
     if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;
     if (dto.category_id !== undefined) updates.category_id = dto.category_id;
-    if (dto.category !== undefined) updates.category = dto.category;
     if (dto.sub_category !== undefined) updates.sub_category = dto.sub_category;
     if (dto.uom_primary !== undefined) updates.uom_primary = dto.uom_primary;
     if (dto.uom_secondary !== undefined) updates.uom_secondary = dto.uom_secondary;

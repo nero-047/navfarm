@@ -582,7 +582,6 @@ export const itemMaster = mysqlTable('item_master', {
   item_type: varchar('item_type', { length: 30 }).notNull(),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
-  category: varchar('category', { length: 100 }), // Legacy text category field
   sub_category: varchar('sub_category', { length: 100 }), // Legacy text sub_category field
   uom_primary: varchar('uom_primary', { length: 20 }).notNull(),
   uom_secondary: varchar('uom_secondary', { length: 20 }),

@@ -1,0 +1,1 @@
+ALTER TABLE `item_master` DROP COLUMN `category`;

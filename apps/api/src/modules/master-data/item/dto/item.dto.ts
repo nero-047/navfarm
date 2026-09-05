@@ -50,11 +50,6 @@ export class CreateItemDto {
   @IsOptional()
   category_id?: string;
 
-  @ApiProperty({ description: 'Legacy text category', required: false })
-  @IsString()
-  @IsOptional()
-  category?: string;
-
   @ApiProperty({ description: 'Legacy text subcategory', required: false })
   @IsString()
   @IsOptional()
@@ -235,11 +230,6 @@ export class UpdateItemDto {
   @IsUUID()
   @IsOptional()
   category_id?: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  category?: string;
 
   @ApiProperty({ required: false })
   @IsString()

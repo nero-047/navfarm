@@ -111,7 +111,7 @@ async function run() {
         ['MARKET_PIG', 'Market hog', 'FINISHED_GOOD', 'OUTPUT', 'HEAD', '0'], ['SEMEN', 'Boar semen dose', 'FINISHED_GOOD', 'OUTPUT', 'DOSE', '0'],
       ];
       for (const [code, name, type, category, unit, cost] of itemRows) items[code] = await add(s.itemMaster, {
-        item_code: code, item_name: name, item_type: type, category_id: categories[category], category,
+        item_code: code, item_name: name, item_type: type, category_id: categories[category],
         uom_primary: unit, valuation_method: type === 'LIVING_ASSET' ? 'BIO_ASSET' : 'FIFO',
         is_biological_asset: type === 'LIVING_ASSET',
         // Zero is a software-test placeholder, never a verified product withdrawal period.
