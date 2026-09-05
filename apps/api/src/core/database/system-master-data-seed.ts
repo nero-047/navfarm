@@ -33,21 +33,25 @@ export const SYSTEM_UOM_SEED: Array<{
 // LIVESTOCK, FINISHED_GOODS) plus MEDICINE/VACCINE (item.service.ts's withdrawal_days check
 // branches on these two literal strings), rounded out with the spec's remaining documented
 // types (SEMI_FINISHED, BY_PRODUCT, OVERHEAD) that aren't in use yet.
+// code_prefix defaults to each row's own type_code — same backfill rule migration
+// 0060 applied to existing tenants' rows (see NumberSeriesService.resolveSeriesFor's
+// doc comment: an ITEM_<type_code> series defers to this prefix over its own).
 export const SYSTEM_ITEM_TYPE_SEED: Array<{
   type_code: string;
   type_name: string;
+  code_prefix: string;
   description?: string;
 }> = [
-  { type_code: 'RAW_MATERIAL', type_name: 'Raw Material', description: 'Unprocessed input consumed in production (feed ingredients, chemicals, etc.).' },
-  { type_code: 'CONSUMABLE', type_name: 'Consumable', description: 'General consumable stock — not a raw material line item.' },
-  { type_code: 'FEED', type_name: 'Feed', description: 'Formulated animal feed.' },
-  { type_code: 'MEDICINE', type_name: 'Medicine', description: 'Medicine — requires withdrawal_days before a treated animal may be slaughtered.' },
-  { type_code: 'VACCINE', type_name: 'Vaccine', description: 'Vaccine — requires withdrawal_days before a treated animal may be slaughtered.' },
-  { type_code: 'LIVESTOCK', type_name: 'Livestock', description: 'Living biological asset (animal) tracked as inventory.' },
-  { type_code: 'SEMI_FINISHED', type_name: 'Semi-Finished Good', description: 'Partially processed output, consumed further downstream.' },
-  { type_code: 'FINISHED_GOODS', type_name: 'Finished Goods', description: 'Final saleable output.' },
-  { type_code: 'BY_PRODUCT', type_name: 'By-Product', description: 'Secondary output generated alongside the main product.' },
-  { type_code: 'OVERHEAD', type_name: 'Overhead', description: 'Non-physical cost item (labor, utilities) with no stock quantity.' },
+  { type_code: 'RAW_MATERIAL', type_name: 'Raw Material', code_prefix: 'RAW_MATERIAL', description: 'Unprocessed input consumed in production (feed ingredients, chemicals, etc.).' },
+  { type_code: 'CONSUMABLE', type_name: 'Consumable', code_prefix: 'CONSUMABLE', description: 'General consumable stock — not a raw material line item.' },
+  { type_code: 'FEED', type_name: 'Feed', code_prefix: 'FEED', description: 'Formulated animal feed.' },
+  { type_code: 'MEDICINE', type_name: 'Medicine', code_prefix: 'MEDICINE', description: 'Medicine — requires withdrawal_days before a treated animal may be slaughtered.' },
+  { type_code: 'VACCINE', type_name: 'Vaccine', code_prefix: 'VACCINE', description: 'Vaccine — requires withdrawal_days before a treated animal may be slaughtered.' },
+  { type_code: 'LIVESTOCK', type_name: 'Livestock', code_prefix: 'LIVESTOCK', description: 'Living biological asset (animal) tracked as inventory.' },
+  { type_code: 'SEMI_FINISHED', type_name: 'Semi-Finished Good', code_prefix: 'SEMI_FINISHED', description: 'Partially processed output, consumed further downstream.' },
+  { type_code: 'FINISHED_GOODS', type_name: 'Finished Goods', code_prefix: 'FINISHED_GOODS', description: 'Final saleable output.' },
+  { type_code: 'BY_PRODUCT', type_name: 'By-Product', code_prefix: 'BY_PRODUCT', description: 'Secondary output generated alongside the main product.' },
+  { type_code: 'OVERHEAD', type_name: 'Overhead', code_prefix: 'OVERHEAD', description: 'Non-physical cost item (labor, utilities) with no stock quantity.' },
 ];
 
 /**

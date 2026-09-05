@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -6,6 +6,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateItemTypeDto, UpdateItemTypeDto, QueryItemTypeDto } from './dto/item-type.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +17,7 @@ export class ItemTypeService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -24,6 +26,22 @@ export class ItemTypeService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /** Item types carry no further type dimension of their own — resolves the master-alone series. */
+  private async resolveTypeCode(dto: CreateItemTypeDto, tenantId: string, companyId: string | null): Promise<string> {
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('ITEM_TYPE', null, tenantId, companyId);
+    if (!seriesCode) {
+      if (!dto.type_code) {
+        throw new BadRequestException('type_code is required — no number series is configured for item types.');
+      }
+      return dto.type_code.toUpperCase();
+    }
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId);
+    if (series.allow_manual && dto.type_code) {
+      return dto.type_code.toUpperCase();
+    }
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
   }
 
   async create(dto: CreateItemTypeDto, tenantId: string, userPayload?: any) {
@@ -42,10 +60,13 @@ export class ItemTypeService {
       }
     }
 
-    // 2. Check duplicate type code
+    // 2. Resolve the type code — a series if one is configured, else the user-supplied code.
+    const typeCode = await this.resolveTypeCode(dto, tenantId, companyId);
+
+    // 3. Check duplicate type code
     const duplicateConditions = [
       eq(schema.itemTypeMaster.tenant_id, tenantId),
-      eq(schema.itemTypeMaster.type_code, dto.type_code.toUpperCase()),
+      eq(schema.itemTypeMaster.type_code, typeCode),
       isNull(schema.itemTypeMaster.deleted_at),
     ];
     if (companyId) {
@@ -61,7 +82,7 @@ export class ItemTypeService {
       .limit(1);
 
     if (existing.length > 0) {
-      throw new ConflictException(`Item type with code '${dto.type_code}' already exists in this scope.`);
+      throw new ConflictException(`Item type with code '${typeCode}' already exists in this scope.`);
     }
 
     const itemTypeId = randomUUID();
@@ -69,7 +90,11 @@ export class ItemTypeService {
       item_type_id: itemTypeId,
       tenant_id: tenantId,
       company_id: companyId,
-      type_code: dto.type_code.toUpperCase(),
+      type_code: typeCode,
+      // code_prefix is the more specific configuration an ITEM_<type_code> series
+      // defers to instead of its own prefix (NumberSeriesService.resolveSeriesFor
+      // callers) — defaults to the type_code itself when not explicitly set.
+      code_prefix: (dto.code_prefix || typeCode).toUpperCase(),
       type_name: dto.type_name,
       description: dto.description || null,
       is_active: true,
@@ -179,6 +204,7 @@ export class ItemTypeService {
     };
 
     if (dto.type_code !== undefined) updates.type_code = dto.type_code.toUpperCase();
+    if (dto.code_prefix !== undefined) updates.code_prefix = dto.code_prefix.toUpperCase();
     if (dto.type_name !== undefined) updates.type_name = dto.type_name;
     if (dto.description !== undefined) updates.description = dto.description;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { FeedFormulaService } from './feed-formula.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('FeedFormulaService', () => {
@@ -22,11 +23,21 @@ describe('FeedFormulaService', () => {
     transaction: mockTransaction,
   };
 
+  const numberSeries = {
+    resolveSeriesFor: jest.fn(),
+    generateNext: jest.fn(),
+    lockSeries: jest.fn(),
+  };
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
     mockTransaction.mockClear();
+    numberSeries.resolveSeriesFor.mockReset();
+    numberSeries.generateNext.mockReset();
+    numberSeries.lockSeries.mockReset();
+    numberSeries.resolveSeriesFor.mockResolvedValue(null); // default: manual, as today
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +54,7 @@ describe('FeedFormulaService', () => {
             log: jest.fn().mockResolvedValue({}),
           },
         },
+        { provide: NumberSeriesService, useValue: numberSeries },
       ],
     }).compile();
 
@@ -201,6 +213,37 @@ describe('FeedFormulaService', () => {
       expect(mockDbInsert).toHaveBeenCalledTimes(2); // 1 header + 1 ingredient
       expect(result.formula_code).toBe('FORM01');
       expect(result.ingredients.length).toBe(1);
+    });
+
+    it('generates the formula code via the resolved series when one is configured', async () => {
+      numberSeries.resolveSeriesFor.mockResolvedValue('FEED_FORMULA');
+      numberSeries.lockSeries.mockResolvedValue({ allow_manual: false });
+      numberSeries.generateNext.mockResolvedValue('FF-001');
+
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]) }) }) }) // company
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ item_id: 'item-target' }]) }) }) }) // target item
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) }) // duplicate check (none)
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ item_id: 'raw-1' }]) }) }) }) // ingredient item
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ formula_id: 'form-1', formula_code: 'FF-001' }]) }) }) }) // findOne formula
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue([{ ingredient_id: 'ingr-1', item_id: 'raw-1' }]) }) }); // findOne ingredients
+
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
+
+      const result = await service.create(
+        {
+          company_id: 'comp-1',
+          formula_name: 'Broiler Starter',
+          target_item_id: 'item-target',
+          batch_size: 1000,
+          batch_unit: 'KG',
+          ingredients: [{ item_id: 'raw-1', quantity: 500, unit: 'KG' }],
+        },
+        'tenant-123',
+      );
+
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('FEED_FORMULA', 'tenant-123', 'comp-1');
+      expect(result.formula_code).toBe('FF-001');
     });
   });
 });

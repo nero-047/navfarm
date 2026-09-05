@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -6,6 +6,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateDiseaseDto, UpdateDiseaseDto, QueryDiseaseDto } from './dto/disease.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +17,7 @@ export class DiseaseService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -24,6 +26,27 @@ export class DiseaseService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /**
+   * Diseases carry no type dimension of their own — resolves the master-alone
+   * series. Returns the manual code untouched when no series is configured
+   * (and requires one be supplied), or the user's code when the resolved
+   * series has allow_manual set, or a freshly generated one otherwise.
+   */
+  private async resolveDiseaseCode(dto: CreateDiseaseDto, tenantId: string): Promise<string> {
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('DISEASE', null, tenantId, dto.company_id);
+    if (!seriesCode) {
+      if (!dto.disease_code) {
+        throw new BadRequestException('disease_code is required — no number series is configured for diseases.');
+      }
+      return dto.disease_code.toUpperCase();
+    }
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, dto.company_id);
+    if (series.allow_manual && dto.disease_code) {
+      return dto.disease_code.toUpperCase();
+    }
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id);
   }
 
   async create(dto: CreateDiseaseDto, tenantId: string, userPayload?: any) {
@@ -38,7 +61,10 @@ export class DiseaseService {
       throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
     }
 
-    // 2. Check duplicate disease code within the company scope
+    // 2. Resolve the disease code — a series if one is configured, else the user-supplied code.
+    const diseaseCode = await this.resolveDiseaseCode(dto, tenantId);
+
+    // 3. Check duplicate disease code within the company scope
     const existing = await this.db
       .select()
       .from(schema.diseaseMaster)
@@ -46,14 +72,14 @@ export class DiseaseService {
         and(
           eq(schema.diseaseMaster.tenant_id, tenantId),
           eq(schema.diseaseMaster.company_id, dto.company_id),
-          eq(schema.diseaseMaster.disease_code, dto.disease_code.toUpperCase()),
+          eq(schema.diseaseMaster.disease_code, diseaseCode),
           isNull(schema.diseaseMaster.deleted_at)
         )
       )
       .limit(1);
 
     if (existing.length > 0) {
-      throw new ConflictException(`Disease definition with code '${dto.disease_code}' already exists in this company.`);
+      throw new ConflictException(`Disease definition with code '${diseaseCode}' already exists in this company.`);
     }
 
     const diseaseId = randomUUID();
@@ -61,7 +87,7 @@ export class DiseaseService {
       disease_id: diseaseId,
       tenant_id: tenantId,
       company_id: dto.company_id,
-      disease_code: dto.disease_code.toUpperCase(),
+      disease_code: diseaseCode,
       disease_name: dto.disease_name,
       scientific_name: dto.scientific_name || null,
       symptoms: dto.symptoms || null,

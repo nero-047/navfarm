@@ -16,6 +16,7 @@ import {
   QueryBreedLifecycleStageDto,
 } from './dto/breed.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -26,6 +27,7 @@ export class BreedService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -34,6 +36,22 @@ export class BreedService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /** Resolves by breed_type first (e.g. BREED_BROILER), then the master-alone BREED series, else manual. */
+  private async resolveBreedCode(dto: CreateBreedDto, tenantId: string, companyId: string | null): Promise<string> {
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('BREED', dto.breed_type, tenantId, companyId);
+    if (!seriesCode) {
+      if (!dto.breed_code) {
+        throw new BadRequestException('breed_code is required — no number series is configured for breeds.');
+      }
+      return dto.breed_code.toUpperCase();
+    }
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId);
+    if (series.allow_manual && dto.breed_code) {
+      return dto.breed_code.toUpperCase();
+    }
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
   }
 
   // ========================================================
@@ -278,10 +296,14 @@ export class BreedService {
     // Verify species exists
     const species = await this.findOneSpecies(dto.species_id);
 
+    // Resolve the breed code — a series (breed_type first, then BREED alone) if
+    // one is configured, else the user-supplied code.
+    const breedCode = await this.resolveBreedCode(dto, tenantId, companyId);
+
     // Verify duplicate breed code in company scope
     const duplicateConditions = [
       eq(schema.breedMaster.tenant_id, tenantId),
-      eq(schema.breedMaster.breed_code, dto.breed_code.toUpperCase()),
+      eq(schema.breedMaster.breed_code, breedCode),
       isNull(schema.breedMaster.deleted_at),
     ];
     if (companyId) {
@@ -297,7 +319,7 @@ export class BreedService {
       .limit(1);
 
     if (existing.length > 0) {
-      throw new ConflictException(`Breed with code '${dto.breed_code}' already exists.`);
+      throw new ConflictException(`Breed with code '${breedCode}' already exists.`);
     }
 
     const breedId = randomUUID();
@@ -307,7 +329,7 @@ export class BreedService {
       company_id: companyId,
       nob_id: dto.nob_id,
       lob_id: dto.lob_id || null,
-      breed_code: dto.breed_code.toUpperCase(),
+      breed_code: breedCode,
       breed_name: dto.breed_name,
       species_id: dto.species_id,
       species: dto.species || species.species_name, // legacy fallback

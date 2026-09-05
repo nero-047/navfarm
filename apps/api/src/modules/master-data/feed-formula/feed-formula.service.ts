@@ -6,6 +6,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateFeedFormulaDto, UpdateFeedFormulaDto, QueryFeedFormulaDto } from './dto/feed-formula.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -16,6 +17,7 @@ export class FeedFormulaService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -24,6 +26,22 @@ export class FeedFormulaService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /** Feed formulas carry no type dimension of their own — resolves the master-alone series. */
+  private async resolveFormulaCode(dto: CreateFeedFormulaDto, tenantId: string): Promise<string> {
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('FEED_FORMULA', null, tenantId, dto.company_id);
+    if (!seriesCode) {
+      if (!dto.formula_code) {
+        throw new BadRequestException('formula_code is required — no number series is configured for feed formulas.');
+      }
+      return dto.formula_code.toUpperCase();
+    }
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, dto.company_id);
+    if (series.allow_manual && dto.formula_code) {
+      return dto.formula_code.toUpperCase();
+    }
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id);
   }
 
   async create(dto: CreateFeedFormulaDto, tenantId: string, userPayload?: any) {
@@ -53,7 +71,10 @@ export class FeedFormulaService {
       throw new NotFoundException(`Target produced Item with ID '${dto.target_item_id}' not found.`);
     }
 
-    // 3. Verify unique formula code per company
+    // 3. Resolve the formula code — a series if one is configured, else the user-supplied code.
+    const formulaCode = await this.resolveFormulaCode(dto, tenantId);
+
+    // 4. Verify unique formula code per company
     const existing = await this.db
       .select()
       .from(schema.feedFormulaMaster)
@@ -61,17 +82,17 @@ export class FeedFormulaService {
         and(
           eq(schema.feedFormulaMaster.tenant_id, tenantId),
           eq(schema.feedFormulaMaster.company_id, dto.company_id),
-          eq(schema.feedFormulaMaster.formula_code, dto.formula_code.toUpperCase()),
+          eq(schema.feedFormulaMaster.formula_code, formulaCode),
           isNull(schema.feedFormulaMaster.deleted_at)
         )
       )
       .limit(1);
 
     if (existing.length > 0) {
-      throw new ConflictException(`Feed formula with code '${dto.formula_code}' already exists in this company.`);
+      throw new ConflictException(`Feed formula with code '${formulaCode}' already exists in this company.`);
     }
 
-    // 4. Verify each ingredient item exists
+    // 5. Verify each ingredient item exists
     for (const ingredient of dto.ingredients) {
       const [ingrItem] = await this.db
         .select()
@@ -92,7 +113,7 @@ export class FeedFormulaService {
         formula_id: formulaId,
         tenant_id: tenantId,
         company_id: dto.company_id,
-        formula_code: dto.formula_code.toUpperCase(),
+        formula_code: formulaCode,
         formula_name: dto.formula_name,
         target_item_id: dto.target_item_id,
         batch_size: dto.batch_size.toString(),

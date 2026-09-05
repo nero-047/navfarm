@@ -3,10 +3,10 @@ import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsInt, Min, Max, I
 import { Type } from 'class-transformer';
 
 export class CreateUomDto {
-  @ApiProperty({ description: 'Short code for the UOM', example: 'KG' })
+  @ApiProperty({ description: 'Short code for the UOM. Optional when a number series is configured for UOMs — the code is generated then.', required: false, example: 'KG' })
   @IsString()
-  @IsNotEmpty()
-  uom_code: string;
+  @IsOptional()
+  uom_code?: string;
 
   @ApiProperty({ description: 'Full descriptive name', example: 'Kilogram' })
   @IsString()

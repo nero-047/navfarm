@@ -92,10 +92,10 @@ export class CreateBreedDto {
   @IsOptional()
   lob_id?: string;
 
-  @ApiProperty({ description: 'Unique code representing the breed', example: 'COBB500' })
+  @ApiProperty({ description: 'Unique code representing the breed. Optional when a number series is configured for breeds — the code is generated then.', required: false, example: 'COBB500' })
   @IsString()
-  @IsNotEmpty()
-  breed_code: string;
+  @IsOptional()
+  breed_code?: string;
 
   @ApiProperty({ description: 'Full descriptive name of the breed', example: 'Cobb 500 Broiler' })
   @IsString()

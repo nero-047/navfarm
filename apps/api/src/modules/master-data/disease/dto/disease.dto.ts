@@ -8,10 +8,10 @@ export class CreateDiseaseDto {
   @IsNotEmpty()
   company_id: string;
 
-  @ApiProperty({ description: 'Unique code representing the disease definition', example: 'DIS-ND' })
+  @ApiProperty({ description: 'Unique code representing the disease definition. Optional when a number series is configured for diseases — the code is generated then.', required: false, example: 'DIS-ND' })
   @IsString()
-  @IsNotEmpty()
-  disease_code: string;
+  @IsOptional()
+  disease_code?: string;
 
   @ApiProperty({ description: 'Common name of the disease', example: 'Newcastle Disease' })
   @IsString()

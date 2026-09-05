@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UomService } from './uom.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('UomService', () => {
@@ -18,10 +19,20 @@ describe('UomService', () => {
     update: mockDbUpdate,
   };
 
+  const numberSeries = {
+    resolveSeriesFor: jest.fn(),
+    generateNext: jest.fn(),
+    lockSeries: jest.fn(),
+  };
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
+    numberSeries.resolveSeriesFor.mockReset();
+    numberSeries.generateNext.mockReset();
+    numberSeries.lockSeries.mockReset();
+    numberSeries.resolveSeriesFor.mockResolvedValue(null); // default: manual, as today
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -38,6 +49,7 @@ describe('UomService', () => {
             log: jest.fn().mockResolvedValue({}),
           },
         },
+        { provide: NumberSeriesService, useValue: numberSeries },
       ],
     }).compile();
 
@@ -137,6 +149,27 @@ describe('UomService', () => {
       expect(mockDbInsert).toHaveBeenCalled();
       expect(auditLogService.log).toHaveBeenCalled();
       expect(result.uom_code).toBe('KG');
+    });
+
+    it('generates the code via a uom_type series when one is configured', async () => {
+      numberSeries.resolveSeriesFor.mockResolvedValue('UOM_WEIGHT');
+      numberSeries.lockSeries.mockResolvedValue({ allow_manual: false });
+      numberSeries.generateNext.mockResolvedValue('WGT-001');
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) }) // no duplicate
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ uom_code: 'WGT-001', uom_name: 'Weight unit' }]) }) }) }); // findOne
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
+
+      const result = await service.create({ uom_name: 'Weight unit', uom_type: 'WEIGHT' }, 'tenant-123');
+
+      expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('UOM', 'WEIGHT', 'tenant-123', null);
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('UOM_WEIGHT', 'tenant-123', null);
+      expect(result.uom_code).toBe('WGT-001');
+    });
+
+    it('rejects when neither a series nor a manual code is supplied', async () => {
+      await expect(service.create({ uom_name: 'Weight unit', uom_type: 'WEIGHT' } as any, 'tenant-123'))
+        .rejects.toThrow(BadRequestException);
     });
   });
 

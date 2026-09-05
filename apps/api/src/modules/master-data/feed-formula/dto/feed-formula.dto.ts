@@ -38,10 +38,10 @@ export class CreateFeedFormulaDto {
   @IsNotEmpty()
   company_id: string;
 
-  @ApiProperty({ description: 'Unique code representing the formula recipe/BOM', example: 'FORM-BR-STARTER' })
+  @ApiProperty({ description: 'Unique code representing the formula recipe/BOM. Optional when a number series is configured for feed formulas — the code is generated then.', required: false, example: 'FORM-BR-STARTER' })
   @IsString()
-  @IsNotEmpty()
-  formula_code: string;
+  @IsOptional()
+  formula_code?: string;
 
   @ApiProperty({ description: 'Common name of the formula', example: 'Broiler Starter Feed Formula' })
   @IsString()

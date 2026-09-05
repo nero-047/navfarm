@@ -12,6 +12,7 @@ import {
   UpdateUomConversionDto 
 } from './dto/uom.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -22,6 +23,7 @@ export class UomService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -32,13 +34,32 @@ export class UomService {
     return tenantDb;
   }
 
+  /** Resolves by uom_type first (e.g. UOM_WEIGHT), then the master-alone UOM series, else manual. */
+  private async resolveUomCode(dto: CreateUomDto, tenantId: string, companyId: string | null): Promise<string> {
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('UOM', dto.uom_type, tenantId, companyId);
+    if (!seriesCode) {
+      if (!dto.uom_code) {
+        throw new BadRequestException('uom_code is required — no number series is configured for units of measure.');
+      }
+      return dto.uom_code.toUpperCase();
+    }
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId);
+    if (series.allow_manual && dto.uom_code) {
+      return dto.uom_code.toUpperCase();
+    }
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
+  }
+
   async create(dto: CreateUomDto, tenantId: string, userPayload?: any) {
     const companyId = dto.company_id || null;
+
+    // Resolve the UOM code — a series if one is configured, else the user-supplied code.
+    const uomCode = await this.resolveUomCode(dto, tenantId, companyId);
 
     // Validate unique UOM code per tenant/company
     const conditions = [
       eq(schema.uomMaster.tenant_id, tenantId),
-      eq(schema.uomMaster.uom_code, dto.uom_code.toUpperCase()),
+      eq(schema.uomMaster.uom_code, uomCode),
       isNull(schema.uomMaster.deleted_at),
     ];
     if (companyId) {
@@ -54,7 +75,7 @@ export class UomService {
       .limit(1);
 
     if (existing.length > 0) {
-      throw new ConflictException(`UOM with code '${dto.uom_code}' already exists in this scope.`);
+      throw new ConflictException(`UOM with code '${uomCode}' already exists in this scope.`);
     }
 
     // Handle is_base_uom rule: only one base UOM per uom_type within scope
@@ -89,7 +110,7 @@ export class UomService {
       uom_id: uomId,
       tenant_id: tenantId,
       company_id: companyId,
-      uom_code: dto.uom_code.toUpperCase(),
+      uom_code: uomCode,
       uom_name: dto.uom_name,
       uom_type: dto.uom_type,
       decimal_places: dto.decimal_places ?? 0,

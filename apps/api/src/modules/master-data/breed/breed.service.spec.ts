@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BreedService } from './breed.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('BreedService', () => {
   let service: BreedService;
@@ -17,10 +18,20 @@ describe('BreedService', () => {
     update: mockDbUpdate,
   };
 
+  const numberSeries = {
+    resolveSeriesFor: jest.fn(),
+    generateNext: jest.fn(),
+    lockSeries: jest.fn(),
+  };
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
+    numberSeries.resolveSeriesFor.mockReset();
+    numberSeries.generateNext.mockReset();
+    numberSeries.lockSeries.mockReset();
+    numberSeries.resolveSeriesFor.mockResolvedValue(null); // default: manual, as today
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -37,6 +48,7 @@ describe('BreedService', () => {
             log: jest.fn().mockResolvedValue({}),
           },
         },
+        { provide: NumberSeriesService, useValue: numberSeries },
       ],
     }).compile();
 
@@ -220,6 +232,38 @@ describe('BreedService', () => {
       expect(insertedValues.residual_value_pct).toBe('10');
       expect(insertedValues.productive_life_cycles).toBe(7);
       expect(insertedValues.avg_litter_size_born).toBe('11.5');
+    });
+
+    it('generates the breed code via a breed_type series when one is configured', async () => {
+      numberSeries.resolveSeriesFor.mockResolvedValue('BREED_BROILER');
+      numberSeries.lockSeries.mockResolvedValue({ allow_manual: false });
+      numberSeries.generateNext.mockResolvedValue('BRD-001');
+      mockDbSelect
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ species_id: 'spec-1', species_name: 'Chicken' }]) }) }) })
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) }) // no duplicate
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ breed_code: 'BRD-001', breed_name: 'Cobb 500' }]) }) }) });
+
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
+
+      const result = await service.createBreed(
+        { nob_id: 'nob-1', breed_name: 'Cobb 500', species_id: 'spec-1', breed_type: 'BROILER' },
+        'tenant-123',
+      );
+
+      expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('BREED', 'BROILER', 'tenant-123', null);
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('BREED_BROILER', 'tenant-123', null);
+      expect(result.breed_code).toBe('BRD-001');
+    });
+
+    it('rejects when neither a series nor a manual breed_code is supplied', async () => {
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ species_id: 'spec-1', species_name: 'Chicken' }]) }) }),
+      });
+
+      await expect(service.createBreed(
+        { nob_id: 'nob-1', breed_name: 'Cobb 500', species_id: 'spec-1', breed_type: 'BROILER' } as any,
+        'tenant-123',
+      )).rejects.toThrow(BadRequestException);
     });
   });
 

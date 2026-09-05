@@ -22,10 +22,10 @@ export class CreateStageDto {
   @IsNotEmpty()
   lob_id: string;
 
-  @ApiProperty({ description: 'Unique stage code per LOB', example: 'QUARANTINE' })
+  @ApiProperty({ description: 'Unique stage code per LOB. Optional when a number series is configured for stages — the code is generated then.', required: false, example: 'QUARANTINE' })
   @IsString()
-  @IsNotEmpty()
-  stage_code: string;
+  @IsOptional()
+  stage_code?: string;
 
   @ApiProperty({ description: 'Display name', example: 'Quarantine' })
   @IsString()

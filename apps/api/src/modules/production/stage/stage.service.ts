@@ -6,12 +6,14 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateStageDto, UpdateStageDto, QueryStageDto } from './dto/stage.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 @Injectable()
 export class StageService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -20,6 +22,22 @@ export class StageService {
       throw new Error('Tenant database connection context not established.');
     }
     return tenantDb;
+  }
+
+  /** Resolves by stage_category first (e.g. STAGE_PRODUCTIVE), then the master-alone STAGE series, else manual. */
+  private async resolveStageCode(dto: CreateStageDto, tenantId: string): Promise<string> {
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('STAGE', dto.stage_category, tenantId, dto.company_id);
+    if (!seriesCode) {
+      if (!dto.stage_code) {
+        throw new BadRequestException('stage_code is required — no number series is configured for stages.');
+      }
+      return dto.stage_code.toUpperCase();
+    }
+    const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, dto.company_id);
+    if (series.allow_manual && dto.stage_code) {
+      return dto.stage_code.toUpperCase();
+    }
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id);
   }
 
   /** AUTO_BY_DAY stages must specify which day to auto-move on. */
@@ -64,10 +82,14 @@ export class StageService {
     if (dto.next_stage_id) await this.assertStageExists(dto.next_stage_id);
     if (dto.alt_next_stage_id) await this.assertStageExists(dto.alt_next_stage_id);
 
+    // Resolve the stage code — a series (stage_category first, then STAGE alone) if
+    // one is configured, else the user-supplied code.
+    const stageCode = await this.resolveStageCode(dto, tenantId);
+
     const duplicateConditions = [
       eq(schema.stageMaster.tenant_id, tenantId),
       eq(schema.stageMaster.lob_id, dto.lob_id),
-      eq(schema.stageMaster.stage_code, dto.stage_code.toUpperCase()),
+      eq(schema.stageMaster.stage_code, stageCode),
       isNull(schema.stageMaster.deleted_at),
     ];
     if (dto.company_id) {
@@ -83,7 +105,7 @@ export class StageService {
       .limit(1);
 
     if (existing.length > 0) {
-      throw new ConflictException(`Stage code '${dto.stage_code}' already exists for this LOB.`);
+      throw new ConflictException(`Stage code '${stageCode}' already exists for this LOB.`);
     }
 
     const stageId = randomUUID();
@@ -93,7 +115,7 @@ export class StageService {
       company_id: dto.company_id || null,
       nob_id: dto.nob_id,
       lob_id: dto.lob_id,
-      stage_code: dto.stage_code.toUpperCase(),
+      stage_code: stageCode,
       stage_name: dto.stage_name,
       stage_category: dto.stage_category,
       stage_sequence: dto.stage_sequence,

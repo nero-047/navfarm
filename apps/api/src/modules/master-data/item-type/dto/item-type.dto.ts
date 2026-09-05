@@ -8,15 +8,20 @@ export class CreateItemTypeDto {
   @IsOptional()
   company_id?: string;
 
-  @ApiProperty({ description: 'Unique item type code', example: 'RAW_MATERIAL' })
+  @ApiProperty({ description: 'Unique item type code. Optional when a number series is configured for item types — the code is generated then.', required: false, example: 'RAW_MATERIAL' })
   @IsString()
-  @IsNotEmpty()
-  type_code: string;
+  @IsOptional()
+  type_code?: string;
 
   @ApiProperty({ description: 'Descriptive name of the item type', example: 'Raw Material' })
   @IsString()
   @IsNotEmpty()
   type_name: string;
+
+  @ApiProperty({ description: 'Prefix an ITEM_<type_code> series uses instead of its own prefix when generating item codes for this type. Defaults to the type_code itself when omitted.', required: false, example: 'RAW' })
+  @IsString()
+  @IsOptional()
+  code_prefix?: string;
 
   @ApiProperty({ description: 'Explanation of what this item type is used for', required: false })
   @IsString()
@@ -33,6 +38,11 @@ export class UpdateItemTypeDto {
   @IsString()
   @IsOptional()
   type_code?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  code_prefix?: string;
 
   @ApiProperty({ required: false })
   @IsString()
