@@ -114,9 +114,9 @@ const location: MasterDataConfig = {
     { key: "parent_location_id", label: "Parent Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], helpText: "Leave blank only for a root Farm.", section: "Identification" },
     { key: "location_level", label: "Hierarchy Level", type: "number", hideInForm: true, helpText: "Computed from the parent location." },
     { key: "area_size", label: "Area Size", type: "number", step: "0.01", section: "Identification" },
-    { key: "area_unit", label: "Area UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Identification" },
+    { key: "area_unit", label: "Area UOM", type: "select-entity", entityEndpoint: "/uom?uomType=AREA", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Identification" },
     { key: "max_capacity", label: "Max Capacity", type: "number", step: "0.01", required: true, section: "Identification" },
-    { key: "capacity_uom", label: "Capacity UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Identification" },
+    { key: "capacity_uom", label: "Capacity UOM", type: "select-entity", required: true, entityEndpoint: "/uom?uomType=COUNT", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Identification" },
     { key: "storage_type", label: "Storage Location", type: "select", options: ["STORE", "SILO"].map((v) => ({ value: v, label: v })), section: "Identification" },
     { key: "silo_capacity_kg", label: "Silo Capacity (KG)", type: "number", step: "0.01", visibleWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, requiredWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, helpText: "Required when Storage Location is SILO.", section: "Identification" },
     { key: "silo_reorder_days", label: "Silo Reorder Days", type: "number", visibleWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, requiredWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, helpText: "Required when Storage Location is SILO.", section: "Identification" },
@@ -487,6 +487,9 @@ const item: MasterDataConfig = {
     { key: "item_type", label: "Item Type", type: "select-entity", required: true, entityEndpoint: "/item-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"], section: "Identification" },
     { key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"], section: "Identification" },
     { key: "sub_category", label: "Sub Category", type: "text", placeholder: "Grower", helpText: "Free-text subcategory (e.g. Starter/Grower/Finisher/Layer). For a structured, reusable subcategory list, create it as a child of the chosen Category instead." },
+    // Left unfiltered: an item's primary/secondary UOM legitimately spans every
+    // uom_type — KG for feed, LITER for medicine, BAG or HEAD for others — there is
+    // no single obviously-correct type to narrow this picker to.
     { key: "uom_primary", label: "Primary UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Units & Valuation" },
     { key: "uom_secondary", label: "Secondary UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Units & Valuation" },
     { key: "uom_conversion_factor", label: "UOM Conversion Factor", type: "number", step: "0.000001", helpText: "Optional. 1 secondary unit = this many primary units (e.g. 1 BAG = 50 KG -> 50)." },
@@ -721,7 +724,10 @@ const feedFormula: MasterDataConfig = {
       dependsOn: ["nob_id", "lob_id"], dependsOnMode: "query", queryParams: { nob_id: "nobId", lob_id: "lobId" },
     },
     { key: "batch_size", label: "Batch Size", type: "number", required: true, step: "0.01" },
-    { key: "batch_unit", label: "Batch Unit", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
+    // Feed batches are always weighed out (KG/TONNE), never counted or measured
+    // by volume, so this is filtered — unlike Item's Primary/Secondary UOM below,
+    // which legitimately spans every type.
+    { key: "batch_unit", label: "Batch Unit", type: "select-entity", required: true, entityEndpoint: "/uom?uomType=WEIGHT", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "description", label: "Description", type: "textarea" },
     {
       key: "ingredients", label: "Ingredients (JSON array)", type: "json", required: true, createOnly: true,
@@ -838,7 +844,11 @@ const resource: MasterDataConfig = {
     { key: "designation", label: "Designation", type: "text", placeholder: "Senior Farm Worker", helpText: "Labor/manpower only.", section: "People" },
     { key: "department", label: "Department", type: "text", placeholder: "Farm Operations", helpText: "Department or team.", section: "People" },
     { key: "capacity", label: "Capacity", type: "number", step: "0.01", section: "Capacity & Cost" },
+    // Left unfiltered: a resource's capacity spans LABOR (HEAD), EQUIPMENT (KG,
+    // LITER for a tank, BAG for a mixer) and VEHICLE (TONNE) — no single type fits.
     { key: "capacity_uom", label: "Capacity UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Capacity & Cost" },
+    // Left unfiltered: cost rate is quoted per HOUR (labor), per KG/LITER (material
+    // consumption), or per HEAD/trip — spans every type.
     { key: "unit", label: "Cost UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Capacity & Cost" },
     { key: "cost_rate", label: "Cost Rate", type: "number", step: "0.01", section: "Capacity & Cost" },
     { key: "cost_element", label: "Cost Element", type: "text", placeholder: "DIRECT_LABOR", helpText: "GL cost classification, e.g. DIRECT_LABOR / INDIRECT_LABOR / EQUIPMENT_HIRE / FUEL / MAINTENANCE.", section: "Capacity & Cost" },
