@@ -421,6 +421,13 @@
       "when": 1788561325870,
       "tag": "0059_silo_allowed_parent_types_add_shed",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "5",
+      "when": 1788597160826,
+      "tag": "0060_thin_dark_beast",
+      "breakpoints": true
     }
   ]
 }

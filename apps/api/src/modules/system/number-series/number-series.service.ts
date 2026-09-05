@@ -165,6 +165,60 @@ export class NumberSeriesService {
   }
 
   /**
+   * Type-aware series resolution, shared by every master that wants "auto-numbered
+   * where configured, manual everywhere else". Checks, in order:
+   *   1. a series for master + type (e.g. `ITEM_RAW_MATERIAL`, `ANIMAL_SOW`) — the
+   *      more specific configuration;
+   *   2. else a series for the master alone (e.g. `ITEM`, `ANIMAL`);
+   *   3. else `null` — meaning nothing is configured and the caller must leave the
+   *      code field to manual entry, exactly as it works today. This is what keeps
+   *      `KG`, `LITER`, `GESTATION` and `LARGE_WHITE` meaningful: a master is only
+   *      auto-numbered once someone deliberately adds a series row for it.
+   *
+   * Returns the resolved `series_code` (not a generated code) so the caller passes
+   * it straight into `generateNext` / `lockSeries`. Only checks existence + active
+   * state — it never mutates a series row, so it's safe to call speculatively
+   * before deciding whether to generate a code at all.
+   */
+  async resolveSeriesFor(
+    masterKey: string,
+    typeValue: string | null | undefined,
+    tenantId: string,
+    companyId?: string | null,
+    executor: MySql2Database<typeof schema> = this.db,
+  ): Promise<string | null> {
+    const seriesExists = async (seriesCode: string): Promise<boolean> => {
+      const conditions = [
+        eq(schema.noSeriesMaster.tenant_id, tenantId),
+        eq(schema.noSeriesMaster.series_code, seriesCode),
+        eq(schema.noSeriesMaster.is_active, true),
+        isNull(schema.noSeriesMaster.deleted_at),
+      ];
+      conditions.push(
+        companyId
+          ? or(eq(schema.noSeriesMaster.company_id, companyId), isNull(schema.noSeriesMaster.company_id))!
+          : isNull(schema.noSeriesMaster.company_id)
+      );
+      const [row] = await executor
+        .select({ series_id: schema.noSeriesMaster.series_id })
+        .from(schema.noSeriesMaster)
+        .where(and(...conditions))
+        .limit(1);
+      return !!row;
+    };
+
+    if (typeValue) {
+      const typeSeriesCode = `${masterKey}_${typeValue}`.toUpperCase();
+      if (await seriesExists(typeSeriesCode)) return typeSeriesCode;
+    }
+
+    const masterSeriesCode = masterKey.toUpperCase();
+    if (await seriesExists(masterSeriesCode)) return masterSeriesCode;
+
+    return null;
+  }
+
+  /**
    * Locks the series row (SELECT ... FOR UPDATE) without incrementing it.
    * For callers whose sequence number isn't the row's own current_seq — e.g.
    * hierarchical location codes, which count siblings under a specific

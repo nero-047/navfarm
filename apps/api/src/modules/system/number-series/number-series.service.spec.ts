@@ -235,4 +235,62 @@ describe('NumberSeriesService', () => {
       ).rejects.toThrow(ConflictException);
     });
   });
+
+  describe('resolveSeriesFor', () => {
+    // Queues one select().from().where().limit() result: a hit means a matching,
+    // active no_series_master row exists in scope; a miss means it doesn't.
+    const seedExists = (exists: boolean) => {
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue(exists ? [{ series_id: 'series-1' }] : []),
+          }),
+        }),
+      });
+    };
+
+    it('prefers the master+type series over the master series', async () => {
+      seedExists(true); // ITEM_RAW_MATERIAL exists
+
+      const result = await service.resolveSeriesFor('ITEM', 'RAW_MATERIAL', 'tenant-123', 'comp-1');
+
+      expect(result).toBe('ITEM_RAW_MATERIAL');
+      expect(mockDbSelect).toHaveBeenCalledTimes(1); // short-circuits before checking the master-alone series
+    });
+
+    it('falls back to the master series when no type series exists', async () => {
+      seedExists(false); // ITEM_CONSUMABLE missing
+      seedExists(true); // ITEM exists
+
+      const result = await service.resolveSeriesFor('ITEM', 'CONSUMABLE', 'tenant-123', 'comp-1');
+
+      expect(result).toBe('ITEM');
+    });
+
+    it('returns null when nothing is configured, so the code stays manual', async () => {
+      seedExists(false); // UOM_WEIGHT missing
+      seedExists(false); // UOM missing
+
+      const result = await service.resolveSeriesFor('UOM', 'WEIGHT', 'tenant-123', 'comp-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('skips the master+type tier entirely when no typeValue is given', async () => {
+      seedExists(true); // ITEM_CATEGORY exists
+
+      const result = await service.resolveSeriesFor('ITEM_CATEGORY', null, 'tenant-123', 'comp-1');
+
+      expect(result).toBe('ITEM_CATEGORY');
+      expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    });
+
+    it('is case-insensitive on the type value when building the master+type series code', async () => {
+      seedExists(true); // ITEM_RAW_MATERIAL exists
+
+      const result = await service.resolveSeriesFor('item', 'raw_material', 'tenant-123', 'comp-1');
+
+      expect(result).toBe('ITEM_RAW_MATERIAL');
+    });
+  });
 });

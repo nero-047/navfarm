@@ -510,7 +510,7 @@ export const itemCategoryMaster = mysqlTable('item_category_master', {
   category_id: varchar('category_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }), // null means global tenant-wide category
-  category_code: varchar('category_code', { length: 50 }).notNull(),
+  category_code: varchar('category_code', { length: 255 }).notNull(),
   category_name: varchar('category_name', { length: 100 }).notNull(),
   parent_category_id: varchar('parent_category_id', { length: 36 }),
   is_active: boolean('is_active').default(true).notNull(),
@@ -539,6 +539,11 @@ export const itemTypeMaster = mysqlTable('item_type_master', {
   company_id: varchar('company_id', { length: 36 }), // null means global tenant-wide type
   type_code: varchar('type_code', { length: 30 }).notNull(),
   type_name: varchar('type_name', { length: 100 }).notNull(),
+  // Mirrors location_type_master.code_prefix: the more specific configuration an
+  // ITEM_<type_code> series' generated code defers to instead of its own `prefix`
+  // (NumberSeriesService.resolveSeriesFor). Defaulted from type_code for existing
+  // rows so this is purely additive — no behaviour changes until a caller opts in.
+  code_prefix: varchar('code_prefix', { length: 20 }).notNull(),
   description: text('description'),
   is_system: boolean('is_system').default(false).notNull(),
   is_active: boolean('is_active').default(true).notNull(),
@@ -1483,7 +1488,7 @@ export const glAccountMaster = mysqlTable('gl_account_master', {
   gl_account_id: varchar('gl_account_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull(),
-  account_code: varchar('account_code', { length: 50 }).notNull(),
+  account_code: varchar('account_code', { length: 255 }).notNull(),
   account_name: varchar('account_name', { length: 150 }).notNull(),
   account_type: varchar('account_type', { length: 50 }).notNull(), // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
   parent_account_id: varchar('parent_account_id', { length: 36 }),
@@ -1617,7 +1622,7 @@ export const costCenterMaster = mysqlTable('cost_center_master', {
   cost_center_id: varchar('cost_center_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull(),
-  cost_center_code: varchar('cost_center_code', { length: 50 }).notNull(),
+  cost_center_code: varchar('cost_center_code', { length: 255 }).notNull(),
   cost_center_name: varchar('cost_center_name', { length: 150 }).notNull(),
   cost_center_type: varchar('cost_center_type', { length: 50 }).notNull(), // DEPARTMENT, FARM, WAREHOUSE, PROJECT, OTHER
   parent_cost_center_id: varchar('parent_cost_center_id', { length: 36 }),
