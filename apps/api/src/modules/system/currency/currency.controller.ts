@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpStatus } from '@nestjs/common';
+import { Req, Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CurrencyService } from './currency.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -18,19 +18,21 @@ export class CurrencyController {
 
   @Get('rates')
   @ApiOperation({ summary: 'Fetch active currency exchange conversion rates' })
-  async listExchangeRates() {
-    return this.currencyService.listExchangeRates();
+  async listExchangeRates(@Req() req: any) {
+    const companyId = req.headers['x-workspace-scope'] === 'TENANT' ? null : (req.headers['x-active-company-id'] || req.user?.companyId);
+    return this.currencyService.listExchangeRates(companyId);
   }
 
   @Post('rate')
   @ApiOperation({ summary: 'Register/Update conversion exchange rate' })
-  async updateExchangeRate(@Body() body: UpdateExchangeRateDto) {
+  async updateExchangeRate(@Body() body: UpdateExchangeRateDto, @Req() req: any) {
     return this.currencyService.updateExchangeRate(
       body.fromCurrencyId,
       body.toCurrencyId,
       body.rate,
       body.source,
       body.rateDate,
+      req.headers['x-workspace-scope'] === 'TENANT' ? null : (req.headers['x-active-company-id'] || req.user?.companyId),
     );
   }
 

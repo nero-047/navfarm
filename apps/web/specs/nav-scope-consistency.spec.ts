@@ -18,7 +18,14 @@ const LAYOUT = join(__dirname, '../src/app/(app)/layout.tsx');
  * different content depending on where you stand, so "Company Dashboard" and
  * "PIGGERY Dashboard" are describing different things at the same route.
  */
-const SCOPE_SPECIFIC_BY_DESIGN = new Set(['/dashboard']);
+const SCOPE_SPECIFIC_BY_DESIGN = new Set([
+  '/dashboard',
+  // /companies is a list of every company at tenant scope, and one company's
+  // own settings page at company scope — where the user has exactly one and
+  // the route redirects straight into it. Calling both "Companies" described
+  // the tenant page and misdescribed the company one.
+  '/companies',
+]);
 
 /**
  * Top-level items sit at six spaces of indentation; children at ten. An item is

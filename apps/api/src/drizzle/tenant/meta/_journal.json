@@ -505,6 +505,13 @@
       "when": 1788712382566,
       "tag": "0071_adorable_ultron",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "5",
+      "when": 1788716559734,
+      "tag": "0072_brown_bastion",
+      "breakpoints": true
     }
   ]
 }

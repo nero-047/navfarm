@@ -192,6 +192,10 @@ export const currencyMaster = mysqlTable('currency_master', {
 
 export const exchangeRate = mysqlTable('exchange_rate', {
   rate_id: varchar('rate_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  // Scoped per company, per Rishi: the screen sits in the company-scoped
+  // Finance section, so a rate entered in one company must not silently move
+  // another company's numbers. Existing rows have none and read as tenant-wide.
+  company_id: varchar('company_id', { length: 36 }),
   from_currency_id: varchar('from_currency_id', { length: 36 }).notNull().references(() => currencyMaster.currency_id, { onDelete: 'cascade' }),
   to_currency_id: varchar('to_currency_id', { length: 36 }).notNull().references(() => currencyMaster.currency_id, { onDelete: 'cascade' }),
   rate: decimal('rate', { precision: 18, scale: 6 }).notNull(),

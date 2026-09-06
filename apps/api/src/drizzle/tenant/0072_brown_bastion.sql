@@ -1,0 +1,1 @@
+ALTER TABLE `exchange_rate` ADD `company_id` varchar(36);

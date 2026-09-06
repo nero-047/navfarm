@@ -19,7 +19,7 @@ function sections() {
 }
 
 describe('Finance sections', () => {
-  it('lists every report the module ships', () => {
+  it('lists every section the module ships', () => {
     const keys = sections().map((s) => s.key);
     expect(keys).toEqual([
       'journal',
@@ -28,6 +28,10 @@ describe('Finance sections', () => {
       'trial-balance',
       'bio-asset-reconciliation',
       'batch-cost-variance',
+      // Not a report: the first data-entry screen in Finance. BBP-1 §1.1 has
+      // Finance entering the USD/ZWL rate by hand, so it belongs with the
+      // finance work rather than in a setup page nobody revisits.
+      'exchange-rates',
     ]);
   });
 
