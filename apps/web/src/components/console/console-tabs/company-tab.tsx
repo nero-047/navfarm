@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Field } from "@/components/ui/field";
+import { Field, ReadField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,6 @@ import {
   Building2,
   Plus,
   ArrowLeft,
-  UserPlus,
   Check,
   Upload,
   Image as ImageIcon
@@ -40,12 +39,12 @@ interface CompanyTabProps {
  * change the fiscal year, not to complete step seven of eight.
  */
 export const SETTINGS_SECTIONS = [
-  { key: "profile", labelKey: "ctSecProfile" },
-  { key: "address", labelKey: "ctSecAddress" },
-  { key: "contact", labelKey: "ctSecContact" },
-  { key: "localization", labelKey: "ctSecLocale" },
-  { key: "fiscal", labelKey: "ctSecFiscal" },
-  { key: "modules", labelKey: "ctSecSectors" },
+  { key: "profile", labelKey: "ctSecProfile", descKey: "ctSecProfileDesc" },
+  { key: "address", labelKey: "ctSecAddress", descKey: "ctSecAddressDesc" },
+  { key: "contact", labelKey: "ctSecContact", descKey: "ctSecContactDesc" },
+  { key: "localization", labelKey: "ctSecLocale", descKey: "ctSecLocaleDesc" },
+  { key: "fiscal", labelKey: "ctSecFiscal", descKey: "ctSecFiscalDesc" },
+  { key: "modules", labelKey: "ctSecSectors", descKey: "ctSecSectorsDesc" },
 ] as const;
 
 export default function CompanyTab({
@@ -67,22 +66,6 @@ export default function CompanyTab({
   // Navigation context
   const [selectedCompanyDetails, setSelectedCompanyDetails] = useState<any>(null);
 
-  // Users of the selected details company context
-
-  // New admin form context
-  const [adminForm, setAdminForm] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    phone: ""
-  });
-  const [addingAdmin, setAddingAdmin] = useState(false);
-  const [showAdminDialog, setShowAdminDialog] = useState(false);
-  const [userPendingDeletion, setUserPendingDeletion] = useState<string | null>(null);
-
-  // View/edit a single operator — reuses the same modal as Team Management
-  // (profile, Active toggle, role assignment, company access) instead of
-  // this panel only ever offering a one-way Deactivate.
 
   // 8 steps detailed setup configuration context
   const [setupDetails, setSetupDetails] = useState<any>(null);
@@ -93,6 +76,7 @@ export default function CompanyTab({
   // state only when no owner is passed.
   const [ownTab] = useState<"profile" | "address" | "contact" | "localization" | "fiscal" | "modules">("profile");
   const settingsTab = (section as typeof ownTab) || ownTab;
+  const activeSection = SETTINGS_SECTIONS.find((sec) => sec.key === settingsTab) ?? SETTINGS_SECTIONS[0];
 
   // Support catalogs fetched on mount
   const [languages, setLanguages] = useState<any[]>([]);
@@ -510,52 +494,6 @@ export default function CompanyTab({
     }
   };
 
-  const handleAddCompanyAdmin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!targetCompany?.company_id) return;
-    setAddingAdmin(true);
-    setError("");
-    setSuccess("");
-    try {
-      await api.post("/auth/register-admin", {
-        email: adminForm.email,
-        password_hash: adminForm.password,
-        full_name: adminForm.fullName,
-        phone: adminForm.phone,
-        user_type: isTenantAdmin ? "COMPANY_ADMIN" : "STANDARD_USER",
-        tenant_id: tenantId,
-        company_id: targetCompany.company_id,
-        timezone_pref_id: targetCompany.default_timezone_id || "Asia/Kolkata"
-      });
-      setSuccess(isTenantAdmin ? "New Company Administrator registered successfully!" : "New Company Operator registered successfully!");
-      setAdminForm({ fullName: "", email: "", password: "", phone: "" });
-      setShowAdminDialog(false);
-      if (onRefreshCompany) {
-        await onRefreshCompany(targetCompany.company_id);
-      }
-      setTimeout(() => setSuccess(""), 4000);
-    } catch (err: any) {
-      setError(err?.message || "Failed to register company user.");
-    } finally {
-      setAddingAdmin(false);
-    }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    setError("");
-    setSuccess("");
-    try {
-      await api.delete(`/user/${userId}`);
-      setSuccess("Account deactivated successfully!");
-      setUserPendingDeletion(null);
-      if (targetCompany?.company_id) {
-      }
-      setTimeout(() => setSuccess(""), 4000);
-    } catch (err: any) {
-      setError(err?.message || "Failed to deactivate account.");
-    }
-  };
-
   // Render List View (Tenant Admin only when selectedCompanyDetails is null)
   if (isTenantAdmin && !selectedCompanyDetails && !skipDirectory) {
     return (
@@ -689,9 +627,9 @@ export default function CompanyTab({
                     onChange={(e) => setCreateForm({ ...createForm, company_display_name: e.target.value })}
                   />
                 </Field>
-                <div className="flex flex-col gap-1.5">
-                  <label className="nf-text-label text-(--text-secondary)">{t("ctClassification")}</label>
+                <Field label={t("ctClassification")} htmlFor="cfg-ct-classification">
                   <Select
+                    id="cfg-ct-classification"
                     value={createForm.company_type}
                     onChange={(e) => setCreateForm({ ...createForm, company_type: e.target.value })}
                   >
@@ -702,7 +640,7 @@ export default function CompanyTab({
                     <option value="Trust">{t("ctClsTrust")}</option>
                     <option value="Co-operative">{t("ctClsCooperative")}</option>
                   </Select>
-                </div>
+                </Field>
                 <Field label={t("ctPrimaryIndustry")} htmlFor="create-industry-type" required>
                   <Input
                     id="create-industry-type"
@@ -744,8 +682,7 @@ export default function CompanyTab({
                     onChange={(e) => setCreateForm({ ...createForm, registration_no: e.target.value })}
                   />
                 </Field>
-                <div className="flex flex-col gap-1.5">
-                  <label className="nf-text-label text-(--text-secondary)">{t("ctBrandHexColor")}</label>
+                <Field label={t("ctBrandHexColor")}>
                   <div className="flex gap-2 items-center">
                     <input
                       type="color"
@@ -760,7 +697,7 @@ export default function CompanyTab({
                       placeholder="#1F4E79"
                     />
                   </div>
-                </div>
+                </Field>
               </div>
 
               <div className="flex flex-col-reverse gap-3 border-t border-(--border) pt-4 sm:flex-row sm:justify-end">
@@ -805,21 +742,21 @@ export default function CompanyTab({
           <ArrowLeft className="w-4 h-4" />{t("ctBackToDirectory")}</button>
       )}
 
-      <div className="company-settings-container grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
+      {/* One column, full width. This was a 12-column grid with the form in 8
+          and a right-hand column holding the administrators and tenant-summary
+          cards. Those cards are gone, so the column held nothing and a third of
+          the page was empty while the form stayed cramped beside it. */}
+      <div className="company-settings-container flex flex-col gap-4">
 
-        {/* Left Column Settings (Configuring all 8 wizard steps) */}
-        <div className="flex flex-col gap-4 lg:col-span-8">
-
-          {/* Settings details card */}
           <Card className="nf-company-config flex flex-col gap-5 border-(--border) bg-(--surface) p-5">
-            <div className="flex justify-between items-center border-b border-(--border) pb-4">
-              <div>
-                <h3 className="text-sm font-semibold text-(--text-primary)">{t("ctErpSetupConfig")}</h3>
-                {targetCompany && (
-                  <span className="text-[9px] text-(--text-secondary) font-mono font-semibold bg-(--surface-raised) px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-(--border) mt-1 block w-fit">{targetCompany.company_id}</span>
-                )}
-              </div>
-
+            {/* Names the section you are on. It used to read "ERP setup
+                configuration" on all six, with the company UUID under it —
+                a heading that told you nothing you had not just clicked, over
+                an identifier no one operating a farm needs to read. The company
+                is already identified by the strip above this card. */}
+            <div className="flex flex-col gap-1 border-b border-(--border) pb-4">
+              <h2 className="text-sm font-semibold text-(--text-primary)">{t(activeSection.labelKey)}</h2>
+              <p className="text-xs leading-5 text-(--text-secondary)">{t(activeSection.descKey)}</p>
             </div>
 
             {setupLoadWarning && (
@@ -837,106 +774,61 @@ export default function CompanyTab({
             ) : loadingDetails ? (
               <div className="text-xs text-(--text-secondary) text-center py-12 animate-pulse">{t("ctLoadingSteps")}</div>
             ) : (
-              <div className="flex flex-col md:flex-row gap-6 items-start">
-
-
-                {/* Tab content body */}
-                <div className="flex-1 w-full min-w-0">
+              <div className="min-w-0">
 
                   {/* profile TAB */}
                   {settingsTab === "profile" && (
                     !isEditing ? (
                       <div className="flex flex-col gap-6">
-                        {/* Logo & Header Card */}
-                        <div className="p-4 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) flex items-center gap-4">
-                          <div className="w-16 h-16 rounded-[var(--radius-sm)] border border-(--border) bg-(--input-bg) flex items-center justify-center overflow-hidden shrink-0">
+                        {/* Logo and website only. The company's name, code and
+                            type were repeated here from the identity strip
+                            directly above this card — the same three facts
+                            twice on one screen, a hand-width apart. */}
+                        <div className="flex items-center gap-4 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-4">
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-sm)] border border-(--border) bg-(--input-bg)">
                             {currentLogoUrl ? (
                               <img
                                 src={currentLogoUrl.startsWith('/') ? `${backendUrl}${currentLogoUrl}` : currentLogoUrl}
                                 alt={t("ctCompanyLogoAlt")}
-                                className="w-full h-full object-contain p-1"
+                                className="h-full w-full object-contain p-1"
                               />
                             ) : (
-                              <ImageIcon className="w-8 h-8 text-(--text-muted)" />
+                              <ImageIcon className="h-8 w-8 text-(--text-muted)" />
                             )}
                           </div>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-sm font-semibold text-(--text-primary)">{setupDetails?.company?.company_name || targetCompany?.company_name}</span>
-                            <span className="text-xs text-(--text-secondary) font-mono">{setupDetails?.company?.company_code || targetCompany?.company_code} • {setupDetails?.company?.company_type || targetCompany?.company_type}</span>
-                            {setupDetails?.company?.website && (
-                              <a href={setupDetails.company.website} target="_blank" rel="noreferrer" className="text-xs text-(--accent) hover:underline">
+                          <ReadField
+                            label={t("ctOfficialWebsite")}
+                            value={setupDetails?.company?.website ? (
+                              <a href={setupDetails.company.website} target="_blank" rel="noreferrer" className="text-(--accent) hover:underline">
                                 {setupDetails.company.website}
                               </a>
-                            )}
-                          </div>
+                            ) : ""}
+                          />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctCompanyCode")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-1 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
-                              {setupDetails?.company?.company_code || targetCompany?.company_code}
-                            </span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctLegalEntityName")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_name || targetCompany?.company_name}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("coFieldDisplayName")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_display_name || targetCompany?.company_display_name || "—"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctBusinessClassification")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.company_type || targetCompany?.company_type || "—"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryIndustry")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.industry_type || targetCompany?.industry_type || "—"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctTaxRegIdFull")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-1 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
-                              {setupDetails?.company?.tax_id || targetCompany?.tax_id || "—"}
-                            </span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctTaxRegimeScheme")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.tax_regime || "STANDARD"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctCorpRegNoFull")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-1.5 font-mono bg-(--surface-raised) border border-(--border) px-3 py-1.5 rounded-[var(--radius-sm)] w-fit">
-                              {setupDetails?.company?.registration_no || targetCompany?.registration_no || "—"}
-                            </span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctIncorporationDate")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.company?.incorporation_date || "—"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctOfficialWebsite")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.website || "—"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctAutoVerifyDomain")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.email_domain || "—"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctSupportEmail")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.support_email || "—"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryPhoneLandline")}</span>
-                            <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.phone_primary || "—"}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryAccentColor")}</span>
-                            <div className="flex items-center gap-2 mt-2">
-                              <div className="w-5 h-5 rounded-lg border border-(--border)" style={{ backgroundColor: setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79" }} />
-                              <span className="text-xs font-mono text-(--text-secondary) uppercase">{setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79"}</span>
-                            </div>
-                          </div>
+                        <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+                          <ReadField mono label={t("ctCompanyCode")} value={setupDetails?.company?.company_code || targetCompany?.company_code} />
+                          <ReadField label={t("ctLegalEntityName")} value={setupDetails?.company?.company_name || targetCompany?.company_name} />
+                          <ReadField label={t("coFieldDisplayName")} value={setupDetails?.company?.company_display_name || targetCompany?.company_display_name} />
+                          <ReadField label={t("ctBusinessClassification")} value={setupDetails?.company?.company_type || targetCompany?.company_type} />
+                          <ReadField label={t("ctPrimaryIndustry")} value={setupDetails?.company?.industry_type || targetCompany?.industry_type} />
+                          <ReadField mono label={t("ctTaxRegIdFull")} value={setupDetails?.company?.tax_id || targetCompany?.tax_id} />
+                          <ReadField label={t("ctTaxRegimeScheme")} value={setupDetails?.company?.tax_regime} />
+                          <ReadField mono label={t("ctCorpRegNoFull")} value={setupDetails?.company?.registration_no || targetCompany?.registration_no} />
+                          <ReadField label={t("ctIncorporationDate")} value={setupDetails?.company?.incorporation_date} />
+                          <ReadField mono label={t("ctAutoVerifyDomain")} value={setupDetails?.company?.email_domain} />
+                          <ReadField mono label={t("ctSupportEmail")} value={setupDetails?.company?.support_email} />
+                          <ReadField mono label={t("ctPrimaryPhoneLandline")} value={setupDetails?.company?.phone_primary} />
+                          <ReadField
+                            label={t("ctPrimaryAccentColor")}
+                            mono
+                            value={
+                              <span className="flex items-center gap-2">
+                                <span className="h-4 w-4 rounded-[var(--radius-xs)] border border-(--border)" style={{ backgroundColor: setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79" }} />
+                                <span className="uppercase">{setupDetails?.company?.primary_color_hex || targetCompany?.primary_color_hex || "#1F4E79"}</span>
+                              </span>
+                            }
+                          />
                         </div>
                       </div>
                     ) : (
@@ -994,9 +886,9 @@ export default function CompanyTab({
                               onChange={(e) => setProfileForm({ ...profileForm, company_display_name: e.target.value })}
                             />
                           </Field>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctClassification")}</label>
+                          <Field label={t("ctClassification")} htmlFor="cfg-ct-classification">
                             <Select
+                              id="cfg-ct-classification"
                               value={profileForm.company_type}
                               onChange={(e) => setProfileForm({ ...profileForm, company_type: e.target.value })}
                             >
@@ -1007,7 +899,7 @@ export default function CompanyTab({
                               <option value="Trust">{t("ctClsTrust")}</option>
                               <option value="Co-operative">{t("ctClsCooperative")}</option>
                             </Select>
-                          </div>
+                          </Field>
                           <Field label={t("ctPrimaryIndustry")} htmlFor="profile-industry-type" required>
                             <Input
                               id="profile-industry-type"
@@ -1023,9 +915,9 @@ export default function CompanyTab({
                               onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
                             />
                           </Field>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctTaxRegime")}</label>
+                          <Field label={t("ctTaxRegime")} htmlFor="cfg-ct-tax-regime">
                             <Select
+                              id="cfg-ct-tax-regime"
                               value={profileForm.tax_regime}
                               onChange={(e) => setProfileForm({ ...profileForm, tax_regime: e.target.value })}
                             >
@@ -1033,7 +925,7 @@ export default function CompanyTab({
                               <option value="COMPOSITION">{t("ctSchemeComposition")}</option>
                               <option value="EXEMPT">{t("ctSchemeExempt")}</option>
                             </Select>
-                          </div>
+                          </Field>
                           <Field label={t("ctCorpRegNoShort")} htmlFor="profile-registration-no">
                             <Input
                               id="profile-registration-no"
@@ -1082,8 +974,7 @@ export default function CompanyTab({
                               onChange={(e) => setProfileForm({ ...profileForm, phone_primary: e.target.value })}
                             />
                           </Field>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctBrandHexColor")}</label>
+                          <Field label={t("ctBrandHexColor")}>
                             <div className="flex gap-2 items-center">
                               <input
                                 type="color"
@@ -1097,11 +988,13 @@ export default function CompanyTab({
                                 className="flex-1"
                               />
                             </div>
-                          </div>
+                          </Field>
                         </div>
-                        <Button type="submit" disabled={saving || uploadingLogo} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
-                        </Button>
+                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <Button type="submit" disabled={saving || uploadingLogo} className="text-xs">
+                            <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
+                          </Button>
+                        </div>
                       </form>
                     )
                   )}
@@ -1110,47 +1003,16 @@ export default function CompanyTab({
                   {/* address TAB */}
                   {settingsTab === "address" && (
                     !isEditing ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctAddressLabelTag")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.address_label || "Primary HQ"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctAddressType")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.address_type || "HQ"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctAddressLine1")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.line1 || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctAddressLine2")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.line2 || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctCity")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.city || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctStateProvince")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.address?.state_id || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctCountryCode")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.address?.country_id || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctPincodePostal")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.address?.pincode || "—"}</span>
-                        </div>
-                        <div className="flex flex-col sm:col-span-2">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctGpsCoordinates")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">
-                            {setupDetails?.address?.gps_latitude && setupDetails?.address?.gps_longitude
-                              ? `${setupDetails.address.gps_latitude}, ${setupDetails.address.gps_longitude}`
-                              : "—"}
-                          </span>
-                        </div>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <ReadField label={t("ctAddressLabelTag")} value={setupDetails?.address?.address_label || "Primary HQ"} />
+                        <ReadField label={t("ctAddressType")} value={setupDetails?.address?.address_type || "HQ"} />
+                        <ReadField label={t("ctAddressLine1")} value={setupDetails?.address?.line1} />
+                        <ReadField label={t("ctAddressLine2")} value={setupDetails?.address?.line2} />
+                        <ReadField label={t("ctCity")} value={setupDetails?.address?.city} />
+                        <ReadField label={t("ctStateProvince")} value={setupDetails?.address?.state_id} />
+                        <ReadField mono label={t("ctCountryCode")} value={setupDetails?.address?.country_id} />
+                        <ReadField mono label={t("ctPincodePostal")} value={setupDetails?.address?.pincode} />
+                        <ReadField mono className="sm:col-span-2" label={t("ctGpsCoordinates")} value={setupDetails?.address?.gps_latitude && setupDetails?.address?.gps_longitude ? `${setupDetails.address.gps_latitude}, ${setupDetails.address.gps_longitude}` : "—"} />
                       </div>
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
@@ -1163,9 +1025,9 @@ export default function CompanyTab({
                               onChange={(e) => setAddressForm({ ...addressForm, address_label: e.target.value })}
                             />
                           </Field>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctAddressType")}</label>
+                          <Field label={t("ctAddressType")} htmlFor="cfg-ct-address-type">
                             <Select
+                              id="cfg-ct-address-type"
                               value={addressForm.address_type}
                               onChange={(e) => setAddressForm({ ...addressForm, address_type: e.target.value })}
                             >
@@ -1174,7 +1036,7 @@ export default function CompanyTab({
                               <option value="Warehouse">{t("ctAddrWarehouseDepot")}</option>
                               <option value="Farm">{t("ctAddrFarmSite")}</option>
                             </Select>
-                          </div>
+                          </Field>
                           <Field label={t("ctAddressLine1")} htmlFor="address-line1" required>
                             <Input
                               id="address-line1"
@@ -1241,9 +1103,11 @@ export default function CompanyTab({
                             </Field>
                           </div>
                         </div>
-                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
-                        </Button>
+                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <Button type="submit" disabled={saving} className="text-xs">
+                            <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
+                          </Button>
+                        </div>
                       </form>
                     )
                   )}
@@ -1251,39 +1115,14 @@ export default function CompanyTab({
                   {/* contact TAB */}
                   {settingsTab === "contact" && (
                     !isEditing ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctContactPersonName")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.contact?.full_name || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("profileDesignation")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.contact?.designation || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryPhone")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.phone_primary || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctSecondaryPhone")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.phone_secondary || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctPrimaryEmail")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.contact?.email || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctAlertEmails")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">
-                            {setupDetails?.contact?.receives_alerts ? "Active - Receives ERP threshold notifications" : "Disabled"}
-                          </span>
-                        </div>
-                        <div className="flex flex-col sm:col-span-2">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctExecReportEmails")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">
-                            {setupDetails?.contact?.receives_reports ? "Active - Receives periodic executive summary reports" : "Disabled"}
-                          </span>
-                        </div>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <ReadField label={t("ctContactPersonName")} value={setupDetails?.contact?.full_name} />
+                        <ReadField label={t("profileDesignation")} value={setupDetails?.contact?.designation} />
+                        <ReadField mono label={t("ctPrimaryPhone")} value={setupDetails?.contact?.phone_primary} />
+                        <ReadField mono label={t("ctSecondaryPhone")} value={setupDetails?.contact?.phone_secondary} />
+                        <ReadField mono label={t("ctPrimaryEmail")} value={setupDetails?.contact?.email} />
+                        <ReadField label={t("ctAlertEmails")} value={setupDetails?.contact?.receives_alerts ? "Active - Receives ERP threshold notifications" : "Disabled"} />
+                        <ReadField className="sm:col-span-2" label={t("ctExecReportEmails")} value={setupDetails?.contact?.receives_reports ? "Active - Receives periodic executive summary reports" : "Disabled"} />
                       </div>
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
@@ -1349,9 +1188,11 @@ export default function CompanyTab({
                             </label>
                           </div>
                         </div>
-                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
-                        </Button>
+                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <Button type="submit" disabled={saving} className="text-xs">
+                            <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
+                          </Button>
+                        </div>
                       </form>
                     )
                   )}
@@ -1360,34 +1201,18 @@ export default function CompanyTab({
                   {/* localization TAB */}
                   {settingsTab === "localization" && (
                     !isEditing ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctDefaultLanguage")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">
-                            {languages.find(l => l.lang_id === setupDetails?.company?.default_language_id)?.lang_name || setupDetails?.company?.default_language_id || "—"}
-                          </span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctBaseCurrency")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">
-                            {currencies.find(c => c.currency_id === setupDetails?.company?.base_currency_id)?.currency_name || setupDetails?.company?.base_currency_id || "—"}
-                          </span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctDefaultTimezone")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.default_timezone_id || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctCountryLocaleCode")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.company?.country_id || "—"}</span>
-                        </div>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <ReadField label={t("ctDefaultLanguage")} value={languages.find(l => l.lang_id === setupDetails?.company?.default_language_id)?.lang_name || setupDetails?.company?.default_language_id} />
+                        <ReadField label={t("ctBaseCurrency")} value={currencies.find(c => c.currency_id === setupDetails?.company?.base_currency_id)?.currency_name || setupDetails?.company?.base_currency_id} />
+                        <ReadField mono label={t("ctDefaultTimezone")} value={setupDetails?.company?.default_timezone_id} />
+                        <ReadField mono label={t("ctCountryLocaleCode")} value={setupDetails?.company?.country_id} />
                       </div>
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctDefaultLanguage")}</label>
+                          <Field label={t("ctDefaultLanguage")} htmlFor="cfg-ct-default-language">
                             <Select
+                              id="cfg-ct-default-language"
                               value={localizationForm.default_language_id}
                               onChange={(e) => setLocalizationForm({ ...localizationForm, default_language_id: e.target.value })}
                             >
@@ -1396,10 +1221,10 @@ export default function CompanyTab({
                                 <option key={l.lang_id} value={l.lang_id}>{l.lang_name} ({l.lang_code})</option>
                               ))}
                             </Select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctBaseCurrency")}</label>
+                          </Field>
+                          <Field label={t("ctBaseCurrency")} htmlFor="cfg-ct-base-currency">
                             <Select
+                              id="cfg-ct-base-currency"
                               value={localizationForm.base_currency_id}
                               onChange={(e) => setLocalizationForm({ ...localizationForm, base_currency_id: e.target.value })}
                             >
@@ -1408,7 +1233,7 @@ export default function CompanyTab({
                                 <option key={c.currency_id} value={c.currency_id}>{c.currency_name} ({c.currency_code})</option>
                               ))}
                             </Select>
-                          </div>
+                          </Field>
                           <Field label={t("ctTimezoneId")} htmlFor="localization-timezone" required>
                             <Input
                               id="localization-timezone"
@@ -1426,9 +1251,11 @@ export default function CompanyTab({
                             />
                           </Field>
                         </div>
-                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
-                        </Button>
+                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <Button type="submit" disabled={saving} className="text-xs">
+                            <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
+                          </Button>
+                        </div>
                       </form>
                     )
                   )}
@@ -1436,65 +1263,34 @@ export default function CompanyTab({
                   {/* fiscal TAB */}
                   {settingsTab === "fiscal" && (
                     !isEditing ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctFiscalYearFormat")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.fiscal_year_format || "FY APR-MAR"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctFiscalStartMonthDay")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">
-                            {setupDetails?.fiscal?.fiscal_start_month ? `Month ${setupDetails.fiscal.fiscal_start_month}` : "Month 4 (April)"} (Day {setupDetails?.fiscal?.fiscal_start_day || 1} to Day {setupDetails?.fiscal?.fiscal_end_day || 31})
-                          </span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctCurrentFiscalYear")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.current_fiscal_year || "2026-27"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctPeriodType")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.period_type || "MONTHLY"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctAccountingStandard")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.accounting_standard || "Local GAAP"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctDepreciationModel")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.depreciation_method || "SLM (Straight Line)"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctInventoryCostingModel")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.inventory_valuation || "FIFO"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctTaxFilingFrequency")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">{setupDetails?.fiscal?.gst_filing_frequency || "MONTHLY"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctStatutoryTaxAudit")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2">
-                            {setupDetails?.fiscal?.tax_audit_applicable ? "Mandatory Tax Audit Applicable" : "Not Applicable"}
-                          </span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="nf-text-label text-(--text-secondary)">{t("ctDecimalPrecision")}</span>
-                          <span className="text-xs font-semibold text-(--text-primary) mt-2 font-mono">{setupDetails?.fiscal?.decimal_places ?? 2} Decimal Places</span>
-                        </div>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <ReadField mono label={t("ctFiscalYearFormat")} value={setupDetails?.fiscal?.fiscal_year_format || "FY APR-MAR"} />
+                        <ReadField
+                          label={t("ctFiscalStartMonthDay")}
+                          value={`${setupDetails?.fiscal?.fiscal_start_month ? `Month ${setupDetails.fiscal.fiscal_start_month}` : "Month 4 (April)"} (Day ${setupDetails?.fiscal?.fiscal_start_day || 1} to Day ${setupDetails?.fiscal?.fiscal_end_day || 31})`}
+                        />
+                        <ReadField mono label={t("ctCurrentFiscalYear")} value={setupDetails?.fiscal?.current_fiscal_year || "2026-27"} />
+                        <ReadField label={t("ctPeriodType")} value={setupDetails?.fiscal?.period_type || "MONTHLY"} />
+                        <ReadField label={t("ctAccountingStandard")} value={setupDetails?.fiscal?.accounting_standard || "Local GAAP"} />
+                        <ReadField label={t("ctDepreciationModel")} value={setupDetails?.fiscal?.depreciation_method || "SLM (Straight Line)"} />
+                        <ReadField label={t("ctInventoryCostingModel")} value={setupDetails?.fiscal?.inventory_valuation || "FIFO"} />
+                        <ReadField label={t("ctTaxFilingFrequency")} value={setupDetails?.fiscal?.gst_filing_frequency || "MONTHLY"} />
+                        <ReadField label={t("ctStatutoryTaxAudit")} value={setupDetails?.fiscal?.tax_audit_applicable ? "Mandatory Tax Audit Applicable" : "Not Applicable"} />
+                        <ReadField mono label={t("ctDecimalPrecision")} value={`${setupDetails?.fiscal?.decimal_places ?? 2} decimal places`} />
                       </div>
                     ) : (
                       <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctFiscalStartMonth")}</label>
+                          <Field label={t("ctFiscalStartMonth")} htmlFor="cfg-ct-fiscal-start-month">
                             <Select
+                              id="cfg-ct-fiscal-start-month"
                               value={fiscalForm.fiscal_start_month}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, fiscal_start_month: parseInt(e.target.value) })}
                             >
                               <option value={1}>{t("ctMonthJanuary")}</option>
                               <option value={4}>{t("ctMonthApril")}</option>
                             </Select>
-                          </div>
+                          </Field>
                           <Field label={t("ctCurrentFiscalYear")} htmlFor="fiscal-year" required>
                             <Input
                               id="fiscal-year"
@@ -1504,19 +1300,19 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctAccountingPeriodicity")}</label>
+                          <Field label={t("ctAccountingPeriodicity")} htmlFor="cfg-ct-accounting-periodicity">
                             <Select
+                              id="cfg-ct-accounting-periodicity"
                               value={fiscalForm.period_type}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, period_type: e.target.value })}
                             >
                               <option value="MONTHLY">{t("ctPeriodMonthly")}</option>
                               <option value="QUARTERLY">{t("ctPeriodQuarterly")}</option>
                             </Select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctAccountingStandard")}</label>
+                          </Field>
+                          <Field label={t("ctAccountingStandard")} htmlFor="cfg-ct-accounting-standard">
                             <Select
+                              id="cfg-ct-accounting-standard"
                               value={fiscalForm.accounting_standard}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, accounting_standard: e.target.value })}
                             >
@@ -1524,10 +1320,10 @@ export default function CompanyTab({
                               <option value="IFRS">IFRS</option>
                               <option value="US GAAP">US GAAP</option>
                             </Select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctDepreciationModel")}</label>
+                          </Field>
+                          <Field label={t("ctDepreciationModel")} htmlFor="cfg-ct-depreciation-model">
                             <Select
+                              id="cfg-ct-depreciation-model"
                               value={fiscalForm.depreciation_method}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, depreciation_method: e.target.value })}
                             >
@@ -1535,10 +1331,10 @@ export default function CompanyTab({
                               <option value="WDV">{t("ctDeprWdv")}</option>
                               <option value="UNITS_OF_PRODUCTION">{t("ctDeprUnitsOfProduction")}</option>
                             </Select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctInventoryCostingMethod")}</label>
+                          </Field>
+                          <Field label={t("ctInventoryCostingMethod")} htmlFor="cfg-ct-inventory-costing-method">
                             <Select
+                              id="cfg-ct-inventory-costing-method"
                               value={fiscalForm.inventory_valuation}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, inventory_valuation: e.target.value })}
                             >
@@ -1546,20 +1342,20 @@ export default function CompanyTab({
                               <option value="Weighted Average">{t("ctCostWeightedAverage")}</option>
                               <option value="STANDARD COSTING">{t("ctCostStandard")}</option>
                             </Select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctTaxFilingFrequency")}</label>
+                          </Field>
+                          <Field label={t("ctTaxFilingFrequency")} htmlFor="cfg-ct-tax-filing-frequency">
                             <Select
+                              id="cfg-ct-tax-filing-frequency"
                               value={fiscalForm.gst_filing_frequency}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, gst_filing_frequency: e.target.value })}
                             >
                               <option value="MONTHLY">{t("ctFilingMonthly")}</option>
                               <option value="QUARTERLY">{t("ctFilingQuarterly")}</option>
                             </Select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="nf-text-label text-(--text-secondary)">{t("ctDecimalPrecision")}</label>
+                          </Field>
+                          <Field label={t("ctDecimalPrecision")} htmlFor="cfg-ct-decimal-precision">
                             <Select
+                              id="cfg-ct-decimal-precision"
                               value={fiscalForm.decimal_places}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, decimal_places: parseInt(e.target.value) })}
                             >
@@ -1567,7 +1363,7 @@ export default function CompanyTab({
                               <option value={3}>3 Decimal Places (0.000)</option>
                               <option value={4}>4 Decimal Places (0.0000)</option>
                             </Select>
-                          </div>
+                          </Field>
                           <div className="flex flex-col justify-center pt-2 sm:col-span-2">
                             <label className="flex items-center gap-2 cursor-pointer text-xs">
                               <input
@@ -1580,9 +1376,11 @@ export default function CompanyTab({
                             </label>
                           </div>
                         </div>
-                        <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
-                        </Button>
+                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <Button type="submit" disabled={saving} className="text-xs">
+                            <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
+                          </Button>
+                        </div>
                       </form>
                     )
                   )}
@@ -1693,100 +1491,18 @@ export default function CompanyTab({
                             );
                           })}
                         </div>
-                        <Button onClick={handleSaveModules} disabled={saving} className="mt-6 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? "Saving Changes..." : "Save Business Verticals"}
-                        </Button>
+                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <Button type="button" onClick={handleSaveModules} disabled={saving} className="text-xs">
+                            <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
+                          </Button>
+                        </div>
                       </div>
                     )
                   )}
 
-                </div>
               </div>
             )}
           </Card>
-
-
-        </div>
-
-        {/* Right Column: Manage Users */}
-        <div className="flex flex-col gap-4 lg:col-span-4">
-
-          {/* User list card */}
-
-          <Dialog
-            open={showAdminDialog}
-            onClose={() => setShowAdminDialog(false)}
-            title={isTenantAdmin ? "Add company administrator" : "Add company operator"}
-            description={`Create an account for ${targetCompany?.company_name ?? "this company"}.`}
-            maxWidth="md"
-            footer={
-              <>
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowAdminDialog(false)}>{t("cancel")}</Button>
-                <Button type="submit" form="add-admin-form" disabled={addingAdmin} size="sm" className="flex items-center gap-1.5 nf-btn-primary">
-                  <UserPlus className="w-3.5 h-3.5" /> {addingAdmin ? "Registering..." : (isTenantAdmin ? "Add Administrator" : "Add Operator")}
-                </Button>
-              </>
-            }
-          >
-            <form id="add-admin-form" onSubmit={handleAddCompanyAdmin} className="flex flex-col gap-4 pt-1">
-              <Field label={t("authFullName")} htmlFor="admin-full-name" required>
-                <Input
-                  id="admin-full-name"
-                  placeholder={t("ctPhPersonName")}
-                  value={adminForm.fullName}
-                  onChange={(e) => setAdminForm({ ...adminForm, fullName: e.target.value })}
-                  required
-                />
-              </Field>
-              <Field label={t("usrEmailAddress")} htmlFor="admin-email" required>
-                <Input
-                  id="admin-email"
-                  type="email"
-                  placeholder="user@domain.com"
-                  value={adminForm.email}
-                  onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
-                  required
-                />
-              </Field>
-              <Field label={t("usrTempPassword")} htmlFor="admin-password" required>
-                <Input
-                  id="admin-password"
-                  type="password"
-                  placeholder={t("ctPhMinEightChars")}
-                  value={adminForm.password}
-                  onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
-                  required
-                />
-              </Field>
-              <Field label={t("ctPhoneNumber")} htmlFor="admin-phone">
-                <Input
-                  id="admin-phone"
-                  placeholder="+919999911111"
-                  value={adminForm.phone}
-                  onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
-                />
-              </Field>
-            </form>
-          </Dialog>
-
-          <Dialog
-            open={Boolean(userPendingDeletion)}
-            onClose={() => setUserPendingDeletion(null)}
-            title={t("ctDeactivateAccount")}
-            description={t("ctDeactivateWarning")}
-            maxWidth="sm"
-            footer={
-              <>
-                <Button variant="outline" size="sm" onClick={() => setUserPendingDeletion(null)}>{t("cancel")}</Button>
-                <Button variant="destructive" size="sm" onClick={() => userPendingDeletion && handleDeleteUser(userPendingDeletion)}>{t("deactivate")}</Button>
-              </>
-            }
-          >
-            <p className="text-xs leading-5 text-(--text-secondary) pt-1">{t("ctConfirmDeactivate")}</p>
-          </Dialog>
-
-
-        </div>
 
       </div>
     </div>

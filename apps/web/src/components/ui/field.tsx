@@ -32,3 +32,49 @@ export function Field({ label, htmlFor, hint, error, required, className, childr
     </div>
   );
 }
+
+/**
+ * The read-only counterpart to `Field`, for users who may see a form but not
+ * change it.
+ *
+ * It exists because the alternative in practice was not "one component" but
+ * "two visual languages": company settings hand-typed 45 read-only value spans
+ * whose label spacing, text size and mono/non-mono treatment had all drifted
+ * apart from each other and from the editable form beside them, so the same
+ * page looked like a different product depending on your role.
+ *
+ * Disabling the real inputs was the other option and is worse to read — our
+ * controls dim to 50% opacity when disabled, which is the correct signal for a
+ * control you could otherwise use, and the wrong one for a value you are simply
+ * being shown.
+ *
+ * `mono` is for machine-shaped values — codes, ids, timezones — where character
+ * alignment aids comparison. Prose does not take it.
+ */
+export function ReadField({
+  label,
+  value,
+  mono,
+  className,
+}: {
+  label: string;
+  value: ReactNode;
+  mono?: boolean;
+  className?: string;
+}) {
+  const empty = value === null || value === undefined || value === '';
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
+      <span className="nf-text-label text-(--text-secondary)">{label}</span>
+      <span
+        className={cn(
+          'min-w-0 break-words text-sm',
+          mono && 'font-mono',
+          empty ? 'text-(--text-muted)' : 'font-medium text-(--text-primary)'
+        )}
+      >
+        {empty ? '—' : value}
+      </span>
+    </div>
+  );
+}
