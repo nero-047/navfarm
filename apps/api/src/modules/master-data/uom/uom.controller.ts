@@ -63,12 +63,14 @@ export class UomController {
   async findAllConversions(
     @Query('itemId') itemId: string,
     @Query('companyId') companyId: string,
+    @Query('fromUom') fromUom: string,
+    @Query('toUom') toUom: string,
     @Query('limit') limit: number,
     @Query('offset') offset: number,
     @Req() req: any
   ) {
     const tenantId = req.user?.tenantId || req['tenantId'];
-    const result = await this.uomService.findAllConversions({ itemId, companyId, limit, offset }, tenantId);
+    const result = await this.uomService.findAllConversions({ itemId, companyId, fromUom, toUom, limit, offset }, tenantId);
     return {
       success: true,
       message: 'UOM conversion factors retrieved successfully.',

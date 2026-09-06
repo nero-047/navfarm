@@ -425,7 +425,7 @@ export class UomService {
     return conv;
   }
 
-  async findAllConversions(query: { itemId?: string; companyId?: string; limit?: number; offset?: number }, tenantId: string) {
+  async findAllConversions(query: { itemId?: string; companyId?: string; fromUom?: string; toUom?: string; limit?: number; offset?: number }, tenantId: string) {
     // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
     const conditions: any[] = [
       eq(schema.uomConversionMaster.tenant_id, tenantId),
@@ -440,6 +440,13 @@ export class UomService {
         )
       );
     }
+
+    // The Item Master Template says the item's conversion factor is
+    // "Auto-filled from uom_conversion_master", which needs a lookup by unit
+    // pair rather than by item — otherwise the form has to ask for a number
+    // this table already holds.
+    if (query.fromUom) conditions.push(eq(schema.uomConversionMaster.from_uom, query.fromUom.toUpperCase()));
+    if (query.toUom) conditions.push(eq(schema.uomConversionMaster.to_uom, query.toUom.toUpperCase()));
 
     const limit = query.limit || 50;
     const offset = query.offset || 0;
