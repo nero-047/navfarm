@@ -16,6 +16,15 @@ const MASTERS: Record<string, [string, string]> = {
   REASON: ['MASTER_DATA', 'REASON'], RESOURCE: ['MASTER_DATA', 'RESOURCE'], DISEASE: ['MASTER_DATA', 'DISEASE'],
   FEED_FORMULA: ['MASTER_DATA', 'FEED_FORMULA'], COST_CENTER: ['MASTER_DATA', 'COST_CENTER'],
   GL_ACCOUNT: ['MASTER_DATA', 'GL_ACCOUNT'], ANIMAL: ['PIGGERY', 'ANIMAL'],
+  // The join masters, each mapped to the permission its own create route
+  // enforces: POST /uom/conversion is MASTER_DATA/UOM/create, POST /gl-mapping
+  // is MASTER_DATA/GL_MAPPING/create, and POST /breed-lifecycle-stage is
+  // MASTER_DATA/BREED_LIFECYCLE_STAGE/create. Omitting them here is why their
+  // code preview 400'd with "Select a supported master" while the column and
+  // the series machinery were already in place.
+  UOM_CONVERSION: ['MASTER_DATA', 'UOM'],
+  GL_MAPPING: ['MASTER_DATA', 'GL_MAPPING'],
+  BREED_LIFECYCLE_STAGE: ['MASTER_DATA', 'BREED_LIFECYCLE_STAGE'],
 };
 
 export function codePreviewPermissions(master: unknown): RequiredPermission[] {
