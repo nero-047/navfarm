@@ -40,7 +40,7 @@ Lifecycle Stage Config, 32 KPI Parameters, 47-code Reason Master, Dimensions/Cos
 
 | Master | Rows | Evidence | Gap |
 |---|---:|---|---|
-| **Number Series** | 25 | §1 map "No Series" | No prefix table, no per-document sequences, no reset rules anywhere in the BBP. What is built was specified by Rishi, not the blueprint. |
+| **Number Series** | 25 | §1 map "No Series" | No prefix table, no per-document sequences, no reset rules anywhere in the BBP. The only concrete format it gives is the animal code, and that conflicts with the client template (see §2 #10). The instruction to give every master a prefix-plus-sequence came from Rishi; the individual prefixes came variously from the client templates and from configuration decisions made during development. Worth confirming the prefix list with the client rather than treating it as settled. |
 | **Units of Measure** | 10 | §1 map "UOM"; client template `Unit Of Measure.xlsx` | No UOM master spec, no conversion rules. §1.3 asks for "duel UOM" on data entry without defining it. Base UOM is a BC-owned item field per §1.5. |
 | **Suppliers** | 3 | §1 map "Vendor" | `vendor_master` appears exactly once in the whole BBP, as a table join in report R16. No field spec. |
 
