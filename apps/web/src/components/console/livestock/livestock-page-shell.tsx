@@ -93,9 +93,29 @@ export function LivestockPageShell({ activeKey, children }: { activeKey: Livesto
     );
   }
 
+  // The header names the section the user actually opened. It used to be
+  // pinned to the register's title, so /livestock/breeding, /facility and
+  // /analytics all announced themselves as the animal register while rendering
+  // something else — clicking "Herd Analytics & Parity" and landing on a page
+  // headed "Animal Register" reads as a broken link. Titles come from the same
+  // labelKeys the sidebar renders, so a tab and its header cannot drift.
+  const sectionLabelKey =
+    LIVESTOCK_SECTIONS.find((section) => section.key === activeKey)?.labelKey ?? "navLivestockRegister";
+
+  // Only the register has a description of its own. The other three sections
+  // already carry their subtitle inside their own panel, so they render the
+  // title alone rather than borrowing the register's copy.
+  const isRegister = activeKey === "register";
+  const isDairy = activeLob === "DAIRY";
+
   return (
     <ConsolePage>
-      <PageHeader title={t("pigAnimalRegisterTitle")} description={t("pigAnimalRegisterDesc")} />
+      <PageHeader
+        title={isRegister ? (isDairy ? t("dairyCowRegister") : t("pigSwineRegister")) : t(sectionLabelKey)}
+        description={
+          isRegister ? (isDairy ? t("dairyCowHerdRegisterDesc") : t("pigAnimalRegisterDesc")) : undefined
+        }
+      />
       {children}
     </ConsolePage>
   );
