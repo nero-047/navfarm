@@ -47,6 +47,8 @@ export interface MasterDataField {
   entityValueKey?: string;
   /** Fields on the related record to join (" — ") for the option label */
   entityLabelKeys?: string[];
+  /** Select multiple related values with checkboxes (submitted as an array). */
+  multiple?: boolean;
   /**
    * For type "select-entity": key(s) of other field(s) in this form whose value this dropdown
    * depends on (e.g. lob_id depending on nob_id). Disabled until every parent has a value;
@@ -124,6 +126,12 @@ export interface MasterDataConfig {
   apiBase: string;
   idKey: string;
   fields: MasterDataField[];
+  /** Frontend-only BC references. Never part of creation/edit payloads. */
+  bcFields?: { key: string; label: string }[];
+  /** BC owns this catalog; local users may browse but cannot mutate it. */
+  owner?: "BC";
+  /** BBP business administrator mapped to Tenant/Company Admin by the user. */
+  businessAdminOnly?: boolean;
   /** Table columns; defaults to all non-hidden fields plus status if omitted */
   columns?: { key: string; label: string }[];
   group: string;

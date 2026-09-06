@@ -123,12 +123,14 @@ export class AnimalService {
    * tenant-wide ANIMAL series and finally to ANIMAL_PIGGERY so existing
    * piggery tenants keep their numbering unchanged.
    */
-  private async generateAnimalCode(lobId: string, tenantId: string, companyId: string): Promise<string> {
+  private async generateAnimalCode(lobId: string, tenantId: string, companyId: string, manualCode?: string): Promise<string> {
     const [lob] = await this.db
       .select({ lob_code: schema.lobMaster.lob_code })
       .from(schema.lobMaster)
       .where(eq(schema.lobMaster.lob_id, lobId))
       .limit(1);
+
+    if (manualCode) return this.numberSeriesService.manualCode('ANIMAL', manualCode, tenantId, companyId, lob?.lob_code?.toUpperCase());
 
     const candidates = [
       lob?.lob_code ? `ANIMAL_${lob.lob_code.toUpperCase()}` : null,
@@ -253,7 +255,7 @@ export class AnimalService {
     }
 
     const animalId = randomUUID();
-    const animalCode = await this.generateAnimalCode(lobId, tenantId, dto.company_id);
+    const animalCode = await this.generateAnimalCode(lobId, tenantId, dto.company_id, dto.animal_code);
     const totalOpeningAssetValue = dto.acquisition_cost + (dto.landing_cost || 0);
 
     const newAnimal = {
@@ -755,7 +757,7 @@ export class AnimalService {
     const destCode = destStage.stage_code?.toUpperCase();
     if (
       animal.gender === 'F' &&
-      (destCode === 'WEANING' || destCode === 'DRY_SOW_GESTATION' || destCode === 'FLUSH_SERVICE') &&
+      ['WEANING', 'DRY_SOW_GESTATION', 'FLUSH_SERVICE', 'DRY_PERIOD', 'GESTATION', 'FLUSH'].includes(destCode || '') &&
       currentStage?.stage_code?.toUpperCase()?.includes('FARROW')
     ) {
       newParity += 1;
@@ -798,4 +800,3 @@ export class AnimalService {
     return this.findOne(id);
   }
 }
-

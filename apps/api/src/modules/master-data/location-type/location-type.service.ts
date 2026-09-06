@@ -7,13 +7,14 @@ import { randomUUID } from 'node:crypto';
 import * as schema from '../../../core/database/schema';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { CreateLocationTypeDto, QueryLocationTypeDto, UpdateLocationTypeDto } from './dto/location-type.dto';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const mysqlTimestamp = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 const seriesCodeFor = (typeCode: string) => `LOCATION_${typeCode}`;
 
 @Injectable()
 export class LocationTypeService {
-  constructor(private readonly cls: ClsService, private readonly auditService: AuditLogService) {}
+  constructor(private readonly cls: ClsService, private readonly auditService: AuditLogService, private readonly numberSeriesService: NumberSeriesService) {}
 
   private get db(): MySql2Database<typeof schema> {
     const db = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
@@ -51,8 +52,8 @@ export class LocationTypeService {
   }
 
   async create(dto: CreateLocationTypeDto, tenantId: string, user?: any) {
-    const typeCode = dto.type_code.toUpperCase();
     const companyId = dto.company_id || null;
+    const typeCode = await this.numberSeriesService.resolveNewCode('LOCATION_TYPE', dto.type_code, tenantId, companyId);
     const [duplicate] = await this.db.select().from(schema.locationTypeMaster).where(and(
       eq(schema.locationTypeMaster.tenant_id, tenantId),
       eq(schema.locationTypeMaster.type_code, typeCode),
@@ -92,7 +93,7 @@ export class LocationTypeService {
         series_id: randomUUID(), tenant_id: tenantId, company_id: companyId,
         series_code: seriesCodeFor(typeCode), series_name: `${dto.type_name} Location`,
         document_type: 'LOCATION', prefix, separator: '-',
-        seq_length: 3, current_seq: currentSeq, reset_frequency: 'NEVER', allow_manual: false,
+        seq_length: 3, current_seq: currentSeq, reset_frequency: 'NEVER', allow_manual: true,
       });
     });
     await this.auditService.log({ tenantId, companyId: companyId || undefined, userId: user?.userId, action: 'CREATE', entityName: 'location_type_master', entityId: row.location_type_id, newValues: row });

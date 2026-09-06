@@ -47,6 +47,12 @@ describe('MedicineService', () => {
     expect(service).toBeDefined();
   });
 
+  it('reads withdrawal from the scoped Item, never a legacy profile zero', async () => {
+    mockDbSelect.mockReturnValueOnce({ from: () => ({ where: () => ({ limit: async () => [{ medicine_id: 'med', tenant_id: 'tenant', company_id: 'company', item_id: 'item', withdrawal_period_days: 0 }] }) }) });
+    mockDbSelect.mockReturnValueOnce({ from: () => ({ where: () => ({ limit: async () => [{ withdrawal_days: null }] }) }) });
+    expect((await service.findOne('med')).bc_withdrawal_days).toBeNull();
+  });
+
   describe('create', () => {
     it('should throw NotFoundException if company does not exist', async () => {
       mockDbSelect.mockReturnValue({
@@ -168,7 +174,7 @@ describe('MedicineService', () => {
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue([{ medicine_id: 'med-1', composition: 'Amoxicillin 10%' }]),
+              limit: jest.fn().mockResolvedValue([{ medicine_id: 'med-1', tenant_id: 'tenant-123', company_id: 'comp-1', item_id: 'item-1', composition: 'Amoxicillin 10%' }]),
             }),
           }),
         });
@@ -176,6 +182,8 @@ describe('MedicineService', () => {
       mockDbInsert.mockReturnValue({
         values: jest.fn().mockResolvedValue({}),
       });
+
+      mockDbSelect.mockReturnValueOnce({ from: () => ({ where: () => ({ limit: async () => [{ withdrawal_days: null }] }) }) });
 
       const result = await service.create(
         {

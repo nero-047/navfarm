@@ -53,7 +53,13 @@ export function MasterDataPageShell({ activeKey }: { activeKey: string }) {
   const router = useRouter();
   const { t, tLabel } = useLanguage();
   const { ready, user, mayView, scopeKey } = useMasterDataPageState();
-  const activeConfig: MasterDataConfig = getConfig(activeKey) || MASTER_DATA_CONFIGS.find((c) => c.isPrimary)!;
+  // Old bookmarks must not reopen independent Farm/Shed/Warehouse creation.
+  // Their persistence remains for historical operational references.
+  const legacyLocation = ["farm", "shed", "warehouse"].includes(activeKey);
+  const activeConfig: MasterDataConfig = getConfig(legacyLocation ? "location" : activeKey) || MASTER_DATA_CONFIGS.find((c) => c.isPrimary)!;
+  useEffect(() => {
+    if (legacyLocation) router.replace("/master-data/location");
+  }, [legacyLocation, router]);
   const parentConfig = (activeConfig.tabOf && getConfig(activeConfig.tabOf)) || activeConfig;
   const tabConfigs = MASTER_DATA_CONFIGS.filter((c) => c.tabOf === parentConfig.key);
   const parentKey = parentConfig.key;

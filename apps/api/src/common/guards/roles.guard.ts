@@ -7,6 +7,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../core/database/schema';
 import { REQUIRE_PERMISSION_KEY, RequiredPermission } from '../decorators/require-permission.decorator';
+import { CODE_PREVIEW_PERMISSION_KEY, codePreviewPermissions } from '../decorators/require-code-preview-permission.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -44,7 +45,10 @@ export class RolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    if (!requiredPermission) {
+    const previewPermission = this.reflector.getAllAndOverride<boolean>(CODE_PREVIEW_PERMISSION_KEY, [context.getHandler(), context.getClass()]);
+    const requiredPermissions = previewPermission ? codePreviewPermissions(request.query?.master) : requiredPermission ? [requiredPermission] : [];
+
+    if (!requiredPermissions.length) {
       return true;
     }
 
@@ -76,7 +80,7 @@ export class RolesGuard implements CanActivate {
         )
       );
 
-    const hasMatch = userPermissions.some((perm) => {
+    const hasMatch = requiredPermissions.some((requiredPermission) => userPermissions.some((perm) => {
       const matchesModule = perm.moduleCode === 'ALL' || perm.moduleCode === requiredPermission.moduleCode;
       const matchesResource = perm.resource === 'ALL' || perm.resource === requiredPermission.resource;
 
@@ -94,7 +98,7 @@ export class RolesGuard implements CanActivate {
         case 'print': return perm.canPrint;
         default: return false;
       }
-    });
+    }));
 
     if (!hasMatch) {
       throw new ForbiddenException('Insufficient permissions to execute this request.');

@@ -66,6 +66,7 @@ describe('ItemService', () => {
           provide: NumberSeriesService,
           useValue: {
             generateNext: mockGenerateNext,
+            resolveSeriesFor: jest.fn().mockResolvedValue('ITEM'),
           },
         },
         { provide: NobLobResolutionService, useValue: nobLobResolution },

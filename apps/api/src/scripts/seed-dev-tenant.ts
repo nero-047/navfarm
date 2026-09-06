@@ -345,6 +345,7 @@ export async function seedDevTenant() {
           seq_length: series.seq_length,
           current_seq: 0,
           reset_frequency: series.reset_frequency,
+          allow_manual: series.allow_manual ?? false,
         });
       }
 

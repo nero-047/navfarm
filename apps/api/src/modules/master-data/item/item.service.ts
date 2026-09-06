@@ -72,7 +72,7 @@ export class ItemService {
       series_code: 'ITEM', series_name: template.series_name, document_type: template.document_type,
       prefix: template.prefix, date_format: template.date_format, separator: template.separator,
       seq_length: template.seq_length, current_seq: currentSeq,
-      reset_frequency: template.reset_frequency, allow_manual: false,
+      reset_frequency: template.reset_frequency, allow_manual: true,
     }).onDuplicateKeyUpdate({ set: { series_name: template.series_name } });
   }
 
@@ -81,7 +81,8 @@ export class ItemService {
    * scope guard (master-data-scope.ts walks declared FKs) cannot check it and
    * any string would otherwise be accepted. Resolved the same way
    * LocationService.resolveLocationType resolves location_type: an active,
-   * undeleted type either owned by this company or shared tenant-wide.
+   * undeleted type owned by this exact scope. Tenant rows are draft templates,
+   * not shared live records for companies.
    * Matched exactly, never upper-cased — the stored value is what
    * assertWithdrawalDays() compares against 'MEDICINE'/'VACCINE'.
    */
@@ -95,7 +96,7 @@ export class ItemService {
         eq(schema.itemTypeMaster.is_active, true),
         isNull(schema.itemTypeMaster.deleted_at),
         companyId
-          ? or(eq(schema.itemTypeMaster.company_id, companyId), isNull(schema.itemTypeMaster.company_id))!
+          ? eq(schema.itemTypeMaster.company_id, companyId)
           : isNull(schema.itemTypeMaster.company_id),
       ))
       .limit(1);
@@ -175,9 +176,10 @@ export class ItemService {
 
     // 4. One company-wide ITEM sequence is shared by all Item Types.
     await this.ensureCompanyItemSeries(tenantId, companyId);
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('ITEM', dto.item_type, tenantId, companyId) || 'ITEM';
     const itemCode = dto.item_code?.trim()
-      ? await this.numberSeriesService.manualCode('ITEM', dto.item_code, tenantId, companyId)
-      : await this.numberSeriesService.generateNext('ITEM', tenantId, companyId);
+      ? await this.numberSeriesService.manualCode('ITEM', dto.item_code, tenantId, companyId, dto.item_type)
+      : await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
 
     const itemId = randomUUID();
     const newItem = {

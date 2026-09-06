@@ -13,7 +13,7 @@ export const MASTER_TABLES: Record<string, AnyMySqlTable> = {
   'item-attribute': schema.itemAttributeMaster, uom: schema.uomMaster,
   'uom/conversion': schema.uomConversionMaster, species: schema.speciesMaster,
   breed: schema.breedMaster, 'breed-lifecycle-stage': schema.breedLifecycleStages,
-  disease: schema.diseaseMaster, medicine: schema.medicineMaster, 'feed-formula': schema.feedFormulaMaster,
+  reason: schema.reasonMaster, disease: schema.diseaseMaster, medicine: schema.medicineMaster, 'feed-formula': schema.feedFormulaMaster,
   supplier: schema.supplierMaster, customer: schema.customerMaster, resource: schema.resourceMaster,
   'gl-account': schema.glAccountMaster, 'gl-mapping': schema.glMappingMaster, 'cost-center': schema.costCenterMaster,
 };

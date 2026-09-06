@@ -77,7 +77,7 @@ export class LocationService {
         series_id: randomUUID(), tenant_id: tenantId, company_id: companyId,
         series_code: seriesCode, series_name: `${type.type_name} Location`,
         document_type: 'LOCATION', prefix: type.code_prefix, separator: '-',
-        seq_length: 3, current_seq: currentSeq, reset_frequency: 'NEVER', allow_manual: false,
+        seq_length: 3, current_seq: currentSeq, reset_frequency: 'NEVER', allow_manual: true,
       });
     }
     return seriesCode;
@@ -497,6 +497,9 @@ export class LocationService {
     }
     if (query.locationType) {
       conditions.push(eq(schema.locationMaster.location_type, query.locationType));
+    }
+    if (query.rootOnly) {
+      conditions.push(isNull(schema.locationMaster.parent_location_id));
     }
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.locationMaster.is_active, query.isActive));

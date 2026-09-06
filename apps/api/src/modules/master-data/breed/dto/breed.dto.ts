@@ -8,9 +8,10 @@ import { Type } from 'class-transformer';
 
 export class CreateSpeciesDto {
   @ApiProperty({ description: 'Unique code representing the species', example: 'CHICKEN' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  species_code: string;
+  species_code?: string;
 
   @ApiProperty({ description: 'Full name of the species', example: 'Chicken' })
   @IsString()

@@ -78,7 +78,8 @@ export class MedicineService {
       item_id: dto.item_id,
       composition: dto.composition || null,
       dosage_guideline: dto.dosage_guideline || null,
-      withdrawal_period_days: dto.withdrawal_period_days ?? 0,
+      // Withdrawal is owned by the linked BC Item; no local duplicate value.
+      withdrawal_period_days: null,
       route_of_administration: dto.route_of_administration || null,
       is_active: true,
       status: 'ACTIVE',
@@ -113,7 +114,11 @@ export class MedicineService {
       throw new NotFoundException(`Medicine with ID '${id}' not found.`);
     }
 
-    return medicine;
+    const [item] = await this.db.select({ withdrawal_days: schema.itemMaster.withdrawal_days }).from(schema.itemMaster).where(and(
+      eq(schema.itemMaster.item_id, medicine.item_id), eq(schema.itemMaster.tenant_id, medicine.tenant_id),
+      companyCondition(schema.itemMaster.company_id, medicine.company_id),
+    )).limit(1);
+    return { ...medicine, bc_withdrawal_days: item?.withdrawal_days ?? null };
   }
 
   async findAll(query: QueryMedicineDto, tenantId: string) {
@@ -192,7 +197,6 @@ export class MedicineService {
     if (dto.item_id !== undefined) updates.item_id = dto.item_id;
     if (dto.composition !== undefined) updates.composition = dto.composition;
     if (dto.dosage_guideline !== undefined) updates.dosage_guideline = dto.dosage_guideline;
-    if (dto.withdrawal_period_days !== undefined) updates.withdrawal_period_days = dto.withdrawal_period_days;
     if (dto.route_of_administration !== undefined) updates.route_of_administration = dto.route_of_administration;
     if (dto.is_active !== undefined) updates.is_active = dto.is_active;
     if (dto.status !== undefined) updates.status = dto.status;

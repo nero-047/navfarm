@@ -81,7 +81,7 @@ export interface ConsoleSessionOptions {
    * the companies directory, and so the Add Company action — which a company
    * admin never sees.
    */
-  userType?: 'COMPANY_ADMIN' | 'TENANT_ADMIN';
+  userType?: 'COMPANY_ADMIN' | 'TENANT_ADMIN' | 'SYSTEM_ADMIN' | 'OPERATIONAL_ADMIN';
   /**
    * Extra route stubs, registered after the built-in ones so they win:
    * Playwright dispatches to the most-recently-registered matching handler

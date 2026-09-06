@@ -23,12 +23,6 @@ export class CreateMedicineDto {
   @IsOptional()
   dosage_guideline?: string;
 
-  @ApiProperty({ description: 'Withdrawal period in days before slaughter/harvest', required: false, default: 0 })
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  withdrawal_period_days?: number;
-
   @ApiProperty({ description: 'Route of drug administration', required: false, example: 'ORAL', enum: ['ORAL', 'INJECTION', 'WATER', 'TOPICAL'] })
   @IsString()
   @IsOptional()
@@ -54,12 +48,6 @@ export class UpdateMedicineDto {
   @IsString()
   @IsOptional()
   dosage_guideline?: string;
-
-  @ApiProperty({ required: false })
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  withdrawal_period_days?: number;
 
   @ApiProperty({ required: false })
   @IsString()

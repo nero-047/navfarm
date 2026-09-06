@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsInt, Min, IsNumber } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateLocationDto {
   @ApiProperty({ description: 'Company UUID scope', required: false })
@@ -299,6 +299,12 @@ export class QueryLocationDto {
   @IsOptional()
   @IsString()
   locationType?: string;
+
+  @ApiProperty({ description: 'Only locations without a parent', required: false })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' ? true : value === 'false' ? false : value)
+  @IsBoolean()
+  rootOnly?: boolean;
 
   @ApiProperty({ description: 'Filter by active status', required: false })
   @IsOptional()

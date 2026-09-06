@@ -35,6 +35,7 @@ import { SupplierModule } from './modules/master-data/supplier/supplier.module';
 import { CustomerModule } from './modules/master-data/customer/customer.module';
 import { ResourceModule } from './modules/master-data/resource/resource.module';
 import { DiseaseModule } from './modules/master-data/disease/disease.module';
+import { ReasonModule } from './modules/master-data/reason/reason.module';
 import { MedicineModule } from './modules/master-data/medicine/medicine.module';
 import { FeedFormulaModule } from './modules/master-data/feed-formula/feed-formula.module';
 import { GlAccountModule } from './modules/finance/gl-account/gl-account.module';
@@ -116,6 +117,7 @@ import { SystemController } from './system/system.controller';
     CustomerModule,
     ResourceModule,
     DiseaseModule,
+    ReasonModule,
     MedicineModule,
     FeedFormulaModule,
     GlAccountModule,

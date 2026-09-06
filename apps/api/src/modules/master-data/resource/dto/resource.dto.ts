@@ -28,7 +28,7 @@ export class CreateResourceDto {
   @IsNotEmpty()
   resource_name: string;
 
-  @ApiProperty({ description: 'Resource category', example: 'LABOR', enum: ['LABOR', 'EQUIPMENT', 'VEHICLE'] })
+  @ApiProperty({ description: 'Resource category; LABOR remains a legacy alias', example: 'MANPOWER', enum: ['MANPOWER', 'EQUIPMENT', 'VEHICLE', 'UTILITY', 'OTHER', 'LABOR'] })
   @IsString()
   @IsNotEmpty()
   resource_type: string;

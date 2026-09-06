@@ -21,9 +21,10 @@ export class CreateItemAttributeDto {
   lob_id?: string;
 
   @ApiProperty({ description: 'Unique short code for this attribute', example: 'PROTEIN_PCT' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  attribute_code: string;
+  attribute_code?: string;
 
   @ApiProperty({ description: 'Display name shown on the item form', example: 'Protein %' })
   @IsString()

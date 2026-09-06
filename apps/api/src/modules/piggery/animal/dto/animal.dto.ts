@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsIn, IsInt, Min, IsNumber, IsDateString, IsArray, ArrayNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsIn, IsInt, Min, IsNumber, IsDateString, IsArray, ArrayNotEmpty, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -25,6 +25,13 @@ const STATUSES = ['ACTIVE', 'QUARANTINE', 'SICK', 'PREGNANT', 'LACTATING', 'DRY'
 export const DISPOSAL_TYPES = ['SOLD', 'SLAUGHTERED', 'DIED', 'TRANSFERRED'] as const;
 
 export class CreateAnimalDto {
+  @ApiProperty({ description: 'Optional manual code; omit to allocate from the configured animal series', required: false })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
+  animal_code?: string;
+
   @ApiProperty({ description: 'Company UUID scope' })
   @IsUUID()
   @IsNotEmpty()
@@ -434,4 +441,3 @@ export class BulkTransitionAnimalStageDto extends TransitionAnimalStageDto {
   @IsUUID('4', { each: true })
   animal_ids: string[];
 }
-

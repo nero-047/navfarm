@@ -12,6 +12,7 @@ import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { ChangePlanDto } from './dto/change-plan.dto';
 import { ConfigService } from '@nestjs/config';
+import { DOCUMENTED_REASONS } from '../../../core/database/reason-code-seed';
 
 @Injectable()
 export class TenantService {
@@ -215,7 +216,7 @@ export class TenantService {
         });
       }
 
-      // The 11 seeded LVS_PIGGERY production stages (see SYSTEM_STAGE_SEED — piggery-only,
+      // The eight BBP LVS_PIGGERY production stages (see SYSTEM_STAGE_SEED — piggery-only,
       // other LOBs get theirs via the normal Stage CRUD API once documented). Two passes,
       // not one: next_stage_id/alt_next_stage_id are FKs MySQL checks per-statement (no
       // deferred constraint checking like Postgres), and BOAR_AI even points at itself —
@@ -224,6 +225,9 @@ export class TenantService {
       const pigLobId = lobIdByCode.get('LVS_PIGGERY');
       const pigNobId = nobIdByCode.get('LIVESTOCK');
       if (pigLobId && pigNobId) {
+        for (const reason of DOCUMENTED_REASONS) {
+          await tenantDb.insert(schema.reasonMaster).values({ ...reason, reason_id: randomUUID(), tenant_id: tenantId, company_id: null });
+        }
         const stageIdByCode = new Map(SYSTEM_STAGE_SEED.map((s) => [s.stage_code, randomUUID()]));
 
         for (const stage of SYSTEM_STAGE_SEED) {
@@ -285,6 +289,7 @@ export class TenantService {
           seq_length: series.seq_length,
           current_seq: 0,
           reset_frequency: series.reset_frequency,
+          allow_manual: series.allow_manual ?? false,
         });
       }
 

@@ -417,7 +417,7 @@ describe('AnimalService', () => {
       expect(res.current_location_id).toBe('loc-2');
     });
 
-    it('increments parity_count when a sow moves from farrowing to weaning', async () => {
+    it.each(['WEANING', 'DRY_PERIOD', 'GESTATION', 'FLUSH'])('preserves the post-farrowing parity rule for %s', async (destination) => {
       let captured: any = null;
       mockDbSelect
         .mockReturnValueOnce(found({
@@ -433,7 +433,7 @@ describe('AnimalService', () => {
         })) // findOne — no current_stage: animal_register has no such column
         .mockReturnValueOnce(found({
           stage_id: 'st-wean',
-          stage_code: 'WEANING',
+          stage_code: destination,
           stage_name: 'Weaning',
         })) // destStage
         .mockReturnValueOnce(found({
@@ -516,6 +516,5 @@ describe('AnimalService', () => {
     });
   });
 });
-
 
 

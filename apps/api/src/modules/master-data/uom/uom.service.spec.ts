@@ -61,6 +61,13 @@ describe('UomService', () => {
     expect(service).toBeDefined();
   });
 
+  it('rechecks base uniqueness when an existing base changes type', async () => {
+    jest.spyOn(service, 'findOne').mockResolvedValue({ uom_id: 'id', tenant_id: 'tenant', company_id: null, uom_code: 'KG', uom_type: 'WEIGHT', is_base_uom: true } as any);
+    mockDbSelect.mockReturnValue({ from: () => ({ where: () => ({ limit: async () => [{ uom_code: 'LITER' }] }) }) });
+    await expect(service.update('id', { uom_type: 'VOLUME' }, 'tenant')).rejects.toThrow('A base UOM');
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
   describe('create', () => {
     it('should throw ConflictException if UOM code already exists', async () => {
       mockDbSelect.mockReturnValue({
@@ -211,4 +218,3 @@ describe('UomService', () => {
     });
   });
 });
-

@@ -215,7 +215,7 @@ export class UomService {
     }
 
     // Handle is_base_uom rule: only one base UOM per type
-    if (dto.is_base_uom && !uom.is_base_uom) {
+    if ((dto.is_base_uom ?? uom.is_base_uom) && (!uom.is_base_uom || (dto.uom_type !== undefined && dto.uom_type !== uom.uom_type))) {
       const baseConditions = [
         eq(schema.uomMaster.tenant_id, tenantId),
         eq(schema.uomMaster.uom_type, dto.uom_type || uom.uom_type),

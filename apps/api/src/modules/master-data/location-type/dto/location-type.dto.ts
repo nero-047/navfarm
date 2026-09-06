@@ -14,10 +14,11 @@ export class CreateLocationTypeDto {
   company_id?: string;
 
   @ApiProperty({ example: 'FARM' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[A-Za-z][A-Za-z0-9_]*$/)
-  type_code: string;
+  @Matches(/^[A-Za-z][A-Za-z0-9_-]*$/)
+  type_code?: string;
 
   @ApiProperty({ example: 'Farm' })
   @IsString()

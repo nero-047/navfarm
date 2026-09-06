@@ -27,7 +27,7 @@ function LookupEntitySelect({ field, value, onChange }: {
     if (companyId) params.set("companyId", companyId);
     setLoading(true);
     setError("");
-    api.get(`${field.entityEndpoint}?${params}`).then((res: any) => {
+    api.get(`${field.entityEndpoint}${field.entityEndpoint?.includes("?") ? "&" : "?"}${params}`).then((res: any) => {
       if (!cancelled) setOptions(Array.isArray(res) ? res : res?.data || []);
     }).catch((err: Error) => {
       if (!cancelled) setError(err.message || "Could not load options");
@@ -67,18 +67,20 @@ export function LookupCard({
 
   // Include every required creation field: recipes need item/UOM selectors
   // and ingredients as well as their code and name.
-  const numbering = useCodeSeries(config.key, form);
+  const numbering = useCodeSeries(config.key, form, config.owner !== "BC");
   const fields = config.fields.filter((f) => f.required || f.showInLookup).map(numbering.field).filter(
-    (f) => !f.hideInForm && !f.readOnly && !f.editOnly && !f.filterOnly && !(getActiveWorkspaceScope() === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)),
+    (f) => !f.hideInForm && !f.editOnly && !f.filterOnly && !(getActiveWorkspaceScope() === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)),
   );
 
   const add = async () => {
+    if (config.owner === "BC") return;
     setBusy(true);
     setError("");
     try {
       const cid = getActiveWorkspaceScope() === "TENANT" ? null : getActiveCompanyId();
       const body: Row = {};
       for (const field of fields) {
+        if (field.readOnly) continue;
         const value = form[field.key];
         if (value === undefined || value === "") continue;
         if (field.type === "json") {
@@ -92,6 +94,7 @@ export function LookupCard({
       if (cid && config.fields.some((f) => f.key === "company_id")) body.company_id = cid;
       await api.post(config.apiBase, body);
       setForm({});
+      numbering.refresh();
       onCreated();
     } catch (e: any) {
       setError(e?.message || "Could not add");
@@ -101,6 +104,11 @@ export function LookupCard({
   };
 
   const complete = fields.filter((f) => f.required).every((f) => String(form[f.key] ?? "").trim() !== "");
+
+  if (config.owner === "BC") return <div className="grid gap-3">
+    <p className="text-sm">BC-owned catalog. Create or change records in Business Central; integration is not connected yet.</p>
+    <button type="button" onClick={onManage} className="text-left text-xs underline">View {config.label}</button>
+  </div>;
 
   return (
     <div className="grid gap-3">
@@ -136,7 +144,8 @@ export function LookupCard({
                 aria-label={f.label}
                 type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "email" ? "email" : "text"}
                 step={f.step}
-                value={String(form[f.key] ?? "")}
+                value={String(numbering.value(f.key, form[f.key] ?? ""))}
+                readOnly={f.readOnly}
                 placeholder={f.placeholder}
                 onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
               />

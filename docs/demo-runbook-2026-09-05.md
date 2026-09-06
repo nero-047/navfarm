@@ -139,8 +139,10 @@ verified at 375px and 1440px.*
 - **Procurement and Sales.** They do not exist — no purchase order, GRN, sales order or invoice. The
   honest answer is that they are a separate programme, not a missing screen.
 - **Reports.** No browsing surface; financial reports are endpoints only.
-- **D365 Business Central.** No integration. Every master now carries a place for an external ERP
-  reference, so connecting it later is a mapping exercise — that is a strength, say it that way.
+- **D365 Business Central.** No integration. Do not claim that every master has a persisted ERP
+  reference or that integration is only a mapping exercise. The September 6 review found that
+  claim unsupported by the code. Frontend-only BC references are being added to read-only
+  record views; they are not evidence of synchronization. See `masters-review-2026-09-06.md`.
 - **The other fifteen lines of business.** Taxonomy only, by decision.
 - **Daily data entry, posting and correction.** Designed and specced, not built.
 - **The Preseed button** (company-admin only, so you should not see it as tenant admin). It clones

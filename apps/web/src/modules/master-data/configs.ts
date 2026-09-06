@@ -81,7 +81,7 @@ const locationType: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "type_code", label: "Type Code", type: "text", required: true, placeholder: "FARM" },
+    { key: "type_code", label: "Type Code", type: "text", required: true, placeholder: "FARM", createOnly: true },
     { key: "type_name", label: "Type Name", type: "text", required: true, placeholder: "Farm" },
     { key: "code_prefix", label: "Code Prefix", type: "text", required: true, placeholder: "FARM", helpText: "Future locations use PREFIX-001, PREFIX-002, and so on." },
     { key: "allowed_parent_types", label: "Allowed Parent Types", type: "text", showInLookup: true, placeholder: "FARM,SHED", helpText: "Comma-separated type codes. Leave blank for a root type." },
@@ -244,6 +244,11 @@ const numberSeries: MasterDataConfig = {
 // ── Piggery ──────────────────────────────────────────────────────────────────
 
 const animal: MasterDataConfig = {
+  bcFields: [
+    { key: "bc_fixed_asset_no", label: "Fixed Asset No." },
+    { key: "bc_converted_to_inventory_date", label: "Converted to Inventory Date" },
+    { key: "bc_bio_asset_value", label: "Bio Asset Value (Non-current Asset)" },
+  ],
   key: "animal",
   label: "Animal Register",
   description: "Individual animal lifetime identity — lineage, entry, cost, current stage/location. Never physically deleted; use Dispose to record sale/slaughter/death.",
@@ -259,7 +264,7 @@ const animal: MasterDataConfig = {
     { key: "status", label: "Status" },
   ],
   fields: [
-    { key: "animal_code", label: "Animal Code", type: "text", readOnly: true, helpText: "Auto-generated from No. Series ANIMAL_PIGGERY. Format: PIG-YYYY-SEQ.", section: "Identification" },
+    { key: "animal_code", label: "Animal Code", type: "text", required: true, createOnly: true, section: "Identification" },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], section: "Identification" },
     { key: "lob_id", label: "Line of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", section: "Identification" },
@@ -478,6 +483,19 @@ const itemAttribute: MasterDataConfig = {
 
 const item: MasterDataConfig = {
   key: "item",
+  owner: "BC",
+  bcFields: [
+    { key: "item_code", label: "Item No." },
+    { key: "item_name", label: "Description" },
+    { key: "uom_primary", label: "Base Unit of Measure" },
+    { key: "item_type", label: "Item Type" },
+    { key: "bc_lot_nos", label: "Lot Nos." },
+    { key: "withdrawal_days", label: "Withdrawal Days" },
+    { key: "bc_inventory_posting_group", label: "Inventory Posting Group" },
+    { key: "bc_gen_prod_posting_group", label: "General Product Posting Group" },
+    { key: "inventory_gl_account", label: "Inventory GL Account" },
+    { key: "bc_consumption_gl_account", label: "Consumption GL Account" },
+  ],
   label: "Items",
   description: "Inventory item master — raw materials, finished goods, assets.",
   apiBase: "/item",
@@ -593,12 +611,12 @@ const breed: MasterDataConfig = {
     { key: "avg_fcr", label: "Avg FCR" },
   ],
   fields: [
-    { key: "location_id", label: "Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], section: "Identification", helpText: "Generated breed codes include this location's code. Leave blank to enter a manual code." },
+    { key: "location_id", label: "Farm Location (optional)", type: "select-entity", entityEndpoint: "/location?locationType=FARM&rootOnly=true", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], section: "Identification", helpText: "Only active, first-level farms without a parent. When selected, the farm code prefixes the generated breed code." },
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], section: "Identification" },
     { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this breed applies to all LOBs under the selected NOB.", section: "Identification" },
     { key: "breed_code", label: "Breed Code", type: "text", required: true, placeholder: "COBB500", section: "Identification" },
-    { key: "breed_name", label: "Breed Name", type: "text", required: true, placeholder: "Cobb 500 Broiler", section: "Identification" },
+    { key: "breed_name", label: "Breed Name", type: "text", required: true, placeholder: "Yorkshire", section: "Identification" },
     { key: "species_id", label: "Species", type: "select-entity", required: true, entityEndpoint: "/species", entityValueKey: "species_id", entityLabelKeys: ["species_code", "species_name"], section: "Identification" },
     {
       key: "breed_type", label: "Breed Type", type: "select", required: true, section: "Identification",
@@ -685,6 +703,21 @@ const breedLifecycleStage: MasterDataConfig = {
   ],
 };
 
+const reason: MasterDataConfig = {
+  key: "reason", label: "Reasons", singular: "Reason", apiBase: "/reason", idKey: "reason_id",
+  group: "Livestock & Health", isPrimary: true, businessAdminOnly: true,
+  description: "Shared company reasons for mortality, culling, returns, selection, disposal and transfers. Only documented examples are loaded; Tenant and Company Admins maintain this catalog.",
+  columns: [{ key: "reason_code", label: "Code" }, { key: "reason_name", label: "Name" }, { key: "category", label: "Category" }, { key: "mandatory_weight", label: "Weight Required" }],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "reason_code", label: "Reason Code", type: "text", required: true, createOnly: true },
+    { key: "reason_name", label: "Reason Name", type: "text", required: true },
+    { key: "category", label: "Category", type: "select", required: true, options: ["MORTALITY", "CULL", "RETURN", "SELECTION", "DISPOSAL", "TRANSFER"].map((value) => ({ value, label: value })) },
+    { key: "applicable_stages", label: "Applicable Stages", type: "select-entity", multiple: true, entityEndpoint: "/stage", entityValueKey: "stage_code", entityLabelKeys: ["stage_code", "stage_name"], helpText: "Select the stages where this reason is available. Leave all unchecked for all stages." },
+    { key: "mandatory_weight", label: "Weight Required", type: "boolean", helpText: "Reason requires a positive KG value when posting. Posting-screen integration is separate from this catalog." },
+  ],
+};
+
 const disease: MasterDataConfig = {
   key: "disease",
   label: "Diseases",
@@ -716,17 +749,16 @@ const medicine: MasterDataConfig = {
   idKey: "medicine_id",
   group: "Livestock & Health",
   isPrimary: true,
+  bcFields: [{ key: "bc_withdrawal_days", label: "Withdrawal Period (days)" }],
   columns: [
     { key: "composition", label: "Composition" },
     { key: "route_of_administration", label: "Route" },
-    { key: "withdrawal_period_days", label: "Withdrawal (days)" },
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "item_id", label: "Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
     { key: "composition", label: "Composition", type: "text", placeholder: "Amoxicillin 10% w/w" },
     { key: "dosage_guideline", label: "Dosage Guideline", type: "textarea" },
-    { key: "withdrawal_period_days", label: "Withdrawal Period (days)", type: "number" },
     {
       key: "route_of_administration", label: "Route of Administration", type: "select",
       options: ["ORAL", "INJECTION", "WATER", "TOPICAL"].map((v) => ({ value: v, label: v })),
@@ -868,16 +900,16 @@ const resource: MasterDataConfig = {
     { key: "resource_name", label: "Resource Name", type: "text", required: true, placeholder: "Senior Laborer", section: "Identification" },
     {
       key: "resource_type", label: "Resource Type", type: "select", required: true, section: "Identification",
-      options: ["LABOR", "EQUIPMENT", "VEHICLE"].map((v) => ({ value: v, label: v })),
+      options: ["MANPOWER", "EQUIPMENT", "VEHICLE", "UTILITY", "OTHER", "LABOR"].map((v) => ({ value: v, label: v === "LABOR" ? "LABOR (legacy manpower)" : v })),
     },
     {
       key: "resource_sub_type", label: "Sub-Type", type: "select", section: "Identification",
       options: ["PERMANENT", "CONTRACT", "DAILY", "OWNED", "LEASED", "RENTED"].map((v) => ({ value: v, label: v })),
       helpText: "PERMANENT/CONTRACT/DAILY for labor; OWNED/LEASED/RENTED for equipment or vehicles.",
     },
-    { key: "employee_id", label: "Employee ID", type: "text", placeholder: "EMP-001", helpText: "Labor/manpower only.", section: "People", visibleWhen: { anyOf: [{ key: "resource_type", equals: "LABOR" }] } },
-    { key: "designation", label: "Designation", type: "text", placeholder: "Senior Farm Worker", helpText: "Labor/manpower only.", section: "People", visibleWhen: { anyOf: [{ key: "resource_type", equals: "LABOR" }] } },
-    { key: "department", label: "Department", type: "text", placeholder: "Farm Operations", helpText: "Department or team.", section: "People", visibleWhen: { anyOf: [{ key: "resource_type", equals: "LABOR" }] } },
+    { key: "employee_id", label: "Employee ID", type: "text", placeholder: "EMP-001", helpText: "Labor/manpower only.", section: "People", visibleWhen: { anyOf: [{ key: "resource_type", equals: ["MANPOWER", "LABOR"] }] } },
+    { key: "designation", label: "Designation", type: "text", placeholder: "Senior Farm Worker", helpText: "Labor/manpower only.", section: "People", visibleWhen: { anyOf: [{ key: "resource_type", equals: ["MANPOWER", "LABOR"] }] } },
+    { key: "department", label: "Department", type: "text", placeholder: "Farm Operations", helpText: "Department or team.", section: "People", visibleWhen: { anyOf: [{ key: "resource_type", equals: ["MANPOWER", "LABOR"] }] } },
     { key: "capacity", label: "Capacity", type: "number", step: "0.01", section: "Capacity & Cost" },
     // Left unfiltered: a resource's capacity spans LABOR (HEAD), EQUIPMENT (KG,
     // LITER for a tank, BAG for a mixer) and VEHICLE (TONNE) — no single type fits.
@@ -907,6 +939,13 @@ const resource: MasterDataConfig = {
 
 const glAccount: MasterDataConfig = {
   key: "gl-account",
+  owner: "BC",
+  bcFields: [
+    { key: "account_code", label: "Account No." },
+    { key: "account_name", label: "Account Name" },
+    { key: "bc_direct_posting", label: "Direct Posting" },
+    { key: "bc_blocked", label: "Blocked in BC" },
+  ],
   label: "GL Accounts",
   description: "Chart of Accounts.",
   apiBase: "/gl-account",
@@ -1026,7 +1065,7 @@ export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   stage, numberSeries,
   animal,
   itemCategory, itemType, uom, uomConversion, item, itemAttribute,
-  species, breed, breedLifecycleStage, disease, medicine, feedFormula,
+  species, breed, breedLifecycleStage, reason, disease, medicine, feedFormula,
   supplier, customer, resource,
   glAccount, glMapping, costCenter,
 ];

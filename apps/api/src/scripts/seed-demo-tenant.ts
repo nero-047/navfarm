@@ -350,6 +350,7 @@ async function seedDemoTenant() {
           series_code: series.series_code, series_name: series.series_name, document_type: series.document_type,
           prefix: series.prefix || null, date_format: series.date_format || null, separator: series.separator,
           seq_length: series.seq_length, current_seq: 0, reset_frequency: series.reset_frequency,
+          allow_manual: series.allow_manual ?? false,
         });
       }
 

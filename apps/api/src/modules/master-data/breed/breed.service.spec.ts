@@ -21,6 +21,7 @@ describe('BreedService', () => {
   };
 
   const numberSeries = {
+    resolveNewCode: jest.fn(async (_master: string, code?: string) => code?.toUpperCase()),
     resolveSeriesFor: jest.fn(),
     generateNext: jest.fn(),
     lockSeries: jest.fn(),
@@ -259,7 +260,7 @@ describe('BreedService', () => {
       const returning = (rows: any[]) => ({ from: () => ({ where: () => Object.assign(Promise.resolve(rows), { limit: async () => rows }) }) });
       mockDbSelect
         .mockReturnValueOnce(returning([{ species_id: 'pig', species_name: 'Pig' }]))
-        .mockReturnValueOnce(returning([{ location_code: parentCode }]))
+        .mockReturnValueOnce(returning([{ location_code: parentCode, location_type: 'FARM', parent_location_id: null }]))
         .mockReturnValueOnce(returning(siblings as any[]))
         .mockReturnValueOnce(returning([]))
         .mockReturnValueOnce(returning([{ breed_code: expected }]));
@@ -270,6 +271,32 @@ describe('BreedService', () => {
       expect(result.breed_code).toBe(expected);
       expect(numberSeries.lockSeries).toHaveBeenCalledWith('BREED_SOW', 'tenant', null, mockDb);
       expect(numberSeries.generateNext).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { location_type: 'PEN', parent_location_id: 'farm' },
+      { location_type: 'FARM', parent_location_id: 'another-farm' },
+      null,
+    ])('rejects a non-root farm even with a manual breed code: %j', async (location) => {
+      const returning = (rows: any[]) => ({ from: () => ({ where: () => ({ limit: async () => rows }) }) });
+      mockDbSelect.mockReturnValueOnce(returning([{ species_id: 'pig', species_name: 'Pig' }]))
+        .mockReturnValueOnce(returning(location ? [location] : []));
+      await expect(service.createBreed({ nob_id: 'livestock', breed_name: 'Yorkshire', species_id: 'pig', breed_type: 'SOW', location_id: 'location', breed_code: 'CUSTOM' }, 'tenant'))
+        .rejects.toThrow('first-level farm');
+      expect(mockDbInsert).not.toHaveBeenCalled();
+    });
+
+    it('can generate a breed code without the optional farm', async () => {
+      numberSeries.resolveSeriesFor.mockResolvedValue('BREED');
+      numberSeries.lockSeries.mockResolvedValue({ allow_manual: true });
+      numberSeries.generateNext.mockResolvedValue('BRD-001');
+      const returning = (rows: any[]) => ({ from: () => ({ where: () => ({ limit: async () => rows }) }) });
+      mockDbSelect.mockReturnValueOnce(returning([{ species_id: 'pig', species_name: 'Pig' }]))
+        .mockReturnValueOnce(returning([])).mockReturnValueOnce(returning([{ breed_code: 'BRD-001' }]));
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
+      await expect(service.createBreed({ nob_id: 'livestock', breed_name: 'Yorkshire', species_id: 'pig', breed_type: 'SOW' }, 'tenant'))
+        .resolves.toMatchObject({ breed_code: 'BRD-001' });
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('BREED', 'tenant', null, mockDb);
     });
 
     it('rejects when neither a series nor a manual breed_code is supplied', async () => {

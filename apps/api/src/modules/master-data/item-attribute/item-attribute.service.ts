@@ -7,6 +7,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateItemAttributeDto, UpdateItemAttributeDto, QueryItemAttributeDto } from './dto/item-attribute.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -17,6 +18,7 @@ export class ItemAttributeService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -33,10 +35,11 @@ export class ItemAttributeService {
     if (dto.data_type === 'LIST' && (!dto.list_values || dto.list_values.length === 0)) {
       throw new ConflictException('LIST attributes require at least one entry in list_values.');
     }
+    const attributeCode = await this.numberSeriesService.resolveNewCode('ITEM_ATTRIBUTE', dto.attribute_code, tenantId, companyId);
 
     const conditions = [
       eq(schema.itemAttributeMaster.tenant_id, tenantId),
-      eq(schema.itemAttributeMaster.attribute_code, dto.attribute_code.toUpperCase()),
+      eq(schema.itemAttributeMaster.attribute_code, attributeCode),
       isNull(schema.itemAttributeMaster.deleted_at),
     ];
     if (companyId) {
@@ -62,7 +65,7 @@ export class ItemAttributeService {
       company_id: companyId,
       nob_id: dto.nob_id || null,
       lob_id: dto.lob_id || null,
-      attribute_code: dto.attribute_code.toUpperCase(),
+      attribute_code: attributeCode,
       attribute_name: dto.attribute_name,
       data_type: dto.data_type,
       list_values: dto.list_values ? JSON.stringify(dto.list_values) : null,

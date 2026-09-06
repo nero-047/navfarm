@@ -2,6 +2,7 @@ import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ClsService } from 'nestjs-cls';
 import { RolesGuard } from './roles.guard';
+import { CODE_PREVIEW_PERMISSION_KEY } from '../decorators/require-code-preview-permission.decorator';
 
 describe('RolesGuard operational context', () => {
   const area = { area_id: 'area-1', company_id: 'company-1', nob_id: 'livestock', lob_id: 'piggery' };
@@ -51,5 +52,46 @@ describe('RolesGuard operational context', () => {
     await expect(guard.canActivate(context({ 'x-active-company-id': 'company-1' }))).resolves.toBe(true);
     expect(select).not.toHaveBeenCalled();
     expect(set).not.toHaveBeenCalled();
+  });
+});
+
+describe('RolesGuard master code previews', () => {
+  const permissions = jest.fn();
+  const query = { from: () => query, innerJoin: () => query, where: permissions };
+  const select = jest.fn(() => query);
+  const context = (master: unknown, isPreview = true, headers = {}) => ({
+    switchToHttp: () => ({ getRequest: () => ({ headers, query: { master }, user: { userType: 'OPERATIONAL_ADMIN', userId: 'operator', tenantId: 'tenant-1', companyId: 'company-1' } }) }),
+    getHandler: () => isPreview,
+    getClass: () => undefined,
+  }) as unknown as ExecutionContext;
+  const guard = new RolesGuard(
+    { getAllAndOverride: (key: string, targets: unknown[]) => key === CODE_PREVIEW_PERMISSION_KEY ? targets[0] : { moduleCode: 'SYSTEM', resource: 'NUMBER_SERIES', action: 'view' } } as unknown as Reflector,
+    { get: () => ({ select }), set: jest.fn() } as unknown as ClsService,
+  );
+  beforeEach(() => { permissions.mockReset(); select.mockClear(); });
+  it('allows a UOM creator to preview UOM without Number Series permission', async () => {
+    permissions.mockResolvedValue([{ moduleCode: 'MASTER_DATA', resource: 'UOM', canCreate: true }]);
+    await expect(guard.canActivate(context('UOM'))).resolves.toBe(true);
+    await expect(guard.canActivate(context('BREED'))).rejects.toThrow('Insufficient permissions');
+    await expect(guard.canActivate(context('UOM', false))).rejects.toThrow('Insufficient permissions');
+  });
+  it('does not treat view-only master access as create permission', async () => {
+    permissions.mockResolvedValue([{ moduleCode: 'MASTER_DATA', resource: 'UOM', canView: true }]);
+    await expect(guard.canActivate(context('UOM'))).rejects.toThrow('Insufficient permissions');
+  });
+  it.each([['STAGE', 'PRODUCTION', 'STAGE'], ['ANIMAL', 'PIGGERY', 'ANIMAL'], ['LOCATION_TYPE', 'MASTER_DATA', 'LOCATION']])('uses the exact %s controller permission', async (master, moduleCode, resource) => {
+    permissions.mockResolvedValue([{ moduleCode, resource, canCreate: true }]);
+    await expect(guard.canActivate(context(master))).resolves.toBe(true);
+  });
+  it('retains the existing Number Series viewer path', async () => {
+    permissions.mockResolvedValue([{ moduleCode: 'SYSTEM', resource: 'NUMBER_SERIES', canView: true }]);
+    await expect(guard.canActivate(context('UOM'))).resolves.toBe(true);
+  });
+  it.each([undefined, ['UOM', 'BREED'], 'UNKNOWN', '__proto__'])('rejects unsupported master %p', async (master) => {
+    await expect(guard.canActivate(context(master))).rejects.toThrow('supported master');
+  });
+  it('still validates company assignments before permissions', async () => {
+    select.mockImplementationOnce(() => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) as unknown as typeof query);
+    await expect(guard.canActivate(context('UOM', true, { 'x-active-company-id': 'other-company' }))).rejects.toThrow('Not authorized for this company');
   });
 });

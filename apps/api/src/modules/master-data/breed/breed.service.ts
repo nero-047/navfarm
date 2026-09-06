@@ -44,10 +44,11 @@ export class BreedService {
 
   /** Resolves by breed_type first (e.g. BREED_BROILER), then the master-alone BREED series, else manual. */
   private async resolveBreedCode(dto: CreateBreedDto, tenantId: string, companyId: string | null, executor: MySql2Database<typeof schema> = this.db): Promise<string> {
-    const seriesCode = dto.location_id ? await this.numberSeriesService.resolveSeriesFor('BREED', dto.breed_type, tenantId, companyId, executor) : null;
+    const location = dto.location_id ? await this.requireRootFarm(dto.location_id, tenantId, companyId, executor) : undefined;
+    const seriesCode = await this.numberSeriesService.resolveSeriesFor('BREED', dto.breed_type, tenantId, companyId, executor);
     if (!seriesCode) {
       if (!dto.breed_code) {
-        throw new BadRequestException('breed_code is required without a location and configured breed series.');
+        throw new BadRequestException('Enter a breed code or configure a breed number series.');
       }
       return dto.breed_code.toUpperCase();
     }
@@ -55,12 +56,7 @@ export class BreedService {
     if (series.allow_manual && dto.breed_code) {
       return dto.breed_code.toUpperCase();
     }
-    const [location] = await executor.select().from(schema.locationMaster).where(and(
-      eq(schema.locationMaster.location_id, dto.location_id!), eq(schema.locationMaster.tenant_id, tenantId),
-      companyId ? eq(schema.locationMaster.company_id, companyId) : isNull(schema.locationMaster.company_id),
-      eq(schema.locationMaster.is_active, true), isNull(schema.locationMaster.deleted_at),
-    )).limit(1);
-    if (!location) throw new BadRequestException('Select an active location in this company.');
+    if (!location) return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, executor);
     const code = await generateCompositeCode({
       parentCode: location.location_code, prefix: series.prefix || dto.breed_type, seqLength: series.seq_length,
       fetchSiblingCodes: () => executor.select({ code: schema.breedMaster.breed_code }).from(schema.breedMaster).where(and(
@@ -72,17 +68,30 @@ export class BreedService {
     return code;
   }
 
+  private async requireRootFarm(locationId: string, tenantId: string, companyId: string | null, executor = this.db) {
+    const [location] = await executor.select().from(schema.locationMaster).where(and(
+      eq(schema.locationMaster.location_id, locationId), eq(schema.locationMaster.tenant_id, tenantId),
+      companyId ? eq(schema.locationMaster.company_id, companyId) : isNull(schema.locationMaster.company_id),
+      eq(schema.locationMaster.is_active, true), isNull(schema.locationMaster.deleted_at),
+    )).limit(1);
+    if (!location || location.location_type !== 'FARM' || location.parent_location_id !== null) {
+      throw new BadRequestException('Breed location must be an active, first-level farm without a parent in this workspace.');
+    }
+    return location;
+  }
+
   // ========================================================
   // SPECIES MASTER CRUD
   // ========================================================
 
   async createSpecies(dto: CreateSpeciesDto, tenantId: string, userPayload?: any) {
     const companyId = dto.company_id || null;
+    const speciesCode = await this.numberSeriesService.resolveNewCode('SPECIES', dto.species_code, tenantId, companyId);
 
     // Check duplicate code
     const duplicateConditions = [
       eq(schema.speciesMaster.tenant_id, tenantId),
-      eq(schema.speciesMaster.species_code, dto.species_code.toUpperCase()),
+      eq(schema.speciesMaster.species_code, speciesCode),
       isNull(schema.speciesMaster.deleted_at),
     ];
     if (companyId) {
@@ -106,7 +115,7 @@ export class BreedService {
       species_id: speciesId,
       tenant_id: tenantId,
       company_id: companyId,
-      species_code: dto.species_code.toUpperCase(),
+      species_code: speciesCode,
       species_name: dto.species_name,
       status: 'ACTIVE',
       is_active: true,
@@ -472,6 +481,7 @@ export class BreedService {
 
   async updateBreed(id: string, dto: UpdateBreedDto, tenantId: string, userPayload?: any) {
     const breed = await this.findOneBreed(id);
+    if (dto.location_id) await this.requireRootFarm(dto.location_id, tenantId, breed.company_id);
 
     if (dto.breed_code && dto.breed_code.toUpperCase() !== breed.breed_code) {
       const duplicateConditions = [
