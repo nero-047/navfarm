@@ -300,7 +300,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
       // Company scope has exactly one company and this route lands on its
       // settings page, not a list — "Companies" was the tenant-scope label
       // leaking into a scope where it describes the wrong thing.
-      { label: t("companySettings"), href: "/companies",     icon: Building2 },
+      { label: t("companySettings"), href: "/company/settings", icon: Building2 },
       { label: t("masterData"),      href: "/master-data",    icon: Database, activePrefix: "/master-data" },
       { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
       { label: t("financeCosting"), href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },

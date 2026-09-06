@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Field } from "@/components/ui/field";
@@ -17,7 +16,6 @@ import {
   ArrowLeft,
   Users,
   UserPlus,
-  Trash2,
   MapPin,
   Contact,
   Globe,
@@ -30,7 +28,7 @@ import {
 import { api } from "../../../services/api-client";
 import { Dialog } from "../../ui/dialog";
 import { FullPageDialogBoundary } from "../../ui/full-page-overlay";
-import { EditMemberModal, ActiveStatusBadge } from "../edit-member-modal";
+import { EditMemberModal } from "../edit-member-modal";
 import { useLanguage } from "@/hooks/useLanguage";
 
 interface CompanyTabProps {
@@ -1801,40 +1799,6 @@ export default function CompanyTab({
           </Card>
           </FullPageDialogBoundary>
 
-          {/* Details footer stats */}
-          <Card className="nf-company-config flex flex-col gap-4 border-(--border) bg-(--surface) p-6">
-            <h4 className="text-sm font-semibold text-(--text-primary)">{t("ctTenantConfigSummary")}</h4>
-            {targetCompany ? (
-              <div className="text-xs text-(--text-secondary) flex flex-col gap-4">
-                <div className="flex justify-between items-center py-2 border-b border-(--border)">
-                  <span className="text-(--text-secondary) font-medium">{t("ctBaseCurrency")}</span>
-                  <span className="text-(--text-primary) font-semibold font-mono bg-(--surface-raised) px-2 py-0.5 rounded-[var(--radius-xs)] border border-(--border)">
-                    {currencies.find(c => c.currency_id === targetCompany?.base_currency_id)?.currency_name || "INR"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-(--border)">
-                  <span className="text-(--text-secondary) font-medium">{t("ctTimezone")}</span>
-                  <span className="text-(--text-primary) font-semibold">{targetCompany?.default_timezone_id || "Asia/Kolkata"}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-(--border)">
-                  <span className="text-(--text-secondary) font-medium">{t("ctOperatingCountry")}</span>
-                  <span className="text-(--text-primary) font-semibold font-mono bg-(--surface-raised) px-2 py-0.5 rounded-[var(--radius-xs)] border border-(--border)">
-                    {targetCompany?.country_id || "IND"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-(--text-secondary) font-medium">{t("ctOnboardingStatus")}</span>
-                  <span className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-semibold ${
-                    targetCompany?.onboarding_status === 'COMPLETED' ? 'bg-(--success-muted) text-(--success) border border-(--success)' : 'bg-(--warning-muted) text-(--warning) border border-(--warning)'
-                  }`}>
-                    {targetCompany?.onboarding_status || 'PENDING'}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="text-xs text-(--text-secondary)">{t("ctNoCompanySelected")}</div>
-            )}
-          </Card>
 
         </div>
 
@@ -1842,66 +1806,25 @@ export default function CompanyTab({
         <div className="flex flex-col gap-4 lg:col-span-4">
 
           {/* User list card */}
+          {/* Team Management (/users) is where people are invited, assigned
+              roles and removed. This card duplicated a slice of that, and
+              titled the same rows "Company administrators" or "Company
+              operators" purely by who was looking — nothing filtered by role.
+              A link to the real screen beats a partial copy of it. */}
           <Card className="nf-company-config border-(--border) bg-(--surface) p-5">
-            <div className="mb-4 flex items-center justify-between gap-3 border-b border-(--border) pb-4">
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-(--text-primary)"><Users className="h-4 w-4 text-(--accent)" />{isTenantAdmin ? "Company administrators" : "Company operators"}</h4>
-              <button type="button" onClick={() => setShowAdminDialog(true)} className="nf-primary-action flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold text-white transition hover:opacity-90"><UserPlus size={14} /> Add</button>
-            </div>
-
-            <div className="flex flex-col gap-3 max-h-60 overflow-y-auto pr-1">
-              {loadingUsers ? (
-                <div className="text-xs text-(--text-secondary) text-center py-6">{t("ctLoadingTeam")}</div>
-              ) : companyUsers.length === 0 ? (
-                <div className="text-xs text-(--text-secondary) text-center py-6">{t("ctNoUsersAssigned")}</div>
-              ) : (
-                companyUsers.map((u) => {
-                  const isSelf = !!currentUser?.userId && u.user_id === currentUser.userId;
-                  return (
-                  <button
-                    key={u.user_id}
-                    type="button"
-                    onClick={() => setEditingOperator(u)}
-                    className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-3 text-left transition hover:border-(--accent)"
-                  >
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className="truncate text-xs font-semibold text-(--text-primary)">
-                        {u.full_name}
-                        {isSelf && <span className="ml-1.5 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>YOU</span>}
-                      </span>
-                      <span className="truncate text-[10px] text-(--text-secondary)">{u.email}</span>
-                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                        <ActiveStatusBadge isActive={u.is_active !== false} />
-                        {u.roles && u.roles.length > 0 ? (
-                          u.roles.map((r: any) => (
-                            <Badge key={r.role_id} variant="accent">{r.role_name}</Badge>
-                          ))
-                        ) : (
-                          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("ctNoRoleAssigned")}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <span
-                        onClick={(e) => { e.stopPropagation(); setEditingOperator(u); }}
-                        className="p-1.5 text-(--text-secondary) hover:text-(--accent) hover:bg-(--accent-muted) rounded-lg cursor-pointer transition-colors"
-                        title={t("ctViewEdit")}
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </span>
-                      {!isSelf && (
-                        <span
-                          onClick={(e) => { e.stopPropagation(); setUserPendingDeletion(u.user_id); }}
-                          className="p-1.5 text-(--text-secondary) hover:text-(--danger) hover:bg-(--danger-muted) rounded-lg cursor-pointer transition-colors"
-                          title={t("ctDeactivateAccount")}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                  );
-                })
-              )}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-(--accent)" />
+                <div>
+                  <h4 className="text-sm font-semibold text-(--text-primary)">{t("teamManagement")}</h4>
+                  <p className="mt-0.5 text-xs text-(--text-secondary)">
+                    {loadingUsers ? t("ctLoadingTeam") : t("ctTeamCount", { count: String(companyUsers.length) })}
+                  </p>
+                </div>
+              </div>
+              <a href="/users" className="nf-primary-action flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold text-white transition hover:opacity-90">
+                {t("ctManageTeam")}
+              </a>
             </div>
           </Card>
 

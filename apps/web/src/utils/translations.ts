@@ -535,6 +535,8 @@ export const translations = {
     ctOnboardingStatus: "Onboarding Status",
     ctNoCompanySelected: "No company selected.",
     ctLoadingTeam: "Loading team directory…",
+    ctTeamCount: "{{count}} people with access",
+    ctManageTeam: "Manage team",
     ctNoUsersAssigned: "No users assigned. Register one below.",
     ctNoRoleAssigned: "No role assigned",
     ctConfirmDeactivate: "Are you sure you want to deactivate this account?",
