@@ -2,12 +2,11 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle, Activity } from "lucide-react";
+import { CheckCircle, Activity } from "lucide-react";
 import { useCompaniesPageData } from "@/components/console/companies/use-companies-page-data";
 import CompanyTab, { SETTINGS_SECTIONS } from "@/components/console/console-tabs/company-tab";
 import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { useLanguage } from "@/hooks/useLanguage";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState, ErrorState } from "@/components/ui/states";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -75,7 +74,16 @@ export function CompanySettingsView({ companyId, section = "profile", basePath =
 
           The company name is deliberately not in this header either: the
           breadcrumb above it and the company card in the main sidebar both
-          already carry it. */}
+          already carry it.
+
+          There is no "Back to All Companies" action. Leaving a company scope
+          is what the scope switcher in the main sidebar is for, and it does
+          strictly more than that button did: it switches to tenant scope, to
+          any other company, or to an operational area, and it is present on
+          every screen rather than only on this one. A second, weaker way out
+          of the scope, sitting next to the permanent one, is a choice the user
+          has to read before ignoring. Tenant scope carries /companies as a
+          standing nav item, so the directory is still one control away. */}
       <PageHeader
         title={t(activeSection.labelKey)}
         description={t(activeSection.descKey)}
@@ -86,20 +94,6 @@ export function CompanySettingsView({ companyId, section = "profile", basePath =
             {targetCompany.country_id && <span>{targetCompany.country_id}</span>}
             <StatusBadge status={targetCompany.onboarding_status} t={t} />
           </div>
-        }
-        actions={
-          user?.userType === "TENANT_ADMIN" ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/companies")}
-              aria-label={t("coBackToAllCompanies")}
-            >
-              <ArrowLeft className="w-4 h-4 mr-1.5" />
-              {t("coBackToAllCompanies")}
-            </Button>
-          ) : undefined
         }
         sticky={false}
       />
