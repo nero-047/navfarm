@@ -796,6 +796,8 @@ const feedFormula: MasterDataConfig = {
 // ── Business Partners ─────────────────────────────────────────────────────────
 
 const supplier: MasterDataConfig = {
+  owner: "BC",
+  bcNote: "MOM 18 Aug 2026 (Triple C Office), procurement flow Req \u2192 Order \u2192 Vendor \u2192 GRV \u2192 PI: \u201CRequisition (Req) will be raised and maintained in NavFarm. Order, Vendor selection, GRV and PI will be processed in D365BC.\u201D BBP-1 \u00A71 also lists Vendor among the masters, without specifying it.",
   key: "supplier",
   label: "Suppliers",
   description: "Vendors and raw material suppliers.",
