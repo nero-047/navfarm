@@ -172,6 +172,18 @@ export async function bootstrap() {
         currency_name: 'US Dollar',
         symbol: '$',
       },
+      {
+        // BBP-1 §1.1 treats ZWL as the foreign currency against a USD base:
+        // "Exchange Rate (USD/ZWL) ... Manual entry by Finance." Without the
+        // row there is nothing to record a rate against.
+        // NOTE for the client: Zimbabwe replaced ZWL with ZiG (Zimbabwe Gold)
+        // in April 2024. The blueprint says ZWL throughout, so ZWL is what is
+        // seeded — worth confirming before sign-off.
+        currency_id: '20000000-2000-2000-2000-200000000003',
+        iso_code: 'ZWL',
+        currency_name: 'Zimbabwe Dollar',
+        symbol: 'Z$',
+      },
     ];
     for (const currency of currencies) {
       await masterDb

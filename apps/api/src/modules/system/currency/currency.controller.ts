@@ -30,6 +30,7 @@ export class CurrencyController {
       body.toCurrencyId,
       body.rate,
       body.source,
+      body.rateDate,
     );
   }
 

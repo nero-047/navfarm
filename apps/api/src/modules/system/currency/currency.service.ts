@@ -34,7 +34,7 @@ export class CurrencyService {
       .innerJoin(schema.currencyMaster, eq(schema.exchangeRate.from_currency_id, schema.currencyMaster.currency_id));
   }
 
-  async updateExchangeRate(fromCurrencyId: string, toCurrencyId: string, rate: number, source?: string) {
+  async updateExchangeRate(fromCurrencyId: string, toCurrencyId: string, rate: number, source?: string, rateDate?: string) {
     const rateId = randomUUID();
     await this.db
       .insert(schema.exchangeRate)
@@ -43,7 +43,9 @@ export class CurrencyService {
         from_currency_id: fromCurrencyId,
         to_currency_id: toCurrencyId,
         rate: rate.toString(),
-        rate_date: new Date().toISOString().split('T')[0],
+        // A dated row, not an overwrite: restating a past period needs the rate
+        // as at that date, so each entry is kept rather than replacing the last.
+        rate_date: rateDate || new Date().toISOString().split('T')[0],
         rate_source: source || 'MANUAL',
       });
     
