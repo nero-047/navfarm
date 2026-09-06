@@ -37,6 +37,7 @@ const EXPECTED: Record<string, string> = {
   "gl-account": "GL Account",
   "gl-mapping": "GL Mapping",
   "cost-center": "Cost Center",
+  reason: "Reason",
 };
 
 describe("singularLabel", () => {
