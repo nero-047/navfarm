@@ -83,6 +83,7 @@ under whichever reading the client later prefers. All verified in the document.
 | 7 | **Animal categories** | BBP-1 lists 10 with no GGP-Local. The Bio Asset BBP requires "GGP Local" and defines `Z + Z → Local GGP`. That makes 12, not 10. |
 | 8 | **KPI master** | §1.4 gives 32 rows then says they are an example, that the real master is Stage × Season × Weight × Age × Breed-type, and self-reports missing KPIs ("weaner and grower mortality, Avg CDM against budgeted etc"). |
 | 9 | **EV journal batch name** | Rendered three different ways in one section: `(EV-YYYY-NN)`, `EV-YYYY-SEQ`, `EV-YYYY-NNNNN`. |
+| 10 | **Animal code format** | BBP §2.1 field spec: "Animal Code … **ANM-YYYY-NNNNN**. System-generated. Cannot be changed." The client's own `Animal Register Master Template.xlsx` says "Auto-generated from No. Series ANIMAL_PIGGERY. Format: **PIG-YYYY-SEQ**" with example `PIG-2025-0001`, and TDD tracker row 6 repeats `PIG-YYYY-SEQ`. Two client documents contradict the blueprint. The build follows the template (`PIG-`); under the stated authority order the BBP (`ANM-`) should win. Needs a client decision, not an internal one. |
 
 **Still owed by Triple C** (named in the BBP or MOMs, never delivered): the 47 reason codes and
 their per-code mandatory-weight flag, stage filter and Pig Expert mapping; breed/line codes and
@@ -138,6 +139,7 @@ Stated plainly so nothing here is a surprise on the day.
   on-screen notice states §1.5 and §1.6 and that no BC integration exists yet. Deliberate, per
   Rishi, so work is possible before the connector lands.
 - **The 44 undocumented reason codes are absent by choice**, not oversight.
+- **Animal codes are inconsistent in the demo data.** The 20 seeded animals are `PIG-001`…`PIG-020` (three digits, no year); the series is configured for `PIG-YYYY-NNNN`, so the next animal registered renders as `PIG-2026-0021` in a list where everything else is `PIG-001`. Existing rows were left untouched deliberately when the series was corrected (commit `edf4a06`).
 - Operational lifecycle-stepper screens still use the old static stages; aligning the master did
   not rewire them.
 - The master-data page shell still gates on administrator type even where the API grants a
