@@ -4,6 +4,24 @@
   "private": true,
   "nx": {
     "targets": {
+      "verify-demo-master-integrity": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": { "cwd": "apps/api", "command": "node --import tsx src/scripts/verify-demo-master-integrity.ts" }
+      },
+      "db-align-demo-bbp-masters": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": { "cwd": "apps/api", "command": "node --import tsx src/scripts/align-demo-bbp-masters.ts" }
+      },
+      "db-configure-demo-master-series": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --import tsx src/scripts/configure-demo-master-series.ts"
+        }
+      },
       "build": {
         "executor": "nx:run-commands",
         "options": {

@@ -8,15 +8,12 @@ import * as schema from '../../../core/database/schema';
 import { CreateNumberSeriesDto, UpdateNumberSeriesDto, QueryNumberSeriesDto } from './dto/number-series.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
+import { formatSeriesCode, nextSequence } from './code-format.util';
+import { MASTER_CODE_COLUMNS } from './master-code-columns';
+import { generateCompositeCode } from './composite-code.util';
+import { CodePreviewDto } from './dto/code-preview.dto';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
-
-/** Formats a date segment per a simple 'YYYY' / 'YY' token — the only two the spec's examples use. */
-function formatDateSegment(dateFormat: string, now: Date): string {
-  const year = now.getFullYear();
-  if (dateFormat === 'YY') return String(year).slice(-2);
-  return String(year); // 'YYYY' and anything else falls back to the 4-digit year.
-}
 
 @Injectable()
 export class NumberSeriesService {
@@ -89,7 +86,7 @@ export class NumberSeriesService {
       seq_length: defaults.seqLength,
       current_seq: currentSeq,
       reset_frequency: 'NEVER',
-      allow_manual: false,
+      allow_manual: true,
     }).onDuplicateKeyUpdate({ set: { series_name: defaults.seriesName } });
   }
 
@@ -135,19 +132,7 @@ export class NumberSeriesService {
     }
 
     const now = new Date();
-    const lastUpdated = new Date(series.updated_at);
-    const periodRolledOver =
-      (series.reset_frequency === 'YEARLY' && now.getFullYear() !== lastUpdated.getFullYear()) ||
-      (series.reset_frequency === 'MONTHLY' &&
-        (now.getFullYear() !== lastUpdated.getFullYear() || now.getMonth() !== lastUpdated.getMonth()));
-
-    const nextSeq = (periodRolledOver ? 0 : series.current_seq) + 1;
-
-    const parts: string[] = [];
-    if (series.prefix) parts.push(series.prefix);
-    if (series.date_format) parts.push(formatDateSegment(series.date_format, now));
-    parts.push(String(nextSeq).padStart(series.seq_length, '0'));
-    const formattedCode = parts.join(series.separator || '-');
+    const { sequence: nextSeq, code: formattedCode } = await this.nextAvailableCode(series, tenantId, companyId, executor, now);
 
     await executor
       .update(schema.noSeriesMaster)
@@ -159,6 +144,26 @@ export class NumberSeriesService {
       .where(eq(schema.noSeriesMaster.series_id, series.series_id));
 
     return formattedCode;
+  }
+
+  /** Includes inactive/deleted identities: a manual code is never overwritten
+   * or recycled. This is also used by read-only previews, without a row lock. */
+  private async nextAvailableCode(series: typeof schema.noSeriesMaster.$inferSelect, tenantId: string, companyId: string | null | undefined, executor = this.db, now = new Date()) {
+    const master = series.document_type?.toUpperCase();
+    const field = MASTER_CODE_COLUMNS[master];
+    const table = MASTER_TABLES[master?.toLowerCase().replaceAll('_', '-')];
+    const columns = table ? getTableColumns(table) : undefined;
+    const occupied = new Set<string>();
+    if (field && columns?.[field]) {
+      const rows = await executor.select({ code: columns[field] }).from(table).where(and(
+        eq(columns.tenant_id, tenantId), companyCondition(columns.company_id, companyId),
+      ));
+      for (const row of rows) occupied.add(String(row.code).toUpperCase());
+    }
+    let sequence = nextSequence(series, now);
+    let code = formatSeriesCode(series, sequence, now);
+    while (occupied.has(code.toUpperCase())) code = formatSeriesCode(series, ++sequence, now);
+    return { sequence, code };
   }
 
   /**
@@ -215,7 +220,8 @@ export class NumberSeriesService {
 
   async resolveCodeSettings(master: string, type: string | undefined, tenantId: string, companyId?: string | null) {
     if (!/^[A-Z][A-Z_]{0,49}$/.test(master)) throw new BadRequestException('Invalid master code.');
-    const code = await this.resolveSeriesFor(master, type, tenantId, companyId);
+    const code = await this.resolveSeriesFor(master, type, tenantId, companyId) ||
+      (master === 'ANIMAL' ? await this.resolveSeriesFor('ANIMAL', 'PIGGERY', tenantId, companyId) : null);
     if (!code) return { generated: false, allowManual: true };
     const [row] = await this.db.select().from(schema.noSeriesMaster).where(and(
       eq(schema.noSeriesMaster.tenant_id, tenantId), eq(schema.noSeriesMaster.series_code, code),
@@ -225,14 +231,86 @@ export class NumberSeriesService {
     return row ? { generated: true, allowManual: row.allow_manual, seriesCode: row.series_code, prefix: row.prefix } : { generated: false, allowManual: true };
   }
 
+  /** Read-only: never initializes a series, increments a counter, or reserves a code. */
+  async previewCode(query: CodePreviewDto, tenantId: string, companyId?: string | null) {
+    if (!MASTER_CODE_COLUMNS[query.master]) throw new BadRequestException('Unsupported master code.');
+    let type = query.type;
+    if (query.master === 'ANIMAL') {
+      const scope = this.cls.get<{ lobId?: string }>('masterScope');
+      const lobId = query.lobId || scope?.lobId;
+      if (lobId) {
+        const [lob] = await this.db.select({ code: schema.lobMaster.lob_code }).from(schema.lobMaster).where(eq(schema.lobMaster.lob_id, lobId)).limit(1);
+        type = lob?.code;
+      }
+    }
+    const settings = await this.resolveCodeSettings(query.master, type, tenantId, companyId);
+    if (!settings.generated || !settings.seriesCode) return settings;
+    const [series] = await this.db.select().from(schema.noSeriesMaster).where(and(
+      eq(schema.noSeriesMaster.tenant_id, tenantId), companyCondition(schema.noSeriesMaster.company_id, companyId),
+      eq(schema.noSeriesMaster.series_code, settings.seriesCode),
+      eq(schema.noSeriesMaster.is_active, true), isNull(schema.noSeriesMaster.deleted_at),
+    )).limit(1);
+    if (!series) return { generated: false, allowManual: true };
+    const hierarchy: Record<string, [string, string, string, string]> = {
+      LOCATION: ['location', 'location_id', 'location_code', 'parent_location_id'],
+      BREED: ['location', 'location_id', 'location_code', 'location_id'],
+      ITEM_CATEGORY: ['item-category', 'category_id', 'category_code', 'parent_category_id'],
+      GL_ACCOUNT: ['gl-account', 'gl_account_id', 'account_code', 'parent_account_id'],
+      COST_CENTER: ['cost-center', 'cost_center_id', 'cost_center_code', 'parent_cost_center_id'],
+    };
+    const definition = hierarchy[query.master];
+    if (query.parentId && definition) {
+      const [parentKey, parentId, parentCode, childParent] = definition;
+      const parentTable = MASTER_TABLES[parentKey];
+      const parentColumns = getTableColumns(parentTable);
+      const [parent] = await this.db.select().from(parentTable).where(and(
+        eq(parentColumns[parentId], query.parentId), eq(parentColumns.tenant_id, tenantId),
+        companyCondition(parentColumns.company_id, companyId), isNull(parentColumns.deleted_at),
+        eq(parentColumns.is_active, true), ...masterScopeConditions(this.cls, parentTable),
+      )).limit(1);
+      if (!parent) throw new BadRequestException('Select an active parent in this workspace.');
+      if (query.master === 'BREED' && (parent.location_type !== 'FARM' || parent.parent_location_id !== null)) {
+        throw new BadRequestException('Breed location must be a first-level farm without a parent.');
+      }
+      let prefix = series.prefix || (query.master === 'BREED' ? query.type : series.series_code) || series.series_code;
+      if (query.master === 'LOCATION') {
+        const [locationType] = await this.db.select().from(schema.locationTypeMaster).where(and(
+          eq(schema.locationTypeMaster.tenant_id, tenantId), companyCondition(schema.locationTypeMaster.company_id, companyId),
+          eq(schema.locationTypeMaster.type_code, query.type || ''), isNull(schema.locationTypeMaster.deleted_at),
+        )).limit(1);
+        if (!locationType) throw new BadRequestException('Select a location type first.');
+        prefix = locationType.code_prefix;
+      }
+      const table = MASTER_TABLES[query.master.toLowerCase().replaceAll('_', '-')];
+      const columns = getTableColumns(table);
+      const conditions = [eq(columns.tenant_id, tenantId), companyCondition(columns.company_id, companyId), eq(columns[childParent], query.parentId)];
+      if (query.master === 'LOCATION') conditions.push(eq(columns.location_type, query.type!));
+      const preview = await generateCompositeCode({
+        parentCode: String(parent[parentCode]), prefix, seqLength: series.seq_length,
+        fetchSiblingCodes: async () => this.db.select({ code: columns[MASTER_CODE_COLUMNS[query.master]] }).from(table).where(and(...conditions)) as Promise<{ code: string }[]>,
+      });
+      return { ...settings, preview };
+    }
+    return { ...settings, preview: (await this.nextAvailableCode(series, tenantId, companyId)).code };
+  }
+
+  /** Validate an explicit manual identity without consuming the series. */
+  async resolveNewCode(master: string, supplied: string | undefined, tenantId: string, companyId?: string | null, type?: string): Promise<string> {
+    if (supplied) return this.manualCode(master, supplied, tenantId, companyId, type);
+    const series = await this.resolveSeriesFor(master, type, tenantId, companyId);
+    if (!series) throw new BadRequestException('Enter a manual code or configure a number series for this master.');
+    return this.generateNext(series, tenantId, companyId);
+  }
+
   /** Validate an explicit manual identity without consuming the series. */
   async manualCode(master: string, supplied: string, tenantId: string, companyId?: string | null, type?: string) {
     const settings = await this.resolveCodeSettings(master, type, tenantId, companyId);
     if (settings.generated && !settings.allowManual) throw new BadRequestException('This number series does not allow manual entry.');
     const code = supplied.trim().toUpperCase();
     const table = MASTER_TABLES[master.toLowerCase().replaceAll('_', '-')];
+    if (!table || !MASTER_CODE_COLUMNS[master]) throw new BadRequestException('Unsupported master code.');
     const columns = getTableColumns(table);
-    const column = columns[`${master.toLowerCase()}_code`];
+    const column = columns[MASTER_CODE_COLUMNS[master]];
     const width = Number(column.getSQLType().match(/\((\d+)\)/)?.[1] || 255);
     if (!code || code.length > width) throw new BadRequestException(`Code must contain 1 to ${width} characters.`);
     const [duplicate] = await this.db.select().from(table).where(and(

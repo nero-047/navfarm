@@ -70,6 +70,39 @@ describe('NumberSeriesService', () => {
     });
   });
 
+  describe('read-only preview', () => {
+    const returning = (rows: any[]) => {
+      const builder: any = { from: () => builder, where: () => builder, limit: async () => rows, then: (resolve: any, reject: any) => Promise.resolve(rows).then(resolve, reject) };
+      return builder;
+    };
+    const series = { series_code: 'ITEM', document_type: 'ITEM', prefix: 'ITM', seq_length: 3, current_seq: 0,
+      date_format: null, separator: '-', reset_frequency: 'NEVER', updated_at: new Date().toISOString() };
+
+    it('returns the next unoccupied code without writes or locks', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: true, allowManual: true, seriesCode: 'ITEM' } as any);
+      mockDbSelect.mockReturnValueOnce(returning([series])).mockReturnValueOnce(returning([{ code: 'ITM-001' }]));
+      await expect(service.previewCode({ master: 'ITEM' }, 'tenant', 'company')).resolves.toMatchObject({ preview: 'ITM-002' });
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockDbInsert).not.toHaveBeenCalled();
+    });
+
+    it('uses the same composite sibling numbering as create', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: true, allowManual: true, seriesCode: 'BREED' } as any);
+      mockDbSelect.mockReturnValueOnce(returning([{ ...series, series_code: 'BREED', prefix: 'BRD' }]))
+        .mockReturnValueOnce(returning([{ location_code: 'FARM-001', location_type: 'FARM', parent_location_id: null }]))
+        .mockReturnValueOnce(returning([{ code: 'FARM-001/BRD-002' }]));
+      await expect(service.previewCode({ master: 'BREED', parentId: 'farm' }, 'tenant', 'company')).resolves.toMatchObject({ preview: 'FARM-001/BRD-003' });
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('rejects inaccessible parents rather than exposing their codes', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: true, allowManual: true, seriesCode: 'BREED' } as any);
+      mockDbSelect.mockReturnValueOnce(returning([series])).mockReturnValueOnce(returning([]));
+      await expect(service.previewCode({ master: 'BREED', parentId: 'other-company-farm' }, 'tenant', 'company')).rejects.toThrow('active parent in this workspace');
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+  });
+
   describe('generateNext', () => {
     const mockLockedSelect = (row: any) => {
       mockDbSelect.mockReturnValueOnce({
@@ -84,6 +117,17 @@ describe('NumberSeriesService', () => {
         }),
       });
     };
+
+    it('skips occupied manual identities without changing those records', async () => {
+      mockLockedSelect({ series_id: 'series-1', document_type: 'ITEM', current_seq: 0, seq_length: 3,
+        prefix: 'ITM', date_format: null, separator: '-', reset_frequency: 'NEVER', is_active: true, updated_at: new Date().toISOString() });
+      mockDbSelect.mockReturnValueOnce({ from: () => ({ where: async () => [{ code: 'ITM-001' }, { code: 'itm-002' }, { code: 'MANUAL' }] }) });
+      const set = jest.fn(() => ({ where: async () => ({}) }));
+      mockDbUpdate.mockReturnValue({ set });
+      await expect(service.generateNext('ITEM', 'tenant', 'company')).resolves.toBe('ITM-003');
+      expect(mockDbUpdate).toHaveBeenCalledTimes(1);
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ current_seq: 3, last_generated_code: 'ITM-003' }));
+    });
 
     it('formats prefix + zero-padded sequence and increments current_seq', async () => {
       mockLockedSelect({

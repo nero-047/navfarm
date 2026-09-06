@@ -2,9 +2,15 @@
 import { useEffect, useState } from "react";
 import { api } from "@/services/api-client";
 import type { MasterDataField } from "./types";
+import { getActiveCompanyId, getActiveWorkspaceScope, getActiveOperationalAreaId } from "@/hooks/useAuth";
 
 const CODE_SERIES: Record<string, [string, string, string?]> = {
-  item: ["ITEM", "item_code"],
+  reason: ["REASON", "reason_code"],
+  animal: ["ANIMAL", "animal_code"],
+  species: ["SPECIES", "species_code"],
+  "item-attribute": ["ITEM_ATTRIBUTE", "attribute_code"],
+  "location-type": ["LOCATION_TYPE", "type_code"],
+  item: ["ITEM", "item_code", "item_type"],
   supplier: ["SUPPLIER", "supplier_code"],
   customer: ["CUSTOMER", "customer_code"],
   resource: ["RESOURCE", "resource_code"],
@@ -19,40 +25,60 @@ const CODE_SERIES: Record<string, [string, string, string?]> = {
   "gl-account": ["GL_ACCOUNT", "account_code", "account_type"],
   "cost-center": ["COST_CENTER", "cost_center_code", "cost_center_type"],
 };
-interface Settings { generated: boolean; allowManual: boolean }
+const PARENT_FIELDS: Record<string, string> = {
+  location: "parent_location_id", breed: "location_id", "item-category": "parent_category_id",
+  "gl-account": "parent_account_id", "cost-center": "parent_cost_center_id",
+};
+interface Settings { generated: boolean; allowManual: boolean; preview?: string }
 
 export function useCodeSeries(key: string, form: Record<string, unknown>, enabled = true) {
+  const [revision, setRevision] = useState(0);
   const definition = CODE_SERIES[key];
-  const canGenerate = !!definition && (key !== "breed" || !!form.location_id);
+  const canGenerate = !!definition;
   const type = definition?.[2] ? String(form[definition[2]] || "") : "";
-  const requestKey = `${key}:${type}:${canGenerate}`;
+  const parentId = String(form[PARENT_FIELDS[key]] || "");
+  const lobId = key === "animal" ? String(form.lob_id || "") : "";
+  const scopeKey = `${getActiveWorkspaceScope()}:${getActiveCompanyId()}:${getActiveOperationalAreaId()}`;
+  const requestKey = `${scopeKey}:${key}:${type}:${parentId}:${lobId}:${revision}`;
   const [result, setResult] = useState<{ key: string; settings?: Settings; error?: string }>();
   const [selection, setSelection] = useState<{ key: string; mode: "serial" | "manual" }>();
   useEffect(() => {
-    if (!definition || !canGenerate || !enabled) return;
+    if (!enabled) { setSelection(undefined); setResult(undefined); return; }
+    if (!definition || !canGenerate) return;
     let cancelled = false;
     const params = new URLSearchParams({ master: definition[0] });
     if (type) params.set("type", type);
-    api.get(`/number-series/resolve?${params}`).then((res) => {
+    if (parentId) params.set("parentId", parentId);
+    if (lobId) params.set("lobId", lobId);
+    api.get(`/number-series/preview?${params}`).then((res) => {
       const data = res?.data || res;
-      if (!cancelled) setResult({ key: requestKey, settings: { generated: data.generated === true, allowManual: data.allowManual !== false } });
+      if (!cancelled) setResult({ key: requestKey, settings: { generated: data.generated === true, allowManual: data.allowManual !== false, preview: data.preview } });
     }).catch((err: Error) => { if (!cancelled) setResult({ key: requestKey, error: err.message || "Could not check code numbering." }); });
     return () => { cancelled = true; };
-  }, [key, type, enabled, canGenerate]);
+  }, [key, type, parentId, lobId, scopeKey, enabled, canGenerate, requestKey]);
   const current = result?.key === requestKey ? result : undefined;
-  const mode = selection?.key === requestKey ? selection.mode : "serial";
+  const modeKey = `${scopeKey}:${key}`;
+  const mode = selection?.key === modeKey ? selection.mode : "serial";
+  // Locations use type-specific series. Choosing an entry mode must not wait
+  // for a type (or its preview request); the resolved series policy still wins.
+  const awaitingLocationType = key === "location" && !type;
+  const managedCode = awaitingLocationType || current?.settings?.generated;
+  const allowManual = awaitingLocationType || current?.settings?.allowManual;
+  const serial = enabled && managedCode && !(allowManual && mode === "manual");
   return {
-    canChoose: enabled && canGenerate && current?.settings?.generated && current.settings.allowManual,
+    canChoose: enabled && canGenerate && managedCode && allowManual,
     mode,
-    chooseMode: (mode: "serial" | "manual") => setSelection({ key: requestKey, mode }),
+    chooseMode: (mode: "serial" | "manual") => setSelection({ key: modeKey, mode }),
+    refresh: () => setRevision((value) => value + 1),
+    value: (fieldKey: string, value: unknown) => serial && fieldKey === definition?.[1] ? current?.settings?.preview || "" : value,
     loading: canGenerate && enabled && !current,
     error: canGenerate && enabled ? current?.error : undefined,
     field: (field: MasterDataField): MasterDataField => {
-      if (!enabled || !canGenerate || field.key !== definition?.[1] || !current?.settings?.generated) return field;
-      const manual = current.settings.allowManual && mode === "manual";
+      if (!enabled || !canGenerate || field.key !== definition?.[1] || !managedCode) return field;
+      const manual = allowManual && mode === "manual";
       return { ...field, required: manual, readOnly: !manual,
-        placeholder: manual ? "Enter a unique code" : "Assigned when saved",
-        helpText: manual ? "Enter a unique manual code for this master." : "Generated from the configured number series when saved." };
+        placeholder: manual ? "Enter a unique code" : awaitingLocationType ? "Select Location Type to preview code" : "Calculating code…",
+        helpText: manual ? "Enter a unique manual code for this master." : awaitingLocationType ? "The selected Location Type determines the numbering series." : "Live preview — allocated when saved. Another user's save may change the final number." };
     },
   };
 }

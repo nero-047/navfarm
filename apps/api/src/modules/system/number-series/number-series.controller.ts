@@ -5,6 +5,8 @@ import { CreateNumberSeriesDto, UpdateNumberSeriesDto, QueryNumberSeriesDto } fr
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+import { CodePreviewDto } from './dto/code-preview.dto';
+import { RequireCodePreviewPermission } from '../../../common/decorators/require-code-preview-permission.decorator';
 
 @ApiTags('Number Series')
 @ApiBearerAuth()
@@ -36,6 +38,13 @@ export class NumberSeriesController {
   async resolveCodeSettings(@Query('master') master: string, @Query('type') type: string | undefined, @Req() req: any) {
     const companyId = req.headers['x-workspace-scope'] === 'TENANT' ? null : (req.headers['x-active-company-id'] || req.user?.companyId);
     return this.numberSeriesService.resolveCodeSettings(master, type, req.user?.tenantId || req.tenantId, companyId);
+  }
+
+  @Get('preview')
+  @RequireCodePreviewPermission()
+  async preview(@Query() query: CodePreviewDto, @Req() req: any) {
+    const companyId = req.headers['x-workspace-scope'] === 'TENANT' ? null : (req.headers['x-active-company-id'] || req.user?.companyId);
+    return this.numberSeriesService.previewCode(query, req.user?.tenantId || req.tenantId, companyId);
   }
 
   @Get(':id')
