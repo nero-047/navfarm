@@ -5,6 +5,7 @@ import { Loader2, Inbox, Plus } from "lucide-react";
 import { InlineAlert } from "@/components/ui/alert";
 import { api } from "@/services/api-client";
 import { useLanguage } from "@/hooks/useLanguage";
+import { getActiveCompanyId } from "@/hooks/useAuth";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 type Row = Record<string, any>;
@@ -51,9 +52,18 @@ export default function ExchangeRatePanel() {
     setLoading(true);
     setError("");
     try {
-      const [rateRes, currRes] = await Promise.all([api.get("/currency/rates"), api.get("/currency")]);
+      // The company's own currencies, not the platform catalog. /currency lists
+      // every currency any tenant has ever needed — INR among them here — and
+      // offering those invites a rate between two currencies this company does
+      // not use. BBP-1 §1.1 gives a company one base and one foreign currency.
+      const companyId = getActiveCompanyId();
+      const [rateRes, detailRes] = await Promise.all([
+        api.get("/currency/rates"),
+        companyId ? api.get(`/setup/wizard/company-details/${companyId}`) : Promise.resolve(null),
+      ]);
       setRows(unwrap<Row[]>(rateRes) || []);
-      setCurrencies(unwrap<Row[]>(currRes) || []);
+      const detail: any = detailRes ? unwrap<any>(detailRes) : null;
+      setCurrencies(detail?.currencies || []);
     } catch (err: any) {
       setError(err?.message || t("finExchangeRateLoadFailed"));
     } finally {

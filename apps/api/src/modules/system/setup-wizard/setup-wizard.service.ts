@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and, or, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -562,11 +562,33 @@ export class SetupWizardService implements OnModuleInit {
       .from(schema.companyModules)
       .where(eq(schema.companyModules.company_id, companyId));
 
+    // The company's own currencies, joined to their codes. BBP-1 §1.1 gives a
+    // company one base currency and treats the other as the foreign/local one,
+    // so anything asking "which currencies may this company use" should read
+    // this rather than the platform-wide catalog, which lists every currency
+    // any tenant has ever needed.
+    const currencies = await this.db
+      .select({
+        currency_id: schema.companyCurrencyConfig.currency_id,
+        iso_code: schema.currencyMaster.iso_code,
+        currency_name: schema.currencyMaster.currency_name,
+        symbol: schema.currencyMaster.symbol,
+        decimal_places: schema.currencyMaster.decimal_places,
+        symbol_position: schema.currencyMaster.symbol_position,
+        is_base: schema.companyCurrencyConfig.is_base,
+        is_reporting: schema.companyCurrencyConfig.is_reporting,
+      })
+      .from(schema.companyCurrencyConfig)
+      .innerJoin(schema.currencyMaster, eq(schema.companyCurrencyConfig.currency_id, schema.currencyMaster.currency_id))
+      .where(eq(schema.companyCurrencyConfig.company_id, companyId))
+      .orderBy(desc(schema.companyCurrencyConfig.is_base));
+
     return {
       company,
       address: address || null,
       contact: contact || null,
       fiscal: fiscal || null,
+      currencies,
       modules: modules.map(m => m.module_code)
     };
   }
