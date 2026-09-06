@@ -227,6 +227,40 @@ export class ItemService {
     await this.db.transaction(async (tx) => {
       await tx.insert(schema.itemMaster).values(newItem);
 
+      // The Item Master Template has the item's factor "Auto-filled from
+      // uom_conversion_master", so the conversion belongs in that table rather
+      // than only on the item. If the pair is already recorded the form shows it
+      // read-only and nothing is written here; if it was captured on this form
+      // for the first time, record it now so the next item inherits it and the
+      // two can never disagree.
+      if (dto.uom_secondary && dto.uom_conversion_factor != null) {
+        const pair = [
+          eq(schema.uomConversionMaster.tenant_id, tenantId),
+          eq(schema.uomConversionMaster.from_uom, dto.uom_primary.toUpperCase()),
+          eq(schema.uomConversionMaster.to_uom, dto.uom_secondary.toUpperCase()),
+          companyId ? eq(schema.uomConversionMaster.company_id, companyId) : isNull(schema.uomConversionMaster.company_id),
+        ];
+        const [existing] = await tx.select({ id: schema.uomConversionMaster.conversion_id })
+          .from(schema.uomConversionMaster).where(and(...pair)).limit(1);
+        if (!existing) {
+          await tx.insert(schema.uomConversionMaster).values({
+            conversion_id: randomUUID(),
+            tenant_id: tenantId,
+            company_id: companyId,
+            item_id: null, // applies to every item using this unit pair
+            from_uom: dto.uom_primary.toUpperCase(),
+            to_uom: dto.uom_secondary.toUpperCase(),
+            conversion_factor: dto.uom_conversion_factor.toString(),
+            // effective_from is NOT NULL and the form does not ask for it here;
+            // the factor is true from the moment it is recorded, and left
+            // open-ended until someone supersedes it in UOM Conversion.
+            effective_from: toMysqlTimestamp().slice(0, 10),
+            is_active: true,
+            created_by: userPayload?.userId || null,
+          });
+        }
+      }
+
       if (dto.attributes && dto.attributes.length > 0) {
         for (const attr of dto.attributes) {
           // Verify attribute definition exists

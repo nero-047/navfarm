@@ -129,6 +129,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [entityOptions, setEntityOptions] = useState<Record<string, Row[]>>({});
+  // Per derived field: "found" when the source master already holds the value
+  // (so it is filled and locked), "missing" when it does not (so it is asked
+  // for here and recorded), undefined while the parents are incomplete.
+  const [derived, setDerived] = useState<Record<string, "found" | "missing">>({});
 
   const [nobFilterOptions, setNobFilterOptions] = useState<Row[]>([]);
   const [lobFilterOptions, setLobFilterOptions] = useState<Row[]>([]);
@@ -172,7 +176,16 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   // stands as a warning and the row saves without a code.
   const codeIsMandatory = !!config.fields.find((f) => f.key === numbering.codeKey)?.required;
   const numberingBlocks = !!numbering.error && codeIsMandatory;
-  const formFields = config.fields.map(numbering.field).filter((f) => !f.hideInForm && !(workspaceScope === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)));
+  // A derived field is read-only once its source master supplies the value, and
+  // required while it does not — that is the moment the number is captured.
+  const applyDerived = (f: MasterDataField): MasterDataField => {
+    if (!f.derivedFrom) return f;
+    const state = derived[f.key];
+    if (state === "found") return { ...f, readOnly: true, required: false, helpText: `From ${f.derivedFrom.endpoint.replace(/^\//, "")} — the stored factor for these units.` };
+    if (state === "missing") return { ...f, readOnly: false, required: true, helpText: f.derivedFrom.missingHelpText || f.helpText };
+    return { ...f, readOnly: true, helpText: f.helpText };
+  };
+  const formFields = config.fields.map(numbering.field).map(applyDerived).filter((f) => !f.hideInForm && !(workspaceScope === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)));
   // A requiresParent field is offered only once it can actually be filtered, and
   // only if that filter leaves something to choose. Before this, Sub Category
   // listed every category in the tenant while no Category was selected.
@@ -285,6 +298,46 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     // effect that actually powers those dropdowns, not the dependent-fields
     // effect below.
   }, [config.key, entityReloadKey]);
+
+  // Fill a derivedFrom field from its source master. The Item Master Template
+  // says the UOM Conversion Factor is "Auto-filled from uom_conversion_master",
+  // so when that table already holds the pair the number is shown and locked;
+  // when it does not, the field stays open so the factor is captured once, here,
+  // and saved into UOM Conversion rather than living only on the item.
+  useEffect(() => {
+    if (!modalOpen) return;
+    let cancelled = false;
+    for (const f of config.fields.filter((x) => x.derivedFrom)) {
+      const d = f.derivedFrom!;
+      const params = new URLSearchParams();
+      let complete = true;
+      for (const [fieldKey, paramName] of Object.entries(d.params)) {
+        const v = form[fieldKey];
+        if (!v) { complete = false; break; }
+        params.set(paramName, String(v));
+      }
+      if (!complete) {
+        setDerived((prev) => (prev[f.key] === undefined ? prev : { ...prev, [f.key]: undefined as any }));
+        continue;
+      }
+      if (companyId) params.set("companyId", companyId);
+      api.get(`${d.endpoint}${d.endpoint.includes("?") ? "&" : "?"}${params}`).then((res: any) => {
+        if (cancelled) return;
+        const rows = unwrap<Row[]>(res) || [];
+        const hit = Array.isArray(rows) ? rows[0] : undefined;
+        if (hit && hit[d.valueKey] != null) {
+          setDerived((prev) => ({ ...prev, [f.key]: "found" }));
+          setForm((prev) => ({ ...prev, [f.key]: String(hit[d.valueKey]) }));
+        } else {
+          setDerived((prev) => ({ ...prev, [f.key]: "missing" }));
+        }
+      }).catch(() => { if (!cancelled) setDerived((prev) => ({ ...prev, [f.key]: "missing" })); });
+    }
+    return () => { cancelled = true; };
+    // Re-runs when a parent value changes: the fields named in every
+    // derivedFrom's params are the real dependency.
+  }, [modalOpen, companyId, config.key,
+      ...config.fields.filter((x) => x.derivedFrom).flatMap((x) => Object.keys(x.derivedFrom!.params).map((k) => form[k]))]);
 
   useEffect(() => {
     if (!modalOpen) return;

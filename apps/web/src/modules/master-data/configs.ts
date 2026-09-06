@@ -556,7 +556,19 @@ const item: MasterDataConfig = {
     // no single obviously-correct type to narrow this picker to.
     { key: "uom_primary", label: "Primary UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Units & Valuation" },
     { key: "uom_secondary", label: "Secondary UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Units & Valuation" },
-    { key: "uom_conversion_factor", label: "UOM Conversion Factor", type: "number", step: "0.000001", helpText: "Optional. 1 secondary unit = this many primary units (e.g. 1 BAG = 50 KG -> 50)." },
+    {
+      // Item Master Template: "Auto-filled from uom_conversion_master. 1
+      // secondary = N primary." Shown read-only when that table already holds
+      // the pair; asked for, and recorded there, when it does not.
+      key: "uom_conversion_factor", label: "UOM Conversion Factor", type: "number", step: "0.000001",
+      section: "Units & Valuation",
+      derivedFrom: {
+        endpoint: "/uom/conversion", params: { uom_primary: "fromUom", uom_secondary: "toUom" },
+        valueKey: "conversion_factor",
+        missingHelpText: "No conversion exists for these units yet — enter it once and it is saved to UOM Conversion.",
+      },
+      helpText: "Choose a Primary and Secondary UOM; the factor comes from UOM Conversion.",
+    },
     { key: "valuation_method", label: "Valuation Method", type: "select-entity", entityEndpoint: "/costing-method", entityValueKey: "method_code", entityLabelKeys: ["method_code", "method_name"], helpText: "Leave blank to inherit the LOB default.", section: "Units & Valuation" },
     { key: "standard_cost", label: "Standard Cost", type: "number", step: "0.01", requiredWhen: { anyOf: [{ key: "valuation_method", equals: "STANDARD" }] }, helpText: "Required when Valuation Method is STANDARD." },
     { key: "is_lot_tracked", label: "Lot Tracked", type: "boolean" },

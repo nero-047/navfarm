@@ -80,6 +80,19 @@ export interface MasterDataField {
    */
   requiresParent?: boolean;
   /**
+   * Fill this field from another master instead of asking for it. The Item
+   * Master Template describes the UOM Conversion Factor as "Auto-filled from
+   * uom_conversion_master. 1 secondary = N primary", so a value that table
+   * already holds should not be typed again — and the two can then never
+   * disagree.
+   *
+   * `params` maps a field on this form to the query param that filters the
+   * lookup. When every one has a value the endpoint is queried: a hit fills the
+   * field and locks it, a miss leaves it editable so the value is captured here
+   * for the first time.
+   */
+  derivedFrom?: { endpoint: string; params: Record<string, string>; valueKey: string; missingHelpText?: string };
+  /**
    * Field exists purely to scope a sibling select-entity field's options (e.g. a helper
    * nob_id/lob_id pair on a form whose own table has no such column) — collected in the form
    * but excluded from the save payload.
