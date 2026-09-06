@@ -76,7 +76,6 @@ export default function CompanyTab({
   // state only when no owner is passed.
   const [ownTab] = useState<"profile" | "address" | "contact" | "localization" | "fiscal" | "modules">("profile");
   const settingsTab = (section as typeof ownTab) || ownTab;
-  const activeSection = SETTINGS_SECTIONS.find((sec) => sec.key === settingsTab) ?? SETTINGS_SECTIONS[0];
 
   // Support catalogs fetched on mount
   const [languages, setLanguages] = useState<any[]>([]);
@@ -742,22 +741,11 @@ export default function CompanyTab({
           <ArrowLeft className="w-4 h-4" />{t("ctBackToDirectory")}</button>
       )}
 
-      {/* One column, full width. This was a 12-column grid with the form in 8
-          and a right-hand column holding the administrators and tenant-summary
-          cards. Those cards are gone, so the column held nothing and a third of
-          the page was empty while the form stayed cramped beside it. */}
-      <div className="company-settings-container flex flex-col gap-4">
-
-          <Card className="nf-company-config flex flex-col gap-5 border-(--border) bg-(--surface) p-5">
-            {/* Names the section you are on. It used to read "ERP setup
-                configuration" on all six, with the company UUID under it —
-                a heading that told you nothing you had not just clicked, over
-                an identifier no one operating a farm needs to read. The company
-                is already identified by the strip above this card. */}
-            <div className="flex flex-col gap-1 border-b border-(--border) pb-4">
-              <h2 className="text-sm font-semibold text-(--text-primary)">{t(activeSection.labelKey)}</h2>
-              <p className="text-xs leading-5 text-(--text-secondary)">{t(activeSection.descKey)}</p>
-            </div>
+      {/* No card. The section title and its one explanatory line moved to the
+          page header, and what was left was a border drawn around the only
+          thing on the page — the form sits on the page itself now, the way a
+          settings screen normally reads. */}
+      <div className="company-settings-container nf-company-config flex flex-col gap-5">
 
             {setupLoadWarning && (
               <div className="flex items-start gap-2 rounded-lg border border-(--warning) bg-(--warning-muted) px-3 py-2.5 text-xs leading-5 text-(--warning)">
@@ -1502,7 +1490,6 @@ export default function CompanyTab({
 
               </div>
             )}
-          </Card>
 
       </div>
     </div>

@@ -30,6 +30,7 @@ export function CompanySettingsView({ companyId, section = "profile", basePath =
   const router = useRouter();
   const { t } = useLanguage();
   const { user, tenantId, companies, currencies, loading, error, reload } = useCompaniesPageData();
+  const activeSection = SETTINGS_SECTIONS.find((sec) => sec.key === section) ?? SETTINGS_SECTIONS[0];
 
   // The sections belong in the console's own sub-sidebar, next to where Master
   // Data and Finance put theirs — not in a second sidebar drawn inside the
@@ -57,15 +58,20 @@ export function CompanySettingsView({ companyId, section = "profile", basePath =
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 px-4 pb-4 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
-      {/* The company identity belongs in the page header, not in a card under
-          it. It used to be both: the header named the company in its
-          description and a strip directly below repeated the same name, code
-          and country beside an avatar — two identity blocks stacked, the
-          second one costing a full row of vertical space to say nothing new.
-          PageHeader already has a `meta` slot for exactly this. */}
+      {/* Everything identifying the page lives here, once. The section's own
+          title and description used to be a card header below this, and the
+          company's name and code a second card below that — three heading
+          blocks before the first field.
+
+          The company name is deliberately not repeated in this header: the
+          breadcrumb above it and the company card in the main sidebar both
+          already carry it, so a third copy is what pushed the form off the
+          first screen. The section name is likewise not repeated — the
+          sub-sidebar marks the active section, which is the same information
+          in the place the user just clicked. */}
       <PageHeader
         title={t("coSettingsTitle")}
-        description={targetCompany.company_name}
+        description={t(activeSection.descKey)}
         meta={
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={S.muted}>
             <span className="font-mono">{targetCompany.company_code}</span>
