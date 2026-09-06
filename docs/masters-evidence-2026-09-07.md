@@ -49,7 +49,7 @@ Lifecycle Stage Config, 32 KPI Parameters, 47-code Reason Master, Dimensions/Cos
 | Master | Rows | Evidence | Note |
 |---|---:|---|---|
 | **Resources** | 4 | Client template `Resource Master Template.xlsx`; TDD tracker row 138 | The words "resource master" do not appear in BBP-1. |
-| **Medicines** | 3 | — | Medicine is an **item type** in the BBP (§1.5 "feed, medicine, vaccine, semen dose…"), not a master. Withdrawal Days is a field on the BC item. The master is a NAVFarm-side profile; its withdrawal value is now displayed from the linked item rather than editable separately. |
+| **Medicines** | 3 | **none** | No document asks for a Medicine master. BBP-1 mentions medicine 12 times, always as an *item*: §1.5 "Items (feed, **medicine**, vaccine, semen dose…) are CREATED IN D365BC only", with "Withdrawal Days (for medicine)" as a BC-owned **item** field. The client's Item Master Template declares Withdrawal Period Days as an Item field; the TDD tracker's only two mentions are Item Master rows (medicine is an item *category*); there is no Medicine template and no MOM mentions medicine at all. The table holds `item_id` plus composition, dosage_guideline, route_of_administration (requested by **no** document) and withdrawal_period_days (duplicating `item_master.withdrawal_days`). Added by Arun 2026-07-27/08-05. **Rishi's decision 2026-09-06: remove it and fold into Item.** |
 
 ### Nested / lookup masters
 
@@ -139,7 +139,7 @@ Stated plainly so nothing here is a surprise on the day.
   on-screen notice states §1.5 and §1.6 and that no BC integration exists yet. Deliberate, per
   Rishi, so work is possible before the connector lands.
 - **The 44 undocumented reason codes are absent by choice**, not oversight.
-- **Animal codes are inconsistent in the demo data.** The 20 seeded animals are `PIG-001`…`PIG-020` (three digits, no year); the series is configured for `PIG-YYYY-NNNN`, so the next animal registered renders as `PIG-2026-0021` in a list where everything else is `PIG-001`. Existing rows were left untouched deliberately when the series was corrected (commit `edf4a06`).
+- ~~Animal codes inconsistent in the demo data.~~ **Resolved 2026-09-06.** The 20 seeded animals were renumbered `PIG-2026-0001`…`PIG-2026-0020` to match the configured series; the next registration continues at `PIG-2026-0021`. `animal_code` exists in exactly one column and all 12 foreign keys reference `animal_id`, so nothing pointed at the old values. Note this follows the client template's `PIG-YYYY-SEQ`, not the BBP's `ANM-YYYY-NNNNN` — see §2 #10, still a client decision.
 - Operational lifecycle-stepper screens still use the old static stages; aligning the master did
   not rewire them.
 - The master-data page shell still gates on administrator type even where the API grants a
