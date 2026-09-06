@@ -825,7 +825,7 @@ export class BatchService {
       [bioState] = await this.db.select().from(schema.batchBioAssetState).where(eq(schema.batchBioAssetState.batch_id, id)).limit(1);
       if (!bioState) {
         const stateId = randomUUID();
-        const stage = batch.current_stage_code === 'DRY_SOW_GESTATION' || batch.current_stage_code === 'LACTATION' ? 'MATURE' : 'PREMATURE';
+        const stage = ['GESTATION', 'DRY_SOW_GESTATION', 'LACTATION'].includes(batch.current_stage_code || '') ? 'MATURE' : 'PREMATURE';
         await this.db.insert(schema.batchBioAssetState).values({
           state_id: stateId,
           batch_id: id,
@@ -2272,7 +2272,7 @@ export class BatchService {
         if (row.feed_qty != null && Number(row.feed_qty) > 0) {
           let feedItemId = row.feed_item_id;
           if (!feedItemId) {
-            if (batch.current_stage_code === 'DRY_SOW_GESTATION') {
+            if (batch.current_stage_code === 'GESTATION' || batch.current_stage_code === 'DRY_SOW_GESTATION') {
               feedItemId = feedItems.find((i) => i.item_code.includes('GEST'))?.item_id;
             } else if (batch.current_stage_code === 'LACTATION' || batch.current_stage_code === 'FARROWING') {
               feedItemId = feedItems.find((i) => i.item_code.includes('CREEP') || i.item_code.includes('LACT'))?.item_id;
@@ -2932,5 +2932,4 @@ export class BatchService {
     return { success: true };
   }
 }
-
 

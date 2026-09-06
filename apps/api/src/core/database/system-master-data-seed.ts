@@ -7,6 +7,8 @@
  * entries alongside these via the normal master-data APIs.
  */
 
+import { BBP_STAGE_SEED, BBP_STAGE_RENAMES } from './piggery-bbp-stage-seed';
+
 export const SYSTEM_UOM_SEED: Array<{
   uom_code: string;
   uom_name: string;
@@ -306,7 +308,7 @@ export const SYSTEM_PARAMETER_SEED: Array<{
  * not exist among these 11 rows. alt_next_stage_code is left undefined for that
  * row — it resolves to a null alt_next_stage_id rather than a made-up stage.
  */
-export const SYSTEM_STAGE_SEED: Array<{
+const LEGACY_STAGE_SEED: Array<{
   stage_code: string;
   stage_name: string;
   stage_category: 'PRE_PRODUCTIVE' | 'PRODUCTIVE' | 'OUTPUT' | 'DISPOSAL';
@@ -335,6 +337,9 @@ export const SYSTEM_STAGE_SEED: Array<{
   { stage_code: 'DISPOSED', stage_name: 'Disposed / End of Life', stage_category: 'DISPOSAL', stage_sequence: 11, min_days_before_move: 0, transition_trigger: 'MANUAL', data_entry_form: 'STANDARD', show_on_animal_card: true, stage_description: 'Terminal stage — animal sold, slaughtered, or deceased.' },
 ];
 
+/** BBP §1.7 supersedes the earlier 11-stage workbook examples above. */
+export const SYSTEM_STAGE_SEED: typeof LEGACY_STAGE_SEED = [...BBP_STAGE_SEED];
+
 /**
  * Number Series definitions. BATCH is tenant-wide (nob_code/lob_code unset) —
  * the series that already had an equivalent hand-rolled generator before Phase
@@ -357,8 +362,10 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
   separator: string;
   seq_length: number;
   reset_frequency: 'YEARLY' | 'MONTHLY' | 'NEVER';
+  allow_manual?: boolean;
 }> = [
   { series_code: 'BATCH', series_name: 'Batch Number', document_type: 'BATCH', prefix: 'BATCH', separator: '-', seq_length: 6, reset_frequency: 'NEVER' },
+  { series_code: 'REASON', series_name: 'Reason Code', document_type: 'REASON', prefix: 'RSN', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
   { series_code: 'ANIMAL_PIGGERY', series_name: 'Piggery Animal Code', document_type: 'ANIMAL', nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', prefix: 'PIG', date_format: 'YYYY', separator: '-', seq_length: 4, reset_frequency: 'YEARLY' },
   { series_code: 'ITEM', series_name: 'Item Code', document_type: 'ITEM', prefix: 'ITM', separator: '-', seq_length: 4, reset_frequency: 'NEVER' },
   { series_code: 'SUPPLIER', series_name: 'Supplier Code', document_type: 'SUPPLIER', prefix: 'SUP', separator: '-', seq_length: 3, reset_frequency: 'NEVER' },
@@ -393,7 +400,7 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
  * breed_code and stage_code are resolved to UUIDs at seed time in seed-dev-tenant.ts.
  * feed_item_code and output_item_code are resolved to item_ids from SYSTEM_ITEM_SEED.
  */
-export const SYSTEM_BREED_LIFECYCLE_SEED: Array<{
+const LEGACY_BREED_LIFECYCLE_SEED: Array<{
   breed_code: string;
   stage_code: string;
   calc_unit: 'DAY' | 'WEEK' | 'MONTH';
@@ -459,3 +466,13 @@ export const SYSTEM_BREED_LIFECYCLE_SEED: Array<{
     { breed_code, stage_code: 'DISPOSED',          calc_unit: 'DAY' as const, period_from: 1, period_to: 1, std_mortality_rate_pct: 0.0, alert_severity: 'INFO'    as const, notes: 'Record disposal reason.' },
   ]),
 ];
+
+/** Preserve illustrative feed benchmarks only where the BBP stage identity is
+ * unambiguous. Do not split the old combined flushing/service profile by guess. */
+export const SYSTEM_BREED_LIFECYCLE_SEED: typeof LEGACY_BREED_LIFECYCLE_SEED = LEGACY_BREED_LIFECYCLE_SEED.flatMap((row) => {
+  const code = BBP_STAGE_RENAMES[row.stage_code] || row.stage_code;
+  const stage = SYSTEM_STAGE_SEED.find((entry) => entry.stage_code === code);
+  if (!stage) return [];
+  return [{ ...row, stage_code: code, period_to: stage.typical_duration_days ?? row.period_to,
+    notes: 'Illustrative demo benchmark, not a client-approved feeding protocol. Stage duration aligned to BBP §1.7; confirm breed-specific targets before live use.' }];
+});

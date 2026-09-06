@@ -463,7 +463,7 @@ describe('BatchService', () => {
       scheduler_id: 'sched-1',
       start_date: '2026-07-01',
       opening_quantity: '20.0000',
-      current_stage_code: 'DRY_SOW_GESTATION',
+      current_stage_code: 'GESTATION',
     };
 
     const feedParameter = {
@@ -1019,7 +1019,6 @@ describe('BatchService', () => {
     });
   });
 });
-
 
 
 

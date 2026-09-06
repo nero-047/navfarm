@@ -124,15 +124,13 @@ async function run() {
       const stageIds: Record<string, string> = {};
       for (const definition of SYSTEM_STAGE_SEED) {
         const { next_stage_code, alt_next_stage_code, ...row } = definition;
-        if (row.stage_code === 'DRY_SOW_GESTATION') row.typical_duration_days = 116;
-        if (row.stage_code === 'GILT_GROWER') row.typical_duration_days = 210;
         if (row.stage_code === 'QUARANTINE') { row.typical_duration_days = 28; row.auto_move_on_day = 28; }
         stageIds[row.stage_code] = await add(s.stageMaster, { ...row, ...domain });
       }
       for (const row of SYSTEM_STAGE_SEED) await tx.update(s.stageMaster).set({ next_stage_id: row.next_stage_code ? stageIds[row.next_stage_code] : null, alt_next_stage_id: row.alt_next_stage_code ? stageIds[row.alt_next_stage_code] : null }).where(eq(s.stageMaster.stage_id, stageIds[row.stage_code]));
       for (const [code, name] of [['LARGE_WHITE', 'Large White'], ['LANDRACE', 'Landrace'], ['DUROC', 'Duroc'], ['YORKSHIRE', 'Yorkshire']]) {
         const breed = await add(s.breedMaster, { breed_code: code, breed_name: name, species_id: species, species: 'PIG', breed_type: 'MEAT', gestation_days: 116, lactation_days: 28, productive_life_months: 36, avg_litter_size_born: '11.5', avg_litter_size_weaned: '10', avg_weaning_weight_kg: '7', farrowing_rate_pct: '85', avg_fcr: '2.8', ...domain });
-        for (const [stage, feed, days, qty, weight] of [['DRY_SOW_GESTATION', 'FEED_GEST', 116, '2.5', '180'], ['LACTATION', 'FEED_LACT', 28, '5', '170'], ['CB_GROWER', 'FEED_GROW', 77, '2', '100']] as const) await add(s.breedLifecycleStages, { breed_id: breed, stage_id: stageIds[stage], calc_unit: 'DAY', period_from: 1, period_to: days, feed_item_id: items[feed], feed_qty_per_head_per_day_kg: qty, std_body_weight_kg: weight, season_type: 'ALL', notes: 'Demo benchmark for software testing; confirm farm-specific standards before live use.' });
+        for (const [stage, feed, days, qty, weight] of [['GESTATION', 'FEED_GEST', 116, '2.5', '180'], ['LACTATION', 'FEED_LACT', 28, '5', '170']] as const) await add(s.breedLifecycleStages, { breed_id: breed, stage_id: stageIds[stage], calc_unit: 'DAY', period_from: 1, period_to: days, feed_item_id: items[feed], feed_qty_per_head_per_day_kg: qty, std_body_weight_kg: weight, season_type: 'ALL', notes: 'Demo benchmark for software testing; confirm farm-specific standards before live use.' });
       }
       for (const [code, name] of [['ASF', 'African swine fever'], ['PRRS', 'Porcine reproductive and respiratory syndrome'], ['SCOUR', 'Piglet diarrhoea']]) await add(s.diseaseMaster, { disease_code: code, disease_name: name, treatment_guideline: 'Demo reference only. Follow the farm veterinarian’s approved protocol.' });
       for (const code of ['IRON', 'DEWORM', 'VACCINE']) await add(s.medicineMaster, { item_id: items[code], composition: 'Demo catalog placeholder — verify licensed product label', dosage_guideline: 'Veterinarian-approved protocol required; no dosing advice supplied.', withdrawal_period_days: 0 });
