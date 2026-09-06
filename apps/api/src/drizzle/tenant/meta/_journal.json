@@ -470,6 +470,20 @@
       "when": 1788636511934,
       "tag": "0066_tranquil_hardball",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "5",
+      "when": 1788686486452,
+      "tag": "0067_stale_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "5",
+      "when": 1788687287133,
+      "tag": "0068_serious_the_watchers",
+      "breakpoints": true
     }
   ]
 }

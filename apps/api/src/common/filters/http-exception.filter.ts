@@ -1,6 +1,17 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { Response, Request } from 'express';
 
+/** Drizzle wraps driver failures in cause. Never expose SQL or constraint data. */
+export function isDuplicateEntry(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  for (let current = error; current && typeof current === 'object' && !seen.has(current);) {
+    seen.add(current);
+    if ('code' in current && current.code === 'ER_DUP_ENTRY') return true;
+    current = 'cause' in current ? current.cause : undefined;
+  }
+  return false;
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
@@ -11,7 +22,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+        : isDuplicateEntry(exception) ? HttpStatus.CONFLICT : HttpStatus.INTERNAL_SERVER_ERROR;
 
     if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
       console.error('Unhandled Exception:', exception);
@@ -20,7 +31,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const message =
       exception instanceof HttpException
         ? exception.getResponse()
-        : 'Internal server error';
+        : status === HttpStatus.CONFLICT ? 'A record with this unique code or identity already exists. Refresh and try another code.' : 'Internal server error';
 
     response.status(status).json({
       statusCode: status,

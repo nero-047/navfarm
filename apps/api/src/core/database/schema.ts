@@ -18,7 +18,7 @@ import {
   uniqueIndex,
   AnyMySqlColumn,
 } from 'drizzle-orm/mysql-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 // ==========================================
@@ -505,7 +505,7 @@ export const uomMaster = mysqlTable('uom_master', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' })
-});
+}, (table) => [ uniqueIndex('uq_uom_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.uom_code) ]);
 
 export const itemCategoryMaster = mysqlTable('item_category_master', {
   category_id: varchar('category_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -528,6 +528,7 @@ export const itemCategoryMaster = mysqlTable('item_category_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_item_category_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.category_code),
   parentCategoryFk: foreignKey({
     columns: [table.parent_category_id],
     foreignColumns: [table.category_id],
@@ -567,6 +568,7 @@ export const itemTypeMaster = mysqlTable('item_type_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_item_type_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.type_code),
   uqTypeCode: uniqueIndex('uq_item_type_master_tenant_company_code').on(
     table.tenant_id, table.company_id, table.type_code
   ),
@@ -627,7 +629,7 @@ export const itemMaster = mysqlTable('item_master', {
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
-});
+}, (table) => [ uniqueIndex('uq_item_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.item_code) ]);
 
 export const uomConversionMaster = mysqlTable('uom_conversion_master', {
   conversion_id: varchar('conversion_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -669,7 +671,7 @@ export const itemAttributeMaster = mysqlTable('item_attribute_master', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' })
-});
+}, (table) => [ uniqueIndex('uq_item_attribute_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.attribute_code) ]);
 
 export const itemAttributeValues = mysqlTable('item_attribute_values', {
   value_id: varchar('value_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -697,7 +699,7 @@ export const speciesMaster = mysqlTable('species_master', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' })
-});
+}, (table) => [ uniqueIndex('uq_species_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.species_code) ]);
 
 export const breedMaster = mysqlTable('breed_master', {
   breed_id: varchar('breed_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -745,7 +747,7 @@ export const breedMaster = mysqlTable('breed_master', {
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
-});
+}, (table) => [ uniqueIndex('uq_breed_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.breed_code) ]);
 
 export const farmMaster = mysqlTable('farm_master', {
   farm_id: varchar('farm_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -861,6 +863,7 @@ export const locationTypeMaster = mysqlTable('location_type_master', {
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_location_type_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.type_code),
   uqLocationTypeCode: uniqueIndex('uq_location_type_tenant_company_code').on(
     table.tenant_id, table.company_id, table.type_code
   ),
@@ -909,6 +912,7 @@ export const locationMaster = mysqlTable('location_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_location_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.location_code),
   parentLocationFk: foreignKey({
     columns: [table.parent_location_id],
     foreignColumns: [table.location_id],
@@ -1202,7 +1206,7 @@ export const supplierMaster = mysqlTable('supplier_master', {
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
-});
+}, (table) => [ uniqueIndex('uq_supplier_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.supplier_code) ]);
 
 export const supplierMasterRelations = relations(supplierMaster, ({ one }) => ({
   company: one(companyMaster, {
@@ -1234,7 +1238,7 @@ export const customerMaster = mysqlTable('customer_master', {
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
-});
+}, (table) => [ uniqueIndex('uq_customer_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.customer_code) ]);
 
 export const customerMasterRelations = relations(customerMaster, ({ one }) => ({
   company: one(companyMaster, {
@@ -1284,6 +1288,7 @@ export const resourceMaster = mysqlTable('resource_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_resource_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.resource_code),
   companyFk: foreignKey({
     columns: [table.company_id],
     foreignColumns: [companyMaster.company_id],
@@ -1346,6 +1351,24 @@ export const resourceMaintenanceLogRelations = relations(resourceMaintenanceLog,
   })
 }));
 
+export const reasonMaster = mysqlTable('reason_master', {
+  reason_id: varchar('reason_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  reason_code: varchar('reason_code', { length: 50 }).notNull(),
+  reason_name: varchar('reason_name', { length: 150 }).notNull(),
+  category: varchar('category', { length: 20 }).notNull(),
+  applicable_stages: json('applicable_stages').$type<string[] | null>(),
+  mandatory_weight: boolean('mandatory_weight').default(false).notNull(),
+  is_active: boolean('is_active').default(true).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
+  created_by: varchar('created_by', { length: 36 }),
+  updated_by: varchar('updated_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+  deleted_at: timestamp('deleted_at', { mode: 'string' }),
+}, (table) => [uniqueIndex('uq_reason_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.reason_code)]);
+
 export const diseaseMaster = mysqlTable('disease_master', {
   disease_id: varchar('disease_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
@@ -1363,7 +1386,7 @@ export const diseaseMaster = mysqlTable('disease_master', {
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
-});
+}, (table) => [ uniqueIndex('uq_disease_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.disease_code) ]);
 
 export const diseaseMasterRelations = relations(diseaseMaster, ({ one }) => ({
   company: one(companyMaster, {
@@ -1421,6 +1444,7 @@ export const feedFormulaMaster = mysqlTable('feed_formula_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_feed_formula_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.formula_code),
   companyFk: foreignKey({
     columns: [table.company_id],
     foreignColumns: [companyMaster.company_id],
@@ -1515,6 +1539,7 @@ export const glAccountMaster = mysqlTable('gl_account_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_gl_account_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.account_code),
   companyFk: foreignKey({
     columns: [table.company_id],
     foreignColumns: [companyMaster.company_id],
@@ -1650,6 +1675,7 @@ export const costCenterMaster = mysqlTable('cost_center_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config')
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_cost_center_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.cost_center_code),
   companyFk: foreignKey({
     columns: [table.company_id],
     foreignColumns: [companyMaster.company_id],
@@ -1779,6 +1805,7 @@ export const stageMaster = mysqlTable('stage_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config'),
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_stage_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.lob_id, table.stage_code),
   nextStageFk: foreignKey({
     columns: [table.next_stage_id],
     foreignColumns: [table.stage_id],
@@ -1859,6 +1886,7 @@ export const noSeriesMaster = mysqlTable('no_series_master', {
   deleted_at: timestamp('deleted_at', { mode: 'string' }),
   extension_config: json('extension_config'),
 }, (table) => ({
+  uqScopedCode: uniqueIndex('uq_no_series_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.series_code),
   uqSeriesCode: uniqueIndex('uq_no_series_master_tenant_company_code').on(
     table.tenant_id, table.company_id, table.series_code
   ),
