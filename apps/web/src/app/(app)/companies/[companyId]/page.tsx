@@ -10,5 +10,5 @@ import { CompanySettingsView } from "@/components/console/companies/company-sett
  */
 export default function CompanyByIdPage() {
   const params = useParams<{ companyId: string }>();
-  return <CompanySettingsView companyId={params.companyId} />;
+  return <CompanySettingsView companyId={params.companyId} basePath={`/companies/${params.companyId}`} />;
 }

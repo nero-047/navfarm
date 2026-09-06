@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle, Activity } from "lucide-react";
 import { useCompaniesPageData } from "@/components/console/companies/use-companies-page-data";
-import CompanyTab from "@/components/console/console-tabs/company-tab";
+import CompanyTab, { SETTINGS_SECTIONS } from "@/components/console/console-tabs/company-tab";
+import { useContextNav, type ContextNavModel } from "@/components/shell/ContextNav";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,10 +27,21 @@ function StatusBadge({ status, t }: { status: string; t: (key: any) => string })
   );
 }
 
-export function CompanySettingsView({ companyId }: { companyId: string }) {
+export function CompanySettingsView({ companyId, section = "profile", basePath = "/company/settings" }: { companyId: string; section?: string; basePath?: string }) {
   const router = useRouter();
   const { t } = useLanguage();
   const { user, tenantId, companies, currencies, loading, error, reload } = useCompaniesPageData();
+
+  // The sections belong in the console's own sub-sidebar, next to where Master
+  // Data and Finance put theirs — not in a second sidebar drawn inside the
+  // page. Same component, same place on screen, same behaviour.
+  const contextNav = useMemo<ContextNavModel>(() => ({
+    label: t("ctSettingsSections"),
+    groups: [{ items: SETTINGS_SECTIONS.map((s) => ({ key: s.key, label: t(s.labelKey as any) })) }],
+    activeKey: section,
+    onSelect: (key: string) => router.push(`${basePath}/${key}`),
+  }), [section, basePath, t, router]);
+  useContextNav(contextNav);
 
   if (loading) return <LoadingState label={t("coLoadingCompanies")} />;
 
@@ -91,6 +104,7 @@ export function CompanySettingsView({ companyId }: { companyId: string }) {
         currentUser={user}
         onSelectCompany={(company: any) => void company}
         skipDirectory={true}
+        section={section}
       />
     </div>
   );

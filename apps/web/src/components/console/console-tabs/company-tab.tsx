@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { ContextNav } from "@/components/shell/ContextNav";
 import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -7,15 +6,12 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Edit2,
   Save,
-  X,
   AlertCircle,
   CheckCircle,
   Building2,
   Plus,
   ArrowLeft,
-  Users,
   UserPlus,
   Check,
   Upload,
@@ -23,8 +19,6 @@ import {
 } from "lucide-react";
 import { api } from "../../../services/api-client";
 import { Dialog } from "../../ui/dialog";
-import { FullPageDialogBoundary } from "../../ui/full-page-overlay";
-import { EditMemberModal } from "../edit-member-modal";
 import { useLanguage } from "@/hooks/useLanguage";
 
 interface CompanyTabProps {
@@ -45,7 +39,7 @@ interface CompanyTabProps {
  * into a settings page, where nobody is walking a sequence. You come here to
  * change the fiscal year, not to complete step seven of eight.
  */
-const SETTINGS_SECTIONS = [
+export const SETTINGS_SECTIONS = [
   { key: "profile", labelKey: "ctSecProfile" },
   { key: "address", labelKey: "ctSecAddress" },
   { key: "contact", labelKey: "ctSecContact" },
@@ -63,7 +57,8 @@ export default function CompanyTab({
   currentUser,
   onSelectCompany,
   skipDirectory = false,
-}: CompanyTabProps) {
+  section,
+}: CompanyTabProps & { section?: string }) {
   const { t } = useLanguage();
   const isTenantAdmin = currentUser?.userType === "TENANT_ADMIN";
   const isCompanyAdmin = currentUser?.userType === "COMPANY_ADMIN";
@@ -73,8 +68,6 @@ export default function CompanyTab({
   const [selectedCompanyDetails, setSelectedCompanyDetails] = useState<any>(null);
 
   // Users of the selected details company context
-  const [companyUsers, setCompanyUsers] = useState<any[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
 
   // New admin form context
   const [adminForm, setAdminForm] = useState({
@@ -90,14 +83,16 @@ export default function CompanyTab({
   // View/edit a single operator — reuses the same modal as Team Management
   // (profile, Active toggle, role assignment, company access) instead of
   // this panel only ever offering a one-way Deactivate.
-  const [editingOperator, setEditingOperator] = useState<any | null>(null);
-  const [operatorRoles, setOperatorRoles] = useState<any[]>([]);
 
   // 8 steps detailed setup configuration context
   const [setupDetails, setSetupDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [setupLoadWarning, setSetupLoadWarning] = useState("");
-  const [settingsTab, setSettingsTab] = useState<"profile" | "address" | "contact" | "localization" | "fiscal" | "modules">("profile");
+  // The active section is the page's to own: it drives the shell sub-sidebar
+  // and the URL, so it cannot live in local state here. Falls back to internal
+  // state only when no owner is passed.
+  const [ownTab] = useState<"profile" | "address" | "contact" | "localization" | "fiscal" | "modules">("profile");
+  const settingsTab = (section as typeof ownTab) || ownTab;
 
   // Support catalogs fetched on mount
   const [languages, setLanguages] = useState<any[]>([]);
@@ -108,7 +103,16 @@ export default function CompanyTab({
   const [loadingLobs, setLoadingLobs] = useState<Record<string, boolean>>({});
 
   // Edit settings context for the active tab
-  const [isEditing, setIsEditing] = useState(false);
+  // Only a tenant or company admin may edit. This check used to live on the
+  // "Edit Configuration" button; with that button gone it has to gate the
+  // fields themselves, or removing the wizard would have handed edit rights to
+  // everyone who can view the page.
+  // Settings are editable. This was a wizard you opened, reviewed and closed,
+  // so every section had a read-only twin behind an "Edit Configuration"
+  // button; a settings page shows the fields and a Save, like every other form
+  // in the console. Kept as a constant so the per-section read-only branches
+  // fall away without rewriting six sections at once.
+  const isEditing = canEditCompany;
   const [saving, setSaving] = useState(false);
 
   // Logo upload state
@@ -217,26 +221,7 @@ export default function CompanyTab({
     fetchCatalogs();
   }, []);
 
-  const fetchCompanyUsers = async (companyId: string) => {
-    setLoadingUsers(true);
-    try {
-      const data = await api.get(`/user/company/${companyId}`);
-      setCompanyUsers(data || []);
-    } catch (err) {
-      console.error("Failed to fetch company operators:", err);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
 
-  const fetchOperatorRoles = async (companyId: string) => {
-    try {
-      const data = await api.get(`/role/company/${companyId}`);
-      setOperatorRoles(Array.isArray(data) ? data : []);
-    } catch {
-      setOperatorRoles([]);
-    }
-  };
 
   const fetchSetupDetails = async (companyId: string) => {
     setLoadingDetails(true);
@@ -254,10 +239,7 @@ export default function CompanyTab({
 
   useEffect(() => {
     if (targetCompany?.company_id) {
-      fetchCompanyUsers(targetCompany.company_id);
-      fetchOperatorRoles(targetCompany.company_id);
       fetchSetupDetails(targetCompany.company_id);
-      setIsEditing(false);
     }
   }, [targetCompany?.company_id]);
 
@@ -449,7 +431,6 @@ export default function CompanyTab({
       }
 
       setSuccess(`Company settings step updated successfully!`);
-      setIsEditing(false);
       await fetchSetupDetails(targetCompany.company_id);
       if (onRefreshCompany) {
         await onRefreshCompany(targetCompany.company_id);
@@ -471,7 +452,6 @@ export default function CompanyTab({
         modules: modulesForm
       });
       setSuccess("Nature of Business and sub-sectors modules list saved!");
-      setIsEditing(false);
       await fetchSetupDetails(targetCompany.company_id);
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
@@ -550,7 +530,6 @@ export default function CompanyTab({
       setSuccess(isTenantAdmin ? "New Company Administrator registered successfully!" : "New Company Operator registered successfully!");
       setAdminForm({ fullName: "", email: "", password: "", phone: "" });
       setShowAdminDialog(false);
-      fetchCompanyUsers(targetCompany.company_id);
       if (onRefreshCompany) {
         await onRefreshCompany(targetCompany.company_id);
       }
@@ -570,7 +549,6 @@ export default function CompanyTab({
       setSuccess("Account deactivated successfully!");
       setUserPendingDeletion(null);
       if (targetCompany?.company_id) {
-        fetchCompanyUsers(targetCompany.company_id);
       }
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
@@ -833,8 +811,7 @@ export default function CompanyTab({
         <div className="flex flex-col gap-4 lg:col-span-8">
 
           {/* Settings details card */}
-          <FullPageDialogBoundary open={isEditing} onClose={() => setIsEditing(false)} className="max-w-[980px]">
-          <Card role={isEditing ? "dialog" : undefined} aria-modal={isEditing ? true : undefined} className={`nf-company-config flex flex-col gap-5 border-(--border) bg-(--surface) p-5 ${isEditing ? "max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-[0_24px_80px_rgba(0,0,0,0.24)] sm:max-h-[calc(100dvh-3rem)]" : ""}`}>
+          <Card className="nf-company-config flex flex-col gap-5 border-(--border) bg-(--surface) p-5">
             <div className="flex justify-between items-center border-b border-(--border) pb-4">
               <div>
                 <h3 className="text-sm font-semibold text-(--text-primary)">{t("ctErpSetupConfig")}</h3>
@@ -843,24 +820,6 @@ export default function CompanyTab({
                 )}
               </div>
 
-              {/* Edit button allowed for Tenant Admin & Company Admin */}
-              {canEditCompany && (
-                <div>
-                  {!isEditing ? (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="flex h-10 items-center gap-1.5 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface) px-4 text-xs font-semibold text-(--accent) transition hover:bg-(--accent-muted)"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />{t("ctEditConfiguration")}</button>
-                  ) : (
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      className="flex items-center gap-1 text-xs text-(--text-secondary) hover:text-(--text-primary) font-semibold bg-(--surface-raised) py-1.5 px-3 rounded-lg border border-(--border) cursor-pointer transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5" />{t("ctCloseEditor")}</button>
-                  )}
-                </div>
-              )}
             </div>
 
             {setupLoadWarning && (
@@ -880,23 +839,6 @@ export default function CompanyTab({
             ) : (
               <div className="flex flex-col md:flex-row gap-6 items-start">
 
-                {/* The console has one sub-sidebar component — ContextNav —
-                    which Master Data, Finance and Production all declare a
-                    model for. Its own note says it exists "rather than
-                    hand-rolling four in-page sidebars as they did before".
-                    This page was a fifth, built from raw buttons and inline
-                    Tailwind, which is why it did not look like the rest of
-                    the application. Same sections, shared renderer. */}
-                <div className="w-full shrink-0 border-b border-(--border) pb-3 md:w-52 md:border-b-0 md:border-r md:pb-0 md:pr-4">
-                  <ContextNav
-                    model={{
-                      label: t("ctSettingsSections"),
-                      groups: [{ items: SETTINGS_SECTIONS.map((s) => ({ key: s.key, label: t(s.labelKey as any) })) }],
-                      activeKey: settingsTab,
-                      onSelect: (key: string) => setSettingsTab(key as typeof settingsTab),
-                    }}
-                  />
-                </div>
 
                 {/* Tab content body */}
                 <div className="flex-1 w-full min-w-0">
@@ -1762,7 +1704,6 @@ export default function CompanyTab({
               </div>
             )}
           </Card>
-          </FullPageDialogBoundary>
 
 
         </div>
@@ -1771,27 +1712,6 @@ export default function CompanyTab({
         <div className="flex flex-col gap-4 lg:col-span-4">
 
           {/* User list card */}
-          {/* Team Management (/users) is where people are invited, assigned
-              roles and removed. This card duplicated a slice of that, and
-              titled the same rows "Company administrators" or "Company
-              operators" purely by who was looking — nothing filtered by role.
-              A link to the real screen beats a partial copy of it. */}
-          <Card className="nf-company-config border-(--border) bg-(--surface) p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-(--accent)" />
-                <div>
-                  <h4 className="text-sm font-semibold text-(--text-primary)">{t("teamManagement")}</h4>
-                  <p className="mt-0.5 text-xs text-(--text-secondary)">
-                    {loadingUsers ? t("ctLoadingTeam") : t("ctTeamCount", { count: String(companyUsers.length) })}
-                  </p>
-                </div>
-              </div>
-              <a href="/users" className="nf-primary-action flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold text-white transition hover:opacity-90">
-                {t("ctManageTeam")}
-              </a>
-            </div>
-          </Card>
 
           <Dialog
             open={showAdminDialog}
@@ -1865,20 +1785,6 @@ export default function CompanyTab({
             <p className="text-xs leading-5 text-(--text-secondary) pt-1">{t("ctConfirmDeactivate")}</p>
           </Dialog>
 
-          {editingOperator && (
-            <EditMemberModal
-              member={editingOperator}
-              roles={operatorRoles}
-              isTenantAdmin={isTenantAdmin}
-              allCompanies={companies}
-              isSelf={!!currentUser?.userId && editingOperator.user_id === currentUser.userId}
-              onClose={() => setEditingOperator(null)}
-              onSaved={() => {
-                setEditingOperator(null);
-                if (targetCompany?.company_id) fetchCompanyUsers(targetCompany.company_id);
-              }}
-            />
-          )}
 
         </div>
 

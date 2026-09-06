@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CompanySettingsView } from "@/components/console/companies/company-settings-view";
-import { getActiveCompanyId } from "@/hooks/useAuth";
-import { LoadingState, ErrorState } from "@/components/ui/states";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { LoadingState } from "@/components/ui/states";
 import { useLanguage } from "@/hooks/useLanguage";
 
 /**
@@ -19,13 +18,7 @@ import { useLanguage } from "@/hooks/useLanguage";
  */
 export default function CompanySettingsRoute() {
   const { t } = useLanguage();
-  const [companyId, setCompanyId] = useState<string | null | undefined>(undefined);
-
-  // Read on the client: getActiveCompanyId touches localStorage, which is not
-  // there during the server render.
-  useEffect(() => { setCompanyId(getActiveCompanyId()); }, []);
-
-  if (companyId === undefined) return <LoadingState label={t("coLoadingCompanies")} />;
-  if (!companyId) return <ErrorState message={t("coNotFoundDesc")} />;
-  return <CompanySettingsView companyId={companyId} />;
+  const router = useRouter();
+  useEffect(() => { router.replace("/company/settings/profile"); }, [router]);
+  return <LoadingState label={t("coLoadingCompanies")} />;
 }
