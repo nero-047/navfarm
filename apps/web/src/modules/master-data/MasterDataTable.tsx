@@ -677,19 +677,33 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       const disabled = f.dependsOnMode !== "query" && parents.length > 0 && !resolvedEp;
       const parentLabel = parents.map((k) => tLabel(config.fields.find((pf) => pf.key === k)?.label || k)).join(" & ");
       if (f.multiple) {
+        // A real multi-select rather than a column of checkboxes: with eight
+        // stages the checkbox list was taller than the rest of the form, and it
+        // read as a settings panel rather than one field. Chosen values show as
+        // removable chips so the selection is legible without opening the list.
         const selected = parseStringList(form[f.key]);
         const missing = selected.filter((key) => !options.some((option) => option[f.entityValueKey || "id"] === key));
-        return <div role="group" aria-label={f.label} className="grid gap-2 rounded-lg border p-3" style={S.surface}>
-          {options.map((option) => {
-            const key = String(option[f.entityValueKey || "id"]);
-            return <label key={key} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={selected.includes(key)} disabled={disabled || f.readOnly}
-                onChange={(e) => setField(f.key, e.target.checked ? [...selected, key] : selected.filter((entry) => entry !== key))} />
-              {entityLabel(option, f)}
-            </label>;
-          })}
-          {missing.map((key) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked onChange={() => setField(f.key, selected.filter((entry) => entry !== key))} />{key} — unavailable in active catalog</label>)}
-          {!options.length && <p className="text-xs" style={S.muted}>No selectable records loaded.</p>}
+        const unselected = options.filter((o) => !selected.includes(String(o[f.entityValueKey || "id"])));
+        return <div className="flex flex-col gap-2">
+          {(selected.length > 0) && <div className="flex flex-wrap gap-1.5">
+            {selected.map((key) => {
+              const option = options.find((o) => String(o[f.entityValueKey || "id"]) === key);
+              return <span key={key} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs" style={S.raised}>
+                {option ? entityLabel(option, f) : `${key} — unavailable in active catalog`}
+                {!f.readOnly && <button type="button" aria-label={`Remove ${key}`} onClick={() => setField(f.key, selected.filter((entry) => entry !== key))}
+                  className="font-semibold" style={{ color: "var(--danger)" }}>×</button>}
+              </span>;
+            })}
+          </div>}
+          <select {...accessibility} value="" disabled={disabled || f.readOnly || !unselected.length}
+            className={`${inputCls} nf-select`} style={S.input}
+            onChange={(e) => { if (e.target.value) setField(f.key, [...selected, e.target.value]); }}>
+            <option value="">{!options.length ? t("selectPlaceholder") : unselected.length ? t("selectPlaceholder") : ""}</option>
+            {unselected.map((o) => (
+              <option key={String(o[f.entityValueKey || "id"])} value={String(o[f.entityValueKey || "id"])}>{entityLabel(o, f)}</option>
+            ))}
+          </select>
+          {!!missing.length && <p className="text-xs" style={S.muted}>{missing.length} selected value(s) are not in the active catalog.</p>}
         </div>;
       }
       return (

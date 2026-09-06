@@ -524,6 +524,12 @@ export class CreateBreedLifecycleStageDto {
   @ApiProperty({ description: 'End of this standard range in calc_unit', example: 11 })
   @IsInt()
   period_to: number;
+  @ApiProperty({ description: 'Standard teat count for this line at this stage. BBP §6 hard-blocks gilt selection below 15.', required: false, example: 15 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  std_teats?: number;
+
 
   @ApiProperty({ description: 'Season this standard applies to, if seasonal', required: false, example: 'Winter' })
   @IsString()
@@ -640,6 +646,12 @@ export class UpdateBreedLifecycleStageDto {
   @IsInt()
   @IsOptional()
   period_to?: number;
+  @ApiProperty({ description: 'Standard teat count for this line at this stage. BBP §6 hard-blocks gilt selection below 15.', required: false, example: 15 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  std_teats?: number;
+
 
   @ApiProperty({ required: false })
   @IsString()

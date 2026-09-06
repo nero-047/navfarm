@@ -682,6 +682,7 @@ export class BreedService {
       calc_unit: dto.calc_unit,
       period_from: dto.period_from,
       period_to: dto.period_to,
+      std_teats: dto.std_teats ?? null,
       season_type: dto.season_type || null,
       feed_item_id: dto.feed_item_id || null,
       feed_qty_per_head_per_day_kg: dto.feed_qty_per_head_per_day_kg?.toString() || null,
@@ -779,6 +780,7 @@ export class BreedService {
     if (dto.calc_unit !== undefined) updates.calc_unit = dto.calc_unit;
     if (dto.period_from !== undefined) updates.period_from = dto.period_from;
     if (dto.period_to !== undefined) updates.period_to = dto.period_to;
+    if (dto.std_teats !== undefined) updates.std_teats = dto.std_teats;
     if (dto.season_type !== undefined) updates.season_type = dto.season_type;
     if (dto.feed_item_id !== undefined) updates.feed_item_id = dto.feed_item_id;
     if (dto.feed_qty_per_head_per_day_kg !== undefined) updates.feed_qty_per_head_per_day_kg = dto.feed_qty_per_head_per_day_kg?.toString() || null;

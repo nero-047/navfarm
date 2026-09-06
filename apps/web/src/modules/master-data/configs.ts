@@ -707,6 +707,9 @@ const breedLifecycleStage: MasterDataConfig = {
     },
     { key: "period_from", label: "Period From", type: "number", required: true },
     { key: "period_to", label: "Period To", type: "number", required: true },
+    // Breed Master Template, Lifecycle sheet: "Teats" (mandatory). The standard
+    // for the stage; BBP §6 hard-blocks gilt selection below 15.
+    { key: "std_teats", label: "Standard Teat Count", type: "number", helpText: "Minimum teat count expected at this stage. BBP §6 blocks gilt selection below 15." },
     { key: "season_type", label: "Season", type: "text", placeholder: "Winter" },
     { key: "feed_item_id", label: "Feed Item", type: "select-entity", entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
     { key: "feed_qty_per_head_per_day_kg", label: "Feed Qty per Head per Day (KG)", type: "number", step: "0.0001" },
@@ -917,7 +920,12 @@ const resource: MasterDataConfig = {
     { key: "resource_name", label: "Resource Name", type: "text", required: true, placeholder: "Senior Laborer", section: "Identification" },
     {
       key: "resource_type", label: "Resource Type", type: "select", required: true, section: "Identification",
-      options: ["MANPOWER", "EQUIPMENT", "VEHICLE", "UTILITY", "OTHER", "LABOR"].map((v) => ({ value: v, label: v === "LABOR" ? "LABOR (legacy manpower)" : v })),
+      // The client template lists MANPOWER, EQUIPMENT, VEHICLE, UTILITY, OTHER.
+      // LABOR was a legacy alias for MANPOWER and offering both made the list
+      // read as two ways to say the same thing. No resource uses LABOR — the
+      // live counts are MANPOWER 4, EQUIPMENT 2, UTILITY 2 — so it is dropped
+      // as a choice. Restore it here if a legacy row ever turns up needing it.
+      options: ["MANPOWER", "EQUIPMENT", "VEHICLE", "UTILITY", "OTHER"].map((v) => ({ value: v, label: v })),
     },
     {
       key: "resource_sub_type", label: "Sub-Type", type: "select", section: "Identification",

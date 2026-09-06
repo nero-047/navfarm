@@ -247,9 +247,16 @@ export class NumberSeriesService {
         companyCondition(schema.noSeriesMaster.company_id, companyId),
       ));
     const taken = new Set(rows.map((r) => r.series_code));
+    // Animal and Location do not take a plain series. An animal code carries a
+    // date segment and is resolved per LOB (ANIMAL_PIGGERY); a location code is
+    // hierarchical — <parent code>/<TYPE>-<seq> — counted per parent rather
+    // than from a company-wide counter, and resolved per location type
+    // (LOCATION_SHED, LOCATION_PEN...). Offering the bare key invites a series
+    // that would never be reached, so neither is listed as available.
+    const selfCoded = new Set(['ANIMAL', 'LOCATION']);
     return Object.keys(MASTER_CODE_COLUMNS)
       .sort()
-      .filter((key) => !taken.has(key))
+      .filter((key) => !taken.has(key) && !selfCoded.has(key))
       .map((key) => ({ master_key: key, code_column: MASTER_CODE_COLUMNS[key] }));
   }
 

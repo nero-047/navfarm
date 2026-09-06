@@ -1822,6 +1822,11 @@ export const breedLifecycleStages = mysqlTable('breed_lifecycle_stages', {
   calc_unit: varchar('calc_unit', { length: 10 }).notNull(), // DAY, WEEK, MONTH
   period_from: int('period_from').notNull(),
   period_to: int('period_to').notNull(),
+  // Breed Master Template, Lifecycle sheet: "Teats", mandatory. The per-animal
+  // count lives on animal_register.no_of_teats; this is the standard for the
+  // stage, which BBP §6 checks against — teat count below 15 hard-blocks gilt
+  // selection, so the threshold has to be configurable per line and stage.
+  std_teats: int('std_teats'),
   season_type: varchar('season_type', { length: 20 }),
   feed_item_id: varchar('feed_item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'restrict' }),
   feed_qty_per_head_per_day_kg: decimal('feed_qty_per_head_per_day_kg', { precision: 8, scale: 4 }),
