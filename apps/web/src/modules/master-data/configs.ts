@@ -423,6 +423,7 @@ const uomConversion: MasterDataConfig = {
   tabLabel: "UOM Conversions",
   supportsRestore: false,
   columns: [
+    { key: "conversion_code", label: "Code" },
     { key: "from_uom", label: "From" },
     { key: "to_uom", label: "To" },
     { key: "conversion_factor", label: "Factor" },
@@ -431,6 +432,7 @@ const uomConversion: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
+    { key: "conversion_code", label: "Conversion Code", type: "text", placeholder: "CONV-001", helpText: "Optional. Leave blank until the numbering convention is agreed; a series can generate it later." },
     {
       key: "item_id", label: "Item", type: "select-entity",
       entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"],
@@ -663,12 +665,14 @@ const breedLifecycleStage: MasterDataConfig = {
   tabLabel: "Lifecycle Stages",
   supportsRestore: false,
   columns: [
+    { key: "lifecycle_code", label: "Code" },
     { key: "calc_unit", label: "Unit" },
     { key: "period_from", label: "From" },
     { key: "period_to", label: "To" },
     { key: "std_fcr", label: "Std FCR" },
   ],
   fields: [
+    { key: "lifecycle_code", label: "Lifecycle Code", type: "text", placeholder: "BLS-001", helpText: "Optional. Leave blank until the numbering convention is agreed; a series can generate it later." },
     { key: "breed_id", label: "Breed", type: "select-entity", required: true, entityEndpoint: "/breed", entityValueKey: "breed_id", entityLabelKeys: ["breed_code", "breed_name"] },
     { key: "stage_id", label: "Stage", type: "select-entity", required: true, entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"] },
     {
@@ -741,14 +745,25 @@ const disease: MasterDataConfig = {
   ],
 };
 
+/**
+ * Not a master of its own. BBP-1 §1.5 lists medicine among the things that are
+ * items — "Items (feed, medicine, vaccine, semen dose, overhead supplies) are
+ * CREATED IN D365BC only" — and puts Withdrawal Days on the item card. The
+ * client's Item Master Template says the same, and the TDD tracker's only
+ * mentions of medicine are Item Master rows. So this is a per-item profile,
+ * reached through the Item workbook exactly like Item Attributes, and it is
+ * identified by its item's code rather than one of its own.
+ */
 const medicine: MasterDataConfig = {
   key: "medicine",
-  label: "Medicines",
-  description: "Medicine/vaccine profiles linked to an inventory item.",
+  label: "Medicine Profiles",
+  singular: "Medicine Profile",
+  description: "Composition, dosage and route for an item of type MEDICINE or VACCINE. Withdrawal days come from the item.",
   apiBase: "/medicine",
   idKey: "medicine_id",
-  group: "Livestock & Health",
-  isPrimary: true,
+  group: "Inventory",
+  tabOf: "item",
+  tabLabel: "Medicine",
   bcFields: [{ key: "bc_withdrawal_days", label: "Withdrawal Period (days)" }],
   columns: [
     { key: "composition", label: "Composition" },
@@ -980,10 +995,12 @@ const glMapping: MasterDataConfig = {
   group: "Finance",
   lookupFor: ["gl-account"],
   columns: [
+    { key: "mapping_code", label: "Code" },
     { key: "transaction_type", label: "Transaction Type" },
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "mapping_code", label: "Mapping Code", type: "text", placeholder: "MAP-001", helpText: "Optional. Leave blank until the numbering convention is agreed; a series can generate it later." },
     { key: "item_category_id", label: "Item Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"] },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank to match all NOBs." },
     { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank to match all LOBs under the selected NOB." },

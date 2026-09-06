@@ -11,7 +11,11 @@ export const MASTER_TABLES: Record<string, AnyMySqlTable> = {
   stage: schema.stageMaster, 'number-series': schema.noSeriesMaster, animal: schema.animalRegister,
   item: schema.itemMaster, 'item-type': schema.itemTypeMaster, 'item-category': schema.itemCategoryMaster,
   'item-attribute': schema.itemAttributeMaster, uom: schema.uomMaster,
-  'uom/conversion': schema.uomConversionMaster, species: schema.speciesMaster,
+  // Two keys, one table: 'uom/conversion' is the controller route enforceMasterRequest
+  // matches; 'uom-conversion' is what the UOM_CONVERSION master key resolves to in
+  // NumberSeriesService. Consumers dedupe by table object, so the alias is free.
+  'uom/conversion': schema.uomConversionMaster, 'uom-conversion': schema.uomConversionMaster,
+  species: schema.speciesMaster,
   breed: schema.breedMaster, 'breed-lifecycle-stage': schema.breedLifecycleStages,
   reason: schema.reasonMaster, disease: schema.diseaseMaster, medicine: schema.medicineMaster, 'feed-formula': schema.feedFormulaMaster,
   supplier: schema.supplierMaster, customer: schema.customerMaster, resource: schema.resourceMaster,

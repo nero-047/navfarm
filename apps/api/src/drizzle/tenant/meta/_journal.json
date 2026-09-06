@@ -484,6 +484,20 @@
       "when": 1788687287133,
       "tag": "0068_serious_the_watchers",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "5",
+      "when": 1788696035796,
+      "tag": "0069_green_human_robot",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "5",
+      "when": 1788696895194,
+      "tag": "0070_overconfident_red_wolf",
+      "breakpoints": true
     }
   ]
 }

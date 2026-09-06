@@ -8,6 +8,7 @@ export class CreateMedicineDto {
   @IsOptional()
   company_id?: string;
 
+
   @ApiProperty({ description: 'Item Master UUID link', example: 'item-uuid-here' })
   @IsUUID()
   @IsNotEmpty()
@@ -34,6 +35,7 @@ export class CreateMedicineDto {
 }
 
 export class UpdateMedicineDto {
+
   @ApiProperty({ required: false })
   @IsUUID()
   @IsOptional()

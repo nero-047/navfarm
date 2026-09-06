@@ -29,7 +29,7 @@ const EXPECTED: Record<string, string> = {
   breed: "Breed",
   "breed-lifecycle-stage": "Breed Lifecycle Stage",
   disease: "Disease",
-  medicine: "Medicine",
+  medicine: "Medicine Profile",
   "feed-formula": "Feed Formula",
   supplier: "Supplier",
   customer: "Customer",

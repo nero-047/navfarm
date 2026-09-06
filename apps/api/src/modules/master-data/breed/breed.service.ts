@@ -667,10 +667,16 @@ export class BreedService {
     if (dto.feed_item_id) await this.assertItemExists(dto.feed_item_id);
     if (dto.output_item_id) await this.assertItemExists(dto.output_item_id);
 
+    // breed_lifecycle_stages has no company_id — a row is scoped through its breed —
+    // so the code resolves against the tenant-wide series scope. Manual today,
+    // automatic once a BREED_LIFECYCLE_STAGE series is configured, null otherwise.
+    const lifecycleCode = await this.numberSeriesService.resolveOptionalCode('BREED_LIFECYCLE_STAGE', dto.lifecycle_code, tenantId, null);
+
     const lifecycleId = randomUUID();
     const newLifecycleStage = {
       lifecycle_id: lifecycleId,
       tenant_id: tenantId,
+      lifecycle_code: lifecycleCode,
       breed_id: dto.breed_id,
       stage_id: dto.stage_id,
       calc_unit: dto.calc_unit,
@@ -765,6 +771,10 @@ export class BreedService {
     if (dto.output_item_id) await this.assertItemExists(dto.output_item_id);
 
     const updates: any = {};
+    // Blank means "untouched": the form posts "" for every optional field, and the
+    // 24 live rows created before this column existed still hold NULL.
+    const lifecycleCode = await this.numberSeriesService.editedCode('BREED_LIFECYCLE_STAGE', dto.lifecycle_code, lifecycleStage.lifecycle_code, tenantId, null);
+    if (lifecycleCode) updates.lifecycle_code = lifecycleCode;
     if (dto.stage_id !== undefined) updates.stage_id = dto.stage_id;
     if (dto.calc_unit !== undefined) updates.calc_unit = dto.calc_unit;
     if (dto.period_from !== undefined) updates.period_from = dto.period_from;

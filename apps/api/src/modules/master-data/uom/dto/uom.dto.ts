@@ -121,6 +121,11 @@ export class QueryUomDto {
 }
 
 export class CreateUomConversionDto {
+  @ApiProperty({ description: 'Unique code for this record within the tenant/company scope. Optional: no UOM conversion number series is configured yet, so a code is only stored when one is typed. Once a series is configured the code is generated instead.', required: false, example: 'CONV-001' })
+  @IsString()
+  @IsOptional()
+  conversion_code?: string;
+
   @ApiProperty({ description: 'Item UUID (null means a generic conversion factor)', required: false })
   @IsUUID()
   @IsOptional()
@@ -158,6 +163,11 @@ export class CreateUomConversionDto {
 }
 
 export class UpdateUomConversionDto {
+  @ApiProperty({ description: 'Unique code within the tenant/company scope. Leave blank to keep the stored code unchanged.', required: false })
+  @IsString()
+  @IsOptional()
+  conversion_code?: string;
+
   @ApiProperty({ description: 'Conversion factor multiplier', required: false })
   @IsNumber()
   @IsOptional()

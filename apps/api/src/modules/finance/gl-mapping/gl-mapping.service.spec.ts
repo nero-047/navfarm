@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GlMappingService } from './gl-mapping.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NotFoundException } from '@nestjs/common';
 
 describe('GlMappingService', () => {
@@ -17,10 +18,23 @@ describe('GlMappingService', () => {
     update: mockDbUpdate,
   };
 
+  // Mirrors the real service with NO series configured, which is the state these
+  // four masters ship in: a typed code is uppercased and kept, blank stays null.
+  const numberSeries = {
+    resolveOptionalCode: jest.fn(async (_master: string, code?: string | null) => code?.trim() ? code.trim().toUpperCase() : null),
+    editedCode: jest.fn(async (_master: string, code: string | null | undefined, current?: string | null) => {
+      if (!code?.trim()) return null;
+      const next = code.trim().toUpperCase();
+      return next === current ? null : next;
+    }),
+  };
+
   beforeEach(async () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
+    numberSeries.resolveOptionalCode.mockClear();
+    numberSeries.editedCode.mockClear();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -37,6 +51,7 @@ describe('GlMappingService', () => {
             log: jest.fn().mockResolvedValue({}),
           },
         },
+        { provide: NumberSeriesService, useValue: numberSeries },
       ],
     }).compile();
 

@@ -7,6 +7,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateGlMappingDto, UpdateGlMappingDto, QueryGlMappingDto } from './dto/gl-mapping.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -17,6 +18,7 @@ export class GlMappingService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -165,11 +167,16 @@ export class GlMappingService {
     }
 
 
+    // 6. Resolve the mapping code — manual today, automatic once a GL_MAPPING
+    // series is configured. Null when neither applies; the column is nullable.
+    const mappingCode = await this.numberSeriesService.resolveOptionalCode('GL_MAPPING', dto.mapping_code, tenantId, dto.company_id);
+
     const mappingId = randomUUID();
     const newMapping = {
       mapping_id: mappingId,
       tenant_id: tenantId,
       company_id: dto.company_id || null,
+      mapping_code: mappingCode,
       item_category_id: dto.item_category_id || null,
       nob_id: dto.nob_id || null,
       lob_id: dto.lob_id || null,
@@ -401,6 +408,10 @@ export class GlMappingService {
       updated_at: toMysqlTimestamp(),
     };
 
+    // Blank means "untouched": the master-data form posts "" for every optional
+    // field, and the 18 live rows created before this column existed hold NULL.
+    const mappingCode = await this.numberSeriesService.editedCode('GL_MAPPING', dto.mapping_code, mapping.mapping_code, tenantId, mapping.company_id);
+    if (mappingCode) updates.mapping_code = mappingCode;
     if (dto.item_category_id !== undefined) updates.item_category_id = dto.item_category_id;
     if (dto.nob_id !== undefined) updates.nob_id = dto.nob_id;
     if (dto.lob_id !== undefined) updates.lob_id = dto.lob_id;

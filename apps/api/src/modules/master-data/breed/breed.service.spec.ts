@@ -25,6 +25,14 @@ describe('BreedService', () => {
     resolveSeriesFor: jest.fn(),
     generateNext: jest.fn(),
     lockSeries: jest.fn(),
+    // No BREED_LIFECYCLE_STAGE series is configured, so a typed code is kept as
+    // entered and a blank one leaves the nullable column null.
+    resolveOptionalCode: jest.fn(async (_master: string, code?: string | null) => code?.trim() ? code.trim().toUpperCase() : null),
+    editedCode: jest.fn(async (_master: string, code: string | null | undefined, current?: string | null) => {
+      if (!code?.trim()) return null;
+      const next = code.trim().toUpperCase();
+      return next === current ? null : next;
+    }),
   };
 
   const nobLobResolution = {
@@ -39,6 +47,8 @@ describe('BreedService', () => {
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
     numberSeries.resolveSeriesFor.mockReset();
+    numberSeries.resolveOptionalCode.mockClear();
+    numberSeries.editedCode.mockClear();
     numberSeries.generateNext.mockReset();
     numberSeries.lockSeries.mockReset();
     numberSeries.resolveSeriesFor.mockResolvedValue(null); // default: manual, as today

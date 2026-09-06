@@ -635,6 +635,11 @@ export const uomConversionMaster = mysqlTable('uom_conversion_master', {
   conversion_id: varchar('conversion_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
+  // Nullable by design: no numbering convention has been supplied for this master
+  // yet, so no no_series_master row exists for it. A code may be typed manually
+  // today; the moment a series is configured, NumberSeriesService.resolveOptionalCode()
+  // starts generating one with no further code change. Existing rows keep NULL.
+  conversion_code: varchar('conversion_code', { length: 50 }),
   item_id: varchar('item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'cascade' }),
   from_uom: varchar('from_uom', { length: 20 }).notNull(),
   to_uom: varchar('to_uom', { length: 20 }).notNull(),
@@ -648,7 +653,7 @@ export const uomConversionMaster = mysqlTable('uom_conversion_master', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   deleted_at: timestamp('deleted_at', { mode: 'string' })
-});
+}, (table) => [ uniqueIndex('uq_uom_conversion_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.conversion_code) ]);
 
 export const itemAttributeMaster = mysqlTable('item_attribute_master', {
   attribute_id: varchar('attribute_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -1399,6 +1404,10 @@ export const medicineMaster = mysqlTable('medicine_master', {
   medicine_id: varchar('medicine_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  // Nullable by design: no numbering convention has been supplied for this master
+  // yet, so no no_series_master row exists for it. A code may be typed manually
+  // today; the moment a series is configured, NumberSeriesService.resolveOptionalCode()
+  // starts generating one with no further code change. Existing rows keep NULL.
   item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'cascade' }),
   composition: varchar('composition', { length: 255 }),
   dosage_guideline: text('dosage_guideline'),
@@ -1574,6 +1583,11 @@ export const glMappingMaster = mysqlTable('gl_mapping_master', {
   mapping_id: varchar('mapping_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
+  // Nullable by design: no numbering convention has been supplied for this master
+  // yet, so no no_series_master row exists for it. A code may be typed manually
+  // today; the moment a series is configured, NumberSeriesService.resolveOptionalCode()
+  // starts generating one with no further code change. Existing rows keep NULL.
+  mapping_code: varchar('mapping_code', { length: 50 }),
   item_category_id: varchar('item_category_id', { length: 36 }),
   // Additive lookup-key dimensions — the spec's full 6-dimensional gl_posting_setup model
   // (nob_id, lob_id, stage_id, transaction_type, posting_group/item_category, valuation_method).
@@ -1634,7 +1648,8 @@ export const glMappingMaster = mysqlTable('gl_mapping_master', {
     columns: [table.credit_gl_account_id],
     foreignColumns: [glAccountMaster.gl_account_id],
     name: 'gl_map_credit_gl_id_fk'
-  }).onDelete('restrict')
+  }).onDelete('restrict'),
+  scopeCode: uniqueIndex('uq_gl_mapping_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.mapping_code)
 }));
 
 export const glMappingMasterRelations = relations(glMappingMaster, ({ one }) => ({
@@ -1829,6 +1844,11 @@ export const stageMaster = mysqlTable('stage_master', {
 export const breedLifecycleStages = mysqlTable('breed_lifecycle_stages', {
   lifecycle_id: varchar('lifecycle_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  // Nullable by design: no numbering convention has been supplied for this master
+  // yet, so no no_series_master row exists for it. A code may be typed manually
+  // today; the moment a series is configured, NumberSeriesService.resolveOptionalCode()
+  // starts generating one with no further code change. Existing rows keep NULL.
+  lifecycle_code: varchar('lifecycle_code', { length: 50 }),
   breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'cascade' }),
   stage_id: varchar('stage_id', { length: 36 }).notNull().references(() => stageMaster.stage_id, { onDelete: 'restrict' }),
   calc_unit: varchar('calc_unit', { length: 10 }).notNull(), // DAY, WEEK, MONTH
@@ -1855,7 +1875,9 @@ export const breedLifecycleStages = mysqlTable('breed_lifecycle_stages', {
   is_active: boolean('is_active').default(true).notNull(),
   created_by: varchar('created_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
-});
+  // No company_id on this table — a lifecycle row is scoped through its breed —
+  // so the scope key is tenant + code, not tenant + company + code.
+}, (table) => [ uniqueIndex('uq_breed_lifecycle_stages_scope_code').on(table.tenant_id, table.lifecycle_code) ]);
 
 // Reusable, concurrency-safe business-code generator. generateNext() in
 // number-series.service.ts locks a single row here (SELECT ... FOR UPDATE) rather

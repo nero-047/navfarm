@@ -497,6 +497,11 @@ const CALC_UNITS = ['DAY', 'WEEK', 'MONTH'] as const;
 const ALERT_SEVERITIES = ['INFO', 'WARNING', 'CRITICAL'] as const;
 
 export class CreateBreedLifecycleStageDto {
+  @ApiProperty({ description: 'Unique code for this record within the tenant/company scope. Optional: no breed lifecycle stage number series is configured yet, so a code is only stored when one is typed. Once a series is configured the code is generated instead.', required: false, example: 'BLS-001' })
+  @IsString()
+  @IsOptional()
+  lifecycle_code?: string;
+
   @ApiProperty({ description: 'Breed UUID this standard is for' })
   @IsUUID()
   @IsNotEmpty()
@@ -610,6 +615,11 @@ export class CreateBreedLifecycleStageDto {
 }
 
 export class UpdateBreedLifecycleStageDto {
+  @ApiProperty({ description: 'Unique code within the tenant/company scope. Leave blank to keep the stored code unchanged.', required: false })
+  @IsString()
+  @IsOptional()
+  lifecycle_code?: string;
+
   @ApiProperty({ required: false })
   @IsUUID()
   @IsOptional()

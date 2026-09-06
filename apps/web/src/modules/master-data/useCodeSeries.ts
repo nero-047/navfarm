@@ -24,6 +24,14 @@ const CODE_SERIES: Record<string, [string, string, string?]> = {
   "item-category": ["ITEM_CATEGORY", "category_code"],
   "gl-account": ["GL_ACCOUNT", "account_code", "account_type"],
   "cost-center": ["COST_CENTER", "cost_center_code", "cost_center_type"],
+  // The last four masters to gain a code. No series is configured for any of them
+  // (the client's numbering conventions are still outstanding), so the preview call
+  // returns { generated: false, allowManual: true } and the field stays a plain
+  // optional text input. Registering them now means that when a series is finally
+  // added the serial/manual toggle appears with no further frontend change.
+  "uom-conversion": ["UOM_CONVERSION", "conversion_code"],
+  "gl-mapping": ["GL_MAPPING", "mapping_code"],
+  "breed-lifecycle-stage": ["BREED_LIFECYCLE_STAGE", "lifecycle_code"],
 };
 const PARENT_FIELDS: Record<string, string> = {
   location: "parent_location_id", breed: "location_id", "item-category": "parent_category_id",

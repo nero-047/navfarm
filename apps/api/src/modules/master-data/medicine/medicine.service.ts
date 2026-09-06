@@ -7,6 +7,7 @@ import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { CreateMedicineDto, UpdateMedicineDto, QueryMedicineDto } from './dto/medicine.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { NumberSeriesService } from '../../system/number-series/number-series.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -17,6 +18,7 @@ export class MedicineService {
   constructor(
     private readonly cls: ClsService,
     private readonly auditService: AuditLogService,
+    private readonly numberSeriesService: NumberSeriesService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -69,6 +71,10 @@ export class MedicineService {
     if (existing.length > 0) {
       throw new ConflictException(`Medicine profile for Item with ID '${dto.item_id}' already exists.`);
     }
+
+    // 4. Resolve the medicine code. No MEDICINE series is configured (the client
+    // has not supplied its numbering convention yet), so this is null unless a code
+    // was typed — and becomes automatic the day a series is added, with no change here.
 
     const medicineId = randomUUID();
     const newMedicine = {
@@ -194,6 +200,8 @@ export class MedicineService {
       updated_at: toMysqlTimestamp(),
     };
 
+    // A blank code means "untouched" — the form posts "" for every optional field,
+    // and the 6 live rows created before this column existed still hold NULL.
     if (dto.item_id !== undefined) updates.item_id = dto.item_id;
     if (dto.composition !== undefined) updates.composition = dto.composition;
     if (dto.dosage_guideline !== undefined) updates.dosage_guideline = dto.dosage_guideline;

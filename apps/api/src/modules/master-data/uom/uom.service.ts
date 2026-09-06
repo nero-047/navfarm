@@ -374,11 +374,16 @@ export class UomService {
       throw new ConflictException('A conversion factor already exists between these units.');
     }
 
+    // Manual today, automatic once a UOM_CONVERSION series is configured; null
+    // when neither applies, which is why the column is nullable.
+    const conversionCode = await this.numberSeriesService.resolveOptionalCode('UOM_CONVERSION', dto.conversion_code, tenantId, companyId);
+
     const conversionId = randomUUID();
     const newConv = {
       conversion_id: conversionId,
       tenant_id: tenantId,
       company_id: companyId,
+      conversion_code: conversionCode,
       item_id: dto.item_id || null,
       from_uom: dto.from_uom.toUpperCase(),
       to_uom: dto.to_uom.toUpperCase(),
@@ -455,6 +460,10 @@ export class UomService {
       updated_at: toMysqlTimestamp(),
     };
 
+    // Blank means "untouched": the master-data form posts "" for every optional
+    // field, and rows created before this column existed still hold NULL.
+    const conversionCode = await this.numberSeriesService.editedCode('UOM_CONVERSION', dto.conversion_code, conv.conversion_code, tenantId, conv.company_id);
+    if (conversionCode) updates.conversion_code = conversionCode;
     if (dto.conversion_factor !== undefined) updates.conversion_factor = dto.conversion_factor.toString();
     if (dto.effective_from !== undefined) updates.effective_from = dto.effective_from;
     if (dto.effective_to !== undefined) updates.effective_to = dto.effective_to;

@@ -15,6 +15,17 @@ import { CodePreviewDto } from './dto/code-preview.dto';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
 
+/**
+ * Tenant + company scope for an arbitrary master table. breed_lifecycle_stages is
+ * scoped through its breed and has no company_id column at all; passing its
+ * undefined column to eq() builds invalid SQL, so the clause is simply omitted.
+ */
+const scopeKeyConditions = (columns: Record<string, any>, tenantId: string, companyId?: string | null) => {
+  const conditions = [eq(columns.tenant_id, tenantId)];
+  if (columns.company_id) conditions.push(companyCondition(columns.company_id, companyId));
+  return conditions;
+};
+
 @Injectable()
 export class NumberSeriesService {
   constructor(
@@ -156,7 +167,7 @@ export class NumberSeriesService {
     const occupied = new Set<string>();
     if (field && columns?.[field]) {
       const rows = await executor.select({ code: columns[field] }).from(table).where(and(
-        eq(columns.tenant_id, tenantId), companyCondition(columns.company_id, companyId),
+        ...scopeKeyConditions(columns, tenantId, companyId),
       ));
       for (const row of rows) occupied.add(String(row.code).toUpperCase());
     }
@@ -314,10 +325,57 @@ export class NumberSeriesService {
     const width = Number(column.getSQLType().match(/\((\d+)\)/)?.[1] || 255);
     if (!code || code.length > width) throw new BadRequestException(`Code must contain 1 to ${width} characters.`);
     const [duplicate] = await this.db.select().from(table).where(and(
-      eq(columns.tenant_id, tenantId), companyCondition(columns.company_id, companyId), eq(column, code),
+      ...scopeKeyConditions(columns, tenantId, companyId), eq(column, code),
     )).limit(1);
     if (duplicate) throw new ConflictException(`Code '${code}' already exists in this scope.`);
     return code;
+  }
+
+  /**
+   * Optional-identity counterpart of resolveNewCode(), for the masters whose code
+   * column is nullable because no numbering convention has been agreed for them
+   * yet (medicine, UOM conversion, GL mapping, breed lifecycle stage).
+   *
+   * Same three-way resolution as every other master, minus the throw:
+   *   1. a supplied code is validated for width and scope-uniqueness (manualCode);
+   *   2. else a configured series generates one;
+   *   3. else null — creation proceeds with no code, which is what happens today
+   *      because resolveCodeSettings() returns { generated: false, allowManual: true }
+   *      when no no_series_master row exists. Configure a series later and this
+   *      starts auto-numbering with no further code change.
+   */
+  async resolveOptionalCode(
+    master: string,
+    supplied: string | undefined | null,
+    tenantId: string,
+    companyId?: string | null,
+    type?: string,
+  ): Promise<string | null> {
+    if (supplied?.trim()) return this.manualCode(master, supplied, tenantId, companyId, type);
+    const series = await this.resolveSeriesFor(master, type, tenantId, companyId);
+    if (!series) return null;
+    return this.generateNext(series, tenantId, companyId);
+  }
+
+  /**
+   * Re-validates a manually edited code on update: same width/uniqueness rules as
+   * manualCode(), but the record's own row is excluded so saving an unchanged code
+   * is not a conflict with itself. Returns null when nothing was typed, meaning
+   * "leave the stored code alone" — the master-data form posts "" for an untouched
+   * optional field, and for these masters "" must not mean "clear the identity".
+   */
+  async editedCode(
+    master: string,
+    supplied: string | undefined | null,
+    current: string | null | undefined,
+    tenantId: string,
+    companyId?: string | null,
+    type?: string,
+  ): Promise<string | null> {
+    if (!supplied?.trim()) return null;
+    const code = supplied.trim().toUpperCase();
+    if (code === current) return null;
+    return this.manualCode(master, code, tenantId, companyId, type);
   }
 
   /**

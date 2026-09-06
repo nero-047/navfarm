@@ -9,3 +9,16 @@ export const MASTER_CODE_UNIQUE_KEYS: Record<string, string[]> = {
   gl_account_master: ['account_code'], cost_center_master: ['cost_center_code'],
   no_series_master: ['series_code'], stage_master: ['lob_id', 'stage_code'],
 };
+
+/**
+ * Deliberately absent: medicine_master, uom_conversion_master, gl_mapping_master
+ * and breed_lifecycle_stages. Each carries a uq_<table>_scope_code index in
+ * schema.ts and is protected by it exactly like the tables above — but their code
+ * columns are NULLABLE while the client's numbering conventions are outstanding,
+ * and a UNIQUE index does not constrain rows whose key contains NULL. Listing them
+ * here would break the two consumers, which both assume a NOT NULL code:
+ * verify-demo-master-integrity.ts asserts MySQL REJECTS a duplicated row (it will
+ * not, for NULL codes), and align-demo-bbp-masters.ts groups on `company_id`, which
+ * breed_lifecycle_stages does not have. Add them here once a series is configured
+ * for each and the columns are backfilled and made NOT NULL.
+ */

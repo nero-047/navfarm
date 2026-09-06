@@ -8,6 +8,11 @@ export class CreateGlMappingDto {
   @IsOptional()
   company_id?: string;
 
+  @ApiProperty({ description: 'Unique code for this record within the tenant/company scope. Optional: no GL mapping number series is configured yet, so a code is only stored when one is typed. Once a series is configured the code is generated instead.', required: false, example: 'MAP-001' })
+  @IsString()
+  @IsOptional()
+  mapping_code?: string;
+
   @ApiProperty({ description: 'Optional Item Category UUID link for scoped category mapping rules', required: false })
   @IsUUID()
   @IsOptional()
@@ -65,6 +70,11 @@ export class CreateGlMappingDto {
 }
 
 export class UpdateGlMappingDto {
+  @ApiProperty({ description: 'Unique code within the tenant/company scope. Leave blank to keep the stored code unchanged.', required: false })
+  @IsString()
+  @IsOptional()
+  mapping_code?: string;
+
   @ApiProperty({ required: false })
   @IsUUID()
   @IsOptional()

@@ -70,6 +70,77 @@ describe('NumberSeriesService', () => {
     });
   });
 
+  /**
+   * medicine, UOM conversion, GL mapping and breed lifecycle stage have a code
+   * column but no configured series — the client owes us its numbering
+   * conventions, so no no_series_master row was created for any of them. These
+   * cover the "nothing configured" path that every one of their creates takes
+   * today, and the "series added later" path that must then just work.
+   */
+  describe('resolveOptionalCode', () => {
+    const noRows = () => mockDbSelect.mockReturnValue({ from: () => ({ where: () => ({ limit: async () => [] }) }) });
+
+    it('returns null when nothing is typed and no series is configured', async () => {
+      jest.spyOn(service, 'resolveSeriesFor').mockResolvedValue(null);
+      await expect(service.resolveOptionalCode('GL_MAPPING', undefined, 'tenant', 'company')).resolves.toBeNull();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('treats the form\'s empty string as "no code", not as a blank identity', async () => {
+      jest.spyOn(service, 'resolveSeriesFor').mockResolvedValue(null);
+      await expect(service.resolveOptionalCode('GL_MAPPING', '   ', 'tenant', 'company')).resolves.toBeNull();
+    });
+
+    it('keeps and normalizes a manually typed code while no series exists', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: false, allowManual: true });
+      noRows();
+      await expect(service.resolveOptionalCode('GL_MAPPING', ' map-001 ', 'tenant', 'company')).resolves.toBe('MAP-001');
+    });
+
+    it('rejects a manual code already used in the same scope', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: false, allowManual: true });
+      mockDbSelect.mockReturnValue({ from: () => ({ where: () => ({ limit: async () => [{ mapping_id: 'existing' }] }) }) });
+      await expect(service.resolveOptionalCode('GL_MAPPING', 'MAP-001', 'tenant', 'company')).rejects.toThrow(ConflictException);
+    });
+
+    it('starts generating the moment a series is configured, with no other change', async () => {
+      jest.spyOn(service, 'resolveSeriesFor').mockResolvedValue('GL_MAPPING');
+      const generate = jest.spyOn(service, 'generateNext').mockResolvedValue('MAP-007');
+      await expect(service.resolveOptionalCode('GL_MAPPING', undefined, 'tenant', 'company')).resolves.toBe('MAP-007');
+      expect(generate).toHaveBeenCalledWith('GL_MAPPING', 'tenant', 'company');
+    });
+
+    it('scopes breed_lifecycle_stages on tenant alone — that table has no company_id column', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: false, allowManual: true });
+      noRows();
+      await expect(service.resolveOptionalCode('BREED_LIFECYCLE_STAGE', 'bls-001', 'tenant', null)).resolves.toBe('BLS-001');
+    });
+  });
+
+  describe('editedCode', () => {
+    it('leaves the stored code alone when the field comes back blank', async () => {
+      await expect(service.editedCode('GL_MAPPING', '', 'MAP-001', 'tenant', 'company')).resolves.toBeNull();
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
+    it('is not a conflict with itself when the code is resubmitted unchanged', async () => {
+      await expect(service.editedCode('GL_MAPPING', ' map-001 ', 'MAP-001', 'tenant', 'company')).resolves.toBeNull();
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
+    it('validates a genuinely changed code for scope uniqueness', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: false, allowManual: true });
+      mockDbSelect.mockReturnValue({ from: () => ({ where: () => ({ limit: async () => [{ mapping_id: 'other' }] }) }) });
+      await expect(service.editedCode('GL_MAPPING', 'MAP-002', 'MAP-001', 'tenant', 'company')).rejects.toThrow(ConflictException);
+    });
+
+    it('names a NULL-coded legacy row as changed, so it can finally be given a code', async () => {
+      jest.spyOn(service, 'resolveCodeSettings').mockResolvedValue({ generated: false, allowManual: true });
+      mockDbSelect.mockReturnValue({ from: () => ({ where: () => ({ limit: async () => [] }) }) });
+      await expect(service.editedCode('GL_MAPPING', 'map-001', null, 'tenant', 'company')).resolves.toBe('MAP-001');
+    });
+  });
+
   describe('read-only preview', () => {
     const returning = (rows: any[]) => {
       const builder: any = { from: () => builder, where: () => builder, limit: async () => rows, then: (resolve: any, reject: any) => Promise.resolve(rows).then(resolve, reject) };
