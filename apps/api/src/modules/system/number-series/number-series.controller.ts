@@ -7,7 +7,6 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CodePreviewDto } from './dto/code-preview.dto';
 import { RequireCodePreviewPermission } from '../../../common/decorators/require-code-preview-permission.decorator';
-import { MASTER_CODE_COLUMNS } from './master-code-columns';
 
 @ApiTags('Number Series')
 @ApiBearerAuth()
@@ -51,10 +50,9 @@ export class NumberSeriesController {
    */
   @Get('masters')
   @RequirePermission('SYSTEM', 'NUMBER_SERIES', 'view')
-  async appliesTo() {
-    return Object.keys(MASTER_CODE_COLUMNS)
-      .sort()
-      .map((key) => ({ master_key: key, code_column: MASTER_CODE_COLUMNS[key] }));
+  async appliesTo(@Req() req: any) {
+    const companyId = req.headers['x-workspace-scope'] === 'TENANT' ? null : (req.headers['x-active-company-id'] || req.user?.companyId);
+    return this.numberSeriesService.availableMasters(req.user?.tenantId || req.tenantId, companyId);
   }
 
   @Get('preview')

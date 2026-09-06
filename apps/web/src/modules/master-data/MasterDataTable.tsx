@@ -179,6 +179,17 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     // not flicker in and out; an empty array is a real "nothing to choose".
     return loaded === undefined || loaded.length > 0;
   };
+  // A master can be exhausted: Number Series takes exactly one row per master,
+  // so once every master has one there is nothing left to add and the button
+  // should go rather than open a form whose only required picker is empty.
+  // Driven by the same endpoint the picker uses, so the two cannot disagree.
+  const exhaustingField = config.fields.find((f) => f.required && f.createOnly && f.type === "select-entity" && f.entityEndpoint);
+  const exhausted = (() => {
+    if (!exhaustingField?.entityEndpoint) return false;
+    const loaded = entityOptions[exhaustingField.entityEndpoint];
+    return Array.isArray(loaded) && loaded.length === 0;
+  })();
+
   const visibleFields = (editing ? formFields.filter((f) => !f.createOnly) : formFields.filter((f) => !f.editOnly))
     .filter((f) => !f.visibleWhen || isFieldRequired({ ...f, required: false, requiredWhen: f.visibleWhen }, form))
     .filter((f) => parentSatisfied(f) && hasChoices(f));
@@ -651,7 +662,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               style={{ ...S.input, paddingLeft: "1.75rem" }}
             />
           </div>
-          {!readOnly && <button
+          {!readOnly && !exhausted && <button
             onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
             style={{ backgroundColor: "var(--accent)" }}

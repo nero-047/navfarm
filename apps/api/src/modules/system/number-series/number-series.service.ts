@@ -229,6 +229,30 @@ export class NumberSeriesService {
     return null;
   }
 
+  /**
+   * The masters that can still be given a series in this scope. A master takes
+   * its code from exactly one series — resolveSeriesFor() looks up a single row
+   * by master key — so offering a master that already has one invites a
+   * duplicate that would silently never be reached. Type-scoped series
+   * (LOCATION_SHED) are matched by prefix so a master keeps offering itself
+   * while it still has types without a series of their own.
+   */
+  async availableMasters(tenantId: string, companyId?: string | null) {
+    const rows = await this.db
+      .select({ series_code: schema.noSeriesMaster.series_code })
+      .from(schema.noSeriesMaster)
+      .where(and(
+        eq(schema.noSeriesMaster.tenant_id, tenantId),
+        isNull(schema.noSeriesMaster.deleted_at),
+        companyCondition(schema.noSeriesMaster.company_id, companyId),
+      ));
+    const taken = new Set(rows.map((r) => r.series_code));
+    return Object.keys(MASTER_CODE_COLUMNS)
+      .sort()
+      .filter((key) => !taken.has(key))
+      .map((key) => ({ master_key: key, code_column: MASTER_CODE_COLUMNS[key] }));
+  }
+
   async resolveCodeSettings(master: string, type: string | undefined, tenantId: string, companyId?: string | null) {
     if (!/^[A-Z][A-Z_]{0,49}$/.test(master)) throw new BadRequestException('Invalid master code.');
     const code = await this.resolveSeriesFor(master, type, tenantId, companyId) ||

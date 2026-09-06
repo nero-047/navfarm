@@ -145,7 +145,13 @@ export function LookupCard({
                 type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "email" ? "email" : "text"}
                 step={f.step}
                 value={String(numbering.value(f.key, form[f.key] ?? ""))}
+                // Disabled, not merely readOnly: a readOnly input still renders
+                // white, focusable and with a focus ring, so a code following
+                // the number series looked hand-editable in the nested card
+                // while the full form greyed the same field out.
                 readOnly={f.readOnly}
+                disabled={f.readOnly}
+                className={f.readOnly ? "bg-(--surface-raised) cursor-not-allowed" : undefined}
                 placeholder={f.placeholder}
                 onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
               />
