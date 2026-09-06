@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Search, Loader2, Inbox } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Inbox, Eye } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { getActiveCompanyId, getActiveWorkspaceScope } from "@/hooks/useAuth";
+import { getActiveCompanyId, getActiveWorkspaceScope, getStoredUser } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { MasterDataConfig, MasterDataField } from "./types";
 import { CollapsibleCard } from "./CollapsibleCard";
@@ -15,6 +15,8 @@ import { singularLabel } from "./labels";
 import { LookupCard } from "./LookupCard";
 import { MASTER_DATA_CONFIGS } from "./configs";
 import { useCodeSeries } from "./useCodeSeries";
+import { MasterRecordView } from "./MasterRecordView";
+import { BcOwnershipNotice } from "./BcOwnershipNotice";
 
 const PAGE_SIZE = 25;
 
@@ -135,6 +137,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const [form, setForm] = useState<Row>({});
   // Pending, not-yet-added input text for each "string-list" field's chip editor, keyed by field key.
   const [chipDrafts, setChipDrafts] = useState<Record<string, string>>({});
@@ -153,6 +156,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const workspaceScope = getActiveWorkspaceScope();
   const companyId = workspaceScope === "TENANT" ? null : getActiveCompanyId();
+  // BBP-1 §1.5 and §1.6 put Items and the Chart of Accounts in Business Central:
+  // "NAVFarm cannot create items independently", "NAVFarm does NOT maintain its own
+  // Chart of Accounts". That integration is not built, so until it is, these stay
+  // locally editable and the notice states the blueprint's position rather than
+  // the screen pretending a BC connection exists. Rishi's call, 2026-09-06.
+  const bcOwned = config.owner === "BC";
+  const administrationRestricted = !!config.businessAdminOnly && !["TENANT_ADMIN", "COMPANY_ADMIN"].includes(getStoredUser()?.userType || "");
+  const readOnly = administrationRestricted;
   const numbering = useCodeSeries(config.key, form, modalOpen && !editing);
   const formFields = config.fields.map(numbering.field).filter((f) => !f.hideInForm && !(workspaceScope === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)));
   const visibleFields = (editing ? formFields.filter((f) => !f.createOnly) : formFields.filter((f) => !f.editOnly))
@@ -281,9 +292,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   }, [modalOpen, form, config.key, entityReloadKey]);
 
   const openCreate = () => {
+    if (readOnly) return;
     setEditing(null);
     const initial: Row = {};
-    formFields.forEach((f) => { initial[f.key] = f.type === "boolean" ? false : f.type === "string-list" ? [] : ""; });
+    formFields.forEach((f) => { initial[f.key] = f.type === "boolean" ? false : f.type === "string-list" || f.multiple ? [] : ""; });
     setForm(initial);
     setFormError("");
     setChipDrafts({});
@@ -291,11 +303,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   };
 
   const openEdit = (row: Row) => {
+    if (readOnly) return;
     setEditing(row);
     const initial: Row = {};
     formFields.filter((f) => !f.createOnly).forEach((f) => {
       let v = row[f.key];
-      if (f.type === "string-list") {
+      if (f.type === "string-list" || f.multiple) {
         initial[f.key] = parseStringList(v);
         return;
       }
@@ -335,13 +348,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   });
 
   const handleSave = async () => {
+    if (readOnly) return;
     setSaving(true);
     setFormError("");
     try {
       for (const f of visibleFields) {
         if (f.filterOnly) continue;
         const v = form[f.key];
-        const isEmpty = v === "" || v === undefined || v === null;
+        const isEmpty = v === "" || v === undefined || v === null || (Array.isArray(v) && !v.length);
         if (isEmpty && isFieldRequired(f, form)) {
           throw new Error(`"${tLabel(f.label)}" is required.`);
         }
@@ -374,12 +388,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       load();
     } catch (err: any) {
       setFormError(err?.message || t("mdFailedToSave"));
+      if (!editing) numbering.refresh();
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
+    if (readOnly) return;
     if (!confirmDelete) return;
     setDeleting(true);
     try {
@@ -397,6 +413,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
    * between Active/Inactive in one click, no confirmation step (unlike the trash-icon delete
    * flow), since it's trivially reversible by clicking again. */
   const handleToggleActive = async (row: Row) => {
+    if (readOnly) return;
     const id = row[config.idKey];
     setTogglingId(id);
     try {
@@ -414,7 +431,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   };
 
   const renderField = (f: MasterDataField) => {
-    const value = form[f.key] ?? "";
+    const value = numbering.value(f.key, form[f.key] ?? "") as any;
     const accessibility = { id: `master-${config.key}-${f.key}`, "aria-label": tLabel(f.label), "aria-required": isFieldRequired(f, form) };
     if (f.type === "boolean") {
       return (
@@ -520,6 +537,22 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       // doesn't prevent fetching (mirrors the backend treating an absent filter as "show all").
       const disabled = f.dependsOnMode !== "query" && parents.length > 0 && !resolvedEp;
       const parentLabel = parents.map((k) => tLabel(config.fields.find((pf) => pf.key === k)?.label || k)).join(" & ");
+      if (f.multiple) {
+        const selected = parseStringList(form[f.key]);
+        const missing = selected.filter((key) => !options.some((option) => option[f.entityValueKey || "id"] === key));
+        return <div role="group" aria-label={f.label} className="grid gap-2 rounded-lg border p-3" style={S.surface}>
+          {options.map((option) => {
+            const key = String(option[f.entityValueKey || "id"]);
+            return <label key={key} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={selected.includes(key)} disabled={disabled || f.readOnly}
+                onChange={(e) => setField(f.key, e.target.checked ? [...selected, key] : selected.filter((entry) => entry !== key))} />
+              {entityLabel(option, f)}
+            </label>;
+          })}
+          {missing.map((key) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked onChange={() => setField(f.key, selected.filter((entry) => entry !== key))} />{key} — unavailable in active catalog</label>)}
+          {!options.length && <p className="text-xs" style={S.muted}>No selectable records loaded.</p>}
+        </div>;
+      }
       return (
         <select {...accessibility} value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={disabled}>
           <option value="">{disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder")}</option>
@@ -538,7 +571,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         step={f.step}
         value={value}
         onChange={(e) => setField(f.key, e.target.value)}
-        placeholder={f.readOnly && !editing ? "Generated when this record is created" : f.placeholder}
+        placeholder={f.placeholder}
         disabled={f.readOnly}
         className={`${inputCls} disabled:cursor-not-allowed disabled:opacity-70`}
         style={f.readOnly ? { ...S.input, backgroundColor: "var(--surface-raised)" } : S.input}
@@ -604,17 +637,25 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               style={{ ...S.input, paddingLeft: "1.75rem" }}
             />
           </div>
-          <button
+          {!readOnly && <button
             onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
             style={{ backgroundColor: "var(--accent)" }}
           >
             <Plus className="h-3.5 w-3.5" /> {t("addItem", { name: tLabel(singularLabel(config)) })}
-          </button>
+          </button>}
         </div>
       </div>
 
       {error && <InlineAlert>{error}</InlineAlert>}
+
+      {bcOwned && <BcOwnershipNotice />}
+      {administrationRestricted && <p className="rounded-lg border p-3 text-sm" style={S.raised}>Only a Tenant Admin or Company Admin can add, edit or deactivate reasons. You can view the shared catalog here.</p>}
+      {bcOwned && lookupConfigs.length > 0 && <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs text-(--text-muted)">Related NAVFarm setup:</span>
+        {lookupConfigs.filter((c) => c.owner !== "BC").map((c) => <button key={c.key} type="button"
+          className="text-xs underline" onClick={() => setLookupManager(c)}>Manage {c.label}</button>)}
+      </div>}
 
       <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
@@ -640,7 +681,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                   <TableCell colSpan={columns.length + 2} className="py-10 text-center" style={S.sub}>
                     <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
                     {t("noRecordsYet", { name: tLabel(config.label).toLowerCase() })}
-                    <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>{t("addFirstOne")}</button>
+                    {!readOnly && <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>{t("addFirstOne")}</button>}
                   </TableCell>
                 </tr>
               ) : (
@@ -652,7 +693,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                         <TableCell key={c.key} className="whitespace-nowrap" style={S.primary}>{displayValue(row, c.key, t("mdYes"), t("mdNo"))}</TableCell>
                       ))}
                       <TableCell className="text-right">
-                        {(config.supportsRestore ?? true) ? (
+                        {!readOnly && (config.supportsRestore ?? true) ? (
                           <div className="flex items-center justify-end gap-2">
                             <span className="text-[10px] font-semibold" style={{ color: inactive ? "var(--text-muted)" : "var(--success)" }}>
                               {inactive ? t("statusInactive") : t("statusActive")}
@@ -685,10 +726,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button onClick={() => openEdit(row)} title={t("edit")} className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
-                            <Pencil className="h-3.5 w-3.5" />
+                          <button onClick={() => setViewingId(String(row[config.idKey]))} aria-label={`View ${singularLabel(config)}`} title="View" className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
+                            <Eye className="h-3.5 w-3.5" />
                           </button>
-                          {!(config.supportsRestore ?? true) && (
+                          {!readOnly && <button onClick={() => openEdit(row)} title={t("edit")} className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>}
+                          {!readOnly && !(config.supportsRestore ?? true) && (
                             <button onClick={() => setConfirmDelete(row)} title={t("deactivate")} className="rounded-lg p-1.5 transition hover:bg-[var(--danger-muted)]" style={{ color: "var(--danger)" }}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -709,12 +753,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         )}
       </div>
 
+      {viewingId && <MasterRecordView config={config} id={viewingId} onClose={() => setViewingId(null)} />}
+
       {/* Master forms open in a centred window. Dense, sectioned forms use a
           near-full-page presentation like Business Central, while compact
           masters keep a conventional modal. Both retain one scrolling body,
           a pinned action footer, focus trapping and Escape handling. */}
       <Dialog
-        open={modalOpen}
+        open={modalOpen && !readOnly}
         onClose={() => !saving && setModalOpen(false)}
         title={editing ? t("editItem", { name: tLabel(singularLabel(config)) }) : t("addItem", { name: tLabel(singularLabel(config)) })}
         maxWidth={sectionCount > 1 ? "xl" : "lg"}
@@ -775,14 +821,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
           {lookupConfigs.map((c) => (
               <CollapsibleCard key={c.key} title={c.label} subtitle="Add one without leaving this form">
-                <LookupCard config={c} onCreated={() => setEntityReloadKey((k) => k + 1)} onManage={() => setLookupManager(c)} />
+                <LookupCard config={c} onCreated={() => { setEntityReloadKey((k) => k + 1); numbering.refresh(); }} onManage={() => setLookupManager(c)} />
               </CollapsibleCard>
             ))}
         </div>
       </Dialog>
 
       <Dialog open={!!lookupManager} title={`Manage ${lookupManager?.label || ""}`} maxWidth="xl"
-        onClose={() => { setLookupManager(null); setEntityReloadKey((k) => k + 1); }}>
+        onClose={() => { setLookupManager(null); setEntityReloadKey((k) => k + 1); numbering.refresh(); }}>
         {lookupManager && <MasterDataTable key={lookupManager.key} config={lookupManager} />}
       </Dialog>
 

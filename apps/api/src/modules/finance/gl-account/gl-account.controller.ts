@@ -20,6 +20,9 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 
 @ApiTags('G/L Account (Chart of Accounts)')
 @ApiBearerAuth()
+// Chart of Accounts (BBP-1 §1.6) places this catalog in Business Central. That integration is not built,
+// so the catalog stays writable here and the frontend notice states the blueprint's
+// position. Re-add a write guard when the BC sync endpoint lands.
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('gl-account')
 export class GlAccountController {
