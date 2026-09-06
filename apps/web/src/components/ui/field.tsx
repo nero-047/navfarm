@@ -78,3 +78,47 @@ export function ReadField({
     </div>
   );
 }
+
+/**
+ * A named run of fields inside one form.
+ *
+ * Long forms in this application were flat: company Profile put thirteen
+ * fields in a single two-column run covering four unrelated subjects —
+ * identity, tax registration, contact details and branding — so nothing on
+ * screen told you where one topic ended and the next began, and every field
+ * looked equally important because every field looked identical.
+ *
+ * The group heading is deliberately quiet and carries no border or surface of
+ * its own. A card per group is what this page had before and is what made it
+ * read as a wizard; the point here is rhythm, not more chrome.
+ *
+ * The grid is 12 columns so a field can be sized to its content — a date, a
+ * country code and a legal entity name are not the same width in anything
+ * that was designed. Every child states its own span ("sm:col-span-4"). There
+ * is deliberately no default applied to `> *`: an arbitrary-variant default
+ * and a child's own col-span land at the same CSS specificity, so which won
+ * would come down to Tailwind's output order rather than intent.
+ */
+export function FieldGroup({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn('flex flex-col gap-3', className)}>
+      <div className="flex flex-col gap-0.5">
+        <h3 className="nf-text-label-strong text-(--text-primary)">{title}</h3>
+        {description && <p className="text-[12px] text-(--text-muted)">{description}</p>}
+      </div>
+      <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-12">
+        {children}
+      </div>
+    </section>
+  );
+}

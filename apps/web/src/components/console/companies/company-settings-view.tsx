@@ -63,14 +63,21 @@ export function CompanySettingsView({ companyId, section = "profile", basePath =
           company's name and code a second card below that — three heading
           blocks before the first field.
 
-          The company name is deliberately not repeated in this header: the
+          The title is the section — Profile, Address, Fiscal year — so the
+          heading and the highlighted item in the sub-sidebar say the same
+          word. It read "Company settings" on all six, which named the screen
+          the user was already looking at and left the section identified only
+          by a nav highlight.
+
+          "Company settings" has not gone anywhere: it is the highlighted item
+          in the main sidebar, one level up, which is exactly the level it
+          belongs to.
+
+          The company name is deliberately not in this header either: the
           breadcrumb above it and the company card in the main sidebar both
-          already carry it, so a third copy is what pushed the form off the
-          first screen. The section name is likewise not repeated — the
-          sub-sidebar marks the active section, which is the same information
-          in the place the user just clicked. */}
+          already carry it. */}
       <PageHeader
-        title={t("coSettingsTitle")}
+        title={t(activeSection.labelKey)}
         description={t(activeSection.descKey)}
         meta={
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={S.muted}>

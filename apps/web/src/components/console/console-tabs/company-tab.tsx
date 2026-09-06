@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Field, ReadField } from "@/components/ui/field";
+import { Field, FieldGroup, ReadField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -603,7 +603,6 @@ export default function CompanyTab({
                 <Field label={t("ctCompanyCode")} htmlFor="create-company-code" required>
                   <Input
                     id="create-company-code"
-                    placeholder="UNIQUE_CODE"
                     value={createForm.company_code}
                     onChange={(e) => setCreateForm({ ...createForm, company_code: e.target.value })}
                     required
@@ -649,18 +648,16 @@ export default function CompanyTab({
                     required
                   />
                 </Field>
-                <Field label={t("ctOperatingCountry")} htmlFor="create-country-id">
+                <Field label={t("ctOperatingCountry")} htmlFor="create-country-id" hint={t("ctHintCountryIso")}>
                   <Input
                     id="create-country-id"
-                    placeholder="IND"
                     value={createForm.country_id}
                     onChange={(e) => setCreateForm({ ...createForm, country_id: e.target.value })}
                   />
                 </Field>
-                <Field label={t("ctTimezone")} htmlFor="create-timezone">
+                <Field label={t("ctTimezone")} htmlFor="create-timezone" hint={t("ctHintTimezoneIana")}>
                   <Input
                     id="create-timezone"
-                    placeholder="Asia/Kolkata"
                     value={createForm.default_timezone_id}
                     onChange={(e) => setCreateForm({ ...createForm, default_timezone_id: e.target.value })}
                   />
@@ -668,7 +665,6 @@ export default function CompanyTab({
                 <Field label={t("ctTaxRegIdShort")} htmlFor="create-tax-id">
                   <Input
                     id="create-tax-id"
-                    placeholder="GSTIN12345"
                     value={createForm.tax_id}
                     onChange={(e) => setCreateForm({ ...createForm, tax_id: e.target.value })}
                   />
@@ -676,7 +672,6 @@ export default function CompanyTab({
                 <Field label={t("ctCorpRegNoShort")} htmlFor="create-registration-no">
                   <Input
                     id="create-registration-no"
-                    placeholder="CIN12345"
                     value={createForm.registration_no}
                     onChange={(e) => setCreateForm({ ...createForm, registration_no: e.target.value })}
                   />
@@ -820,46 +815,12 @@ export default function CompanyTab({
                         </div>
                       </div>
                     ) : (
-                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
-                        {/* Logo Upload Section */}
-                        <div className="p-4 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) flex flex-col sm:flex-row items-center gap-4">
-                          <div className="w-16 h-16 rounded-[var(--radius-sm)] border border-dashed border-(--border) bg-(--input-bg) flex items-center justify-center overflow-hidden shrink-0">
-                            {profileForm.company_logo_url ? (
-                              <img
-                                src={profileForm.company_logo_url.startsWith('/') ? `${backendUrl}${profileForm.company_logo_url}` : profileForm.company_logo_url}
-                                alt={t("ctLogoPreviewAlt")}
-                                className="w-full h-full object-contain p-1"
-                              />
-                            ) : (
-                              <ImageIcon className="w-8 h-8 text-(--text-muted)" />
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-1 flex-1">
-                            <label className="text-xs font-semibold text-(--text-secondary)">{t("ctCompanyLogoImage")}</label>
-                            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-(--accent)/10 text-(--accent) border border-(--accent)/30 text-xs font-semibold hover:bg-(--accent)/20 transition-all w-fit">
-                              <Upload className="w-3.5 h-3.5" />
-                              {uploadingLogo ? "Uploading..." : profileForm.company_logo_url ? "Change Logo" : "Upload Logo"}
-                              <input
-                                type="file"
-                                accept="image/png, image/jpeg, image/svg+xml, image/webp"
-                                onChange={handleLogoUpload}
-                                disabled={uploadingLogo}
-                                className="hidden"
-                              />
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Field label={t("ctCompanyCodeReadOnly")} htmlFor="profile-company-code">
-                            <Input
-                              id="profile-company-code"
-                              value={profileForm.company_code}
-                              disabled
-                              className="opacity-50"
-                            />
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-8">
+                        <FieldGroup title={t("ctGrpIdentity")}>
+                          <Field className="sm:col-span-3" label={t("ctCompanyCode")} htmlFor="profile-company-code" hint={t("ctHintCodeFixed")}>
+                            <Input id="profile-company-code" value={profileForm.company_code} disabled />
                           </Field>
-                          <Field label={t("ctLegalEntityName")} htmlFor="profile-company-name" required>
+                          <Field className="sm:col-span-9" label={t("ctLegalEntityName")} htmlFor="profile-company-name" required>
                             <Input
                               id="profile-company-name"
                               value={profileForm.company_name}
@@ -867,14 +828,14 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label={t("coFieldDisplayName")} htmlFor="profile-company-display-name">
+                          <Field className="sm:col-span-5" label={t("coFieldDisplayName")} htmlFor="profile-company-display-name" hint={t("ctHintDisplayName")}>
                             <Input
                               id="profile-company-display-name"
                               value={profileForm.company_display_name}
                               onChange={(e) => setProfileForm({ ...profileForm, company_display_name: e.target.value })}
                             />
                           </Field>
-                          <Field label={t("ctClassification")} htmlFor="cfg-ct-classification">
+                          <Field className="sm:col-span-3" label={t("ctClassification")} htmlFor="cfg-ct-classification">
                             <Select
                               id="cfg-ct-classification"
                               value={profileForm.company_type}
@@ -888,7 +849,7 @@ export default function CompanyTab({
                               <option value="Co-operative">{t("ctClsCooperative")}</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctPrimaryIndustry")} htmlFor="profile-industry-type" required>
+                          <Field className="sm:col-span-4" label={t("ctPrimaryIndustry")} htmlFor="profile-industry-type" required>
                             <Input
                               id="profile-industry-type"
                               value={profileForm.industry_type}
@@ -896,14 +857,32 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label={t("ctTaxRegIdShort")} htmlFor="profile-tax-id">
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpRegistration")}>
+                          <Field className="sm:col-span-4" label={t("ctTaxRegIdShort")} htmlFor="profile-tax-id">
                             <Input
                               id="profile-tax-id"
                               value={profileForm.tax_id}
                               onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
                             />
                           </Field>
-                          <Field label={t("ctTaxRegime")} htmlFor="cfg-ct-tax-regime">
+                          <Field className="sm:col-span-4" label={t("ctCorpRegNoShort")} htmlFor="profile-registration-no">
+                            <Input
+                              id="profile-registration-no"
+                              value={profileForm.registration_no}
+                              onChange={(e) => setProfileForm({ ...profileForm, registration_no: e.target.value })}
+                            />
+                          </Field>
+                          <Field className="sm:col-span-4" label={t("ctIncorporationDate")} htmlFor="profile-incorporation-date">
+                            <Input
+                              id="profile-incorporation-date"
+                              type="date"
+                              value={profileForm.incorporation_date}
+                              onChange={(e) => setProfileForm({ ...profileForm, incorporation_date: e.target.value })}
+                            />
+                          </Field>
+                          <Field className="sm:col-span-4" label={t("ctTaxRegime")} htmlFor="cfg-ct-tax-regime">
                             <Select
                               id="cfg-ct-tax-regime"
                               value={profileForm.tax_regime}
@@ -914,71 +893,88 @@ export default function CompanyTab({
                               <option value="EXEMPT">{t("ctSchemeExempt")}</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctCorpRegNoShort")} htmlFor="profile-registration-no">
-                            <Input
-                              id="profile-registration-no"
-                              value={profileForm.registration_no}
-                              onChange={(e) => setProfileForm({ ...profileForm, registration_no: e.target.value })}
-                            />
-                          </Field>
-                          <Field label={t("ctIncorporationDate")} htmlFor="profile-incorporation-date">
-                            <Input
-                              id="profile-incorporation-date"
-                              type="date"
-                              value={profileForm.incorporation_date}
-                              onChange={(e) => setProfileForm({ ...profileForm, incorporation_date: e.target.value })}
-                            />
-                          </Field>
-                          <Field label={t("ctWebsiteUrl")} htmlFor="profile-website">
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpContactWeb")}>
+                          <Field className="sm:col-span-6" label={t("ctWebsiteUrl")} htmlFor="profile-website">
                             <Input
                               id="profile-website"
-                              placeholder="https://greenvalleyfarms.in"
                               value={profileForm.website}
                               onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
                             />
                           </Field>
-                          <Field label={t("ctEmailDomainAutoVerify")} htmlFor="profile-email-domain">
+                          <Field className="sm:col-span-6" label={t("ctEmailDomainAutoVerify")} htmlFor="profile-email-domain" hint={t("ctHintEmailDomain")}>
                             <Input
                               id="profile-email-domain"
-                              placeholder="greenvalleyfarms.in"
                               value={profileForm.email_domain}
                               onChange={(e) => setProfileForm({ ...profileForm, email_domain: e.target.value })}
                             />
                           </Field>
-                          <Field label={t("ctSupportEmail")} htmlFor="profile-support-email">
+                          <Field className="sm:col-span-6" label={t("ctSupportEmail")} htmlFor="profile-support-email">
                             <Input
                               id="profile-support-email"
-                              placeholder="support@greenvalleyfarms.in"
                               type="email"
                               value={profileForm.support_email}
                               onChange={(e) => setProfileForm({ ...profileForm, support_email: e.target.value })}
                             />
                           </Field>
-                          <Field label={t("ctPrimaryPhoneLandline")} htmlFor="profile-phone-primary">
+                          <Field className="sm:col-span-6" label={t("ctPrimaryPhoneLandline")} htmlFor="profile-phone-primary">
                             <Input
                               id="profile-phone-primary"
-                              placeholder="+91 11 2345 6789"
+                              type="tel"
                               value={profileForm.phone_primary}
                               onChange={(e) => setProfileForm({ ...profileForm, phone_primary: e.target.value })}
                             />
                           </Field>
-                          <Field label={t("ctBrandHexColor")}>
-                            <div className="flex gap-2 items-center">
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpBranding")} description={t("ctGrpBrandingDesc")}>
+                          <Field className="sm:col-span-6" label={t("ctCompanyLogoImage")}>
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-sm)] border border-dashed border-(--border) bg-(--input-bg)">
+                                {profileForm.company_logo_url ? (
+                                  <img
+                                    src={profileForm.company_logo_url.startsWith('/') ? `${backendUrl}${profileForm.company_logo_url}` : profileForm.company_logo_url}
+                                    alt={t("ctLogoPreviewAlt")}
+                                    className="h-full w-full object-contain p-0.5"
+                                  />
+                                ) : (
+                                  <ImageIcon className="h-5 w-5 text-(--text-muted)" />
+                                )}
+                              </div>
+                              <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) px-3 text-sm font-medium text-(--text-primary) transition-colors hover:border-(--accent)">
+                                <Upload className="h-4 w-4" />
+                                {uploadingLogo ? t("ctLogoUploading") : profileForm.company_logo_url ? t("ctLogoChange") : t("ctLogoUpload")}
+                                <input
+                                  type="file"
+                                  accept="image/png, image/jpeg, image/svg+xml, image/webp"
+                                  onChange={handleLogoUpload}
+                                  disabled={uploadingLogo}
+                                  className="hidden"
+                                />
+                              </label>
+                            </div>
+                          </Field>
+                          <Field className="sm:col-span-6" label={t("ctBrandHexColor")} htmlFor="profile-brand-hex">
+                            <div className="flex items-center gap-2">
                               <input
                                 type="color"
+                                aria-label={t("ctBrandHexColor")}
                                 value={profileForm.primary_color_hex}
                                 onChange={(e) => setProfileForm({ ...profileForm, primary_color_hex: e.target.value })}
-                                className="w-12 h-12 rounded-[var(--radius-sm)] bg-transparent border-0 cursor-pointer"
+                                className="h-10 w-10 shrink-0 cursor-pointer rounded-[var(--radius-sm)] border border-(--input-border) bg-transparent p-1"
                               />
                               <Input
+                                id="profile-brand-hex"
                                 value={profileForm.primary_color_hex}
                                 onChange={(e) => setProfileForm({ ...profileForm, primary_color_hex: e.target.value })}
-                                className="flex-1"
+                                className="font-mono"
                               />
                             </div>
                           </Field>
-                        </div>
-                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                        </FieldGroup>
+
+                        <div className="flex justify-end border-t border-(--border) pt-4">
                           <Button type="submit" disabled={saving || uploadingLogo} className="text-xs">
                             <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                           </Button>
@@ -1003,9 +999,9 @@ export default function CompanyTab({
                         <ReadField mono className="sm:col-span-2" label={t("ctGpsCoordinates")} value={setupDetails?.address?.gps_latitude && setupDetails?.address?.gps_longitude ? `${setupDetails.address.gps_latitude}, ${setupDetails.address.gps_longitude}` : "—"} />
                       </div>
                     ) : (
-                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Field label={t("ctAddressNicknameTag")} htmlFor="address-label">
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-8">
+                        <FieldGroup title={t("ctGrpThisAddress")}>
+                          <Field className="sm:col-span-7" label={t("ctAddressNicknameTag")} htmlFor="address-label">
                             <Input
                               id="address-label"
                               placeholder={t("ctPhHeadquartersGate")}
@@ -1013,7 +1009,7 @@ export default function CompanyTab({
                               onChange={(e) => setAddressForm({ ...addressForm, address_label: e.target.value })}
                             />
                           </Field>
-                          <Field label={t("ctAddressType")} htmlFor="cfg-ct-address-type">
+                          <Field className="sm:col-span-5" label={t("ctAddressType")} htmlFor="cfg-ct-address-type">
                             <Select
                               id="cfg-ct-address-type"
                               value={addressForm.address_type}
@@ -1025,7 +1021,10 @@ export default function CompanyTab({
                               <option value="Farm">{t("ctAddrFarmSite")}</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctAddressLine1")} htmlFor="address-line1" required>
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpPostal")}>
+                          <Field className="sm:col-span-12" label={t("ctAddressLine1")} htmlFor="address-line1" required>
                             <Input
                               id="address-line1"
                               value={addressForm.line1}
@@ -1033,14 +1032,14 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label={t("ctAddressLine2")} htmlFor="address-line2">
+                          <Field className="sm:col-span-12" label={t("ctAddressLine2")} htmlFor="address-line2">
                             <Input
                               id="address-line2"
                               value={addressForm.line2}
                               onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
                             />
                           </Field>
-                          <Field label={t("ctCity")} htmlFor="address-city" required>
+                          <Field className="sm:col-span-4" label={t("ctCity")} htmlFor="address-city" required>
                             <Input
                               id="address-city"
                               value={addressForm.city}
@@ -1048,7 +1047,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label={t("ctStateProvince")} htmlFor="address-state" required>
+                          <Field className="sm:col-span-4" label={t("ctStateProvince")} htmlFor="address-state" required>
                             <Input
                               id="address-state"
                               value={addressForm.state_id}
@@ -1056,15 +1055,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label={t("country")} htmlFor="address-country" required>
-                            <Input
-                              id="address-country"
-                              value={addressForm.country_id}
-                              onChange={(e) => setAddressForm({ ...addressForm, country_id: e.target.value })}
-                              required
-                            />
-                          </Field>
-                          <Field label={t("ctPincode")} htmlFor="address-pincode" required>
+                          <Field className="sm:col-span-2" label={t("ctPincode")} htmlFor="address-pincode" required>
                             <Input
                               id="address-pincode"
                               value={addressForm.pincode}
@@ -1072,26 +1063,38 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <div className="grid grid-cols-2 gap-2 sm:col-span-2">
-                            <Field label={t("ctGpsLatitude")} htmlFor="address-gps-lat">
-                              <Input
-                                id="address-gps-lat"
-                                placeholder={t("ctPhLatitude")}
-                                value={addressForm.gps_latitude}
-                                onChange={(e) => setAddressForm({ ...addressForm, gps_latitude: e.target.value })}
-                              />
-                            </Field>
-                            <Field label={t("ctGpsLongitude")} htmlFor="address-gps-lng">
-                              <Input
-                                id="address-gps-lng"
-                                placeholder={t("ctPhLongitude")}
-                                value={addressForm.gps_longitude}
-                                onChange={(e) => setAddressForm({ ...addressForm, gps_longitude: e.target.value })}
-                              />
-                            </Field>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <Field className="sm:col-span-2" label={t("country")} htmlFor="address-country" required hint={t("ctHintCountryIso")}>
+                            <Input
+                              id="address-country"
+                              value={addressForm.country_id}
+                              onChange={(e) => setAddressForm({ ...addressForm, country_id: e.target.value })}
+                              required
+                            />
+                          </Field>
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpCoordinates")} description={t("ctGrpCoordinatesDesc")}>
+                          <Field className="sm:col-span-3" label={t("ctGpsLatitude")} htmlFor="address-gps-lat">
+                            <Input
+                              id="address-gps-lat"
+                              placeholder={t("ctPhLatitude")}
+                              className="font-mono"
+                              value={addressForm.gps_latitude}
+                              onChange={(e) => setAddressForm({ ...addressForm, gps_latitude: e.target.value })}
+                            />
+                          </Field>
+                          <Field className="sm:col-span-3" label={t("ctGpsLongitude")} htmlFor="address-gps-lng">
+                            <Input
+                              id="address-gps-lng"
+                              placeholder={t("ctPhLongitude")}
+                              className="font-mono"
+                              value={addressForm.gps_longitude}
+                              onChange={(e) => setAddressForm({ ...addressForm, gps_longitude: e.target.value })}
+                            />
+                          </Field>
+                        </FieldGroup>
+
+                        <div className="flex justify-end border-t border-(--border) pt-4">
                           <Button type="submit" disabled={saving} className="text-xs">
                             <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                           </Button>
@@ -1113,9 +1116,9 @@ export default function CompanyTab({
                         <ReadField className="sm:col-span-2" label={t("ctExecReportEmails")} value={setupDetails?.contact?.receives_reports ? "Active - Receives periodic executive summary reports" : "Disabled"} />
                       </div>
                     ) : (
-                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Field label={t("ctKeyContactFullName")} htmlFor="contact-full-name" required>
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-8">
+                        <FieldGroup title={t("ctGrpKeyContact")} description={t("ctGrpKeyContactDesc")}>
+                          <Field className="sm:col-span-7" label={t("ctKeyContactFullName")} htmlFor="contact-full-name" required>
                             <Input
                               id="contact-full-name"
                               value={contactForm.full_name}
@@ -1123,7 +1126,7 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label={t("ctDesignationRole")} htmlFor="contact-designation" required>
+                          <Field className="sm:col-span-5" label={t("ctDesignationRole")} htmlFor="contact-designation" required>
                             <Input
                               id="contact-designation"
                               value={contactForm.designation}
@@ -1131,22 +1134,10 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <Field label={t("ctPrimaryContactPhone")} htmlFor="contact-phone-primary" required>
-                            <Input
-                              id="contact-phone-primary"
-                              value={contactForm.phone_primary}
-                              onChange={(e) => setContactForm({ ...contactForm, phone_primary: e.target.value })}
-                              required
-                            />
-                          </Field>
-                          <Field label={t("ctSecondaryContactPhone")} htmlFor="contact-phone-secondary">
-                            <Input
-                              id="contact-phone-secondary"
-                              value={contactForm.phone_secondary}
-                              onChange={(e) => setContactForm({ ...contactForm, phone_secondary: e.target.value })}
-                            />
-                          </Field>
-                          <Field label={t("ctPrimaryEmail")} htmlFor="contact-email" required>
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpHowToReach")}>
+                          <Field className="sm:col-span-7" label={t("ctPrimaryEmail")} htmlFor="contact-email" required>
                             <Input
                               id="contact-email"
                               type="email"
@@ -1155,28 +1146,50 @@ export default function CompanyTab({
                               required
                             />
                           </Field>
-                          <div className="flex flex-col gap-2 justify-center pt-2">
-                            <label className="flex items-center gap-2 cursor-pointer text-xs">
-                              <input
-                                type="checkbox"
-                                checked={contactForm.receives_alerts}
-                                onChange={(e) => setContactForm({ ...contactForm, receives_alerts: e.target.checked })}
-                                className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
-                              />
-                              <span className="text-(--text-secondary) font-medium">{t("ctReceiveThresholdAlerts")}</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-xs">
-                              <input
-                                type="checkbox"
-                                checked={contactForm.receives_reports}
-                                onChange={(e) => setContactForm({ ...contactForm, receives_reports: e.target.checked })}
-                                className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
-                              />
-                              <span className="text-(--text-secondary) font-medium">{t("ctReceiveExecReports")}</span>
-                            </label>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <Field className="sm:col-span-5" label={t("ctPrimaryContactPhone")} htmlFor="contact-phone-primary" required>
+                            <Input
+                              id="contact-phone-primary"
+                              type="tel"
+                              value={contactForm.phone_primary}
+                              onChange={(e) => setContactForm({ ...contactForm, phone_primary: e.target.value })}
+                              required
+                            />
+                          </Field>
+                          <Field className="sm:col-span-5" label={t("ctSecondaryContactPhone")} htmlFor="contact-phone-secondary">
+                            <Input
+                              id="contact-phone-secondary"
+                              type="tel"
+                              value={contactForm.phone_secondary}
+                              onChange={(e) => setContactForm({ ...contactForm, phone_secondary: e.target.value })}
+                            />
+                          </Field>
+                        </FieldGroup>
+
+                        {/* These two were a bare column of checkboxes wedged into the
+                            field grid, vertically centred against nothing. They are a
+                            subscription choice, not a contact detail. */}
+                        <FieldGroup title={t("ctGrpNotifications")} description={t("ctGrpNotificationsDesc")}>
+                          <label className="sm:col-span-6 flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-3">
+                            <input
+                              type="checkbox"
+                              checked={contactForm.receives_alerts}
+                              onChange={(e) => setContactForm({ ...contactForm, receives_alerts: e.target.checked })}
+                              className="mt-0.5 h-4 w-4 cursor-pointer rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent)"
+                            />
+                            <span className="text-sm text-(--text-primary)">{t("ctReceiveThresholdAlerts")}</span>
+                          </label>
+                          <label className="sm:col-span-6 flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-3">
+                            <input
+                              type="checkbox"
+                              checked={contactForm.receives_reports}
+                              onChange={(e) => setContactForm({ ...contactForm, receives_reports: e.target.checked })}
+                              className="mt-0.5 h-4 w-4 cursor-pointer rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent)"
+                            />
+                            <span className="text-sm text-(--text-primary)">{t("ctReceiveExecReports")}</span>
+                          </label>
+                        </FieldGroup>
+
+                        <div className="flex justify-end border-t border-(--border) pt-4">
                           <Button type="submit" disabled={saving} className="text-xs">
                             <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                           </Button>
@@ -1196,9 +1209,9 @@ export default function CompanyTab({
                         <ReadField mono label={t("ctCountryLocaleCode")} value={setupDetails?.company?.country_id} />
                       </div>
                     ) : (
-                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Field label={t("ctDefaultLanguage")} htmlFor="cfg-ct-default-language">
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-8">
+                        <FieldGroup title={t("ctGrpLanguageMoney")}>
+                          <Field className="sm:col-span-6" label={t("ctDefaultLanguage")} htmlFor="cfg-ct-default-language">
                             <Select
                               id="cfg-ct-default-language"
                               value={localizationForm.default_language_id}
@@ -1210,7 +1223,9 @@ export default function CompanyTab({
                               ))}
                             </Select>
                           </Field>
-                          <Field label={t("ctBaseCurrency")} htmlFor="cfg-ct-base-currency">
+                          {/* BBP-1 §1.1: "USD. All financial values stored in USD."
+                              Changing this restates every amount in the company. */}
+                          <Field className="sm:col-span-6" label={t("ctBaseCurrency")} htmlFor="cfg-ct-base-currency" hint={t("ctHintBaseCurrency")}>
                             <Select
                               id="cfg-ct-base-currency"
                               value={localizationForm.base_currency_id}
@@ -1222,24 +1237,30 @@ export default function CompanyTab({
                               ))}
                             </Select>
                           </Field>
-                          <Field label={t("ctTimezoneId")} htmlFor="localization-timezone" required>
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpPlaceTime")}>
+                          <Field className="sm:col-span-5" label={t("ctTimezoneId")} htmlFor="localization-timezone" required hint={t("ctHintTimezoneIana")}>
                             <Input
                               id="localization-timezone"
+                              className="font-mono"
                               value={localizationForm.default_timezone_id}
                               onChange={(e) => setLocalizationForm({ ...localizationForm, default_timezone_id: e.target.value })}
                               required
                             />
                           </Field>
-                          <Field label={t("ctOperatingCountryCode")} htmlFor="localization-country" required>
+                          <Field className="sm:col-span-3" label={t("ctOperatingCountryCode")} htmlFor="localization-country" required hint={t("ctHintCountryIso")}>
                             <Input
                               id="localization-country"
+                              className="font-mono uppercase"
                               value={localizationForm.country_id}
                               onChange={(e) => setLocalizationForm({ ...localizationForm, country_id: e.target.value.toUpperCase() })}
                               required
                             />
                           </Field>
-                        </div>
-                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                        </FieldGroup>
+
+                        <div className="flex justify-end border-t border-(--border) pt-4">
                           <Button type="submit" disabled={saving} className="text-xs">
                             <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                           </Button>
@@ -1267,9 +1288,9 @@ export default function CompanyTab({
                         <ReadField mono label={t("ctDecimalPrecision")} value={`${setupDetails?.fiscal?.decimal_places ?? 2} decimal places`} />
                       </div>
                     ) : (
-                      <form onSubmit={handleSaveTab} className="flex flex-col gap-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Field label={t("ctFiscalStartMonth")} htmlFor="cfg-ct-fiscal-start-month">
+                      <form onSubmit={handleSaveTab} className="flex flex-col gap-8">
+                        <FieldGroup title={t("ctGrpTheYear")}>
+                          <Field className="sm:col-span-4" label={t("ctFiscalStartMonth")} htmlFor="cfg-ct-fiscal-start-month">
                             <Select
                               id="cfg-ct-fiscal-start-month"
                               value={fiscalForm.fiscal_start_month}
@@ -1279,16 +1300,17 @@ export default function CompanyTab({
                               <option value={4}>{t("ctMonthApril")}</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctCurrentFiscalYear")} htmlFor="fiscal-year" required>
+                          <Field className="sm:col-span-3" label={t("ctCurrentFiscalYear")} htmlFor="fiscal-year" required>
                             <Input
                               id="fiscal-year"
+                              className="font-mono"
                               placeholder={t("ctPhFiscalYear")}
                               value={fiscalForm.current_fiscal_year}
                               onChange={(e) => setFiscalForm({ ...fiscalForm, current_fiscal_year: e.target.value })}
                               required
                             />
                           </Field>
-                          <Field label={t("ctAccountingPeriodicity")} htmlFor="cfg-ct-accounting-periodicity">
+                          <Field className="sm:col-span-3" label={t("ctAccountingPeriodicity")} htmlFor="cfg-ct-accounting-periodicity">
                             <Select
                               id="cfg-ct-accounting-periodicity"
                               value={fiscalForm.period_type}
@@ -1298,7 +1320,10 @@ export default function CompanyTab({
                               <option value="QUARTERLY">{t("ctPeriodQuarterly")}</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctAccountingStandard")} htmlFor="cfg-ct-accounting-standard">
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpAccountingPolicy")} description={t("ctGrpAccountingPolicyDesc")}>
+                          <Field className="sm:col-span-4" label={t("ctAccountingStandard")} htmlFor="cfg-ct-accounting-standard">
                             <Select
                               id="cfg-ct-accounting-standard"
                               value={fiscalForm.accounting_standard}
@@ -1309,7 +1334,7 @@ export default function CompanyTab({
                               <option value="US GAAP">US GAAP</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctDepreciationModel")} htmlFor="cfg-ct-depreciation-model">
+                          <Field className="sm:col-span-4" label={t("ctDepreciationModel")} htmlFor="cfg-ct-depreciation-model">
                             <Select
                               id="cfg-ct-depreciation-model"
                               value={fiscalForm.depreciation_method}
@@ -1320,7 +1345,7 @@ export default function CompanyTab({
                               <option value="UNITS_OF_PRODUCTION">{t("ctDeprUnitsOfProduction")}</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctInventoryCostingMethod")} htmlFor="cfg-ct-inventory-costing-method">
+                          <Field className="sm:col-span-4" label={t("ctInventoryCostingMethod")} htmlFor="cfg-ct-inventory-costing-method">
                             <Select
                               id="cfg-ct-inventory-costing-method"
                               value={fiscalForm.inventory_valuation}
@@ -1331,7 +1356,21 @@ export default function CompanyTab({
                               <option value="STANDARD COSTING">{t("ctCostStandard")}</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctTaxFilingFrequency")} htmlFor="cfg-ct-tax-filing-frequency">
+                          <Field className="sm:col-span-4" label={t("ctDecimalPrecision")} htmlFor="cfg-ct-decimal-precision">
+                            <Select
+                              id="cfg-ct-decimal-precision"
+                              value={fiscalForm.decimal_places}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, decimal_places: parseInt(e.target.value) })}
+                            >
+                              <option value={2}>{t("ctDecimals2")}</option>
+                              <option value={3}>{t("ctDecimals3")}</option>
+                              <option value={4}>{t("ctDecimals4")}</option>
+                            </Select>
+                          </Field>
+                        </FieldGroup>
+
+                        <FieldGroup title={t("ctGrpTaxCompliance")}>
+                          <Field className="sm:col-span-4" label={t("ctTaxFilingFrequency")} htmlFor="cfg-ct-tax-filing-frequency">
                             <Select
                               id="cfg-ct-tax-filing-frequency"
                               value={fiscalForm.gst_filing_frequency}
@@ -1341,30 +1380,18 @@ export default function CompanyTab({
                               <option value="QUARTERLY">{t("ctFilingQuarterly")}</option>
                             </Select>
                           </Field>
-                          <Field label={t("ctDecimalPrecision")} htmlFor="cfg-ct-decimal-precision">
-                            <Select
-                              id="cfg-ct-decimal-precision"
-                              value={fiscalForm.decimal_places}
-                              onChange={(e) => setFiscalForm({ ...fiscalForm, decimal_places: parseInt(e.target.value) })}
-                            >
-                              <option value={2}>2 Decimal Places (0.00)</option>
-                              <option value={3}>3 Decimal Places (0.000)</option>
-                              <option value={4}>4 Decimal Places (0.0000)</option>
-                            </Select>
-                          </Field>
-                          <div className="flex flex-col justify-center pt-2 sm:col-span-2">
-                            <label className="flex items-center gap-2 cursor-pointer text-xs">
-                              <input
-                                type="checkbox"
-                                checked={fiscalForm.tax_audit_applicable}
-                                onChange={(e) => setFiscalForm({ ...fiscalForm, tax_audit_applicable: e.target.checked })}
-                                className="w-4 h-4 rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent) cursor-pointer"
-                              />
-                              <span className="text-(--text-secondary) font-medium">{t("ctStatutoryAuditApplicable")}</span>
-                            </label>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex justify-end border-t border-(--border) pt-4">
+                          <label className="sm:col-span-8 flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] border border-(--border) bg-(--surface-raised) p-3">
+                            <input
+                              type="checkbox"
+                              checked={fiscalForm.tax_audit_applicable}
+                              onChange={(e) => setFiscalForm({ ...fiscalForm, tax_audit_applicable: e.target.checked })}
+                              className="mt-0.5 h-4 w-4 cursor-pointer rounded-[var(--radius-xs)] border-(--border) bg-(--input-bg) text-(--accent)"
+                            />
+                            <span className="text-sm text-(--text-primary)">{t("ctStatutoryAuditApplicable")}</span>
+                          </label>
+                        </FieldGroup>
+
+                        <div className="flex justify-end border-t border-(--border) pt-4">
                           <Button type="submit" disabled={saving} className="text-xs">
                             <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                           </Button>
