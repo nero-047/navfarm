@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ContextNav } from "@/components/shell/ContextNav";
 import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -16,11 +17,6 @@ import {
   ArrowLeft,
   Users,
   UserPlus,
-  MapPin,
-  Contact,
-  Globe,
-  Calendar,
-  Layers,
   Check,
   Upload,
   Image as ImageIcon
@@ -42,6 +38,21 @@ interface CompanyTabProps {
   /** When true, skip the Corporate Directory list and go straight to company settings */
   skipDirectory?: boolean;
 }
+
+/**
+ * The six settings sections. These were labelled "Step 1", "Step 2",
+ * "Steps 4-6", "Step 7", "Step 8" — onboarding-wizard wording that survived
+ * into a settings page, where nobody is walking a sequence. You come here to
+ * change the fiscal year, not to complete step seven of eight.
+ */
+const SETTINGS_SECTIONS = [
+  { key: "profile", labelKey: "ctSecProfile" },
+  { key: "address", labelKey: "ctSecAddress" },
+  { key: "contact", labelKey: "ctSecContact" },
+  { key: "localization", labelKey: "ctSecLocale" },
+  { key: "fiscal", labelKey: "ctSecFiscal" },
+  { key: "modules", labelKey: "ctSecSectors" },
+] as const;
 
 export default function CompanyTab({
   activeCompany,
@@ -869,68 +880,22 @@ export default function CompanyTab({
             ) : (
               <div className="flex flex-col md:flex-row gap-6 items-start">
 
-                {/* Tab Selector Sidebar inside Settings card */}
-                <div className="flex flex-row md:flex-col gap-1 w-full md:w-52 overflow-x-auto shrink-0 pb-3 md:pb-0 border-b md:border-b-0 md:border-r border-(--border) pr-0 md:pr-4">
-                  <button
-                    type="button"
-                    onClick={() => setSettingsTab("profile")}
-                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                      settingsTab === "profile"
-                        ? "bg-(--accent)/10 text-(--text-primary) border-l-2 border-(--accent)"
-                        : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4 shrink-0" />{t("ctStep1Profile")}</button>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsTab("address")}
-                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                      settingsTab === "address"
-                        ? "bg-(--accent)/10 text-(--text-primary) border-l-2 border-(--accent)"
-                        : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
-                    }`}
-                  >
-                    <MapPin className="w-4 h-4 shrink-0" />{t("ctStep2Address")}</button>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsTab("contact")}
-                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                      settingsTab === "contact"
-                        ? "bg-(--accent)/10 text-(--text-primary) border-l-2 border-(--accent)"
-                        : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
-                    }`}
-                  >
-                    <Contact className="w-4 h-4 shrink-0" />{t("ctStep3Contact")}</button>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsTab("localization")}
-                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                      settingsTab === "localization"
-                        ? "bg-(--accent)/10 text-(--text-primary) border-l-2 border-(--accent)"
-                        : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
-                    }`}
-                  >
-                    <Globe className="w-4 h-4 shrink-0" />{t("ctStep456Locale")}</button>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsTab("fiscal")}
-                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                      settingsTab === "fiscal"
-                        ? "bg-(--accent)/10 text-(--text-primary) border-l-2 border-(--accent)"
-                        : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
-                    }`}
-                  >
-                    <Calendar className="w-4 h-4 shrink-0" />{t("ctStep7Fiscal")}</button>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsTab("modules")}
-                    className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                      settingsTab === "modules"
-                        ? "bg-(--accent)/10 text-(--text-primary) border-l-2 border-(--accent)"
-                        : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-raised)"
-                    }`}
-                  >
-                    <Layers className="w-4 h-4 shrink-0" />{t("ctStep8Sectors")}</button>
+                {/* The console has one sub-sidebar component — ContextNav —
+                    which Master Data, Finance and Production all declare a
+                    model for. Its own note says it exists "rather than
+                    hand-rolling four in-page sidebars as they did before".
+                    This page was a fifth, built from raw buttons and inline
+                    Tailwind, which is why it did not look like the rest of
+                    the application. Same sections, shared renderer. */}
+                <div className="w-full shrink-0 border-b border-(--border) pb-3 md:w-52 md:border-b-0 md:border-r md:pb-0 md:pr-4">
+                  <ContextNav
+                    model={{
+                      label: t("ctSettingsSections"),
+                      groups: [{ items: SETTINGS_SECTIONS.map((s) => ({ key: s.key, label: t(s.labelKey as any) })) }],
+                      activeKey: settingsTab,
+                      onSelect: (key: string) => setSettingsTab(key as typeof settingsTab),
+                    }}
+                  />
                 </div>
 
                 {/* Tab content body */}
@@ -1193,7 +1158,7 @@ export default function CompanyTab({
                           </div>
                         </div>
                         <Button type="submit" disabled={saving || uploadingLogo} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Step 1 Profile Settings"}
+                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                         </Button>
                       </form>
                     )
@@ -1335,7 +1300,7 @@ export default function CompanyTab({
                           </div>
                         </div>
                         <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Step 2 Address"}
+                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                         </Button>
                       </form>
                     )
@@ -1443,7 +1408,7 @@ export default function CompanyTab({
                           </div>
                         </div>
                         <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Step 3 Contact"}
+                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                         </Button>
                       </form>
                     )
@@ -1520,7 +1485,7 @@ export default function CompanyTab({
                           </Field>
                         </div>
                         <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Localization"}
+                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                         </Button>
                       </form>
                     )
@@ -1674,7 +1639,7 @@ export default function CompanyTab({
                           </div>
                         </div>
                         <Button type="submit" disabled={saving} className="mt-4 self-end flex items-center gap-2 cursor-pointer text-xs">
-                          <Save className="w-4 h-4" /> {saving ? "Saving changes..." : "Save Fiscal Configurations"}
+                          <Save className="w-4 h-4" /> {saving ? t("saving") : t("saveChanges")}
                         </Button>
                       </form>
                     )
