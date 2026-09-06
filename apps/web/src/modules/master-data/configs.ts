@@ -727,6 +727,9 @@ const breedLifecycleStage: MasterDataConfig = {
     // These two columns have existed on breed_lifecycle_stages since the schema
     // was written but were never exposed, so there was no way to record a
     // vaccination or medication plan for a breed at a stage at all.
+    // Breed Master Template, Lifecycle sheet: "Resource Requirements". The
+    // column existed and nothing on the form could fill it.
+    { key: "resource_requirements", label: "Resource Requirements", type: "json", helpText: "Resources this breed needs at this stage, from the resource planner." },
     { key: "vaccination_protocol", label: "Vaccination Protocol", type: "json", helpText: "Entries of { vaccine, day, route, dose } for this breed at this stage." },
     { key: "medication_protocol", label: "Medication Protocol", type: "json", helpText: "Entries of { medicine, day, route, dose, withdrawal_days } for this breed at this stage." },
     { key: "notes", label: "Notes", type: "textarea", helpText: "Shown as a tooltip on the data entry screen." },
