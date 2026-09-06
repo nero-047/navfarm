@@ -122,3 +122,43 @@ about what the number is.
 Not covered here: the templates' *example values* and validation rules
 (dropdown value lists, conditional-mandatory logic). This audit answers "does the
 field exist", not "does it accept exactly what the client will type".
+
+---
+
+## Currency configuration — resolved and outstanding (added 2026-09-06)
+
+Rishi: residual value is **a rate that computes the amount**, not a stored
+figure; currency belongs in company config as a base and a local currency, and
+entries are in base currency only.
+
+**Resolved.** `breed_master.residual_value_pct` stays a rate — no change needed,
+and no amount column should be added to the breed.
+
+**Fixed.** Two tables held the base currency and had drifted apart:
+`company_master.base_currency_id` said USD while `company_currency_config` still
+flagged INR as both base and reporting. They now agree on USD, base and
+reporting, matching BBP-1 §1.1 ("USD. All financial values stored in USD").
+Note the app reads `company_master.base_currency_id` (`useCompanyCurrency`), so
+the config table was the stale one and nothing on screen was wrong — but two
+sources for one fact is a defect waiting to surface.
+
+**Outstanding, and BBP-mandatory:**
+
+1. **No exchange-rate field exists anywhere in the schema.** BBP-1 §1.1 requires
+   "Exchange Rate (USD/ZWL) | Decimal(6) | Manual entry by Finance. Alert fires
+   if not updated in 7 days", marked mandatory. A search across every column in
+   the tenant database for `exchange`, `fx` and `conversion_rate` returns
+   nothing. Without it the reporting-currency requirement cannot be met.
+2. **ZWL is not in `currency_master`.** It holds exactly two rows, INR and USD.
+   The BBP treats ZWL as the foreign currency against USD, so it has to exist
+   before any rate can be recorded against it.
+3. **Note the BBP contradicts itself on reporting currency** — the §1.1
+   flowchart says ZWL, the §1.1 field spec says USD. Set to USD here, following
+   the field spec, but see §2 #1 of the evidence pack.
+
+One nuance worth confirming with the client: the documents describe the residual
+rate as a **price per kilogram** — the Bio Asset BBP's "expected weight 150 kg
+multiplied by 2.05, resulting in 307.50" and the 20 Aug MOM's "Sale Price per Kg
+(e.g. $2.50)". Our column is a **percentage** (`decimal(5,2)`). Both are rates
+that compute an amount, but they are not the same rate, and a per-kg rate is
+itself currency-denominated.
