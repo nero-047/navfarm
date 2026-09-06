@@ -265,8 +265,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   }, [config.supportsNobLobFilter, nobFilter]);
 
   useEffect(() => {
+    // Includes the select-entity columns nested inside a jsonRow, whose
+    // dropdowns are otherwise never populated because they are not top-level
+    // fields.
     const endpoints = Array.from(
-      new Set(config.fields.filter((f) => f.type === "select-entity" && f.entityEndpoint && !f.dependsOn).map((f) => f.entityEndpoint!))
+      new Set([...config.fields, ...config.fields.flatMap((f) => f.jsonRow || [])]
+        .filter((f) => f.type === "select-entity" && f.entityEndpoint && !f.dependsOn)
+        .map((f) => f.entityEndpoint!))
     );
     endpoints.forEach(async (ep) => {
       try {
@@ -588,6 +593,55 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               ))}
             </div>
           )}
+        </div>
+      );
+    }
+    // A json array with a declared row shape is edited as rows of real inputs.
+    // The stored value stays JSON, so nothing about the API changes — only the
+    // way it is produced. Typing JSON by hand is how a trailing comma becomes a
+    // rejected save with nothing useful to say about it.
+    if (f.type === "json" && f.jsonRow?.length) {
+      let rows: Row[] = [];
+      try { const parsed = value ? JSON.parse(value) : []; if (Array.isArray(parsed)) rows = parsed; } catch { rows = []; }
+      const broken = !!value && rows.length === 0 && value.trim() !== "[]" && value.trim() !== "";
+      const write = (next: Row[]) => setField(f.key, JSON.stringify(next));
+      return (
+        <div className="flex flex-col gap-2">
+          {broken && <InlineAlert>This entry is not a JSON array, so it cannot be shown as rows. Clear it to start again.</InlineAlert>}
+          {rows.map((row, idx) => (
+            <div key={idx} className="flex flex-wrap items-end gap-2 rounded-lg border p-2" style={S.raised}>
+              {f.jsonRow!.map((col) => (
+                <label key={col.key} className="flex min-w-[8rem] flex-1 flex-col gap-1">
+                  <span className="text-[11px] font-medium" style={S.sub}>{tLabel(col.label)}</span>
+                  {col.type === "select-entity" ? (
+                    <select className={`${inputCls} nf-select`} style={S.input} disabled={readOnly}
+                      value={String(row[col.key] ?? "")}
+                      onChange={(e) => write(rows.map((r, i) => i === idx ? { ...r, [col.key]: e.target.value } : r))}>
+                      <option value="">{t("selectPlaceholder")}</option>
+                      {(entityOptions[col.entityEndpoint || ""] || []).map((o) => (
+                        <option key={String(o[col.entityValueKey || "id"])} value={String(o[col.entityValueKey || "id"])}>
+                          {(col.entityLabelKeys || []).map((k) => o[k]).filter(Boolean).join(" — ") || String(o[col.entityValueKey || "id"])}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className={inputCls} style={S.input} disabled={readOnly}
+                      type={col.type === "number" ? "number" : "text"} step={col.step} placeholder={col.placeholder}
+                      value={String(row[col.key] ?? "")}
+                      onChange={(e) => write(rows.map((r, i) => i === idx ? { ...r, [col.key]: col.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value } : r))} />
+                  )}
+                </label>
+              ))}
+              {!readOnly && <button type="button" onClick={() => write(rows.filter((_, i) => i !== idx))}
+                className="rounded-lg border px-2 py-1.5 text-xs font-medium" style={{ ...S.surface, color: "var(--danger)" }}>
+                {t("mdRemoveRow")}
+              </button>}
+            </div>
+          ))}
+          {!readOnly && <button type="button" onClick={() => write([...rows, {}])}
+            className="self-start rounded-lg border px-3 py-1.5 text-xs font-semibold" style={S.surface}>
+            <Plus className="mr-1 inline h-3 w-3" />{rows.length ? t("mdAddMore") : t("mdAdd")}
+          </button>}
         </div>
       );
     }

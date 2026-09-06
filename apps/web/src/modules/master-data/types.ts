@@ -93,6 +93,17 @@ export interface MasterDataField {
    */
   derivedFrom?: { endpoint: string; params: Record<string, string>; valueKey: string; missingHelpText?: string };
   /**
+   * Describes one entry of a `json` array field so it can be edited as rows of
+   * real inputs — add, fill, delete — instead of asking someone to type valid
+   * JSON into a textarea. Typing JSON by hand is how you get a trailing comma
+   * and a rejected save with nothing useful to say about it.
+   *
+   * Each column may itself be a select-entity, so an entry that references
+   * another master (an item attribute, a feed ingredient) is chosen rather
+   * than pasted as a UUID.
+   */
+  jsonRow?: MasterDataField[];
+  /**
    * Field exists purely to scope a sibling select-entity field's options (e.g. a helper
    * nob_id/lob_id pair on a form whose own table has no such column) — collected in the form
    * but excluded from the save payload.

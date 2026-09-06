@@ -590,8 +590,12 @@ const item: MasterDataConfig = {
     { key: "cogs_gl_account", label: "COGS GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts cost of goods sold to.", section: "Accounting" },
     { key: "is_blocked", label: "Blocked", type: "boolean", helpText: "A blocked item stays visible/historical but cannot be transacted.", section: "Accounting" },
     {
-      key: "attributes", label: "Attribute Values (JSON array)", type: "json",
+      key: "attributes", label: "Attribute Values", type: "json",
       jsonListKeys: ["attribute_id", "attribute_value"],
+      jsonRow: [
+        { key: "attribute_id", label: "Attribute", type: "select-entity", entityEndpoint: "/item-attribute", entityValueKey: "attribute_id", entityLabelKeys: ["attribute_code", "attribute_name"] },
+        { key: "attribute_value", label: "Value", type: "text", placeholder: "8.5" },
+      ],
       helpText: 'Array of { attribute_id, attribute_value }. Define available attributes first under Item Attributes. Example: [{"attribute_id":"...","attribute_value":"8.5"}]',
     },
   ],
@@ -799,7 +803,13 @@ const feedFormula: MasterDataConfig = {
     { key: "batch_unit", label: "Batch Unit", type: "select-entity", required: true, entityEndpoint: "/uom?uomType=WEIGHT", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
     { key: "description", label: "Description", type: "textarea" },
     {
-      key: "ingredients", label: "Ingredients (JSON array)", type: "json", required: true, createOnly: true,
+      key: "ingredients", label: "Ingredients", type: "json", required: true, createOnly: true,
+      jsonRow: [
+        { key: "item_id", label: "Item", type: "select-entity", entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+        { key: "quantity", label: "Quantity", type: "number", step: "0.001" },
+        { key: "unit", label: "Unit", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
+        { key: "inclusion_pct", label: "Inclusion %", type: "number", step: "0.01" },
+      ],
       helpText: 'Array of { item_id, quantity, unit, inclusion_pct?, loss_pct? }. Example: [{"item_id":"...","quantity":650,"unit":"KG"}]. Set at creation only — the API does not yet support editing ingredients after a formula is created.',
     },
   ],
