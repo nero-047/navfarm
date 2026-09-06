@@ -7,6 +7,7 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CodePreviewDto } from './dto/code-preview.dto';
 import { RequireCodePreviewPermission } from '../../../common/decorators/require-code-preview-permission.decorator';
+import { MASTER_CODE_COLUMNS } from './master-code-columns';
 
 @ApiTags('Number Series')
 @ApiBearerAuth()
@@ -38,6 +39,22 @@ export class NumberSeriesController {
   async resolveCodeSettings(@Query('master') master: string, @Query('type') type: string | undefined, @Req() req: any) {
     const companyId = req.headers['x-workspace-scope'] === 'TENANT' ? null : (req.headers['x-active-company-id'] || req.user?.companyId);
     return this.numberSeriesService.resolveCodeSettings(master, type, req.user?.tenantId || req.tenantId, companyId);
+  }
+
+  /**
+   * The masters a series can serve. resolveSeriesFor() binds a series to a
+   * master by string convention — series_code must equal the master key, or
+   * `MASTER_TYPE` for a type-scoped one. Typed by hand that is silent to get
+   * wrong: a series named ITEMS never applies to anything and nothing reports
+   * it. The form picks from this list instead of asking someone to remember
+   * the spelling.
+   */
+  @Get('masters')
+  @RequirePermission('SYSTEM', 'NUMBER_SERIES', 'view')
+  async appliesTo() {
+    return Object.keys(MASTER_CODE_COLUMNS)
+      .sort()
+      .map((key) => ({ master_key: key, code_column: MASTER_CODE_COLUMNS[key] }));
   }
 
   @Get('preview')

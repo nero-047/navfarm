@@ -215,7 +215,7 @@ const numberSeries: MasterDataConfig = {
   isPrimary: true,
   supportsRestore: false,
   columns: [
-    { key: "series_code", label: "Code" },
+    { key: "series_code", label: "Applies To" },
     { key: "series_name", label: "Name" },
     { key: "document_type", label: "Document Type" },
     { key: "last_generated_code", label: "Last Generated" },
@@ -224,7 +224,16 @@ const numberSeries: MasterDataConfig = {
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank for a series shared across all business verticals." },
     { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id" },
-    { key: "series_code", label: "Series Code", type: "text", required: true, placeholder: "BATCH" },
+    {
+      // The binding is by string convention: resolveSeriesFor() looks for a row
+      // whose series_code equals the master key (ITEM), or `MASTER_TYPE` for a
+      // type-scoped one (LOCATION_SHED, ANIMAL_PIGGERY). Typed by hand that was
+      // silent to get wrong — a series named ITEMS applies to nothing and
+      // nothing says so. Picked from the API's own registry instead.
+      key: "series_code", label: "Applies To", type: "select-entity", required: true, createOnly: true,
+      entityEndpoint: "/number-series/masters", entityValueKey: "master_key", entityLabelKeys: ["master_key"],
+      helpText: "The master this series generates codes for. For a type-scoped series (e.g. sheds only) create it as MASTER_TYPE — LOCATION_SHED.",
+    },
     { key: "series_name", label: "Series Name", type: "text", required: true, placeholder: "Batch Number" },
     { key: "document_type", label: "Document Type", type: "text", required: true, placeholder: "BATCH" },
     { key: "prefix", label: "Prefix", type: "text", placeholder: "BATCH" },
