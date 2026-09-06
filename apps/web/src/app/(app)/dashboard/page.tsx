@@ -41,6 +41,7 @@ import {
   NavUser,
 } from "../../../hooks/useAuth";
 import { useLanguage } from "../../../hooks/useLanguage";
+import { useCompanyCurrency } from "../../../hooks/useCompanyCurrency";
 import { LoadingState, ErrorState } from "../../../components/ui/states";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { ConsolePage } from "../../../components/ui/console-page";
@@ -87,6 +88,8 @@ export default function DashboardPage() {
   const [scope, setScope] = useState<WorkspaceScope>("COMPANY");
   const [activeLob, setActiveLobState] = useState<string>("PIGGERY");
   const [activeCompanyId, setActiveCompanyIdState] = useState<string>("");
+  // Amounts render in the active company's configured currency, not a hardcoded one.
+  const { formatMoney } = useCompanyCurrency();
   const [companies, setCompanies] = useState<any[]>([]);
   const [operationalAreas, setOperationalAreas] = useState<any[]>([]);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
@@ -411,7 +414,7 @@ export default function DashboardPage() {
             <StatCard
               icon={DollarSign}
               label={t("dashGroupBatchValuation")}
-              value={`₹ ${tenantScopedBatches.reduce((sum, b) => sum + (Number(b.wip_value) || 0), 0).toLocaleString("en-IN")}`}
+              value={formatMoney(tenantScopedBatches.reduce((sum, b) => sum + (Number(b.wip_value) || 0), 0))}
               unit={t("dashWip")}
               onClick={() => router.push("/finance/journal")}
               sub={
@@ -631,7 +634,7 @@ export default function DashboardPage() {
               </div>
               <div className="mt-3 flex items-baseline gap-2">
                 <span className="text-3xl font-bold tracking-tight font-mono">
-                  ₹ {batches.reduce((sum, b) => sum + (Number(b.wip_value) || 0), 0).toLocaleString("en-IN")}
+                  {formatMoney(batches.reduce((sum, b) => sum + (Number(b.wip_value) || 0), 0))}
                 </span>
                 <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{t("dashWip")}</span>
               </div>
@@ -836,7 +839,7 @@ export default function DashboardPage() {
               <StatCard
                 icon={DollarSign}
                 label={t("dashBatchWipValuation")}
-                value={`₹ ${(isAllBatchesView ? aggWip : Number(activeBatch?.wip_value || 0)).toLocaleString("en-IN")}`}
+                value={formatMoney(isAllBatchesView ? aggWip : Number(activeBatch?.wip_value || 0))}
                 unit={t("dashWip")}
                 onClick={() => router.push("/livestock")}
                 sub={
@@ -1016,7 +1019,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-2xl font-bold tracking-tight font-mono">
-                    ₹ {Number(activeDairyBatch?.wip_value || 0).toLocaleString("en-IN")}
+                    {formatMoney(activeDairyBatch?.wip_value || 0)}
                   </span>
                   <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{t("dashValuationWord")}</span>
                 </div>
