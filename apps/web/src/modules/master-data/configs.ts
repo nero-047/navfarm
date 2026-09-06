@@ -530,7 +530,7 @@ const item: MasterDataConfig = {
       // own parents. Sub-categories are reached through the Sub Category field
       // below, which filters to children of whatever is chosen here.
       key: "category_id", label: "Category", type: "select-entity", entityEndpoint: "/item-category?rootOnly=true", entityValueKey: "category_id", entityLabelKeys: ["category_code", "category_name"],
-      dependsOn: "item_type", dependsOnMode: "query", queryParams: { item_type: "itemType" }, section: "Identification",
+      dependsOn: "item_type", dependsOnMode: "query", queryParams: { item_type: "itemType" }, requiresParent: true, section: "Identification",
     },
     {
       // A sub-category is just a category whose parent_category_id is the chosen
@@ -538,7 +538,7 @@ const item: MasterDataConfig = {
       // sub_category stays the free-text column it always was; this field now
       // writes the chosen category's category_code into it instead of typed text.
       key: "sub_category", label: "Sub Category", type: "select-entity", entityEndpoint: "/item-category", entityValueKey: "category_code", entityLabelKeys: ["category_code", "category_name"],
-      dependsOn: "category_id", dependsOnMode: "query", queryParams: { category_id: "parentCategoryId" },
+      dependsOn: "category_id", dependsOnMode: "query", queryParams: { category_id: "parentCategoryId" }, requiresParent: true, section: "Identification",
       helpText: "Optional. Lists categories whose parent is the selected Category above — create one there first if the subcategory you need doesn't exist yet.",
     },
     // Left unfiltered: an item's primary/secondary UOM legitimately spans every
@@ -729,7 +729,7 @@ const disease: MasterDataConfig = {
   apiBase: "/disease",
   idKey: "disease_id",
   group: "Livestock & Health",
-  lookupFor: ["medicine"],
+  lookupFor: ["breed"],
   columns: [
     { key: "disease_code", label: "Code" },
     { key: "disease_name", label: "Name" },
@@ -745,41 +745,6 @@ const disease: MasterDataConfig = {
   ],
 };
 
-/**
- * Not a master of its own. BBP-1 §1.5 lists medicine among the things that are
- * items — "Items (feed, medicine, vaccine, semen dose, overhead supplies) are
- * CREATED IN D365BC only" — and puts Withdrawal Days on the item card. The
- * client's Item Master Template says the same, and the TDD tracker's only
- * mentions of medicine are Item Master rows. So this is a per-item profile,
- * reached through the Item workbook exactly like Item Attributes, and it is
- * identified by its item's code rather than one of its own.
- */
-const medicine: MasterDataConfig = {
-  key: "medicine",
-  label: "Medicine Profiles",
-  singular: "Medicine Profile",
-  description: "Composition, dosage and route for an item of type MEDICINE or VACCINE. Withdrawal days come from the item.",
-  apiBase: "/medicine",
-  idKey: "medicine_id",
-  group: "Inventory",
-  tabOf: "item",
-  tabLabel: "Medicine",
-  bcFields: [{ key: "bc_withdrawal_days", label: "Withdrawal Period (days)" }],
-  columns: [
-    { key: "composition", label: "Composition" },
-    { key: "route_of_administration", label: "Route" },
-  ],
-  fields: [
-    { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "item_id", label: "Item", type: "select-entity", required: true, entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
-    { key: "composition", label: "Composition", type: "text", placeholder: "Amoxicillin 10% w/w" },
-    { key: "dosage_guideline", label: "Dosage Guideline", type: "textarea" },
-    {
-      key: "route_of_administration", label: "Route of Administration", type: "select",
-      options: ["ORAL", "INJECTION", "WATER", "TOPICAL"].map((v) => ({ value: v, label: v })),
-    },
-  ],
-};
 
 const feedFormula: MasterDataConfig = {
   key: "feed-formula",
@@ -1082,7 +1047,7 @@ export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   stage, numberSeries,
   animal,
   itemCategory, itemType, uom, uomConversion, item, itemAttribute,
-  species, breed, breedLifecycleStage, reason, disease, medicine, feedFormula,
+  species, breed, breedLifecycleStage, reason, disease, feedFormula,
   supplier, customer, resource,
   glAccount, glMapping, costCenter,
 ];

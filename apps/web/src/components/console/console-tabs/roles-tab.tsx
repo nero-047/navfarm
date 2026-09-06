@@ -55,7 +55,6 @@ const DEFAULT_RESOURCES = [
   { module_code: "MASTER_DATA", resource: "CUSTOMER", name: "Customers", nameKey: "rolCustomers" },
   { module_code: "MASTER_DATA", resource: "RESOURCE", name: "Resources (Labor/Equipment)", nameKey: "rolResourcesLabor" },
   { module_code: "MASTER_DATA", resource: "DISEASE", name: "Diseases", nameKey: "rolDiseases" },
-  { module_code: "MASTER_DATA", resource: "MEDICINE", name: "Medicines", nameKey: "rolMedicines" },
   { module_code: "MASTER_DATA", resource: "REASON", name: "Reasons", nameKey: "rolReasons" },
   { module_code: "MASTER_DATA", resource: "FEED_FORMULA", name: "Feed Formulas", nameKey: "rolFeedFormulas" },
   { module_code: "MASTER_DATA", resource: "GL_ACCOUNT", name: "GL Accounts", nameKey: "rolGlAccounts" },

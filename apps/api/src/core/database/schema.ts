@@ -1400,39 +1400,7 @@ export const diseaseMasterRelations = relations(diseaseMaster, ({ one }) => ({
   })
 }));
 
-export const medicineMaster = mysqlTable('medicine_master', {
-  medicine_id: varchar('medicine_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
-  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  // Nullable by design: no numbering convention has been supplied for this master
-  // yet, so no no_series_master row exists for it. A code may be typed manually
-  // today; the moment a series is configured, NumberSeriesService.resolveOptionalCode()
-  // starts generating one with no further code change. Existing rows keep NULL.
-  item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'cascade' }),
-  composition: varchar('composition', { length: 255 }),
-  dosage_guideline: text('dosage_guideline'),
-  withdrawal_period_days: int('withdrawal_period_days'),
-  route_of_administration: varchar('route_of_administration', { length: 50 }), // e.g. ORAL, INJECTION, WATER
-  is_active: boolean('is_active').default(true).notNull(),
-  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
-  created_by: varchar('created_by', { length: 36 }),
-  updated_by: varchar('updated_by', { length: 36 }),
-  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
-  deleted_at: timestamp('deleted_at', { mode: 'string' }),
-  extension_config: json('extension_config')
-});
 
-export const medicineMasterRelations = relations(medicineMaster, ({ one }) => ({
-  company: one(companyMaster, {
-    fields: [medicineMaster.company_id],
-    references: [companyMaster.company_id]
-  }),
-  item: one(itemMaster, {
-    fields: [medicineMaster.item_id],
-    references: [itemMaster.item_id]
-  })
-}));
 
 export const feedFormulaMaster = mysqlTable('feed_formula_master', {
   formula_id: varchar('formula_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),

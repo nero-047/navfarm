@@ -140,31 +140,6 @@ export async function seedDemoGaps() {
       }
     });
 
-    /* ── Medicines (rides on the MED-* items each company already has) ──── */
-    await run('Medicines', async () => {
-      const profile: Record<string, { comp: string; dose: string; wd: number; route: string }> = {
-        'MED-IRON-DEX': { comp: 'Iron dextran 200 mg/ml', dose: '2 ml IM at day 3 of age', wd: 0, route: 'INTRAMUSCULAR' },
-        'MED-OXYTOCIN': { comp: 'Oxytocin 10 IU/ml', dose: '1-2 ml IM during farrowing, max 2 doses', wd: 0, route: 'INTRAMUSCULAR' },
-        'MED-PENICILLIN': { comp: 'Procaine penicillin G 300,000 IU/ml', dose: '1 ml per 10 kg BW for 3-5 days', wd: 14, route: 'INTRAMUSCULAR' },
-        'MED-IVERMECTIN': { comp: 'Ivermectin 1% w/v', dose: '1 ml per 33 kg BW subcutaneous', wd: 28, route: 'SUBCUTANEOUS' },
-        'MED-TYLOSIN': { comp: 'Tylosin phosphate 100 g/kg', dose: '100 g per tonne of feed for 21 days', wd: 7, route: 'ORAL_IN_FEED' },
-      };
-      for (const { c, items } of perCompany) {
-        for (const [code, p] of Object.entries(profile)) {
-          const itemId = items.get(code);
-          if (!itemId) continue;
-          const [x] = await db.select().from(schema.medicineMaster)
-            .where(and(eq(schema.medicineMaster.company_id, c.company_id), eq(schema.medicineMaster.item_id, itemId))).limit(1);
-          if (x) continue;
-          await db.insert(schema.medicineMaster).values({
-            medicine_id: randomUUID(), tenant_id: tenantId, company_id: c.company_id, item_id: itemId,
-            composition: p.comp, dosage_guideline: p.dose, withdrawal_period_days: p.wd,
-            route_of_administration: p.route, is_active: true, created_by: by,
-          });
-        }
-      }
-    });
-
     /* ── Resources + maintenance log ───────────────────────────────────── */
     await run('Resources & maintenance', async () => {
       for (const { c, tag } of perCompany) {

@@ -69,6 +69,17 @@ export interface MasterDataField {
   /** Required when dependsOnMode is "query": maps each dependsOn field key to its query-param name. */
   queryParams?: Record<string, string>;
   /**
+   * For dependsOnMode "query": hide this field until every parent has a value,
+   * and hide it when the filtered picker would be empty.
+   *
+   * Query mode deliberately omits an unset parent rather than blocking the
+   * fetch, which is right for an optional filter but wrong for a hierarchy —
+   * without this, Sub Category listed every category in the tenant while no
+   * Category was chosen, and Category listed every one while no Item Type was.
+   * A picker that cannot be filtered yet should not be offered at all.
+   */
+  requiresParent?: boolean;
+  /**
    * Field exists purely to scope a sibling select-entity field's options (e.g. a helper
    * nob_id/lob_id pair on a form whose own table has no such column) — collected in the form
    * but excluded from the save payload.

@@ -166,8 +166,22 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const readOnly = administrationRestricted;
   const numbering = useCodeSeries(config.key, form, modalOpen && !editing);
   const formFields = config.fields.map(numbering.field).filter((f) => !f.hideInForm && !(workspaceScope === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)));
+  // A requiresParent field is offered only once it can actually be filtered, and
+  // only if that filter leaves something to choose. Before this, Sub Category
+  // listed every category in the tenant while no Category was selected.
+  const parentSatisfied = (f: MasterDataField) =>
+    !f.requiresParent || parentKeys(f).every((k) => !!form[k]);
+  const hasChoices = (f: MasterDataField) => {
+    if (!f.requiresParent) return true;
+    const ep = resolveEndpoint(f, form);
+    const loaded = ep ? entityOptions[ep] : undefined;
+    // Undefined means the fetch has not resolved yet — keep the field so it does
+    // not flicker in and out; an empty array is a real "nothing to choose".
+    return loaded === undefined || loaded.length > 0;
+  };
   const visibleFields = (editing ? formFields.filter((f) => !f.createOnly) : formFields.filter((f) => !f.editOnly))
-    .filter((f) => !f.visibleWhen || isFieldRequired({ ...f, required: false, requiredWhen: f.visibleWhen }, form));
+    .filter((f) => !f.visibleWhen || isFieldRequired({ ...f, required: false, requiredWhen: f.visibleWhen }, form))
+    .filter((f) => parentSatisfied(f) && hasChoices(f));
   const columns = config.columns || config.fields.filter((f) => !f.hideInTable).slice(0, 5);
   const lookupConfigs = MASTER_DATA_CONFIGS.filter((c) => c.lookupFor?.includes(config.key));
   const sectionCount = new Set(visibleFields.map((f) => f.section || "Identification")).size;
