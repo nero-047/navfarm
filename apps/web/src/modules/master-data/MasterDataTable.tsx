@@ -888,7 +888,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             const identificationIndex = order.indexOf(DEFAULT);
             if (identificationIndex > 0) order.unshift(...order.splice(identificationIndex, 1));
             return order.map((s, i) => (
-              <CollapsibleCard key={s} title={s} defaultOpen={i === 0}>
+              // Open the first card, and any card holding a field the form
+              // will refuse to save without. Primary UOM is required and lives
+              // in "Units & Valuation", so with only the first card open a
+              // mandatory field sat collapsed below optional ones like Storage
+              // Temp — invisible until you went looking for it.
+              <CollapsibleCard key={s} title={s} defaultOpen={i === 0 || bySection.get(s)!.some((f) => isFieldRequired(f, form))}>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {bySection.get(s)!.map((f) => (
                     <div key={f.key} className={f.type === "textarea" || f.type === "json" || f.type === "string-list" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
