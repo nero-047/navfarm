@@ -76,6 +76,35 @@ export class ItemService {
     }).onDuplicateKeyUpdate({ set: { series_name: template.series_name } });
   }
 
+  /**
+   * item_master.item_type stores a type_code string with no foreign key, so the
+   * scope guard (master-data-scope.ts walks declared FKs) cannot check it and
+   * any string would otherwise be accepted. Resolved the same way
+   * LocationService.resolveLocationType resolves location_type: an active,
+   * undeleted type either owned by this company or shared tenant-wide.
+   * Matched exactly, never upper-cased — the stored value is what
+   * assertWithdrawalDays() compares against 'MEDICINE'/'VACCINE'.
+   */
+  private async assertItemTypeExists(itemType: string, tenantId: string, companyId: string | null) {
+    const [type] = await this.db
+      .select({ id: schema.itemTypeMaster.item_type_id })
+      .from(schema.itemTypeMaster)
+      .where(and(
+        eq(schema.itemTypeMaster.tenant_id, tenantId),
+        eq(schema.itemTypeMaster.type_code, itemType),
+        eq(schema.itemTypeMaster.is_active, true),
+        isNull(schema.itemTypeMaster.deleted_at),
+        companyId
+          ? or(eq(schema.itemTypeMaster.company_id, companyId), isNull(schema.itemTypeMaster.company_id))!
+          : isNull(schema.itemTypeMaster.company_id),
+      ))
+      .limit(1);
+
+    if (!type) {
+      throw new NotFoundException(`Item Type '${itemType}' not found.`);
+    }
+  }
+
   /** withdrawal_days is mandatory for MEDICINE/VACCINE item types per spec. */
   private assertWithdrawalDays(itemType: string, withdrawalDays?: number | null) {
     if ((itemType === 'MEDICINE' || itemType === 'VACCINE') && withdrawalDays == null) {
@@ -126,6 +155,9 @@ export class ItemService {
       }
     }
 
+    // 3. Verify the item type exists in this scope
+    await this.assertItemTypeExists(dto.item_type, tenantId, companyId);
+
     this.assertWithdrawalDays(dto.item_type, dto.withdrawal_days);
     this.assertStandardCost(dto.valuation_method, dto.standard_cost);
     this.assertTrackingSeries(dto.is_lot_tracked, dto.is_serial_tracked, dto.tracking_series_id);
@@ -141,7 +173,7 @@ export class ItemService {
       lob_id: dto.lob_id,
     });
 
-    // 3. One company-wide ITEM sequence is shared by all Item Types.
+    // 4. One company-wide ITEM sequence is shared by all Item Types.
     await this.ensureCompanyItemSeries(tenantId, companyId);
     const itemCode = dto.item_code?.trim()
       ? await this.numberSeriesService.manualCode('ITEM', dto.item_code, tenantId, companyId)
@@ -318,6 +350,14 @@ export class ItemService {
       if (!category) {
         throw new NotFoundException(`Item Category with ID '${dto.category_id}' not found.`);
       }
+    }
+
+    // Only a genuine change is held to the master. Seed and demo scripts write
+    // item_type straight into item_master (e.g. BY_PRODUCT, which no tenant has
+    // in item_type_master), and the console resends every field on edit — so
+    // validating an unchanged value would make such a row impossible to edit.
+    if (dto.item_type !== undefined && dto.item_type !== item.item_type) {
+      await this.assertItemTypeExists(dto.item_type, tenantId, item.company_id);
     }
 
     if (dto.item_code && dto.item_code.toUpperCase() !== item.item_code) {

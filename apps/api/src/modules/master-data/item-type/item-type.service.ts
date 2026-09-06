@@ -1,7 +1,7 @@
 import { masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
+import { eq, and, like, or, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -167,29 +167,11 @@ export class ItemTypeService {
   async update(id: string, dto: UpdateItemTypeDto, tenantId: string, userPayload?: any) {
     const itemType = await this.findOne(id);
 
-    if (dto.type_code && dto.type_code.toUpperCase() !== itemType.type_code) {
-      const duplicateConditions = [
-        eq(schema.itemTypeMaster.tenant_id, tenantId),
-        eq(schema.itemTypeMaster.type_code, dto.type_code.toUpperCase()),
-        ne(schema.itemTypeMaster.item_type_id, id),
-        isNull(schema.itemTypeMaster.deleted_at),
-      ];
-      const targetCompanyId = itemType.company_id;
-      if (targetCompanyId) {
-        duplicateConditions.push(eq(schema.itemTypeMaster.company_id, targetCompanyId));
-      } else {
-        duplicateConditions.push(isNull(schema.itemTypeMaster.company_id));
-      }
-
-      const existing = await this.db
-        .select()
-        .from(schema.itemTypeMaster)
-        .where(and(...duplicateConditions))
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new ConflictException(`Item type with code '${dto.type_code}' already exists in this scope.`);
-      }
+    // type_code is immutable (UpdateItemTypeDto no longer carries it), and
+    // blocking the row is the same outcome by another route: an inactive
+    // MEDICINE type is what remove() refuses to allow.
+    if (itemType.is_system && (dto.is_active === false || (dto.status !== undefined && dto.status.toUpperCase() !== 'ACTIVE'))) {
+      throw new ConflictException(`Item type '${itemType.type_code}' is a system type and cannot be deactivated.`);
     }
 
     const updates: any = {
@@ -197,7 +179,6 @@ export class ItemTypeService {
       updated_at: toMysqlTimestamp(),
     };
 
-    if (dto.type_code !== undefined) updates.type_code = dto.type_code.toUpperCase();
     if (dto.code_prefix !== undefined) updates.code_prefix = dto.code_prefix.toUpperCase();
     if (dto.type_name !== undefined) updates.type_name = dto.type_name;
     if (dto.description !== undefined) updates.description = dto.description;
@@ -229,6 +210,23 @@ export class ItemTypeService {
 
     if (itemType.is_system) {
       throw new ConflictException(`Item type '${itemType.type_code}' is a system type and cannot be deleted.`);
+    }
+
+    // item_master.item_type holds the type_code string with no foreign key, so
+    // deleting a type in use leaves those items pointing at nothing. Mirrors
+    // LocationTypeService.remove()'s check against location_master.
+    const usageConditions = [
+      eq(schema.itemMaster.tenant_id, tenantId),
+      eq(schema.itemMaster.item_type, itemType.type_code),
+    ];
+    if (itemType.company_id) usageConditions.push(eq(schema.itemMaster.company_id, itemType.company_id));
+    const [item] = await this.db
+      .select({ id: schema.itemMaster.item_id })
+      .from(schema.itemMaster)
+      .where(and(...usageConditions))
+      .limit(1);
+    if (item) {
+      throw new ConflictException(`Item type '${itemType.type_code}' is already used by an item and cannot be deleted.`);
     }
 
     const deletedTime = toMysqlTimestamp();

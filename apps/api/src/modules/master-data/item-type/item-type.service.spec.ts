@@ -98,6 +98,107 @@ describe('ItemTypeService', () => {
     });
   });
 
+  describe('update', () => {
+    const systemType = {
+      item_type_id: 'type-1', type_code: 'MEDICINE', type_name: 'Medicine',
+      company_id: null, is_system: true, is_active: true, status: 'ACTIVE',
+    };
+    const tenantType = { ...systemType, item_type_id: 'type-2', type_code: 'FEED', type_name: 'Feed', is_system: false };
+
+    const mockUpdateChain = () => {
+      const set = jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) });
+      mockDbUpdate.mockReturnValue({ set });
+      return set;
+    };
+
+    // item.service.ts gates withdrawal_days on the literal strings 'MEDICINE'
+    // and 'VACCINE', so a renamed code silently disables that food-safety rule.
+    it('never writes a type_code, even when a caller smuggles one past the DTO', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(makeSelectResult([systemType])) // findOne
+        .mockReturnValueOnce(makeSelectResult([systemType])); // findOne after update
+      const set = mockUpdateChain();
+
+      await service.update('type-1', { type_name: 'Medicine', type_code: 'MED' } as any, 'tenant-123');
+
+      expect(set.mock.calls[0][0].type_code).toBeUndefined();
+    });
+
+    it('refuses to deactivate a system item type', async () => {
+      mockDbSelect.mockReturnValueOnce(makeSelectResult([systemType]));
+
+      await expect(service.update('type-1', { is_active: false }, 'tenant-123'))
+        .rejects.toThrow(ConflictException);
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('refuses to move a system item type off ACTIVE status', async () => {
+      mockDbSelect.mockReturnValueOnce(makeSelectResult([systemType]));
+
+      await expect(service.update('type-1', { status: 'INACTIVE' }, 'tenant-123'))
+        .rejects.toThrow(ConflictException);
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('still allows the editable fields on a system item type', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(makeSelectResult([systemType]))
+        .mockReturnValueOnce(makeSelectResult([{ ...systemType, description: 'Vet supplies' }]));
+      const set = mockUpdateChain();
+
+      const result = await service.update('type-1', { description: 'Vet supplies' }, 'tenant-123');
+
+      expect(set.mock.calls[0][0].description).toBe('Vet supplies');
+      expect(result.description).toBe('Vet supplies');
+    });
+
+    it('still allows a non-system type to be deactivated', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(makeSelectResult([tenantType]))
+        .mockReturnValueOnce(makeSelectResult([{ ...tenantType, is_active: false }]));
+      const set = mockUpdateChain();
+
+      await service.update('type-2', { is_active: false }, 'tenant-123');
+
+      expect(set.mock.calls[0][0].is_active).toBe(false);
+    });
+  });
+
+  describe('remove', () => {
+    const inUseType = {
+      item_type_id: 'type-2', type_code: 'FEED', type_name: 'Feed',
+      company_id: 'comp-1', is_system: false, is_active: true, status: 'ACTIVE',
+    };
+
+    it('refuses to delete an item type that items still reference', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(makeSelectResult([inUseType])) // findOne
+        .mockReturnValueOnce(makeSelectResult([{ id: 'item-1' }])); // usage probe
+
+      await expect(service.remove('type-2', 'tenant-123'))
+        .rejects.toThrow(/is already used by an item and cannot be deleted/);
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('soft-deletes an item type no item references', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(makeSelectResult([inUseType])) // findOne
+        .mockReturnValueOnce(makeSelectResult([])); // usage probe: none
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+      const result = await service.remove('type-2', 'tenant-123');
+
+      expect(result.success).toBe(true);
+      expect(mockDbUpdate).toHaveBeenCalled();
+    });
+
+    it('still refuses to delete a system item type', async () => {
+      mockDbSelect.mockReturnValueOnce(makeSelectResult([{ ...inUseType, is_system: true }]));
+
+      await expect(service.remove('type-2', 'tenant-123')).rejects.toThrow(ConflictException);
+    });
+  });
+
   describe('create — auto-generated (a series is configured for ITEM_TYPE)', () => {
     it('generates the type_code via the resolved series', async () => {
       numberSeries.resolveSeriesFor.mockResolvedValue('ITEM_TYPE');

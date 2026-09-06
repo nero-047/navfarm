@@ -4,7 +4,7 @@ import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('ItemService', () => {
   let service: ItemService;
@@ -100,6 +100,13 @@ describe('ItemService', () => {
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ id: 'type-raw' }]), // item_type_master lookup
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
               limit: jest.fn().mockResolvedValue([{ item_id: 'item-1', item_code: 'ITM-0001' }]),
             }),
           }),
@@ -138,7 +145,7 @@ describe('ItemService', () => {
     it('should reject a MEDICINE item with no withdrawal_days', async () => {
       mockDbSelect
         .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]) }) }) })
-        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }) }) });
+        .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ id: 'type-medicine' }]) }) }) });
 
       await expect(
         service.create(
@@ -163,6 +170,7 @@ describe('ItemService', () => {
         nobLobResolution.resolve.mockResolvedValue({ nob_id: 'nob-livestock', lob_id: 'lob-piggery' });
         mockDbSelect
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]) }) }) })
+          .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ id: 'type-raw' }]) }) }) })
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ item_id: 'item-1', item_code: 'ITM-0001' }]) }) }) })
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ leftJoin: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue([]) }) }) });
 
@@ -185,6 +193,7 @@ describe('ItemService', () => {
         nobLobResolution.resolve.mockResolvedValue({ nob_id: 'nob-livestock', lob_id: null });
         mockDbSelect
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]) }) }) })
+          .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ id: 'type-raw' }]) }) }) })
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ item_id: 'item-1', item_code: 'ITM-0001' }]) }) }) })
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ leftJoin: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue([]) }) }) });
 
@@ -206,6 +215,7 @@ describe('ItemService', () => {
       it('honors an explicit nob_id on the DTO over derivation', async () => {
         mockDbSelect
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ company_id: 'comp-1' }]) }) }) })
+          .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ id: 'type-raw' }]) }) }) })
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ item_id: 'item-1', item_code: 'ITM-0001' }]) }) }) })
           .mockReturnValueOnce({ from: jest.fn().mockReturnValue({ leftJoin: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue([]) }) }) });
 
@@ -222,6 +232,107 @@ describe('ItemService', () => {
         expect(nobLobResolution.resolve).toHaveBeenCalledWith('tenant-123', 'comp-1', { nob_id: 'nob-explicit', lob_id: undefined });
         expect(insertedValues.nob_id).toBe('nob-explicit');
       });
+    });
+  });
+
+  /**
+   * item_master.item_type is a plain string with no FK, so nothing below the
+   * service rejects a code that is not in item_type_master — the scope guard
+   * only walks declared foreign keys. Seed and demo scripts write codes
+   * directly, so rows carrying a code the master never had must stay readable
+   * and editable; only a caller *changing* item_type is held to the master.
+   */
+  describe('item_type validation against item_type_master', () => {
+    const rows = (result: any[]) => ({
+      from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue(result) }) }),
+    });
+    const attributeRows = (result: any[]) => ({
+      from: jest.fn().mockReturnValue({ leftJoin: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(result) }) }),
+    });
+    const legacyItem = {
+      item_id: 'item-1', item_code: 'ITM-0001', item_name: 'Offal',
+      item_type: 'BY_PRODUCT', company_id: 'comp-1', withdrawal_days: null,
+    };
+
+    it('rejects a create whose item_type is not a known type code', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(rows([{ company_id: 'comp-1' }])) // company
+        .mockReturnValueOnce(rows([])); // item_type_master: no such code
+
+      await expect(
+        service.create(
+          { company_id: 'comp-1', item_name: 'Nonsense', item_type: 'BANANA_REPUBLIC', uom_primary: 'KG' } as any,
+          'tenant-123',
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockGenerateNext).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects an update that changes item_type to an unknown type code', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(rows([legacyItem])) // findOne
+        .mockReturnValueOnce(attributeRows([]))
+        .mockReturnValueOnce(rows([])); // item_type_master: no such code
+
+      await expect(service.update('item-1', { item_type: 'BANANA_REPUBLIC' }, 'tenant-123'))
+        .rejects.toThrow(NotFoundException);
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('allows an update that changes item_type to a known type code', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(rows([legacyItem])) // findOne
+        .mockReturnValueOnce(attributeRows([]))
+        .mockReturnValueOnce(rows([{ id: 'type-finished' }])) // item_type_master hit
+        .mockReturnValueOnce(rows([{ ...legacyItem, item_type: 'FINISHED_GOOD' }])) // findOne after update
+        .mockReturnValueOnce(attributeRows([]));
+      const set = jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) });
+      mockDbUpdate.mockReturnValue({ set });
+
+      const result = await service.update('item-1', { item_type: 'FINISHED_GOOD' }, 'tenant-123');
+
+      expect(set.mock.calls[0][0].item_type).toBe('FINISHED_GOOD');
+      expect(result.item_type).toBe('FINISHED_GOOD');
+    });
+
+    // A demo script wrote BY_PRODUCT straight into item_master; the console
+    // resends every field on edit, so validating an unchanged item_type would
+    // make such a row impossible to edit at all.
+    it('lets a row whose stored item_type is unknown be edited while it resends that same item_type', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(rows([legacyItem])) // findOne
+        .mockReturnValueOnce(attributeRows([]))
+        .mockReturnValueOnce(rows([{ ...legacyItem, item_name: 'Offal (chilled)' }])) // findOne after update
+        .mockReturnValueOnce(attributeRows([]));
+      const set = jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) });
+      mockDbUpdate.mockReturnValue({ set });
+
+      const result = await service.update('item-1', { item_name: 'Offal (chilled)', item_type: 'BY_PRODUCT' }, 'tenant-123');
+
+      expect(set.mock.calls[0][0].item_name).toBe('Offal (chilled)');
+      expect(result.item_name).toBe('Offal (chilled)');
+    });
+
+    it('still reads a row whose stored item_type is unknown', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(rows([legacyItem]))
+        .mockReturnValueOnce(attributeRows([]));
+
+      await expect(service.findOne('item-1')).resolves.toMatchObject({ item_type: 'BY_PRODUCT' });
+    });
+
+    it('still lists rows whose stored item_type is unknown', async () => {
+      mockDbSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockReturnValue({ offset: jest.fn().mockResolvedValue([legacyItem]) }),
+          }),
+        }),
+      });
+
+      await expect(service.findAll({}, 'tenant-123')).resolves.toEqual([legacyItem]);
     });
   });
 

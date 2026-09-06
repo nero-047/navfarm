@@ -33,12 +33,12 @@ export class CreateItemTypeDto {
   extension_config?: any;
 }
 
+// No type_code, exactly as UpdateLocationTypeDto has none: item_master.item_type
+// stores the code as a plain string with no foreign key, and item.service.ts
+// gates withdrawal_days on the literals 'MEDICINE'/'VACCINE', so renaming a code
+// after create would silently detach every existing and future item from that
+// food-safety rule. The code is immutable once the type exists.
 export class UpdateItemTypeDto {
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  type_code?: string;
-
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()

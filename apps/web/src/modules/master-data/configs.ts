@@ -361,7 +361,11 @@ const itemType: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "type_code", label: "Type Code", type: "text", required: true, placeholder: "RAW_MATERIAL" },
+    // createOnly: items reference a type by its code string, so the code is
+    // immutable after create (UpdateItemTypeDto has no type_code, and the
+    // global pipe's forbidNonWhitelisted would 400 the whole edit if the form
+    // kept resending it).
+    { key: "type_code", label: "Type Code", type: "text", required: true, placeholder: "RAW_MATERIAL", createOnly: true },
     { key: "type_name", label: "Type Name", type: "text", required: true, placeholder: "Raw Material" },
     { key: "description", label: "Description", type: "textarea" },
   ],
