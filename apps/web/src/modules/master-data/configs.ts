@@ -495,6 +495,7 @@ const itemAttribute: MasterDataConfig = {
 const item: MasterDataConfig = {
   key: "item",
   owner: "BC",
+  bcNote: "BBP-1 §1.5: \u201CItems (feed, medicine, vaccine, semen dose, overhead supplies) are CREATED IN D365BC only. NAVFarm cannot create items independently.\u201D",
   bcFields: [
     { key: "item_code", label: "Item No." },
     { key: "item_name", label: "Description" },
@@ -929,6 +930,7 @@ const resource: MasterDataConfig = {
 const glAccount: MasterDataConfig = {
   key: "gl-account",
   owner: "BC",
+  bcNote: "BBP-1 §1.6: \u201CNAVFarm does NOT maintain its own Chart of Accounts. COA lives entirely in D365BC.\u201D",
   bcFields: [
     { key: "account_code", label: "Account No." },
     { key: "account_name", label: "Account Name" },
@@ -1026,6 +1028,8 @@ const glMapping: MasterDataConfig = {
 };
 
 const costCenter: MasterDataConfig = {
+  owner: "BC",
+  bcNote: "BBP-1 §1.8: \u201CDimensions are configured in D365BC and mirrored in NAVFarm dimension master via API sync. The dimensions (cost centre) will be created in NAVFarm same as in BC365.\u201D The primary mandatory dimension is Cost Centre = Farm Code.",
   key: "cost-center",
   label: "Cost Centers",
   description: "Dimensions for cost allocation and reporting.",

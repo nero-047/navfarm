@@ -141,6 +141,12 @@ export interface MasterDataConfig {
   bcFields?: { key: string; label: string }[];
   /** BC owns this catalog; local users may browse but cannot mutate it. */
   owner?: "BC";
+  /**
+   * What the blueprint says about this catalog's source, quoted. Rendered by
+   * BcOwnershipNotice so each master cites its own section rather than one
+   * hardcoded sentence about Items and the COA.
+   */
+  bcNote?: string;
   /** BBP business administrator mapped to Tenant/Company Admin by the user. */
   businessAdminOnly?: boolean;
   /** Table columns; defaults to all non-hidden fields plus status if omitted */

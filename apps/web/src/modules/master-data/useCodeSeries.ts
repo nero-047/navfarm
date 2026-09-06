@@ -81,6 +81,9 @@ export function useCodeSeries(key: string, form: Record<string, unknown>, enable
     value: (fieldKey: string, value: unknown) => serial && fieldKey === definition?.[1] ? current?.settings?.preview || "" : value,
     loading: canGenerate && enabled && !current,
     error: canGenerate && enabled ? current?.error : undefined,
+    /** The config field this hook drives, so a caller can tell whether a failed
+     * preview actually prevents saving. */
+    codeKey: definition?.[1],
     field: (field: MasterDataField): MasterDataField => {
       if (!enabled || !canGenerate || field.key !== definition?.[1] || !managedCode) return field;
       const manual = allowManual && mode === "manual";

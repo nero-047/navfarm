@@ -68,6 +68,9 @@ export function LookupCard({
   // Include every required creation field: recipes need item/UOM selectors
   // and ingredients as well as their code and name.
   const numbering = useCodeSeries(config.key, form, config.owner !== "BC");
+  // As in the full form: only a mandatory code can block Add on a failed preview.
+  const codeIsMandatory = !!config.fields.find((f) => f.key === numbering.codeKey)?.required;
+  const numberingBlocks = !!numbering.error && codeIsMandatory;
   const fields = config.fields.filter((f) => f.required || f.showInLookup).map(numbering.field).filter(
     (f) => !f.hideInForm && !f.editOnly && !f.filterOnly && !(getActiveWorkspaceScope() === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)),
   );
@@ -165,7 +168,7 @@ export function LookupCard({
       ) : null}
       {numbering.error && <p className="text-xs text-(--danger)">{numbering.error}</p>}
       <div className="flex items-center gap-3 flex-wrap">
-        <Button type="button" size="sm" onClick={add} disabled={busy || !complete || numbering.loading || !!numbering.error}>
+        <Button type="button" size="sm" onClick={add} disabled={busy || !complete || numbering.loading || numberingBlocks}>
           {busy ? "Adding…" : `Add ${singularLabel(config)}`}
         </Button>
         <button type="button" onClick={onManage} className="text-xs underline text-(--text-secondary)">

@@ -165,6 +165,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const administrationRestricted = !!config.businessAdminOnly && !["TENANT_ADMIN", "COMPANY_ADMIN"].includes(getStoredUser()?.userType || "");
   const readOnly = administrationRestricted;
   const numbering = useCodeSeries(config.key, form, modalOpen && !editing);
+  // A failed code preview used to disable Create outright. For a master whose
+  // code is optional — UOM Conversion says "leave blank until the numbering
+  // convention is agreed" — that made an unrelated preview problem block the
+  // whole record. Only a mandatory code can stop a save; otherwise the message
+  // stands as a warning and the row saves without a code.
+  const codeIsMandatory = !!config.fields.find((f) => f.key === numbering.codeKey)?.required;
+  const numberingBlocks = !!numbering.error && codeIsMandatory;
   const formFields = config.fields.map(numbering.field).filter((f) => !f.hideInForm && !(workspaceScope === "OPERATIONAL" && ["nob_id", "lob_id"].includes(f.key)));
   // A requiresParent field is offered only once it can actually be filtered, and
   // only if that filter leaves something to choose. Before this, Sub Category
@@ -674,7 +681,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
       {error && <InlineAlert>{error}</InlineAlert>}
 
-      {bcOwned && <BcOwnershipNotice />}
+      {bcOwned && <BcOwnershipNotice config={config} />}
       {administrationRestricted && <p className="rounded-lg border p-3 text-sm" style={S.raised}>Only a Tenant Admin or Company Admin can add, edit or deactivate reasons. You can view the shared catalog here.</p>}
       {bcOwned && lookupConfigs.length > 0 && <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs text-(--text-muted)">Related NAVFarm setup:</span>
@@ -797,7 +804,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || numbering.loading || !!numbering.error}
+              disabled={saving || numbering.loading || numberingBlocks}
               className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               style={{ backgroundColor: "var(--accent)" }}
             >

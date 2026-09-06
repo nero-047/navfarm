@@ -34,7 +34,7 @@ export function MasterRecordView({ config, id, onClose }: { config: MasterDataCo
     presentation={fields.length > 10 ? "page" : "modal"}
     footer={<button type="button" className="nf-button" onClick={onClose}>Close</button>}>
     {error ? <InlineAlert>{error}</InlineAlert> : !record ? <p role="status">Loading record…</p> : <div className="grid gap-6">
-      {config.owner === "BC" && <BcOwnershipNotice />}
+      {config.owner === "BC" && <BcOwnershipNotice config={config} />}
       <dl className={`grid grid-cols-1 gap-4 sm:grid-cols-2${config.owner === "BC" ? " order-last" : ""}`}>
         {fields.map((field) => <div key={field.key} className="min-w-0">
           <dt className="text-xs text-(--text-muted)">{field.label}</dt>
