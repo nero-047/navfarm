@@ -290,7 +290,11 @@ export async function bootstrap() {
     const costingMethods: Array<typeof master.costingMethodConfig.$inferInsert> = [
       {
         method_code: 'STANDARD',
-        method_name: 'Standard / FIFO Costing',
+        // Named for itself, not for FIFO: FIFO is its own row below, and the
+        // Item form lists both by name. "Standard / FIFO Costing" alongside
+        // "First In First Out" reads as two ways to say FIFO, while only this
+        // one makes standard_cost mandatory (item.service.ts assertStandardCost).
+        method_name: 'Standard Costing',
         variance_auto: 'YES',
         layer_tracking: true,
         is_system: true,
