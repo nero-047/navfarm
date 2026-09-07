@@ -14,6 +14,14 @@
         "cache": false,
         "options": { "cwd": "apps/api", "command": "node --import tsx src/scripts/align-demo-bbp-masters.ts" }
       },
+      "db-seed-demo-breeding-chain": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --import tsx src/scripts/seed-demo-breeding-chain.ts"
+        }
+      },
       "db-configure-demo-master-series": {
         "executor": "nx:run-commands",
         "cache": false,
