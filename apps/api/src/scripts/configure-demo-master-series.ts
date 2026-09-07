@@ -14,6 +14,16 @@ const definitions = [
   ['ITEM_ATTRIBUTE', 'ATTR', 'Item Attribute Code'],
   ['GL_ACCOUNT', 'GL', 'GL Account Code (reserved; BC-owned catalog)'],
   ['COST_CENTER', 'CC', 'Cost Center Code'],
+  // The three join masters. Each already had a company-scoped series row and no
+  // tenant-scoped one, while every series above has both — and resolveSeriesFor
+  // matches scope exactly (companyCondition: eq when a company is given, IS NULL
+  // when not). So a conversion or mapping created at tenant scope found no
+  // series and stored a NULL code, while the form said "Follow number series"
+  // and promised a code allocated on save. Every row in both tables carried a
+  // NULL code as a result: uom_conversion 7 of 7, gl_mapping 18 of 18.
+  ['UOM_CONVERSION', 'CONV', 'UOM Conversion Code'],
+  ['GL_MAPPING', 'GLMAP', 'GL Mapping Code'],
+  ['BREED_LIFECYCLE_STAGE', 'BLS', 'Breed Lifecycle Stage Code'],
 ] as const;
 
 async function run() {

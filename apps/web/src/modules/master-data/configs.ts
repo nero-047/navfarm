@@ -441,19 +441,37 @@ const uomConversion: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
-    { key: "conversion_code", label: "Conversion Code", type: "text", placeholder: "CONV-001", helpText: "Optional. Leave blank until the numbering convention is agreed; a series can generate it later." },
+    { key: "conversion_code", label: "Conversion Code", type: "text", placeholder: "CONV-001" },
+    // The four fields below are the whole of the client's "UOM Conversion" sheet
+    // (Unit Of Measure.xlsx). Their wording is the sheet's own, not a paraphrase.
     {
       key: "item_id", label: "Item", type: "select-entity",
       entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"],
       helpText: "Leave blank for a factor that applies to every item using these units.",
     },
-    { key: "from_uom", label: "From UOM", type: "text", required: true, placeholder: "VIAL" },
-    { key: "to_uom", label: "To UOM", type: "text", required: true, placeholder: "ML" },
+    // Both of these store a UOM *code* (the rows hold GRAM, KG, TONNE), which is
+    // why the value key is uom_code and not uom_id. They were free-text boxes:
+    // nothing stopped you typing a unit that does not exist, and the placeholders
+    // invented a VIAL→ML example the client never wrote.
+    {
+      key: "from_uom", label: "From UOM", type: "select-entity", required: true,
+      entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"],
+      helpText: "Entry or purchase UOM.",
+    },
+    {
+      key: "to_uom", label: "To UOM", type: "select-entity", required: true,
+      entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"],
+      helpText: "Base UOM. A factor always converts TO the base unit.",
+    },
     {
       key: "conversion_factor", label: "Conversion Factor", type: "number", required: true,
-      placeholder: "100", helpText: "From × Factor = To. One vial of 100 ml is a factor of 100.",
+      placeholder: "50",
+      helpText: "Multiply the From quantity to get the base quantity. 1 BAG = 50 KG, so the factor is 50.",
     },
-    { key: "effective_from", label: "Effective From", type: "date", required: true },
+    // Not on the client's sheet. The column predates this work (schema, 21 July)
+    // and is NOT NULL, so the form cannot stop asking for it without a migration.
+    // Flagged in docs/masters-evidence; needs a client answer, not a guess.
+    { key: "effective_from", label: "Effective From", type: "date", required: true, helpText: "Not on the client template — our column. Use the date this factor starts applying." },
     { key: "effective_to", label: "Effective To", type: "date", helpText: "Leave blank while the factor is open-ended." },
   ],
 };
