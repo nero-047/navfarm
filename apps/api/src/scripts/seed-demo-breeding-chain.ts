@@ -183,12 +183,39 @@ async function run() {
       }
     }
 
+    // Roll the litters up onto the sow. Without this the animal register keeps
+    // parity_count 0 and total_piglets_* 0 while its own farrowing records say
+    // twelve born live — the detail panel contradicted itself on screen.
+    //
+    // Parity follows BBP-1: "Parity incremented on weaning POST". So a sow
+    // whose current litter is still on her has not reached that parity yet,
+    // and her count is one behind the litter number.
+    const rollups = farrowings.map((f) => ({
+      sow_animal_id: f.sow_animal_id,
+      sow_code: f.sow_code,
+      parity_count: f.weaning_date ? f.parity_number : f.parity_number - 1,
+      total_piglets_born_live: f.piglets_born_live,
+      total_piglets_weaned: f.piglets_weaned,
+    }));
+
+    if (apply || verify) {
+      for (const r of rollups) {
+        await db.query(
+          `UPDATE animal_register
+              SET parity_count = ?, total_piglets_born_live = ?, total_piglets_weaned = ?
+            WHERE animal_id = ?`,
+          [r.parity_count, r.total_piglets_born_live, r.total_piglets_weaned, r.sow_animal_id],
+        );
+      }
+    }
+
     const plan = {
       database: 'tenant_devco',
       mode: apply ? 'APPLY' : verify ? 'VERIFY' : 'READ-ONLY',
       semenLots: semen.map((s) => ({ boar: s.boar_code, collected: s.collection_date, doses: s.doses_collected })),
       matings: breedings.map((b) => ({ sow: b.sow_code, mated: b.mating_date, dueOrFarrowed: b.expected_farrowing_date, parity: b.parity_number })),
       farrowings: farrowings.map((f) => ({ sow: f.sow_code, on: f.farrowing_date, bornLive: f.piglets_born_live, status: f.farrowing_status, weaned: f.piglets_weaned })),
+      sowRollups: rollups.map((r) => ({ sow: r.sow_code, parity: r.parity_count, bornLive: r.total_piglets_born_live, weaned: r.total_piglets_weaned })),
       totals: { semen: semen.length, matings: breedings.length, farrowings: farrowings.length },
     };
     console.log(JSON.stringify(plan, null, 2));
