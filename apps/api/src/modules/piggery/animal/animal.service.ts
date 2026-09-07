@@ -31,6 +31,41 @@ const DISPOSAL_STATUS_MAP: Record<string, string | undefined> = {
 // no_of_teats on a GILT (create and update) rather than a selection action that does not exist.
 const MIN_GILT_TEATS = 15;
 
+/**
+ * Statuses that mean the animal has left the herd. Only dispose() may set
+ * these, because only dispose() does the work they imply: for SLAUGHTERED it
+ * blocks until every administered medicine's withdrawal period has elapsed
+ * (assertWithdrawalPeriodsElapsed — a food-safety rule, not bookkeeping), it
+ * computes gain_loss_on_disposal against book value, and it records
+ * disposal_date, disposal_type and disposal_value while flipping is_active.
+ *
+ * Without this guard a plain PUT /animal/:id with { status: 'SLAUGHTERED' }
+ * returned 200 and left the row SLAUGHTERED with is_active still 1, no
+ * disposal record and no withdrawal check — verified against the running API
+ * on 2026-09-07 before the guard existed.
+ */
+const DISPOSAL_ONLY_STATUSES = new Set(Object.values(DISPOSAL_STATUS_MAP).filter(Boolean) as string[]);
+
+/**
+ * CULLED is blocked too, but it is NOT a disposal type — DISPOSAL_TYPES is
+ * SOLD / SLAUGHTERED / DIED / TRANSFERRED — so dispose() cannot set it either
+ * and the message must not send anyone there.
+ *
+ * BBP-1: "On mortality or cull: record CLOSED (not deleted). Closure date,
+ * reason, disposal destination, weight at death/cull recorded. D365BC FA or
+ * inventory write-off triggered", and "Out-of-Production Date and Cull Date are
+ * TWO SEPARATE fields (MOM 24 Aug). System does not allow Cull Date <
+ * Out-of-Production Date", with an INFO alert when the gap exceeds 14 days
+ * because the animal is still eating during the hold.
+ *
+ * None of that is built: the register has expected_cull_date and nothing else —
+ * no out_of_production_date, no cull_date, no disposal destination, no weight
+ * at cull — and the CULL reason category holds one code. So culling has no
+ * correct path today, and letting a status dropdown fake one would record a
+ * culled animal with none of the closure data the blueprint requires.
+ */
+const CULL_STATUS = 'CULLED';
+
 function assertGiltTeatCount(animalType: string | undefined, noOfTeats: number | undefined | null): void {
   if (animalType !== 'GILT' || noOfTeats === undefined || noOfTeats === null) return;
   if (noOfTeats < MIN_GILT_TEATS) {
@@ -457,6 +492,21 @@ export class AnimalService {
 
   async update(id: string, dto: UpdateAnimalDto, tenantId: string, userPayload?: any) {
     const animal = await this.findOne(id);
+
+    // Changing to the same value is not a disposal, so re-saving a form that
+    // shows an already-disposed animal is still allowed.
+    if (dto.status && dto.status !== animal.status) {
+      if (DISPOSAL_ONLY_STATUSES.has(dto.status)) {
+        throw new BadRequestException(
+          `'${dto.status}' records that the animal has left the herd and must be set through Dispose, which checks medicine withdrawal periods and posts the gain or loss on disposal.`,
+        );
+      }
+      if (dto.status === CULL_STATUS) {
+        throw new BadRequestException(
+          `'CULLED' closes the animal's record and triggers a write-off, and needs the out-of-production date, cull date, reason and weight that go with it. That flow is not built yet, so it cannot be set here.`,
+        );
+      }
+    }
 
     assertGiltTeatCount(animal.animal_type, dto.no_of_teats);
 

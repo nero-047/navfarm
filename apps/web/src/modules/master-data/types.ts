@@ -186,6 +186,15 @@ export interface MasterDataConfig {
    */
   supportsRestore?: boolean;
   /**
+   * Which values of this master's own `status` column mean the record is still
+   * in play. Used to colour the status chip: in-play reads as live, anything
+   * else reads as spent.
+   *
+   * Animal Register's live values are the in-herd ones; CULLED / DEAD / SOLD /
+   * SLAUGHTERED mean the animal has left, and are set only by Dispose.
+   */
+  statusActiveValues?: string[];
+  /**
    * Shown in the master-data sub-sidebar. A master that is only a lookup for
    * another master (item category, UOM) is not primary — it is reached
    * through the card in its parent's dialog, not through its own nav entry.

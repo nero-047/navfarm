@@ -266,6 +266,11 @@ const animal: MasterDataConfig = {
   group: "Piggery",
   isPrimary: true,
   supportsRestore: false,
+  // The in-herd statuses. CULLED / DEAD / SOLD / SLAUGHTERED mean the animal
+  // has left; Dispose sets those, after checking medicine withdrawal periods
+  // and posting the gain or loss on disposal, and the API now rejects them on
+  // the plain update path.
+  statusActiveValues: ["ACTIVE", "QUARANTINE", "SICK", "PREGNANT", "LACTATING", "DRY"],
   columns: [
     { key: "animal_code", label: "Code" },
     { key: "animal_type", label: "Type" },
@@ -324,7 +329,11 @@ const animal: MasterDataConfig = {
     { key: "current_location_id", label: "Current Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], section: "Current Position" },
     {
       key: "status", label: "Status", type: "select", section: "Current Position",
-      options: ["ACTIVE", "QUARANTINE", "SICK", "PREGNANT", "LACTATING", "DRY", "CULLED", "DEAD", "SOLD", "SLAUGHTERED"].map((v) => ({ value: v, label: v })),
+      // The four disposal statuses are absent on purpose: the API refuses them
+      // here, because they are what Dispose records. Offering an option that
+      // can only ever fail is worse than not offering it.
+      options: ["ACTIVE", "QUARANTINE", "SICK", "PREGNANT", "LACTATING", "DRY"].map((v) => ({ value: v, label: v })),
+      helpText: "Sold, slaughtered, died or culled are recorded through Dispose, not here.",
     },
     { key: "parity_count", label: "Parity Count", type: "number", hideInForm: true, section: "Production" },
     { key: "total_piglets_born_live", label: "Total Piglets Born Live", type: "number", hideInForm: true, section: "Production" },
