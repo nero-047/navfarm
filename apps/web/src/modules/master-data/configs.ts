@@ -266,6 +266,7 @@ const animal: MasterDataConfig = {
   group: "Piggery",
   isPrimary: true,
   supportsRestore: false,
+  detailPanel: "animal",
   // The in-herd statuses. CULLED / DEAD / SOLD / SLAUGHTERED mean the animal
   // has left; Dispose sets those, after checking medicine withdrawal periods
   // and posting the gain or loss on disposal, and the API now rejects them on

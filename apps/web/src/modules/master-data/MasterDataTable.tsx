@@ -12,6 +12,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import type { MasterDataConfig, MasterDataField } from "./types";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { singularLabel } from "./labels";
+import AnimalDetailPanel from "./AnimalDetailPanel";
 import { LookupCard } from "./LookupCard";
 import { MASTER_DATA_CONFIGS } from "./configs";
 import { useCodeSeries } from "./useCodeSeries";
@@ -225,6 +226,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   // on medicine withdrawal periods and posts the gain or loss. So the column
   // could only ever be a dead badge there. Rishi's call: drop it.
   const ownsStatusColumn = columns.some((c) => c.key === "status");
+  // Master-detail: clicking a row narrows the list and opens a panel beside it,
+  // for masters where one record has enough behind it to be worth reading on
+  // its own. Only Animal Register qualifies today.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const detailFor = config.detailPanel;
+  const selectedRow = detailFor ? rows.find((r) => String(r[config.idKey]) === selectedId) : undefined;
   const statusActiveValues = config.statusActiveValues;
   const lookupConfigs = MASTER_DATA_CONFIGS.filter((c) => c.lookupFor?.includes(config.key));
   const sectionCount = new Set(visibleFields.map((f) => f.section || "Identification")).size;
@@ -822,7 +829,8 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           className="text-xs underline" onClick={() => setLookupManager(c)}>Manage {c.label}</button>)}
       </div>}
 
-      <div className="overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+      <div className={selectedRow ? "grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : undefined}>
+      <div className="min-w-0 overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <TableHeader>
@@ -867,7 +875,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 pagedRows.map((row) => {
                   const inactive = row.is_active === false;
                   return (
-                    <TableRow key={row[config.idKey]}>
+                    <TableRow
+                      key={row[config.idKey]}
+                      onClick={detailFor ? () => setSelectedId(String(row[config.idKey])) : undefined}
+                      className={detailFor ? "cursor-pointer" : undefined}
+                      style={detailFor && String(row[config.idKey]) === selectedId
+                        ? { backgroundColor: "var(--surface-raised)" }
+                        : undefined}
+                    >
                       {columns.map((c) => (
                         c.key === "status" && row.status ? (
                           // A chip, in the same shape as the Active badge below,
@@ -927,7 +942,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                         )}
                       </TableCell>}
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button onClick={() => setViewingId(String(row[config.idKey]))} aria-label={`View ${singularLabel(config)}`} title="View" className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
                             <Eye className="h-3.5 w-3.5" />
                           </button>
@@ -953,6 +968,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
             <Pagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizeOptions={[25, 50, 100]} />
           </div>
         )}
+      </div>
+      {selectedRow && detailFor === "animal" && (
+        <div className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-8rem)]">
+          <AnimalDetailPanel row={selectedRow} onClose={() => setSelectedId(null)} />
+        </div>
+      )}
       </div>
 
       {viewingId && <MasterRecordView config={config} id={viewingId} onClose={() => setViewingId(null)} />}

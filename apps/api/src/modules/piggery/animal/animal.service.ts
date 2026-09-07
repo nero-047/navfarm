@@ -1,7 +1,8 @@
 import { masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, or, like } from 'drizzle-orm';
+import { eq, and, or, like, desc, sql } from 'drizzle-orm';
+import { aliasedTable } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -688,6 +689,57 @@ export class AnimalService {
     });
 
     return this.findOne(id);
+  }
+
+  /**
+   * Every breeding record this animal appears in, from either side.
+   *
+   * A boar is not a sow with a different flag: he appears on the mating as
+   * boar_animal_id and never as sow_animal_id, so filtering on one column would
+   * have shown an empty breeding history for both boars in the herd. The join
+   * to the partner animal is what lets the screen name the other parent
+   * without a second round trip per row.
+   */
+  async getBreedingHistory(animalId: string) {
+    const animal = await this.findOne(animalId);
+    const sow = aliasedTable(schema.animalRegister, 'sow');
+    const boar = aliasedTable(schema.animalRegister, 'boar');
+
+    const matings = await this.db
+      .select({
+        breeding_id: schema.breedingRecord.breeding_id,
+        role: sql<string>`CASE WHEN ${schema.breedingRecord.sow_animal_id} = ${animalId} THEN 'DAM' ELSE 'SIRE' END`,
+        mating_type: schema.breedingRecord.mating_type,
+        mating_date: schema.breedingRecord.mating_date,
+        second_mating_date: schema.breedingRecord.second_mating_date,
+        expected_farrowing_date: schema.breedingRecord.expected_farrowing_date,
+        preg_check_date: schema.breedingRecord.preg_check_date,
+        preg_check_method: schema.breedingRecord.preg_check_method,
+        pregnancy_confirmed: schema.breedingRecord.pregnancy_confirmed,
+        conception_result: schema.breedingRecord.conception_result,
+        parity_number: schema.breedingRecord.parity_number,
+        semen_dose_qty: schema.breedingRecord.semen_dose_qty,
+        sow_code: sow.animal_code,
+        boar_code: boar.animal_code,
+      })
+      .from(schema.breedingRecord)
+      .leftJoin(sow, eq(sow.animal_id, schema.breedingRecord.sow_animal_id))
+      .leftJoin(boar, eq(boar.animal_id, schema.breedingRecord.boar_animal_id))
+      .where(or(
+        eq(schema.breedingRecord.sow_animal_id, animalId),
+        eq(schema.breedingRecord.boar_animal_id, animalId),
+      ))
+      .orderBy(desc(schema.breedingRecord.mating_date));
+
+    // Farrowings hang off the sow only — a boar's litters are reachable through
+    // his matings, which the caller already has.
+    const farrowings = await this.db
+      .select()
+      .from(schema.farrowingRecord)
+      .where(eq(schema.farrowingRecord.sow_animal_id, animalId))
+      .orderBy(desc(schema.farrowingRecord.farrowing_date));
+
+    return { animal_code: animal.animal_code, animal_type: animal.animal_type, matings, farrowings };
   }
 
   async getBioAssetLedger(animalId: string) {

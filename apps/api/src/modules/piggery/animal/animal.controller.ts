@@ -93,6 +93,15 @@ export class AnimalController {
     return { success: true, message: 'Animal disposal recorded.', data: result };
   }
 
+  @Get(':id/breeding')
+  @RequirePermission('PIGGERY', 'ANIMAL', 'view')
+  @ApiOperation({ summary: "An animal's matings (from either side) and its farrowings" })
+  @ApiParam({ name: 'id', description: 'Animal UUID' })
+  async getBreedingHistory(@Param('id') id: string) {
+    const result = await this.animalService.getBreedingHistory(id);
+    return { success: true, message: 'Breeding history retrieved.', data: result };
+  }
+
   @Get(':id/bio-asset-ledger')
   @RequirePermission('PIGGERY', 'ANIMAL', 'view')
   @ApiOperation({ summary: 'Get IAS 41 bio-asset ledger history for an animal' })

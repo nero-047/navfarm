@@ -186,6 +186,13 @@ export interface MasterDataConfig {
    */
   supportsRestore?: boolean;
   /**
+   * Opens a detail panel beside the list when a row is clicked, narrowing the
+   * table to make room. Named rather than boolean because the panel's content
+   * is master-specific — there is no generic "show everything" panel worth
+   * having.
+   */
+  detailPanel?: "animal";
+  /**
    * Which values of this master's own `status` column mean the record is still
    * in play. Used to colour the status chip: in-play reads as live, anything
    * else reads as spent.
