@@ -14,6 +14,14 @@
         "cache": false,
         "options": { "cwd": "apps/api", "command": "node --import tsx src/scripts/align-demo-bbp-masters.ts" }
       },
+      "db-align-stages-to-tdd": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --import tsx src/scripts/align-stages-to-tdd.ts"
+        }
+      },
       "db-seed-demo-breeding-chain": {
         "executor": "nx:run-commands",
         "cache": false,
