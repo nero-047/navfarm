@@ -437,6 +437,30 @@ body {
   }
 }
 
+/* A second 236px column does not fit next to the 260px primary nav until the
+   window is wide enough to carry both. At 1024 the pair took 496px — 48% of
+   the window — leaving the work surface 464px, and the Items table, which
+   needs 712px, was clipped inside it.
+   So between 1024 and 1280 the context nav keeps the compact form it already
+   has below 1024 (a strip when flat, a selector when grouped) and sits above
+   the content instead of beside it. The work surface goes from 464px to
+   ~730px. Nothing new is introduced: both geometries already existed, this
+   only moves the boundary between them to where the space actually runs out. */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  [data-shell-region='workspace'][data-has-context-nav='true'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  [data-shell-region='context-nav'] {
+    width: auto;
+    min-width: 0;
+    overflow-y: visible;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    CONTEXTUAL NAVIGATION — LEVEL 2
 
@@ -545,7 +569,7 @@ body {
 
 /* ── mobile: flat index becomes a scrolling tab strip ───────────────────── */
 
-@media (max-width: 1023.98px) {
+@media (max-width: 1279.98px) {
   /* One list, two geometries — the same markup that is a column on desktop is
      a horizontal strip here, so there is no second copy of the index and no
      second navigation landmark. */
@@ -596,6 +620,16 @@ body {
     display: block;
   }
 
+  /* ...but only while it *is* a drawer. From 1024 the primary nav is a
+     permanent column, so this copy would render the whole grouped index
+     inside the sidebar while the selector sits above the content — the same
+     index twice. */
+  @media (min-width: 1024px) {
+    [data-shell-region='primary-nav'] [data-context-nav][data-grouped='true'] {
+      display: none;
+    }
+  }
+
   [data-context-nav-trigger] {
     display: flex;
     align-items: center;
@@ -637,7 +671,7 @@ body {
   display: flex;
   width: 100%;
 }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   [data-context-nav-selector] {
     display: none;
   }

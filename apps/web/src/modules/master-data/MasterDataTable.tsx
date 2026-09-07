@@ -847,13 +847,17 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                       ))}
                       <TableCell className="text-right">
                         {!readOnly && (config.supportsRestore ?? true) ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="text-[10px] font-semibold" style={{ color: inactive ? "var(--text-muted)" : "var(--success)" }}>
-                              {inactive ? t("statusInactive") : t("statusActive")}
-                            </span>
+                          <div className="flex items-center justify-end">
+                            {/* The switch alone. It carried a text label beside
+                                it saying Active/Inactive — the same fact the
+                                switch's own position and colour already state,
+                                twice in one cell. Screen readers were the only
+                                audience for that text and they get it from
+                                aria-checked instead. */}
                             <button
                               role="switch"
                               aria-checked={!inactive}
+                              aria-label={String(row[columns[0]?.key] ?? tLabel(config.label))}
                               onClick={() => handleToggleActive(row)}
                               disabled={togglingId === row[config.idKey]}
                               title={inactive ? t("restore") : t("deactivate")}
