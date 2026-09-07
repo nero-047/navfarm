@@ -214,6 +214,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     .filter((f) => !f.visibleWhen || isFieldRequired({ ...f, required: false, requiredWhen: f.visibleWhen }, form))
     .filter((f) => parentSatisfied(f) && hasChoices(f));
   const columns = config.columns || config.fields.filter((f) => !f.hideInTable).slice(0, 5);
+  // A master that already shows a status of its own does not also get the
+  // generic active/deactivated column — two columns of the same meaning, and on
+  // Animal Register two columns literally headed the same word.
+  const ownsStatusColumn = columns.some((c) => c.key === "status");
   const lookupConfigs = MASTER_DATA_CONFIGS.filter((c) => c.lookupFor?.includes(config.key));
   const sectionCount = new Set(visibleFields.map((f) => f.section || "Identification")).size;
   // Business Central-style adaptive presentation: compact masters remain a
@@ -818,29 +822,34 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 {columns.map((c) => (
                   <TableHead key={c.key} className="whitespace-nowrap">{tLabel(c.label)}</TableHead>
                 ))}
-                {/* "Active", not "Status". This column is the record's own
-                    active/deactivated flag — the switch below it. Several
+                {/* The record's own active/deactivated flag — the switch below
+                    it — headed "Active" rather than "Status", because several
                     masters carry a domain status of their own that the client's
-                    templates name "Status": Animal Register's is ACTIVE /
-                    QUARANTINE / SICK / PREGNANT / LACTATING / DRY / CULLED /
-                    DEAD / SOLD / SLAUGHTERED, mandatory, per its template. With
-                    both headers reading "Status" that screen showed two columns
-                    of the same name saying different things. The client's word
-                    stays on the client's field. */}
-                <TableHead className="text-right">{t("activeColumn")}</TableHead>
+                    templates name "Status".
+
+                    A master that already shows that status does not get this
+                    column at all. Animal Register is the case: its status is
+                    ACTIVE / QUARANTINE / SICK / PREGNANT / LACTATING / DRY /
+                    CULLED / DEAD / SOLD / SLAUGHTERED (its template, column AH,
+                    mandatory), it sets supportsRestore: false so this cell was
+                    a dead badge anyway, and its own description says an animal
+                    is "Never physically deleted; use Dispose to record
+                    sale/slaughter/death". An active flag beside that says
+                    nothing the Status column has not already said. */}
+                {!ownsStatusColumn && <TableHead className="text-right">{t("activeColumn")}</TableHead>}
                 <TableHead className="text-right">{t("actionsColumn")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <tr>
-                  <TableCell colSpan={columns.length + 2} className="py-10 text-center" style={S.sub}>
+                  <TableCell colSpan={columns.length + (ownsStatusColumn ? 1 : 2)} className="py-10 text-center" style={S.sub}>
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("loadingEllipsis")}
                   </TableCell>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <TableCell colSpan={columns.length + 2} className="py-10 text-center" style={S.sub}>
+                  <TableCell colSpan={columns.length + (ownsStatusColumn ? 1 : 2)} className="py-10 text-center" style={S.sub}>
                     <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
                     {t("noRecordsYet", { name: tLabel(config.label).toLowerCase() })}
                     {!readOnly && <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>{t("addFirstOne")}</button>}
@@ -854,7 +863,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                       {columns.map((c) => (
                         <TableCell key={c.key} className="whitespace-nowrap" style={S.primary}>{displayValue(row, c.key, t("mdYes"), t("mdNo"))}</TableCell>
                       ))}
-                      <TableCell className="text-right">
+                      {!ownsStatusColumn && <TableCell className="text-right">
                         {!readOnly && (config.supportsRestore ?? true) ? (
                           <div className="flex items-center justify-end">
                             {/* The switch alone. It carried a text label beside
@@ -889,7 +898,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                             {inactive ? t("statusInactive") : t("statusActive")}
                           </span>
                         )}
-                      </TableCell>
+                      </TableCell>}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button onClick={() => setViewingId(String(row[config.idKey]))} aria-label={`View ${singularLabel(config)}`} title="View" className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
