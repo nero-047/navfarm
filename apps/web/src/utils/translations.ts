@@ -971,6 +971,7 @@ export const translations = {
     addItem: "Add {{name}}",
     editItem: "Edit {{name}}",
     statusColumn: "Status",
+    activeColumn: "Active",
     actionsColumn: "Actions",
     loadingEllipsis: "Loading…",
     noRecordsYet: "No {{name}} yet.",

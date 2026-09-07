@@ -818,7 +818,16 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 {columns.map((c) => (
                   <TableHead key={c.key} className="whitespace-nowrap">{tLabel(c.label)}</TableHead>
                 ))}
-                <TableHead className="text-right">{t("statusColumn")}</TableHead>
+                {/* "Active", not "Status". This column is the record's own
+                    active/deactivated flag — the switch below it. Several
+                    masters carry a domain status of their own that the client's
+                    templates name "Status": Animal Register's is ACTIVE /
+                    QUARANTINE / SICK / PREGNANT / LACTATING / DRY / CULLED /
+                    DEAD / SOLD / SLAUGHTERED, mandatory, per its template. With
+                    both headers reading "Status" that screen showed two columns
+                    of the same name saying different things. The client's word
+                    stays on the client's field. */}
+                <TableHead className="text-right">{t("activeColumn")}</TableHead>
                 <TableHead className="text-right">{t("actionsColumn")}</TableHead>
               </tr>
             </TableHeader>
