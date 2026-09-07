@@ -214,14 +214,17 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     .filter((f) => !f.visibleWhen || isFieldRequired({ ...f, required: false, requiredWhen: f.visibleWhen }, form))
     .filter((f) => parentSatisfied(f) && hasChoices(f));
   const columns = config.columns || config.fields.filter((f) => !f.hideInTable).slice(0, 5);
-  // A master that already shows a status of its own does not also get the
-  // generic active/deactivated column — two columns of the same meaning, and on
-  // Animal Register two columns literally headed the same word.
-  // Status and Active are different facts, so both columns stand. Status is
-  // the master's own domain state; Active is whether the record is live at all.
-  // Animal Register is the case that proves they are not the same: its status
-  // runs ACTIVE → QUARANTINE → … while is_active only ever flips through
-  // Dispose.
+  // Status and Active are different facts — Status is the master's domain
+  // state, Active is whether the record is live at all — but a master that
+  // cannot toggle Active here has nothing to put in that column except a word
+  // its Status column has already said.
+  //
+  // Animal Register is that case. Breed has @Delete(':id') and
+  // @Patch(':id/restore'), which is what its switch calls; Animal has neither,
+  // because an animal is not deactivated, it is disposed — and dispose() blocks
+  // on medicine withdrawal periods and posts the gain or loss. So the column
+  // could only ever be a dead badge there. Rishi's call: drop it.
+  const ownsStatusColumn = columns.some((c) => c.key === "status");
   const statusActiveValues = config.statusActiveValues;
   const lookupConfigs = MASTER_DATA_CONFIGS.filter((c) => c.lookupFor?.includes(config.key));
   const sectionCount = new Set(visibleFields.map((f) => f.section || "Identification")).size;
@@ -841,20 +844,20 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                     is "Never physically deleted; use Dispose to record
                     sale/slaughter/death". An active flag beside that says
                     nothing the Status column has not already said. */}
-                <TableHead className="text-right">{t("activeColumn")}</TableHead>
+                {!ownsStatusColumn && <TableHead className="text-right">{t("activeColumn")}</TableHead>}
                 <TableHead className="text-right">{t("actionsColumn")}</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <tr>
-                  <TableCell colSpan={columns.length + 2} className="py-10 text-center" style={S.sub}>
+                  <TableCell colSpan={columns.length + (ownsStatusColumn ? 1 : 2)} className="py-10 text-center" style={S.sub}>
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" style={S.accent} /> {t("loadingEllipsis")}
                   </TableCell>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <TableCell colSpan={columns.length + 2} className="py-10 text-center" style={S.sub}>
+                  <TableCell colSpan={columns.length + (ownsStatusColumn ? 1 : 2)} className="py-10 text-center" style={S.sub}>
                     <Inbox className="mx-auto mb-2 h-6 w-6" style={S.muted} />
                     {t("noRecordsYet", { name: tLabel(config.label).toLowerCase() })}
                     {!readOnly && <button onClick={openCreate} className="mt-2 block w-full font-semibold" style={S.accent}>{t("addFirstOne")}</button>}
@@ -887,7 +890,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                         <TableCell key={c.key} className="whitespace-nowrap" style={S.primary}>{displayValue(row, c.key, t("mdYes"), t("mdNo"))}</TableCell>
                         )
                       ))}
-                      <TableCell className="text-right">
+                      {!ownsStatusColumn && <TableCell className="text-right">
                         {!readOnly && (config.supportsRestore ?? true) ? (
                           <div className="flex items-center justify-end">
                             {/* The switch alone. It carried a text label beside
@@ -922,7 +925,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                             {inactive ? t("statusInactive") : t("statusActive")}
                           </span>
                         )}
-                      </TableCell>
+                      </TableCell>}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button onClick={() => setViewingId(String(row[config.idKey]))} aria-label={`View ${singularLabel(config)}`} title="View" className="rounded-lg p-1.5 transition hover:bg-[var(--surface-raised)]" style={S.sub}>
