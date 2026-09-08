@@ -350,12 +350,12 @@ const animal: MasterDataConfig = {
     // and residual value are IAS 41 figures that apply to any biological asset
     // — a boar included. dispose() still computes gain/loss against book_value
     // for a male, so that number is now used but not visible on his form.
-    { key: "current_bio_asset_value", label: "Current Bio-Asset Value", type: "number", step: "0.01", editOnly: true, helpText: "Set from acquisition cost at creation; adjust here afterward.", visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
-    { key: "book_value", label: "Book Value NBV", type: "number", step: "0.01", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "current_bio_asset_value", label: "Current Bio-Asset Value", type: "number", step: "0.01", editOnly: true, helpText: "Set from acquisition cost at creation; adjust here afterward. Reconciles with D365BC: each animal is a Child Fixed Asset there, and BC posts acquisition and returns the FA Ledger Entry reference (Bio Asset BBP). No BC connector yet \u2014 this is a local figure.", visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "book_value", label: "Book Value NBV", type: "number", step: "0.01", editOnly: true, helpText: "Reconciles with D365BC: each animal is a Child Fixed Asset there, and BC posts acquisition and returns the FA Ledger Entry reference (Bio Asset BBP). No BC connector yet \u2014 this is a local figure.", visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
     { key: "total_amortised", label: "Total Amortised", type: "number", step: "0.01", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
     { key: "amortisation_monthly", label: "Monthly Amortisation", type: "number", step: "0.01", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
     { key: "residual_value", label: "Residual Value", type: "number", step: "0.01", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
-    { key: "expected_cull_date", label: "Expected Cull Date", type: "date", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "expected_cull_date", label: "Expected Cull Date", type: "date", editOnly: true, helpText: "Derived from the productive life start and the breed's productive life.", section: "Production" },
     { key: "disposal_date", label: "Disposal Date", type: "date", hideInForm: true, helpText: "Set via the Dispose action, not direct edit.", section: "Bio-Asset" },
     { key: "disposal_type", label: "Disposal Type", type: "text", hideInForm: true, helpText: "Set via the Dispose action, not direct edit.", section: "Bio-Asset" },
     { key: "no_of_teats", label: "No. of Teats", type: "number", helpText: "BBP §6: below 15 blocks this gilt from selection regardless of TSI score.", visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
@@ -372,9 +372,13 @@ const animal: MasterDataConfig = {
       options: ["ACTIVE", "QUARANTINE", "SICK", "PREGNANT", "LACTATING", "DRY"].map((v) => ({ value: v, label: v })),
       helpText: "Sold, slaughtered, died or culled are recorded through Dispose, not here.",
     },
-    { key: "parity_count", label: "Parity Count", type: "number", hideInForm: true, section: "Production" },
-    { key: "total_piglets_born_live", label: "Total Piglets Born Live", type: "number", hideInForm: true, section: "Production" },
-    { key: "total_piglets_weaned", label: "Total Piglets Weaned", type: "number", hideInForm: true, section: "Production" },
+    // editOnly, not because they are uninteresting at registration but because
+    // CreateAnimalDto does not accept them and the API runs
+    // forbidNonWhitelisted — sending them on create would 400 the whole form.
+    // A sow transferred in with a parity history gets it on the first edit.
+    { key: "parity_count", label: "Parity Count", type: "number", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, helpText: "Completed pregnancies, incremented on weaning. Rolled up from farrowing records, so a manual figure is replaced at the next weaning.", section: "Bio-Asset" },
+    { key: "total_piglets_born_live", label: "Total Piglets Born Live", type: "number", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "total_piglets_weaned", label: "Total Piglets Weaned", type: "number", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
     { key: "productive_life_start", label: "Productive Life Start", type: "date", section: "Production" },
     { key: "notes", label: "Notes", type: "textarea", section: "Production" },
   ],

@@ -222,6 +222,14 @@ export default function AnimalDetailPanel({ row, onClose }: { row: Row; onClose:
             <ReadField label="Parity count" value={fmt(row.parity_count)} />
             <ReadField label="Piglets born live" value={fmt(row.total_piglets_born_live)} />
             <ReadField label="Piglets weaned" value={fmt(row.total_piglets_weaned)} />
+            {/* Disposal belongs here and nowhere near the registration form: it
+                is set by the Dispose action, which checks every administered
+                medicine's withdrawal period and posts the gain or loss against
+                book value. A form field would let someone type an animal out of
+                the herd and skip all of it. Blank until it happens, which is
+                itself the useful reading for a live animal. */}
+            <ReadField label="Disposal date" value={fmt(row.disposal_date)} />
+            <ReadField label="Disposal type" value={fmt(row.disposal_type)} />
           </div>
         )}
 
