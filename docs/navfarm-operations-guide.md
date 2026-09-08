@@ -1,5 +1,21 @@
 # NAVFarm — How the System Works
 
+> **PARTLY SUPERSEDED — one company, not two.**
+>
+> This guide was written while the demo tenant carried two companies. Highland
+> Commercial Porkers was deleted on 6 September 2026 at Rishi's instruction
+> (*"just delete the highland data"*), so the demo now has **one tenant, one
+> company (Apex Swine Genetics & Breeding, `APEXBREED`), one operational area,
+> one LOB (`LVS_PIGGERY`)**.
+>
+> Everything below that names Highland — the company table, the Vikram Singh and
+> Suresh Rathi logins, the company-scope screenshot, the 2.27% mortality example
+> and the standard-costing walkthrough at the end — no longer runs. Multi-company
+> and multi-area remain *supported*; the demo data no longer exercises them.
+>
+> The mechanics the guide explains are still accurate. Read `docs/decisions.md`
+> for the current position.
+
 **Verified against a running instance on 2026-09-01.** Every figure, screenshot and behaviour
 below was checked in the browser and against the database, not inferred from test output.
 

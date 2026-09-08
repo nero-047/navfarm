@@ -1,5 +1,17 @@
 # NAVFarm — Piggery Programme Status
 
+> **SUPERSEDED — read `docs/decisions.md` for the current position.**
+>
+> This was written on 2 September 2026 and describes the system as it stood then.
+> Several of its facts stopped being true on 6 September, when Rishi had the second
+> demo company deleted: *"just delete the highland data"*. It said two companies
+> and listed Highland logins; there is **one tenant, one company (APEXBREED), one
+> operational area, one LOB with stages (LVS_PIGGERY)**. The gate figures below are
+> also stale — see the corrected table in §3.
+>
+> Corrections are marked inline. The rest is left as written, because a status
+> report is a record of what was true on its date, not a live document.
+
 **As at 2 September 2026.** Every figure below was measured against the running system, not
 estimated. Where something is a projection rather than a fact, it says so.
 
@@ -21,8 +33,13 @@ LOBs across 6 NOBs** as taxonomy.
 
 **One tenant, many companies, many operational areas.** A tenant is the customer. Inside it,
 each legal entity is a company with its own ledger; inside a company, an operational area is a
-physical unit running one LOB. The demo tenant has two companies — a nucleus breeding business
-and a commercial grow-finish business — with one piggery area each.
+physical unit running one LOB.
+
+> **Corrected 8 September.** The demo tenant carried two companies when this was written.
+> It now carries **one** — Apex Swine Genetics & Breeding (`APEXBREED`), with the single
+> operational area Apex Nucleus Breeding & Gestation Unit. Highland Pork was deleted on
+> 6 September at Rishi's instruction, for a demo that shows one company and one area.
+> Many companies and many areas remain *supported*; the demo data no longer exercises them.
 
 **Batches carry cost; animals carry identity.** A batch accumulates feed, medicine, labour and
 overhead, and closes into finished inventory. An animal register row carries the ear tag, the
@@ -32,7 +49,8 @@ parity count and its own stage and pen. They are joined, not merged — which is
 ### Why piggery first
 
 Only `LVS_PIGGERY` is in scope. The other fifteen LOBs exist as taxonomy rows and nothing else:
-**piggery has 11 lifecycle stages configured; every other LOB has zero.** Since batches, data
+**piggery has lifecycle stages configured; every other LOB has zero.** (11 when this was
+written; 15 active since the stage master was aligned to the TDD tracker on 8 September.) Since batches, data
 entry, records, schedulers and costing all hang off `stage_master`, those LOBs are
 non-functional *by decision*, not by oversight. They get built once piggery is complete and its
 operational area does everything a real pig farm needs.
@@ -169,12 +187,12 @@ a display code that matched no stage row — the API now rejects it.
 
 | Gate | Result |
 |---|---|
-| API tests | 222 / 222 |
-| Web tests | 80 / 80 |
+| API tests | 222 / 222 &nbsp;*(463 / 463 as at 8 Sep)* |
+| Web tests | 80 / 80 &nbsp;*(108 / 108 as at 8 Sep)* |
 | API typecheck | 0 errors |
 | Web typecheck | 0 errors |
 | API lint | 0 errors |
-| Web lint | 87 errors (accepted baseline, none new) |
+| Web lint | 87 errors (accepted baseline, none new) &nbsp;*(85 as at 8 Sep)* |
 
 ---
 
@@ -294,17 +312,17 @@ Sign in with any account below; the password is `12345678`.
 
 | User | Type | Sees |
 |---|---|---|
-| `admin@apexagri.local` | Tenant admin | Both companies, all scopes |
+| `admin@apexagri.local` | Tenant admin | The company, all scopes |
 | `arjun.sharma@apexagri.local` | Company admin | Apex |
-| `vikram.singh@highlandpork.local` | Company admin | Highland |
 | `supervisor@apexpork.local` | Operational admin | Apex piggery area |
-| `supervisor@highlandpork.local` | Operational admin | Highland piggery area |
 
-To see the full standard-costing flow, sign in as the Highland company admin and close
-`PIG-BAT-2026-0102` at 98 head with an actual end date of 2026-07-15. That posts the output
-valuation, six variance rows and their journals, and fills the Batch Cost Variance report.
-
----
+> **Corrected 8 September.** The Highland Pork logins that were listed here
+> (`vikram.singh@highlandpork.local`, `supervisor@highlandpork.local`) no longer exist —
+> that company was deleted on 6 September.
+>
+> The standard-costing walkthrough that followed also no longer runs: it asked you to sign
+> in as the Highland company admin and close `PIG-BAT-2026-0102`. That batch went with the
+> company. A replacement walkthrough on the remaining company has not been written.
 
 ## Related documents
 

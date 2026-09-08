@@ -14,6 +14,45 @@ const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 };
 
+/**
+ * Adds up a set of locations' areas, in one unit.
+ *
+ * Pure and exported so the rule can be tested without a database — the arithmetic is
+ * where TDD row 138 actually lives ("the *total* of area of pens and sub locations should
+ * not exceed the area of the farm location"), and it was previously spread across two
+ * loops that compared one child at a time.
+ *
+ * Skipped, and why:
+ * - no area recorded — nothing to add, and absence is not zero;
+ * - a different unit — there is no tenant-wide area conversion (uom_conversion_master is
+ *   scoped to an item's stock units), so adding SQFT to ACRE would give a confident wrong
+ *   answer. Reported separately so a caller can say the total is partial;
+ * - the location being edited, when `excludeLocationId` is given, or updating a location
+ *   without changing its area would count it twice and reject a valid save.
+ */
+export function sumAreasInUnit(
+  rows: { location_id?: string; location_code: string; area_size: string | number | null; area_unit: string | null }[],
+  unit: string | null | undefined,
+  excludeLocationId?: string,
+): { total: number; counted: string[]; skipped: string[] } {
+  let total = 0;
+  const counted: string[] = [];
+  const skipped: string[] = [];
+  for (const row of rows) {
+    if (excludeLocationId && row.location_id === excludeLocationId) continue;
+    if (row.area_size == null || row.area_size === '') continue;
+    if (unit && row.area_unit && unit.toUpperCase() !== row.area_unit.toUpperCase()) {
+      skipped.push(row.location_code);
+      continue;
+    }
+    const size = Number(row.area_size);
+    if (!Number.isFinite(size)) continue;
+    total += size;
+    counted.push(row.location_code);
+  }
+  return { total, counted, skipped };
+}
+
 @Injectable()
 export class LocationService {
   constructor(
@@ -327,6 +366,105 @@ export class LocationService {
     }
   }
 
+  /**
+   * Sums the area already committed by a parent's children, in the parent's unit.
+   *
+   * Children carrying no area are skipped, and so are children measured in a different
+   * unit — there is no tenant-wide area conversion to lean on (uom_conversion_master is
+   * scoped to a specific item's stock units, not a general SQM↔ACRE factor), and adding
+   * SQFT to ACRE would produce a confident wrong number. Skipping is the honest choice,
+   * but it does mean a mixed-unit hierarchy is only partially checked; `skipped` is
+   * returned so the caller can say so rather than implying a complete answer.
+   */
+  private async sumChildArea(
+    parentLocationId: string,
+    unit: string | null | undefined,
+    tenantId: string,
+    excludeLocationId?: string,
+  ): Promise<{ total: number; counted: string[]; skipped: string[] }> {
+    const children = await this.db.select({
+      location_id: schema.locationMaster.location_id,
+      location_code: schema.locationMaster.location_code,
+      area_size: schema.locationMaster.area_size,
+      area_unit: schema.locationMaster.area_unit,
+    }).from(schema.locationMaster).where(and(
+      eq(schema.locationMaster.parent_location_id, parentLocationId),
+      eq(schema.locationMaster.tenant_id, tenantId),
+      isNull(schema.locationMaster.deleted_at),
+    ));
+
+    return sumAreasInUnit(children, unit, excludeLocationId);
+  }
+
+  /**
+   * TDD row 138: "the total of area of pens and sub locations should not exceed the area
+   * of the farm location."
+   *
+   * The rule is about the SUM of a parent's children, not each child measured on its own.
+   * Three 400 m² pens each fit inside a 1000 m² shed; together they do not. Checking them
+   * one at a time — which is what this did before — accepts exactly that.
+   *
+   * Only checked when both this location and its parent carry an area_size, and only
+   * across children sharing the parent's unit; see sumChildArea for why.
+   */
+  private async assertAreaFitsInParent(
+    childAreaSize: number | string | null | undefined,
+    childAreaUnit: string | null | undefined,
+    parent: { location_id: string; area_size: string | null; area_unit: string | null; location_code: string } | undefined,
+    tenantId: string,
+    excludeLocationId?: string,
+  ) {
+    if (childAreaSize == null || childAreaSize === '' || !parent?.area_size) return;
+    if (childAreaUnit && parent.area_unit && childAreaUnit.toUpperCase() !== parent.area_unit.toUpperCase()) return;
+    const childSize = Number(childAreaSize);
+    const parentSize = Number(parent.area_size);
+    if (!Number.isFinite(childSize) || !Number.isFinite(parentSize)) return;
+
+    const unit = parent.area_unit || childAreaUnit || null;
+    const { total: siblingTotal, counted, skipped } = await this.sumChildArea(
+      parent.location_id, unit, tenantId, excludeLocationId,
+    );
+    const combined = siblingTotal + childSize;
+    if (combined > parentSize) {
+      const u = unit ? ' ' + unit : '';
+      const withSiblings = counted.length
+        ? ` (${childSize}${u} here plus ${siblingTotal}${u} already used by ${counted.length} other location${counted.length === 1 ? '' : 's'}: ${counted.slice(0, 3).join(', ')}${counted.length > 3 ? '…' : ''})`
+        : '';
+      const note = skipped.length ? ` ${skipped.length} location(s) measured in another unit were not counted.` : '';
+      throw new ConflictException(
+        `Total area of locations under '${parent.location_code}' would be ${combined}${u}, which exceeds its ${parentSize}${u}${withSiblings}.${note}`,
+      );
+    }
+  }
+
+  /**
+   * The other direction of the same rule: shrinking (or unit-changing) a location's own
+   * area_size must not leave its children already claiming more than the new figure —
+   * again as a total, not one at a time.
+   *
+   * Direct children only. Each child's own create/update enforced the rule one level
+   * down, so every descendant already fits within its own parent.
+   */
+  private async assertChildTotalFitsWithinArea(
+    locationId: string,
+    newAreaSize: number | string | null | undefined,
+    newAreaUnit: string | null | undefined,
+    tenantId: string,
+  ) {
+    if (newAreaSize == null || newAreaSize === '') return;
+    const parentSize = Number(newAreaSize);
+    if (!Number.isFinite(parentSize)) return;
+
+    const { total, counted, skipped } = await this.sumChildArea(locationId, newAreaUnit, tenantId);
+    if (counted.length && total > parentSize) {
+      const u = newAreaUnit ? ' ' + newAreaUnit : '';
+      const note = skipped.length ? ` ${skipped.length} location(s) measured in another unit were not counted.` : '';
+      throw new ConflictException(
+        `Cannot set Area Size to ${parentSize}${u} — locations under it already total ${total}${u} (${counted.slice(0, 3).join(', ')}${counted.length > 3 ? '…' : ''}).${note}`,
+      );
+    }
+  }
+
   /** Validates the UOM belongs to the same template/company scope. */
   private async assertUomExists(uomCode: string | null | undefined, tenantId: string, companyId?: string | null) {
     if (!uomCode) return;
@@ -395,6 +533,10 @@ export class LocationService {
     if (allowedParentTypes.length > 0 && !parent) {
       throw new ConflictException(`${locationType.type_name} requires a parent location.`);
     }
+
+    // 3.5. This location's area, plus everything already under the same parent,
+    //      must fit inside that parent.
+    await this.assertAreaFitsInParent(dto.area_size, dto.area_unit, parent, tenantId);
 
     // 4. SILO locations must carry silo tracking fields
     if (!dto.storage_type && typeCode === 'SILO') dto.storage_type = 'SILO';
@@ -587,6 +729,20 @@ export class LocationService {
     }
     if (dto.capacity_uom !== undefined) {
       await this.assertUomExists(dto.capacity_uom, tenantId, dto.company_id !== undefined ? dto.company_id : location.company_id);
+    }
+
+    // This location's area must still fit inside its (possibly newly-assigned) parent's, and —
+    // the other direction — shrinking its own area must not strand children that already fit
+    // under the old value.
+    if (dto.area_size !== undefined || dto.area_unit !== undefined || dto.parent_location_id !== undefined) {
+      const effectiveAreaSize = dto.area_size !== undefined ? dto.area_size : location.area_size;
+      const effectiveAreaUnit = dto.area_unit !== undefined ? dto.area_unit : location.area_unit;
+      // Exclude this location from its own sibling total, or editing a location
+      // without changing its area would count it twice and reject a valid save.
+      await this.assertAreaFitsInParent(effectiveAreaSize, effectiveAreaUnit, parent, tenantId, id);
+      if (dto.area_size !== undefined || dto.area_unit !== undefined) {
+        await this.assertChildTotalFitsWithinArea(id, effectiveAreaSize, effectiveAreaUnit, tenantId);
+      }
     }
 
     const updates: any = {
