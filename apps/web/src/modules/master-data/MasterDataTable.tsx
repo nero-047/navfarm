@@ -670,12 +670,25 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     }
     if (f.type === "select-entity") {
       const resolvedEp = resolveEndpoint(f, form);
-      const options = resolvedEp ? entityOptions[resolvedEp] || [] : [];
+      let options = resolvedEp ? entityOptions[resolvedEp] || [] : [];
       const parents = parentKeys(f);
       // "query" mode never blocks — an unset parent just narrows the results less, it
       // doesn't prevent fetching (mirrors the backend treating an absent filter as "show all").
-      const disabled = f.dependsOnMode !== "query" && parents.length > 0 && !resolvedEp;
+      let disabled = f.dependsOnMode !== "query" && parents.length > 0 && !resolvedEp;
       const parentLabel = parents.map((k) => tLabel(config.fields.find((pf) => pf.key === k)?.label || k)).join(" & ");
+      let restrictedReason = "";
+      if (f.restrictOptionsBy && !disabled) {
+        const r = f.restrictOptionsBy;
+        const selectorRow = (entityOptions[r.selectorEntityEndpoint] || []).find((row) => row[r.selectorCodeKey] === form[r.selectorKey]);
+        const allowList = selectorRow ? parseStringList(selectorRow[r.allowListKey]) : [];
+        if (!allowList.length) {
+          disabled = true;
+          restrictedReason = t("mdNoParentForType");
+          options = [];
+        } else {
+          options = options.filter((o) => allowList.includes(o[r.optionCodeKey]));
+        }
+      }
       if (f.multiple) {
         // A real multi-select rather than a column of checkboxes: with eight
         // stages the checkbox list was taller than the rest of the form, and it
@@ -708,7 +721,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       }
       return (
         <select {...accessibility} value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={disabled}>
-          <option value="">{disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder")}</option>
+          <option value="">{restrictedReason || (disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder"))}</option>
           {options.map((o) => (
             <option key={o[f.entityValueKey || "id"]} value={o[f.entityValueKey || "id"]}>
               {entityLabel(o, f)}

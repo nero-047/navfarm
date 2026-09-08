@@ -111,7 +111,17 @@ const location: MasterDataConfig = {
       key: "location_type", label: "Location Type", type: "select-entity", required: true,
       entityEndpoint: "/location-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"], section: "Identification",
     },
-    { key: "parent_location_id", label: "Parent Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], helpText: "Leave blank only for a root Farm.", section: "Identification" },
+    {
+      key: "parent_location_id", label: "Parent Location", type: "select-entity",
+      entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"],
+      dependsOn: "location_type",
+      restrictOptionsBy: {
+        selectorKey: "location_type", selectorEntityEndpoint: "/location-type", selectorCodeKey: "type_code",
+        allowListKey: "allowed_parent_types", optionCodeKey: "location_type",
+      },
+      helpText: "Options are limited to the parent types the selected Location Type allows; a root type (e.g. Farm) needs no parent.",
+      section: "Identification",
+    },
     { key: "location_level", label: "Hierarchy Level", type: "number", hideInForm: true, helpText: "Computed from the parent location." },
     { key: "area_size", label: "Area Size", type: "number", step: "0.01", section: "Identification" },
     { key: "area_unit", label: "Area UOM", type: "select-entity", entityEndpoint: "/uom?uomType=AREA", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Identification" },

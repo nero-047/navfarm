@@ -69,7 +69,7 @@ export const SYSTEM_LOCATION_TYPE_SEED: Array<{
 }> = [
   { type_code: 'FARM', type_name: 'Farm', code_prefix: 'FARM', allowed_parent_types: [] },
   { type_code: 'SHED', type_name: 'Shed / House', code_prefix: 'SHED', allowed_parent_types: ['FARM'] },
-  { type_code: 'PEN', type_name: 'Pen', code_prefix: 'PEN', allowed_parent_types: ['FARM', 'SHED'] },
+  { type_code: 'PEN', type_name: 'Pen', code_prefix: 'PEN', allowed_parent_types: ['SHED'] },
   { type_code: 'CAGE', type_name: 'Cage', code_prefix: 'CAGE', allowed_parent_types: ['FARM', 'SHED'] },
   { type_code: 'STORE', type_name: 'Store', code_prefix: 'STORE', allowed_parent_types: ['FARM'] },
   { type_code: 'QUARANTINE', type_name: 'Quarantine', code_prefix: 'QUAR', allowed_parent_types: ['FARM', 'SHED'] },

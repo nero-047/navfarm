@@ -327,6 +327,70 @@ export class LocationService {
     }
   }
 
+  /**
+   * A child location's footprint must fit inside its immediate parent's — a Shed cannot claim
+   * more area than the Farm it sits on, a Pen cannot claim more than its Shed, and so on up
+   * whatever hierarchy the tenant builds. Only checked when both this location and its parent
+   * carry an area_size; a unit mismatch is skipped rather than guessed at, since there's no
+   * general area-unit conversion table (uom_conversion_master is scoped to a specific item's
+   * stock units, not a tenant-wide SQM<->ACRE factor) — comparing SQFT to ACRE without a real
+   * factor would be worse than not comparing at all.
+   */
+  private assertAreaWithinParent(
+    childAreaSize: number | string | null | undefined,
+    childAreaUnit: string | null | undefined,
+    parent: { area_size: string | null; area_unit: string | null; location_code: string } | undefined,
+  ) {
+    if (childAreaSize == null || childAreaSize === '' || !parent?.area_size) return;
+    if (childAreaUnit && parent.area_unit && childAreaUnit.toUpperCase() !== parent.area_unit.toUpperCase()) return;
+    const childSize = Number(childAreaSize);
+    const parentSize = Number(parent.area_size);
+    if (!Number.isFinite(childSize) || !Number.isFinite(parentSize)) return;
+    if (childSize > parentSize) {
+      throw new ConflictException(
+        `Area Size (${childSize}${childAreaUnit ? ' ' + childAreaUnit : ''}) cannot exceed parent location '${parent.location_code}''s area (${parentSize}${parent.area_unit ? ' ' + parent.area_unit : ''}).`,
+      );
+    }
+  }
+
+  /**
+   * The other direction of the same rule: shrinking (or unit-changing) a location's own
+   * area_size must not strand children that already fit under the old value. Direct children
+   * only — each child's own create/update already enforced the rule one level down, so
+   * transitively every descendant already fits within its own parent.
+   */
+  private async assertChildrenFitWithinArea(
+    locationId: string,
+    newAreaSize: number | string | null | undefined,
+    newAreaUnit: string | null | undefined,
+    tenantId: string,
+  ) {
+    if (newAreaSize == null || newAreaSize === '') return;
+    const parentSize = Number(newAreaSize);
+    if (!Number.isFinite(parentSize)) return;
+
+    const children = await this.db.select({
+      location_code: schema.locationMaster.location_code,
+      area_size: schema.locationMaster.area_size,
+      area_unit: schema.locationMaster.area_unit,
+    }).from(schema.locationMaster).where(and(
+      eq(schema.locationMaster.parent_location_id, locationId),
+      eq(schema.locationMaster.tenant_id, tenantId),
+      isNull(schema.locationMaster.deleted_at),
+    ));
+
+    for (const child of children) {
+      if (child.area_size == null) continue;
+      if (newAreaUnit && child.area_unit && newAreaUnit.toUpperCase() !== child.area_unit.toUpperCase()) continue;
+      const childSize = Number(child.area_size);
+      if (Number.isFinite(childSize) && childSize > parentSize) {
+        throw new ConflictException(
+          `Cannot set Area Size to ${parentSize}${newAreaUnit ? ' ' + newAreaUnit : ''} — child location '${child.location_code}' already has ${childSize}${child.area_unit ? ' ' + child.area_unit : ''}.`,
+        );
+      }
+    }
+  }
+
   /** Validates the UOM belongs to the same template/company scope. */
   private async assertUomExists(uomCode: string | null | undefined, tenantId: string, companyId?: string | null) {
     if (!uomCode) return;
@@ -395,6 +459,9 @@ export class LocationService {
     if (allowedParentTypes.length > 0 && !parent) {
       throw new ConflictException(`${locationType.type_name} requires a parent location.`);
     }
+
+    // 3.5. This location's area must fit inside its parent's.
+    this.assertAreaWithinParent(dto.area_size, dto.area_unit, parent);
 
     // 4. SILO locations must carry silo tracking fields
     if (!dto.storage_type && typeCode === 'SILO') dto.storage_type = 'SILO';
@@ -587,6 +654,18 @@ export class LocationService {
     }
     if (dto.capacity_uom !== undefined) {
       await this.assertUomExists(dto.capacity_uom, tenantId, dto.company_id !== undefined ? dto.company_id : location.company_id);
+    }
+
+    // This location's area must still fit inside its (possibly newly-assigned) parent's, and —
+    // the other direction — shrinking its own area must not strand children that already fit
+    // under the old value.
+    if (dto.area_size !== undefined || dto.area_unit !== undefined || dto.parent_location_id !== undefined) {
+      const effectiveAreaSize = dto.area_size !== undefined ? dto.area_size : location.area_size;
+      const effectiveAreaUnit = dto.area_unit !== undefined ? dto.area_unit : location.area_unit;
+      this.assertAreaWithinParent(effectiveAreaSize, effectiveAreaUnit, parent);
+      if (dto.area_size !== undefined || dto.area_unit !== undefined) {
+        await this.assertChildrenFitWithinArea(id, effectiveAreaSize, effectiveAreaUnit, tenantId);
+      }
     }
 
     const updates: any = {

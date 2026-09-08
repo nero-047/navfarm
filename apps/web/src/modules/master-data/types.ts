@@ -69,6 +69,29 @@ export interface MasterDataField {
   /** Required when dependsOnMode is "query": maps each dependsOn field key to its query-param name. */
   queryParams?: Record<string, string>;
   /**
+   * Narrows this select-entity field's options to whichever "types" another already-selected
+   * master row allows — driven entirely by live master data, not a hardcoded rule. Location's
+   * Parent Location uses this: the selected Location Type's own `allowed_parent_types` list
+   * says which location types may be its parent (an empty list means it's a root type, e.g.
+   * Farm, and the field is disabled with no options at all).
+   *
+   * Pair with `dependsOn: selectorKey` (default "path" mode) so the field is disabled until
+   * the selector has a value and resets when the selector changes — this prop only adds the
+   * type-filter and the "root type, no parent allowed" disabled state on top of that.
+   */
+  restrictOptionsBy?: {
+    /** Field in this form holding the selector's current code (e.g. "location_type"). */
+    selectorKey: string;
+    /** Entity endpoint the selector field itself already fetches full rows from (e.g. "/location-type"). */
+    selectorEntityEndpoint: string;
+    /** Column on a selector row holding its own code, matched against the selector field's value (e.g. "type_code"). */
+    selectorCodeKey: string;
+    /** Column on a selector row holding the array of codes this field's options are allowed to have (e.g. "allowed_parent_types"). */
+    allowListKey: string;
+    /** Column on this field's own option rows to test against the allow-list (e.g. "location_type"). */
+    optionCodeKey: string;
+  };
+  /**
    * For dependsOnMode "query": hide this field until every parent has a value,
    * and hide it when the filtered picker would be empty.
    *
