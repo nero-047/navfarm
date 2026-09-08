@@ -338,18 +338,29 @@ const animal: MasterDataConfig = {
     { key: "acquisition_cost", label: "Acquisition Cost", type: "number", step: "0.01", readOnly: true, visibleWhen: { anyOf: [{ key: "entry_type", equals: ["PURCHASED_IMPORTED", "PURCHASED_LOCAL"] }] }, helpText: "Taken from the rate on the source goods receipt.", section: "Acquisition" },
     { key: "acquisition_cost", label: "Acquisition Cost", type: "number", step: "0.01", requiredWhen: { anyOf: [{ key: "entry_type", equals: ["BORN_ON_FARM", "TRANSFERRED_IN"] }] }, visibleWhen: { anyOf: [{ key: "entry_type", equals: ["BORN_ON_FARM", "TRANSFERRED_IN"] }] }, section: "Acquisition" },
     { key: "landing_cost", label: "Landing Cost", type: "number", step: "0.01", helpText: "Transport/import duty/quarantine charges for imported animals.", section: "Acquisition" },
-    { key: "total_opening_asset_value", label: "Total Opening Asset Value", type: "number", hideInForm: true, section: "Acquisition" },
-    { key: "current_bio_asset_value", label: "Current Bio-Asset Value", type: "number", step: "0.01", editOnly: true, helpText: "Set from acquisition cost at creation; adjust here afterward.", section: "Bio-Asset" },
-    { key: "book_value", label: "Book Value NBV", type: "number", step: "0.01", editOnly: true, section: "Bio-Asset" },
-    { key: "total_amortised", label: "Total Amortised", type: "number", step: "0.01", editOnly: true, section: "Bio-Asset" },
-    { key: "amortisation_monthly", label: "Monthly Amortisation", type: "number", step: "0.01", editOnly: true, section: "Bio-Asset" },
-    { key: "residual_value", label: "Residual Value", type: "number", step: "0.01", editOnly: true, section: "Bio-Asset" },
-    { key: "expected_cull_date", label: "Expected Cull Date", type: "date", editOnly: true, section: "Bio-Asset" },
+    // Acquisition Cost + Landing Cost, computed by the service on save. Shown
+    // rather than hidden because it is the figure the opening bio-asset value
+    // and the whole amortisation schedule are built from, so it belongs where
+    // the two numbers that make it are. Read-only: the service recomputes it
+    // from those two on every write, so an entered figure would be overwritten.
+    { key: "total_opening_asset_value", label: "Total Opening Asset Value", type: "number", step: "0.01", readOnly: true, helpText: "Acquisition Cost + Landing Cost. Calculated on save.", section: "Acquisition" },
+    // Bio-Asset is female-only on Rishi's call (2026-09-08). Note the section
+    // mixes two kinds of field: no_of_teats / tsi / grading are gilt-selection
+    // measures and are genuinely female-only, while book value, amortisation
+    // and residual value are IAS 41 figures that apply to any biological asset
+    // — a boar included. dispose() still computes gain/loss against book_value
+    // for a male, so that number is now used but not visible on his form.
+    { key: "current_bio_asset_value", label: "Current Bio-Asset Value", type: "number", step: "0.01", editOnly: true, helpText: "Set from acquisition cost at creation; adjust here afterward.", visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "book_value", label: "Book Value NBV", type: "number", step: "0.01", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "total_amortised", label: "Total Amortised", type: "number", step: "0.01", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "amortisation_monthly", label: "Monthly Amortisation", type: "number", step: "0.01", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "residual_value", label: "Residual Value", type: "number", step: "0.01", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "expected_cull_date", label: "Expected Cull Date", type: "date", editOnly: true, visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
     { key: "disposal_date", label: "Disposal Date", type: "date", hideInForm: true, helpText: "Set via the Dispose action, not direct edit.", section: "Bio-Asset" },
     { key: "disposal_type", label: "Disposal Type", type: "text", hideInForm: true, helpText: "Set via the Dispose action, not direct edit.", section: "Bio-Asset" },
-    { key: "no_of_teats", label: "No. of Teats", type: "number", helpText: "BBP §6: below 15 blocks this gilt from selection regardless of TSI score.", section: "Bio-Asset" },
-    { key: "tsi", label: "TSI", type: "number", step: "0.01", helpText: "Total Sow Index score.", section: "Bio-Asset" },
-    { key: "grading", label: "Grading", type: "text", section: "Bio-Asset" },
+    { key: "no_of_teats", label: "No. of Teats", type: "number", helpText: "BBP §6: below 15 blocks this gilt from selection regardless of TSI score.", visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "tsi", label: "TSI", type: "number", step: "0.01", helpText: "Total Sow Index score.", visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
+    { key: "grading", label: "Grading", type: "text", visibleWhen: { anyOf: [{ key: "gender", equals: "F" }] }, section: "Bio-Asset" },
     { key: "current_stage_id", label: "Current Stage", type: "select-entity", entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"], section: "Current Position" },
     { key: "current_batch_id", label: "Current Batch", type: "select-entity", entityEndpoint: "/batch", entityValueKey: "batch_id", entityLabelKeys: ["batch_no"], section: "Current Position" },
     { key: "current_location_id", label: "Current Location", type: "select-entity", entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"], section: "Current Position" },
