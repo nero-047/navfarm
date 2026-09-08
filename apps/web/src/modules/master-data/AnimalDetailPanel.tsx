@@ -345,21 +345,21 @@ export default function AnimalDetailPanel({ row, onClose }: { row: Row; onClose:
                 </ol>
               )}
 
-              <div className="rounded-[var(--radius-sm)] border p-3" style={S.raised}>
-                <p className="text-[11px] font-semibold" style={S.sub}>Not yet in the chain</p>
-                <ul className="mt-1 flex flex-col gap-0.5 text-[11px]" style={S.muted}>
-                  <li>Weaner / grower batch — no batch carries this animal yet</li>
-                  <li>Transfer order — none raised yet</li>
-                  <li>DOA at Colcom — not modelled, no table</li>
-                  <li>Kill sheet — not modelled, no table</li>
-                </ul>
-                <p className="mt-2 text-[11px] leading-5" style={S.muted}>
-                  BBP-1 builds this chain from existing production records, so every card above is a real
-                  record. The last two have no table in the schema: the BBP describes the kill sheet as a
-                  process — attached to the transfer order, carcass weights per line — without a field
-                  specification.
-                </p>
-              </div>
+              {/* This used to list four "not yet in the chain" items, hardcoded
+                  and unconditional, so every animal was told no batch carried
+                  it and no transfer order had been raised whether or not that
+                  was true. Two of the four were also the wrong question: a sow
+                  is never carried by a weaner or grower batch. Those batches
+                  are her piglets, counted by head and not individually
+                  registered, so the link runs from her farrowing to the batch,
+                  not from her to a batch she is in. An absent card already says
+                  a thing has not happened; only a permanent gap needs stating,
+                  and that is the two below. */}
+              <p className="text-[11px] leading-5" style={S.muted}>
+                The chain ends at the transfer order. DOA at Colcom and the kill sheet have no tables in
+                the schema — BBP-1 describes the kill sheet as a process, attached to the transfer order
+                with carcass weights per line, without a field specification.
+              </p>
             </div>
           )
         )}

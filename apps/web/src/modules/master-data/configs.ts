@@ -314,6 +314,12 @@ const animal: MasterDataConfig = {
       options: ["PURCHASED_IMPORTED", "PURCHASED_LOCAL", "BORN_ON_FARM", "TRANSFERRED_IN"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
     },
     { key: "entry_date", label: "Entry Date", type: "date", required: true, section: "Acquisition" },
+    // Sits with Entry Date rather than beside Date of Birth (where the master
+    // template puts it) because it is the entry that gives it meaning, and the
+    // two dates it is computed from are the ones either side of it here.
+    // readOnly: the API computes it on every write and discards anything sent
+    // alongside a DOB, so an editable box would take input it then throws away.
+    { key: "age_at_entry_weeks", label: "Age at Entry (Weeks)", type: "number", readOnly: true, helpText: "Computed from Date of Birth and Entry Date.", section: "Acquisition" },
     { key: "source_receipt_id", label: "Source Goods Receipt", type: "select-entity", entityEndpoint: "/goods-receipt", entityValueKey: "receipt_id", entityLabelKeys: ["receipt_no"], helpText: "Required for PURCHASED_IMPORTED / PURCHASED_LOCAL entries.", section: "Acquisition" },
     { key: "source_batch_id", label: "Source Batch", type: "select-entity", entityEndpoint: "/batch", entityValueKey: "batch_id", entityLabelKeys: ["batch_no"], helpText: "Required for BORN_ON_FARM entries.", section: "Acquisition" },
     // Filtered to LIVING_ASSET: the field is the animal's inventory identity, and
