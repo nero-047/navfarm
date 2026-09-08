@@ -19,6 +19,7 @@ import { codeFieldOf } from "./useCodeSeries";
 import { useCodeSeries } from "./useCodeSeries";
 import { MasterRecordView } from "./MasterRecordView";
 import { BcOwnershipNotice } from "./BcOwnershipNotice";
+import { SearchableEntitySelect } from "./SearchableEntitySelect";
 
 const PAGE_SIZE = 25;
 
@@ -1100,9 +1101,28 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           {!!missing.length && <p className="text-xs" style={S.muted}>{missing.length} selected value(s) are not in the active catalog.</p>}
         </div>;
       }
+      const placeholderText = restrictedReason || (disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder"));
+      if (f.searchable) {
+        return (
+          <SearchableEntitySelect
+            id={accessibility.id}
+            ariaLabel={accessibility["aria-label"]}
+            ariaRequired={accessibility["aria-required"]}
+            value={value}
+            onChange={(v) => setField(f.key, v)}
+            options={options}
+            valueKey={f.entityValueKey || "id"}
+            getLabel={(o) => entityLabel(o, f)}
+            disabled={disabled}
+            placeholder={placeholderText}
+            searchPlaceholder={t("searchPlaceholder")}
+            noMatchesLabel={t("mdNoMatches")}
+          />
+        );
+      }
       return (
         <select {...accessibility} value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={disabled}>
-          <option value="">{restrictedReason || (disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder"))}</option>
+          <option value="">{placeholderText}</option>
           {options.map((o) => (
             <option key={o[f.entityValueKey || "id"]} value={o[f.entityValueKey || "id"]}>
               {entityLabel(o, f)}
