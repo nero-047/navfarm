@@ -127,10 +127,14 @@ export class CreateAnimalDto {
   @IsOptional()
   dam_animal_id?: string;
 
-  @ApiProperty({ description: 'Purchase price per animal' })
+  @ApiProperty({
+    description:
+      "Purchase price per animal. Omit for a purchased entry — the API reads it off the source goods receipt line and discards anything sent. Required for every other entry type, which has no document to read it from; the service enforces that rather than this DTO, because the form legitimately omits the field for purchases.",
+    required: false,
+  })
   @IsNumber()
-  @IsNotEmpty()
-  acquisition_cost: number;
+  @IsOptional()
+  acquisition_cost?: number;
 
   @ApiProperty({ description: 'Transport/import duty/quarantine charges per head for imported animals', required: false })
   @IsNumber()

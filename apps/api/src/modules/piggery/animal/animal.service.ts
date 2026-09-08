@@ -299,10 +299,47 @@ export class AnimalService {
       throw new BadRequestException(`source_batch_id is required when entry_type is 'BORN_ON_FARM'.`);
     }
 
+    // A purchased animal's cost is a fact on the receipt it arrived on, not a
+    // number retyped into the register. Derived here and the caller's value
+    // discarded, so the register and the receipt cannot drift apart. Animals
+    // that were not purchased keep the cost as entered — there is no document
+    // to read it off.
+    let acquisitionCost = dto.acquisition_cost;
     if (dto.source_receipt_id) {
       await this.assertExists(
         this.db.select().from(schema.goodsReceipt).where(eq(schema.goodsReceipt.receipt_id, dto.source_receipt_id)),
         'Goods receipt', dto.source_receipt_id,
+      );
+
+      const [receiptLine] = await this.db
+        .select({ rate: schema.goodsReceiptLine.rate, amount: schema.goodsReceiptLine.amount })
+        .from(schema.goodsReceiptLine)
+        .where(and(
+          eq(schema.goodsReceiptLine.receipt_id, dto.source_receipt_id),
+          eq(schema.goodsReceiptLine.item_id, dto.item_id),
+        ))
+        .limit(1);
+
+      if (!receiptLine) {
+        throw new BadRequestException(
+          `The source goods receipt has no line for this animal's item, so there is no purchase price to read. Either the wrong receipt was chosen or the wrong item.`,
+        );
+      }
+      if (receiptLine.rate === null || receiptLine.rate === undefined) {
+        throw new BadRequestException(
+          `The source goods receipt line for this animal's item carries no rate, so the acquisition cost cannot be derived from it.`,
+        );
+      }
+      acquisitionCost = Number(receiptLine.rate);
+    }
+
+    // Only reachable for an entry with no receipt behind it: the form omits the
+    // field entirely for purchased animals (it is readOnly there, and readOnly
+    // fields are stripped from the payload), so this cannot be a plain
+    // "required field missing" on the DTO without breaking that path.
+    if (acquisitionCost === undefined || acquisitionCost === null) {
+      throw new BadRequestException(
+        `Acquisition cost is required for a '${dto.entry_type}' entry — there is no goods receipt to read it from.`,
       );
     }
     if (dto.source_batch_id) {
@@ -355,7 +392,7 @@ export class AnimalService {
 
     const animalId = randomUUID();
     const animalCode = await this.generateAnimalCode(lobId, tenantId, dto.company_id, dto.animal_code);
-    const totalOpeningAssetValue = dto.acquisition_cost + (dto.landing_cost || 0);
+    const totalOpeningAssetValue = acquisitionCost + (dto.landing_cost || 0);
 
     const newAnimal = {
       animal_id: animalId,
@@ -379,7 +416,7 @@ export class AnimalService {
       ear_tag_image_url: dto.ear_tag_image_url || null,
       sire_animal_id: dto.sire_animal_id || null,
       dam_animal_id: dto.dam_animal_id || null,
-      acquisition_cost: dto.acquisition_cost.toString(),
+      acquisition_cost: acquisitionCost.toString(),
       landing_cost: dto.landing_cost?.toString() || null,
       total_opening_asset_value: totalOpeningAssetValue.toString(),
       current_bio_asset_value: totalOpeningAssetValue.toString(),

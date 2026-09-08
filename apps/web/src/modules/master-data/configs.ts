@@ -320,14 +320,23 @@ const animal: MasterDataConfig = {
     // readOnly: the API computes it on every write and discards anything sent
     // alongside a DOB, so an editable box would take input it then throws away.
     { key: "age_at_entry_weeks", label: "Age at Entry (Weeks)", type: "number", readOnly: true, helpText: "Computed from Date of Birth and Entry Date.", section: "Acquisition" },
-    { key: "source_receipt_id", label: "Source Goods Receipt", type: "select-entity", entityEndpoint: "/goods-receipt", entityValueKey: "receipt_id", entityLabelKeys: ["receipt_no"], helpText: "Required for PURCHASED_IMPORTED / PURCHASED_LOCAL entries.", section: "Acquisition" },
-    { key: "source_batch_id", label: "Source Batch", type: "select-entity", entityEndpoint: "/batch", entityValueKey: "batch_id", entityLabelKeys: ["batch_no"], helpText: "Required for BORN_ON_FARM entries.", section: "Acquisition" },
+    // Shown only for the entry types they belong to. The API has always
+    // enforced these as COND rules and rejected the wrong combination; the form
+    // asked for both from everyone, so a born-on-farm piglet was offered a
+    // goods receipt it could never legally carry.
+    { key: "source_receipt_id", label: "Source Goods Receipt", type: "select-entity", entityEndpoint: "/goods-receipt", entityValueKey: "receipt_id", entityLabelKeys: ["receipt_no"], visibleWhen: { anyOf: [{ key: "entry_type", equals: ["PURCHASED_IMPORTED", "PURCHASED_LOCAL"] }] }, requiredWhen: { anyOf: [{ key: "entry_type", equals: ["PURCHASED_IMPORTED", "PURCHASED_LOCAL"] }] }, helpText: "The receipt this animal arrived on.", section: "Acquisition" },
+    { key: "source_batch_id", label: "Source Batch", type: "select-entity", entityEndpoint: "/batch", entityValueKey: "batch_id", entityLabelKeys: ["batch_no"], visibleWhen: { anyOf: [{ key: "entry_type", equals: "BORN_ON_FARM" }] }, requiredWhen: { anyOf: [{ key: "entry_type", equals: "BORN_ON_FARM" }] }, helpText: "The farrowing batch this animal was born from.", section: "Acquisition" },
     // Filtered to LIVING_ASSET: the field is the animal's inventory identity, and
     // an unfiltered /item offered feed and grain here — "Maize grain" was a valid
     // choice for what a pig is. The picker appends isActive=true, and its URL
     // builder handles the existing query string.
     { key: "item_id", label: "Item (Living Asset)", type: "select-entity", required: true, entityEndpoint: "/item?itemType=LIVING_ASSET", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"], section: "Acquisition" },
-    { key: "acquisition_cost", label: "Acquisition Cost", type: "number", step: "0.01", required: true, section: "Acquisition" },
+    // Two fields, one column. A purchased animal's cost is read off its goods
+    // receipt by the API and anything typed here is discarded, so offering an
+    // editable box for it would take input it then throws away. Everything else
+    // has no document behind it and is entered by hand.
+    { key: "acquisition_cost", label: "Acquisition Cost", type: "number", step: "0.01", readOnly: true, visibleWhen: { anyOf: [{ key: "entry_type", equals: ["PURCHASED_IMPORTED", "PURCHASED_LOCAL"] }] }, helpText: "Taken from the rate on the source goods receipt.", section: "Acquisition" },
+    { key: "acquisition_cost", label: "Acquisition Cost", type: "number", step: "0.01", requiredWhen: { anyOf: [{ key: "entry_type", equals: ["BORN_ON_FARM", "TRANSFERRED_IN"] }] }, visibleWhen: { anyOf: [{ key: "entry_type", equals: ["BORN_ON_FARM", "TRANSFERRED_IN"] }] }, section: "Acquisition" },
     { key: "landing_cost", label: "Landing Cost", type: "number", step: "0.01", helpText: "Transport/import duty/quarantine charges for imported animals.", section: "Acquisition" },
     { key: "total_opening_asset_value", label: "Total Opening Asset Value", type: "number", hideInForm: true, section: "Acquisition" },
     { key: "current_bio_asset_value", label: "Current Bio-Asset Value", type: "number", step: "0.01", editOnly: true, helpText: "Set from acquisition cost at creation; adjust here afterward.", section: "Bio-Asset" },

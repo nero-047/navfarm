@@ -96,7 +96,10 @@ export default function AnimalDetailPanel({ row, onClose }: { row: Row; onClose:
         summary: fmt(row.entry_type).replaceAll("_", " ").toLowerCase() || "Entry recorded",
         detail: [
           ["Entry type", fmt(row.entry_type)], ["Entry date", fmt(row.entry_date)],
-          ["Source GRN", fmt(row.source_grn_id)], ["Born from batch", fmt(row.source_batch_id)],
+          // source_receipt_id, not source_grn_id: the column was deliberately
+          // named after this codebase's goods_receipt table rather than the
+          // spec's "GRN", and the timeline was still asking for the spec's name.
+          ["Source receipt", fmt(row.source_receipt_id)], ["Born from batch", fmt(row.source_batch_id)],
           ["Acquisition cost", fmt(row.acquisition_cost)],
         ],
       });
@@ -212,7 +215,10 @@ export default function AnimalDetailPanel({ row, onClose }: { row: Row; onClose:
             <ReadField label="Entry type" value={fmt(row.entry_type)} />
             <ReadField label="Entry date" value={fmt(row.entry_date)} />
             <ReadField mono label="RFID tag" value={fmt(row.rfid_tag)} />
-            <ReadField mono label="Ear tag" value={fmt(row.ear_tag_visual)} />
+            {/* ear_tag, not ear_tag_visual — the latter is not a column and
+                never was, so this field read blank for every animal even though
+                all of them carry a tag. */}
+            <ReadField mono label="Ear tag" value={fmt(row.ear_tag)} />
             <ReadField label="Parity count" value={fmt(row.parity_count)} />
             <ReadField label="Piglets born live" value={fmt(row.total_piglets_born_live)} />
             <ReadField label="Piglets weaned" value={fmt(row.total_piglets_weaned)} />

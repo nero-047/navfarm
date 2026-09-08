@@ -209,6 +209,112 @@ describe('AnimalService', () => {
    * narrower rule Rishi chose on 2026-09-08: computed whenever DOB is known,
    * typed only when it is not.
    */
+  /**
+   * A purchased animal's cost is a fact on the receipt it arrived on, not a
+   * number somebody retypes into the register. Rishi, 2026-09-08.
+   */
+  describe('acquisition cost from the source receipt', () => {
+    const purchased = {
+      ...baseDto,
+      entry_type: 'PURCHASED_LOCAL',
+      source_receipt_id: 'grn-1',
+      acquisition_cost: 999,
+    };
+
+    const receiptFound = () => found({ receipt_id: 'grn-1' });
+    const line = (rate: string | null) => ({
+      from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue(rate === null ? [] : [{ rate, amount: rate }]) }) }),
+    });
+
+    it('takes the cost from the receipt line, ignoring what the caller sent', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }))
+        .mockReturnValueOnce(receiptFound())
+        .mockReturnValueOnce(line('1500.0000'))
+        .mockReturnValueOnce(found({ lob_code: 'PIGGERY' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1' }));
+
+      const inserted: any[] = [];
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockImplementation((v) => { inserted.push(v); return Promise.resolve({}); }) });
+
+      await service.create(purchased as any, 'tenant-123');
+
+      expect(inserted[0].acquisition_cost).toBe('1500');
+    });
+
+    it('refuses when the receipt carries no line for this animal item', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }))
+        .mockReturnValueOnce(receiptFound())
+        .mockReturnValueOnce(line(null));
+
+      await expect(service.create(purchased as any, 'tenant-123')).rejects.toThrow(/receipt/i);
+    });
+
+    it('accepts a purchased entry that sends no cost at all', async () => {
+      // The form cannot send it: the field is readOnly for purchased animals,
+      // and readOnly fields are stripped from the payload. The receipt is the
+      // source, so its absence is correct rather than an error.
+      const { acquisition_cost, ...noCost } = purchased;
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }))
+        .mockReturnValueOnce(receiptFound())
+        .mockReturnValueOnce(line('1500.0000'))
+        .mockReturnValueOnce(found({ lob_code: 'PIGGERY' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1' }));
+
+      const inserted: any[] = [];
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockImplementation((v) => { inserted.push(v); return Promise.resolve({}); }) });
+
+      await service.create(noCost as any, 'tenant-123');
+
+      expect(inserted[0].acquisition_cost).toBe('1500');
+      expect(inserted[0].total_opening_asset_value).toBe('1700');
+    });
+
+    it('refuses a non-purchased entry that sends no cost, since nothing can supply it', async () => {
+      const { acquisition_cost, ...noCost } = baseDto as any;
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }));
+
+      await expect(service.create(noCost, 'tenant-123')).rejects.toThrow(/acquisition cost/i);
+    });
+
+    it('leaves a non-purchased entry cost exactly as entered', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }))
+        .mockReturnValueOnce(found({ lob_code: 'PIGGERY' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1' }));
+
+      const inserted: any[] = [];
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockImplementation((v) => { inserted.push(v); return Promise.resolve({}); }) });
+
+      await service.create({ ...baseDto, acquisition_cost: 2857.57 } as any, 'tenant-123');
+
+      expect(inserted[0].acquisition_cost).toBe('2857.57');
+    });
+  });
+
   describe('age at entry weeks (TDD row 12)', () => {
     it('computes whole weeks between dob and entry_date', () => {
       expect(resolveAgeAtEntryWeeks('2025-12-04', '2026-01-01', undefined)).toBe(4);
