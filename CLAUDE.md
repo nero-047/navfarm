@@ -21,3 +21,17 @@
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
 <!-- nx configuration end-->
+
+# NAVFarm
+
+**Read `AGENTS.md` before planning or writing anything.** It carries the client,
+the scope, the source-of-truth order, the script and master-data conventions,
+the commands, and the open questions that are the client's to answer.
+
+Two things it is worth repeating here, because they are the ones most often got
+wrong:
+
+- **`rak docs/` is not a source of truth.** The BBP, the TDD tracker, the master
+  templates and what Rishi says are. An older briefing said the opposite.
+- **Verify by driving the running app and reading MySQL, not by reading the
+  code.** Every defect that mattered in this project passed its tests first.
