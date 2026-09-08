@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AnimalService } from './animal.service';
+import { AnimalService, resolveAgeAtEntryWeeks } from './animal.service';
 import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
@@ -199,6 +199,148 @@ describe('AnimalService', () => {
       await expect(
         service.create({ ...baseDto, animal_type: 'GILT', no_of_teats: 14 } as any, 'tenant-123'),
       ).rejects.toThrow(/teat/i);
+    });
+  });
+
+  /**
+   * TDD tracker Excel row 12 (S.No. 11): "Age at entry week, should be auto
+   * computed as per DOB of BORN ON FARM animals and MANUAL ENTRY if animals
+   * are IMPORTED." The Animal Register Master Template's column G is the
+   * narrower rule Rishi chose on 2026-09-08: computed whenever DOB is known,
+   * typed only when it is not.
+   */
+  describe('age at entry weeks (TDD row 12)', () => {
+    it('computes whole weeks between dob and entry_date', () => {
+      expect(resolveAgeAtEntryWeeks('2025-12-04', '2026-01-01', undefined)).toBe(4);
+    });
+
+    it('floors a partial week rather than rounding it up', () => {
+      // 27 days is three weeks and six days. The animal has not lived a fourth week.
+      expect(resolveAgeAtEntryWeeks('2025-12-05', '2026-01-01', undefined)).toBe(3);
+    });
+
+    it('is zero for an animal born on the day it entered the register', () => {
+      expect(resolveAgeAtEntryWeeks('2026-01-01', '2026-01-01', undefined)).toBe(0);
+    });
+
+    it('ignores a client-supplied value when dob is known', () => {
+      // Otherwise the stored age and the stored dob can disagree, and the row
+      // stops being self-consistent.
+      expect(resolveAgeAtEntryWeeks('2025-12-04', '2026-01-01', 99)).toBe(4);
+    });
+
+    it('keeps the typed value when dob is unknown', () => {
+      expect(resolveAgeAtEntryWeeks(null, '2026-01-01', 12)).toBe(12);
+    });
+
+    it('is null when dob is unknown and nothing was typed', () => {
+      expect(resolveAgeAtEntryWeeks(null, '2026-01-01', undefined)).toBeNull();
+    });
+
+    it('rejects a dob after the entry date', () => {
+      expect(() => resolveAgeAtEntryWeeks('2026-02-01', '2026-01-01', undefined)).toThrow(/before/i);
+    });
+
+    it('rejects a negative typed age', () => {
+      expect(() => resolveAgeAtEntryWeeks(null, '2026-01-01', -1)).toThrow(/age at entry/i);
+    });
+
+    it('rejects a typed age beyond the typo guard', () => {
+      expect(() => resolveAgeAtEntryWeeks(null, '2026-01-01', 521)).toThrow(/age at entry/i);
+    });
+
+    it('rejects a bad age before the number series issues a code', async () => {
+      // A rejected create must not burn a sequence. Driving the real API showed
+      // it did: a create refused for age 521 still consumed PIG-2026-0022, and
+      // the register jumped 0021 -> 0023 with nothing in between.
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }));
+
+      await expect(
+        service.create({ ...baseDto, age_at_entry_weeks: 521 } as any, 'tenant-123'),
+      ).rejects.toThrow(/age at entry/i);
+
+      expect(numberSeriesService.generateNext).not.toHaveBeenCalled();
+    });
+
+    it('stores the computed age on create when dob is given', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }))
+        .mockReturnValueOnce(found({ lob_code: 'PIGGERY' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1' }));
+
+      const insertedRecords: any[] = [];
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockImplementation((v) => { insertedRecords.push(v); return Promise.resolve({}); }) });
+
+      await service.create({ ...baseDto, dob: '2025-12-04', age_at_entry_weeks: 99 } as any, 'tenant-123');
+
+      expect(insertedRecords[0].age_at_entry_weeks).toBe(4);
+    });
+
+    it('stores the typed age on create when dob is omitted', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ company_id: 'comp-1' }))
+        .mockReturnValueOnce(found({ nob_id: 'nob-1' }))
+        .mockReturnValueOnce(found({ lob_id: 'lob-1' }))
+        .mockReturnValueOnce(found({ breed_id: 'breed-1' }))
+        .mockReturnValueOnce(found({ item_id: 'item-1' }))
+        .mockReturnValueOnce(found({ lob_code: 'PIGGERY' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1' }));
+
+      const insertedRecords: any[] = [];
+      mockDbInsert.mockReturnValue({ values: jest.fn().mockImplementation((v) => { insertedRecords.push(v); return Promise.resolve({}); }) });
+
+      await service.create({ ...baseDto, age_at_entry_weeks: 12 } as any, 'tenant-123');
+
+      expect(insertedRecords[0].age_at_entry_weeks).toBe(12);
+    });
+
+    it('recomputes the age when dob is edited', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', animal_type: 'SOW', dob: null, entry_date: '2026-01-01' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1' }));
+
+      let updated: any;
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockImplementation((v) => { updated = v; return { where: jest.fn().mockResolvedValue({}) }; }) });
+
+      await service.update('a-1', { dob: '2025-12-04' } as any, 'tenant-123');
+
+      expect(updated.age_at_entry_weeks).toBe(4);
+    });
+
+    it('leaves the age untouched when the update names neither dob nor the age', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', animal_type: 'SOW', dob: '2025-12-04', entry_date: '2026-01-01' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1' }));
+
+      let updated: any;
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockImplementation((v) => { updated = v; return { where: jest.fn().mockResolvedValue({}) }; }) });
+
+      await service.update('a-1', { grading: 'A' } as any, 'tenant-123');
+
+      expect(updated).not.toHaveProperty('age_at_entry_weeks');
+    });
+
+    it('refuses a typed age on update when the animal has a dob', async () => {
+      mockDbSelect
+        .mockReturnValueOnce(found({ animal_id: 'a-1', company_id: 'comp-1', animal_type: 'SOW', dob: '2025-12-04', entry_date: '2026-01-01' }))
+        .mockReturnValueOnce(found({ animal_id: 'a-1' }));
+
+      let updated: any;
+      mockDbUpdate.mockReturnValue({ set: jest.fn().mockImplementation((v) => { updated = v; return { where: jest.fn().mockResolvedValue({}) }; }) });
+
+      await service.update('a-1', { age_at_entry_weeks: 99 } as any, 'tenant-123');
+
+      // The dob still governs — the typed value is discarded, not merged.
+      expect(updated.age_at_entry_weeks).toBe(4);
     });
   });
 

@@ -512,6 +512,13 @@
       "when": 1788716559734,
       "tag": "0072_brown_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "5",
+      "when": 1788846367306,
+      "tag": "0073_narrow_the_call",
+      "breakpoints": true
     }
   ]
 }

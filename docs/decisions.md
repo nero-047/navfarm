@@ -124,9 +124,15 @@ production date, cull date, reason, weight, write-off) is not built.
 *Asked 2026-09-07, refined the same day.*
 
 The list narrows and a panel opens beside it. Tabs: Animal data, Breeding
-details, Traceability, and (per TDD row 6) Location traceability and History are
-to be added — Rishi chose to keep the genealogy timeline as well rather than
-replace it.
+details, Traceability, and Location traceability and History are to be added —
+Rishi chose to keep the genealogy timeline as well rather than replace it.
+
+*Attribution corrected 2026-09-08.* This entry used to credit the two new tabs
+to "TDD row 6". It should not: Excel row 6 (S.No. 5) asks only for a clickable
+list page, an animal card and an RHS overview pane. The tracker never mentions
+a History tab or a Location traceability tab, and neither do the master
+templates, BBP-1 or the MOMs — searched, not assumed. The tabs and their
+columns are **Rishi's**, recorded below.
 
 Traceability is a **timeline of cards, newest first, each expanding in place**
 — not a dialog, and opening one closes the other. Steps with no table are named
@@ -136,6 +142,66 @@ the record is merely missing.
 The panel header shows the **animal code only**. Type, gender and status live in
 the Animal data tab; the code stays in the header because it is the one fact
 that must hold on every tab.
+
+### TDD row numbers in this repo mean Excel row numbers
+*Established 2026-09-08, after a misattribution traced back to it.*
+
+The tracker has a `S.No.` column that runs one behind the spreadsheet's own row
+numbers, because row 1 is the header. When Rishi says "row 12" he means Excel
+row 12, which is S.No. 11. Quote it as "Excel row N (S.No. N-1)" so the next
+reader can find it either way. Getting this wrong is what credited the History
+and Location traceability tabs to a row about a list page.
+
+### Age at Entry Weeks is computed whenever DOB is known
+*Asked 2026-09-08, from TDD tracker Excel row 12 (S.No. 11).*
+
+The two documents specify different triggers. The tracker says "auto computed
+as per DOB of BORN ON FARM animals and MANUAL ENTRY if animals are IMPORTED" —
+keying off entry type. The Animal Register Master Template's column G says
+"Computed from dob and entry_date. Manual entry if imported and DOB unknown" —
+keying off whether a date of birth exists.
+
+**Rishi chose the template's rule.** An imported animal that arrives with a
+birth date should not have its age typed in when the dates already say it.
+
+Consequences, all enforced in `resolveAgeAtEntryWeeks()`:
+
+- A value supplied alongside a DOB is **discarded, not merged**. A row holding
+  both a DOB and a contradicting age has no reading that is true.
+- A DOB after the entry date is a 400, not a zero. The animal cannot have
+  arrived before it was born, and silently flooring it hides bad data.
+- Hand-typed ages are capped at 520 weeks. That is a **typo guard, not a client
+  figure** — ten years is past any pig's productive life, so a larger number is
+  a birth year typed into a weeks box. Computed ages are never capped: if the
+  dates say the animal is older, the dates are the record.
+- Animals with no DOB and no typed age stay NULL. The backfill leaves them and
+  reports them rather than inventing a "typical" age.
+
+The template's own example row contradicts itself here (DOB 2024-10-01, entry
+2025-01-15 is ~15 weeks, but the example value is 3, and entry_type is
+PURCHASED_IMPORTED with a DOB filled in anyway). Flagged, not followed.
+
+### The History and Location traceability tabs are ours
+*Decided 2026-09-08, replacing a false citation to the TDD tracker.*
+
+No client document specifies them. Rishi specified them:
+
+- **HISTORY** — columns LAST DATE / BATCH / CURRENT DATE / ENTRY NO. / STAGE.
+  One row per **transition event**: LAST DATE is the previous move's date,
+  CURRENT DATE is this move's, STAGE and BATCH are what was moved *into*, and
+  ENTRY NO. is the source document's number.
+- **LOCATION TRACEABILITY** — PURCHASE / OUTPUT / TRANSFER / MORTALITY / CULLS
+  with a Location column.
+
+Both read one append-only `animal_movement_log` rather than two tables, so the
+two tabs cannot disagree about the same move. CULLS has no source — the cull
+flow is not built and `dispose()` refuses CULLED — so it is **named as
+unmodelled**, matching how Traceability already treats the Kill Sheet and DOA.
+An empty card implies the record is merely missing.
+
+Present the tabs as ours when talking to the client. They are a reasonable
+reading of what a farm needs; they are not something Triple C has asked for in
+writing.
 
 ### Parity counts completed pregnancies, post weaning
 *TDD row 27, implemented 2026-09-07.*

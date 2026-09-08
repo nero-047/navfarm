@@ -67,6 +67,63 @@ const DISPOSAL_ONLY_STATUSES = new Set(Object.values(DISPOSAL_STATUS_MAP).filter
  */
 const CULL_STATUS = 'CULLED';
 
+/**
+ * Upper bound on a hand-typed age at entry. Not a client figure and not a
+ * domain rule — ten years is well past any pig's productive life, so a value
+ * above it is a typing slip (a birth year in the weeks box), not a claim about
+ * the animal. Computed ages are never checked against it: if the dates say the
+ * animal is older, the dates are the record.
+ */
+const MAX_TYPED_AGE_AT_ENTRY_WEEKS = 520;
+
+const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * TDD tracker Excel row 12 (S.No. 11) and Animal Register Master Template
+ * column G: "Computed from dob and entry_date. Manual entry if imported and
+ * DOB unknown."
+ *
+ * The two documents disagree on the trigger — the tracker keys the automatic
+ * computation off entry_type (BORN_ON_FARM), the template keys it off whether
+ * a dob exists at all. Rishi settled it on 2026-09-08 in favour of the
+ * template: an imported animal that arrives with a birth certificate should
+ * not have its age typed in when the dates already say it.
+ *
+ * A supplied value is discarded rather than merged when dob is known, because
+ * a row holding both a dob and a contradicting age has no reading that is
+ * true. Parsed as UTC midnight so the result does not shift by a day for
+ * anyone east or west of the server.
+ */
+export function resolveAgeAtEntryWeeks(
+  dob: string | null | undefined,
+  entryDate: string | null | undefined,
+  typed: number | null | undefined,
+): number | null {
+  if (dob && entryDate) {
+    const born = Date.parse(`${String(dob).slice(0, 10)}T00:00:00Z`);
+    const entered = Date.parse(`${String(entryDate).slice(0, 10)}T00:00:00Z`);
+    if (Number.isNaN(born) || Number.isNaN(entered)) {
+      throw new BadRequestException('Date of birth and entry date must both be valid dates.');
+    }
+    if (born > entered) {
+      throw new BadRequestException(
+        `Date of birth '${String(dob).slice(0, 10)}' falls after the entry date '${String(entryDate).slice(0, 10)}' — an animal cannot enter the farm before it is born.`,
+      );
+    }
+    // Floored: six days into a week is not a week lived.
+    return Math.floor((entered - born) / MS_PER_WEEK);
+  }
+
+  if (typed === undefined || typed === null) return null;
+
+  if (!Number.isInteger(typed) || typed < 0 || typed > MAX_TYPED_AGE_AT_ENTRY_WEEKS) {
+    throw new BadRequestException(
+      `Age at entry must be a whole number of weeks between 0 and ${MAX_TYPED_AGE_AT_ENTRY_WEEKS}.`,
+    );
+  }
+  return typed;
+}
+
 function assertGiltTeatCount(animalType: string | undefined, noOfTeats: number | undefined | null): void {
   if (animalType !== 'GILT' || noOfTeats === undefined || noOfTeats === null) return;
   if (noOfTeats < MIN_GILT_TEATS) {
@@ -187,6 +244,12 @@ export class AnimalService {
 
   async create(dto: CreateAnimalDto, tenantId: string, userPayload?: any) {
     assertGiltTeatCount(dto.animal_type, dto.no_of_teats);
+    // Resolved here, beside the other cheap guards, rather than down at the
+    // insert: generateAnimalCode() consumes a number series, and a create that
+    // fails after it has run leaves a permanent hole in the animal codes. One
+    // did — a create refused for an out-of-range age still burned PIG-2026-0022,
+    // and the register jumped straight from 0021 to 0023.
+    const ageAtEntryWeeks = resolveAgeAtEntryWeeks(dto.dob, dto.entry_date, dto.age_at_entry_weeks);
 
     await this.assertExists(
       this.db.select().from(schema.companyMaster).where(eq(schema.companyMaster.company_id, dto.company_id)),
@@ -305,6 +368,7 @@ export class AnimalService {
       breed_id: dto.breed_id,
       gender: dto.gender,
       dob: dto.dob || null,
+      age_at_entry_weeks: ageAtEntryWeeks,
       entry_type: dto.entry_type,
       entry_date: dto.entry_date,
       source_receipt_id: dto.source_receipt_id || null,
@@ -571,6 +635,17 @@ export class AnimalService {
 
     if (dto.breed_id !== undefined) updates.breed_id = dto.breed_id;
     if (dto.dob !== undefined) updates.dob = dto.dob;
+    // entry_date is not editable, so the animal's own is always the second
+    // term. Recomputed rather than copied through: an edited dob that left a
+    // stale age behind would contradict itself on the very screen that shows
+    // both, and a typed age sent for an animal that has a dob loses to the dob.
+    if (dto.dob !== undefined || dto.age_at_entry_weeks !== undefined) {
+      updates.age_at_entry_weeks = resolveAgeAtEntryWeeks(
+        dto.dob !== undefined ? dto.dob : animal.dob,
+        animal.entry_date,
+        dto.age_at_entry_weeks,
+      );
+    }
     if (dto.rfid_tag !== undefined) updates.rfid_tag = dto.rfid_tag;
     if (dto.ear_tag !== undefined) updates.ear_tag = dto.ear_tag;
     if (dto.ear_tag_image_url !== undefined) updates.ear_tag_image_url = dto.ear_tag_image_url;

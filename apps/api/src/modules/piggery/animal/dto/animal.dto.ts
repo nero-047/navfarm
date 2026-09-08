@@ -67,6 +67,16 @@ export class CreateAnimalDto {
   @IsOptional()
   dob?: string;
 
+  @ApiProperty({
+    description:
+      "Age in whole weeks when the animal entered the farm. Computed from dob and entry_date whenever dob is given — a value sent alongside a dob is ignored, not merged. Supply it only for an imported animal whose date of birth is unknown.",
+    required: false,
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  age_at_entry_weeks?: number;
+
   @ApiProperty({ description: 'How this animal entered the register', enum: ENTRY_TYPES })
   @IsString()
   @IsIn(ENTRY_TYPES)
@@ -190,6 +200,16 @@ export class UpdateAnimalDto {
   @IsDateString()
   @IsOptional()
   dob?: string;
+
+  @ApiProperty({
+    description:
+      'Age in whole weeks at entry. Only honoured while the animal has no date of birth; once a dob is on the record the dob governs and this is recomputed from it.',
+    required: false,
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  age_at_entry_weeks?: number;
 
   @ApiProperty({ required: false })
   @IsString()

@@ -198,6 +198,17 @@ export default function AnimalDetailPanel({ row, onClose }: { row: Row; onClose:
             <ReadField label="Gender" value={fmt(row.gender)} />
             <ReadField label="Status" value={fmt(row.status)} />
             <ReadField label="Date of birth" value={fmt(row.dob)} />
+            {/* Template column G sits between DOB and Entry type, and it reads
+                as a pair with the DOB above it: when that is filled the age is
+                computed from it, when it is blank the age is the only record of
+                how old the animal was. Suffixed rather than left bare because
+                "3" beside a date is ambiguous about its unit. */}
+            <ReadField
+              label="Age at entry"
+              value={row.age_at_entry_weeks === null || row.age_at_entry_weeks === undefined
+                ? ""
+                : `${row.age_at_entry_weeks} weeks`}
+            />
             <ReadField label="Entry type" value={fmt(row.entry_type)} />
             <ReadField label="Entry date" value={fmt(row.entry_date)} />
             <ReadField mono label="RFID tag" value={fmt(row.rfid_tag)} />

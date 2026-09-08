@@ -1,0 +1,1 @@
+ALTER TABLE `animal_register` ADD `age_at_entry_weeks` int;

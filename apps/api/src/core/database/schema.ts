@@ -2850,6 +2850,13 @@ export const animalRegister = mysqlTable('animal_register', {
   breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
   gender: char('gender', { length: 1 }).notNull(), // F, M
   dob: date('dob', { mode: 'string' }),
+  // Animal Register Master Template column G, TDD row 12: computed from dob and
+  // entry_date whenever dob is known, typed by hand only when it is not — an
+  // imported animal with no birth record still has an age, and this column is
+  // the only place it is written down. Nullable because the template marks it
+  // Mandatory: NO, and because an import with neither a dob nor a stated age
+  // has no honest value to store.
+  age_at_entry_weeks: int('age_at_entry_weeks'),
   entry_type: varchar('entry_type', { length: 30 }).notNull(), // PURCHASED_IMPORTED, PURCHASED_LOCAL, BORN_ON_FARM, TRANSFERRED_IN
   entry_date: date('entry_date', { mode: 'string' }).notNull(),
   // Spec's "source_grn_id" — named to match this codebase's actual table (goods_receipt, not GRN).
