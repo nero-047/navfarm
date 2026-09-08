@@ -44,24 +44,37 @@ this file and Rishi disagree, **Rishi wins** — say so and update this file.
 - A second developer, Arun, used to land commits on shared branches. **Review
   anything you did not write** rather than assuming it is correct.
 
-## 2. Source of truth, in order
+## 2. Source of truth
 
-1. **What Rishi says in the conversation.**
-2. **`TDD_Triple-C Development Testing_Tracker`** — 143 numbered requirement
-   rows, the most specific statement of what each screen must do. Row numbers
-   are quotable; use them in commit messages.
-3. **BBP-1** (`OneDrive_1_04-09-2026/Solution Documents/Triple-C_NAVFarm
-   BBP1_V0.1_Final.docx`) and the **eight master templates** in
-   `OneDrive_1_04-09-2026/Master Templates/`.
-4. The MOMs in `OneDrive_1_04-09-2026/MOMs/` for decisions taken in meetings.
+**Rishi is the source of truth.** Not the BBP, not the TDD tracker, not the
+templates. Every document in this repo is *reference* — evidence of what the
+client has said so far — and every one of them is incomplete, unsigned, or
+contradicts another. What the application should do is what Rishi says it
+should do.
 
-**`rak docs/` is NOT a source of truth.** Rishi: "half cooked docs". The
-previous version of this file told you to treat them as current. It was wrong.
-Do not shape fields, labels or flows from them.
+That is not a formality. The BBP is unsigned (§18's approval boxes are all
+empty), the BBP and the TDD tracker disagree on stage names and on the animal
+code prefix, and the BBP contradicts itself on the reporting currency. There is
+no document you can defer to in order to avoid asking.
 
-**The BBP is unsigned.** §18's approval checkboxes are all empty. Where the
-BBP and the TDD disagree — and they do, on stage names, on the animal code
-prefix — say so and ask rather than picking one silently.
+**`docs/decisions.md` is the record of what Rishi has decided.** Read it before
+planning. Add to it when he decides something new — the decision, the date, and
+the reasoning, so the next agent does not re-ask a settled question or quietly
+reverse it.
+
+Reference material, most useful first:
+
+1. **`TDD_Triple-C Development Testing_Tracker`** — 143 numbered requirement
+   rows, the most specific statement of what each screen must do. Quote row
+   numbers in commit messages.
+2. **`OneDrive_1_04-09-2026/`** — the latest client material: BBP-1 in
+   `Solution Documents/`, the eight `Master Templates/`, and the `MOMs/`.
+3. **`rak docs/`** — older, superseded. Reference only, and rarely worth
+   opening. An earlier version of this file called it the Product Source of
+   Truth; it never was.
+
+When two documents disagree, or when a document is silent, **ask Rishi** and
+then record the answer. Do not pick one silently and do not invent a third.
 
 ### Reading the client documents
 
