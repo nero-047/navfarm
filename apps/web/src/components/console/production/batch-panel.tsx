@@ -14,6 +14,7 @@ import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } f
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 import BatchPerformanceCurvesPanel from "@/components/console/production/batch-performance-curves-panel";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 const PAGE_SIZE = 25;
 
@@ -41,6 +42,7 @@ const emptyTxForm = () => ({ transaction_date: new Date().toISOString().slice(0,
 const emptyStdConsumptionLine = () => ({ item_id: "", std_qty_per_unit_per_day: "", std_rate: "" });
 
 export default function BatchPanel() {
+  const { formatMoney } = useCompanyCurrency();
   const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1168,7 +1170,7 @@ export default function BatchPanel() {
               {viewing.total_cost != null && (
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider" style={S.muted}>{t("blLabelTotalCost")}</p>
-                  <p className="font-semibold mt-0.5" style={S.primary}>₹{Number(viewing.total_cost).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold mt-0.5" style={S.primary}>{formatMoney(Number(viewing.total_cost))}</p>
                 </div>
               )}
             </div>
@@ -1252,7 +1254,7 @@ export default function BatchPanel() {
                         <TableCell className="px-3 py-2 font-medium" style={S.primary}>{itemLabel(l.item_id)}</TableCell>
                         <TableCell className="px-3 py-2" style={S.sub}>{l.source_batch_id ? batchLabel(l.source_batch_id) : "—"}</TableCell>
                         <TableCell className="px-3 py-2" style={S.primary}>{l.quantity} {l.uom}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{l.rate ? `₹${Number(l.rate).toFixed(2)}` : "—"}</TableCell>
+                        <TableCell className="px-3 py-2" style={S.primary}>{l.rate ? formatMoney(Number(l.rate).toFixed(2)) : "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

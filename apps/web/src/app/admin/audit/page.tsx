@@ -105,7 +105,7 @@ export default function AdminAuditPage() {
                 <TableRow key={log.audit_id || idx}>
                   <TableCell className="px-5 font-mono" style={{ color: "var(--text-muted)" }}>{idx + 1}</TableCell>
                   <TableCell className="px-5 font-mono whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                    {log.created_at ? new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                    {log.created_at ? new Date(log.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—"}
                   </TableCell>
                   <TableCell className="px-5">{actionBadge(log.action)}</TableCell>
                   <TableCell className="px-5 font-medium" style={{ color: "var(--text-primary)" }}>

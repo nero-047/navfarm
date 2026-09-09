@@ -124,7 +124,10 @@ export class AuthService {
 
     if (!companyPlaceholder && dto.company_id === '00000000-0000-0000-0000-000000000000') {
       const [lang] = await this.db.select().from(schema.languageMaster).limit(1);
-      const [curr] = await this.db.select().from(schema.currencyMaster).limit(1);
+      // USD by iso_code, not by row order. The currency master is an unordered
+      // ISO reference list with no system default, so `limit(1)` returned INR
+      // simply because it is inserted first.
+      const [curr] = await this.db.select().from(schema.currencyMaster).where(eq(schema.currencyMaster.iso_code, 'USD')).limit(1);
 
       await this.db.insert(schema.companyMaster).values({
         company_id: '00000000-0000-0000-0000-000000000000',
@@ -133,10 +136,10 @@ export class AuthService {
         company_name: 'Placeholder Company',
         company_type: 'Pvt Ltd',
         industry_type: 'Poultry Farming',
-        base_currency_id: curr?.currency_id || '20000000-2000-2000-2000-200000000001',
+        base_currency_id: curr?.currency_id || '20000000-2000-2000-2000-200000000002',
         default_language_id: lang?.lang_id || '10000000-1000-1000-1000-100000000001',
-        default_timezone_id: 'Asia/Kolkata',
-        country_id: 'IND',
+        default_timezone_id: 'UTC',
+        country_id: 'ZWE',
         onboarding_status: 'PENDING',
         is_active: true,
       });

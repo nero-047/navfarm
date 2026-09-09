@@ -18,6 +18,7 @@ import AnimalStageTransitionModal from "@/components/console/piggery/animal-stag
 import {
   TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ const LEDGER_ENTRY_TYPE_LABEL_KEY: Record<string, TranslationKeys> = {
 
 function formatDate(d?: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 // ── Withdrawal warning banner ─────────────────────────────────────────────────
@@ -132,6 +133,7 @@ function WithdrawalWarning({ message, t }: { message: string; t: (key: Translati
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AnimalPanel() {
+  const { formatMoney } = useCompanyCurrency();
   const { t } = useLanguage();
   const companyId = getActiveCompanyId();
 
@@ -772,12 +774,12 @@ export default function AnimalPanel() {
                 [t("anpFieldDateOfBirth"), formatDate(viewing.dob)],
                 [t("anpFieldEarTag"), viewing.ear_tag || "—"],
                 [t("anpFieldRfidTag"), viewing.rfid_tag || "—"],
-                [t("anpFieldAcquisitionCost"), viewing.acquisition_cost ? `₹${Number(viewing.acquisition_cost).toLocaleString("en-IN")}` : "—"],
-                [t("anpFieldBookValue"), viewing.book_value ? `₹${Number(viewing.book_value).toLocaleString("en-IN")}` : "—"],
+                [t("anpFieldAcquisitionCost"), viewing.acquisition_cost ? formatMoney(Number(viewing.acquisition_cost)) : "—"],
+                [t("anpFieldBookValue"), viewing.book_value ? formatMoney(Number(viewing.book_value)) : "—"],
                 [t("anpFieldDisposalDate"), viewing.is_active ? "—" : formatDate(viewing.disposal_date)],
                 [t("anpFieldDisposalType"), viewing.disposal_type ? disposalTypeLabel(viewing.disposal_type) : "—"],
-                [t("anpFieldDisposalValue"), viewing.disposal_value ? `₹${Number(viewing.disposal_value).toLocaleString("en-IN")}` : "—"],
-                [t("anpFieldGainLossOnDisposal"), viewing.gain_loss_on_disposal ? `₹${Number(viewing.gain_loss_on_disposal).toLocaleString("en-IN")}` : "—"],
+                [t("anpFieldDisposalValue"), viewing.disposal_value ? formatMoney(Number(viewing.disposal_value)) : "—"],
+                [t("anpFieldGainLossOnDisposal"), viewing.gain_loss_on_disposal ? formatMoney(Number(viewing.gain_loss_on_disposal)) : "—"],
               ].map(([label, val]) => (
                 <div key={label as string}>
                   <p className="text-xs uppercase tracking-wide" style={S.muted}>{label as string}</p>
@@ -865,25 +867,25 @@ export default function AnimalPanel() {
                 <div className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
                   <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>{t("anpKpiNbv")}</p>
                   <p className="mt-1 text-lg font-bold" style={S.primary}>
-                    ₹{viewing.book_value ? Number(viewing.book_value).toLocaleString("en-IN") : viewing.acquisition_cost ? Number(viewing.acquisition_cost).toLocaleString("en-IN") : "0"}
+                    {formatMoney(viewing.book_value ? Number(viewing.book_value) : viewing.acquisition_cost ? Number(viewing.acquisition_cost) : "0")}
                   </p>
                 </div>
                 <div className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
                   <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>{t("anpKpiOpeningAssetValue")}</p>
                   <p className="mt-1 text-lg font-bold" style={S.primary}>
-                    ₹{viewing.total_opening_asset_value ? Number(viewing.total_opening_asset_value).toLocaleString("en-IN") : viewing.acquisition_cost ? Number(viewing.acquisition_cost).toLocaleString("en-IN") : "0"}
+                    {formatMoney(viewing.total_opening_asset_value ? Number(viewing.total_opening_asset_value) : viewing.acquisition_cost ? Number(viewing.acquisition_cost) : "0")}
                   </p>
                 </div>
                 <div className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
                   <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>{t("anpKpiTotalAmortized")}</p>
                   <p className="mt-1 text-lg font-bold" style={S.primary}>
-                    ₹{viewing.total_amortised ? Number(viewing.total_amortised).toLocaleString("en-IN") : "0"}
+                    {formatMoney(viewing.total_amortised ? Number(viewing.total_amortised) : "0")}
                   </p>
                 </div>
                 <div className="rounded-[var(--radius-md)] border p-3" style={S.raised}>
                   <p className="text-[10px] font-semibold uppercase tracking-wide" style={S.muted}>{t("anpKpiMonthlyAmortization")}</p>
                   <p className="mt-1 text-lg font-bold" style={S.primary}>
-                    {viewing.amortisation_monthly ? `₹${Number(viewing.amortisation_monthly).toLocaleString("en-IN")}` : "—"}
+                    {viewing.amortisation_monthly ? formatMoney(Number(viewing.amortisation_monthly)) : "—"}
                   </p>
                 </div>
               </div>
@@ -929,7 +931,7 @@ export default function AnimalPanel() {
                           <TableCell style={S.primary} className="font-mono text-xs">{entry.document_no || "—"}</TableCell>
                           <TableCell style={S.muted}>{entry.quantity ? Number(entry.quantity).toFixed(0) : "1"}</TableCell>
                           <TableCell className="text-right font-medium" style={Number(entry.cost_amount) < 0 ? S.danger : S.primary}>
-                            ₹{Number(entry.cost_amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            {formatMoney(Number(entry.cost_amount))}
                           </TableCell>
                           <TableCell style={S.muted}>{entry.status ? statusLabel(entry.status) : t("anpStatusActive")}</TableCell>
                         </TableRow>

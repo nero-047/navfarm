@@ -25,6 +25,7 @@ import { ConsolePage } from "@/components/ui/console-page";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { useCompanyCurrency, formatMoney, type CompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -68,10 +69,10 @@ function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
 }
 
-const formatMoney = (v: unknown) =>
+const fmtMoney = (v: unknown, currency?: CompanyCurrency | null) =>
   v === null || v === undefined || v === ""
     ? "—"
-    : `₹ ${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    : formatMoney(v as number, currency);
 
 // The API returns MySQL timestamps ("2026-08-24 22:26:27"); Safari rejects
 // that format in `new Date()`, so normalise before formatting.
@@ -81,7 +82,7 @@ const formatStamp = (v?: string | null) => {
   return Number.isNaN(parsed.getTime()) ? v : parsed.toLocaleString();
 };
 
-function fromApi(r: ApiRow): ApprovalItem {
+function fromApi(r: ApiRow, currency?: CompanyCurrency | null): ApprovalItem {
   return {
     id: r.request_id,
     doc_type: r.doc_type,
@@ -97,7 +98,7 @@ function fromApi(r: ApiRow): ApprovalItem {
       item_or_stage: r.item_or_stage || "—",
       requested_qty: r.requested_qty || "—",
       uom: r.uom || "",
-      cost_impact: formatMoney(r.cost_impact),
+      cost_impact: fmtMoney(r.cost_impact, currency),
       justification: r.justification || "—",
     },
     status: r.status as ApprovalStatus,
@@ -114,6 +115,7 @@ const TAB_ROUTES: Record<ApprovalStatus, string> = {
 };
 
 export function ApprovalsPageShell({ activeTab }: { activeTab: ApprovalStatus }) {
+  const { currency } = useCompanyCurrency();
   const router = useRouter();
   const { t } = useLanguage();
   const [user, setUser] = useState<NavUser | null>(null);
@@ -167,7 +169,7 @@ export function ApprovalsPageShell({ activeTab }: { activeTab: ApprovalStatus })
         api.get(`/approval?${params.toString()}`),
         api.get(`/approval/counts?${params.toString()}`).catch(() => null),
       ]);
-      setApprovals((unwrap<ApiRow[]>(res) || []).map(fromApi));
+      setApprovals((unwrap<ApiRow[]>(res) || []).map((r) => fromApi(r, currency)));
       const fetched = countRes ? unwrap<Partial<Record<ApprovalStatus, number>>>(countRes) : null;
       if (fetched) {
         setCounts({

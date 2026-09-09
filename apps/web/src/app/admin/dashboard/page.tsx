@@ -299,7 +299,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-[10px] font-mono" style={S.muted}>
-                      {log.created_at ? new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                      {log.created_at ? new Date(log.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—"}
                     </div>
                   </div>
                 </div>

@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useLanguage } from "@/hooks/useLanguage";
 import { AnimalMultiSelect, splitEvenly, truncateRemarks } from "./animal-multi-select";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 // file_url from the API is server-relative (e.g. "/uploads/xyz.jpg") — resolve
 // it against the API's own origin, not the web app's, since uploads are served
@@ -119,6 +120,7 @@ interface BatchMeta {
 // No static batch data — all data is fetched live from the database.
 
 export default function OperationalBatchDataEntry() {
+  const { formatMoney } = useCompanyCurrency();
   const { t } = useLanguage();
   // ── Live data state ──
   const [batches, setBatches] = useState<BatchMeta[]>([]);
@@ -818,7 +820,7 @@ export default function OperationalBatchDataEntry() {
             uom: "HRS",
             persons: Number(l.persons || 0) || undefined,
             hours: Number(l.hours || 0) || undefined,
-            remarks: `Labour: ${l.resource} (${l.persons} persons × ${l.hours} hrs @ ₹${l.rate}/hr)`,
+            remarks: `Labour: ${l.resource} (${l.persons} persons × ${l.hours} hrs @ ${formatMoney(l.rate)}/hr)`,
           });
         }
       }
@@ -1161,7 +1163,7 @@ export default function OperationalBatchDataEntry() {
                 <span>{t("feedConsumptionNutrition")}</span>
               </h3>
               <span className="text-xs font-bold text-[var(--text-primary)]">
-                {t("bdeTotal")} {totalFeedConsumed.toFixed(1)} KG (₹ {totalFeedCost.toFixed(2)})
+                {t("bdeTotal")} {totalFeedConsumed.toFixed(1)} KG ({formatMoney(totalFeedCost.toFixed(2))})
               </span>
             </div>
 
@@ -1260,7 +1262,7 @@ export default function OperationalBatchDataEntry() {
                 <span>{t("medicineClinicalTreatment")}</span>
               </h3>
               <span className="text-xs font-bold text-[var(--text-primary)]">
-                {t("bdeTotal")} ₹ {totalMedicineCost.toLocaleString("en-IN")}
+                {t("bdeTotal")} {formatMoney(totalMedicineCost)}
               </span>
             </div>
 
@@ -1314,7 +1316,7 @@ export default function OperationalBatchDataEntry() {
                             className="w-16 rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--surface-raised)] px-1.5 py-0.5 text-right text-xs font-bold text-[var(--text-primary)]"
                           />
                         </td>
-                        <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono font-bold">₹ {r.cost}</td>
+                        <td className="px-3 py-2 align-top text-right whitespace-nowrap font-mono font-bold">{formatMoney(r.cost)}</td>
                         <td className="px-3 py-2 align-top text-right whitespace-nowrap">
                           <button
                             onClick={() => handleRemoveMed(r.id)}
@@ -1467,7 +1469,7 @@ export default function OperationalBatchDataEntry() {
                 <span>{t("bdeSecLabour")}</span>
               </h3>
               <span className="text-xs font-bold text-[var(--text-primary)] font-mono">
-                ₹ {totalLabourCost.toFixed(2)} ({totalLabourHours} hrs)
+                {formatMoney(totalLabourCost.toFixed(2))} ({totalLabourHours} hrs)
               </span>
             </div>
 
@@ -1480,11 +1482,11 @@ export default function OperationalBatchDataEntry() {
                     <div>
                       <span className="font-semibold text-[var(--text-primary)]">{l.resource}</span>
                       <span className="text-[11px] text-[var(--text-secondary)] block font-mono">
-                        {l.persons} Persons · {l.hours} Hours (₹ {l.rate}/hr)
+                        {l.persons} Persons · {l.hours} Hours ({formatMoney(l.rate)}/hr)
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-[var(--text-primary)]">₹ {(l.persons * l.hours * l.rate).toFixed(2)}</span>
+                      <span className="font-mono font-bold text-[var(--text-primary)]">{formatMoney((l.persons * l.hours * l.rate).toFixed(2))}</span>
                       <button
                         onClick={() => handleRemoveLabour(l.id)}
                         className="text-[var(--text-muted)] hover:text-rose-500 p-1"
@@ -1515,7 +1517,7 @@ export default function OperationalBatchDataEntry() {
                 <span>{t("bdeSecOverheads")}</span>
               </h3>
               <span className="text-xs font-bold text-[var(--text-primary)] font-mono">
-                Total: ₹ {totalOverheads.toFixed(2)}
+                Total: {formatMoney(totalOverheads.toFixed(2))}
               </span>
             </div>
 
@@ -1530,7 +1532,7 @@ export default function OperationalBatchDataEntry() {
                       <span className="block text-[10px] text-[var(--text-muted)]">{o.remarks}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-[var(--text-primary)]">₹ {o.amount.toFixed(2)}</span>
+                      <span className="font-mono font-bold text-[var(--text-primary)]">{formatMoney(o.amount.toFixed(2))}</span>
                       <button
                         onClick={() => handleRemoveOverhead(o.id)}
                         className="text-[var(--text-muted)] hover:text-rose-500 p-1"
@@ -1623,17 +1625,17 @@ export default function OperationalBatchDataEntry() {
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-2">
               <Scale className="w-4 h-4 text-[var(--accent)]" />{t("bdeWipSummaryTitle")}</h4>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">{t("obFeedLabel")}<strong className="text-[var(--text-primary)]">₹ {totalFeedCost.toFixed(2)}</strong> ({totalFeedConsumed.toFixed(1)} KG) ·
-              Meds: <strong className="text-[var(--text-primary)]">₹ {totalMedicineCost.toFixed(2)}</strong> ·
-              Labour: <strong className="text-[var(--text-primary)]">₹ {totalLabourCost.toFixed(2)}</strong> ·
-              Overheads: <strong className="text-[var(--text-primary)]">₹ {totalOverheads.toFixed(2)}</strong> ·
+            <p className="text-xs text-[var(--text-secondary)] mt-1">{t("obFeedLabel")}<strong className="text-[var(--text-primary)]">{formatMoney(totalFeedCost.toFixed(2))}</strong> ({totalFeedConsumed.toFixed(1)} KG) ·
+              Meds: <strong className="text-[var(--text-primary)]">{formatMoney(totalMedicineCost.toFixed(2))}</strong> ·
+              Labour: <strong className="text-[var(--text-primary)]">{formatMoney(totalLabourCost.toFixed(2))}</strong> ·
+              Overheads: <strong className="text-[var(--text-primary)]">{formatMoney(totalOverheads.toFixed(2))}</strong> ·
               Mortality: <strong className="text-[var(--text-primary)]">{totalMortality} Head</strong>
             </p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-[10px] uppercase font-bold text-[var(--text-muted)]">{t("bdeEstCostPerAnimalDay")}</p>
-              <p className="text-lg font-bold text-[var(--accent)] font-mono">₹ {estCostPerAnimalDay}</p>
+              <p className="text-lg font-bold text-[var(--accent)] font-mono">{formatMoney(estCostPerAnimalDay)}</p>
             </div>
             <Button
               onClick={handleSaveAll}

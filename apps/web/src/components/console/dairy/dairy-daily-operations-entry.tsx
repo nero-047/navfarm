@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { InlineAlert } from "@/components/ui/alert";
 import { StatRow, StatCard } from "@/components/ui/stat-row";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 type Row = Record<string, any>;
 
@@ -19,8 +20,6 @@ function unwrap<T = any>(res: any): T {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (v: unknown) =>
-  `₹ ${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
  * Daily milking entry for a dairy herd.
@@ -38,6 +37,8 @@ const money = (v: unknown) =>
  * save shows the error instead of a tick.
  */
 export default function DairyDailyOperationsEntry() {
+  const { formatMoney } = useCompanyCurrency();
+  const money = (v: unknown) => formatMoney(Number(v || 0));
   const { t } = useLanguage();
   const router = useRouter();
   const companyId = getActiveCompanyId();
@@ -404,6 +405,8 @@ export default function DairyDailyOperationsEntry() {
 }
 
 function CostLine({ label, value }: { label: string; value: unknown }) {
+  const { formatMoney } = useCompanyCurrency();
+  const money = (v: unknown) => formatMoney(Number(v || 0));
   return (
     <div className="flex items-center justify-between">
       <span className="text-[var(--text-secondary)]">{label}</span>

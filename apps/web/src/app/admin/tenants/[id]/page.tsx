@@ -296,7 +296,7 @@ export default function TenantDetailPage() {
           <InfoRow label={t("admDbHost")}         value={`${tenant.db_host || "localhost"}:${tenant.db_port || 3306}`} />
           <InfoRow label={t("admDbName")}         value={tenant.db_name || "—"} />
           <InfoRow label={t("admBillingEmail")}   value={tenant.billing_email || "—"} />
-          <InfoRow label={t("admCreatedAt")}      value={tenant.created_at ? new Date(tenant.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"} />
+          <InfoRow label={t("admCreatedAt")}      value={tenant.created_at ? new Date(tenant.created_at).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" }) : "—"} />
         </div>
       </div>
 

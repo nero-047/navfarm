@@ -7,6 +7,7 @@ import { api } from "@/services/api-client";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 type Row = Record<string, any>;
 
@@ -25,8 +26,6 @@ function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
 }
 
-const money = (n: number) =>
-  `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
  * A variance is unfavourable when actual cost came in above standard. Positive
@@ -39,6 +38,8 @@ function varianceStyle(amount: number) {
 }
 
 export default function BatchCostVariancePanel() {
+  const { formatMoney } = useCompanyCurrency();
+  const money = (v: unknown) => formatMoney(Number(v || 0));
   const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [batchFilter, setBatchFilter] = useState("");

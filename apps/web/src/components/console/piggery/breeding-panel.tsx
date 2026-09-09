@@ -16,6 +16,7 @@ import { api } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 type Row = Record<string, any>;
 
@@ -37,6 +38,7 @@ const S = {
 };
 
 export function BreedingPanel() {
+  const { formatMoney } = useCompanyCurrency();
   const { t } = useLanguage();
   const [subTab, setSubTab] = useState<"mating" | "farrowing" | "semen">("mating");
   const [loading, setLoading] = useState(true);
@@ -628,7 +630,7 @@ export function BreedingPanel() {
                           {t("brpDosesCount", { count: s.doses_collected })}
                         </td>
                         <td className="py-3.5 px-4 font-mono text-xs" style={S.sub}>
-                          ₹{Number(s.running_cost_period || 0).toLocaleString()}
+                          {formatMoney(Number(s.running_cost_period || 0).toLocaleString())}
                         </td>
                         <td className="py-3.5 px-4 font-mono text-xs font-bold" style={S.success}>
                           {t("brpUnitCostPerDose", { cost: Number(s.unit_cost_per_dose || 0).toFixed(2) })}

@@ -284,18 +284,22 @@ export class TenantService {
           series_name: series.series_name,
           document_type: series.document_type,
           prefix: series.prefix || null,
-          date_format: series.date_format || null,
           separator: series.separator,
+          seq_separator: series.seq_separator || null,
           seq_length: series.seq_length,
           current_seq: 0,
           reset_frequency: series.reset_frequency,
           allow_manual: series.allow_manual ?? false,
+          code_segments: series.code_segments ?? null,
+          prefix_position: series.prefix_position ?? 'END',
         });
       }
 
       // Seed placeholder company to prevent foreign key errors for initial user registration
       const defaultLangId = masterLangs.find(l => l.is_system_default)?.lang_id || masterLangs[0]?.lang_id || '10000000-1000-1000-1000-100000000001';
-      const defaultCurrId = masterCurrs.find(c => c.is_system_default)?.currency_id || masterCurrs[0]?.currency_id || '20000000-2000-2000-2000-200000000001';
+      // USD by iso_code first — `masterCurrs[0]` is INR, which is only the
+      // first row of an unordered ISO reference list, not a default.
+      const defaultCurrId = masterCurrs.find(c => c.iso_code === 'USD')?.currency_id || masterCurrs.find(c => c.is_system_default)?.currency_id || masterCurrs[0]?.currency_id || '20000000-2000-2000-2000-200000000002';
       await tenantDb.insert(schema.companyMaster).values({
         company_id: '00000000-0000-0000-0000-000000000000',
         tenant_id: tenantId,
@@ -305,8 +309,8 @@ export class TenantService {
         industry_type: 'Poultry Farming',
         base_currency_id: defaultCurrId,
         default_language_id: defaultLangId,
-        default_timezone_id: 'Asia/Kolkata',
-        country_id: 'IND',
+        default_timezone_id: 'UTC',
+        country_id: 'ZWE',
         onboarding_status: 'PENDING',
         is_active: true,
       });

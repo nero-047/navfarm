@@ -11,6 +11,7 @@ import { InlineAlert } from "@/components/ui/alert";
 import { StatRow, StatCard } from "@/components/ui/stat-row";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 type Row = Record<string, any>;
 
@@ -30,13 +31,9 @@ const S = {
   success: { color: "var(--success)", borderColor: "var(--success)", backgroundColor: "var(--success-muted)" },
 };
 
-function formatCurrency(val?: number | string | null) {
-  if (val == null) return "₹0.00";
-  const num = Number(val);
-  return `₹${num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 export default function BioAssetRollForwardPanel() {
+  const { formatMoney } = useCompanyCurrency();
+  const formatCurrency = (val?: number | string | null) => formatMoney(val == null ? 0 : Number(val));
   const { t } = useLanguage();
   const companyId = getActiveCompanyId();
 

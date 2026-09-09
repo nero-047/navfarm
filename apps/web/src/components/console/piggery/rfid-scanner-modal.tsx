@@ -11,6 +11,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 type Row = Record<string, any>;
 
@@ -43,6 +44,7 @@ export default function RfidScannerModal({
   onAnimalUpdated,
   medItems,
 }: RfidScannerModalProps) {
+  const { formatMoney } = useCompanyCurrency();
   const { t } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -218,7 +220,7 @@ export default function RfidScannerModal({
                 <div className="text-right">
                   <p className="text-[10px] font-semibold uppercase tracking-wider" style={S.muted}>{t("rfmNetBookValue")}</p>
                   <p className="text-lg font-bold font-mono" style={S.primary}>
-                    ₹{animal.book_value ? Number(animal.book_value).toLocaleString("en-IN") : animal.acquisition_cost ? Number(animal.acquisition_cost).toLocaleString("en-IN") : "0"}
+                    {formatMoney(animal.book_value ? Number(animal.book_value) : animal.acquisition_cost ? Number(animal.acquisition_cost) : "0")}
                   </p>
                 </div>
               </div>

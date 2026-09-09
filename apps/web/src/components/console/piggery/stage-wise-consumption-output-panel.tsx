@@ -22,6 +22,7 @@ import { stageWindows } from "./build-lifecycle-stages";
 import { apportionToAnimal } from "./apportion-to-animal";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { AnimalMultiSelect, splitEvenly, type AnimalOption } from "../production/animal-multi-select";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 interface BatchProfile {
   id: string;
@@ -372,6 +373,7 @@ function buildStageProfile(b: any, txs: any[], stageLog: any[] = [], attachments
 }
 
 export default function StageWiseConsumptionOutputPanel() {
+  const { formatMoney } = useCompanyCurrency();
   const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
@@ -644,7 +646,7 @@ export default function StageWiseConsumptionOutputPanel() {
     setToastMsg("");
     setTimeout(() => {
       setRecalculating(false);
-      setToastMsg(`✓ Recomputed WIP: ₹ ${totalStageWipCost.toLocaleString("en-IN")} across ${durationDays} stage days (${avgAnimals} avg head).`);
+      setToastMsg(`✓ Recomputed WIP: ${formatMoney(totalStageWipCost)} across ${durationDays} stage days (${avgAnimals} avg head).`);
       setTimeout(() => setToastMsg(""), 4500);
     }, 600);
   };
@@ -898,7 +900,7 @@ export default function StageWiseConsumptionOutputPanel() {
         >
           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swFeedConsumed")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>
-            {totalFeedKg.toLocaleString("en-IN", { minimumFractionDigits: 1 })} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>KG</span>
+            {totalFeedKg.toLocaleString(undefined, { minimumFractionDigits: 1 })} <span className="text-xs font-normal" style={{ color: "var(--text-secondary)" }}>KG</span>
           </p>
         </div>
         <div
@@ -907,7 +909,7 @@ export default function StageWiseConsumptionOutputPanel() {
         >
           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("swMedCost")}</p>
           <p className="text-xl font-bold font-mono mt-1" style={{ color: "var(--text-primary)" }}>
-            ₹ {totalMedCost.toLocaleString("en-IN")}
+            {formatMoney(totalMedCost)}
           </p>
         </div>
         <div
@@ -990,8 +992,8 @@ export default function StageWiseConsumptionOutputPanel() {
                         <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-500">{f.consumed.toFixed(2)}</td>
                         <td className="px-3 py-2.5 text-right font-mono text-[var(--text-muted)]">{f.wastage.toFixed(2)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{closing.toFixed(2)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono">₹ {f.rate.toFixed(2)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatMoney(f.rate.toFixed(2))}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">{formatMoney(cost)}</td>
                       </tr>
                     );
                   })}
@@ -1001,7 +1003,7 @@ export default function StageWiseConsumptionOutputPanel() {
                     <td colSpan={5} className="py-2.5 px-2">{t("swStageFeedTotals")}</td>
                     <td className="px-3 py-2.5 text-right text-emerald-500 font-mono">{totalFeedKg.toFixed(2)} KG</td>
                     <td colSpan={3} className="py-2.5"></td>
-                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalFeedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">{formatMoney(totalFeedCost)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1032,14 +1034,14 @@ export default function StageWiseConsumptionOutputPanel() {
                       <td className="px-3 py-2.5 text-right font-mono">{m.issued}</td>
                       <td className="px-3 py-2.5 text-right font-mono font-bold text-blue-500">{m.consumed}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-[var(--text-muted)]">{m.wastage}</td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {m.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">{formatMoney(m.cost)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
                     <td colSpan={6} className="py-2.5 px-2">{t("swStageClinicalVaccineTotal")}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalMedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">{formatMoney(totalMedCost)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1072,9 +1074,9 @@ export default function StageWiseConsumptionOutputPanel() {
                         <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)]">{l.date || "—"}</td>
                         <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{l.resource}</td>
                         <td className="px-3 py-2.5 text-right font-mono font-bold">{l.hours} hrs</td>
-                        <td className="px-3 py-2.5 text-right font-mono">₹ {l.rate.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatMoney(l.rate.toFixed(2))}</td>
                         <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">
-                          ₹ {l.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          {formatMoney(l.cost)}
                         </td>
                       </tr>
                     ))
@@ -1084,7 +1086,7 @@ export default function StageWiseConsumptionOutputPanel() {
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
                     <td colSpan={5} className="py-2.5 px-2">{t("swTotalStageLabourCost")}</td>
                     <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">
-                      ₹ {totalLabourCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      {formatMoney(totalLabourCost)}
                     </td>
                   </tr>
                 </tfoot>
@@ -1117,9 +1119,9 @@ export default function StageWiseConsumptionOutputPanel() {
                         <td className="px-3 py-2.5 text-[var(--text-muted)]">{index + 1}</td>
                         <td className="px-3 py-2.5 font-semibold text-[var(--text-primary)]">{o.item}</td>
                         <td className="px-3 py-2.5 text-[var(--text-secondary)]">{o.basis}</td>
-                        <td className="px-3 py-2.5 text-right font-mono">₹ {o.rate.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatMoney(o.rate.toFixed(2))}</td>
                         <td className="px-3 py-2.5 text-right font-mono font-bold">{o.qty}</td>
-                        <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">₹ {o.cost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-[var(--text-primary)]">{formatMoney(o.cost)}</td>
                       </tr>
                     ))
                   )}
@@ -1127,7 +1129,7 @@ export default function StageWiseConsumptionOutputPanel() {
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border)] font-bold text-xs bg-[var(--surface-raised)]/60">
                     <td colSpan={5} className="py-2.5 px-2">{t("swTotalStageOverheads")}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">₹ {totalOverheadCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[var(--accent)]">{formatMoney(totalOverheadCost)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1315,23 +1317,23 @@ export default function StageWiseConsumptionOutputPanel() {
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-[var(--text-secondary)]">{t("swFeedNutrition")}</span>
-                    <span className="font-mono font-bold">₹ {totalFeedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalFeedCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
+                    <span className="font-mono font-bold">{formatMoney(totalFeedCost)} ({((totalFeedCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[var(--text-secondary)]">{t("swMedicineVaccine")}</span>
-                    <span className="font-mono font-bold">₹ {totalMedCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalMedCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
+                    <span className="font-mono font-bold">{formatMoney(totalMedCost)} ({((totalMedCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[var(--text-secondary)]">{t("swDirectFarmLabour")}</span>
-                    <span className="font-mono font-bold">₹ {totalLabourCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalLabourCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
+                    <span className="font-mono font-bold">{formatMoney(totalLabourCost)} ({((totalLabourCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[var(--text-secondary)]">{t("swDirectOverheads")}</span>
-                    <span className="font-mono font-bold">₹ {totalOverheadCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({((totalOverheadCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
+                    <span className="font-mono font-bold">{formatMoney(totalOverheadCost)} ({((totalOverheadCost / (totalStageWipCost || 1)) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="border-t pt-2 flex justify-between font-bold text-sm" style={{ borderColor: "var(--border)" }}>
                     <span>{t("swTotalStageWip")}</span>
-                    <span className="text-[var(--accent)] font-mono">₹ {totalStageWipCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    <span className="text-[var(--accent)] font-mono">{formatMoney(totalStageWipCost)}</span>
                   </div>
                 </div>
               </div>
@@ -1356,7 +1358,7 @@ export default function StageWiseConsumptionOutputPanel() {
                   </div>
                   <div className="border-t pt-2 flex justify-between font-bold text-sm text-emerald-600 dark:text-emerald-400" style={{ borderColor: "var(--border)" }}>
                     <span>{t("swCostPerAnimalDay")}</span>
-                    <span className="font-mono">₹ {costPerHeadDay} / head-day</span>
+                    <span className="font-mono">{formatMoney(costPerHeadDay)} / head-day</span>
                   </div>
                 </div>
               </div>

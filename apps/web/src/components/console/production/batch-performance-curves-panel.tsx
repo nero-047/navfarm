@@ -158,8 +158,8 @@ export default function BatchPerformanceCurvesPanel({
         <StatCard
           icon={Utensils}
           label={t("bpcTotalFeedIntake")}
-          value={summary.totalActFeedKg?.toLocaleString("en-IN") || 0}
-          unit={t("bpcFeedStdSuffix", { value: summary.totalStdFeedKg?.toLocaleString("en-IN") || 0 })}
+          value={summary.totalActFeedKg?.toLocaleString() || 0}
+          unit={t("bpcFeedStdSuffix", { value: summary.totalStdFeedKg?.toLocaleString() || 0 })}
           sub={
             <span className={summary.feedDeviationPct > 10 ? "text-(--warning)" : undefined}>
               {summary.feedDeviationPct > 0 ? `+${summary.feedDeviationPct}%` : `${summary.feedDeviationPct}%`} {t("bpcVarianceVsTarget")}

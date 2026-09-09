@@ -653,7 +653,13 @@ export class BatchService {
       const animalId = randomUUID();
       // Sequential, not Promise.all — generateNext row-locks the series and
       // must serialize to hand out distinct codes.
-      const animalCode = await this.numberSeriesService.generateNext('ANIMAL_PIGGERY', tenantId, companyId);
+      // Resolved, not hardcoded. This asked for ANIMAL_PIGGERY by name, which
+      // broke the moment the series was renamed to ANIMAL — resolveSeriesFor
+      // tries the LOB-specific ANIMAL_PIGGERY first and falls back to ANIMAL,
+      // so either naming works and a new LOB can still take its own series.
+      const animalSeries = await this.numberSeriesService.resolveSeriesFor('ANIMAL', 'PIGGERY', tenantId, companyId);
+      if (!animalSeries) throw new BadRequestException('No animal number series is configured for this workspace.');
+      const animalCode = await this.numberSeriesService.generateNext(animalSeries, tenantId, companyId);
       const cost = shares[i];
       await this.db.insert(schema.animalRegister).values({
         animal_id: animalId,
@@ -1042,7 +1048,7 @@ export class BatchService {
             documentNo: batch.batch_no,
             documentLineId: transactionId,
             postingDate: dto.transaction_date,
-            description: `${dto.output_type} removal impairment (at-cost ₹${atCostValue.toFixed(2)} vs NRV ₹${nrvValue.toFixed(2)}) — ${batch.batch_no}`,
+            description: `${dto.output_type} removal impairment (at-cost ${atCostValue.toFixed(2)} vs NRV ${nrvValue.toFixed(2)}) — ${batch.batch_no}`,
             nobId: batch.nob_id || undefined,
             lobId: batch.lob_id,
             stageId: batch.stage_id || undefined,
@@ -1628,7 +1634,7 @@ export class BatchService {
       const residual = totalCost - sumOfOutputValues - sumOfVariances;
       if (Math.abs(residual) > 0.01) {
         throw new BadRequestException(
-          `Batch cannot close — cost does not reconcile (₹${residual.toFixed(2)} unaccounted for). ` +
+          `Batch cannot close — cost does not reconcile (${residual.toFixed(2)} unaccounted for). ` +
           `This usually means a consumption transaction has no matching standard-cost line, or a standard rate is unset for an item that was consumed. Review the batch's transactions before retrying.`
         );
       }

@@ -11,6 +11,9 @@ import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { seedDefaultCompanyRoles } from '../role/default-role-seed';
 import { copyCompanyMasterTemplates } from './copy-master-templates';
 
+/** Seeded in bootstrap-database.ts. */
+const USD_CURRENCY_ID = '20000000-2000-2000-2000-200000000002';
+
 const toMysqlTimestamp = (date: Date = new Date()) =>
   date.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -144,7 +147,8 @@ export class CompanyService {
       langId = lang?.lang_id;
     }
     if (!isValidUuid(currId)) {
-      const [curr] = await this.db.select().from(schema.currencyMaster).limit(1);
+      // See auth.service: pick USD by iso_code, never the first row.
+      const [curr] = await this.db.select().from(schema.currencyMaster).where(eq(schema.currencyMaster.iso_code, 'USD')).limit(1);
       currId = curr?.currency_id;
     }
 
@@ -160,9 +164,9 @@ export class CompanyService {
         company_display_name: dto.company_display_name || dto.company_name,
         company_type: dto.company_type,
         industry_type: dto.industry_type,
-        base_currency_id: currId || '20000000-2000-2000-2000-200000000001',
+        base_currency_id: currId || '20000000-2000-2000-2000-200000000002',
         default_language_id: langId || '10000000-1000-1000-1000-100000000001',
-        default_timezone_id: dto.default_timezone_id || 'Asia/Kolkata',
+        default_timezone_id: dto.default_timezone_id || 'UTC',
         country_id: dto.country_id,
         registration_no: dto.registration_no || null,
         tax_id: dto.tax_id || null,
@@ -275,7 +279,10 @@ export class CompanyService {
       await tx.insert(schema.companyCurrencyConfig).values({
         curr_config_id: currConfigId,
         company_id: companyId,
-        currency_id: currId || '20000000-2000-2000-2000-200000000001',
+        // Was the Indian Rupee's id as a silent fallback, so a company created
+        // without naming a currency got ₹. USD per BBP-1 §1.1's field spec —
+        // the same section's flowchart says ZWL, which is Triple C's to settle.
+        currency_id: currId || USD_CURRENCY_ID,
         is_base: true,
         is_reporting: true,
         display_order: 1,

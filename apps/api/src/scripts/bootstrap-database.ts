@@ -27,6 +27,7 @@ const SYSTEM_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 const SYSTEM_COMPANY_ID = '00000000-0000-0000-0000-000000000000';
 const ENGLISH_ID = '10000000-1000-1000-1000-100000000001';
 const INR_ID = '20000000-2000-2000-2000-200000000001';
+const USD_ID = '20000000-2000-2000-2000-200000000002';
 
 const host = process.env.DATABASE_HOST || 'localhost';
 const port = Number(process.env.DATABASE_PORT || 3306);
@@ -159,12 +160,16 @@ export async function bootstrap() {
     }
 
     const currencies: Array<typeof master.currencyMaster.$inferInsert> = [
+      // No default currency. This table is a reference list of ISO currencies for
+      // company_currency_config and exchange_rate to point at — nothing else. A
+      // default here silently picked one, and the one it picked was the Indian
+      // Rupee on a Zimbabwe piggery. The base currency is a company setting;
+      // there is no system-wide answer to it. Rishi's call, 2026-09-09.
       {
         currency_id: INR_ID,
         iso_code: 'INR',
         currency_name: 'Indian Rupee',
         symbol: '₹',
-        is_system_default: true,
       },
       {
         currency_id: '20000000-2000-2000-2000-200000000002',
@@ -214,6 +219,7 @@ export async function bootstrap() {
       { tz_code: 'America/Sao_Paulo', tz_name: 'Brasilia Standard Time', utc_offset: '-03:00', offset_minutes: -180, is_dst: false },
       { tz_code: 'Australia/Sydney', tz_name: 'Australian Eastern Standard Time', utc_offset: '+10:00', offset_minutes: 600, is_dst: true },
       { tz_code: 'Africa/Johannesburg', tz_name: 'South Africa Standard Time', utc_offset: '+02:00', offset_minutes: 120, is_dst: false },
+      { tz_code: 'Africa/Harare', tz_name: 'Central Africa Time', utc_offset: '+02:00', offset_minutes: 120, is_dst: false },
       { tz_code: 'Africa/Lagos', tz_name: 'West Africa Time', utc_offset: '+01:00', offset_minutes: 60, is_dst: false },
     ].map((tz) => ({ ...tz, tz_id: randomUUID() }));
 
@@ -232,7 +238,7 @@ export async function bootstrap() {
       tzIdByCode.set(row.tz_code, row.tz_id);
     }
 
-    const usdId = '20000000-2000-2000-2000-200000000002';
+    const usdId = USD_ID;
     const countries: Array<typeof master.countryMaster.$inferInsert> = [
       { iso2: 'IN', iso3: 'IND', country_name: 'India', phone_code: '+91', default_tz_id: tzIdByCode.get('Asia/Kolkata'), default_currency_id: INR_ID, flag_emoji: '🇮🇳' },
       { iso2: 'US', iso3: 'USA', country_name: 'United States', phone_code: '+1', default_tz_id: tzIdByCode.get('America/New_York'), default_currency_id: usdId, flag_emoji: '🇺🇸' },
@@ -242,6 +248,7 @@ export async function bootstrap() {
       { iso2: 'CN', iso3: 'CHN', country_name: 'China', phone_code: '+86', default_tz_id: tzIdByCode.get('Asia/Shanghai'), flag_emoji: '🇨🇳' },
       { iso2: 'JP', iso3: 'JPN', country_name: 'Japan', phone_code: '+81', default_tz_id: tzIdByCode.get('Asia/Tokyo'), flag_emoji: '🇯🇵' },
       { iso2: 'AU', iso3: 'AUS', country_name: 'Australia', phone_code: '+61', default_tz_id: tzIdByCode.get('Australia/Sydney'), flag_emoji: '🇦🇺' },
+      { iso2: 'ZW', iso3: 'ZWE', country_name: 'Zimbabwe', phone_code: '+263', default_tz_id: tzIdByCode.get('Africa/Harare'), default_currency_id: usdId, flag_emoji: '🇿🇼' },
       { iso2: 'ZA', iso3: 'ZAF', country_name: 'South Africa', phone_code: '+27', default_tz_id: tzIdByCode.get('Africa/Johannesburg'), flag_emoji: '🇿🇦' },
       { iso2: 'NG', iso3: 'NGA', country_name: 'Nigeria', phone_code: '+234', default_tz_id: tzIdByCode.get('Africa/Lagos'), flag_emoji: '🇳🇬' },
       { iso2: 'DE', iso3: 'DEU', country_name: 'Germany', phone_code: '+49', default_tz_id: tzIdByCode.get('Europe/Paris'), flag_emoji: '🇩🇪' },
@@ -566,14 +573,23 @@ export async function bootstrap() {
         company_name: 'NAVFarm Platform Administration',
         company_type: 'Platform',
         industry_type: 'Administration',
-        base_currency_id: INR_ID,
+        base_currency_id: USD_ID,
         default_language_id: ENGLISH_ID,
-        default_timezone_id: 'Asia/Kolkata',
-        country_id: 'IND',
+        default_timezone_id: 'UTC',
+        country_id: 'ZWE',
         onboarding_status: 'COMPLETED',
       })
       .onDuplicateKeyUpdate({
-        set: { company_name: 'NAVFarm Platform Administration', is_active: true },
+        // Locale is bootstrap-owned. Without it in this set, a platform row
+        // created before the Indian defaults were removed keeps INR and
+        // Asia/Kolkata forever, because the insert always duplicate-keys.
+        set: {
+          company_name: 'NAVFarm Platform Administration',
+          base_currency_id: USD_ID,
+          default_timezone_id: 'UTC',
+          country_id: 'ZWE',
+          is_active: true,
+        },
       });
     const passwordHash = await bcrypt.hash(adminPassword, 12);
     await tenantDb

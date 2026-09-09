@@ -399,7 +399,7 @@ export function NotificationsPageShell({ activeChannel }: { activeChannel: Notif
                     <TableRow key={log.log_id || idx}>
                       <TableCell className="p-4 text-center font-mono" style={{ color: "var(--text-muted)" }}>{idx + 1}</TableCell>
                       <TableCell className="p-4 font-mono" style={{ color: "var(--text-muted)" }}>
-                        {new Date(log.sent_at).toLocaleString('en-IN', { hour12: true })}
+                        {new Date(log.sent_at).toLocaleString(undefined, { hour12: true })}
                       </TableCell>
                       <TableCell className="p-4">
                         {/* Channel is which pipe carried the message, not a

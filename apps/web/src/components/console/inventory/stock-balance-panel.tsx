@@ -7,6 +7,7 @@ import { InlineAlert } from "@/components/ui/alert";
 import { getActiveCompanyId } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 
 type Row = Record<string, any>;
 
@@ -31,6 +32,7 @@ function fmt(n: number) {
 }
 
 export default function StockBalancePanel() {
+  const { formatMoney } = useCompanyCurrency();
   const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [items, setItems] = useState<Row[]>([]);
@@ -96,7 +98,7 @@ export default function StockBalancePanel() {
         </div>
         <div>
           <dt className="nf-text-caption">{t("sbpTotalOnHandValue")}</dt>
-          <dd className="mt-0.5 text-xl font-semibold" style={S.primary}>₹{fmt(totalValue)}</dd>
+          <dd className="mt-0.5 text-xl font-semibold" style={S.primary}>{formatMoney(fmt(totalValue))}</dd>
         </div>
         <div>
           <dt className="nf-text-caption">{t("sbpAtBelowReorderLevel")}</dt>
@@ -155,7 +157,7 @@ export default function StockBalancePanel() {
                       <TableCell className="whitespace-nowrap" style={S.sub}>{row.warehouse_code ? `${row.warehouse_code} — ${row.warehouse_name}` : "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-right font-semibold" style={S.primary}>{fmt(row.on_hand_qty)}</TableCell>
                       <TableCell className="whitespace-nowrap" style={S.sub}>{row.uom}</TableCell>
-                      <TableCell className="whitespace-nowrap text-right" style={S.primary}>₹{fmt(row.on_hand_value)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right" style={S.primary}>{formatMoney(fmt(row.on_hand_value))}</TableCell>
                       <TableCell className="whitespace-nowrap text-right" style={S.sub}>{row.reorder_level != null ? fmt(row.reorder_level) : "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         {belowReorder ? (

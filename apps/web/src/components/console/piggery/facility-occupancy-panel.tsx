@@ -94,14 +94,14 @@ export default function FacilityOccupancyPanel() {
         <StatCard
           icon={Building2}
           label={t("fopTotalCapacity")}
-          value={totalCapacity > 0 ? totalCapacity.toLocaleString("en-IN") : "—"}
+          value={totalCapacity > 0 ? totalCapacity.toLocaleString() : "—"}
           unit={t("fopHead")}
           sub={t("fopConfiguredLocationsPens", { count: locations.length })}
         />
         <StatCard
           icon={Users}
           label={t("fopCurrentOccupancy")}
-          value={totalOccupied.toLocaleString("en-IN")}
+          value={totalOccupied.toLocaleString()}
           unit={t("fopHead")}
           sub={totalCapacity > 0 ? t("fopOverallUtilization", { pct: Math.round((totalOccupied / totalCapacity) * 100) }) : t("fopHeadcountActive")}
         />
