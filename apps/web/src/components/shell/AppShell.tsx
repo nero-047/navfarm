@@ -519,10 +519,23 @@ export function AppShell(props: AppShellProps) {
         </div>
 
         {/* Below the desktop breakpoint the drawer shows one level at a time.
-            At and above it, `lg:block` puts the main navigation back
+            At and above it, the `lg:` classes put the main navigation back
             unconditionally — desktop has room for both, and the sections render
-            in the workspace region rather than here. */}
-        <div className={showPrimaryNav ? "" : "hidden lg:block"}>
+            in the workspace region rather than here.
+
+            These wrappers must be flex children that pass the height
+            constraint through (`flex min-h-0 flex-1 flex-col`). The rail is a
+            flex column and `[data-shell-nav-scroll]` scrolls by way of
+            `flex: 1 1 auto; min-height: 0`, which only resolves against a flex
+            parent. A plain block wrapper here sizes to its content, so the nav
+            grew past the viewport instead of scrolling. */}
+        <div
+          className={
+            showPrimaryNav
+              ? "flex min-h-0 flex-1 flex-col"
+              : "hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+          }
+        >
           <PrimaryNav
             navItems={navItems}
             navSectionLabel={navSectionLabel}
@@ -546,7 +559,7 @@ export function AppShell(props: AppShellProps) {
             ContextNav's provider contract. */}
         {contextNav && (
           <div
-            className={showPrimaryNav ? "hidden" : "lg:hidden"}
+            className={showPrimaryNav ? "hidden" : "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain lg:hidden"}
             onClick={(event) => {
               const target = event.target as HTMLElement;
               if (target.closest("[data-context-nav-item], [data-menu-item]")) {
