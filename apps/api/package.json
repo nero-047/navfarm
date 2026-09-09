@@ -7,12 +7,18 @@
       "verify-demo-master-integrity": {
         "executor": "nx:run-commands",
         "cache": false,
-        "options": { "cwd": "apps/api", "command": "node --import tsx src/scripts/verify-demo-master-integrity.ts" }
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --import tsx src/scripts/verify-demo-master-integrity.ts"
+        }
       },
       "db-align-demo-bbp-masters": {
         "executor": "nx:run-commands",
         "cache": false,
-        "options": { "cwd": "apps/api", "command": "node --import tsx src/scripts/align-demo-bbp-masters.ts" }
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --import tsx src/scripts/align-demo-bbp-masters.ts"
+        }
       },
       "db-backfill-animal-age-at-entry": {
         "executor": "nx:run-commands",
@@ -22,28 +28,20 @@
           "command": "node --import tsx src/scripts/backfill-animal-age-at-entry.ts"
         }
       },
+      "db-reseed-number-series": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --import tsx src/scripts/reseed-number-series.ts"
+        }
+      },
       "db-align-stages-to-tdd": {
         "executor": "nx:run-commands",
         "cache": false,
         "options": {
           "cwd": "apps/api",
           "command": "node --import tsx src/scripts/align-stages-to-tdd.ts"
-        }
-      },
-      "db-seed-demo-breeding-chain": {
-        "executor": "nx:run-commands",
-        "cache": false,
-        "options": {
-          "cwd": "apps/api",
-          "command": "node --import tsx src/scripts/seed-demo-breeding-chain.ts"
-        }
-      },
-      "db-configure-demo-master-series": {
-        "executor": "nx:run-commands",
-        "cache": false,
-        "options": {
-          "cwd": "apps/api",
-          "command": "node --import tsx src/scripts/configure-demo-master-series.ts"
         }
       },
       "build": {
@@ -185,46 +183,11 @@
           "command": "drizzle-kit generate --config drizzle.config.ts"
         }
       },
-      "db-reset-bootstrap-faltu": {
-        "executor": "nx:run-commands",
-        "options": {
-          "cwd": "apps/api",
-          "command": "node --env-file-if-exists=.env --import tsx src/scripts/reset-and-bootstrap-faltu.ts"
-        }
-      },
       "db-seed-dev-tenant": {
         "executor": "nx:run-commands",
         "options": {
           "cwd": "apps/api",
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-dev-tenant.ts"
-        }
-      },
-      "db-seed-demo-data": {
-        "executor": "nx:run-commands",
-        "options": {
-          "cwd": "apps/api",
-          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-dev-demo-data.ts"
-        }
-      },
-      "db-seed-item-master-demo": {
-        "executor": "nx:run-commands",
-        "options": {
-          "cwd": "apps/api",
-          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-item-master-demo.ts"
-        }
-      },
-      "db-seed-demo-tenant": {
-        "executor": "nx:run-commands",
-        "options": {
-          "cwd": "apps/api",
-          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-demo-tenant.ts"
-        }
-      },
-      "db-seed-demo-full-flow": {
-        "executor": "nx:run-commands",
-        "options": {
-          "cwd": "apps/api",
-          "command": "node --env-file-if-exists=.env --import tsx src/scripts/seed-demo-full-flow.ts"
         }
       },
       "db-setup-dev": {

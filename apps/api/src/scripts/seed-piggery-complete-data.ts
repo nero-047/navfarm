@@ -3,6 +3,7 @@ import * as mysql from 'mysql2/promise';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { eq, and, inArray } from 'drizzle-orm';
 import * as schema from '../core/database/schema';
+import { seedLocation, type SeededLocation } from './lib/seed-location';
 
 const host = process.env.DATABASE_HOST || 'localhost';
 const port = Number(process.env.DATABASE_PORT || 3306);
@@ -32,14 +33,19 @@ export async function seedPiggeryData() {
     const company2 = companies.find((c) => c.company_code === 'HIGHLAND') || companies[1] || companies[0];
     const tenantId = company1.tenant_id;
 
-    // Users
-    const [tAdmin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.email, 'admin@apexagri.local')).limit(1);
-    const [c1Admin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.email, 'arjun.sharma@apexagri.local')).limit(1);
-    const [c2Admin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.email, 'vikram.singh@highlandpork.local')).limit(1);
+    // Users, by the scope they hold rather than by email. The emails moved when
+    // the demo was renamed to Triple C, and this fell back to the nil UUID —
+    // which is not a user, so every row created "by" it failed its foreign key
+    // with nothing to say why.
+    const [tAdmin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.user_type, 'TENANT_ADMIN')).limit(1);
+    const [c1Admin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.user_type, 'COMPANY_ADMIN')).limit(1);
+    const [opAdmin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.user_type, 'OPERATIONAL_ADMIN')).limit(1);
+    if (!tAdmin) throw new Error('No TENANT_ADMIN found — run the dev tenant seed first.');
 
-    const tAdminId = tAdmin?.user_id || '00000000-0000-0000-0000-000000000000';
+    const tAdminId = tAdmin.user_id;
     const c1AdminId = c1Admin?.user_id || tAdminId;
-    const c2AdminId = c2Admin?.user_id || tAdminId;
+    const c2AdminId = c1AdminId;
+    const opAdminId = opAdmin?.user_id || tAdminId;
 
     const [nob] = await db.select().from(schema.nobMaster).where(eq(schema.nobMaster.nob_code, 'LIVESTOCK')).limit(1);
     const [lob] = await db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_code, 'LVS_PIGGERY')).limit(1);
@@ -58,6 +64,19 @@ export async function seedPiggeryData() {
 
     const stages = await db.select().from(schema.stageMaster);
     const stageByCode = new Map(stages.map((s) => [s.stage_code, s]));
+    // Say which stage is missing. The stage master was realigned to the TDD
+    // once already, and this script kept asking for the old names — every fresh
+    // seed then died on `stage!.stage_id` with nothing to say what was wrong.
+    const stageOf = (code: string) => {
+      const found = stageByCode.get(code);
+      if (!found) {
+        throw new Error(
+          `Stage '${code}' is not in this tenant's stage master. Seeded stages: ${[...stageByCode.keys()].sort().join(', ')}. ` +
+          `The stage master was realigned to the TDD; update this script's stage codes to match.`
+        );
+      }
+      return found;
+    };
 
     console.log(`Context: Tenant ${tenantId}`);
     console.log(`  - Company 1: ${company1.company_name} (${company1.company_code})`);
@@ -100,46 +119,34 @@ export async function seedPiggeryData() {
     }
 
     // 1.2 Farm, Sheds & Pens
-    const [farm1] = await db.select().from(schema.farmMaster).where(eq(schema.farmMaster.company_id, comp1Id)).limit(1);
-    let farm1Id = farm1?.farm_id;
-    if (!farm1) {
-      farm1Id = randomUUID();
-      await db.insert(schema.farmMaster).values({
-        farm_id: farm1Id!, tenant_id: tenantId, company_id: comp1Id, farm_code: 'FARM-APEX-01', farm_name: 'Apex Nucleus Breeding Farm', farm_type: 'LIVESTOCK', capacity: 165, city: 'Karnal', state: 'Haryana', country: 'India',
-      });
-    } else {
-      // seed-dev-tenant creates the farm row first with only code/name/type, so
-      // fill in the operational detail rather than leaving it blank forever.
-      await db.update(schema.farmMaster).set({
-        farm_name: 'Apex Nucleus Breeding Farm', capacity: 165, city: 'Karnal', state: 'Haryana', country: 'India',
-      }).where(eq(schema.farmMaster.farm_id, farm1Id!));
-    }
+    // The farm is a LOCATION (location_type FARM), not a farm_master row.
+    // seed-dev-tenant already created it; reuse it rather than minting a
+    // second identity. This block used to insert straight into farm_master
+    // with a fresh randomUUID(), leaving a mirror with no location behind it.
+    const locCtx1 = { tenantId, companyId: comp1Id, nobId, lobId };
+    const farmLoc1 = await seedLocation(db, locCtx1, {
+      code: 'FARM-01', name: 'Triple C Farm', type: 'FARM', capacity: 165,
+    });
+    const farm1Id = farmLoc1.id;
 
     // Operational Area 1: APEX-BREED-01
-    const [area1] = await db.select().from(schema.operationalAreaMaster).where(and(eq(schema.operationalAreaMaster.company_id, comp1Id), eq(schema.operationalAreaMaster.area_code, 'APEX-BREED-01'))).limit(1);
-    let area1Id = area1?.area_id;
-    if (!area1) {
-      area1Id = randomUUID();
-      await db.insert(schema.operationalAreaMaster).values({
-        area_id: area1Id, tenant_id: tenantId, company_id: comp1Id, farm_id: farm1Id!, nob_id: nobId, lob_id: lobId, area_code: 'APEX-BREED-01', area_name: 'Apex Nucleus Breeding & Gestation Unit', description: 'Nucleus Swine Breeding, Boar Stud & AI Station, Farrowing Operations', preseed_source: 'TENANT', is_active: true, status: 'ACTIVE',
-      });
-    }
+    // The company's operational area, seeded by the dev tenant. This used to
+    // insert APEX-BREED-01 of its own, so a full chain produced three areas
+    // where the demo is meant to have one.
+    const [area1] = await db.select().from(schema.operationalAreaMaster)
+      .where(eq(schema.operationalAreaMaster.company_id, comp1Id)).limit(1);
+    if (!area1) throw new Error('No operational area for this company — run db-seed-dev-tenant first.');
+    const area1Id = area1.area_id;
 
     const shedConfigs1 = [
       { code: 'SHED-GEST-01', name: 'Breeding & Gestation Complex', type: 'GESTATION', cap: 71 },
       { code: 'SHED-FARR-02', name: 'Farrowing & Early Weaner Barn', type: 'FARROWING', cap: 94 },
     ];
-    const shedMap1 = new Map<string, string>();
+    const shedMap1 = new Map<string, SeededLocation>();
     for (const sc of shedConfigs1) {
-      const [existingShed] = await db.select().from(schema.shedMaster).where(and(eq(schema.shedMaster.company_id, comp1Id), eq(schema.shedMaster.shed_code, sc.code))).limit(1);
-      let sId = existingShed?.shed_id;
-      if (!existingShed) {
-        sId = randomUUID();
-        await db.insert(schema.shedMaster).values({ shed_id: sId!, tenant_id: tenantId, company_id: comp1Id, farm_id: farm1Id!, shed_code: sc.code, shed_name: sc.name, shed_type: sc.type, capacity: sc.cap });
-      } else {
-        await db.update(schema.shedMaster).set({ shed_name: sc.name, shed_type: sc.type, capacity: sc.cap }).where(eq(schema.shedMaster.shed_id, sId!));
-      }
-      shedMap1.set(sc.code, sId!);
+      shedMap1.set(sc.code, await seedLocation(db, locCtx1, {
+        code: sc.code, name: sc.name, type: 'SHED', parent: farmLoc1, subType: sc.type, capacity: sc.cap,
+      }));
     }
 
     const penConfigs1 = [
@@ -152,15 +159,14 @@ export async function seedPiggeryData() {
     ];
     const penMap1 = new Map<string, string>();
     for (const pc of penConfigs1) {
-      const [existingPen] = await db.select().from(schema.locationMaster).where(and(eq(schema.locationMaster.company_id, comp1Id), eq(schema.locationMaster.location_code, pc.code))).limit(1);
-      let pId = existingPen?.location_id;
-      if (!existingPen) {
-        pId = randomUUID();
-        await db.insert(schema.locationMaster).values({
-          location_id: pId, tenant_id: tenantId, company_id: comp1Id, farm_id: farm1Id, shed_id: shedMap1.get(pc.shedCode)!, nob_id: nobId, lob_id: lobId, location_code: pc.code, location_name: pc.name, location_level: 3, location_type: 'PEN', max_capacity: pc.cap.toString(), capacity_uom: pc.uom, last_cleaned_date: pc.cleaned, last_disinfected_date: pc.disinfected,
-        });
-      }
-      penMap1.set(pc.code, pId!);
+      // Parented to its shed, so location_level falls out of the depth instead
+      // of being hardcoded to 3 on every pen.
+      const pen = await seedLocation(db, locCtx1, {
+        code: pc.code, name: pc.name, type: 'PEN', parent: shedMap1.get(pc.shedCode)!,
+        capacity: pc.cap, capacityUom: pc.uom,
+        lastCleanedDate: pc.cleaned, lastDisinfectedDate: pc.disinfected,
+      });
+      penMap1.set(pc.code, pen.id);
     }
 
     // 1.3 Item Categories & Items for Company 1
@@ -276,13 +282,13 @@ export async function seedPiggeryData() {
           { paramCode: 'PARAM-FEED-QUAR-SOW',   stage: 'QUARANTINE',        periodNo: 1,  from: 1,   to: 30,  label: 'Quarantine Intake Ration',  occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '15.00', maxPct: '15.00', target: '1.5000' },
           { paramCode: 'PARAM-MORT-PIG',        stage: 'QUARANTINE',        periodNo: 2,  from: 1,   to: 30,  label: 'Quarantine Mortality',      occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null, maxPct: '1.00', target: '0.0000' },
           { paramCode: 'PARAM-FEED-GILT',       stage: 'GILT_GROWER',       periodNo: 3,  from: 31,  to: 107, label: 'Gilt Grower Ration',        occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.2000' },
-          { paramCode: 'PARAM-FEED-FLUSH',      stage: 'FLUSH_SERVICE',     periodNo: 4,  from: 108, to: 117, label: 'Flush Ration (Pre-Service)', occ: 'DAILY', qty: null, uom: 'KG',  kpi: true,  minPct: '8.00',  maxPct: '8.00',  target: '3.0000' },
-          { paramCode: 'PARAM-FEED-GEST-EARLY', stage: 'DRY_SOW_GESTATION', periodNo: 5,  from: 118, to: 147, label: 'Early Gestation',           occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.0000' },
-          { paramCode: 'PARAM-FEED-GEST-MID',   stage: 'DRY_SOW_GESTATION', periodNo: 6,  from: 148, to: 202, label: 'Mid Gestation',             occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.2000' },
-          { paramCode: 'PARAM-FEED-GEST-LATE',  stage: 'DRY_SOW_GESTATION', periodNo: 7,  from: 203, to: 227, label: 'Late Gestation',            occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.8000' },
-          { paramCode: 'PARAM-FEED-PREFARROW',  stage: 'DRY_SOW_GESTATION', periodNo: 8,  from: 228, to: 231, label: 'Pre-Farrow Transition',     occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.0000' },
-          { paramCode: 'PARAM-MORT-PIG',        stage: 'DRY_SOW_GESTATION', periodNo: 9,  from: 118, to: 231, label: 'Gestation Sow Mortality',   occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null, maxPct: '1.00', target: '0.0000' },
-          { paramCode: 'PARAM-MED-DEWORM',      stage: 'DRY_SOW_GESTATION', periodNo: 10, from: 170, to: 190, label: 'Mid-Gestation Deworming',   occ: 'DAILY', qty: null, uom: 'ML',   kpi: false, minPct: null, maxPct: null, target: '2.0000' },
+          { paramCode: 'PARAM-FEED-FLUSH',      stage: 'FLUSH',     periodNo: 4,  from: 108, to: 117, label: 'Flush Ration (Pre-Service)', occ: 'DAILY', qty: null, uom: 'KG',  kpi: true,  minPct: '8.00',  maxPct: '8.00',  target: '3.0000' },
+          { paramCode: 'PARAM-FEED-GEST-EARLY', stage: 'GESTATION', periodNo: 5,  from: 118, to: 147, label: 'Early Gestation',           occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.0000' },
+          { paramCode: 'PARAM-FEED-GEST-MID',   stage: 'GESTATION', periodNo: 6,  from: 148, to: 202, label: 'Mid Gestation',             occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.2000' },
+          { paramCode: 'PARAM-FEED-GEST-LATE',  stage: 'GESTATION', periodNo: 7,  from: 203, to: 227, label: 'Late Gestation',            occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.8000' },
+          { paramCode: 'PARAM-FEED-PREFARROW',  stage: 'GESTATION', periodNo: 8,  from: 228, to: 231, label: 'Pre-Farrow Transition',     occ: 'DAILY', qty: null, uom: 'KG',   kpi: true,  minPct: '10.00', maxPct: '10.00', target: '2.0000' },
+          { paramCode: 'PARAM-MORT-PIG',        stage: 'GESTATION', periodNo: 9,  from: 118, to: 231, label: 'Gestation Sow Mortality',   occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null, maxPct: '1.00', target: '0.0000' },
+          { paramCode: 'PARAM-MED-DEWORM',      stage: 'GESTATION', periodNo: 10, from: 170, to: 190, label: 'Mid-Gestation Deworming',   occ: 'DAILY', qty: null, uom: 'ML',   kpi: false, minPct: null, maxPct: null, target: '2.0000' },
           // Unscoped — tracked in every stage.
           { paramCode: 'PARAM-WATER-PIG',       stage: null,                periodNo: 11, from: 1,   to: 231, label: 'Water Intake (All Stages)', occ: 'DAILY', qty: null, uom: 'LTR',  kpi: false, minPct: null, maxPct: null, target: '15.0000' },
           { paramCode: 'PARAM-LABOUR-PIG',      stage: null,                periodNo: 12, from: 1,   to: 231, label: 'Direct Labour Hours',       occ: 'DAILY', qty: null, uom: 'HRS',  kpi: false, minPct: null, maxPct: null, target: '6.0000' },
@@ -297,8 +303,8 @@ export async function seedPiggeryData() {
         lines: [
           { paramCode: 'PARAM-FEED-QUAR-SOW',   stage: 'QUARANTINE',        periodNo: 1,  from: 1,   to: 30,  label: 'Quarantine Intake Ration',  occ: 'DAILY', qty: null, uom: 'KG',  kpi: true, minPct: '15.00', maxPct: '15.00', target: '1.5000' },
           { paramCode: 'PARAM-FEED-GILT',       stage: 'GILT_GROWER',       periodNo: 2,  from: 31,  to: 107, label: 'Gilt Grower Ration',        occ: 'DAILY', qty: null, uom: 'KG',  kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.2000' },
-          { paramCode: 'PARAM-FEED-FLUSH',      stage: 'FLUSH_SERVICE',     periodNo: 3,  from: 108, to: 117, label: 'Flush Ration (Pre-Service)', occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '8.00', maxPct: '8.00', target: '3.0000' },
-          { paramCode: 'PARAM-FEED-GEST-MID',   stage: 'DRY_SOW_GESTATION', periodNo: 4,  from: 118, to: 231, label: 'Gestation Ration',          occ: 'DAILY', qty: null, uom: 'KG',  kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.2000' },
+          { paramCode: 'PARAM-FEED-FLUSH',      stage: 'FLUSH',     periodNo: 3,  from: 108, to: 117, label: 'Flush Ration (Pre-Service)', occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '8.00', maxPct: '8.00', target: '3.0000' },
+          { paramCode: 'PARAM-FEED-GEST-MID',   stage: 'GESTATION', periodNo: 4,  from: 118, to: 231, label: 'Gestation Ration',          occ: 'DAILY', qty: null, uom: 'KG',  kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.2000' },
           { paramCode: 'PARAM-FEED-FARROW-DAY', stage: 'FARROWING',         periodNo: 5,  from: 232, to: 234, label: 'Farrowing Day Ration',      occ: 'DAILY', qty: null, uom: 'KG',  kpi: true, minPct: '15.00', maxPct: '15.00', target: '1.5000' },
           { paramCode: 'PARAM-MORT-PIG',        stage: 'FARROWING',         periodNo: 6,  from: 232, to: 234, label: 'Farrowing Losses',          occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null, maxPct: '2.00', target: '0.0000' },
           { paramCode: 'PARAM-FEED-LACT-EARLY', stage: 'LACTATION',         periodNo: 7,  from: 235, to: 241, label: 'Early Lactation',           occ: 'DAILY', qty: null, uom: 'KG',  kpi: true, minPct: '10.00', maxPct: '10.00', target: '4.0000' },
@@ -352,13 +358,13 @@ export async function seedPiggeryData() {
 
     // 1.5 Tagged Swine Herd Animals (15 Head)
     const animalConfigs1 = [
-      { code: 'PIG-2026-0001', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-001', rfid: '982000412880001', stage: 'DRY_SOW_GESTATION', parity: 2, born: 24, weaned: 22, cost: '28000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
+      { code: 'PIG-2026-0001', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-001', rfid: '982000412880001', stage: 'GESTATION', parity: 2, born: 24, weaned: 22, cost: '28000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
       { code: 'PIG-2026-0002', type: 'SOW', breed: landrace, gender: 'F', tag: 'SOW-LR-002', rfid: '982000412880002', stage: 'LACTATION', parity: 3, born: 36, weaned: 34, cost: '30000.0000', loc: 'PEN-FARR-01', status: 'LACTATING' },
-      { code: 'PIG-2026-0003', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-003', rfid: '982000412880003', stage: 'FLUSH_SERVICE', parity: 1, born: 12, weaned: 11, cost: '26000.0000', loc: 'PEN-AI-B2', status: 'ACTIVE' },
-      { code: 'PIG-2026-0004', type: 'SOW', breed: largeWhite, gender: 'F', tag: 'SOW-LW-004', rfid: '982000412880004', stage: 'DRY_SOW_GESTATION', parity: 4, born: 48, weaned: 44, cost: '31000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
+      { code: 'PIG-2026-0003', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-003', rfid: '982000412880003', stage: 'FLUSH', parity: 1, born: 12, weaned: 11, cost: '26000.0000', loc: 'PEN-AI-B2', status: 'ACTIVE' },
+      { code: 'PIG-2026-0004', type: 'SOW', breed: largeWhite, gender: 'F', tag: 'SOW-LW-004', rfid: '982000412880004', stage: 'GESTATION', parity: 4, born: 48, weaned: 44, cost: '31000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
       { code: 'PIG-2026-0005', type: 'SOW', breed: landrace, gender: 'F', tag: 'SOW-LR-005', rfid: '982000412880005', stage: 'LACTATION', parity: 2, born: 24, weaned: 23, cost: '27500.0000', loc: 'PEN-FARR-01', status: 'LACTATING' },
-      { code: 'PIG-2026-0006', type: 'SOW', breed: duroc, gender: 'F', tag: 'SOW-DR-006', rfid: '982000412880006', stage: 'DRY_SOW_GESTATION', parity: 1, born: 11, weaned: 10, cost: '29000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
-      { code: 'PIG-2026-0007', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-007', rfid: '982000412880007', stage: 'FLUSH_SERVICE', parity: 0, born: 0, weaned: 0, cost: '25000.0000', loc: 'PEN-AI-B2', status: 'ACTIVE' },
+      { code: 'PIG-2026-0006', type: 'SOW', breed: duroc, gender: 'F', tag: 'SOW-DR-006', rfid: '982000412880006', stage: 'GESTATION', parity: 1, born: 11, weaned: 10, cost: '29000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
+      { code: 'PIG-2026-0007', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-007', rfid: '982000412880007', stage: 'FLUSH', parity: 0, born: 0, weaned: 0, cost: '25000.0000', loc: 'PEN-AI-B2', status: 'ACTIVE' },
       { code: 'PIG-2026-0008', type: 'SOW', breed: landrace, gender: 'F', tag: 'SOW-LR-008', rfid: '982000412880008', stage: 'QUARANTINE', parity: 2, born: 22, weaned: 20, cost: '26000.0000', loc: 'PEN-QUAR-01', status: 'SICK' },
       { code: 'PIG-2026-0009', type: 'BOAR', breed: duroc, gender: 'M', tag: 'BOAR-DR-001', rfid: '982000412880009', stage: 'BOAR_AI', parity: 0, born: 0, weaned: 0, cost: '45000.0000', loc: 'PEN-BOAR-C1', status: 'ACTIVE' },
       { code: 'PIG-2026-0010', type: 'BOAR', breed: yorkshire, gender: 'M', tag: 'BOAR-YK-002', rfid: '982000412880010', stage: 'BOAR_AI', parity: 0, born: 0, weaned: 0, cost: '42000.0000', loc: 'PEN-BOAR-C1', status: 'ACTIVE' },
@@ -368,14 +374,14 @@ export async function seedPiggeryData() {
       { code: 'PIG-2026-0014', type: 'GILT', breed: duroc, gender: 'F', tag: 'GLT-DR-014', rfid: '982000412880014', stage: 'GILT_GROWER', parity: 0, born: 0, weaned: 0, cost: '18000.0000', loc: 'PEN-GEST-A1', status: 'ACTIVE' },
       { code: 'PIG-2026-0015', type: 'GILT', breed: yorkshire, gender: 'F', tag: 'GLT-YK-015', rfid: '982000412880015', stage: 'GILT_GROWER', parity: 0, born: 0, weaned: 0, cost: '18000.0000', loc: 'PEN-GEST-A1', status: 'ACTIVE' },
       // --- Batch PIG-BAT-2026-0001 working herd (in step with the batch) ---
-      { code: 'PIG-2026-0016', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-016', rfid: '982000412880016', stage: 'DRY_SOW_GESTATION', parity: 3, born: 34, weaned: 32, cost: '29500.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
-      { code: 'PIG-2026-0017', type: 'SOW', breed: landrace,  gender: 'F', tag: 'SOW-LR-017', rfid: '982000412880017', stage: 'DRY_SOW_GESTATION', parity: 2, born: 25, weaned: 24, cost: '28500.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
-      { code: 'PIG-2026-0018', type: 'SOW', breed: largeWhite, gender: 'F', tag: 'SOW-LW-018', rfid: '982000412880018', stage: 'DRY_SOW_GESTATION', parity: 5, born: 58, weaned: 53, cost: '31500.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
-      { code: 'PIG-2026-0019', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-019', rfid: '982000412880019', stage: 'DRY_SOW_GESTATION', parity: 1, born: 12, weaned: 11, cost: '27000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
-      { code: 'PIG-2026-0020', type: 'SOW', breed: duroc,     gender: 'F', tag: 'SOW-DR-020', rfid: '982000412880020', stage: 'DRY_SOW_GESTATION', parity: 2, born: 21, weaned: 20, cost: '29000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
+      { code: 'PIG-2026-0016', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-016', rfid: '982000412880016', stage: 'GESTATION', parity: 3, born: 34, weaned: 32, cost: '29500.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
+      { code: 'PIG-2026-0017', type: 'SOW', breed: landrace,  gender: 'F', tag: 'SOW-LR-017', rfid: '982000412880017', stage: 'GESTATION', parity: 2, born: 25, weaned: 24, cost: '28500.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
+      { code: 'PIG-2026-0018', type: 'SOW', breed: largeWhite, gender: 'F', tag: 'SOW-LW-018', rfid: '982000412880018', stage: 'GESTATION', parity: 5, born: 58, weaned: 53, cost: '31500.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
+      { code: 'PIG-2026-0019', type: 'SOW', breed: yorkshire, gender: 'F', tag: 'SOW-YK-019', rfid: '982000412880019', stage: 'GESTATION', parity: 1, born: 12, weaned: 11, cost: '27000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
+      { code: 'PIG-2026-0020', type: 'SOW', breed: duroc,     gender: 'F', tag: 'SOW-DR-020', rfid: '982000412880020', stage: 'GESTATION', parity: 2, born: 21, weaned: 20, cost: '29000.0000', loc: 'PEN-GEST-A1', status: 'PREGNANT' },
       // --- Same batch, held back: not ready to move with the rest ---
-      { code: 'PIG-2026-0021', type: 'SOW', breed: landrace,  gender: 'F', tag: 'SOW-LR-021', rfid: '982000412880021', stage: 'FLUSH_SERVICE', parity: 2, born: 23, weaned: 21, cost: '28000.0000', loc: 'PEN-AI-B2',   status: 'ACTIVE' },
-      { code: 'PIG-2026-0022', type: 'GILT', breed: yorkshire, gender: 'F', tag: 'GLT-YK-022', rfid: '982000412880022', stage: 'FLUSH_SERVICE', parity: 0, born: 0,  weaned: 0,  cost: '18500.0000', loc: 'PEN-AI-B2',   status: 'ACTIVE' },
+      { code: 'PIG-2026-0021', type: 'SOW', breed: landrace,  gender: 'F', tag: 'SOW-LR-021', rfid: '982000412880021', stage: 'FLUSH', parity: 2, born: 23, weaned: 21, cost: '28000.0000', loc: 'PEN-AI-B2',   status: 'ACTIVE' },
+      { code: 'PIG-2026-0022', type: 'GILT', breed: yorkshire, gender: 'F', tag: 'GLT-YK-022', rfid: '982000412880022', stage: 'FLUSH', parity: 0, born: 0,  weaned: 0,  cost: '18500.0000', loc: 'PEN-AI-B2',   status: 'ACTIVE' },
       { code: 'PIG-2026-0023', type: 'SOW', breed: duroc,     gender: 'F', tag: 'SOW-DR-023', rfid: '982000412880023', stage: 'QUARANTINE', parity: 3, born: 30, weaned: 27, cost: '29000.0000', loc: 'PEN-QUAR-01', status: 'SICK' },
       // --- Batch PIG-BAT-2026-0002 lactation herd ---
       { code: 'PIG-2026-0024', type: 'SOW', breed: landrace,  gender: 'F', tag: 'SOW-LR-024', rfid: '982000412880024', stage: 'LACTATION', parity: 4, born: 47, weaned: 44, cost: '30500.0000', loc: 'PEN-FARR-01', status: 'LACTATING' },
@@ -454,7 +460,7 @@ export async function seedPiggeryData() {
 
     // 1.7 Production Batches & 30-Day Daily Entries for Company 1
     const batches1 = [
-      { no: 'PIG-BAT-2026-0001', breed: yorkshire, costing: 'BIO_ASSET', stage: 'DRY_SOW_GESTATION', shedCode: 'SHED-GEST-01', penCode: 'PEN-GEST-A1', start: '2026-03-06', end: '2026-10-22', qty: '20.0000', status: 'ACTIVE', schedulerCode: 'SCHED-PIG-GEST-114', remarks: 'Yorkshire Parity 1-3 Breeding Gestation Cohort Alpha' },
+      { no: 'PIG-BAT-2026-0001', breed: yorkshire, costing: 'BIO_ASSET', stage: 'GESTATION', shedCode: 'SHED-GEST-01', penCode: 'PEN-GEST-A1', start: '2026-03-06', end: '2026-10-22', qty: '20.0000', status: 'ACTIVE', schedulerCode: 'SCHED-PIG-GEST-114', remarks: 'Yorkshire Parity 1-3 Breeding Gestation Cohort Alpha' },
       { no: 'PIG-BAT-2026-0002', breed: landrace, costing: 'BIO_ASSET', stage: 'LACTATION', shedCode: 'SHED-FARR-02', penCode: 'PEN-FARR-01', start: '2025-12-09', end: '2026-09-14', qty: '25.0000', status: 'ACTIVE', schedulerCode: 'SCHED-PIG-FARR-28', remarks: 'Farrowing Nursing Sows and Piglet Cohort Bravo' },
     ];
     for (const b of batches1) {
@@ -466,12 +472,12 @@ export async function seedPiggeryData() {
       if (!existingBatch) {
         batId = randomUUID();
         await db.insert(schema.batchHeader).values({
-          batch_id: batId, tenant_id: tenantId, company_id: comp1Id, nob_id: nobId, lob_id: lobId, batch_no: b.no, breed_id: b.breed.breed_id, scheduler_id: schedId || null, costing_method: b.costing, current_stage_code: b.stage, stage_id: stage!.stage_id, shed_id: shedMap1.get(b.shedCode)!, location_id: penMap1.get(b.penCode)!, start_date: b.start, expected_end_date: b.end, opening_quantity: b.qty, closing_quantity: b.qty, uom: 'HEAD', status: b.status, remarks: b.remarks, created_by: c1AdminId,
+          batch_id: batId, tenant_id: tenantId, company_id: comp1Id, nob_id: nobId, lob_id: lobId, batch_no: b.no, breed_id: b.breed.breed_id, scheduler_id: schedId || null, costing_method: b.costing, current_stage_code: b.stage, stage_id: stageOf(b.stage).stage_id, shed_id: shedMap1.get(b.shedCode)!.id, location_id: penMap1.get(b.penCode)!, start_date: b.start, expected_end_date: b.end, opening_quantity: b.qty, closing_quantity: b.qty, uom: 'HEAD', status: b.status, remarks: b.remarks, created_by: c1AdminId,
         });
 
-        const bioStage = b.stage === 'DRY_SOW_GESTATION' || b.stage === 'LACTATION' ? 'MATURE' : 'PREMATURE';
+        const bioStage = b.stage === 'GESTATION' || b.stage === 'LACTATION' ? 'PRODUCTIVE_SOW' : 'PREMATURE';
         await db.insert(schema.batchBioAssetState).values({
-          state_id: randomUUID(), batch_id: batId, stage: bioStage, current_quantity: b.qty, nca_book_value: bioStage === 'MATURE' ? (Number(b.qty) * 28000).toFixed(4) : '0.0000',
+          state_id: randomUUID(), batch_id: batId, stage: bioStage, current_quantity: b.qty, nca_book_value: bioStage === 'PRODUCTIVE_SOW' ? (Number(b.qty) * 28000).toFixed(4) : '0.0000',
         });
 
         // 30 days gestation feed
@@ -539,46 +545,36 @@ export async function seedPiggeryData() {
     }
 
     // 2.2 Farm, Sheds & Pens for Company 2
-    const [farm2] = await db.select().from(schema.farmMaster).where(eq(schema.farmMaster.company_id, comp2Id)).limit(1);
-    let farm2Id = farm2?.farm_id;
-    if (!farm2) {
-      farm2Id = randomUUID();
-      await db.insert(schema.farmMaster).values({
-        farm_id: farm2Id!, tenant_id: tenantId, company_id: comp2Id, farm_code: 'FARM-HIGH-01', farm_name: 'Highland Commercial Swine Facility', farm_type: 'LIVESTOCK', capacity: 360, city: 'Hisar', state: 'Haryana', country: 'India',
-      });
-    } else {
-      // seed-dev-tenant creates the farm row first with only code/name/type, so
-      // fill in the operational detail rather than leaving it blank forever.
-      await db.update(schema.farmMaster).set({
-        farm_name: 'Highland Commercial Swine Facility', capacity: 360, city: 'Hisar', state: 'Haryana', country: 'India',
-      }).where(eq(schema.farmMaster.farm_id, farm2Id!));
-    }
+    // Company 2's block previously did `select any farm for this company` and
+    // then UPDATEd its name — with a single-company demo that renamed Triple C's
+    // own farm to "Highland Commercial Swine Facility". Its sheds now hang off
+    // whichever farm this company actually has.
+    const locCtx2 = { tenantId, companyId: comp2Id, nobId, lobId };
+    const farmLoc2 = comp2Id === comp1Id
+      ? farmLoc1
+      : await seedLocation(db, locCtx2, {
+          code: 'FARM-HIGH-01', name: 'Highland Commercial Swine Facility', type: 'FARM', capacity: 360,
+        });
+    const farm2Id = farmLoc2.id;
 
     // Operational Area 2: HIGH-GROW-01
-    const [area2] = await db.select().from(schema.operationalAreaMaster).where(and(eq(schema.operationalAreaMaster.company_id, comp2Id), eq(schema.operationalAreaMaster.area_code, 'HIGH-GROW-01'))).limit(1);
-    let area2Id = area2?.area_id;
-    if (!area2) {
-      area2Id = randomUUID();
-      await db.insert(schema.operationalAreaMaster).values({
-        area_id: area2Id, tenant_id: tenantId, company_id: comp2Id, farm_id: farm2Id!, nob_id: nobId, lob_id: lobId, area_code: 'HIGH-GROW-01', area_name: 'Highland Grow-Finish Commercial Complex', description: 'Commercial Weaner-to-Grower Rearing, High-Density Porker Finishing & Meat Harvest', preseed_source: 'TENANT', is_active: true, status: 'ACTIVE',
-      });
-    }
+    // The company's operational area, seeded by the dev tenant. This used to
+    // insert HIGH-GROW-01 of its own, so a full chain produced three areas
+    // where the demo is meant to have one.
+    const [area2] = await db.select().from(schema.operationalAreaMaster)
+      .where(eq(schema.operationalAreaMaster.company_id, comp2Id)).limit(1);
+    if (!area2) throw new Error('No operational area for this company — run db-seed-dev-tenant first.');
+    const area2Id = area2.area_id;
 
     const shedConfigs2 = [
       { code: 'SHED-NURS-01', name: 'Commercial Weaner Nursery Barn', type: 'NURSERY', cap: 100 },
       { code: 'SHED-GROW-02', name: 'Commercial Grower & Finisher Facility', type: 'GROWER', cap: 260 },
     ];
-    const shedMap2 = new Map<string, string>();
+    const shedMap2 = new Map<string, SeededLocation>();
     for (const sc of shedConfigs2) {
-      const [existingShed] = await db.select().from(schema.shedMaster).where(and(eq(schema.shedMaster.company_id, comp2Id), eq(schema.shedMaster.shed_code, sc.code))).limit(1);
-      let sId = existingShed?.shed_id;
-      if (!existingShed) {
-        sId = randomUUID();
-        await db.insert(schema.shedMaster).values({ shed_id: sId!, tenant_id: tenantId, company_id: comp2Id, farm_id: farm2Id!, shed_code: sc.code, shed_name: sc.name, shed_type: sc.type, capacity: sc.cap });
-      } else {
-        await db.update(schema.shedMaster).set({ shed_name: sc.name, shed_type: sc.type, capacity: sc.cap }).where(eq(schema.shedMaster.shed_id, sId!));
-      }
-      shedMap2.set(sc.code, sId!);
+      shedMap2.set(sc.code, await seedLocation(db, locCtx2, {
+        code: sc.code, name: sc.name, type: 'SHED', parent: farmLoc2, subType: sc.type, capacity: sc.cap,
+      }));
     }
 
     const penConfigs2 = [
@@ -589,15 +585,12 @@ export async function seedPiggeryData() {
     ];
     const penMap2 = new Map<string, string>();
     for (const pc of penConfigs2) {
-      const [existingPen] = await db.select().from(schema.locationMaster).where(and(eq(schema.locationMaster.company_id, comp2Id), eq(schema.locationMaster.location_code, pc.code))).limit(1);
-      let pId = existingPen?.location_id;
-      if (!existingPen) {
-        pId = randomUUID();
-        await db.insert(schema.locationMaster).values({
-          location_id: pId, tenant_id: tenantId, company_id: comp2Id, farm_id: farm2Id, shed_id: shedMap2.get(pc.shedCode)!, nob_id: nobId, lob_id: lobId, location_code: pc.code, location_name: pc.name, location_level: 3, location_type: 'PEN', max_capacity: pc.cap.toString(), capacity_uom: pc.uom, last_cleaned_date: pc.cleaned, last_disinfected_date: pc.disinfected,
-        });
-      }
-      penMap2.set(pc.code, pId!);
+      const pen = await seedLocation(db, locCtx2, {
+        code: pc.code, name: pc.name, type: 'PEN', parent: shedMap2.get(pc.shedCode)!,
+        capacity: pc.cap, capacityUom: pc.uom,
+        lastCleanedDate: pc.cleaned, lastDisinfectedDate: pc.disinfected,
+      });
+      penMap2.set(pc.code, pen.id);
     }
 
     // 2.3 Item Categories & Items for Company 2
@@ -675,14 +668,14 @@ export async function seedPiggeryData() {
         lines: [
           { paramCode: 'PARAM-FEED-QUAR',       stage: 'QUARANTINE', periodNo: 1, from: 1,  to: 14, label: 'Quarantine Adaptation Ration', occ: 'DAILY', qty: null, uom: 'KG',   kpi: true, minPct: '15.00', maxPct: '15.00', target: '0.9000' },
           { paramCode: 'PARAM-MORT-PIG',    stage: 'QUARANTINE', periodNo: 2, from: 1,  to: 14, label: 'Quarantine Mortality Limit',   occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null,    maxPct: '3.00',  target: '0.0000' },
-          { paramCode: 'PARAM-FEED-NURSERY',    stage: 'CB_GROWER',  periodNo: 3, from: 15, to: 34, label: 'Nursery Weaner Adaptation',    occ: 'DAILY', qty: null, uom: 'KG',   kpi: true, minPct: '10.00', maxPct: '10.00', target: '1.2000' },
-          { paramCode: 'PARAM-FEED-GROW-EARLY', stage: 'CB_GROWER',  periodNo: 4, from: 35, to: 48, label: 'Early Grower Phase',           occ: 'DAILY', qty: null, uom: 'KG',   kpi: true, minPct: '10.00', maxPct: '10.00', target: '1.8000' },
-          { paramCode: 'PARAM-FEED-GROW-LATE',  stage: 'CB_GROWER',  periodNo: 5, from: 49, to: 60, label: 'Late Grower Phase',            occ: 'DAILY', qty: null, uom: 'KG',   kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.3000' },
-          { paramCode: 'PARAM-BODYWT-PIG',  stage: 'CB_GROWER',  periodNo: 6, from: 15, to: 60, label: 'Target Final Grower Weight (60kg)', occ: 'DAILY', qty: '60.00000000', uom: 'KG', kpi: true, minPct: '5.00', maxPct: '5.00', target: '60.0000' },
-          { paramCode: 'PARAM-MORT-PIG',    stage: 'CB_GROWER',  periodNo: 7, from: 15, to: 60, label: 'Grower Mortality Limit',       occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null,    maxPct: '1.50',  target: '0.0000' },
+          { paramCode: 'PARAM-FEED-NURSERY',    stage: 'GILT_GROWER',  periodNo: 3, from: 15, to: 34, label: 'Nursery Weaner Adaptation',    occ: 'DAILY', qty: null, uom: 'KG',   kpi: true, minPct: '10.00', maxPct: '10.00', target: '1.2000' },
+          { paramCode: 'PARAM-FEED-GROW-EARLY', stage: 'GILT_GROWER',  periodNo: 4, from: 35, to: 48, label: 'Early Grower Phase',           occ: 'DAILY', qty: null, uom: 'KG',   kpi: true, minPct: '10.00', maxPct: '10.00', target: '1.8000' },
+          { paramCode: 'PARAM-FEED-GROW-LATE',  stage: 'GILT_GROWER',  periodNo: 5, from: 49, to: 60, label: 'Late Grower Phase',            occ: 'DAILY', qty: null, uom: 'KG',   kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.3000' },
+          { paramCode: 'PARAM-BODYWT-PIG',  stage: 'GILT_GROWER',  periodNo: 6, from: 15, to: 60, label: 'Target Final Grower Weight (60kg)', occ: 'DAILY', qty: '60.00000000', uom: 'KG', kpi: true, minPct: '5.00', maxPct: '5.00', target: '60.0000' },
+          { paramCode: 'PARAM-MORT-PIG',    stage: 'GILT_GROWER',  periodNo: 7, from: 15, to: 60, label: 'Grower Mortality Limit',       occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null,    maxPct: '1.50',  target: '0.0000' },
           { paramCode: 'PARAM-LABOUR-PIG',      stage: null,         periodNo: 8, from: 1, to: 60, label: 'Direct Labour Hours',    occ: 'DAILY', qty: null, uom: 'HRS', kpi: false, minPct: null, maxPct: null, target: '8.0000' },
           { paramCode: 'PARAM-POWER-PIG',       stage: null,         periodNo: 9, from: 1, to: 60, label: 'Ventilation & Lighting', occ: 'DAILY', qty: null, uom: 'KWH', kpi: false, minPct: null, maxPct: null, target: '450.0000' },
-          { paramCode: 'PARAM-MED-DEWORM',      stage: 'CB_GROWER',  periodNo: 10, from: 20, to: 60, label: 'Grower Deworming Round', occ: 'DAILY', qty: null, uom: 'ML', kpi: false, minPct: null, maxPct: null, target: '2.0000' },
+          { paramCode: 'PARAM-MED-DEWORM',      stage: 'GILT_GROWER',  periodNo: 10, from: 20, to: 60, label: 'Grower Deworming Round', occ: 'DAILY', qty: null, uom: 'ML', kpi: false, minPct: null, maxPct: null, target: '2.0000' },
         ]
       },
       {
@@ -690,15 +683,15 @@ export async function seedPiggeryData() {
         code: 'SCHED-PIG-FIN-90', name: 'Finisher Grow-Out & Slaughter Schedule', durationValue: 137, breed: duroc, desc: 'Stage-scoped: 130-day finishing grow-out then the harvest window',
         lines: [
           { paramCode: 'PARAM-FEED-QUAR',       stage: 'QUARANTINE', periodNo: 10, from: 1, to: 14, label: 'Intake Quarantine Ration',   occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '15.00', maxPct: '15.00', target: '0.9000' },
-          { paramCode: 'PARAM-FEED-FIN-1',      stage: 'CB_GROWER', periodNo: 1, from: 15,  to: 60,  label: 'Finisher Phase 1',            occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.5000' },
-          { paramCode: 'PARAM-FEED-FIN-2',      stage: 'CB_GROWER', periodNo: 2, from: 61,  to: 100, label: 'Finisher Phase 2',            occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.9000' },
-          { paramCode: 'PARAM-FEED-FIN-MKT',    stage: 'CB_GROWER', periodNo: 3, from: 101, to: 130, label: 'Market Finishing Phase',      occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '10.00', maxPct: '10.00', target: '3.2000' },
-          { paramCode: 'PARAM-BODYWT-PIG',  stage: 'CB_GROWER', periodNo: 4, from: 1,   to: 130, label: 'Target Market Weight (110kg)', occ: 'DAILY', qty: '110.00000000', uom: 'KG', kpi: true, minPct: '5.00', maxPct: '5.00', target: '110.0000' },
-          { paramCode: 'PARAM-MORT-PIG',    stage: 'CB_GROWER', periodNo: 5, from: 1,   to: 130, label: 'Finisher Mortality Limit',    occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null, maxPct: '2.00', target: '0.0000' },
-          { paramCode: 'PARAM-PORK-OUTPUT', stage: 'SLAUGHTER', periodNo: 6, from: 131, to: 137, label: 'Dressed Carcass Harvest Yield', occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '5.00', maxPct: '5.00', target: '85.0000' },
+          { paramCode: 'PARAM-FEED-FIN-1',      stage: 'GILT_GROWER', periodNo: 1, from: 15,  to: 60,  label: 'Finisher Phase 1',            occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.5000' },
+          { paramCode: 'PARAM-FEED-FIN-2',      stage: 'GILT_GROWER', periodNo: 2, from: 61,  to: 100, label: 'Finisher Phase 2',            occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '10.00', maxPct: '10.00', target: '2.9000' },
+          { paramCode: 'PARAM-FEED-FIN-MKT',    stage: 'GILT_GROWER', periodNo: 3, from: 101, to: 130, label: 'Market Finishing Phase',      occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '10.00', maxPct: '10.00', target: '3.2000' },
+          { paramCode: 'PARAM-BODYWT-PIG',  stage: 'GILT_GROWER', periodNo: 4, from: 1,   to: 130, label: 'Target Market Weight (110kg)', occ: 'DAILY', qty: '110.00000000', uom: 'KG', kpi: true, minPct: '5.00', maxPct: '5.00', target: '110.0000' },
+          { paramCode: 'PARAM-MORT-PIG',    stage: 'GILT_GROWER', periodNo: 5, from: 1,   to: 130, label: 'Finisher Mortality Limit',    occ: 'DAILY', qty: '0.00000000', uom: 'HEAD', kpi: true, minPct: null, maxPct: '2.00', target: '0.0000' },
+          { paramCode: 'PARAM-PORK-OUTPUT', stage: 'SLAUGHTERED', periodNo: 6, from: 131, to: 137, label: 'Dressed Carcass Harvest Yield', occ: 'DAILY', qty: null, uom: 'KG', kpi: true, minPct: '5.00', maxPct: '5.00', target: '85.0000' },
           { paramCode: 'PARAM-LABOUR-PIG',      stage: null,        periodNo: 7, from: 1, to: 137, label: 'Direct Labour Hours',    occ: 'DAILY', qty: null, uom: 'HRS', kpi: false, minPct: null, maxPct: null, target: '8.0000' },
           { paramCode: 'PARAM-POWER-PIG',       stage: null,        periodNo: 8, from: 1, to: 137, label: 'Ventilation & Lighting', occ: 'DAILY', qty: null, uom: 'KWH', kpi: false, minPct: null, maxPct: null, target: '450.0000' },
-          { paramCode: 'PARAM-MED-DEWORM',      stage: 'CB_GROWER', periodNo: 9, from: 30, to: 130, label: 'Finisher Deworming Round', occ: 'DAILY', qty: null, uom: 'ML', kpi: false, minPct: null, maxPct: null, target: '2.0000' },
+          { paramCode: 'PARAM-MED-DEWORM',      stage: 'GILT_GROWER', periodNo: 9, from: 30, to: 130, label: 'Finisher Deworming Round', occ: 'DAILY', qty: null, uom: 'ML', kpi: false, minPct: null, maxPct: null, target: '2.0000' },
         ]
       }
     ];
@@ -740,8 +733,8 @@ export async function seedPiggeryData() {
 
     // 2.5 Production Batches & 30-Day Daily Entries for Company 2
     const batches2 = [
-      { no: 'PIG-BAT-2026-0101', breed: duroc, costing: 'STANDARD', stage: 'CB_GROWER', shedCode: 'SHED-GROW-02', penCode: 'PEN-GROW-02', start: '2026-07-15', end: '2026-11-15', qty: '120.0000', status: 'ACTIVE', schedulerCode: 'SCHED-PIG-GROW-60', remarks: 'Highland Commercial Finisher Porker Cohort 101' },
-      { no: 'PIG-BAT-2026-0102', breed: duroc, costing: 'STANDARD', stage: 'SLAUGHTER', shedCode: 'SHED-GROW-02', penCode: 'PEN-FIN-03', start: '2026-03-01', end: '2026-07-15', qty: '100.0000', status: 'ACTIVE', schedulerCode: 'SCHED-PIG-FIN-90', remarks: 'Finished porkers at slaughter weight — ready to close and post standard-cost variances' },
+      { no: 'PIG-BAT-2026-0101', breed: duroc, costing: 'STANDARD', stage: 'GILT_GROWER', shedCode: 'SHED-GROW-02', penCode: 'PEN-GROW-02', start: '2026-07-15', end: '2026-11-15', qty: '120.0000', status: 'ACTIVE', schedulerCode: 'SCHED-PIG-GROW-60', remarks: 'Highland Commercial Finisher Porker Cohort 101' },
+      { no: 'PIG-BAT-2026-0102', breed: duroc, costing: 'STANDARD', stage: 'SLAUGHTERED', shedCode: 'SHED-GROW-02', penCode: 'PEN-FIN-03', start: '2026-03-01', end: '2026-07-15', qty: '100.0000', status: 'ACTIVE', schedulerCode: 'SCHED-PIG-FIN-90', remarks: 'Finished porkers at slaughter weight — ready to close and post standard-cost variances' },
     ];
     for (const b of batches2) {
       const [existingBatch] = await db.select().from(schema.batchHeader).where(and(eq(schema.batchHeader.company_id, comp2Id), eq(schema.batchHeader.batch_no, b.no))).limit(1);
@@ -752,7 +745,7 @@ export async function seedPiggeryData() {
       if (!existingBatch) {
         batId = randomUUID();
         await db.insert(schema.batchHeader).values({
-          batch_id: batId, tenant_id: tenantId, company_id: comp2Id, nob_id: nobId, lob_id: lobId, batch_no: b.no, breed_id: b.breed.breed_id, scheduler_id: schedId || null, costing_method: b.costing, current_stage_code: b.stage, stage_id: stage!.stage_id, shed_id: shedMap2.get(b.shedCode)!, location_id: penMap2.get(b.penCode)!, start_date: b.start, expected_end_date: b.end, opening_quantity: b.qty, closing_quantity: b.status === 'CLOSED' ? '98.0000' : b.qty, uom: 'HEAD', status: b.status, remarks: b.remarks, created_by: c2AdminId,
+          batch_id: batId, tenant_id: tenantId, company_id: comp2Id, nob_id: nobId, lob_id: lobId, batch_no: b.no, breed_id: b.breed.breed_id, scheduler_id: schedId || null, costing_method: b.costing, current_stage_code: b.stage, stage_id: stageOf(b.stage).stage_id, shed_id: shedMap2.get(b.shedCode)!.id, location_id: penMap2.get(b.penCode)!, start_date: b.start, expected_end_date: b.end, opening_quantity: b.qty, closing_quantity: b.status === 'CLOSED' ? '98.0000' : b.qty, uom: 'HEAD', status: b.status, remarks: b.remarks, created_by: c2AdminId,
         });
 
         // Multi-day grower feeding transactions
@@ -802,7 +795,7 @@ export async function seedPiggeryData() {
     const userAreaMap = [
       { userId: tAdminId, areaId: area1Id!, companyId: comp1Id, isPrimary: true },
       { userId: tAdminId, areaId: area2Id!, companyId: comp2Id, isPrimary: false },
-      { userId: c1AdminId, areaId: area1Id!, companyId: comp1Id, isPrimary: true },
+      { userId: opAdminId, areaId: area1Id!, companyId: comp1Id, isPrimary: true },
       { userId: c2AdminId, areaId: area2Id!, companyId: comp2Id, isPrimary: true },
     ];
     for (const uaa of userAreaMap) {
@@ -856,8 +849,8 @@ export async function seedPiggeryData() {
         legs: [
           { stage: 'QUARANTINE', from: 1, pen: 'PEN-QUAR-01' },
           { stage: 'GILT_GROWER', from: 31, pen: 'PEN-GEST-A1' },
-          { stage: 'FLUSH_SERVICE', from: 108, pen: 'PEN-AI-B2' },
-          { stage: 'DRY_SOW_GESTATION', from: 118, pen: 'PEN-GEST-A1' },
+          { stage: 'FLUSH', from: 108, pen: 'PEN-AI-B2' },
+          { stage: 'GESTATION', from: 118, pen: 'PEN-GEST-A1' },
         ],
         records: [
           { day: 3,  type: 'CONSUMPTION', itemCode: 'FEED-GEST-SOW', qty: '60.0000', uom: 'KG', rate: '28.000000', note: 'Flush ration 3.0 kg/head — stimulating ovulation before service' },
@@ -873,8 +866,8 @@ export async function seedPiggeryData() {
         legs: [
           { stage: 'QUARANTINE', from: 1, pen: 'PEN-QUAR-01' },
           { stage: 'GILT_GROWER', from: 31, pen: 'PEN-GEST-A1' },
-          { stage: 'FLUSH_SERVICE', from: 108, pen: 'PEN-AI-B2' },
-          { stage: 'DRY_SOW_GESTATION', from: 118, pen: 'PEN-GEST-A1' },
+          { stage: 'FLUSH', from: 108, pen: 'PEN-AI-B2' },
+          { stage: 'GESTATION', from: 118, pen: 'PEN-GEST-A1' },
           { stage: 'FARROWING', from: 232, pen: 'PEN-FARR-01' },
           { stage: 'LACTATION', from: 235, pen: 'PEN-FARR-01' },
         ],
@@ -891,7 +884,7 @@ export async function seedPiggeryData() {
         penMap: penMap2, itemMap: itemMap2,
         legs: [
           { stage: 'QUARANTINE', from: 1, pen: 'PEN-QUAR-02' },
-          { stage: 'CB_GROWER', from: 15, pen: 'PEN-GROW-02' },
+          { stage: 'GILT_GROWER', from: 15, pen: 'PEN-GROW-02' },
         ],
         records: [
           { day: 4,  type: 'CONSUMPTION', itemCode: 'FEED-WEAN-GROW', qty: '108.0000', uom: 'KG',  rate: '38.000000', note: 'Quarantine adaptation ration 0.9 kg/head' },
@@ -906,8 +899,8 @@ export async function seedPiggeryData() {
         penMap: penMap2, itemMap: itemMap2,
         legs: [
           { stage: 'QUARANTINE', from: 1, pen: 'PEN-QUAR-02' },
-          { stage: 'CB_GROWER', from: 15, pen: 'PEN-GROW-02' },
-          { stage: 'SLAUGHTER', from: 131, pen: 'PEN-FIN-03' },
+          { stage: 'GILT_GROWER', from: 15, pen: 'PEN-GROW-02' },
+          { stage: 'SLAUGHTERED', from: 131, pen: 'PEN-FIN-03' },
         ],
         records: [
           { day: 30,  type: 'CONSUMPTION', itemCode: 'FEED-FINISHER', qty: '250.0000', uom: 'KG',  rate: '41.000000', note: 'Finisher phase 1 ration 2.5 kg/head' },
@@ -1017,19 +1010,19 @@ export async function seedPiggeryData() {
     // animals that were in step, leaving these behind.
     const membership: Array<{ code: string; batchNo: string; stage: string; pen: string }> = [
       // PIG-BAT-2026-0001 — in step at DRY_SOW_GESTATION in the gestation stalls
-      { code: 'PIG-2026-0001', batchNo: 'PIG-BAT-2026-0001', stage: 'DRY_SOW_GESTATION', pen: 'PEN-GEST-A1' },
-      { code: 'PIG-2026-0004', batchNo: 'PIG-BAT-2026-0001', stage: 'DRY_SOW_GESTATION', pen: 'PEN-GEST-A1' },
-      { code: 'PIG-2026-0016', batchNo: 'PIG-BAT-2026-0001', stage: 'DRY_SOW_GESTATION', pen: 'PEN-GEST-A1' },
-      { code: 'PIG-2026-0017', batchNo: 'PIG-BAT-2026-0001', stage: 'DRY_SOW_GESTATION', pen: 'PEN-GEST-A1' },
-      { code: 'PIG-2026-0018', batchNo: 'PIG-BAT-2026-0001', stage: 'DRY_SOW_GESTATION', pen: 'PEN-GEST-A1' },
-      { code: 'PIG-2026-0019', batchNo: 'PIG-BAT-2026-0001', stage: 'DRY_SOW_GESTATION', pen: 'PEN-GEST-A1' },
-      { code: 'PIG-2026-0020', batchNo: 'PIG-BAT-2026-0001', stage: 'DRY_SOW_GESTATION', pen: 'PEN-GEST-A1' },
-      { code: 'PIG-2026-0011', batchNo: 'PIG-BAT-2026-0001', stage: 'DRY_SOW_GESTATION', pen: 'PEN-GEST-A1' },
+      { code: 'PIG-2026-0001', batchNo: 'PIG-BAT-2026-0001', stage: 'GESTATION', pen: 'PEN-GEST-A1' },
+      { code: 'PIG-2026-0004', batchNo: 'PIG-BAT-2026-0001', stage: 'GESTATION', pen: 'PEN-GEST-A1' },
+      { code: 'PIG-2026-0016', batchNo: 'PIG-BAT-2026-0001', stage: 'GESTATION', pen: 'PEN-GEST-A1' },
+      { code: 'PIG-2026-0017', batchNo: 'PIG-BAT-2026-0001', stage: 'GESTATION', pen: 'PEN-GEST-A1' },
+      { code: 'PIG-2026-0018', batchNo: 'PIG-BAT-2026-0001', stage: 'GESTATION', pen: 'PEN-GEST-A1' },
+      { code: 'PIG-2026-0019', batchNo: 'PIG-BAT-2026-0001', stage: 'GESTATION', pen: 'PEN-GEST-A1' },
+      { code: 'PIG-2026-0020', batchNo: 'PIG-BAT-2026-0001', stage: 'GESTATION', pen: 'PEN-GEST-A1' },
+      { code: 'PIG-2026-0011', batchNo: 'PIG-BAT-2026-0001', stage: 'GESTATION', pen: 'PEN-GEST-A1' },
       // PIG-BAT-2026-0001 — SAME BATCH, different stage, different pen.
       // Two failed the day-35 scan and sit back in the service bay awaiting
       // re-breeding; one is in the isolation pen under treatment.
-      { code: 'PIG-2026-0021', batchNo: 'PIG-BAT-2026-0001', stage: 'FLUSH_SERVICE',  pen: 'PEN-AI-B2' },
-      { code: 'PIG-2026-0022', batchNo: 'PIG-BAT-2026-0001', stage: 'FLUSH_SERVICE',  pen: 'PEN-AI-B2' },
+      { code: 'PIG-2026-0021', batchNo: 'PIG-BAT-2026-0001', stage: 'FLUSH',  pen: 'PEN-AI-B2' },
+      { code: 'PIG-2026-0022', batchNo: 'PIG-BAT-2026-0001', stage: 'FLUSH',  pen: 'PEN-AI-B2' },
       { code: 'PIG-2026-0023', batchNo: 'PIG-BAT-2026-0001', stage: 'QUARANTINE',     pen: 'PEN-QUAR-01' },
       // PIG-BAT-2026-0002 — in step at LACTATION in the farrowing crates
       { code: 'PIG-2026-0002', batchNo: 'PIG-BAT-2026-0002', stage: 'LACTATION', pen: 'PEN-FARR-01' },
@@ -1051,7 +1044,7 @@ export async function seedPiggeryData() {
       .where(and(eq(schema.batchHeader.company_id, comp1Id), eq(schema.batchHeader.batch_no, 'PIG-BAT-2026-0002'))).limit(1);
 
     if (gestBatch && lactBatch) {
-      const flushStage = stageByCode.get('FLUSH_SERVICE');
+      const flushStage = stageByCode.get('FLUSH');
       const batchByNo = new Map([[gestBatch.batch_no, gestBatch], [lactBatch.batch_no, lactBatch]]);
 
       for (const m of membership) {
@@ -1086,8 +1079,8 @@ export async function seedPiggeryData() {
           // The hold group IS a split of the gestation cohort — without this link
           // the console can't mark it as one, and the two read as unrelated batches.
           parent_batch_id: cohortBatchId ?? null,
-          costing_method: 'BIO_ASSET', current_stage_code: 'FLUSH_SERVICE', stage_id: flushStage?.stage_id,
-          shed_id: shedMap1.get('SHED-GEST-01')!, location_id: penMap1.get('PEN-AI-B2')!,
+          costing_method: 'BIO_ASSET', current_stage_code: 'FLUSH', stage_id: flushStage?.stage_id,
+          shed_id: shedMap1.get('SHED-GEST-01')!.id, location_id: penMap1.get('PEN-AI-B2')!,
           sub_location_id: penMap1.get('PEN-AI-B2')!,
           start_date: '2026-03-06', expected_end_date: '2026-12-05',
           opening_quantity: '2.0000', closing_quantity: '2.0000', uom: 'HEAD', status: 'ACTIVE',
@@ -1095,7 +1088,7 @@ export async function seedPiggeryData() {
           created_by: c1AdminId,
         });
         await db.insert(schema.batchBioAssetState).values({
-          state_id: randomUUID(), batch_id: holdBatchId, stage: 'MATURE',
+          state_id: randomUUID(), batch_id: holdBatchId, stage: 'PRODUCTIVE_SOW',
           current_quantity: '2.0000', nca_book_value: '47000.0000',
         });
       } else if (!holdBatch.parent_batch_id && cohortBatchId) {
@@ -1110,9 +1103,9 @@ export async function seedPiggeryData() {
       const holdLegs: Array<{ stage: string; on: string; pen: string }> = [
         { stage: 'QUARANTINE', on: '2026-03-06', pen: 'PEN-QUAR-01' },
         { stage: 'GILT_GROWER', on: '2026-04-05', pen: 'PEN-GEST-A1' },
-        { stage: 'FLUSH_SERVICE', on: '2026-06-21', pen: 'PEN-AI-B2' },
-        { stage: 'DRY_SOW_GESTATION', on: '2026-07-01', pen: 'PEN-GEST-A1' },
-        { stage: 'FLUSH_SERVICE', on: splitDate, pen: 'PEN-AI-B2' },
+        { stage: 'FLUSH', on: '2026-06-21', pen: 'PEN-AI-B2' },
+        { stage: 'GESTATION', on: '2026-07-01', pen: 'PEN-GEST-A1' },
+        { stage: 'FLUSH', on: splitDate, pen: 'PEN-AI-B2' },
       ];
       for (let i = 1; i < holdLegs.length; i++) {
         const prev = holdLegs[i - 1];
@@ -1209,7 +1202,7 @@ export async function seedPiggeryData() {
     console.log('  - 2 Schedulers (60-Day Grower, 90-Day Porker Finisher)');
     console.log('  - 2 Batches (Active Commercial Grower & Closed Finisher)');
     console.log('  - 30-Day Grower Feeding Stream, Mortality, 4 Weekly Weight Curves');
-    console.log('  - Harvest Sale Transaction (₹12,15,200)\n');
+    console.log('  - Harvest Sale Transaction (1,215,200)\n');
   } finally {
     await pool.end();
   }

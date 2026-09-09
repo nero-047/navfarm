@@ -144,10 +144,10 @@ export async function seedDemoGaps() {
     await run('Resources & maintenance', async () => {
       for (const { c, tag } of perCompany) {
         const rows = [
-          { code: `RES-${tag}-LAB01`, name: 'Farm Operations Crew (6 hands)', type: 'LABOUR', sub: 'PERMANENT', rate: 550, unit: 'HOUR', cap: 6, desig: 'Stockperson' },
-          { code: `RES-${tag}-LAB02`, name: 'Veterinary Officer', type: 'LABOUR', sub: 'CONTRACT', rate: 1800, unit: 'HOUR', cap: 1, desig: 'Veterinarian' },
-          { code: `RES-${tag}-EQ01`, name: 'Feed Mill & Pellet Line', type: 'EQUIPMENT', sub: 'FIXED', rate: 950, unit: 'HOUR', cap: 2, make: 'Buhler', model: 'MDDK-1000' },
-          { code: `RES-${tag}-EQ02`, name: 'High-Pressure Washer', type: 'EQUIPMENT', sub: 'PORTABLE', rate: 180, unit: 'HOUR', cap: 1, make: 'Karcher', model: 'HD 6/15' },
+          { code: `RES-${tag}-LAB01`, name: 'Farm Operations Crew (6 hands)', type: 'LABOUR', sub: 'PERMANENT', rate: 550, unit: 'HR', cap: 6, desig: 'Stockperson' },
+          { code: `RES-${tag}-LAB02`, name: 'Veterinary Officer', type: 'LABOUR', sub: 'CONTRACT', rate: 1800, unit: 'HR', cap: 1, desig: 'Veterinarian' },
+          { code: `RES-${tag}-EQ01`, name: 'Feed Mill & Pellet Line', type: 'EQUIPMENT', sub: 'FIXED', rate: 950, unit: 'HR', cap: 2, make: 'Buhler', model: 'MDDK-1000' },
+          { code: `RES-${tag}-EQ02`, name: 'High-Pressure Washer', type: 'EQUIPMENT', sub: 'PORTABLE', rate: 180, unit: 'HR', cap: 1, make: 'Karcher', model: 'HD 6/15' },
           { code: `RES-${tag}-VH01`, name: 'Livestock Transport Truck', type: 'VEHICLE', sub: 'OWNED', rate: 42, unit: 'KM', cap: 40, make: 'Tata', model: 'LPT 1109' },
           { code: `RES-${tag}-UTIL01`, name: 'Grid Electricity Supply', type: 'UTILITY', sub: 'METERED', rate: 9.2, unit: 'KWH', cap: 1000 },
         ];
@@ -499,7 +499,7 @@ export async function seedDemoGaps() {
           const [it] = await db.select().from(schema.itemMaster).where(eq(schema.itemMaster.item_id, itemId)).limit(1);
           return Number(it?.standard_cost ?? 0);
         };
-        const [wh] = await db.select().from(schema.warehouseMaster).where(eq(schema.warehouseMaster.company_id, c.company_id)).limit(1);
+        const [wh] = await db.select().from(schema.locationMaster).where(and(eq(schema.locationMaster.company_id, c.company_id), inArray(schema.locationMaster.location_type, ['STORE', 'SILO']))).limit(1);
         for (const b of batches) {
           const [hasIn] = await db.select().from(schema.batchInputLine).where(eq(schema.batchInputLine.batch_id, b.batch_id)).limit(1);
           if (!hasIn && bio) {
@@ -525,7 +525,7 @@ export async function seedDemoGaps() {
               line_id: randomUUID(), batch_id: b.batch_id, item_id: bio, output_type: 'MAIN',
               cost_split_pct: '100.00', quantity: b.closing_quantity ?? b.opening_quantity, uom: 'HEAD',
               computed_cost: d4(Number(b.closing_quantity ?? b.opening_quantity) * 28500),
-              unit_cost: '28500.000000', warehouse_id: wh?.warehouse_id ?? null,
+              unit_cost: '28500.000000', warehouse_id: wh?.location_id ?? null,
             });
           }
         }
@@ -599,7 +599,18 @@ export async function seedDemoGaps() {
 
     /* ── Company currency & language configuration ─────────────────────── */
     await run('Company currency & language', async () => {
-      const currencies = await db.select().from(schema.currencyMaster);
+      // Base currency was "whichever row comes first" (is_base: i === 0), and
+      // the first row seeded is the Indian Rupee — which is why every screen
+      // shows ₹ on a Zimbabwe piggery. Ordered so the base is deliberate.
+      //
+      // USD because BBP-1 §1.1's field spec names it; the same section's
+      // flowchart says ZWL, and ZWL vs ZiG is unresolved. That contradiction is
+      // Triple C's to settle — it is recorded as an open question in AGENTS.md.
+      const allCurrencies = await db.select().from(schema.currencyMaster);
+      const currencies = [
+        ...allCurrencies.filter((c) => c.iso_code === 'USD'),
+        ...allCurrencies.filter((c) => c.iso_code !== 'USD'),
+      ];
       const languages = await db.select().from(schema.languageMaster);
       for (const { c } of perCompany) {
         const [cc] = await db.select().from(schema.companyCurrencyConfig).where(eq(schema.companyCurrencyConfig.company_id, c.company_id)).limit(1);

@@ -8,6 +8,8 @@ import * as mysql from 'mysql2/promise';
 import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
 import { forSeededLobs, SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_ITEM_TYPE_SEED, SYSTEM_LOCATION_TYPE_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED, SYSTEM_BREED_LIFECYCLE_SEED } from '../core/database/system-master-data-seed';
+import { seedLocation } from './lib/seed-location';
+import { seedDefaultCompanyRoles } from '../modules/core/role/default-role-seed';
 import { STARTER_GL_ACCOUNTS, STARTER_GL_MAPPINGS, STARTER_WAREHOUSE } from '../modules/system/setup-wizard/seed/starter-master-data.seed-data';
 
 /**
@@ -35,19 +37,26 @@ const ssl = process.env.DATABASE_SSL === 'true'
 const masterDatabase = process.env.DATABASE_NAME || 'navfarm_master';
 
 const tenantCode = (process.env.DEV_TENANT_CODE || 'devco').toLowerCase();
-const tenantName = process.env.DEV_TENANT_NAME || 'Dev Company';
+const tenantName = process.env.DEV_TENANT_NAME || 'Triple C';
 const companyCode = process.env.DEV_COMPANY_CODE || 'DEVCO';
-const companyName = process.env.DEV_COMPANY_NAME || 'Dev Company Pvt Ltd';
+const companyName = process.env.DEV_COMPANY_NAME || 'Triple C';
 
-const tenantAdminName = process.env.DEV_TENANT_ADMIN_NAME || 'Dev Tenant Admin';
-const tenantAdminEmail = (process.env.DEV_TENANT_ADMIN_EMAIL || `tenantadmin@${tenantCode}.local`).toLowerCase();
-const tenantAdminPassword = process.env.DEV_TENANT_ADMIN_PASSWORD || 'DevTenant@12345';
-
-const companyAdminName = process.env.DEV_COMPANY_ADMIN_NAME || 'Dev Company Admin';
-const companyAdminEmail = (process.env.DEV_COMPANY_ADMIN_EMAIL || `admin@${tenantCode}.local`).toLowerCase();
-const companyAdminPassword = process.env.DEV_COMPANY_ADMIN_PASSWORD || 'DevAdmin@12345';
-
-const COMPANY_ID = '00000000-0000-0000-0000-000000000000';
+/**
+ * The four users this seeds, one per workspace scope plus a normal user.
+ *
+ * One list, used both to create them and to print them at the end. It used to be
+ * two: a set of env-driven constants that created nothing and were printed as
+ * the login credentials, and the users the script actually inserted. The summary
+ * told you to log in as tenantadmin@devco.local, which had never existed.
+ */
+const DEV_PASSWORD = '12345678';
+const DEV_USERS = [
+  { key: 'tenant', type: 'TENANT_ADMIN', name: 'Tenant Administrator', email: 'tenant.admin@triplec.local', scope: 'every company in the tenant' },
+  { key: 'company', type: 'COMPANY_ADMIN', name: 'Company Administrator', email: 'company.admin@triplec.local', scope: 'one company' },
+  { key: 'area', type: 'OPERATIONAL_ADMIN', name: 'Operational Administrator', email: 'area.admin@triplec.local', scope: 'one operational area' },
+  { key: 'standard', type: 'STANDARD_USER', name: 'Standard User', email: 'user@triplec.local', scope: 'no admin rights' },
+] as const;
+const userBy = (key: (typeof DEV_USERS)[number]['key']) => DEV_USERS.find((u) => u.key === key)!;
 
 function assertDatabaseName(value: string): string {
   if (!/^[A-Za-z0-9_]+$/.test(value)) {
@@ -60,12 +69,7 @@ export async function seedDevTenant() {
   if (!/^[a-z0-9-]{3,30}$/.test(tenantCode)) {
     throw new Error(`DEV_TENANT_CODE '${tenantCode}' must be 3-30 lowercase letters/numbers/hyphens.`);
   }
-  for (const [label, pw] of [
-    ['DEV_TENANT_ADMIN_PASSWORD', tenantAdminPassword],
-    ['DEV_COMPANY_ADMIN_PASSWORD', companyAdminPassword],
-  ] as const) {
-    if (pw.length < 8) throw new Error(`${label} must be at least 8 characters.`);
-  }
+  if (DEV_PASSWORD.length < 8) throw new Error('DEV_PASSWORD must be at least 8 characters.');
 
   const masterPool = mysql.createPool({ host, port, user, password, database: masterDatabase, ssl });
   const masterDb = drizzle(masterPool, { schema: master, mode: 'default' });
@@ -340,8 +344,10 @@ export async function seedDevTenant() {
           series_name: series.series_name,
           document_type: series.document_type,
           prefix: series.prefix || null,
-          date_format: series.date_format || null,
           separator: series.separator,
+          seq_separator: series.seq_separator || null,
+          code_segments: series.code_segments ?? null,
+          prefix_position: series.prefix_position ?? 'END',
           seq_length: series.seq_length,
           current_seq: 0,
           reset_frequency: series.reset_frequency,
@@ -350,44 +356,41 @@ export async function seedDevTenant() {
       }
 
       const defaultLangId = masterLangs.find((l) => l.is_system_default)?.lang_id || masterLangs[0]?.lang_id;
-      const defaultCurrId = masterCurrs.find((c) => c.is_system_default)?.currency_id || masterCurrs[0]?.currency_id;
+      // USD by name, not by list order. The currency master is a plain ISO
+      // reference list with no system default, so `masterCurrs[0]` handed the
+      // Zimbabwe piggery the Indian Rupee purely because INR is seeded first.
+      // BBP-1 §1.1 makes USD the base and ZWL the foreign currency.
+      const defaultCurrId =
+        masterCurrs.find((c) => c.iso_code === 'USD')?.currency_id ||
+        masterCurrs.find((c) => c.is_system_default)?.currency_id ||
+        masterCurrs[0]?.currency_id;
 
       // Real random UUIDs, reused across reruns by looking up the existing
       // company by code first — not the old hardcoded '...0000'/'...0001'
       // pattern, which class-validator's @IsUUID() rejects for anything
       // past the all-zeros nil UUID (its version nibble isn't 1-5), breaking
       // every company-scoped endpoint for the second company.
-      const [existingApex] = await tenantDb.select().from(tenant.companyMaster).where(eq(tenant.companyMaster.company_code, 'APEXBREED')).limit(1);
-      const [existingHighland] = await tenantDb.select().from(tenant.companyMaster).where(eq(tenant.companyMaster.company_code, 'HIGHLAND')).limit(1);
-      const COMPANY_1_ID = existingApex?.company_id || randomUUID();
-      const COMPANY_2_ID = existingHighland?.company_id || randomUUID();
+      // One company. The demo used to seed a second, HIGHLAND, which existed only
+      // to exercise company scoping — and cost every later script a decision about
+      // which company it meant. One tenant, one company, one operational area.
+      const [existingCompany] = await tenantDb.select().from(tenant.companyMaster).where(eq(tenant.companyMaster.company_code, 'TRIPLEC')).limit(1);
+      const COMPANY_1_ID = existingCompany?.company_id || randomUUID();
 
       const companyConfigs = [
         {
           id: COMPANY_1_ID,
-          code: 'APEXBREED',
-          name: 'Apex Swine Genetics & Breeding Pvt Ltd',
-          industry: 'Swine Breeding & Genetics',
-          farmCode: 'FARM-APEX-01',
-          farmName: 'Apex Nucleus Breeding Farm',
+          code: 'TRIPLEC',
+          name: 'Triple C',
+          industry: 'Piggery',
+          farmCode: 'FARM-01',
+          farmName: 'Triple C Farm',
           farmCapacity: 165,
           shedCode: 'SHED-GEST-01',
           shedName: 'Breeding & Gestation Complex',
           shedType: 'GESTATION',
           shedCapacity: 71,
-        },
-        {
-          id: COMPANY_2_ID,
-          code: 'HIGHLAND',
-          name: 'Highland Commercial Porkers & Processing Pvt Ltd',
-          industry: 'Commercial Swine Farming',
-          farmCode: 'FARM-HIGH-01',
-          farmName: 'Highland Commercial Swine Complex',
-          farmCapacity: 360,
-          shedCode: 'SHED-NURS-01',
-          shedName: 'Commercial Weaner Nursery Barn',
-          shedType: 'NURSERY',
-          shedCapacity: 100,
+          areaCode: 'PIGGERY-01',
+          areaName: 'Piggery',
         },
       ];
 
@@ -404,9 +407,9 @@ export async function seedDevTenant() {
             industry_type: cc.industry,
             base_currency_id: defaultCurrId,
             default_language_id: defaultLangId,
-            default_timezone_id: 'Asia/Kolkata',
-            country_id: 'IND',
-            financial_year_start: 4,
+            default_timezone_id: 'Africa/Harare',
+            country_id: 'ZWE',
+            financial_year_start: 1,
             onboarding_status: 'COMPLETED',
             is_active: true,
           })
@@ -415,6 +418,14 @@ export async function seedDevTenant() {
               company_code: cc.code,
               company_name: cc.name,
               company_display_name: cc.name,
+              // Locale is seed-owned on the dev tenant. Left out of this set,
+              // a rerun could not correct a company already sitting on the old
+              // INR / IND / April-fiscal-year defaults.
+              base_currency_id: defaultCurrId,
+              default_language_id: defaultLangId,
+              default_timezone_id: 'Africa/Harare',
+              country_id: 'ZWE',
+              financial_year_start: 1,
               onboarding_status: 'COMPLETED',
               is_active: true,
             },
@@ -451,116 +462,181 @@ export async function seedDevTenant() {
           }
         }
 
-        const [existingWarehouse] = await tenantDb.select().from(tenant.warehouseMaster).where(eq(tenant.warehouseMaster.company_id, cc.id)).limit(1);
-        if (!existingWarehouse) {
-          await tenantDb.insert(tenant.warehouseMaster).values({
-            warehouse_id: randomUUID(),
-            tenant_id: tenantId,
-            company_id: cc.id,
-            warehouse_code: `WH-${cc.code}-MAIN`,
-            warehouse_name: `${cc.name} Central Warehouse`,
-            warehouse_type: STARTER_WAREHOUSE.warehouse_type,
-          });
-        }
+        // Farm, shed, store and silo are LOCATIONS, not separate masters —
+        // one location_master row each, distinguished by location_type and by
+        // whether parent_location_id is set. See scripts/lib/seed-location.ts.
+        const nobId = nobIdByCode.get('LIVESTOCK') || null;
+        const lobId = lobIdByCode.get('LVS_PIGGERY') || null;
+        const locCtx = { tenantId, companyId: cc.id, nobId, lobId };
 
-        const [existingFarm] = await tenantDb.select().from(tenant.farmMaster).where(eq(tenant.farmMaster.company_id, cc.id)).limit(1);
-        let farmId = existingFarm?.farm_id;
-        if (!existingFarm) {
-          farmId = randomUUID();
-          await tenantDb.insert(tenant.farmMaster).values({
-            farm_id: farmId,
+        // FARM -> SHED -> (PEN seeded by the piggery script), plus a STORE on
+        // the farm and a SILO on the shed, which is the attachment the
+        // location type master allows (SILO parents: FARM or SHED).
+        const farmLoc = await seedLocation(tenantDb, locCtx, { code: cc.farmCode, name: cc.farmName, type: 'FARM', capacity: cc.farmCapacity });
+        const farmId = farmLoc.id;
+        const shedLoc = await seedLocation(tenantDb, locCtx, { code: cc.shedCode, name: cc.shedName, type: 'SHED', parent: farmLoc, subType: cc.shedType, capacity: cc.shedCapacity });
+        await seedLocation(tenantDb, locCtx, {
+          code: `WH-${cc.code}-MAIN`, name: `${cc.name} Central Warehouse`, type: 'STORE',
+          parent: farmLoc, storageType: 'STORE', subType: STARTER_WAREHOUSE.warehouse_type,
+        });
+        await seedLocation(tenantDb, locCtx, {
+          code: `SILO-${cc.code}-01`, name: `${cc.shedName} Feed Silo`, type: 'SILO',
+          parent: shedLoc, storageType: 'SILO', siloCapacityKg: 25000, siloReorderDays: 7,
+        });
+
+        // The operational area. It was never seeded here — a later coverage
+        // script created it — so a fresh dev tenant had no area at all, and an
+        // OPERATIONAL_ADMIN had nothing to be scoped to.
+        const [existingArea] = await tenantDb.select().from(tenant.operationalAreaMaster)
+          .where(eq(tenant.operationalAreaMaster.company_id, cc.id)).limit(1);
+        // Piggery: the only line of business in scope, and the one the area
+        // belongs to. Resolved here rather than reusing a loop variable from the
+        // breed seeding above, which is out of scope by this point.
+        const areaNobId = nobIdByCode.get('LIVESTOCK');
+        const areaLobId = lobIdByCode.get('LVS_PIGGERY');
+        if (!existingArea && farmId && areaNobId && areaLobId) {
+          await tenantDb.insert(tenant.operationalAreaMaster).values({
+            area_id: randomUUID(),
             tenant_id: tenantId,
             company_id: cc.id,
-            farm_code: cc.farmCode,
-            farm_name: cc.farmName,
-            farm_type: 'LIVESTOCK',
-            capacity: cc.farmCapacity,
-          });
-        }
-        const [existingShed] = await tenantDb.select().from(tenant.shedMaster).where(eq(tenant.shedMaster.company_id, cc.id)).limit(1);
-        if (!existingShed && farmId) {
-          await tenantDb.insert(tenant.shedMaster).values({
-            shed_id: randomUUID(),
-            tenant_id: tenantId,
-            company_id: cc.id,
             farm_id: farmId,
-            shed_code: cc.shedCode,
-            shed_name: cc.shedName,
-            shed_type: cc.shedType,
-            capacity: cc.shedCapacity,
+            nob_id: areaNobId,
+            lob_id: areaLobId,
+            area_code: cc.areaCode,
+            area_name: cc.areaName,
+            preseed_source: 'TENANT',
+            is_active: true,
           });
         }
       }
 
-      // Users: Tenant Admin, Company 1 Admin, Company 2 Admin
-      const commonPasswordHash = await bcrypt.hash('12345678', 10);
+      // Users: one per workspace scope, plus a normal user
+      const commonPasswordHash = await bcrypt.hash(DEV_PASSWORD, 10);
       const tenantAdminUserId = randomUUID();
       const comp1AdminUserId = randomUUID();
-      const comp2AdminUserId = randomUUID();
 
-      // 1. Tenant Admin (Rajesh Varma)
-      const [existingTenantAdmin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'admin@apexagri.local')).limit(1);
+      // 1. Tenant Admin — sees every company in the tenant.
+      const [existingTenantAdmin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, userBy('tenant').email)).limit(1);
       const tAdminId = existingTenantAdmin?.user_id || tenantAdminUserId;
       if (!existingTenantAdmin) {
         await tenantDb.insert(tenant.userMaster).values({
           user_id: tAdminId,
           company_id: COMPANY_1_ID,
           tenant_id: tenantId,
-          full_name: 'Rajesh Varma',
-          email: 'admin@apexagri.local',
+          full_name: userBy('tenant').name,
+          email: userBy('tenant').email,
           password_hash: commonPasswordHash,
           user_type: 'TENANT_ADMIN',
-          timezone_pref_id: 'Asia/Kolkata',
           is_active: true,
         });
       } else {
         await tenantDb.update(tenant.userMaster).set({ password_hash: commonPasswordHash, is_active: true }).where(eq(tenant.userMaster.user_id, tAdminId));
       }
 
-      // 2. Company 1 Admin (Dr. Arjun Sharma)
-      const [existingComp1Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'arjun.sharma@apexagri.local')).limit(1);
+      // 2. Company Admin — sees one company.
+      const [existingComp1Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, userBy('company').email)).limit(1);
       const c1AdminId = existingComp1Admin?.user_id || comp1AdminUserId;
       if (!existingComp1Admin) {
         await tenantDb.insert(tenant.userMaster).values({
           user_id: c1AdminId,
           company_id: COMPANY_1_ID,
           tenant_id: tenantId,
-          full_name: 'Dr. Arjun Sharma',
-          email: 'arjun.sharma@apexagri.local',
+          full_name: userBy('company').name,
+          email: userBy('company').email,
           password_hash: commonPasswordHash,
           user_type: 'COMPANY_ADMIN',
-          timezone_pref_id: 'Asia/Kolkata',
           is_active: true,
         });
       } else {
         await tenantDb.update(tenant.userMaster).set({ password_hash: commonPasswordHash, is_active: true }).where(eq(tenant.userMaster.user_id, c1AdminId));
       }
 
-      // 3. Company 2 Admin (Vikram Singh)
-      const [existingComp2Admin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, 'vikram.singh@highlandpork.local')).limit(1);
-      const c2AdminId = existingComp2Admin?.user_id || comp2AdminUserId;
-      if (!existingComp2Admin) {
+      // 3. Operational Admin — sees one operational area, not the whole company.
+      const opAdminUserId = randomUUID();
+      const [existingOpAdmin] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, userBy('area').email)).limit(1);
+      const opAdminId = existingOpAdmin?.user_id || opAdminUserId;
+      if (!existingOpAdmin) {
         await tenantDb.insert(tenant.userMaster).values({
-          user_id: c2AdminId,
-          company_id: COMPANY_2_ID,
+          user_id: opAdminId,
+          company_id: COMPANY_1_ID,
           tenant_id: tenantId,
-          full_name: 'Vikram Singh',
-          email: 'vikram.singh@highlandpork.local',
+          full_name: userBy('area').name,
+          email: userBy('area').email,
           password_hash: commonPasswordHash,
-          user_type: 'COMPANY_ADMIN',
-          timezone_pref_id: 'Asia/Kolkata',
+          user_type: 'OPERATIONAL_ADMIN',
           is_active: true,
         });
       } else {
-        await tenantDb.update(tenant.userMaster).set({ password_hash: commonPasswordHash, is_active: true }).where(eq(tenant.userMaster.user_id, c2AdminId));
+        await tenantDb.update(tenant.userMaster).set({ password_hash: commonPasswordHash, is_active: true }).where(eq(tenant.userMaster.user_id, opAdminId));
+      }
+
+      // 4. Standard User — the normal user. No admin rights, and the only type an
+      // Operational Admin is allowed to create (auth.service.ts).
+      const standardUserId = randomUUID();
+      const [existingStandard] = await tenantDb.select().from(tenant.userMaster).where(eq(tenant.userMaster.email, userBy('standard').email)).limit(1);
+      const stdId = existingStandard?.user_id || standardUserId;
+      if (!existingStandard) {
+        await tenantDb.insert(tenant.userMaster).values({
+          user_id: stdId,
+          company_id: COMPANY_1_ID,
+          tenant_id: tenantId,
+          full_name: userBy('standard').name,
+          email: userBy('standard').email,
+          password_hash: commonPasswordHash,
+          user_type: 'STANDARD_USER',
+          is_active: true,
+        });
+      } else {
+        await tenantDb.update(tenant.userMaster).set({ password_hash: commonPasswordHash, is_active: true }).where(eq(tenant.userMaster.user_id, stdId));
+      }
+
+      // Roles and permissions. seed-dev-tenant inserts the company row
+      // directly rather than going through CompanyService.create(), which is
+      // the hook that normally seeds them — so a freshly seeded dev tenant had
+      // an empty role_master. RolesGuard waves through SYSTEM_ADMIN,
+      // TENANT_ADMIN and COMPANY_ADMIN, but OPERATIONAL_ADMIN and
+      // STANDARD_USER are checked against role_permissions, so those two users
+      // could not view a single screen.
+      const [existingRole] = await tenantDb.select().from(tenant.roleMaster)
+        .where(eq(tenant.roleMaster.company_id, COMPANY_1_ID)).limit(1);
+      const roleIds = existingRole
+        ? {
+            superAdminRoleId: (await tenantDb.select().from(tenant.roleMaster)
+              .where(and(eq(tenant.roleMaster.company_id, COMPANY_1_ID), eq(tenant.roleMaster.role_code, 'SUPER_ADMIN'))).limit(1))[0]?.role_id,
+            managerRoleId: (await tenantDb.select().from(tenant.roleMaster)
+              .where(and(eq(tenant.roleMaster.company_id, COMPANY_1_ID), eq(tenant.roleMaster.role_code, 'MANAGER'))).limit(1))[0]?.role_id,
+            operatorRoleId: (await tenantDb.select().from(tenant.roleMaster)
+              .where(and(eq(tenant.roleMaster.company_id, COMPANY_1_ID), eq(tenant.roleMaster.role_code, 'OPERATOR'))).limit(1))[0]?.role_id,
+          }
+        : await seedDefaultCompanyRoles(tenantDb, COMPANY_1_ID);
+
+      const userRoleMap = [
+        { userId: tAdminId, roleId: roleIds.superAdminRoleId },
+        { userId: c1AdminId, roleId: roleIds.superAdminRoleId },
+        { userId: opAdminId, roleId: roleIds.managerRoleId },
+        { userId: stdId, roleId: roleIds.operatorRoleId },
+      ];
+      for (const ur of userRoleMap) {
+        if (!ur.roleId) continue;
+        const [existingURA] = await tenantDb.select().from(tenant.userRoleAssignment)
+          .where(and(eq(tenant.userRoleAssignment.user_id, ur.userId), eq(tenant.userRoleAssignment.role_id, ur.roleId)))
+          .limit(1);
+        if (!existingURA) {
+          await tenantDb.insert(tenant.userRoleAssignment).values({
+            assign_id: randomUUID(),
+            user_id: ur.userId,
+            role_id: ur.roleId,
+            assigned_by: tAdminId,
+          });
+        }
       }
 
       // Assign User Company Access
       const userCompanyMap = [
         { userId: tAdminId, companyId: COMPANY_1_ID, primary: true },
-        { userId: tAdminId, companyId: COMPANY_2_ID, primary: false },
         { userId: c1AdminId, companyId: COMPANY_1_ID, primary: true },
-        { userId: c2AdminId, companyId: COMPANY_2_ID, primary: true },
+        { userId: opAdminId, companyId: COMPANY_1_ID, primary: true },
+        { userId: stdId, companyId: COMPANY_1_ID, primary: true },
       ];
       for (const uc of userCompanyMap) {
         const [existingUCA] = await tenantDb.select().from(tenant.userCompanyAssignments)
@@ -596,7 +672,7 @@ export async function seedDevTenant() {
         tenant_type: 'SME',
         plan_id: plan.plan_id,
         plan_start_date: today,
-        billing_email: tenantAdminEmail,
+        billing_email: userBy('tenant').email,
         billing_cycle: plan.billing_cycle,
         max_companies: plan.max_companies,
         max_users: plan.max_users,
@@ -622,10 +698,11 @@ export async function seedDevTenant() {
     console.log('Dev tenant ready.');
     console.log('==================');
     console.log(`Tenant code:      ${tenantCode}  (send as x-tenant-id header, or ?tenant=${tenantCode} on the login page)`);
-    console.log(`Company:          ${companyName} (${companyCode})`);
+    console.log(`Company:          ${companyName} (TRIPLEC)`);
     console.log('');
-    console.log(`Tenant admin:     ${tenantAdminEmail} / ${tenantAdminPassword}`);
-    console.log(`Company admin:    ${companyAdminEmail} / ${companyAdminPassword}`);
+    for (const u of DEV_USERS) {
+      console.log(`  ${u.email.padEnd(30)} ${DEV_PASSWORD.padEnd(10)} ${u.type.padEnd(19)} ${u.scope}`);
+    }
     console.log('');
     console.log(`Login:            http://localhost:3001/login?tenant=${tenantCode}`);
     console.log('Starter GL accounts, GL mappings, one warehouse, and one farm/shed are already seeded.');

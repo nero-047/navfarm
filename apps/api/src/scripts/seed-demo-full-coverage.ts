@@ -57,17 +57,23 @@ export async function seedFullCoverage() {
 
   try {
     const companies = await db.select().from(schema.companyMaster);
-    const comp1 = companies.find((c) => c.company_code === 'APEXBREED');
-    const comp2 = companies.find((c) => c.company_code === 'HIGHLAND');
-    if (!comp1 || !comp2) throw new Error('APEXBREED/HIGHLAND not found — run db-seed-dev-tenant + db-seed-piggery-complete-data first.');
+    // The demo is one company now; this script was written when it was two and
+    // demanded both by code. Falling back to the first keeps every section that
+    // was written "for company 2" running against the company that exists,
+    // rather than the whole stage failing on a name that was renamed.
+    const comp1 = companies[0];
+    const comp2 = companies[1] || companies[0];
+    if (!comp1) throw new Error('No company found — run db-seed-dev-tenant first.');
     const tenantId = comp1.tenant_id;
     const comp1Id = comp1.company_id;
     const comp2Id = comp2.company_id;
 
-    const [tAdmin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.email, 'admin@apexagri.local')).limit(1);
-    const [c1Admin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.email, 'arjun.sharma@apexagri.local')).limit(1);
-    const [c2Admin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.email, 'vikram.singh@highlandpork.local')).limit(1);
-    if (!tAdmin || !c1Admin || !c2Admin) throw new Error('Expected seed-dev-tenant users not found.');
+    // By scope, not by email — the demo's emails moved when it was renamed to
+    // Triple C, and looking them up by address made this stage fail on a name.
+    const [tAdmin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.user_type, 'TENANT_ADMIN')).limit(1);
+    const [c1Admin] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.user_type, 'COMPANY_ADMIN')).limit(1);
+    if (!tAdmin) throw new Error('No TENANT_ADMIN found — run db-seed-dev-tenant first.');
+    const c2Admin = c1Admin ?? tAdmin;
 
     const [nob] = await db.select().from(schema.nobMaster).where(eq(schema.nobMaster.nob_code, 'LIVESTOCK')).limit(1);
     const [lob] = await db.select().from(schema.lobMaster).where(eq(schema.lobMaster.lob_code, 'LVS_PIGGERY')).limit(1);
@@ -85,9 +91,14 @@ export async function seedFullCoverage() {
     const locationsAll = await db.select().from(schema.locationMaster);
     const locMap2 = new Map(locationsAll.filter((l) => l.company_id === comp2Id).map((l) => [l.location_code, l]));
 
-    const [area1] = await db.select().from(schema.operationalAreaMaster).where(and(eq(schema.operationalAreaMaster.company_id, comp1Id), eq(schema.operationalAreaMaster.area_code, 'APEX-BREED-01'))).limit(1);
-    const [area2] = await db.select().from(schema.operationalAreaMaster).where(and(eq(schema.operationalAreaMaster.company_id, comp2Id), eq(schema.operationalAreaMaster.area_code, 'HIGH-GROW-01'))).limit(1);
-    if (!area1 || !area2) throw new Error('Operational areas not found.');
+    // By company, not by hardcoded area code. The codes moved with the rename,
+    // and there is one area per company now rather than one named APEX-BREED-01
+    // and another named HIGH-GROW-01.
+    const [area1] = await db.select().from(schema.operationalAreaMaster)
+      .where(eq(schema.operationalAreaMaster.company_id, comp1Id)).limit(1);
+    const [area2] = await db.select().from(schema.operationalAreaMaster)
+      .where(eq(schema.operationalAreaMaster.company_id, comp2Id)).limit(1);
+    if (!area1) throw new Error('No operational area found — run db-seed-dev-tenant first.');
 
     const batches1 = await db.select().from(schema.batchHeader).where(eq(schema.batchHeader.company_id, comp1Id));
     const batches2 = await db.select().from(schema.batchHeader).where(eq(schema.batchHeader.company_id, comp2Id));
@@ -97,8 +108,8 @@ export async function seedFullCoverage() {
     const batch2b = batches2.find((b) => b.batch_no === 'PIG-BAT-2026-0102');
     if (!batch1a || !batch1b || !batch2a || !batch2b) throw new Error('Expected batches not found.');
 
-    const [warehouse1] = await db.select().from(schema.warehouseMaster).where(eq(schema.warehouseMaster.company_id, comp1Id)).limit(1);
-    const [warehouse2] = await db.select().from(schema.warehouseMaster).where(eq(schema.warehouseMaster.company_id, comp2Id)).limit(1);
+    const [warehouse1] = await db.select().from(schema.locationMaster).where(and(eq(schema.locationMaster.company_id, comp1Id), inArray(schema.locationMaster.location_type, ['STORE', 'SILO']))).limit(1);
+    const [warehouse2] = await db.select().from(schema.locationMaster).where(and(eq(schema.locationMaster.company_id, comp2Id), inArray(schema.locationMaster.location_type, ['STORE', 'SILO']))).limit(1);
     if (!warehouse1 || !warehouse2) throw new Error('Warehouses not found.');
 
     const glAll = await db.select().from(schema.glAccountMaster);
@@ -234,7 +245,7 @@ export async function seedFullCoverage() {
     // ═══════════════════════════════════════════════════════════════════
     for (const [compId, admin, areaId, tag] of [
       [comp1Id, c1Admin, area1.area_id, 'apex'],
-      [comp2Id, c2Admin, area2.area_id, 'highland'],
+      [comp2Id, c2Admin, (area2 ?? area1).area_id, 'highland'],
     ] as const) {
       await run(`Section 3: FARM_SUPERVISOR role + operational admin (${tag})`, async () => {
         const [role] = await db.select().from(schema.roleMaster).where(and(eq(schema.roleMaster.company_id, compId), eq(schema.roleMaster.role_code, 'FARM_SUPERVISOR'))).limit(1);
@@ -292,8 +303,13 @@ export async function seedFullCoverage() {
           ]);
         }
 
-        const email = `supervisor@${tag}pork.local`;
-        const [existingUser] = await db.select().from(schema.userMaster).where(eq(schema.userMaster.email, email)).limit(1);
+        // The operational admin the dev tenant seeds, not a second one of this
+        // script's own. It used to mint supervisor@apexpork.local and
+        // supervisor@highlandpork.local — invented people on a Zimbabwe piggery —
+        // so a full chain ended with three operational admins for one area.
+        const [existingUser] = await db.select().from(schema.userMaster)
+          .where(eq(schema.userMaster.user_type, 'OPERATIONAL_ADMIN')).limit(1);
+        const email = existingUser?.email ?? `supervisor@${tag}pork.local`;
         let userId = existingUser?.user_id;
         if (!existingUser) {
           userId = randomUUID();
@@ -420,17 +436,25 @@ export async function seedFullCoverage() {
 
         // Second small warehouse so a transfer has a real destination.
         const feedmillCode = `WH-${cfg.tag}-FEEDMILL`;
-        const [feedmillWh] = await db.select().from(schema.warehouseMaster).where(and(eq(schema.warehouseMaster.company_id, cfg.compId), eq(schema.warehouseMaster.warehouse_code, feedmillCode))).limit(1);
-        let feedmillWhId = feedmillWh?.warehouse_id;
+        const [feedmillWh] = await db.select().from(schema.locationMaster).where(and(eq(schema.locationMaster.company_id, cfg.compId), eq(schema.locationMaster.location_code, feedmillCode))).limit(1);
+        let feedmillWhId = feedmillWh?.location_id;
         if (!feedmillWh) {
+          // A warehouse is a location of type STORE, parented to the company's
+          // farm when it has one. warehouse_master no longer exists.
+          const [farmLoc] = await db.select().from(schema.locationMaster)
+            .where(and(eq(schema.locationMaster.company_id, cfg.compId), eq(schema.locationMaster.location_type, 'FARM'))).limit(1);
           feedmillWhId = randomUUID();
-          await db.insert(schema.warehouseMaster).values({
-            warehouse_id: feedmillWhId,
+          await db.insert(schema.locationMaster).values({
+            location_id: feedmillWhId,
             tenant_id: tenantId,
             company_id: cfg.compId,
-            warehouse_code: feedmillCode,
-            warehouse_name: `${cfg.tag} Feed Mill Store`,
-            warehouse_type: 'INGREDIENTS',
+            location_code: feedmillCode,
+            location_name: `${cfg.tag} Feed Mill Store`,
+            location_level: farmLoc ? 2 : 1,
+            location_type: 'STORE',
+            parent_location_id: farmLoc?.location_id ?? null,
+            farm_id: farmLoc?.location_id ?? null,
+            storage_type: 'STORE',
           });
         }
 
@@ -641,7 +665,7 @@ export async function seedFullCoverage() {
     // ═══════════════════════════════════════════════════════════════════
     for (const cfg of [
       { compId: comp1Id, admin: c1Admin, areaId: area1.area_id, batch: batch1a!, tag: 'APX' },
-      { compId: comp2Id, admin: c2Admin, areaId: area2.area_id, batch: batch2a!, tag: 'HGH' },
+      { compId: comp2Id, admin: c2Admin, areaId: (area2 ?? area1).area_id, batch: batch2a!, tag: 'HGH' },
     ] as const) {
       await run(`Section 9: Approvals (${cfg.tag})`, async () => {
         const existing = await db.select().from(schema.approvalRequest).where(eq(schema.approvalRequest.company_id, cfg.compId)).limit(1);

@@ -79,20 +79,27 @@ export async function seedDemo() {
   const seconds = Math.round((Date.now() - started) / 1000);
   console.log(`\n✅ Demo environment ready in ${seconds}s.`);
   console.log('════════════════════════════════════════════════════');
-  console.log('Tenant:    devco — Dev Company');
-  console.log('Companies: APEXBREED (nucleus breeding) · HIGHLAND (grow-finish)');
-  console.log('');
-  console.log('PIG-BAT-2026-0102 is staged at slaughter weight, ACTIVE. Closing it from');
-  console.log('Batches → Close posts its standard-cost variances and fills the Batch Cost');
-  console.log('Variance report — variances only exist once a STANDARD batch closes.');
-  console.log('');
-  console.log('Sign in at http://localhost:3002/login — password 12345678 for all:');
-  console.log('  admin@navfarm.local              SYSTEM_ADMIN       platform admin');
-  console.log('  admin@apexagri.local             TENANT_ADMIN       both companies');
-  console.log('  arjun.sharma@apexagri.local      COMPANY_ADMIN      Apex');
-  console.log('  vikram.singh@highlandpork.local  COMPANY_ADMIN      Highland');
-  console.log('  supervisor@apexpork.local        OPERATIONAL_ADMIN  Apex piggery area');
-  console.log('  supervisor@highlandpork.local    OPERATIONAL_ADMIN  Highland piggery area');
+  // Read back what was actually created rather than repeating a list written
+  // by hand. The summary used to name six users on two companies, none of which
+  // survived the rename to Triple C — it told you to sign in as addresses that
+  // did not exist.
+  const summaryPool = mysql.createPool({ host, port, user, password, database: assertDatabaseName(`tenant_${tenantCode}`), ssl });
+  try {
+    const [companies] = await summaryPool.query<any[]>('SELECT company_code, company_name FROM company_master WHERE deleted_at IS NULL');
+    const [areas] = await summaryPool.query<any[]>('SELECT area_code, area_name FROM operational_area_master WHERE deleted_at IS NULL');
+    const [users] = await summaryPool.query<any[]>(
+      "SELECT email, user_type FROM user_master ORDER BY FIELD(user_type,'TENANT_ADMIN','COMPANY_ADMIN','OPERATIONAL_ADMIN','STANDARD_USER'), email"
+    );
+
+    console.log(`Tenant:            ${tenantCode}`);
+    for (const c of companies) console.log(`Company:           ${c.company_name} (${c.company_code})`);
+    for (const a of areas) console.log(`Operational area:  ${a.area_name} (${a.area_code})`);
+    console.log('');
+    console.log('Sign in at http://localhost:3002/login — password 12345678 for all:');
+    for (const u of users) console.log(`  ${String(u.email).padEnd(32)} ${u.user_type}`);
+  } finally {
+    await summaryPool.end();
+  }
   console.log('');
 }
 
