@@ -216,7 +216,7 @@ export class AnimalService {
    * tenant-wide ANIMAL series and finally to ANIMAL_PIGGERY so existing
    * piggery tenants keep their numbering unchanged.
    */
-  private async generateAnimalCode(lobId: string, tenantId: string, companyId: string, manualCode?: string): Promise<string> {
+  private async generateAnimalCode(lobId: string, tenantId: string, companyId: string, manualCode?: string, record: Record<string, unknown> = {}): Promise<string> {
     const [lob] = await this.db
       .select({ lob_code: schema.lobMaster.lob_code })
       .from(schema.lobMaster)
@@ -234,7 +234,7 @@ export class AnimalService {
     let lastError: unknown;
     for (const seriesCode of candidates) {
       try {
-        return await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
+        return await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, undefined, record);
       } catch (err) {
         lastError = err;
       }
@@ -391,7 +391,7 @@ export class AnimalService {
     }
 
     const animalId = randomUUID();
-    const animalCode = await this.generateAnimalCode(lobId, tenantId, dto.company_id, dto.animal_code);
+    const animalCode = await this.generateAnimalCode(lobId, tenantId, dto.company_id, dto.animal_code, dto as unknown as Record<string, unknown>);
     const totalOpeningAssetValue = acquisitionCost + (dto.landing_cost || 0);
 
     const newAnimal = {

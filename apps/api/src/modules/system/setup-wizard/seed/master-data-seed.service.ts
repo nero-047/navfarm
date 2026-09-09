@@ -68,13 +68,19 @@ export class MasterDataSeedService {
         });
       }
 
-      await tx.insert(schema.warehouseMaster).values({
-        warehouse_id: randomUUID(),
+      // The starter warehouse is a location (type STORE), not a row of a
+      // separate warehouse table — that table is gone. It has no parent
+      // because a new company has no farm yet; one can be set later by
+      // editing it under Locations.
+      await tx.insert(schema.locationMaster).values({
+        location_id: randomUUID(),
         tenant_id: tenantId,
         company_id: companyId,
-        warehouse_code: STARTER_WAREHOUSE.warehouse_code,
-        warehouse_name: STARTER_WAREHOUSE.warehouse_name,
-        warehouse_type: STARTER_WAREHOUSE.warehouse_type,
+        location_code: STARTER_WAREHOUSE.warehouse_code,
+        location_name: STARTER_WAREHOUSE.warehouse_name,
+        location_level: 1,
+        location_type: 'STORE',
+        storage_type: 'STORE',
       });
     });
   }

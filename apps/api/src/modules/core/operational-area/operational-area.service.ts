@@ -205,7 +205,7 @@ export class OperationalAreaService {
         tenant_id: schema.operationalAreaMaster.tenant_id,
         company_name: schema.companyMaster.company_name,
         farm_id: schema.operationalAreaMaster.farm_id,
-        farm_name: schema.farmMaster.farm_name,
+        farm_name: schema.locationMaster.location_name,
         nob_id: schema.operationalAreaMaster.nob_id,
         nob_code: schema.nobMaster.nob_code,
         nob_name: schema.nobMaster.nob_name,
@@ -216,7 +216,7 @@ export class OperationalAreaService {
       })
       .from(schema.operationalAreaMaster)
       .leftJoin(schema.companyMaster, eq(schema.companyMaster.company_id, schema.operationalAreaMaster.company_id))
-      .leftJoin(schema.farmMaster, eq(schema.farmMaster.farm_id, schema.operationalAreaMaster.farm_id))
+      .leftJoin(schema.locationMaster, eq(schema.locationMaster.location_id, schema.operationalAreaMaster.farm_id))
       .leftJoin(schema.nobMaster, eq(schema.nobMaster.nob_id, schema.operationalAreaMaster.nob_id))
       .leftJoin(schema.lobMaster, eq(schema.lobMaster.lob_id, schema.operationalAreaMaster.lob_id))
       .where(eq(schema.operationalAreaMaster.area_id, areaId))

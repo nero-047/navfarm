@@ -1,6 +1,7 @@
 import { companyCondition, masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
+import { alias } from 'drizzle-orm/mysql-core';
 import { eq, and, like, or, isNull, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
@@ -9,6 +10,7 @@ import { CreateLocationDto, UpdateLocationDto, QueryLocationDto } from './dto/lo
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { generateCompositeCode } from '../../system/number-series/composite-code.util';
+import { segmentFields } from '../../system/number-series/code-format.util';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -91,8 +93,19 @@ export class LocationService {
     return [];
   }
 
-  private async ensureCompanySeries(type: typeof schema.locationTypeMaster.$inferSelect, tenantId: string, companyId?: string | null) {
-    const seriesCode = `LOCATION_${type.type_code}`;
+  /**
+   * One LOCATION series per company, not one per location type.
+   *
+   * There used to be a LOCATION_FARM, LOCATION_SHED, LOCATION_PEN and so on,
+   * because a series held exactly one prefix and each type needed its own. A
+   * series can now take the type as a segment, so one row covers every type —
+   * and the list stops growing by one every time someone adds a location type.
+   *
+   * The old per-type rows still resolve for anyone who has them; this only
+   * stops new ones being minted.
+   */
+  private async ensureCompanySeries(_type: typeof schema.locationTypeMaster.$inferSelect, tenantId: string, companyId?: string | null) {
+    const seriesCode = 'LOCATION';
     if (!companyId) return seriesCode;
     const [series] = await this.db.select().from(schema.noSeriesMaster).where(and(
       eq(schema.noSeriesMaster.tenant_id, tenantId),
@@ -101,22 +114,15 @@ export class LocationService {
       isNull(schema.noSeriesMaster.deleted_at),
     )).limit(1);
     if (!series) {
-      const existingCodes = await this.db.select({ code: schema.locationMaster.location_code })
-        .from(schema.locationMaster).where(and(
-          eq(schema.locationMaster.tenant_id, tenantId),
-          eq(schema.locationMaster.company_id, companyId),
-          eq(schema.locationMaster.location_type, type.type_code),
-        ));
-      const prefixPattern = new RegExp(`^${type.code_prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d+)$`, 'i');
-      const currentSeq = existingCodes.reduce((max, row) => {
-        const match = row.code.match(prefixPattern);
-        return match ? Math.max(max, Number(match[1])) : max;
-      }, 0);
       await this.db.insert(schema.noSeriesMaster).values({
         series_id: randomUUID(), tenant_id: tenantId, company_id: companyId,
-        series_code: seriesCode, series_name: `${type.type_name} Location`,
-        document_type: 'LOCATION', prefix: type.code_prefix, separator: '-',
-        seq_length: 3, current_seq: currentSeq, reset_frequency: 'NEVER', allow_manual: true,
+        series_code: seriesCode, series_name: 'Location Code',
+        document_type: 'LOCATION', prefix: null, separator: '-',
+        // The shape itself: parent code, then this level's type, then a number
+        // counted among the siblings sharing that stem. A first-level location
+        // has no parent to name, so its code is just TYPE-001.
+        code_segments: ['parent_location_id', 'location_type'],
+        seq_length: 3, current_seq: 0, reset_frequency: 'NEVER', allow_manual: true,
       });
     }
     return seriesCode;
@@ -147,10 +153,31 @@ export class LocationService {
     executor: MySql2Database<typeof schema>,
   ): Promise<string> {
     if (!parent) {
-      return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, executor);
+      // A root location has no parent to name, so the only segment it can offer
+      // is its own type. Children still take the hierarchical path below.
+      return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, executor, { location_type: type.type_code });
     }
 
     const series = await this.numberSeriesService.lockSeries(seriesCode, tenantId, companyId, executor);
+
+    // Series-driven when the series says how, guaranteed when it does not.
+    //
+    // A LOCATION series carrying parent_location_id and location_type composes
+    // the hierarchy itself, per-stem counter and all — FARM001-SHED-001, and
+    // SHED-001 for a shed with no parent. That is the configured path and it is
+    // the one to prefer.
+    //
+    // With no segments configured the composite path below still runs, because
+    // a child's code carrying its ancestry is not a preference here: it is what
+    // every screen, report and traceability chain reads. A tenant whose series
+    // was left unconfigured would otherwise issue flat codes for locations that
+    // do have parents, and nothing would say so.
+    if (segmentFields(series).length) {
+      return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, executor, {
+        parent_location_id: parent.location_id,
+        location_type: type.type_code,
+      });
+    }
 
     return generateCompositeCode({
       parentCode: parent.location_code,
@@ -242,99 +269,8 @@ export class LocationService {
       updated_by: userPayload?.userId || null,
     };
 
-    // Legacy rows are inserted first because location_master keeps temporary
-    // compatibility foreign keys to these records.
-    await this.insertLegacyMirror(tx, location);
     await tx.insert(schema.locationMaster).values(location);
     return location;
-  }
-
-  private async insertLegacyMirror(
-    executor: any,
-    location: typeof schema.locationMaster.$inferInsert,
-  ) {
-    const common = {
-      tenant_id: location.tenant_id,
-      company_id: location.company_id!,
-      is_active: true,
-      status: 'ACTIVE',
-      created_by: location.created_by,
-      updated_by: location.updated_by,
-    };
-
-    if (location.location_type === 'FARM') {
-      await executor.insert(schema.farmMaster).values({
-        ...common,
-        farm_id: location.location_id,
-        farm_code: location.location_code,
-        farm_name: location.location_name,
-        farm_type: 'GENERAL',
-        nob_id: location.nob_id,
-        lob_id: location.lob_id,
-        capacity: Math.round(Number(location.max_capacity || 0)),
-        address_line1: location.location_address,
-      });
-    } else if (location.location_type === 'SHED') {
-      await executor.insert(schema.shedMaster).values({
-        ...common,
-        shed_id: location.location_id,
-        farm_id: location.farm_id!,
-        shed_code: location.location_code,
-        shed_name: location.location_name,
-        shed_type: 'GENERAL',
-        nob_id: location.nob_id,
-        lob_id: location.lob_id,
-        capacity: Math.round(Number(location.max_capacity || 0)),
-      });
-    } else if (location.location_type === 'STORE' || location.location_type === 'SILO') {
-      await executor.insert(schema.warehouseMaster).values({
-        ...common,
-        warehouse_id: location.location_id,
-        farm_id: location.farm_id,
-        warehouse_code: location.location_code,
-        warehouse_name: location.location_name,
-        warehouse_type: location.location_type === 'SILO' ? 'SILO' : 'GENERAL',
-      });
-    }
-  }
-
-  private async updateLegacyMirror(
-    executor: any,
-    location: typeof schema.locationMaster.$inferSelect,
-    effective: Record<string, any>,
-  ) {
-    const common = {
-      is_active: effective.is_active,
-      status: effective.status,
-      deleted_at: effective.deleted_at,
-      updated_by: effective.updated_by,
-      updated_at: effective.updated_at,
-    };
-    if (location.location_type === 'FARM') {
-      await executor.update(schema.farmMaster).set({
-        ...common,
-        farm_name: effective.location_name,
-        nob_id: effective.nob_id,
-        lob_id: effective.lob_id,
-        capacity: Math.round(Number(effective.max_capacity || 0)),
-        address_line1: effective.location_address,
-      }).where(eq(schema.farmMaster.farm_id, location.location_id));
-    } else if (location.location_type === 'SHED') {
-      await executor.update(schema.shedMaster).set({
-        ...common,
-        farm_id: effective.farm_id,
-        shed_name: effective.location_name,
-        nob_id: effective.nob_id,
-        lob_id: effective.lob_id,
-        capacity: Math.round(Number(effective.max_capacity || 0)),
-      }).where(eq(schema.shedMaster.shed_id, location.location_id));
-    } else if (location.location_type === 'STORE' || location.location_type === 'SILO') {
-      await executor.update(schema.warehouseMaster).set({
-        ...common,
-        farm_id: effective.farm_id,
-        warehouse_name: effective.location_name,
-      }).where(eq(schema.warehouseMaster.warehouse_id, location.location_id));
-    }
   }
 
   private async assertNoHierarchyCycle(id: string, parentId: string, tenantId: string) {
@@ -784,7 +720,6 @@ export class LocationService {
     const effective = { ...location, ...updates };
     await this.db.transaction(async (tx) => {
       await tx.update(schema.locationMaster).set(updates).where(eq(schema.locationMaster.location_id, id));
-      await this.updateLegacyMirror(tx, location, effective);
     });
 
     await this.auditService.log({
@@ -823,7 +758,6 @@ export class LocationService {
     };
     await this.db.transaction(async (tx) => {
       await tx.update(schema.locationMaster).set(updates).where(eq(schema.locationMaster.location_id, id));
-      await this.updateLegacyMirror(tx, location, { ...location, ...updates });
     });
 
     await this.auditService.log({
@@ -867,7 +801,6 @@ export class LocationService {
     };
     await this.db.transaction(async (tx) => {
       await tx.update(schema.locationMaster).set(updates).where(eq(schema.locationMaster.location_id, id));
-      await this.updateLegacyMirror(tx, location, { ...location, ...updates });
     });
 
     await this.auditService.log({
@@ -898,15 +831,18 @@ export class LocationService {
       );
     }
 
+    // The parent's name comes from the parent location itself. This used to
+    // left-join farm_master and shed_master and fall back farm -> shed, which
+    // could not name a parent of any other type (a pen under a pen, a silo
+    // under a shed) and needed two dead tables to answer one question.
+    const parentLocation = alias(schema.locationMaster, 'parent_location');
     const locations = await this.db
       .select({
         location: schema.locationMaster,
-        farm: schema.farmMaster,
-        shed: schema.shedMaster,
+        parent: parentLocation,
       })
       .from(schema.locationMaster)
-      .leftJoin(schema.farmMaster, eq(schema.locationMaster.farm_id, schema.farmMaster.farm_id))
-      .leftJoin(schema.shedMaster, eq(schema.locationMaster.shed_id, schema.shedMaster.shed_id))
+      .leftJoin(parentLocation, eq(schema.locationMaster.parent_location_id, parentLocation.location_id))
       .where(and(...conditions));
 
     // Get animal counts per location
@@ -970,7 +906,7 @@ export class LocationService {
       }
     }
 
-    return locations.map(({ location, farm, shed }) => {
+    return locations.map(({ location, parent }) => {
       const animalHeadcount = animalCountMap[location.location_id] || 0;
       const batchHeadcount = batchCountMap[location.location_id] || (location.shed_id ? batchCountMap[location.shed_id] || 0 : 0);
       const totalOccupancy = animalHeadcount + batchHeadcount;
@@ -984,7 +920,7 @@ export class LocationService {
         location_code: location.location_code,
         location_name: location.location_name,
         location_type: location.location_type,
-        parent_name: shed?.shed_name || farm?.farm_name || 'General',
+        parent_name: parent?.location_name || 'General',
         max_capacity: maxCap,
         capacity_uom: location.capacity_uom || 'HEAD',
         current_occupancy: totalOccupancy,

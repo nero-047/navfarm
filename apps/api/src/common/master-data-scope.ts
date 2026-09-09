@@ -6,7 +6,10 @@ import { MySql2Database } from 'drizzle-orm/mysql2';
 import * as schema from '../core/database/schema';
 
 export const MASTER_TABLES: Record<string, AnyMySqlTable> = {
-  farm: schema.farmMaster, warehouse: schema.warehouseMaster, shed: schema.shedMaster,
+  // farm, warehouse and shed are not tables — they are location_master rows
+  // filtered by location_type, served read-only by their own controllers. They
+  // map to locationMaster so scope checks on those routes still resolve.
+  farm: schema.locationMaster, warehouse: schema.locationMaster, shed: schema.locationMaster,
   location: schema.locationMaster, 'location-type': schema.locationTypeMaster,
   stage: schema.stageMaster, 'number-series': schema.noSeriesMaster, animal: schema.animalRegister,
   item: schema.itemMaster, 'item-type': schema.itemTypeMaster, 'item-category': schema.itemCategoryMaster,

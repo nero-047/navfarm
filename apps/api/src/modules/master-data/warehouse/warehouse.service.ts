@@ -1,23 +1,30 @@
-import { masterScopeConditions } from '../../../common/master-data-scope';
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, ne } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
+import { eq, and, like, or, inArray } from 'drizzle-orm';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
-import { CreateWarehouseDto, UpdateWarehouseDto, QueryWarehouseDto } from './dto/warehouse.dto';
-import { AuditLogService } from '../../system/audit-log/audit-log.service';
+import { QueryWarehouseDto } from './dto/warehouse.dto';
+import { masterScopeConditions } from '../../../common/master-data-scope';
 
-const toMysqlTimestamp = (date: Date = new Date()) => {
-  return date.toISOString().slice(0, 19).replace('T', ' ');
-};
+/**
+ * Read-only projection of `location_master` for the STORE and SILO types.
+ *
+ * `warehouse_master` used to be a real table holding a duplicate identity for
+ * every store and silo. It is gone: a warehouse is a location, and its
+ * `warehouse_id` was always the same UUID as its `location_id`, so the six
+ * inventory screens that call `GET /warehouse` keep working unchanged — the
+ * rows are simply read from the one table now and aliased back to the
+ * warehouse_* field names those screens expect.
+ *
+ * Creating, renaming and retiring a warehouse happens through /location, which
+ * is the single write path for the whole tree.
+ */
+
+const WAREHOUSE_TYPES = ['STORE', 'SILO'];
 
 @Injectable()
 export class WarehouseService {
-  constructor(
-    private readonly cls: ClsService,
-    private readonly auditService: AuditLogService,
-  ) {}
+  constructor(private readonly cls: ClsService) {}
 
   private get db(): MySql2Database<typeof schema> {
     const tenantDb = this.cls.get<MySql2Database<typeof schema>>('tenantDb');
@@ -27,261 +34,66 @@ export class WarehouseService {
     return tenantDb;
   }
 
-  async create(dto: CreateWarehouseDto, tenantId: string, userPayload?: any) {
-    // 1. Verify company exists
-    const [company] = await this.db
-      .select()
-      .from(schema.companyMaster)
-      .where(and(eq(schema.companyMaster.company_id, dto.company_id), isNull(schema.companyMaster.deleted_at)))
-      .limit(1);
-
-    if (!company) {
-      throw new NotFoundException(`Company with ID '${dto.company_id}' not found.`);
-    }
-
-    // 2. Verify farm exists (if provided)
-    if (dto.farm_id) {
-      const [farm] = await this.db
-        .select()
-        .from(schema.farmMaster)
-        .where(and(eq(schema.farmMaster.farm_id, dto.farm_id), isNull(schema.farmMaster.deleted_at)))
-        .limit(1);
-
-      if (!farm) {
-        throw new NotFoundException(`Farm with ID '${dto.farm_id}' not found.`);
-      }
-    }
-
-    // 3. Check duplicate warehouse code within company scope
-    const existing = await this.db
-      .select()
-      .from(schema.warehouseMaster)
-      .where(
-        and(
-          eq(schema.warehouseMaster.tenant_id, tenantId),
-          eq(schema.warehouseMaster.company_id, dto.company_id),
-          eq(schema.warehouseMaster.warehouse_code, dto.warehouse_code.toUpperCase()),
-          isNull(schema.warehouseMaster.deleted_at)
-        )
-      )
-      .limit(1);
-
-    if (existing.length > 0) {
-      throw new ConflictException(`Warehouse with code '${dto.warehouse_code}' already exists in this company.`);
-    }
-
-    const warehouseId = randomUUID();
-    const newWarehouse = {
-      warehouse_id: warehouseId,
-      tenant_id: tenantId,
-      company_id: dto.company_id,
-      farm_id: dto.farm_id || null,
-      warehouse_code: dto.warehouse_code.toUpperCase(),
-      warehouse_name: dto.warehouse_name,
-      warehouse_type: dto.warehouse_type,
-      is_active: true,
-      status: 'ACTIVE',
-      extension_config: dto.extension_config ? JSON.stringify(dto.extension_config) : null,
-      created_by: userPayload?.userId || null,
-      updated_by: userPayload?.userId || null,
+  /** Location row -> the warehouse_* shape the inventory screens bind to. */
+  private project(row: typeof schema.locationMaster.$inferSelect) {
+    return {
+      warehouse_id: row.location_id,
+      tenant_id: row.tenant_id,
+      company_id: row.company_id,
+      farm_id: row.farm_id,
+      warehouse_code: row.location_code,
+      warehouse_name: row.location_name,
+      warehouse_type: row.storage_type || row.location_type,
+      location_id: row.location_id,
+      location_type: row.location_type,
+      parent_location_id: row.parent_location_id,
+      is_active: row.is_active,
+      status: row.status,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      deleted_at: row.deleted_at,
     };
-
-    await this.db.insert(schema.warehouseMaster).values(newWarehouse);
-
-    await this.auditService.log({
-      tenantId,
-      companyId: dto.company_id,
-      userId: userPayload?.userId,
-      action: 'CREATE',
-      entityName: 'warehouse_master',
-      entityId: warehouseId,
-      newValues: newWarehouse,
-    });
-
-    return this.findOne(warehouseId);
-  }
-
-  async findOne(id: string) {
-    const [warehouse] = await this.db
-      .select()
-      .from(schema.warehouseMaster)
-      .where(and(eq(schema.warehouseMaster.warehouse_id, id), isNull(schema.warehouseMaster.deleted_at)))
-      .limit(1);
-
-    if (!warehouse) {
-      throw new NotFoundException(`Warehouse with ID '${id}' not found.`);
-    }
-
-    return warehouse;
   }
 
   async findAll(query: QueryWarehouseDto, tenantId: string) {
-    // No isNull(deleted_at) filter — list view shows both Active/Inactive states (toggle switch) so a blocked row can be found again and restored.
+    // No deleted_at filter — the list shows Active and Inactive alike so a
+    // blocked row can be found again, matching the old warehouse behaviour.
     const conditions: any[] = [
-      eq(schema.warehouseMaster.tenant_id, tenantId),
+      eq(schema.locationMaster.tenant_id, tenantId),
+      inArray(schema.locationMaster.location_type, WAREHOUSE_TYPES),
     ];
 
-    conditions.push(...masterScopeConditions(this.cls, schema.warehouseMaster, query.companyId));
-    if (query.farmId) {
-      conditions.push(eq(schema.warehouseMaster.farm_id, query.farmId));
-    }
-    if (query.warehouseType) {
-      conditions.push(eq(schema.warehouseMaster.warehouse_type, query.warehouseType));
-    }
-    if (query.isActive !== undefined) {
-      conditions.push(eq(schema.warehouseMaster.is_active, query.isActive));
-    }
+    conditions.push(...masterScopeConditions(this.cls, schema.locationMaster, query.companyId));
+    if (query.farmId) conditions.push(eq(schema.locationMaster.farm_id, query.farmId));
+    if (query.warehouseType) conditions.push(eq(schema.locationMaster.location_type, query.warehouseType));
+    if (query.isActive !== undefined) conditions.push(eq(schema.locationMaster.is_active, query.isActive));
     if (query.search) {
       conditions.push(
         or(
-          like(schema.warehouseMaster.warehouse_code, `%${query.search}%`),
-          like(schema.warehouseMaster.warehouse_name, `%${query.search}%`)
-        )
+          like(schema.locationMaster.location_code, `%${query.search}%`),
+          like(schema.locationMaster.location_name, `%${query.search}%`),
+        ),
       );
     }
 
-    const limit = query.limit || 50;
-    const offset = query.offset || 0;
-
-    return this.db
+    const rows = await this.db
       .select()
-      .from(schema.warehouseMaster)
+      .from(schema.locationMaster)
       .where(and(...conditions))
-      .limit(limit)
-      .offset(offset);
+      .limit(query.limit || 50)
+      .offset(query.offset || 0);
+
+    return rows.map((r) => this.project(r));
   }
 
-  async update(id: string, dto: UpdateWarehouseDto, tenantId: string, userPayload?: any) {
-    const warehouse = await this.findOne(id);
-
-    if (dto.farm_id) {
-      const [farm] = await this.db
-        .select()
-        .from(schema.farmMaster)
-        .where(and(eq(schema.farmMaster.farm_id, dto.farm_id), isNull(schema.farmMaster.deleted_at)))
-        .limit(1);
-
-      if (!farm) {
-        throw new NotFoundException(`Farm with ID '${dto.farm_id}' not found.`);
-      }
-    }
-
-    if (dto.warehouse_code && dto.warehouse_code.toUpperCase() !== warehouse.warehouse_code) {
-      const existing = await this.db
-        .select()
-        .from(schema.warehouseMaster)
-        .where(
-          and(
-            eq(schema.warehouseMaster.tenant_id, tenantId),
-            eq(schema.warehouseMaster.company_id, warehouse.company_id),
-            eq(schema.warehouseMaster.warehouse_code, dto.warehouse_code.toUpperCase()),
-            ne(schema.warehouseMaster.warehouse_id, id),
-            isNull(schema.warehouseMaster.deleted_at)
-          )
-        )
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new ConflictException(`Warehouse with code '${dto.warehouse_code}' already exists in this company.`);
-      }
-    }
-
-    const updates: any = {
-      updated_by: userPayload?.userId || null,
-      updated_at: toMysqlTimestamp(),
-    };
-
-    if (dto.farm_id !== undefined) updates.farm_id = dto.farm_id;
-    if (dto.warehouse_code !== undefined) updates.warehouse_code = dto.warehouse_code.toUpperCase();
-    if (dto.warehouse_name !== undefined) updates.warehouse_name = dto.warehouse_name;
-    if (dto.warehouse_type !== undefined) updates.warehouse_type = dto.warehouse_type;
-    if (dto.is_active !== undefined) updates.is_active = dto.is_active;
-    if (dto.status !== undefined) updates.status = dto.status;
-    if (dto.extension_config !== undefined) updates.extension_config = JSON.stringify(dto.extension_config);
-
-    await this.db
-      .update(schema.warehouseMaster)
-      .set(updates)
-      .where(eq(schema.warehouseMaster.warehouse_id, id));
-
-    await this.auditService.log({
-      tenantId,
-      companyId: warehouse.company_id,
-      userId: userPayload?.userId,
-      action: 'UPDATE',
-      entityName: 'warehouse_master',
-      entityId: id,
-      oldValues: warehouse,
-      newValues: updates,
-    });
-
-    return this.findOne(id);
-  }
-
-  async remove(id: string, tenantId: string, userPayload?: any) {
-    const warehouse = await this.findOne(id);
-    const deletedTime = toMysqlTimestamp();
-
-    await this.db
-      .update(schema.warehouseMaster)
-      .set({
-        is_active: false,
-        status: 'INACTIVE',
-        deleted_at: deletedTime as any,
-        updated_by: userPayload?.userId || null,
-      })
-      .where(eq(schema.warehouseMaster.warehouse_id, id));
-
-    await this.auditService.log({
-      tenantId,
-      companyId: warehouse.company_id,
-      userId: userPayload?.userId,
-      action: 'DELETE',
-      entityName: 'warehouse_master',
-      entityId: id,
-      oldValues: warehouse,
-      newValues: { status: 'INACTIVE', deleted_at: deletedTime },
-    });
-
-    return { success: true, message: `Warehouse '${warehouse.warehouse_name}' has been soft-deleted.` };
-  }
-
-  async restore(id: string, tenantId: string, userPayload?: any) {
-    const [warehouse] = await this.db
+  async findOne(id: string) {
+    const [row] = await this.db
       .select()
-      .from(schema.warehouseMaster)
-      .where(eq(schema.warehouseMaster.warehouse_id, id))
+      .from(schema.locationMaster)
+      .where(and(eq(schema.locationMaster.location_id, id), inArray(schema.locationMaster.location_type, WAREHOUSE_TYPES)))
       .limit(1);
 
-    if (!warehouse) {
-      throw new NotFoundException(`Warehouse with ID '${id}' not found.`);
-    }
-
-    if (!warehouse.deleted_at) {
-      return warehouse;
-    }
-
-    await this.db
-      .update(schema.warehouseMaster)
-      .set({
-        is_active: true,
-        status: 'ACTIVE',
-        deleted_at: null,
-        updated_by: userPayload?.userId || null,
-        updated_at: toMysqlTimestamp(),
-      })
-      .where(eq(schema.warehouseMaster.warehouse_id, id));
-
-    await this.auditService.log({
-      tenantId,
-      companyId: warehouse.company_id,
-      userId: userPayload?.userId,
-      action: 'RESTORE',
-      entityName: 'warehouse_master',
-      entityId: id,
-      newValues: { status: 'ACTIVE', deleted_at: null },
-    });
-
-    return this.findOne(id);
+    if (!row) throw new NotFoundException(`Warehouse with ID '${id}' not found.`);
+    return this.project(row);
   }
 }

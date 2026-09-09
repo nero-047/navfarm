@@ -116,8 +116,8 @@ export class QrCodeService {
 
     let facilityCode: string | null = null;
     if (dto.warehouse_id) {
-      const [wh] = await this.db.select().from(schema.warehouseMaster).where(eq(schema.warehouseMaster.warehouse_id, dto.warehouse_id)).limit(1);
-      facilityCode = wh?.warehouse_code || null;
+      const [wh] = await this.db.select().from(schema.locationMaster).where(eq(schema.locationMaster.location_id, dto.warehouse_id)).limit(1);
+      facilityCode = wh?.location_code || null;
     }
 
     const qrData = {

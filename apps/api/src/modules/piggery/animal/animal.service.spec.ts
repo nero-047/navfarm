@@ -109,7 +109,7 @@ describe('AnimalService', () => {
 
       const result = await service.create(baseDto as any, 'tenant-123', { userId: 'user-1' });
 
-      expect(numberSeriesService.generateNext).toHaveBeenCalledWith('ANIMAL_PIGGERY', 'tenant-123', 'comp-1');
+      expect(numberSeriesService.generateNext).toHaveBeenCalledWith('ANIMAL_PIGGERY', 'tenant-123', 'comp-1', undefined, expect.any(Object));
       const animalInsert = insertedRecords[0];
       expect(animalInsert.total_opening_asset_value).toBe('3057.57');
       expect(animalInsert.animal_code).toBe('PIG-2026-0001');

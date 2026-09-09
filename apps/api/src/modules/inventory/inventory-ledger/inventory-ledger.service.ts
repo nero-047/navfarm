@@ -449,8 +449,8 @@ export class InventoryLedgerService {
         item_description: schema.inventoryLedger.item_description,
         uom: schema.inventoryLedger.uom,
         warehouse_id: schema.inventoryLedger.warehouse_id,
-        warehouse_code: schema.warehouseMaster.warehouse_code,
-        warehouse_name: schema.warehouseMaster.warehouse_name,
+        warehouse_code: schema.locationMaster.location_code,
+        warehouse_name: schema.locationMaster.location_name,
         reorder_level: schema.itemMaster.reorder_level,
         min_stock_level: schema.itemMaster.min_stock_level,
         max_stock_level: schema.itemMaster.max_stock_level,
@@ -458,7 +458,7 @@ export class InventoryLedgerService {
         on_hand_value: sql<string>`COALESCE(SUM(${schema.inventoryLedger.remaining_quantity} * ${schema.inventoryLedger.rate}), 0)`,
       })
       .from(schema.inventoryLedger)
-      .leftJoin(schema.warehouseMaster, eq(schema.inventoryLedger.warehouse_id, schema.warehouseMaster.warehouse_id))
+      .leftJoin(schema.locationMaster, eq(schema.inventoryLedger.warehouse_id, schema.locationMaster.location_id))
       .innerJoin(schema.itemMaster, eq(schema.inventoryLedger.item_id, schema.itemMaster.item_id))
       .where(and(...conditions))
       .groupBy(
@@ -467,8 +467,8 @@ export class InventoryLedgerService {
         schema.inventoryLedger.item_description,
         schema.inventoryLedger.uom,
         schema.inventoryLedger.warehouse_id,
-        schema.warehouseMaster.warehouse_code,
-        schema.warehouseMaster.warehouse_name,
+        schema.locationMaster.location_code,
+        schema.locationMaster.location_name,
         schema.itemMaster.reorder_level,
         schema.itemMaster.min_stock_level,
         schema.itemMaster.max_stock_level,

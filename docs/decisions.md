@@ -82,6 +82,81 @@ The item form does not re-ask for a conversion factor that UOM Conversion
 already holds — it shows it. If none exists, it is captured there and written to
 UOM Conversion.
 
+Extended 2026-09-08: neither UOM picker offers the unit the other already holds,
+and the capture now runs on edit as well as create. It used to run on create
+only, so an item edited to add a secondary unit wrote the factor to its own row
+and nowhere else, and the next item over the same pair was asked again with
+nothing to stop a different answer.
+
+### Item tracking is one three-way choice, over the two columns that already exist
+*Asked 2026-09-08: "one switch for tracking then one for lot/serial and then an
+input and in backend two booleans for lot and serial".*
+
+TDD row 11 wants LOT, SERIAL or neither. The table has `is_lot_tracked` and
+`is_serial_tracked` as independent flags, which can both be ticked — a state the
+requirement has no name for. **The columns stay as they are; the form is what
+changes.** A tracking switch, then a segmented Lot/Serial choice, then the
+number series — the three in one card, in the order they are decided.
+
+Segmented rather than a two-position switch, because a switch cannot label its
+own "off": between "Tracking: on" and the series picker, an unlabelled toggle
+cannot say whether off means Lot or Serial.
+
+Turning tracking off also clears `tracking_series_id`, in the API rather than
+the form. A number left standing on an untracked item reads as configuration
+still in force.
+
+Amended 2026-09-08: the number was briefly made **typed, not picked**, because
+the picker offered BREED and CUSTOMER — series with nothing to do with lot
+numbers.
+
+Reversed the same day. The complaint was right and the fix was not: the picker
+was unfiltered and no lot or serial series existed, which is a missing filter
+and two missing rows, not a reason to store a number here. An item has many lots
+— FEED_STARTER takes one in March and another in April — so no single lot number
+is a property of the item, and the numbers already have homes per transaction on
+`goods_receipt_line.lot_no`, `inventory_ledger.lot_no`, `bio_asset_ledger.lot_no`
+and `qr_code_master.lot_no`. TDD row 12 names the field "No. **Series**", and the
+BC field already in the item's `bcFields` is "Lot Nos.", which in BC is a series.
+
+Row 12's trailing "(manual)" is `no_series_master.allow_manual` — whether a
+number may be typed rather than generated is a property of the series, and it is
+set on both new rows.
+
+So: the picker is back, filtered. `db-seed-item-tracking-series` adds ITEM_LOT
+and ITEM_SERIAL in every scope that already carries an ITEM series, with
+`document_type` LOT / SERIAL so the segmented Tracked By control passes its own
+value straight through as `?documentType=`. The foreign key is restored. The
+card grouping, the segmented control and the clear-on-untrack all stay.
+
+The GRN being BC-owned does not change this: the item names the series, the
+receipt records the number, and `goods-receipt-panel` already captures `lot_no`
+per line — locally until BC connects, like every other BC-owned record.
+
+### The two GL accounts are read in the record, not typed in the form
+*Asked 2026-09-08: "Inventory GL Account (BC) + COGS GL Account (BC) should be
+shown in the detail with a text/chip saying from BC".*
+
+Both are listed in the item's `bcFields`, which puts them in the record view's
+Business Central panel under a From BC chip and takes them out of the create and
+edit form. Narrower than the 2026-09-06 rule above, which keeps BC-owned masters
+editable: that rule is about whole catalogs — an item still has to be creatable
+here. These two fields are BC's answer, and until the connector exists they read
+as a dash rather than as a local guess.
+
+### Stock-control fields hang off the inventory flag; the withdrawal period does not
+*Asked 2026-09-08.*
+
+Min, max and reorder levels, lead time, shelf life and both storage
+temperatures appear only when Inventoriable is on — a non-inventoried item has
+no balance for them to describe.
+
+Withdrawal Period is the exception: it shows when Inventoriable is on **or** the
+item type is MEDICINE/VACCINE. It is a food-safety block that animal disposal
+reads before allowing a slaughter, so a medicine that happens not to be
+inventoried still has to carry one. Capped at two digits (99), per TDD row 21 —
+in the form and in the DTO, so the form refuses what the API would reject.
+
 ---
 
 ## Animal Register
