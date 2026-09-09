@@ -11,7 +11,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, ChevronLeft } from "lucide-react";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { ProfilePopover, type ProfileMenuItem } from "./ProfilePopover";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -414,6 +414,17 @@ export function AppShell(props: AppShellProps) {
   } = props;
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  /**
+   * Which level the drawer is showing. On a module route the drawer used to
+   * stack both navigations — every main item, then every section of the module
+   * under it — which on a phone is a long scroll where the sections you came for
+   * are below the fold.
+   *
+   * It opens on the sections instead, since being inside a module is why you
+   * opened it, with a back button to the main items. Off a module route there is
+   * only one level and no back button.
+   */
+  const [showPrimaryNav, setShowPrimaryNav] = useState(false);
   const [ready, setReady] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLButtonElement>(null);
@@ -440,6 +451,11 @@ export function AppShell(props: AppShellProps) {
   // open and returns to the trigger on close. Page scroll is held by the
   // shared lock rather than by this component reaching for document.body.
   useScrollLock(mobileOpen);
+  // Each opening starts at the level that matches where you are, rather than
+  // wherever the last visit left it.
+  useEffect(() => {
+    if (mobileOpen) setShowPrimaryNav(!contextNav);
+  }, [mobileOpen, contextNav]);
   useEffect(() => {
     if (!mobileOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -502,12 +518,18 @@ export function AppShell(props: AppShellProps) {
           {sidebarSummary && <div className="mt-4">{sidebarSummary}</div>}
         </div>
 
-        <PrimaryNav
-          navItems={navItems}
-          navSectionLabel={navSectionLabel}
-          fallbackPathname={pathname}
-          onItemClick={close}
-        />
+        {/* Below the desktop breakpoint the drawer shows one level at a time.
+            At and above it, `lg:block` puts the main navigation back
+            unconditionally — desktop has room for both, and the sections render
+            in the workspace region rather than here. */}
+        <div className={showPrimaryNav ? "" : "hidden lg:block"}>
+          <PrimaryNav
+            navItems={navItems}
+            navSectionLabel={navSectionLabel}
+            fallbackPathname={pathname}
+            onItemClick={close}
+          />
+        </div>
 
         {/* The module sub-navigation (e.g. Master Data's sections) normally
             lives outside this drawer entirely, in the workspace region below
@@ -524,7 +546,7 @@ export function AppShell(props: AppShellProps) {
             ContextNav's provider contract. */}
         {contextNav && (
           <div
-            className="lg:hidden"
+            className={showPrimaryNav ? "hidden" : "lg:hidden"}
             onClick={(event) => {
               const target = event.target as HTMLElement;
               if (target.closest("[data-context-nav-item], [data-menu-item]")) {
@@ -532,6 +554,16 @@ export function AppShell(props: AppShellProps) {
               }
             }}
           >
+            {/* Back to the main items. Above the sections, because that is what
+                it goes back to, and it is the first thing focus reaches. */}
+            <button
+              type="button"
+              onClick={() => setShowPrimaryNav(true)}
+              className="mb-1 flex w-full items-center gap-2 px-5 py-3 text-left text-[13px] font-medium text-white/70 hover:bg-white/5 hover:text-white"
+            >
+              <ChevronLeft size={16} />
+              {navSectionLabel}
+            </button>
             {contextNav}
           </div>
         )}
