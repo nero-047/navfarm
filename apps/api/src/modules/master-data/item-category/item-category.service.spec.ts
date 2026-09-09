@@ -116,7 +116,7 @@ describe('ItemCategoryService', () => {
 
       const result = await service.create({ company_id: 'comp-1', category_name: 'Feed' }, 'tenant-123', { userId: 'user-1' });
 
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('ITEM_CATEGORY', 'tenant-123', 'comp-1', expect.anything());
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('ITEM_CATEGORY', 'tenant-123', 'comp-1', expect.anything(), expect.any(Object));
       expect(txInsert).toHaveBeenCalledTimes(1);
       expect(result.category_code).toBe('CAT-001');
     });

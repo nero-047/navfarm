@@ -40,7 +40,7 @@ export class StageService {
     if (series.allow_manual && dto.stage_code) {
       return dto.stage_code.toUpperCase();
     }
-    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id);
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id, undefined, dto as unknown as Record<string, unknown>);
   }
 
   /** AUTO_BY_DAY stages must specify which day to auto-move on. */

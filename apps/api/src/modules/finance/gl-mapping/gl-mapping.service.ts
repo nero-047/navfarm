@@ -169,7 +169,7 @@ export class GlMappingService {
 
     // 6. Resolve the mapping code — manual today, automatic once a GL_MAPPING
     // series is configured. Null when neither applies; the column is nullable.
-    const mappingCode = await this.numberSeriesService.resolveOptionalCode('GL_MAPPING', dto.mapping_code, tenantId, dto.company_id);
+    const mappingCode = await this.numberSeriesService.resolveOptionalCode('GL_MAPPING', dto.mapping_code, tenantId, dto.company_id, undefined, dto as unknown as Record<string, unknown>);
 
     const mappingId = randomUUID();
     const newMapping = {

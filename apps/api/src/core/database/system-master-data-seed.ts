@@ -27,7 +27,7 @@ export const SYSTEM_UOM_SEED: Array<{
   { uom_code: 'BAG', uom_name: 'Bag', uom_type: 'COUNT', decimal_places: 0, is_base_uom: false },
   { uom_code: 'SQFT', uom_name: 'Square Feet', uom_type: 'AREA', decimal_places: 2, is_base_uom: true },
   { uom_code: 'SQM', uom_name: 'Square Meter', uom_type: 'AREA', decimal_places: 2, is_base_uom: false },
-  { uom_code: 'HOUR', uom_name: 'Hour', uom_type: 'TIME', decimal_places: 2, is_base_uom: true },
+  { uom_code: 'HR', uom_name: 'Hour', uom_type: 'TIME', decimal_places: 2, is_base_uom: true },
   { uom_code: 'DAY', uom_name: 'Day', uom_type: 'TIME', decimal_places: 0, is_base_uom: false },
 ];
 
@@ -358,28 +358,88 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
   nob_code?: string;
   lob_code?: string;
   prefix?: string;
-  date_format?: string;
   separator: string;
+  seq_separator?: string;
   seq_length: number;
   reset_frequency: 'YEARLY' | 'MONTHLY' | 'NEVER';
   allow_manual?: boolean;
+  code_segments?: string[];
+  prefix_position?: 'START' | 'END';
 }> = [
+  // One series per master, named after the master it serves. There used to be a
+  // row per VARIANT — LOCATION_FARM, LOCATION_SHED, LOCATION_PEN and so on, one
+  // more with every location type anyone added — because a series held exactly
+  // one prefix, so anything that varied needed its own row. A series takes the
+  // varying part as a segment now, and one row covers every variant.
+  //
+  // Three shapes:
+  //   named   the code IS the name. Sequence Digits 0, no prefix, one name
+  //           segment: a breed is LARGE_WHITE, and LARGE_WHITE-001 would count
+  //           something already unique. A repeat is rejected, not numbered.
+  //   built   composed from the record's own fields plus a prefix.
+  //   serial  prefix and number, because the name is prose. "Demo Grain and
+  //           Feed Suppliers" is better as SUP-004 than DEMO_GRAIN_AND_FEED.
+
+  // named
+  { series_code: 'BREED', series_name: 'Breed Code', document_type: 'BREED', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['breed_name'] },
+  { series_code: 'ITEM_TYPE', series_name: 'Item Type Code', document_type: 'ITEM_TYPE', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['type_name'] },
+  { series_code: 'ITEM_ATTRIBUTE', series_name: 'Item Attribute Code', document_type: 'ITEM_ATTRIBUTE', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['attribute_name'] },
+  { series_code: 'LOCATION_TYPE', series_name: 'Location Type Code', document_type: 'LOCATION_TYPE', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['type_name'] },
+  // The name, not UOM-001 — a unit called UOM-003 tells nobody what it measures.
+  // Most units then get typed over: of the ten in use, Dose, Gram and Hour come
+  // straight from their name while KG, ML, LITER, HR and the rest are the
+  // standard symbol, which no rule derives from "Kilogram" or "Millilitre".
+  // allow_manual is what makes that the normal case rather than a workaround.
+  { series_code: 'UOM', series_name: 'Unit of Measure Code', document_type: 'UOM', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['uom_name'] },
+  // A sub-category is not a master of its own — it is an item category with a
+  // parent, so one series covers both, and its code is its own name alone.
+  //
+  // It briefly carried its parent too (FEED-LACTATION, matching the hand-made
+  // codes already in the data), but the item code names the category and the
+  // sub-category as separate parts — <category>-<sub-category> — so a
+  // sub-category repeating its parent put FEED in an item code three times.
+  // The parent belongs there once, via the category segment.
+  //
+  // The cost: two sub-categories with the same name under different parents
+  // collide, and the second is refused rather than numbered. That is the same
+  // rule every name-based master follows.
+  { series_code: 'ITEM_CATEGORY', series_name: 'Item Category Code', document_type: 'ITEM_CATEGORY', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['category_name'] },
+
+  // built
+  { series_code: 'ITEM', series_name: 'Item Code', document_type: 'ITEM', prefix: 'ITM', separator: '-', seq_length: 4, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['item_type', 'category_id', 'sub_category'] },
+  // The year comes off the animal's own dob, not off the clock: an animal
+  // entered late used to be stamped with the year of typing.
+  { series_code: 'ANIMAL', series_name: 'Animal Code', document_type: 'ANIMAL', nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', prefix: 'PIG', separator: '-', seq_length: 4, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['dob:YEAR'], prefix_position: 'START' },
+  // "/" between the levels of the path and "-" before the number, so the code
+  // reads as a path ending in a count — FARM-001/SHED-001/PEN-001 — and a
+  // first-level location, having no parent to name, is simply FARM-001.
+  { series_code: 'LOCATION', series_name: 'Location Code', document_type: 'LOCATION', separator: '/', seq_separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['parent_location_id', 'location_type'] },
+  // TDD row 75: "Lifecycle ID, should be auto-fetched using a (breed data)".
+  // Breed and stage together say what the row is for — LARGE_WHITE-GESTATION —
+  // and the number distinguishes the period ranges within that pair, of which a
+  // breed and stage can have several.
+  { series_code: 'BREED_LIFECYCLE_STAGE', series_name: 'Breed Lifecycle Stage Code', document_type: 'BREED_LIFECYCLE_STAGE', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['breed_id', 'stage_id'] },
+
+  // serial
   { series_code: 'BATCH', series_name: 'Batch Number', document_type: 'BATCH', prefix: 'BATCH', separator: '-', seq_length: 6, reset_frequency: 'NEVER' },
   { series_code: 'REASON', series_name: 'Reason Code', document_type: 'REASON', prefix: 'RSN', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
-  { series_code: 'ANIMAL_PIGGERY', series_name: 'Piggery Animal Code', document_type: 'ANIMAL', nob_code: 'LIVESTOCK', lob_code: 'LVS_PIGGERY', prefix: 'PIG', date_format: 'YYYY', separator: '-', seq_length: 4, reset_frequency: 'YEARLY' },
-  { series_code: 'ITEM', series_name: 'Item Code', document_type: 'ITEM', prefix: 'ITM', separator: '-', seq_length: 4, reset_frequency: 'NEVER' },
-  { series_code: 'SUPPLIER', series_name: 'Supplier Code', document_type: 'SUPPLIER', prefix: 'SUP', separator: '-', seq_length: 3, reset_frequency: 'NEVER' },
-  { series_code: 'CUSTOMER', series_name: 'Customer Code', document_type: 'CUSTOMER', prefix: 'CUS', separator: '-', seq_length: 3, reset_frequency: 'NEVER' },
-  { series_code: 'RESOURCE', series_name: 'Resource Code', document_type: 'RESOURCE', prefix: 'RES', separator: '-', seq_length: 3, reset_frequency: 'NEVER' },
-  ...SYSTEM_LOCATION_TYPE_SEED.map((type) => ({
-    series_code: `LOCATION_${type.type_code}`,
-    series_name: `${type.type_name} Location`,
-    document_type: 'LOCATION',
-    prefix: type.code_prefix,
-    separator: '-',
-    seq_length: 3,
-    reset_frequency: 'NEVER' as const,
-  })),
+  { series_code: 'SUPPLIER', series_name: 'Supplier Code', document_type: 'SUPPLIER', prefix: 'SUP', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'CUSTOMER', series_name: 'Customer Code', document_type: 'CUSTOMER', prefix: 'CUS', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'RESOURCE', series_name: 'Resource Code', document_type: 'RESOURCE', prefix: 'RES', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'UOM_CONVERSION', series_name: 'UOM Conversion Code', document_type: 'UOM_CONVERSION', prefix: 'CONV', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'STAGE', series_name: 'Stage Code', document_type: 'STAGE', prefix: 'STG', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'SPECIES', series_name: 'Species Code', document_type: 'SPECIES', prefix: 'SPC', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'DISEASE', series_name: 'Disease Code', document_type: 'DISEASE', prefix: 'DIS', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'FEED_FORMULA', series_name: 'Feed Formula Code', document_type: 'FEED_FORMULA', prefix: 'FORM', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+
+  { series_code: 'COST_CENTER', series_name: 'Cost Center Code', document_type: 'COST_CENTER', prefix: 'CC', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'GL_ACCOUNT', series_name: 'GL Account Code (reserved; BC-owned catalog)', document_type: 'GL_ACCOUNT', prefix: 'GL', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  { series_code: 'GL_MAPPING', series_name: 'GL Mapping Code', document_type: 'GL_MAPPING', prefix: 'GLMAP', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  // No LOT or SERIAL series. One item has many lots, so a lot number is not a
+  // property of the item — it belongs to the receipt that delivered it, and
+  // goods_receipt_line.lot_no is where it is captured. Nothing ever generated
+  // from these two; they existed only to give the Item form's Tracking No.
+  // Series picker something to offer.
 ];
 
 /**

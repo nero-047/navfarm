@@ -130,7 +130,7 @@ describe('GlAccountService', () => {
       );
 
       expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('GL_ACCOUNT', 'ASSET', 'tenant-123', 'comp-1');
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('GL_ACCOUNT_ASSET', 'tenant-123', 'comp-1', expect.anything());
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('GL_ACCOUNT_ASSET', 'tenant-123', 'comp-1', expect.anything(), expect.any(Object));
       expect(result.account_code).toBe('1-0001');
     });
 

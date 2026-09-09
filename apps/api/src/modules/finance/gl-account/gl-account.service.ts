@@ -194,7 +194,7 @@ export class GlAccountService {
           )),
       });
     } else {
-      accountCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id, tx);
+      accountCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id, tx, dto as unknown as Record<string, unknown>);
     }
 
     if (accountCode.length > 255) {

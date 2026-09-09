@@ -519,6 +519,62 @@
       "when": 1788846367306,
       "tag": "0073_narrow_the_call",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "5",
+      "when": 1788860055473,
+      "tag": "0074_public_sebastian_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "5",
+      "when": 1788868738868,
+      "tag": "0075_perfect_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "5",
+      "when": 1788877964940,
+      "tag": "0076_fast_sandman",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "5",
+      "when": 1788882140262,
+      "tag": "0077_real_quicksilver",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "5",
+      "when": 1788885546249,
+      "tag": "0078_yummy_catseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "5",
+      "when": 1788886727170,
+      "tag": "0079_omniscient_adam_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "5",
+      "when": 1788895642743,
+      "tag": "0080_quiet_runaways",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "5",
+      "when": 1788949552439,
+      "tag": "0081_curved_moondragon",
+      "breakpoints": true
     }
   ]
 }

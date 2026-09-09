@@ -130,7 +130,7 @@ describe('CostCenterService', () => {
       );
 
       expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('COST_CENTER', 'DEPARTMENT', 'tenant-123', 'comp-1');
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('COST_CENTER_DEPARTMENT', 'tenant-123', 'comp-1', expect.anything());
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('COST_CENTER_DEPARTMENT', 'tenant-123', 'comp-1', expect.anything(), expect.any(Object));
       expect(result.cost_center_code).toBe('DEPT-001');
     });
 

@@ -117,7 +117,7 @@ describe('DiseaseService', () => {
       const result = await service.create({ company_id: 'comp-1', disease_name: 'Newcastle Disease' }, 'tenant-123');
 
       expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('DISEASE', null, 'tenant-123', 'comp-1');
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('DISEASE', 'tenant-123', 'comp-1');
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('DISEASE', 'tenant-123', 'comp-1', undefined, expect.any(Object));
       expect(result.disease_code).toBe('DIS-001');
     });
 

@@ -7,6 +7,7 @@ import { InlineAlert } from "@/components/ui/alert";
 import type { MasterDataConfig } from "./types";
 import { singularLabel } from "./labels";
 import { BcOwnershipNotice } from "./BcOwnershipNotice";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { MasterFieldValue } from "./MasterFieldValue";
 import { getActiveWorkspaceScope } from "@/hooks/useAuth";
 
@@ -22,22 +23,45 @@ export function MasterRecordView({ config, id, onClose }: { config: MasterDataCo
     }).catch((err: Error) => { if (!cancelled) setError(err.message || "Could not load record."); });
     return () => { cancelled = true; };
   }, [config.apiBase, id]);
+  // A form-only gate (Item Tracking) has no column of its own: it is whether any
+  // of the columns it stands for is set. Derive it here the way the form does
+  // when editing, or every field behind such a gate reads as hidden on every
+  // record — the gate would evaluate "off" purely because the record has no key
+  // by that name. MySQL tinyint arrives as 1 as readily as true.
+  const gates: Record<string, unknown> = {};
+  const isOn = (key: string) => record?.[key] === true || record?.[key] === 1;
+  config.fields.forEach((field) => {
+    if (field.seedFromAnyTrue) gates[field.key] = field.seedFromAnyTrue.some(isOn);
+    // Same for a control that stands in for a set of boolean columns: its value
+    // is whichever column is set, and a label reading off it ("Lot No. Series")
+    // has to resolve here as well as in the form.
+    if (field.booleanColumns) gates[field.key] = Object.entries(field.booleanColumns).find(([, column]) => isOn(column))?.[0] ?? "";
+  });
+  const conditionValues = { ...record, ...gates };
+  const labelOf = (field: { label: string; labelWhen?: { key: string; labels: Record<string, string> } }) =>
+    (field.labelWhen && field.labelWhen.labels[String(conditionValues[field.labelWhen.key] ?? "")]) || field.label;
   const fields = config.fields.filter((field) => !field.filterOnly && field.key !== "company_id" &&
     !(getActiveWorkspaceScope() === "OPERATIONAL" && ["nob_id", "lob_id"].includes(field.key)) &&
     !config.bcFields?.some((bcField) => bcField.key === field.key) &&
     (!field.hideInForm || field.readOnly) &&
     (!field.visibleWhen || field.visibleWhen.anyOf.some((condition) => {
-      const value = record?.[condition.key];
+      const value = conditionValues?.[condition.key];
       return condition.equals === undefined ? !!value : (Array.isArray(condition.equals) ? condition.equals : [condition.equals]).includes(value as string | boolean);
     })));
   return <Dialog open onClose={onClose} title={`View ${singularLabel(config)}`} maxWidth="xl"
     presentation={fields.length > 10 ? "page" : "modal"}
     footer={<button type="button" className="nf-button" onClick={onClose}>Close</button>}>
     {error ? <InlineAlert>{error}</InlineAlert> : !record ? <p role="status">Loading record…</p> : <div className="grid gap-6">
+      {/* A blocked record still reads in full — the label says what it is, and
+          every field stays where it was. Blocking is not a reason to hide the
+          record: the list keeps blocked rows precisely so they can be looked at
+          and restored. */}
+      {(record.is_active === false || !!record.deleted_at) &&
+        <p><StatusBadge status="BLOCKED" label="Blocked" /></p>}
       {config.owner === "BC" && <BcOwnershipNotice config={config} />}
       <dl className={`grid grid-cols-1 gap-4 sm:grid-cols-2${config.owner === "BC" ? " order-last" : ""}`}>
         {fields.map((field) => <div key={field.key} className="min-w-0">
-          <dt className="text-xs text-(--text-muted)">{field.label}</dt>
+          <dt className="text-xs text-(--text-muted)">{labelOf(field)}</dt>
           <dd className="mt-1 whitespace-pre-wrap break-words text-sm"><MasterFieldValue field={field} value={record[field.key]} record={record} /></dd>
         </div>)}
       </dl>

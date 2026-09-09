@@ -31,6 +31,9 @@ const STATUS_VARIANT: Record<string, BadgeProps['variant']> = {
   // Batch / production lifecycle
   ACTIVE: 'success',
   INACTIVE: 'neutral',
+  // Deliberate and reversible, but it changes what the record can be used for —
+  // attention, not a failure and not a quiet terminal state.
+  BLOCKED: 'warning',
   COMPLETED: 'success',
 
   // Alert severity

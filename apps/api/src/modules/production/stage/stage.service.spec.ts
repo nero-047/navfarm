@@ -212,7 +212,7 @@ describe('StageService', () => {
       );
 
       expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('STAGE', 'PRE_PRODUCTIVE', 'tenant-123', undefined);
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('STAGE_PRE_PRODUCTIVE', 'tenant-123', undefined);
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('STAGE_PRE_PRODUCTIVE', 'tenant-123', undefined, undefined, expect.any(Object));
       expect(result.stage_code).toBe('STG-001');
     });
 

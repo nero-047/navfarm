@@ -42,7 +42,7 @@ export class ItemTypeService {
     if (series.allow_manual && dto.type_code) {
       return dto.type_code.toUpperCase();
     }
-    return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, undefined, dto as unknown as Record<string, unknown>);
   }
 
   async create(dto: CreateItemTypeDto, tenantId: string, userPayload?: any) {

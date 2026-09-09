@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/services/api-client";
 import type { MasterDataField } from "./types";
 import { getActiveCompanyId, getActiveWorkspaceScope, getActiveOperationalAreaId } from "@/hooks/useAuth";
 
-const CODE_SERIES: Record<string, [string, string, string?]> = {
+/** [series/document key, the master's own code field, the type field driving type-specific series] */
+export const CODE_SERIES: Record<string, [string, string, string?]> = {
   reason: ["REASON", "reason_code"],
   animal: ["ANIMAL", "animal_code"],
   species: ["SPECIES", "species_code"],
@@ -46,8 +47,30 @@ export function useCodeSeries(key: string, form: Record<string, unknown>, enable
   const type = definition?.[2] ? String(form[definition[2]] || "") : "";
   const parentId = String(form[PARENT_FIELDS[key]] || "");
   const lobId = key === "animal" ? String(form.lob_id || "") : "";
+  // The whole in-progress record goes to the preview, so a series configured
+  // with code_segments / prefix_field previews the code it will actually
+  // allocate. Without it the form showed the prefix-only shape while the save
+  // wrote the composed one — a preview that disagrees with the result is worse
+  // than none. Only scalars are sent; a nested value can never be a segment.
+  const record = useMemo(() => JSON.stringify(
+    Object.fromEntries(
+      Object.entries(form)
+        // The code field itself is never a segment, and while it is being typed
+        // it would re-request the preview that is about to replace it.
+        .filter(([k]) => k !== definition?.[1])
+        .filter(([, v]) =>
+          v !== "" && v !== null && v !== undefined && (typeof v === "string" || typeof v === "number" || typeof v === "boolean"))
+    )
+  ), [form, definition]);
+  // A segment can come from a field being typed into, so the record changes on
+  // every keystroke. Debounced, or the preview fires a request per character.
+  const [settledRecord, setSettledRecord] = useState(record);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledRecord(record), 300);
+    return () => clearTimeout(timer);
+  }, [record]);
   const scopeKey = `${getActiveWorkspaceScope()}:${getActiveCompanyId()}:${getActiveOperationalAreaId()}`;
-  const requestKey = `${scopeKey}:${key}:${type}:${parentId}:${lobId}:${revision}`;
+  const requestKey = `${scopeKey}:${key}:${type}:${parentId}:${lobId}:${settledRecord}:${revision}`;
   const [result, setResult] = useState<{ key: string; settings?: Settings; error?: string }>();
   const [selection, setSelection] = useState<{ key: string; mode: "serial" | "manual" }>();
   useEffect(() => {
@@ -58,12 +81,15 @@ export function useCodeSeries(key: string, form: Record<string, unknown>, enable
     if (type) params.set("type", type);
     if (parentId) params.set("parentId", parentId);
     if (lobId) params.set("lobId", lobId);
+    // 4000 is the DTO's cap; past it the preview asks without the record rather
+    // than being rejected, and falls back to the prefix-only shape.
+    if (settledRecord.length > 2 && settledRecord.length <= 4000) params.set("record", settledRecord);
     api.get(`/number-series/preview?${params}`).then((res) => {
       const data = res?.data || res;
       if (!cancelled) setResult({ key: requestKey, settings: { generated: data.generated === true, allowManual: data.allowManual !== false, preview: data.preview } });
     }).catch((err: Error) => { if (!cancelled) setResult({ key: requestKey, error: err.message || "Could not check code numbering." }); });
     return () => { cancelled = true; };
-  }, [key, type, parentId, lobId, scopeKey, enabled, canGenerate, requestKey]);
+  }, [key, type, parentId, lobId, settledRecord, scopeKey, enabled, canGenerate, requestKey]);
   const current = result?.key === requestKey ? result : undefined;
   const modeKey = `${scopeKey}:${key}`;
   const mode = selection?.key === modeKey ? selection.mode : "serial";
@@ -92,4 +118,9 @@ export function useCodeSeries(key: string, form: Record<string, unknown>, enable
         helpText: manual ? "Enter a unique manual code for this master." : awaitingLocationType ? "The selected Location Type determines the numbering series." : "Live preview — allocated when saved. Another user's save may change the final number." };
     },
   };
+}
+
+/** The field holding a master's own code, so a code cannot be built out of itself. */
+export function codeFieldOf(masterKey: string): string | undefined {
+  return CODE_SERIES[masterKey]?.[1];
 }

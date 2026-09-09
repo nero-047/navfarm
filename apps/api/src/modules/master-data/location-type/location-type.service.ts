@@ -53,7 +53,7 @@ export class LocationTypeService {
 
   async create(dto: CreateLocationTypeDto, tenantId: string, user?: any) {
     const companyId = dto.company_id || null;
-    const typeCode = await this.numberSeriesService.resolveNewCode('LOCATION_TYPE', dto.type_code, tenantId, companyId);
+    const typeCode = await this.numberSeriesService.resolveNewCode('LOCATION_TYPE', dto.type_code, tenantId, companyId, undefined, dto as unknown as Record<string, unknown>);
     const [duplicate] = await this.db.select().from(schema.locationTypeMaster).where(and(
       eq(schema.locationTypeMaster.tenant_id, tenantId),
       eq(schema.locationTypeMaster.type_code, typeCode),
@@ -87,14 +87,13 @@ export class LocationTypeService {
       created_by: user?.userId || null, updated_by: user?.userId || null,
     };
 
+    // No series is minted here any more. A location type used to get its own
+    // LOCATION_<TYPE> row, because a series held one prefix and each type needed
+    // a different one — so the Number Series list grew by one every time someone
+    // added a type. The single LOCATION series takes location_type as a segment
+    // instead, and covers every type from one row.
     await this.db.transaction(async (tx) => {
       await tx.insert(schema.locationTypeMaster).values(row);
-      await tx.insert(schema.noSeriesMaster).values({
-        series_id: randomUUID(), tenant_id: tenantId, company_id: companyId,
-        series_code: seriesCodeFor(typeCode), series_name: `${dto.type_name} Location`,
-        document_type: 'LOCATION', prefix, separator: '-',
-        seq_length: 3, current_seq: currentSeq, reset_frequency: 'NEVER', allow_manual: true,
-      });
     });
     await this.auditService.log({ tenantId, companyId: companyId || undefined, userId: user?.userId, action: 'CREATE', entityName: 'location_type_master', entityId: row.location_type_id, newValues: row });
     return this.findOne(row.location_type_id, tenantId);

@@ -11,6 +11,13 @@ export function formatMasterValue(value: unknown, field?: MasterDataField): stri
   if (Array.isArray(value) && !value.length) return field?.multiple ? "All stages" : "—";
   if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) return value.join(", ");
   if (field?.type === "number" && Number.isFinite(Number(value))) return String(Number(value));
+  // TDD row 102 asks for DD/MM/YYYY. Read the parts off the raw string rather
+  // than through Date's local timezone, which shifts a bare "2026-09-08" back a
+  // day for anyone west of UTC and would misdate a record on its own detail page.
+  if (field?.type === "date" && typeof value === "string") {
+    const [, y, m, d] = /^(\d{4})-(\d{2})-(\d{2})/.exec(value) || [];
+    if (d) return `${d}/${m}/${y}`;
+  }
   if (Array.isArray(value) && value.every((entry) => entry?.attribute_name && "attribute_value" in entry)) {
     return value.map((entry) => `${entry.attribute_name}: ${entry.attribute_value ?? "—"}`).join("\n");
   }

@@ -9,15 +9,12 @@ import type { MasterDataConfig } from "./types";
  * 2026-09-06.
  *
  * Each master supplies its own citation through `bcNote` — one hardcoded
- * sentence about Items and the COA would be wrong on every other screen.
+ * sentence about Items and the COA would be wrong on every other screen. That
+ * citation moved to the tooltip: it is provenance worth keeping and worth
+ * reading once, not a paragraph to re-read on every visit to the screen.
  */
 export function BcOwnershipNotice({ config }: { config: MasterDataConfig }) {
-  return <p role="note" className="text-sm text-(--text-secondary)">
-    <strong>To come from Business Central — held locally for now.</strong>{" "}
-    {config.bcNote}
-    {" "}The BC integration is not connected yet, so these records are created and
-    read from the NAVFarm database in the meantime. They are local records, not
-    synchronized BC data.
-    {" "}“From BC” marks the intended source of a field.
+  return <p role="note" title={config.bcNote} className="text-sm text-(--text-secondary)">
+    Owned by Business Central — held locally until the integration is connected.
   </p>;
 }

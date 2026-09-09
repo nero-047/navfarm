@@ -42,7 +42,7 @@ export class FeedFormulaService {
     if (series.allow_manual && dto.formula_code) {
       return dto.formula_code.toUpperCase();
     }
-    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id);
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id, undefined, dto as unknown as Record<string, unknown>);
   }
 
   async create(dto: CreateFeedFormulaDto, tenantId: string, userPayload?: any) {

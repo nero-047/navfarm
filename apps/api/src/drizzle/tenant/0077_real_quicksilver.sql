@@ -1,0 +1,1 @@
+ALTER TABLE `no_series_master` DROP COLUMN `prefix_field`;

@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsInt, Min, IsNumber, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsInt, Min, Max, MaxLength, IsNumber, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+
+// TDD row 21 specifies the withdrawal period as two digits.
+const MAX_WITHDRAWAL_DAYS = 99;
 
 export class ItemAttributeValueInput {
   @ApiProperty({ description: 'Attribute UUID definition link' })
@@ -95,7 +98,7 @@ export class CreateItemDto {
   @IsOptional()
   is_serial_tracked?: boolean;
 
-  @ApiProperty({ description: 'Number Series UUID used to generate this item\'s lot/serial tracking numbers', required: false })
+  @ApiProperty({ description: 'no_series_master row the lot/serial numbers for this item are drawn from. The numbers themselves are recorded per transaction, on goods_receipt_line and inventory_ledger.', required: false })
   @IsUUID()
   @IsOptional()
   tracking_series_id?: string;
@@ -152,9 +155,10 @@ export class CreateItemDto {
   @IsOptional()
   storage_temp_max?: number;
 
-  @ApiProperty({ description: 'Days after last administration before an animal treated with this item may be slaughtered. Mandatory for MEDICINE/VACCINE items.', required: false })
+  @ApiProperty({ description: 'Days after last administration before an animal treated with this item may be slaughtered. Mandatory for MEDICINE/VACCINE items.', required: false, maximum: MAX_WITHDRAWAL_DAYS })
   @IsInt()
   @Min(0)
+  @Max(MAX_WITHDRAWAL_DAYS)
   @IsOptional()
   withdrawal_days?: number;
 
@@ -333,9 +337,10 @@ export class UpdateItemDto {
   @IsOptional()
   storage_temp_max?: number;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, maximum: MAX_WITHDRAWAL_DAYS })
   @IsInt()
   @Min(0)
+  @Max(MAX_WITHDRAWAL_DAYS)
   @IsOptional()
   withdrawal_days?: number;
 

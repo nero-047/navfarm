@@ -7,6 +7,7 @@ export type FieldType =
   | "date"
   | "select"
   | "select-entity"
+  | "field-list"
   | "json"
   | "string-list";
 
@@ -127,6 +128,16 @@ export interface MasterDataField {
    */
   jsonRow?: MasterDataField[];
   /**
+   * Rows this list always carries. Every row from `endpoint` whose `flag`
+   * column is true is present from the moment the form opens, keyed by `key`,
+   * and cannot be removed or repointed — an item attribute marked Mandatory is
+   * on every item in scope, so leaving it off is not one of the choices the
+   * form should offer.
+   *
+   * The value is still typed per item; only the row's presence is fixed.
+   */
+  requiredRows?: { endpoint: string; flag: string; key: string };
+  /**
    * Field exists purely to scope a sibling select-entity field's options (e.g. a helper
    * nob_id/lob_id pair on a form whose own table has no such column) — collected in the form
    * but excluded from the save payload.
@@ -140,6 +151,81 @@ export interface MasterDataField {
   hideInTable?: boolean;
   /** Column width hint for number inputs supporting decimals */
   step?: string;
+  /** Bounds for type "number". Mirror whatever the DTO enforces, so the form
+   *  refuses a value the API would reject rather than round-tripping a 400. */
+  min?: number;
+  max?: number;
+  /**
+   * Keys this switch clears when it is turned off, and the value to clear them
+   * to. A form-only Yes/No that gates real columns: "Use a prefix" off must
+   * actually blank the prefix, not merely hide it, or the code keeps carrying a
+   * prefix nobody can see.
+   */
+  clearsWhenOff?: Record<string, string | number>;
+  /** Seeds a form-only switch from a stored value: on when the value is truthy and not 0. */
+  seedFromValueOf?: string;
+  /**
+   * For "field-list" and for a "select" over another master's fields: the key of
+   * the sibling field naming that master (e.g. "series_code" on Number Series,
+   * holding ITEM / BREED / LOCATION). The options are that master's own fields,
+   * so the picker changes with the master rather than listing a fixed set.
+   */
+  fieldsOf?: string;
+  /**
+   * Render a `select` as a segmented group — every option's label visible at
+   * once — rather than a dropdown. For a two-way choice the person filling the
+   * form has to weigh (Lot vs Serial), a closed dropdown hides half the
+   * question, and a plain on/off switch is worse still: "off" cannot say what
+   * it means.
+   */
+  control?: "segmented";
+  /**
+   * Value this control starts on once it appears. A segmented choice between
+   * two options has no meaningful empty state — "neither" is what the switch
+   * above it already says — so it opens on one rather than on nothing.
+   */
+  defaultValue?: string;
+  /**
+   * Label that follows another field's value: Tracking No. Series reads "Lot
+   * No. Series" or "Serial No. Series" depending on what the item is tracked
+   * by, because the series it points at is one or the other, never both. Falls
+   * back to `label` when the named field holds a value with no entry here.
+   */
+  labelWhen?: { key: string; labels: Record<string, string> };
+  /**
+   * Drop from this field's options any value already chosen in the listed
+   * sibling fields. Primary and Secondary UOM must not be the same unit — a
+   * conversion factor between a unit and itself says nothing.
+   *
+   * Compared against `entityValueKey`, which is what the form actually stores
+   * (UOM stores `uom_code`, most other pickers store the row's UUID), never
+   * against the label, which joins code and name for display only.
+   */
+  excludeValuesOf?: string[];
+  /**
+   * A form-only control standing in for a set of boolean columns: the chosen
+   * option's column is written `true` and every other one `false`. Set
+   * `filterOnly` alongside it — the field's own key is not a column.
+   *
+   * TDD row 11 asks for one three-way choice (LOT, SERIAL, or neither) while
+   * the table carries `is_lot_tracked` and `is_serial_tracked` as independent
+   * flags that can both be ticked at once. This reconciles the two without a
+   * migration: the form can only express the states the requirement allows,
+   * and what gets written is the pair of columns the API already validates.
+   *
+   * While the control is hidden — its `visibleWhen` gate off — every column is
+   * written `false`. Turning tracking off has to clear both flags, not leave
+   * the last choice standing in the database.
+   */
+  booleanColumns?: Record<string, string>;
+  /**
+   * Seed a form-only boolean when editing: on when any of the listed columns on
+   * the record is true. The "is this tracked at all?" gate has no column of its
+   * own — it is precisely whether either tracking flag is set — so without this
+   * an already-tracked item would open with the gate off and its own tracking
+   * fields hidden.
+   */
+  seedFromAnyTrue?: string[];
   /**
    * For type "json" holding an array of objects: when the API's read shape has
    * more keys than its write shape accepts (e.g. a joined display field), list

@@ -56,7 +56,12 @@ export class BreedService {
     if (series.allow_manual && dto.breed_code) {
       return dto.breed_code.toUpperCase();
     }
-    if (!location) return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, executor);
+    // The record goes to the generator so a series configured with
+    // code_segments / prefix_field can read its own fields — breed_name is the
+    // one Rishi named, giving LARGEWHITE-0001 rather than BRD-0001.
+    if (!location) {
+      return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, executor, dto as unknown as Record<string, unknown>);
+    }
     const code = await generateCompositeCode({
       parentCode: location.location_code, prefix: series.prefix || dto.breed_type, seqLength: series.seq_length,
       fetchSiblingCodes: () => executor.select({ code: schema.breedMaster.breed_code }).from(schema.breedMaster).where(and(
@@ -86,7 +91,7 @@ export class BreedService {
 
   async createSpecies(dto: CreateSpeciesDto, tenantId: string, userPayload?: any) {
     const companyId = dto.company_id || null;
-    const speciesCode = await this.numberSeriesService.resolveNewCode('SPECIES', dto.species_code, tenantId, companyId);
+    const speciesCode = await this.numberSeriesService.resolveNewCode('SPECIES', dto.species_code, tenantId, companyId, undefined, dto as unknown as Record<string, unknown>);
 
     // Check duplicate code
     const duplicateConditions = [
@@ -670,7 +675,7 @@ export class BreedService {
     // breed_lifecycle_stages has no company_id — a row is scoped through its breed —
     // so the code resolves against the tenant-wide series scope. Manual today,
     // automatic once a BREED_LIFECYCLE_STAGE series is configured, null otherwise.
-    const lifecycleCode = await this.numberSeriesService.resolveOptionalCode('BREED_LIFECYCLE_STAGE', dto.lifecycle_code, tenantId, null);
+    const lifecycleCode = await this.numberSeriesService.resolveOptionalCode('BREED_LIFECYCLE_STAGE', dto.lifecycle_code, tenantId, null, undefined, dto as unknown as Record<string, unknown>);
 
     const lifecycleId = randomUUID();
     const newLifecycleStage = {
@@ -679,6 +684,7 @@ export class BreedService {
       lifecycle_code: lifecycleCode,
       breed_id: dto.breed_id,
       stage_id: dto.stage_id,
+      category: dto.category || null,
       calc_unit: dto.calc_unit,
       period_from: dto.period_from,
       period_to: dto.period_to,
@@ -697,6 +703,7 @@ export class BreedService {
       medication_protocol: dto.medication_protocol ? JSON.stringify(dto.medication_protocol) : null,
       vaccination_protocol: dto.vaccination_protocol ? JSON.stringify(dto.vaccination_protocol) : null,
       resource_requirements: dto.resource_requirements ? JSON.stringify(dto.resource_requirements) : null,
+      kpi_thresholds: dto.kpi_thresholds ? JSON.stringify(dto.kpi_thresholds) : null,
       kpi_lower_limit: dto.kpi_lower_limit?.toString() || null,
       kpi_upper_limit: dto.kpi_upper_limit?.toString() || null,
       alert_severity: dto.alert_severity || null,
@@ -777,6 +784,7 @@ export class BreedService {
     const lifecycleCode = await this.numberSeriesService.editedCode('BREED_LIFECYCLE_STAGE', dto.lifecycle_code, lifecycleStage.lifecycle_code, tenantId, null);
     if (lifecycleCode) updates.lifecycle_code = lifecycleCode;
     if (dto.stage_id !== undefined) updates.stage_id = dto.stage_id;
+    if (dto.category !== undefined) updates.category = dto.category || null;
     if (dto.calc_unit !== undefined) updates.calc_unit = dto.calc_unit;
     if (dto.period_from !== undefined) updates.period_from = dto.period_from;
     if (dto.period_to !== undefined) updates.period_to = dto.period_to;
@@ -795,6 +803,7 @@ export class BreedService {
     if (dto.medication_protocol !== undefined) updates.medication_protocol = JSON.stringify(dto.medication_protocol);
     if (dto.vaccination_protocol !== undefined) updates.vaccination_protocol = JSON.stringify(dto.vaccination_protocol);
     if (dto.resource_requirements !== undefined) updates.resource_requirements = JSON.stringify(dto.resource_requirements);
+    if (dto.kpi_thresholds !== undefined) updates.kpi_thresholds = JSON.stringify(dto.kpi_thresholds);
     if (dto.kpi_lower_limit !== undefined) updates.kpi_lower_limit = dto.kpi_lower_limit?.toString() || null;
     if (dto.kpi_upper_limit !== undefined) updates.kpi_upper_limit = dto.kpi_upper_limit?.toString() || null;
     if (dto.alert_severity !== undefined) updates.alert_severity = dto.alert_severity;
@@ -837,5 +846,36 @@ export class BreedService {
     });
 
     return { success: true, message: 'Breed lifecycle stage has been deactivated.' };
+  }
+
+  /**
+   * The counterpart removeLifecycleStage never had. Deactivating a stage only
+   * sets is_active = false, so the row was always recoverable in principle —
+   * but with no restore endpoint the list could offer a one-way switch at best,
+   * which is why it fell back to a text badge. breed_lifecycle_stages carries
+   * no deleted_at/updated_at, so flipping the flag is the whole operation.
+   */
+  async restoreLifecycleStage(id: string, tenantId: string, userPayload?: any) {
+    const lifecycleStage = await this.findOneLifecycleStage(id);
+
+    if (lifecycleStage.is_active) {
+      return { success: true, message: 'Breed lifecycle stage is already active.' };
+    }
+
+    await this.db
+      .update(schema.breedLifecycleStages)
+      .set({ is_active: true })
+      .where(eq(schema.breedLifecycleStages.lifecycle_id, id));
+
+    await this.auditService.log({
+      tenantId,
+      userId: userPayload?.userId,
+      action: 'RESTORE',
+      entityName: 'breed_lifecycle_stages',
+      entityId: id,
+      oldValues: lifecycleStage,
+    });
+
+    return { success: true, message: 'Breed lifecycle stage has been restored.' };
   }
 }

@@ -15,6 +15,7 @@ import { singularLabel } from "./labels";
 import AnimalDetailPanel from "./AnimalDetailPanel";
 import { LookupCard } from "./LookupCard";
 import { MASTER_DATA_CONFIGS } from "./configs";
+import { codeFieldOf } from "./useCodeSeries";
 import { useCodeSeries } from "./useCodeSeries";
 import { MasterRecordView } from "./MasterRecordView";
 import { BcOwnershipNotice } from "./BcOwnershipNotice";
@@ -48,6 +49,13 @@ function entityLabel(row: Row, field: MasterDataField): string {
 function parentKeys(f: MasterDataField): string[] {
   if (!f.dependsOn) return [];
   return Array.isArray(f.dependsOn) ? f.dependsOn : [f.dependsOn];
+}
+
+/** A field's label as it should read right now: `labelWhen` lets it follow another field's
+ * value (Tracking No. Series becomes "Lot No. Series" or "Serial No. Series"). */
+function currentLabel(f: MasterDataField, values: Row): string {
+  if (!f.labelWhen) return f.label;
+  return f.labelWhen.labels[String(values[f.labelWhen.key] ?? "")] || f.label;
 }
 
 /** Whether `f` is required right now — statically, or via `requiredWhen` against the live form values. */
@@ -130,6 +138,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [entityOptions, setEntityOptions] = useState<Record<string, Row[]>>({});
+  /**
+   * A real record of the master a "field-list" field is configuring, so the
+   * example shows the codes this tenant actually uses rather than a placeholder
+   * of the shape. UUID references are resolved to the code they point at, which
+   * is what the generator writes.
+   */
+  const [sampleRecord, setSampleRecord] = useState<{ master: string; values: Record<string, string> }>();
   // Per derived field: "found" when the source master already holds the value
   // (so it is filled and locked), "missing" when it does not (so it is asked
   // for here and recorded), undefined while the parents are incomplete.
@@ -323,6 +338,65 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     // effect below.
   }, [config.key, entityReloadKey]);
 
+  useEffect(() => {
+    if (!modalOpen) return;
+    const listField = config.fields.find((f) => f.type === "field-list" && f.fieldsOf);
+    if (!listField) return;
+    const masterKey = String(form[listField.fieldsOf!] || editing?.[listField.fieldsOf!] || "")
+      .toLowerCase().replaceAll("_", "-");
+    const target = MASTER_DATA_CONFIGS.find((c) => c.key === masterKey);
+    if (!target || sampleRecord?.master === masterKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get(`${target.apiBase}?limit=1`);
+        const row = (unwrap<Row[]>(res) || [])[0];
+        if (!row) { if (!cancelled) setSampleRecord({ master: masterKey, values: {} }); return; }
+        const values: Record<string, string> = {};
+        const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        for (const col of target.fields) {
+          const raw = row[col.key];
+          if (raw === null || raw === undefined || raw === "") continue;
+          if (col.type === "select-entity" && col.entityEndpoint && uuid.test(String(raw))) {
+            // The generator writes the referenced row's code, not its id.
+            try {
+              const ref = await api.get(`${col.entityEndpoint.split("?")[0]}/${encodeURIComponent(String(raw))}`);
+              const data: any = (ref as any)?.data ?? ref;
+              values[col.key] = String(data?.[col.entityLabelKeys?.[0] || ""] ?? "");
+            } catch { /* leave it out rather than show an id */ }
+          } else {
+            values[col.key] = String(raw);
+          }
+        }
+        if (!cancelled) setSampleRecord({ master: masterKey, values });
+      } catch { if (!cancelled) setSampleRecord({ master: masterKey, values: {} }); }
+    })();
+    return () => { cancelled = true; };
+  }, [modalOpen, config.fields, form, editing, sampleRecord?.master]);
+
+  // Put a row in place for every mandatory entry of a `requiredRows` list, and
+  // keep it there. An item attribute marked Mandatory applies to every item in
+  // scope, so the item form should open already showing it rather than relying
+  // on whoever fills the form to remember. Only presence is seeded — the value
+  // is theirs to type.
+  useEffect(() => {
+    if (!modalOpen) return;
+    for (const f of config.fields.filter((x) => x.requiredRows)) {
+      const r = f.requiredRows!;
+      const options = entityOptions[r.endpoint];
+      if (!options) continue;
+      const required = options.filter((o) => o[r.flag] === true || o[r.flag] === 1);
+      if (!required.length) continue;
+      setForm((prev) => {
+        let rows: Row[] = [];
+        try { const parsed = prev[f.key] ? JSON.parse(prev[f.key]) : []; if (Array.isArray(parsed)) rows = parsed; } catch { return prev; }
+        const missing = required.filter((o) => !rows.some((row) => String(row[r.key] ?? "") === String(o[r.key])));
+        if (!missing.length) return prev;
+        return { ...prev, [f.key]: JSON.stringify([...missing.map((o) => ({ [r.key]: o[r.key] })), ...rows]) };
+      });
+    }
+  }, [modalOpen, config.key, entityOptions, form]);
+
   // Fill a derivedFrom field from its source master. The Item Master Template
   // says the UOM Conversion Factor is "Auto-filled from uom_conversion_master",
   // so when that table already holds the pair the number is shown and locked;
@@ -404,7 +478,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     if (readOnly) return;
     setEditing(null);
     const initial: Row = {};
-    formFields.forEach((f) => { initial[f.key] = f.type === "boolean" ? false : f.type === "string-list" || f.multiple ? [] : ""; });
+    formFields.forEach((f) => { initial[f.key] = f.type === "boolean" ? false : f.type === "string-list" || f.type === "field-list" || f.multiple ? [] : ""; });
     setForm(initial);
     setFormError("");
     setChipDrafts({});
@@ -415,9 +489,28 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     if (readOnly) return;
     setEditing(row);
     const initial: Row = {};
+    // MySQL tinyint reaches here as 1 as readily as true, and both mean set.
+    const columnIsOn = (key: string) => row[key] === true || row[key] === 1;
     formFields.filter((f) => !f.createOnly).forEach((f) => {
+      // A form-only control has no column of its own, so its state has to be
+      // read back out of the columns it stands for — otherwise an item that is
+      // already lot-tracked opens with the tracking gate off and its own
+      // tracking fields hidden.
+      if (f.booleanColumns) {
+        initial[f.key] = Object.entries(f.booleanColumns).find(([, column]) => columnIsOn(column))?.[0] ?? "";
+        return;
+      }
+      if (f.seedFromAnyTrue) {
+        initial[f.key] = f.seedFromAnyTrue.some(columnIsOn);
+        return;
+      }
+      if (f.seedFromValueOf) {
+        const stored = row[f.seedFromValueOf];
+        initial[f.key] = stored !== null && stored !== undefined && stored !== "" && Number(stored) !== 0;
+        return;
+      }
       let v = row[f.key];
-      if (f.type === "string-list" || f.multiple) {
+      if (f.type === "string-list" || f.type === "field-list" || f.multiple) {
         initial[f.key] = parseStringList(v);
         return;
       }
@@ -449,10 +542,25 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     config.fields.forEach((f) => {
       if (parentKeys(f).includes(key) && next[f.key]) next[f.key] = "";
     });
+    // A switch that gates real columns has to clear them, not just hide them —
+    // a hidden prefix still ends up in the code.
+    const toggled = config.fields.find((f) => f.key === key);
+    if (toggled?.clearsWhenOff && value === false) {
+      for (const [k, v] of Object.entries(toggled.clearsWhenOff)) next[k] = v;
+    }
     if (value) {
       const changedField = config.fields.find((f) => f.key === key);
       (changedField?.exclusiveWith || []).forEach((otherKey) => { next[otherKey] = ""; });
     }
+    // A control that appears part-way through the form starts on its stated
+    // default rather than on nothing. Tracked By is a choice between two, not
+    // three: "neither" is what the switch above it already says, so turning
+    // tracking on lands on Lot until someone says otherwise.
+    config.fields.forEach((f) => {
+      if (f.defaultValue === undefined) return;
+      const shown = !f.visibleWhen || isFieldRequired({ ...f, required: false, requiredWhen: f.visibleWhen }, next);
+      if (shown && (next[f.key] === "" || next[f.key] === undefined)) next[f.key] = f.defaultValue;
+    });
     return next;
   });
 
@@ -462,15 +570,26 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     setFormError("");
     try {
       for (const f of visibleFields) {
-        if (f.filterOnly) continue;
+        // filterOnly normally means "not saved, so nothing to check". A control
+        // standing in for real columns is the exception: it is not sent under
+        // its own key, but it does decide what gets written.
+        if (f.filterOnly && !f.booleanColumns) continue;
         const v = form[f.key];
         const isEmpty = v === "" || v === undefined || v === null || (Array.isArray(v) && !v.length);
         if (isEmpty && isFieldRequired(f, form)) {
-          throw new Error(`"${tLabel(f.label)}" is required.`);
+          throw new Error(`"${tLabel(currentLabel(f, form))}" is required.`);
         }
       }
 
       const payload: Row = {};
+      // What a switch turns off has to be sent as cleared, not omitted. These
+      // fields are hidden the moment the switch flips, so the payload loop below
+      // skips them and the API would keep the old prefix or digit count —
+      // invisible on the form and still in every code it issues.
+      for (const f of formFields) {
+        if (!f.clearsWhenOff || form[f.key] !== false) continue;
+        for (const [k, v] of Object.entries(f.clearsWhenOff)) payload[k] = v;
+      }
       for (const f of visibleFields) {
         if (f.filterOnly || f.readOnly) continue;
         let v = form[f.key];
@@ -485,6 +604,16 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         }
         payload[f.key] = v;
       }
+      // Expand each stand-in control into the boolean columns it represents.
+      // Driven off formFields rather than visibleFields deliberately: a control
+      // whose gate is off still has to write false to every one of its columns,
+      // or turning tracking off would leave the previous flag set.
+      for (const f of formFields) {
+        if (!f.booleanColumns) continue;
+        const chosen = visibleFields.some((v) => v.key === f.key) ? String(form[f.key] ?? "") : "";
+        for (const [option, column] of Object.entries(f.booleanColumns)) payload[column] = chosen === option;
+      }
+
       const hasCompanyField = config.fields.some((f) => f.key === "company_id");
       if (!editing && companyId && hasCompanyField) payload.company_id = companyId;
 
@@ -541,19 +670,180 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const renderField = (f: MasterDataField) => {
     const value = numbering.value(f.key, form[f.key] ?? "") as any;
-    const accessibility = { id: `master-${config.key}-${f.key}`, "aria-label": tLabel(f.label), "aria-required": isFieldRequired(f, form) };
+    const accessibility = { id: `master-${config.key}-${f.key}`, "aria-label": tLabel(currentLabel(f, form)), "aria-required": isFieldRequired(f, form) };
+    // No caption beside the box: every field in this form already carries its
+    // label above the control, and repeating it here printed "Item Tracking"
+    // twice in the same cell. The input keeps its aria-label, so nothing is
+    // lost to a screen reader.
     if (f.type === "boolean") {
       return (
-        <label className="flex items-center gap-2 py-2 text-sm" style={S.primary}>
+        <div className="flex h-11 items-center">
           <input
             {...accessibility}
             type="checkbox"
             checked={!!value}
             onChange={(e) => setField(f.key, e.target.checked)}
-            className="h-4 w-4 rounded-[var(--radius-xs)] accent-[var(--accent)]"
+            className="h-5 w-5 rounded-[var(--radius-xs)] accent-[var(--accent)]"
           />
-          {tLabel(f.label)}
-        </label>
+        </div>
+      );
+    }
+    // An ordered picker over another master's own fields. Number Series uses it
+    // to say what a generated code is built from: pick ITEM as the master and
+    // the options become item_type, category_id, sub_category — the actual
+    // fields of the actual master, not a list anyone has to keep in step.
+    if (f.type === "field-list" || (f.type === "select" && f.fieldsOf)) {
+      // "Applies To" is createOnly, so on an edit it is not among formFields and
+      // never reaches `form` — which left this picker permanently showing its
+      // "choose what this series applies to first" placeholder on the one screen
+      // where you actually configure an existing series. The row being edited
+      // still knows its master, so fall back to it.
+      const masterKey = String(form[f.fieldsOf || ""] || editing?.[f.fieldsOf || ""] || "")
+        .toLowerCase().replaceAll("_", "-");
+      const target = MASTER_DATA_CONFIGS.find((c) => c.key === masterKey);
+      // The series' own Prefix is offered beside the master's fields, so where
+      // it sits in the code is part of the same ordered choice rather than a
+      // fixed position it can never move from.
+      //
+      // Only fields that carry a value a code can be built from: a dropdown
+      // contributes the chosen row's code, a text or number input its own text,
+      // a date its year. A Yes/No has no value to write into a code — an item
+      // reading ...-TRUE-001 says nothing — and neither does a JSON or notes
+      // field. The master's own code field is excluded outright: a code cannot
+      // be built out of itself.
+      // What a code can actually be built from:
+      //   a selection — the chosen row's code (Item Type, Category, Parent);
+      //   a date      — its year, or the whole date;
+      //   the name    — the FIRST free-text field, which is what every master
+      //                 uses for its name and where LARGE_WHITE comes from.
+      //
+      // Not every text field: an item's Image URL is text and belongs in no
+      // code. Not numbers, not Yes/No, not JSON — an item reading ...-TRUE-001
+      // says nothing. The master's own code field is excluded outright, since a
+      // code cannot be built out of itself.
+      //
+      // Prefix is not an entry here either — it has its own First/Last control,
+      // because those are the only two places it belongs.
+      const ownCodeField = codeFieldOf(masterKey);
+      const usable = (target?.fields || [])
+        .filter((c) => !c.hideInForm && !c.filterOnly && c.key !== "company_id" && c.key !== ownCodeField);
+      const firstTextField = usable.find((c) => c.type === "text")?.key;
+      const dateFields = new Set(usable.filter((c) => c.type === "date").map((c) => c.key));
+      const choices = usable
+        .filter((c) => c.type === "select" || c.type === "select-entity" || c.type === "date" || c.key === firstTextField)
+        .map((c) => ({ value: c.key, label: `${tLabel(c.label)} (${c.key})` }));
+      if (!target) {
+        return <p className="py-2 text-xs" style={S.sub}>Choose what this series applies to first — the fields offered here are that master's own.</p>;
+      }
+      if (f.type === "select") {
+        return (
+          <select {...accessibility} className={`${inputCls} nf-select`} style={S.input} disabled={readOnly}
+            value={String(value ?? "")} onChange={(e) => setField(f.key, e.target.value)}>
+            <option value="">{f.placeholder || "None — use the prefix"}</option>
+            {choices.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        );
+      }
+      const list: string[] = Array.isArray(value) ? value : [];
+      const move = (idx: number, by: number) => {
+        const next = [...list];
+        const to = idx + by;
+        if (to < 0 || to >= next.length) return;
+        [next[idx], next[to]] = [next[to], next[idx]];
+        setField(f.key, next);
+      };
+      // A stored date entry is `date_of_birth:YEAR`; match on the field alone so
+      // it still counts as used and its row still finds its label.
+      const fieldOf = (entry: string) => entry.split(":")[0];
+      const remaining = choices.filter((c) => !list.some((entry) => fieldOf(entry) === c.value));
+      // What the configuration above actually produces. Built from the same
+      // order the generator uses — prefix at its chosen end, segments between,
+      // sequence last — with each field standing in for itself, because the real
+      // value is not known until a record is being created.
+      // Mirrors normalizeSegment on the server: the underscore separates words
+      // and a referenced code keeps its own separators, so FARM-001 stays
+      // FARM-001. Stripping them here made the example disagree with the code
+      // the series actually issues, which is worse than showing none.
+      const norm = (v: unknown) => String(v ?? "").toUpperCase()
+        .replace(/\s+/g, "_").replace(/[^A-Z0-9_/-]/g, "")
+        .replace(/_*([/-])_*/g, "$1").replace(/_+/g, "_").replace(/^[_/-]+|[_/-]+$/g, "");
+      const sep = String(form.separator || "-");
+      // Blank means "same as the separator", the same fallback the generator uses.
+      const seqSep = String(form.seq_separator || "") || sep;
+      const seqDigitsRaw = Number(form.seq_length);
+      const seqDigits = Number.isFinite(seqDigitsRaw) ? seqDigitsRaw : 3;
+      const prefixText = norm(form.prefix);
+      const atStart = String(form.prefix_position || "END") === "START";
+      const sample = [
+        ...(prefixText && atStart ? [prefixText] : []),
+        // The codes this tenant actually uses, read off a real record of the
+        // master being configured — a name of the shape tells you the rule, but
+        // only the real values tell you what the code will look like.
+        ...list.map((entry) => {
+          const k = fieldOf(entry);
+          const part = entry.split(":")[1];
+          const raw = sampleRecord?.values?.[k];
+          if (part === "YEAR") return raw ? String(raw).slice(0, 4) : "2026";
+          if (part === "DATE") return raw ? String(raw).slice(0, 10).replace(/-/g, "") : "20260908";
+          const normalised = norm(raw);
+          // A real value when the sample record has one, and an angle-bracketed
+          // name when it does not — SUB-CATEGORY read like a code the system had
+          // produced, when in fact no item in the tenant has a sub-category yet.
+          return normalised || `<${k.replace(/_id$/, "").replace(/_/g, "-")}>`;
+        }),
+        ...(prefixText && !atStart ? [prefixText] : []),
+      ].filter(Boolean);
+
+      // Sequence Digits 0 means no number at all — the Breed code IS the breed
+      // name. The example showed one anyway, so it promised a code the series
+      // would never issue.
+      const stem = sample.join(sep);
+      const shown = seqDigits <= 0 && stem
+        ? stem
+        : `${stem}${stem ? seqSep : ""}${"1".padStart(Math.max(seqDigits, 1), "0")}`;
+
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="rounded-lg border px-2.5 py-2" style={S.raised}>
+            <span className="text-[11px]" style={S.sub}>Example</span>
+            <div className="mt-0.5 font-mono text-xs" style={S.primary}>{shown}</div>
+          </div>
+          <select className={`${inputCls} nf-select`} style={S.input} disabled={readOnly || !remaining.length}
+            value="" onChange={(e) => {
+              // A date joins the list already carrying its part, so the row has
+              // something to show and the stored value is complete from the start.
+              if (e.target.value) setField(f.key, [...list, dateFields.has(e.target.value) ? `${e.target.value}:YEAR` : e.target.value]);
+            }}>
+            <option value="">{remaining.length ? "Add a field…" : "Every field is already used"}</option>
+            {remaining.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+          {list.map((entry, idx) => {
+            const key = fieldOf(entry);
+            const label = choices.find((c) => c.value === key)?.label ?? key;
+            const datePart = entry.split(":")[1] || "YEAR";
+            return (
+              <div key={`${entry}-${idx}`} className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs" style={S.surface}>
+                <span className="w-5 shrink-0 text-center font-semibold" style={S.sub}>{idx + 1}</span>
+                <span className="min-w-0 flex-1 truncate" style={S.primary}>{label}</span>
+                {/* A date can go into a code two ways, and the answer differs per
+                    series: the animal code wants the year of birth, a daily
+                    document wants the whole date. Asked here, on the row. */}
+                {dateFields.has(key) && !readOnly && (
+                  <select className="rounded border px-1.5 py-0.5 text-[11px]" style={S.input} value={datePart}
+                    onChange={(e) => setField(f.key, list.map((v, i) => i === idx ? `${key}:${e.target.value}` : v))}>
+                    <option value="YEAR">Year only</option>
+                    <option value="DATE">Full date</option>
+                  </select>
+                )}
+                {!readOnly && <>
+                  <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label="Move earlier" className="rounded px-1.5 disabled:opacity-30" style={S.sub}>↑</button>
+                  <button type="button" onClick={() => move(idx, 1)} disabled={idx === list.length - 1} aria-label="Move later" className="rounded px-1.5 disabled:opacity-30" style={S.sub}>↓</button>
+                  <button type="button" onClick={() => setField(f.key, list.filter((_, i) => i !== idx))} aria-label="Remove" className="rounded px-1.5" style={{ color: "var(--danger)" }}>×</button>
+                </>}
+              </div>
+            );
+          })}
+        </div>
       );
     }
     if (f.type === "string-list") {
@@ -624,6 +914,15 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       try { const parsed = value ? JSON.parse(value) : []; if (Array.isArray(parsed)) rows = parsed; } catch { rows = []; }
       const broken = !!value && rows.length === 0 && value.trim() !== "[]" && value.trim() !== "";
       const write = (next: Row[]) => setField(f.key, JSON.stringify(next));
+      // Rows the list is required to carry: the entry stays and keeps pointing
+      // at what it points at. Its value is still editable.
+      const req = f.requiredRows;
+      const lockedKeys = new Set(
+        (req ? entityOptions[req.endpoint] || [] : [])
+          .filter((o) => o[req!.flag] === true || o[req!.flag] === 1)
+          .map((o) => String(o[req!.key]))
+      );
+      const isLocked = (row: Row) => !!req && lockedKeys.has(String(row[req.key] ?? ""));
       return (
         <div className="flex flex-col gap-2">
           {broken && <InlineAlert>This entry is not a JSON array, so it cannot be shown as rows. Clear it to start again.</InlineAlert>}
@@ -633,7 +932,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                 <label key={col.key} className="flex min-w-[8rem] flex-1 flex-col gap-1">
                   <span className="text-[11px] font-medium" style={S.sub}>{tLabel(col.label)}</span>
                   {col.type === "select-entity" ? (
-                    <select className={`${inputCls} nf-select`} style={S.input} disabled={readOnly}
+                    <select className={`${inputCls} nf-select`} style={S.input} disabled={readOnly || (isLocked(row) && col.key === req?.key)}
                       value={String(row[col.key] ?? "")}
                       onChange={(e) => write(rows.map((r, i) => i === idx ? { ...r, [col.key]: e.target.value } : r))}>
                       <option value="">{t("selectPlaceholder")}</option>
@@ -651,10 +950,12 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                   )}
                 </label>
               ))}
-              {!readOnly && <button type="button" onClick={() => write(rows.filter((_, i) => i !== idx))}
-                className="rounded-lg border px-2 py-1.5 text-xs font-medium" style={{ ...S.surface, color: "var(--danger)" }}>
-                {t("mdRemoveRow")}
-              </button>}
+              {!readOnly && (isLocked(row)
+                ? <span className="rounded-lg border px-2 py-1.5 text-xs font-medium" style={{ ...S.raised, color: "var(--text-muted)" }}>Mandatory</span>
+                : <button type="button" onClick={() => write(rows.filter((_, i) => i !== idx))}
+                    className="rounded-lg border px-2 py-1.5 text-xs font-medium" style={{ ...S.surface, color: "var(--danger)" }}>
+                    {t("mdRemoveRow")}
+                  </button>)}
             </div>
           ))}
           {!readOnly && <button type="button" onClick={() => write([...rows, {}])}
@@ -675,6 +976,59 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           className={`${inputCls} font-mono text-xs`}
           style={S.input}
         />
+      );
+    }
+    // A short, weighed choice reads better as a segmented group than as a
+    // dropdown: both options stay on screen, and neither is the implied default
+    // that a closed select shows before it is opened. Lot vs Serial is that
+    // choice — the pair it writes to are mutually exclusive, and a plain switch
+    // could not label its own "off".
+    if (f.type === "select" && f.control === "segmented") {
+      const segments = f.options || [];
+      const current = segments.findIndex((o) => o.value === String(value));
+      // Arrow keys move between segments, as a radiogroup is expected to.
+      const step = (delta: number) => {
+        if (!segments.length) return;
+        const from = current < 0 ? 0 : current;
+        setField(f.key, segments[(from + delta + segments.length) % segments.length].value);
+      };
+      return (
+        // nf-input carries the one control height (44px) and radius the console
+        // uses everywhere, so this sits level with the selects beside it rather
+        // than floating in a box of its own size. Segments share the width.
+        <div
+          role="radiogroup"
+          aria-label={tLabel(currentLabel(f, form))}
+          className="nf-input flex items-center gap-1 p-1"
+          style={S.input}
+          onKeyDown={(e) => {
+            if (f.readOnly) return;
+            if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); step(1); }
+            if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); step(-1); }
+          }}
+        >
+          {segments.map((o) => {
+            const active = String(value) === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                tabIndex={active || (current < 0 && o === segments[0]) ? 0 : -1}
+                disabled={f.readOnly}
+                onClick={() => setField(f.key, o.value)}
+                className="nf-press h-full flex-1 rounded-[var(--radius-xs)] text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+                style={{
+                  backgroundColor: active ? "var(--accent)" : "transparent",
+                  color: active ? "#fff" : "var(--text-secondary)",
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
       );
     }
     if (f.type === "select") {
@@ -707,6 +1061,14 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         } else {
           options = options.filter((o) => allowList.includes(o[r.optionCodeKey]));
         }
+      }
+      // Two pickers over one catalog that must not land on the same row: a
+      // Secondary UOM equal to the Primary makes the conversion factor
+      // meaningless. Matched on the value the form stores (uom_code here, a
+      // UUID elsewhere), not on the displayed label.
+      if (f.excludeValuesOf?.length) {
+        const taken = f.excludeValuesOf.map((k) => String(form[k] ?? "")).filter(Boolean);
+        if (taken.length) options = options.filter((o) => !taken.includes(String(o[f.entityValueKey || "id"])));
       }
       if (f.multiple) {
         // A real multi-select rather than a column of checkboxes: with eight
@@ -754,6 +1116,8 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         {...accessibility}
         type={f.type === "number" ? "number" : f.type === "email" ? "email" : f.type === "date" ? "date" : "text"}
         step={f.step}
+        min={f.min}
+        max={f.max}
         value={value}
         onChange={(e) => setField(f.key, e.target.value)}
         placeholder={f.placeholder}
@@ -1049,7 +1413,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                   {bySection.get(s)!.map((f) => (
                     <div key={f.key} className={f.type === "textarea" || f.type === "json" || f.type === "string-list" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
                       <label htmlFor={`master-${config.key}-${f.key}`} className="nf-text-label" style={S.sub}>
-                        {tLabel(f.label)}{isFieldRequired(f, form) && <span style={{ color: "var(--danger)" }}> *</span>}
+                        {tLabel(currentLabel(f, form))}{isFieldRequired(f, form) && <span style={{ color: "var(--danger)" }}> *</span>}
                       </label>
                       {renderField(f)}
                       {f.helpText && <p className="text-[11px]" style={S.muted}>{f.helpText}</p>}

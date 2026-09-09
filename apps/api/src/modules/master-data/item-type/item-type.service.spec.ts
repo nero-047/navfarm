@@ -211,7 +211,7 @@ describe('ItemTypeService', () => {
 
       const result = await service.create({ type_name: 'Raw Material' }, 'tenant-123');
 
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('ITEM_TYPE', 'tenant-123', null);
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('ITEM_TYPE', 'tenant-123', null, undefined, expect.any(Object));
       expect(result.type_code).toBe('ITYPE-001');
     });
 

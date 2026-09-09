@@ -8,63 +8,7 @@ const STATUS_OPTIONS = [
 
 // ── Farm Operations ─────────────────────────────────────────────────────────
 
-const farm: MasterDataConfig = {
-  key: "farm",
-  label: "Farms",
-  description: "Physical farm sites owned by the company.",
-  apiBase: "/farm",
-  idKey: "farm_id",
-  group: "Farm Operations",
-  supportsNobLobFilter: true,
-  columns: [
-    { key: "farm_code", label: "Code" },
-    { key: "farm_name", label: "Name" },
-    { key: "farm_type", label: "Type" },
-    { key: "city", label: "City" },
-    { key: "capacity", label: "Capacity" },
-  ],
-  fields: [
-    { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "farm_code", label: "Farm Code", type: "text", required: true, placeholder: "e.g. FARM01" },
-    { key: "farm_name", label: "Farm Name", type: "text", required: true, placeholder: "Green Valley Breeding Farm" },
-    {
-      key: "farm_type", label: "Farm Type", type: "select", required: true,
-      options: ["BREEDER", "COMMERCIAL_LAYERS", "COMMERCIAL_BROILERS", "HATCHERY", "REARING", "DAIRY"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
-    },
-    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this farm is shared across all business verticals." },
-    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this farm is shared across all LOBs under the selected NOB." },
-    { key: "capacity", label: "Capacity", type: "number" },
-    { key: "address_line1", label: "Address Line 1", type: "text" },
-    { key: "city", label: "City", type: "text" },
-    { key: "state", label: "State", type: "text" },
-    { key: "country", label: "Country", type: "text" },
-    { key: "pincode", label: "Pincode", type: "text" },
-  ],
-};
 
-const warehouse: MasterDataConfig = {
-  key: "warehouse",
-  label: "Warehouses",
-  description: "Storage facilities and silos, optionally linked to a farm.",
-  apiBase: "/warehouse",
-  idKey: "warehouse_id",
-  group: "Farm Operations",
-  columns: [
-    { key: "warehouse_code", label: "Code" },
-    { key: "warehouse_name", label: "Name" },
-    { key: "warehouse_type", label: "Type" },
-  ],
-  fields: [
-    { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "farm_id", label: "Farm", type: "select-entity", entityEndpoint: "/farm", entityValueKey: "farm_id", entityLabelKeys: ["farm_code", "farm_name"] },
-    { key: "warehouse_code", label: "Warehouse Code", type: "text", required: true, placeholder: "WH01" },
-    { key: "warehouse_name", label: "Warehouse Name", type: "text", required: true, placeholder: "Raw Material Feed Silo 1" },
-    {
-      key: "warehouse_type", label: "Warehouse Type", type: "select", required: true,
-      options: ["COLD_STORAGE", "SILO", "GENERAL", "INGREDIENTS", "MEDICINE"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
-    },
-  ],
-};
 
 const locationType: MasterDataConfig = {
   key: "location-type",
@@ -134,34 +78,6 @@ const location: MasterDataConfig = {
   ],
 };
 
-const shed: MasterDataConfig = {
-  key: "shed",
-  label: "Sheds",
-  description: "Rearing sheds belonging to a farm.",
-  apiBase: "/shed",
-  idKey: "shed_id",
-  group: "Farm Operations",
-  supportsNobLobFilter: true,
-  columns: [
-    { key: "shed_code", label: "Code" },
-    { key: "shed_name", label: "Name" },
-    { key: "shed_type", label: "Type" },
-    { key: "capacity", label: "Capacity" },
-  ],
-  fields: [
-    { key: "company_id", label: "Company", type: "text", hideInForm: true },
-    { key: "farm_id", label: "Farm", type: "select-entity", required: true, entityEndpoint: "/farm", entityValueKey: "farm_id", entityLabelKeys: ["farm_code", "farm_name"] },
-    { key: "shed_code", label: "Shed Code", type: "text", required: true, placeholder: "SHED01" },
-    { key: "shed_name", label: "Shed Name", type: "text", required: true, placeholder: "Broiler Grow-out Shed 1" },
-    {
-      key: "shed_type", label: "Shed Type", type: "select", required: true,
-      options: ["OPEN_SIDED", "ENVIRONMENTALLY_CONTROLLED", "SEMI_EC"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
-    },
-    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this shed is shared across all business verticals." },
-    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this shed is shared across all LOBs under the selected NOB." },
-    { key: "capacity", label: "Capacity", type: "number" },
-  ],
-};
 
 // ── Production ───────────────────────────────────────────────────────────────
 
@@ -245,15 +161,81 @@ const numberSeries: MasterDataConfig = {
       helpText: "The master this series generates codes for. For a type-scoped series (e.g. sheds only) create it as MASTER_TYPE — LOCATION_SHED.",
     },
     { key: "series_name", label: "Series Name", type: "text", required: true, placeholder: "Batch Number" },
-    { key: "document_type", label: "Document Type", type: "text", required: true, placeholder: "BATCH" },
-    { key: "prefix", label: "Prefix", type: "text", placeholder: "BATCH" },
-    { key: "date_format", label: "Date Format", type: "text", placeholder: "YYYY", helpText: "Leave blank for no date segment." },
-    { key: "separator", label: "Separator", type: "text", placeholder: "-" },
-    { key: "seq_length", label: "Sequence Digits", type: "number", required: true, placeholder: "6" },
+    // Was a free text box, so a typo here silently pointed the series at a master
+    // that does not exist and the whole thing quietly stopped generating. The
+    // list is the masters without a series yet, plus whichever this series
+    // already uses — `current` keeps an edit able to show its own value.
+    {
+      key: "document_type", label: "Master This Codes", type: "select-entity", required: true,
+      // Every master, not only those without a series: several series share one
+      // document_type (LOCATION_FARM, LOCATION_SHED, LOCATION_PEN are all
+      // LOCATION), and the unique-per-master rule belongs to Applies To above.
+      entityEndpoint: "/number-series/masters?all=true", entityValueKey: "master_key", entityLabelKeys: ["master_key"],
+      helpText: "The master these codes belong to. Code Built From then offers that master's own fields.",
+    },
+    // Two switches, because "no prefix" and "no number" were only ever
+    // expressible by leaving a box empty or typing 0 — a rule the form never
+    // stated. On means the part is in the code; off clears it, so nothing
+    // invisible survives in the value.
+    {
+      key: "use_prefix", label: "Use a Prefix", type: "boolean", filterOnly: true,
+      seedFromValueOf: "prefix", clearsWhenOff: { prefix: "", prefix_position: "END" },
+      helpText: "A fixed piece of text in the code, like ITM. Off for masters coded entirely from their own fields.",
+    },
+    { key: "prefix", label: "Prefix", type: "text", placeholder: "ITM", visibleWhen: { anyOf: [{ key: "use_prefix", equals: true }] }, requiredWhen: { anyOf: [{ key: "use_prefix", equals: true }] } },
+    // Two positions and no more: anywhere in the middle and the prefix is buried
+    // where it identifies nothing. Ignored when no prefix is set.
+    {
+      key: "prefix_position", label: "Prefix Position", type: "select",
+      options: [{ value: "END", label: "Last — just before the number" }, { value: "START", label: "First — at the start of the code" }],
+      helpText: "Where the prefix sits among the fields below.",
+      visibleWhen: { anyOf: [{ key: "use_prefix", equals: true }] },
+    },
+    
+    {
+      // Free text accepted anything — a space, a letter, a character the
+      // sequence parser would then fail to split on. Three that read cleanly in
+      // a code and none of which appear in a normalised segment.
+      key: "separator", label: "Separator", type: "select",
+      options: [{ value: "-", label: "-  (hyphen)" }, { value: "/", label: "/  (slash)" }, { value: "|", label: "|  (pipe)" }],
+      helpText: "Joins the parts below.",
+    },
+    // Location needs both: "/" between the levels of the path and "-" before the
+    // number, so FARM-001/SHED-001/PEN-001 reads as a path ending in a count.
+    // One separator cannot say both — with only "/" a root reads FARM/001.
+    {
+      key: "seq_separator", label: "Separator Before the Number", type: "select",
+      visibleWhen: { anyOf: [{ key: "use_sequence", equals: true }] },
+      options: [{ value: "-", label: "-  (hyphen)" }, { value: "/", label: "/  (slash)" }, { value: "|", label: "|  (pipe)" }],
+      placeholder: "Same as the separator",
+      helpText: "Only when it differs — Location joins its path with / but its number with -.",
+    },
+    // 0 means no number at all — Breed codes are the breed name, and LARGEWHITE-001
+    // would be counting something already unique. Only usable when the code is
+    // built from a field, and a repeat is then rejected rather than numbered.
+    {
+      key: "use_sequence", label: "Use a Running Number", type: "boolean", filterOnly: true,
+      seedFromValueOf: "seq_length", clearsWhenOff: { seq_length: 0, seq_separator: "" },
+      helpText: "Off when the fields alone make the code unique — a breed IS Large White, and LARGE_WHITE-001 would count something already unique. A repeat is then refused rather than numbered.",
+    },
+    { key: "seq_length", label: "Sequence Digits", type: "number", min: 1, max: 12, placeholder: "3", visibleWhen: { anyOf: [{ key: "use_sequence", equals: true }] }, requiredWhen: { anyOf: [{ key: "use_sequence", equals: true }] }, helpText: "A minimum width, not a limit — after 999 the next is 1000." },
     {
       key: "reset_frequency", label: "Reset Frequency", type: "select",
       options: ["NEVER", "MONTHLY", "YEARLY"].map((v) => ({ value: v, label: v })),
     },
+    // What the code is built from, in order, before the number. The options are
+    // the Prefix above plus the fields of whatever master "Applies To" names —
+    // LOCATION offers parent_location_id and location_type, ITEM offers
+    // item_type, category_id and sub_category. Prefix is an entry in the same
+    // list rather than a fixed position, so it can lead, follow, or be left out:
+    // ITEM wants it after the type and category, BREED wants only the name,
+    // LOCATION wants none. A field naming a related record contributes that
+    // record's code; any other field contributes its own value.
+    // Keyed off Document Type, not Applies To: LOCATION_SHED and LOCATION_FARM are
+    // both document_type LOCATION, so the type-specific series offer the same
+    // fields as the master they belong to. Document Type is also on the form for
+    // both create and edit, where Applies To is create-only.
+    { key: "code_segments", label: "Code Built From", type: "field-list", fieldsOf: "document_type", helpText: "Ordered, and any mix. Leave empty for prefix then number. Location: parent location, then location type, then the number." },
     { key: "allow_manual", label: "Allow Manual Entry", type: "boolean", helpText: "Let a user type their own code instead of generating one." },
     { key: "current_seq", label: "Current Sequence", type: "number", hideInForm: true },
     { key: "last_generated_code", label: "Last Generated Code", type: "text", hideInForm: true },
@@ -549,16 +531,33 @@ const itemAttribute: MasterDataConfig = {
     { key: "attribute_code", label: "Attribute Code", type: "text", required: true, placeholder: "PROTEIN_PCT" },
     { key: "attribute_name", label: "Attribute Name", type: "text", required: true, placeholder: "Protein %" },
     {
-      key: "data_type", label: "Value Type", type: "select", required: true,
-      options: ["STRING", "NUMBER", "BOOLEAN", "LIST"].map((v) => ({ value: v, label: v })),
+      // TDD row 130 has a fifth type, LIST, with row 131's List Values behind
+      // it. Both are out: the item's Attribute Value is a free text input
+      // whatever the attribute's type, so LIST would define a set of allowed
+      // values that no screen enforces. STRING went too — TEXT is the same type
+      // under the client's own word.
+      key: "data_type", label: "Data Type", type: "select", required: true,
+      options: ["TEXT", "NUMBER", "DATE", "BOOLEAN"].map((v) => ({ value: v, label: v })),
     },
-    { key: "list_values", label: "List Options", type: "string-list", placeholder: "Grade A", helpText: "Add each allowed value, then Enter or Add.", visibleWhen: { anyOf: [{ key: "data_type", equals: "LIST" }] } },
-    { key: "unit", label: "Unit Label", type: "text", placeholder: "PCT" },
+    // TDD row 132 says "(UOM master)", and this is deliberately not that. An
+    // attribute's unit is a specification — %, °C, mm — not something you
+    // transact in, and uom_master holds the units stock moves in (KG, BAG,
+    // DOSE). Putting % there to satisfy this field would offer it on Primary
+    // UOM, Output UOM and Feed Formula too, where receiving "18 PCT" is
+    // meaningless. Free text until the client asks otherwise. Rishi's call,
+    // 2026-09-08.
+    { key: "unit", label: "Unit", type: "text", placeholder: "%", helpText: "The unit this attribute is measured in, if it has one." },
     { key: "is_mandatory", label: "Mandatory on every item in scope", type: "boolean" },
     { key: "affects_costing", label: "Affects Costing", type: "boolean" },
     { key: "is_variant", label: "Distinguishes Item Variants", type: "boolean" },
   ],
 };
+
+// TDD row 13's inventory flag decides whether any of the stock-control numbers
+// mean anything: an item that is not held in inventory has no balance to carry a
+// minimum, a maximum, a reorder point or a shelf life. One shared gate, so the
+// eight fields cannot drift apart.
+const WHEN_INVENTORIED = { anyOf: [{ key: "is_inventoriable", equals: true }] };
 
 const item: MasterDataConfig = {
   key: "item",
@@ -574,6 +573,7 @@ const item: MasterDataConfig = {
     { key: "bc_inventory_posting_group", label: "Inventory Posting Group" },
     { key: "bc_gen_prod_posting_group", label: "General Product Posting Group" },
     { key: "inventory_gl_account", label: "Inventory GL Account" },
+    { key: "cogs_gl_account", label: "COGS GL Account" },
     { key: "bc_consumption_gl_account", label: "Consumption GL Account" },
   ],
   label: "Items",
@@ -593,16 +593,16 @@ const item: MasterDataConfig = {
     { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this item is used across all business verticals.", section: "Classification" },
     { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this item is used across all LOBs under the selected NOB.", section: "Classification" },
     { key: "item_code", label: "Item Code", type: "text", readOnly: true, helpText: "Assigned from the Item number series unless manual entry is selected.", section: "Identification" },
-    { key: "item_name", label: "Item Name", type: "text", required: true, placeholder: "Cobb Broiler Chicks", section: "Identification" },
+    { key: "item_name", label: "Item Name", type: "text", required: true, placeholder: "Sow lactation feed", section: "Identification" },
     { key: "item_type", label: "Item Type", type: "select-entity", required: true, entityEndpoint: "/item-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"], section: "Identification" },
     {
       // Depends on Item Type via the query mechanism, not path substitution — a
-      // category is not nested under a type in the URL, it's filtered by it.
-      // With no Item Type chosen yet, queryParams omits the param and this lists
-      // every category unfiltered rather than blocking the fetch — deliberately:
-      // most existing categories predate item_type and have none set, so a
-      // block-until-typed rule would empty this picker for them today. See
+      // category is not nested under a type in the URL, it's filtered by it. See
       // resolveEndpoint()'s doc comment above for the general mechanism.
+      // requiresParent is what makes the field appear only once there is an Item
+      // Type to filter by, and only if that filter leaves something to choose;
+      // an earlier note here described the opposite behaviour, which is what the
+      // field did before requiresParent was added.
       // rootOnly: a Category picker must offer categories, not sub-categories —
       // without it the list showed FEED-STARTER and MED-VACCINE next to their
       // own parents. Sub-categories are reached through the Sub Category field
@@ -622,8 +622,8 @@ const item: MasterDataConfig = {
     // Left unfiltered: an item's primary/secondary UOM legitimately spans every
     // uom_type — KG for feed, LITER for medicine, BAG or HEAD for others — there is
     // no single obviously-correct type to narrow this picker to.
-    { key: "uom_primary", label: "Primary UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Units & Valuation" },
-    { key: "uom_secondary", label: "Secondary UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], section: "Units & Valuation" },
+    { key: "uom_primary", label: "Primary UOM", type: "select-entity", required: true, entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], excludeValuesOf: ["uom_secondary"], section: "Units & Valuation" },
+    { key: "uom_secondary", label: "Secondary UOM", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"], excludeValuesOf: ["uom_primary"], section: "Units & Valuation" },
     {
       // Item Master Template: "Auto-filled from uom_conversion_master. 1
       // secondary = N primary." Shown read-only when that table already holds
@@ -638,33 +638,79 @@ const item: MasterDataConfig = {
       helpText: "Choose a Primary and Secondary UOM; the factor comes from UOM Conversion.",
     },
     { key: "valuation_method", label: "Valuation Method", type: "select-entity", entityEndpoint: "/costing-method", entityValueKey: "method_code", entityLabelKeys: ["method_code", "method_name"], helpText: "Leave blank to inherit the LOB default.", section: "Units & Valuation" },
-    { key: "standard_cost", label: "Standard Cost", type: "number", step: "0.01", requiredWhen: { anyOf: [{ key: "valuation_method", equals: "STANDARD" }] }, helpText: "Required when Valuation Method is STANDARD." },
-    { key: "is_lot_tracked", label: "Lot Tracked", type: "boolean" },
-    { key: "is_serial_tracked", label: "Serial Tracked", type: "boolean" },
-    { key: "tracking_series_id", label: "Tracking No. Series", type: "select-entity", entityEndpoint: "/number-series", entityValueKey: "series_id", entityLabelKeys: ["series_code", "series_name"], requiredWhen: { anyOf: [{ key: "is_lot_tracked", equals: true }, { key: "is_serial_tracked", equals: true }] }, helpText: "Required when Lot Tracked or Serial Tracked is on — used to generate this item's tracking numbers.", section: "Classification" },
+    // Asked immediately after the method that demands it, and only then: on any
+    // other method the cost is not merely optional, it has no meaning.
+    { key: "standard_cost", label: "Standard Cost", type: "number", step: "0.01", section: "Units & Valuation", visibleWhen: { anyOf: [{ key: "valuation_method", equals: "STANDARD" }] }, requiredWhen: { anyOf: [{ key: "valuation_method", equals: "STANDARD" }] }, helpText: "Per Primary UOM. Required when Valuation Method is STANDARD." },
+    // TDD row 11 asks for one three-way choice — LOT, SERIAL or neither. The
+    // table carries two independent flags, so the form could tick both, a state
+    // the requirement has no name for and no downstream code reads. Neither
+    // control here is a column: the gate is "is either flag set", and the
+    // segmented choice writes the pair (see booleanColumns in types.ts).
+    //
+    // The series also used to sit in the Classification card, beside Nature of
+    // Business, while the switches that make it mandatory sat in another card
+    // entirely. All three now stand together, in the order they are decided.
+    { key: "is_tracked", label: "Item Tracking", type: "boolean", filterOnly: true, seedFromAnyTrue: ["is_lot_tracked", "is_serial_tracked"], helpText: "Track individual lots or serial numbers of this item through the chain.", section: "Tracking" },
+    {
+      key: "tracking_type", label: "Tracked By", type: "select", control: "segmented", filterOnly: true,
+      options: [{ value: "LOT", label: "Lot" }, { value: "SERIAL", label: "Serial" }],
+      defaultValue: "LOT",
+      booleanColumns: { LOT: "is_lot_tracked", SERIAL: "is_serial_tracked" },
+      visibleWhen: { anyOf: [{ key: "is_tracked", equals: true }] },
+      requiredWhen: { anyOf: [{ key: "is_tracked", equals: true }] },
+      section: "Tracking",
+    },
+    // No Tracking No. Series field. It pointed at LOT / SERIAL series that
+    // generated nothing, because a lot number is not a property of the item —
+    // one item has many lots, and the number belongs to the receipt that
+    // delivered it (goods_receipt_line.lot_no). The switch above still says
+    // WHETHER this item is tracked, and by lot or by serial, which is the part
+    // the item owns. Rishi's call, 2026-09-09.
+    // The columns the segmented control above writes. Kept in the config so the
+    // record view can still state which kind of tracking is in force — each is
+    // shown only when it is the one that is set, so an item never reads back a
+    // pair of flags where the form asked one question.
+    { key: "is_lot_tracked", label: "Lot Tracked", type: "boolean", hideInForm: true, readOnly: true, hideInTable: true, visibleWhen: { anyOf: [{ key: "is_lot_tracked", equals: true }] }, section: "Tracking" },
+    { key: "is_serial_tracked", label: "Serial Tracked", type: "boolean", hideInForm: true, readOnly: true, hideInTable: true, visibleWhen: { anyOf: [{ key: "is_serial_tracked", equals: true }] }, section: "Tracking" },
     { key: "is_biological_asset", label: "Biological Asset", type: "boolean" },
-    { key: "is_inventoriable", label: "Inventoriable", type: "boolean" },
-    { key: "min_stock_level", label: "Min Stock Level", type: "number", step: "0.01" },
-    { key: "max_stock_level", label: "Max Stock Level", type: "number", step: "0.01" },
-    { key: "reorder_level", label: "Reorder Level", type: "number", step: "0.01" },
-    { key: "lead_time_days", label: "Lead Time (days)", type: "number", helpText: "Procurement lead time, for feed/stock forecast planning." },
-    { key: "shelf_life_days", label: "Shelf Life (days)", type: "number" },
-    { key: "storage_temp_min", label: "Storage Temp Min (°C)", type: "number", step: "0.01" },
-    { key: "storage_temp_max", label: "Storage Temp Max (°C)", type: "number", step: "0.01" },
-    { key: "withdrawal_days", label: "Withdrawal Period (days)", type: "number", requiredWhen: { anyOf: [{ key: "item_type", equals: ["MEDICINE", "VACCINE"] }] }, helpText: "Required for MEDICINE/VACCINE items — minimum days after last administration before an animal treated with this item may be slaughtered." },
+    { key: "is_inventoriable", label: "Inventoriable", type: "boolean", helpText: "Held as stock, with a balance and a valuation. Off for services and consumables that are expensed on receipt.", section: "Inventory" },
+    { key: "min_stock_level", label: "Min Stock Level", type: "number", step: "0.01", visibleWhen: WHEN_INVENTORIED, section: "Inventory" },
+    { key: "max_stock_level", label: "Max Stock Level", type: "number", step: "0.01", visibleWhen: WHEN_INVENTORIED, section: "Inventory" },
+    { key: "reorder_level", label: "Reorder Level", type: "number", step: "0.01", visibleWhen: WHEN_INVENTORIED, section: "Inventory" },
+    { key: "lead_time_days", label: "Lead Time (days)", type: "number", visibleWhen: WHEN_INVENTORIED, helpText: "Procurement lead time, for feed/stock forecast planning.", section: "Inventory" },
+    { key: "shelf_life_days", label: "Shelf Life (days)", type: "number", visibleWhen: WHEN_INVENTORIED, section: "Inventory" },
+    { key: "storage_temp_min", label: "Storage Temp Min (°C)", type: "number", step: "0.01", visibleWhen: WHEN_INVENTORIED, section: "Inventory" },
+    { key: "storage_temp_max", label: "Storage Temp Max (°C)", type: "number", step: "0.01", visibleWhen: WHEN_INVENTORIED, section: "Inventory" },
+    {
+      // Shown on either condition, not on the inventory flag alone. The
+      // withdrawal period is a food-safety block — animal disposal reads it
+      // before a slaughter is allowed — so a medicine that happens not to be
+      // inventoried still has to carry one, and the API rejects the save
+      // without it either way.
+      key: "withdrawal_days", label: "Withdrawal Period (days)", type: "number", min: 0, max: 99, section: "Inventory",
+      visibleWhen: { anyOf: [{ key: "is_inventoriable", equals: true }, { key: "item_type", equals: ["MEDICINE", "VACCINE"] }] },
+      requiredWhen: { anyOf: [{ key: "item_type", equals: ["MEDICINE", "VACCINE"] }] },
+      helpText: "Up to 99 days. Required for MEDICINE/VACCINE items — minimum days after last administration before an animal treated with this item may be slaughtered.",
+    },
     { key: "is_qr_enabled", label: "QR Tracking Enabled", type: "boolean" },
     { key: "item_image_url", label: "Item Image URL", type: "text", placeholder: "https://cdn.navfarm.io/items/..." },
-    { key: "inventory_gl_account", label: "Inventory GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts inventory value to.", section: "Accounting" },
-    { key: "cogs_gl_account", label: "COGS GL Account", type: "select-entity", entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts cost of goods sold to.", section: "Accounting" },
-    { key: "is_blocked", label: "Blocked", type: "boolean", helpText: "A blocked item stays visible/historical but cannot be transacted.", section: "Accounting" },
+    // Both accounts come from Business Central with the item — BBP-1 §1.5 — so
+    // they are read in the record's Business Central panel, under a From BC
+    // chip, rather than typed here. Listed in bcFields above, which is what
+    // puts them in that panel and takes them out of this form.
+    { key: "inventory_gl_account", label: "Inventory GL Account", type: "select-entity", hideInForm: true, entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts inventory value to.", section: "Accounting" },
+    { key: "cogs_gl_account", label: "COGS GL Account", type: "select-entity", hideInForm: true, entityEndpoint: "/gl-account", entityValueKey: "gl_account_id", entityLabelKeys: ["account_code", "account_name"], helpText: "GL account this item posts cost of goods sold to.", section: "Accounting" },
     {
+      // A Mandatory attribute is on every item in scope, so the form opens with
+      // a row for each one already in place and no way to take it out. The
+      // value is still typed per item; it is the row that is not optional.
       key: "attributes", label: "Attribute Values", type: "json",
+      requiredRows: { endpoint: "/item-attribute", flag: "is_mandatory", key: "attribute_id" },
       jsonListKeys: ["attribute_id", "attribute_value"],
       jsonRow: [
         { key: "attribute_id", label: "Attribute", type: "select-entity", entityEndpoint: "/item-attribute", entityValueKey: "attribute_id", entityLabelKeys: ["attribute_code", "attribute_name"] },
         { key: "attribute_value", label: "Value", type: "text", placeholder: "8.5" },
       ],
-      helpText: 'Array of { attribute_id, attribute_value }. Define available attributes first under Item Attributes. Example: [{"attribute_id":"...","attribute_value":"8.5"}]',
     },
   ],
 };
@@ -675,7 +721,7 @@ const species: MasterDataConfig = {
   key: "species",
   label: "Species",
   singular: "Species",
-  description: "Base species catalog used by breeds (e.g. Chicken, Cattle).",
+  description: "Base species catalog used by breeds.",
   apiBase: "/species",
   idKey: "species_id",
   group: "Livestock & Health",
@@ -686,15 +732,15 @@ const species: MasterDataConfig = {
   ],
   fields: [
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
-    { key: "species_code", label: "Species Code", type: "text", required: true, placeholder: "CHICKEN" },
-    { key: "species_name", label: "Species Name", type: "text", required: true, placeholder: "Chicken" },
+    { key: "species_code", label: "Species Code", type: "text", required: true, placeholder: "PIG" },
+    { key: "species_name", label: "Species Name", type: "text", required: true, placeholder: "Domestic Pig" },
   ],
 };
 
 const breed: MasterDataConfig = {
   key: "breed",
   label: "Breeds",
-  description: "Breed benchmarks — growth, FCR, mortality, laying rates.",
+  description: "Breed benchmarks — growth, FCR, mortality, reproduction.",
   apiBase: "/breed",
   idKey: "breed_id",
   group: "Livestock & Health",
@@ -711,7 +757,7 @@ const breed: MasterDataConfig = {
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
     { key: "nob_id", label: "Nature of Business", type: "select-entity", required: true, entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], section: "Identification" },
     { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this breed applies to all LOBs under the selected NOB.", section: "Identification" },
-    { key: "breed_code", label: "Breed Code", type: "text", required: true, placeholder: "COBB500", section: "Identification" },
+    { key: "breed_code", label: "Breed Code", type: "text", required: true, placeholder: "YORKSHIRE", section: "Identification" },
     { key: "breed_name", label: "Breed Name", type: "text", required: true, placeholder: "Yorkshire", section: "Identification" },
     { key: "species_id", label: "Species", type: "select-entity", required: true, entityEndpoint: "/species", entityValueKey: "species_id", entityLabelKeys: ["species_code", "species_name"], section: "Identification" },
     {
@@ -727,24 +773,20 @@ const breed: MasterDataConfig = {
     { key: "avg_fcr", label: "Avg FCR", type: "number", step: "0.01", section: "Growth & Performance" },
     { key: "avg_mortality_pct", label: "Avg Mortality %", type: "number", step: "0.01", section: "Growth & Performance" },
     { key: "avg_yield_per_unit", label: "Avg Yield per Unit", type: "number", step: "0.01", section: "Growth & Performance" },
-    { key: "avg_lay_rate_pct", label: "Avg Lay Rate %", type: "number", step: "0.01", section: "Growth & Performance" },
-    { key: "gestation_days", label: "Gestation Days", type: "number", section: "Reproduction" },
-    { key: "lactation_days", label: "Lactation Days", type: "number", section: "Reproduction" },
-    { key: "incubation_days", label: "Incubation Days", type: "number", section: "Reproduction" },
-    { key: "avg_litter_size", label: "Avg Litter Size (legacy/generic)", type: "number", step: "0.01", section: "Reproduction" },
-    { key: "avg_litter_size_born", label: "Avg Litter Size Born", type: "number", step: "0.01", section: "Reproduction" },
-    { key: "avg_litter_size_weaned", label: "Avg Litter Size Weaned", type: "number", step: "0.01", section: "Reproduction" },
-    { key: "avg_weaning_weight_kg", label: "Avg Weaning Weight (KG)", type: "number", step: "0.001", section: "Reproduction" },
-    { key: "farrowing_rate_pct", label: "Farrowing Rate %", type: "number", step: "0.01", section: "Reproduction" },
-    { key: "vaccination_schedule", label: "Vaccination Schedule", type: "json", section: "Reproduction", helpText: "Protocol as JSON. Drives the mandatory ONCE vaccination events on daily entry." },
+    { key: "gestation_days", label: "Gestation Days", type: "number", section: "Reproduction — Female (Sow)" },
+    { key: "lactation_days", label: "Lactation Days", type: "number", section: "Reproduction — Female (Sow)" },
+    { key: "avg_litter_size_born", label: "Avg Litter Size Born", type: "number", step: "0.01", section: "Reproduction — Female (Sow)" },
+    { key: "avg_litter_size_weaned", label: "Avg Litter Size Weaned", type: "number", step: "0.01", section: "Reproduction — Female (Sow)" },
+    { key: "avg_weaning_weight_kg", label: "Avg Weaning Weight (KG)", type: "number", step: "0.001", section: "Reproduction — Female (Sow)" },
+    { key: "farrowing_rate_pct", label: "Farrowing Rate %", type: "number", step: "0.01", section: "Reproduction — Female (Sow)" },
+    { key: "productive_life_months", label: "Productive Life (months)", type: "number", section: "Reproduction — Female (Sow)" },
+    { key: "productive_life_cycles", label: "Productive Life Cycles", type: "number", helpText: "Expected number of parities in productive life. A parity count only applies to a female.", section: "Reproduction — Female (Sow)" },
+    { key: "boar_doses_per_week", label: "Doses per Week", type: "number", step: "0.01", helpText: "Semen doses collected per week — a male KPI.", section: "Reproduction — Male (Boar)" },
+    { key: "boar_productive_life_months", label: "Productive Life (months)", type: "number", helpText: "How long a boar stays productive — amortisation input for a male.", section: "Reproduction — Male (Boar)" },
     { key: "mature_age_months", label: "Mature Age (months)", type: "number", section: "Productive Life" },
-    { key: "productive_life_months", label: "Productive Life (months)", type: "number", section: "Productive Life" },
-    { key: "productive_life_cycles", label: "Productive Life Cycles", type: "number", helpText: "Expected number of parities in productive life.", section: "Productive Life" },
     { key: "residual_value_pct", label: "Residual Value %", type: "number", step: "0.01", helpText: "Salvage value as percent of opening asset value — amortisation input.", section: "Productive Life" },
     { key: "age_labels", label: "Stage Age Labels", type: "json", section: "Productive Life", helpText: "Stage labels by week range (JSON), shown on the data entry screen header." },
     { key: "is_blocked", label: "Blocked", type: "boolean", helpText: "A blocked breed stays visible/historical but cannot be used on new animals.", section: "Productive Life" },
-    { key: "boar_doses_per_week", label: "Boar Doses per Week", type: "number", step: "0.01", helpText: "Boar species only.", section: "Productive Life" },
-    { key: "boar_productive_life_months", label: "Boar Productive Life (months)", type: "number", helpText: "Boar species only.", section: "Productive Life" },
   ],
 };
 
@@ -757,7 +799,6 @@ const breedLifecycleStage: MasterDataConfig = {
   group: "Livestock & Health",
   tabOf: "breed",
   tabLabel: "Lifecycle Stages",
-  supportsRestore: false,
   columns: [
     { key: "lifecycle_code", label: "Code" },
     { key: "calc_unit", label: "Unit" },
@@ -770,6 +811,11 @@ const breedLifecycleStage: MasterDataConfig = {
     { key: "breed_id", label: "Breed", type: "select-entity", required: true, entityEndpoint: "/breed", entityValueKey: "breed_id", entityLabelKeys: ["breed_code", "breed_name"] },
     { key: "stage_id", label: "Stage", type: "select-entity", required: true, entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"] },
     {
+      key: "category", label: "Category", type: "select",
+      helpText: "The class of animal this standard is written for — the same list the Animal Register uses.",
+      options: ["SOW", "GILT", "BOAR", "PIGLET", "COMMERCIAL_PIG"].map((v) => ({ value: v, label: v.replace(/_/g, " ") })),
+    },
+    {
       key: "calc_unit", label: "Period Unit", type: "select", required: true,
       options: ["DAY", "WEEK", "MONTH"].map((v) => ({ value: v, label: v })),
     },
@@ -777,9 +823,13 @@ const breedLifecycleStage: MasterDataConfig = {
     { key: "period_to", label: "Period To", type: "number", required: true },
     // Breed Master Template, Lifecycle sheet: "Teats" (mandatory). The standard
     // for the stage; BBP §6 hard-blocks gilt selection below 15.
-    { key: "std_teats", label: "Standard Teat Count", type: "number", helpText: "Minimum teat count expected at this stage. BBP §6 blocks gilt selection below 15." },
-    { key: "season_type", label: "Season", type: "text", placeholder: "Winter" },
-    { key: "feed_item_id", label: "Feed Item", type: "select-entity", entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+    { key: "std_teats", label: "Standard Teat Count", type: "number", min: 0, max: 99, helpText: "Minimum teat count expected at this stage, two digits at most. BBP §6 blocks gilt selection below 15." },
+    {
+      key: "season_type", label: "Season", type: "select",
+      helpText: "ALL when the standard does not vary by season.",
+      options: ["ALL", "SUMMER", "WINTER"].map((v) => ({ value: v, label: v.charAt(0) + v.slice(1).toLowerCase() })),
+    },
+    { key: "feed_item_id", label: "Feed Item", type: "select-entity", entityEndpoint: "/item?itemType=FEED", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
     { key: "feed_qty_per_head_per_day_kg", label: "Feed Qty per Head per Day (KG)", type: "number", step: "0.0001" },
     { key: "feed_wastage_pct", label: "Feed Wastage %", type: "number", step: "0.01" },
     { key: "std_body_weight_kg", label: "Std Body Weight (KG)", type: "number", step: "0.001" },
@@ -789,12 +839,7 @@ const breedLifecycleStage: MasterDataConfig = {
     { key: "output_item_id", label: "Output Item", type: "select-entity", entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
     { key: "output_uom", label: "Output UOM", type: "text" },
     { key: "std_output_qty", label: "Std Output Qty", type: "number", step: "0.001" },
-    { key: "kpi_lower_limit", label: "KPI Lower Limit", type: "number", step: "0.0001" },
-    { key: "kpi_upper_limit", label: "KPI Upper Limit", type: "number", step: "0.0001" },
-    {
-      key: "alert_severity", label: "Alert Severity", type: "select",
-      options: ["INFO", "WARNING", "CRITICAL"].map((v) => ({ value: v, label: v })),
-    },
+    { key: "kpi_thresholds", label: "KPIs & Alerts", type: "json", helpText: "One entry per KPI, each with its own alert: [{ metric, lower_limit, upper_limit, severity }]. Severity is INFO, WARNING or CRITICAL." },
     // These two columns have existed on breed_lifecycle_stages since the schema
     // was written but were never exposed, so there was no way to record a
     // vaccination or medication plan for a breed at a stage at all.
@@ -804,6 +849,10 @@ const breedLifecycleStage: MasterDataConfig = {
     { key: "vaccination_protocol", label: "Vaccination Protocol", type: "json", helpText: "Entries of { vaccine, day, route, dose } for this breed at this stage." },
     { key: "medication_protocol", label: "Medication Protocol", type: "json", helpText: "Entries of { medicine, day, route, dose, withdrawal_days } for this breed at this stage." },
     { key: "notes", label: "Notes", type: "textarea", helpText: "Shown as a tooltip on the data entry screen." },
+    // TDD row 102 — traceability. The column has always been written; nothing
+    // ever displayed it. hideInForm keeps it off the create/edit form while
+    // readOnly lets the detail view through, which is the filter it checks.
+    { key: "created_at", label: "Created At", type: "date", hideInForm: true, readOnly: true, hideInTable: true },
   ],
 };
 
@@ -1159,7 +1208,7 @@ const costCenter: MasterDataConfig = {
 };
 
 export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
-  farm, warehouse, locationType, location, shed,
+  locationType, location,
   stage, numberSeries,
   animal,
   itemCategory, itemType, uom, uomConversion, item, itemAttribute,

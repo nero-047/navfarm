@@ -306,7 +306,11 @@ describe('BreedService', () => {
       mockDbInsert.mockReturnValue({ values: jest.fn().mockResolvedValue({}) });
       await expect(service.createBreed({ nob_id: 'livestock', breed_name: 'Yorkshire', species_id: 'pig', breed_type: 'SOW' }, 'tenant'))
         .resolves.toMatchObject({ breed_code: 'BRD-001' });
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('BREED', 'tenant', null, mockDb);
+      // The DTO is now the fifth argument: a series configured with
+      // code_segments/prefix_field reads its segments out of the record being
+      // created, so breed_name can drive the code instead of a fixed prefix.
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('BREED', 'tenant', null, mockDb,
+        { nob_id: 'livestock', breed_name: 'Yorkshire', species_id: 'pig', breed_type: 'SOW' });
     });
 
     it('rejects when neither a series nor a manual breed_code is supplied', async () => {

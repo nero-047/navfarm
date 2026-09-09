@@ -189,7 +189,7 @@ export class ItemCategoryService {
           )),
       });
     } else {
-      categoryCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, tx);
+      categoryCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, tx, dto as unknown as Record<string, unknown>);
     }
 
     if (categoryCode.length > 255) {

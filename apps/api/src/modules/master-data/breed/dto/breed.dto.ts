@@ -495,6 +495,12 @@ export class QueryBreedDto {
 
 const CALC_UNITS = ['DAY', 'WEEK', 'MONTH'] as const;
 const ALERT_SEVERITIES = ['INFO', 'WARNING', 'CRITICAL'] as const;
+// Same vocabulary as animal_register.animal_type — a lifecycle standard is
+// written for a class of animal, and the two masters have to agree on the words.
+const LIFECYCLE_CATEGORIES = ['SOW', 'GILT', 'BOAR', 'PIGLET', 'COMMERCIAL_PIG'] as const;
+// TDD row 82 caps the teat count at two digits.
+const MAX_TEATS = 99;
+const SEASON_TYPES = ['ALL', 'SUMMER', 'WINTER'] as const;
 
 export class CreateBreedLifecycleStageDto {
   @ApiProperty({ description: 'Unique code for this record within the tenant/company scope. Optional: no breed lifecycle stage number series is configured yet, so a code is only stored when one is typed. Once a series is configured the code is generated instead.', required: false, example: 'BLS-001' })
@@ -512,6 +518,12 @@ export class CreateBreedLifecycleStageDto {
   @IsNotEmpty()
   stage_id: string;
 
+  @ApiProperty({ description: 'Animal class this standard is written for — matches animal_register.animal_type', enum: LIFECYCLE_CATEGORIES, required: false })
+  @IsString()
+  @IsIn(LIFECYCLE_CATEGORIES)
+  @IsOptional()
+  category?: string;
+
   @ApiProperty({ description: 'Unit for the from/to period range', enum: CALC_UNITS })
   @IsString()
   @IsIn(CALC_UNITS)
@@ -524,15 +536,17 @@ export class CreateBreedLifecycleStageDto {
   @ApiProperty({ description: 'End of this standard range in calc_unit', example: 11 })
   @IsInt()
   period_to: number;
-  @ApiProperty({ description: 'Standard teat count for this line at this stage. BBP §6 hard-blocks gilt selection below 15.', required: false, example: 15 })
+  @ApiProperty({ description: 'Standard teat count for this line at this stage. BBP §6 hard-blocks gilt selection below 15.', required: false, example: 15, maximum: MAX_TEATS })
   @IsInt()
   @Min(0)
+  @Max(MAX_TEATS)
   @IsOptional()
   std_teats?: number;
 
 
-  @ApiProperty({ description: 'Season this standard applies to, if seasonal', required: false, example: 'Winter' })
+  @ApiProperty({ description: 'Season this standard applies to', enum: SEASON_TYPES, required: false, example: 'ALL' })
   @IsString()
+  @IsIn(SEASON_TYPES)
   @IsOptional()
   season_type?: string;
 
@@ -598,6 +612,16 @@ export class CreateBreedLifecycleStageDto {
   @IsOptional()
   resource_requirements?: any;
 
+  @ApiProperty({
+    description: 'KPI thresholds for this stage, each naming its own metric and carrying its own alert: '
+      + '[{ metric, lower_limit, upper_limit, severity }]. Supersedes the single unnamed '
+      + 'kpi_lower_limit/kpi_upper_limit/alert_severity trio, which could not say which metric it bounded.',
+    required: false,
+    example: [{ metric: 'ADG_GPD', lower_limit: 450, upper_limit: null, severity: 'WARNING' }],
+  })
+  @IsOptional()
+  kpi_thresholds?: any;
+
   @ApiProperty({ description: 'Alert if actual KPI falls below this', required: false })
   @IsNumber()
   @IsOptional()
@@ -631,6 +655,12 @@ export class UpdateBreedLifecycleStageDto {
   @IsOptional()
   stage_id?: string;
 
+  @ApiProperty({ required: false, enum: LIFECYCLE_CATEGORIES })
+  @IsString()
+  @IsOptional()
+  @IsIn(LIFECYCLE_CATEGORIES)
+  category?: string;
+
   @ApiProperty({ required: false, enum: CALC_UNITS })
   @IsString()
   @IsOptional()
@@ -646,15 +676,17 @@ export class UpdateBreedLifecycleStageDto {
   @IsInt()
   @IsOptional()
   period_to?: number;
-  @ApiProperty({ description: 'Standard teat count for this line at this stage. BBP §6 hard-blocks gilt selection below 15.', required: false, example: 15 })
+  @ApiProperty({ description: 'Standard teat count for this line at this stage. BBP §6 hard-blocks gilt selection below 15.', required: false, example: 15, maximum: MAX_TEATS })
   @IsInt()
   @Min(0)
+  @Max(MAX_TEATS)
   @IsOptional()
   std_teats?: number;
 
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ enum: SEASON_TYPES, required: false })
   @IsString()
+  @IsIn(SEASON_TYPES)
   @IsOptional()
   season_type?: string;
 
@@ -719,6 +751,16 @@ export class UpdateBreedLifecycleStageDto {
   @ApiProperty({ required: false })
   @IsOptional()
   resource_requirements?: any;
+
+  @ApiProperty({
+    description: 'KPI thresholds for this stage, each naming its own metric and carrying its own alert: '
+      + '[{ metric, lower_limit, upper_limit, severity }]. Supersedes the single unnamed '
+      + 'kpi_lower_limit/kpi_upper_limit/alert_severity trio, which could not say which metric it bounded.',
+    required: false,
+    example: [{ metric: 'ADG_GPD', lower_limit: 450, upper_limit: null, severity: 'WARNING' }],
+  })
+  @IsOptional()
+  kpi_thresholds?: any;
 
   @ApiProperty({ required: false })
   @IsNumber()

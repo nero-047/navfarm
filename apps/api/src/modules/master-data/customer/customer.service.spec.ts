@@ -120,7 +120,7 @@ describe('CustomerService', () => {
         expect.objectContaining({ seriesCode: 'CUSTOMER', prefix: 'CUS', seqLength: 3 }),
         expect.any(Function),
       );
-      expect(mockGenerateNext).toHaveBeenCalledWith('CUSTOMER', 'tenant-123', 'comp-1');
+      expect(mockGenerateNext).toHaveBeenCalledWith('CUSTOMER', 'tenant-123', 'comp-1', undefined, expect.any(Object));
       expect(result.customer_code).toBe('CUS-001');
     });
   });

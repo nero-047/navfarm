@@ -59,7 +59,7 @@ export class ItemController {
   @ApiOperation({ summary: 'Fetch details of a single Item by UUID including mapped attributes' })
   @ApiParam({ name: 'id', description: 'Item UUID' })
   async findOne(@Param('id') id: string) {
-    const result = await this.itemService.findOne(id);
+    const result = await this.itemService.findOne(id, true);
     return {
       success: true,
       message: 'Item details retrieved.',

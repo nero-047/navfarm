@@ -42,7 +42,7 @@ export class ReasonService {
   }
   async create(dto: CreateReasonDto, tenantId: string, user?: any) {
     await this.assertStages(dto.applicable_stages, tenantId, dto.company_id);
-    const reason_code = await this.numbering.resolveNewCode('REASON', dto.reason_code, tenantId, dto.company_id);
+    const reason_code = await this.numbering.resolveNewCode('REASON', dto.reason_code, tenantId, dto.company_id, undefined, dto as unknown as Record<string, unknown>);
     const reason_id = randomUUID();
     await this.db.insert(table).values({ ...dto, reason_code, reason_id, tenant_id: tenantId, reason_name: dto.reason_name.trim(), applicable_stages: dto.applicable_stages?.length ? dto.applicable_stages : null, created_by: user?.userId, updated_by: user?.userId });
     return this.log('CREATE', await this.findOne(reason_id, tenantId), user);

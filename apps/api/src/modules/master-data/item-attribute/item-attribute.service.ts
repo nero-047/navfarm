@@ -35,7 +35,7 @@ export class ItemAttributeService {
     if (dto.data_type === 'LIST' && (!dto.list_values || dto.list_values.length === 0)) {
       throw new ConflictException('LIST attributes require at least one entry in list_values.');
     }
-    const attributeCode = await this.numberSeriesService.resolveNewCode('ITEM_ATTRIBUTE', dto.attribute_code, tenantId, companyId);
+    const attributeCode = await this.numberSeriesService.resolveNewCode('ITEM_ATTRIBUTE', dto.attribute_code, tenantId, companyId, undefined, dto as unknown as Record<string, unknown>);
 
     const conditions = [
       eq(schema.itemAttributeMaster.tenant_id, tenantId),

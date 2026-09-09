@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsIn, IsInt, Min, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsIn, IsInt, Min, MaxLength, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
 const RESET_FREQUENCIES = ['YEARLY', 'MONTHLY', 'NEVER'] as const;
@@ -40,12 +40,6 @@ export class CreateNumberSeriesDto {
   @IsOptional()
   prefix?: string;
 
-  @ApiProperty({ description: 'Date segment format, e.g. "YYYY" — omit for no date segment', required: false })
-  @IsString()
-  @IsOptional()
-  @MaxLength(20)
-  date_format?: string;
-
   @ApiProperty({ description: 'Segment separator', required: false, default: '-' })
   @IsString()
   @IsOptional()
@@ -67,6 +61,31 @@ export class CreateNumberSeriesDto {
   @IsBoolean()
   @IsOptional()
   allow_manual?: boolean;
+
+  @ApiProperty({
+    description: 'Ordered field names of the master this series codes, in order, before the sequence. '
+      + 'Each entry is a field of that master, or the token __PREFIX__ for this series\' own prefix. '
+      + 'Example for LOCATION: ["parent_location_id", "location_type"].',
+    required: false,
+    type: [String],
+    example: ['item_type', 'category_id', 'sub_category'],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  code_segments?: string[];
+
+  @ApiProperty({ description: "Where the prefix sits: START for BRD-LARGEWHITE-001, END for FEED-STARTER-ITM-001.", required: false, enum: ['START', 'END'] })
+  @IsString()
+  @IsIn(['START', 'END'])
+  @IsOptional()
+  prefix_position?: string;
+
+  @ApiProperty({ description: "Separator before the number when it differs from the one joining segments — Location is FARM-001/SHED-001/PEN-001. Blank uses the main separator.", required: false, enum: ['-', '/', '|'] })
+  @IsString()
+  @IsIn(['-', '/', '|'])
+  @IsOptional()
+  seq_separator?: string;
 }
 
 export class UpdateNumberSeriesDto {
@@ -84,12 +103,6 @@ export class UpdateNumberSeriesDto {
   @IsString()
   @IsOptional()
   prefix?: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  @MaxLength(20)
-  date_format?: string;
 
   @ApiProperty({ required: false })
   @IsString()
@@ -113,6 +126,31 @@ export class UpdateNumberSeriesDto {
   @IsBoolean()
   @IsOptional()
   allow_manual?: boolean;
+
+  @ApiProperty({
+    description: 'Ordered field names of the master this series codes, in order, before the sequence. '
+      + 'Each entry is a field of that master, or the token __PREFIX__ for this series\' own prefix. '
+      + 'Example for LOCATION: ["parent_location_id", "location_type"].',
+    required: false,
+    type: [String],
+    example: ['item_type', 'category_id', 'sub_category'],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  code_segments?: string[];
+
+  @ApiProperty({ description: "Where the prefix sits: START for BRD-LARGEWHITE-001, END for FEED-STARTER-ITM-001.", required: false, enum: ['START', 'END'] })
+  @IsString()
+  @IsIn(['START', 'END'])
+  @IsOptional()
+  prefix_position?: string;
+
+  @ApiProperty({ description: "Separator before the number when it differs from the one joining segments — Location is FARM-001/SHED-001/PEN-001. Blank uses the main separator.", required: false, enum: ['-', '/', '|'] })
+  @IsString()
+  @IsIn(['-', '/', '|'])
+  @IsOptional()
+  seq_separator?: string;
 
   @ApiProperty({ required: false })
   @IsBoolean()

@@ -138,7 +138,7 @@ describe('ItemService', () => {
         { userId: 'user-1' },
       );
 
-      expect(mockGenerateNext).toHaveBeenCalledWith('ITEM', 'tenant-123', 'comp-1');
+      expect(mockGenerateNext).toHaveBeenCalledWith('ITEM', 'tenant-123', 'comp-1', undefined, expect.any(Object));
       expect(mockDb.transaction).toHaveBeenCalled();
       expect(result.item_code).toBe('ITM-0001');
     });

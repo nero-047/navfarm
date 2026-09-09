@@ -1,0 +1,1 @@
+ALTER TABLE `no_series_master` ADD `prefix_position` varchar(10) DEFAULT 'END' NOT NULL;

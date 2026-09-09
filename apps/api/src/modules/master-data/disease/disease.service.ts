@@ -47,7 +47,7 @@ export class DiseaseService {
     if (series.allow_manual && dto.disease_code) {
       return dto.disease_code.toUpperCase();
     }
-    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id);
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id, undefined, dto as unknown as Record<string, unknown>);
   }
 
   async create(dto: CreateDiseaseDto, tenantId: string, userPayload?: any) {

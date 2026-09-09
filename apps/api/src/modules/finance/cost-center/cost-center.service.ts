@@ -191,7 +191,7 @@ export class CostCenterService {
           )),
       });
     } else {
-      costCenterCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id, tx);
+      costCenterCode = await this.numberSeriesService.generateNext(seriesCode, tenantId, dto.company_id, tx, dto as unknown as Record<string, unknown>);
     }
 
     if (costCenterCode.length > 255) {

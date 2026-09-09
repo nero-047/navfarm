@@ -602,7 +602,12 @@ export const itemMaster = mysqlTable('item_master', {
   is_serial_tracked: boolean('is_serial_tracked').default(false).notNull(),
   // Lot/serial number series for this item's tracking numbers — separate from item_code's
   // own 'ITEM' series (item.service.ts).
-  tracking_series_id: varchar('tracking_series_id', { length: 36 }).references(() => noSeriesMaster.series_id, { onDelete: 'set null' }),
+  // The series lot/serial numbers are drawn from, not a number itself: an item
+  // has many lots, so no single lot number is a property of the item. The
+  // numbers are recorded per transaction (goods_receipt_line.lot_no,
+  // inventory_ledger.lot_no). The foreign key is back with it — it was dropped
+  // in 0075 when this briefly held typed text. Rishi's call, 2026-09-08.
+  tracking_series_id: varchar('tracking_series_id', { length: 36 }).references(() => noSeriesMaster.series_id, { onDelete: 'restrict' }),
   is_biological_asset: boolean('is_biological_asset').default(false).notNull(),
   is_biological_costing_method: varchar('is_biological_costing_method', { length: 30 }),
   is_inventoriable: boolean('is_inventoriable').default(true).notNull(),
@@ -758,36 +763,12 @@ export const breedMaster = mysqlTable('breed_master', {
   extension_config: json('extension_config')
 }, (table) => [ uniqueIndex('uq_breed_master_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.breed_code) ]);
 
-export const farmMaster = mysqlTable('farm_master', {
-  farm_id: varchar('farm_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
-  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  farm_code: varchar('farm_code', { length: 255 }).notNull(),
-  farm_name: varchar('farm_name', { length: 100 }).notNull(),
-  farm_type: varchar('farm_type', { length: 50 }).notNull(), // BREEDER, COMMERCIAL_LAYERS, COMMERCIAL_BROILERS, HATCHERY, REARING, DAIRY, etc.
-  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
-  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
-  capacity: int('capacity').default(0).notNull(),
-  address_line1: varchar('address_line1', { length: 255 }),
-  city: varchar('city', { length: 100 }),
-  state: varchar('state', { length: 100 }),
-  country: varchar('country', { length: 100 }),
-  pincode: varchar('pincode', { length: 20 }),
-  is_active: boolean('is_active').default(true).notNull(),
-  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
-  created_by: varchar('created_by', { length: 36 }),
-  updated_by: varchar('updated_by', { length: 36 }),
-  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
-  deleted_at: timestamp('deleted_at', { mode: 'string' }),
-  extension_config: json('extension_config')
-});
 
 export const operationalAreaMaster = mysqlTable('operational_area_master', {
   area_id: varchar('area_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  farm_id: varchar('farm_id', { length: 36 }).references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
+  farm_id: varchar('farm_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   area_code: varchar('area_code', { length: 50 }).notNull(),
@@ -813,44 +794,7 @@ export const userOperationalAreaAssignment = mysqlTable('user_operational_area_a
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
 });
 
-export const warehouseMaster = mysqlTable('warehouse_master', {
-  warehouse_id: varchar('warehouse_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
-  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  farm_id: varchar('farm_id', { length: 36 }).references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
-  warehouse_code: varchar('warehouse_code', { length: 255 }).notNull(),
-  warehouse_name: varchar('warehouse_name', { length: 100 }).notNull(),
-  warehouse_type: varchar('warehouse_type', { length: 50 }).notNull(), // COLD_STORAGE, SILO, GENERAL, INGREDIENTS, MEDICINE, etc.
-  is_active: boolean('is_active').default(true).notNull(),
-  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
-  created_by: varchar('created_by', { length: 36 }),
-  updated_by: varchar('updated_by', { length: 36 }),
-  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
-  deleted_at: timestamp('deleted_at', { mode: 'string' }),
-  extension_config: json('extension_config')
-});
 
-export const shedMaster = mysqlTable('shed_master', {
-  shed_id: varchar('shed_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
-  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
-  company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  farm_id: varchar('farm_id', { length: 36 }).notNull().references(() => farmMaster.farm_id, { onDelete: 'restrict' }),
-  shed_code: varchar('shed_code', { length: 255 }).notNull(),
-  shed_name: varchar('shed_name', { length: 100 }).notNull(),
-  shed_type: varchar('shed_type', { length: 50 }).notNull(), // OPEN_SIDED, ENVIRONMENTALLY_CONTROLLED, SEMI_EC
-  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
-  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
-  capacity: int('capacity').default(0).notNull(),
-  is_active: boolean('is_active').default(true).notNull(),
-  status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
-  created_by: varchar('created_by', { length: 36 }),
-  updated_by: varchar('updated_by', { length: 36 }),
-  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
-  deleted_at: timestamp('deleted_at', { mode: 'string' }),
-  extension_config: json('extension_config')
-});
 
 // User-maintainable location classifications. The code is semantic (FARM,
 // SHED, PEN, ...); code_prefix controls the immutable sequential identity of
@@ -888,7 +832,7 @@ export const locationMaster = mysqlTable('location_master', {
   // Farm/Shed/Warehouse tables. parent_location_id is the canonical hierarchy.
   farm_id: varchar('farm_id', { length: 36 }),
   shed_id: varchar('shed_id', { length: 36 }),
-  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   location_code: varchar('location_code', { length: 255 }).notNull(),
   location_name: varchar('location_name', { length: 200 }).notNull(),
   location_address: varchar('location_address', { length: 500 }),
@@ -929,12 +873,12 @@ export const locationMaster = mysqlTable('location_master', {
   }).onDelete('restrict'),
   farmFk: foreignKey({
     columns: [table.farm_id],
-    foreignColumns: [farmMaster.farm_id],
+    foreignColumns: [locationMaster.location_id],
     name: 'loc_master_farm_id_fk'
   }).onDelete('restrict'),
   shedFk: foreignKey({
     columns: [table.shed_id],
-    foreignColumns: [shedMaster.shed_id],
+    foreignColumns: [locationMaster.location_id],
     name: 'loc_master_shed_id_fk'
   }).onDelete('restrict'),
   uqLocationCode: uniqueIndex('uq_location_master_tenant_company_code').on(
@@ -1102,9 +1046,10 @@ export const locationMasterRelations = relations(locationMaster, ({ one }) => ({
     fields: [locationMaster.lob_id],
     references: [lobMaster.lob_id]
   }),
-  warehouse: one(warehouseMaster, {
+  warehouse: one(locationMaster, {
     fields: [locationMaster.warehouse_id],
-    references: [warehouseMaster.warehouse_id]
+    references: [locationMaster.location_id],
+    relationName: 'location_warehouse'
   }),
   parent: one(locationMaster, {
     fields: [locationMaster.parent_location_id],
@@ -1113,23 +1058,15 @@ export const locationMasterRelations = relations(locationMaster, ({ one }) => ({
   })
 }));
 
-export const farmMasterRelations = relations(farmMaster, ({ one, many }) => ({
-  company: one(companyMaster, {
-    fields: [farmMaster.company_id],
-    references: [companyMaster.company_id]
-  }),
-  sheds: many(shedMaster),
-  warehouses: many(warehouseMaster)
-}));
 
 export const operationalAreaMasterRelations = relations(operationalAreaMaster, ({ one, many }) => ({
   company: one(companyMaster, {
     fields: [operationalAreaMaster.company_id],
     references: [companyMaster.company_id]
   }),
-  farm: one(farmMaster, {
+  farm: one(locationMaster, {
     fields: [operationalAreaMaster.farm_id],
-    references: [farmMaster.farm_id]
+    references: [locationMaster.location_id]
   }),
   nob: one(nobMaster, {
     fields: [operationalAreaMaster.nob_id],
@@ -1158,28 +1095,7 @@ export const userOperationalAreaAssignmentRelations = relations(userOperationalA
   })
 }));
 
-export const warehouseMasterRelations = relations(warehouseMaster, ({ one, many }) => ({
-  company: one(companyMaster, {
-    fields: [warehouseMaster.company_id],
-    references: [companyMaster.company_id]
-  }),
-  farm: one(farmMaster, {
-    fields: [warehouseMaster.farm_id],
-    references: [farmMaster.farm_id]
-  }),
-  locations: many(locationMaster)
-}));
 
-export const shedMasterRelations = relations(shedMaster, ({ one }) => ({
-  company: one(companyMaster, {
-    fields: [shedMaster.company_id],
-    references: [companyMaster.company_id]
-  }),
-  farm: one(farmMaster, {
-    fields: [shedMaster.farm_id],
-    references: [farmMaster.farm_id]
-  })
-}));
 
 export const supplierMaster = mysqlTable('supplier_master', {
   supplier_id: varchar('supplier_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
@@ -1823,6 +1739,12 @@ export const breedLifecycleStages = mysqlTable('breed_lifecycle_stages', {
   lifecycle_code: varchar('lifecycle_code', { length: 50 }),
   breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'cascade' }),
   stage_id: varchar('stage_id', { length: 36 }).notNull().references(() => stageMaster.stage_id, { onDelete: 'restrict' }),
+  // TDD row 77: "Category, should be fetched as per the animal register data".
+  // Mirrors animal_register.animal_type (SOW / GILT / BOAR / PIGLET /
+  // COMMERCIAL_PIG), which is what standards actually vary by — a gilt and a sow
+  // are both female and eat nothing alike. It carries sex implicitly, which is
+  // why no separate sex column follows it.
+  category: varchar('category', { length: 20 }),
   calc_unit: varchar('calc_unit', { length: 10 }).notNull(), // DAY, WEEK, MONTH
   period_from: int('period_from').notNull(),
   period_to: int('period_to').notNull(),
@@ -1845,6 +1767,15 @@ export const breedLifecycleStages = mysqlTable('breed_lifecycle_stages', {
   medication_protocol: json('medication_protocol'),
   vaccination_protocol: json('vaccination_protocol'),
   resource_requirements: json('resource_requirements'),
+  // TDD rows 97-99 asked for a lower limit, an upper limit and a severity, but
+  // never said which metric they bound — scheduler.service refuses to guess for
+  // exactly that reason. One unnamed pair per stage row cannot express "ADG below
+  // 450 is a warning AND FCR above 3.1 is critical" either. So the three scalars
+  // below are superseded by a list where every entry names its own metric and
+  // carries its own alert: [{ metric, lower_limit, upper_limit, severity }].
+  // The scalars stay for now — they are NULL on every row, and dropping columns
+  // is a separate, destructive step.
+  kpi_thresholds: json('kpi_thresholds'),
   kpi_lower_limit: decimal('kpi_lower_limit', { precision: 18, scale: 4 }),
   kpi_upper_limit: decimal('kpi_upper_limit', { precision: 18, scale: 4 }),
   alert_severity: varchar('alert_severity', { length: 10 }), // INFO, WARNING, CRITICAL
@@ -1870,12 +1801,33 @@ export const noSeriesMaster = mysqlTable('no_series_master', {
   series_name: varchar('series_name', { length: 150 }).notNull(),
   document_type: varchar('document_type', { length: 50 }).notNull(),
   prefix: varchar('prefix', { length: 20 }),
-  date_format: varchar('date_format', { length: 20 }), // e.g. 'YYYY' — no date segment if unset
   separator: varchar('separator', { length: 1 }).default('-').notNull(),
   seq_length: int('seq_length').notNull(),
   current_seq: bigint('current_seq', { mode: 'number' }).default(0).notNull(),
   last_generated_code: varchar('last_generated_code', { length: 80 }),
   reset_frequency: varchar('reset_frequency', { length: 20 }).default('NEVER').notNull(), // YEARLY, MONTHLY, NEVER
+  /**
+   * The ordered parts of a generated code, before the sequence. Each entry is
+   * either a field of the master being coded, or the token __PREFIX__ standing
+   * for this series' own `prefix` — so prefix, one field, several fields, or any
+   * mix of them, in whatever order the author wants. A field naming a related
+   * record contributes that record's code; any other field contributes its own
+   * value. Null or empty leaves the code exactly as it was before segments.
+   */
+  code_segments: json('code_segments'),
+  /**
+   * Where the prefix sits relative to the segments: START for BRD-LARGEWHITE-001,
+   * END for FEED-STARTER-ITM-001. Only those two — anywhere else and the prefix
+   * is buried mid-code where it identifies nothing. Ignored when no prefix is set.
+   */
+  prefix_position: varchar('prefix_position', { length: 10 }).default('END').notNull(),
+  /**
+   * The separator before the sequence, when it differs from the one joining the
+   * segments. Location is FARM-001/SHED-001/PEN-001 — "/" between path levels,
+   * "-" before the number. Null falls back to `separator`, which is every series
+   * that only ever needed one.
+   */
+  seq_separator: varchar('seq_separator', { length: 1 }),
   allow_manual: boolean('allow_manual').default(false).notNull(),
   is_active: boolean('is_active').default(true).notNull(),
   created_by: varchar('created_by', { length: 36 }),
@@ -1951,7 +1903,7 @@ export const batchHeader = mysqlTable('batch_header', {
 }, (table) => ({
   shedFk: foreignKey({
     columns: [table.shed_id],
-    foreignColumns: [shedMaster.shed_id],
+    foreignColumns: [locationMaster.location_id],
     name: 'batch_header_shed_id_fk'
   }).onDelete('restrict'),
   locationFk: foreignKey({
@@ -2051,7 +2003,7 @@ export const batchOutputLine = mysqlTable('batch_output_line', {
   uom: varchar('uom', { length: 20 }).notNull(),
   computed_cost: decimal('computed_cost', { precision: 18, scale: 4 }),
   unit_cost: decimal('unit_cost', { precision: 18, scale: 6 }),
-  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
 });
 
 // Append-only audit trail of batch_header.current_stage_code/sub_location_id
@@ -2303,7 +2255,7 @@ export const farmRecordAnimalRelations = relations(farmRecordAnimal, ({ one }) =
 export const batchOutputLineRelations = relations(batchOutputLine, ({ one }) => ({
   batch: one(batchHeader, { fields: [batchOutputLine.batch_id], references: [batchHeader.batch_id] }),
   item: one(itemMaster, { fields: [batchOutputLine.item_id], references: [itemMaster.item_id] }),
-  warehouse: one(warehouseMaster, { fields: [batchOutputLine.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  warehouse: one(locationMaster, { fields: [batchOutputLine.warehouse_id], references: [locationMaster.location_id] }),
 }));
 
 // 11a. COSTING / VARIANCE ENGINE (Phase 7) — STANDARD batches only.
@@ -2604,7 +2556,7 @@ export const qrCodeMaster = mysqlTable('qr_code_master', {
   net_weight: decimal('net_weight', { precision: 10, scale: 4 }).notNull(),
   gross_weight: decimal('gross_weight', { precision: 10, scale: 4 }),
   pack_uom: varchar('pack_uom', { length: 20 }).notNull(),
-  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   grade: varchar('grade', { length: 10 }),
   origin_batch_chain: json('origin_batch_chain'),
   breed: varchar('breed', { length: 100 }),
@@ -2635,7 +2587,7 @@ export const qrCodeMasterRelations = relations(qrCodeMaster, ({ one }) => ({
   outputLine: one(batchOutputLine, { fields: [qrCodeMaster.output_line_id], references: [batchOutputLine.line_id] }),
   qcBatch: one(qcBatchDetail, { fields: [qrCodeMaster.qc_id], references: [qcBatchDetail.qc_id] }),
   item: one(itemMaster, { fields: [qrCodeMaster.item_id], references: [itemMaster.item_id] }),
-  warehouse: one(warehouseMaster, { fields: [qrCodeMaster.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  warehouse: one(locationMaster, { fields: [qrCodeMaster.warehouse_id], references: [locationMaster.location_id] }),
 }));
 
 export const auditLog = mysqlTable('audit_log', {
@@ -2714,7 +2666,7 @@ export const inventoryLedger = mysqlTable('inventory_ledger', {
   expiry_date: date('expiry_date', { mode: 'string' }),
   batch_no: varchar('batch_no', { length: 50 }), // denormalized from batch_header.batch_no (Phase 5) for query convenience
   location_id: varchar('location_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
-  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   category_id: varchar('category_id', { length: 36 }).references(() => itemCategoryMaster.category_id, { onDelete: 'restrict' }),
@@ -2802,7 +2754,7 @@ export const goodsReceipt = mysqlTable('goods_receipt', {
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   receipt_no: varchar('receipt_no', { length: 50 }).notNull(),
   posting_date: date('posting_date', { mode: 'string' }).notNull(),
-  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   supplier_id: varchar('supplier_id', { length: 36 }).references(() => supplierMaster.supplier_id, { onDelete: 'restrict' }),
   external_reference_no: varchar('external_reference_no', { length: 50 }),
   remarks: text('remarks'),
@@ -2944,7 +2896,7 @@ export const animalMedicationLog = mysqlTable('animal_medication_log', {
 export const inventoryLedgerRelations = relations(inventoryLedger, ({ one, many }) => ({
   item: one(itemMaster, { fields: [inventoryLedger.item_id], references: [itemMaster.item_id] }),
   location: one(locationMaster, { fields: [inventoryLedger.location_id], references: [locationMaster.location_id] }),
-  warehouse: one(warehouseMaster, { fields: [inventoryLedger.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  warehouse: one(locationMaster, { fields: [inventoryLedger.warehouse_id], references: [locationMaster.location_id] }),
   inboundApplications: many(inventoryApplication, { relationName: 'inbound_ledger' }),
   outboundApplications: many(inventoryApplication, { relationName: 'outbound_ledger' }),
 }));
@@ -2971,7 +2923,7 @@ export const bioAssetLedgerRelations = relations(bioAssetLedger, ({ one }) => ({
 
 export const goodsReceiptRelations = relations(goodsReceipt, ({ one, many }) => ({
   company: one(companyMaster, { fields: [goodsReceipt.company_id], references: [companyMaster.company_id] }),
-  warehouse: one(warehouseMaster, { fields: [goodsReceipt.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  warehouse: one(locationMaster, { fields: [goodsReceipt.warehouse_id], references: [locationMaster.location_id] }),
   supplier: one(supplierMaster, { fields: [goodsReceipt.supplier_id], references: [supplierMaster.supplier_id] }),
   lines: many(goodsReceiptLine),
 }));
@@ -2987,7 +2939,7 @@ export const goodsIssue = mysqlTable('goods_issue', {
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   issue_no: varchar('issue_no', { length: 50 }).notNull(),
   posting_date: date('posting_date', { mode: 'string' }).notNull(),
-  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   cost_center_id: varchar('cost_center_id', { length: 36 }).references(() => costCenterMaster.cost_center_id, { onDelete: 'restrict' }),
   remarks: text('remarks'),
   status: varchar('status', { length: 20 }).default('DRAFT').notNull(),
@@ -3035,12 +2987,12 @@ export const stockTransfer = mysqlTable('stock_transfer', {
 }, (table) => ({
   fromWarehouseFk: foreignKey({
     columns: [table.from_warehouse_id],
-    foreignColumns: [warehouseMaster.warehouse_id],
+    foreignColumns: [locationMaster.location_id],
     name: 'stock_transfer_from_warehouse_fk'
   }).onDelete('restrict'),
   toWarehouseFk: foreignKey({
     columns: [table.to_warehouse_id],
-    foreignColumns: [warehouseMaster.warehouse_id],
+    foreignColumns: [locationMaster.location_id],
     name: 'stock_transfer_to_warehouse_fk'
   }).onDelete('restrict'),
   // Defense in depth alongside the row-locked generator in stock-transfer.service.ts —
@@ -3065,7 +3017,7 @@ export const stockAdjustment = mysqlTable('stock_adjustment', {
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   adjustment_no: varchar('adjustment_no', { length: 50 }).notNull(),
   posting_date: date('posting_date', { mode: 'string' }).notNull(),
-  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => warehouseMaster.warehouse_id, { onDelete: 'restrict' }),
+  warehouse_id: varchar('warehouse_id', { length: 36 }).notNull().references(() => locationMaster.location_id, { onDelete: 'restrict' }),
   reason: varchar('reason', { length: 200 }),
   remarks: text('remarks'),
   status: varchar('status', { length: 20 }).default('DRAFT').notNull(),
@@ -3102,7 +3054,7 @@ export const stockAdjustmentLine = mysqlTable('stock_adjustment_line', {
 
 export const goodsIssueRelations = relations(goodsIssue, ({ one, many }) => ({
   company: one(companyMaster, { fields: [goodsIssue.company_id], references: [companyMaster.company_id] }),
-  warehouse: one(warehouseMaster, { fields: [goodsIssue.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  warehouse: one(locationMaster, { fields: [goodsIssue.warehouse_id], references: [locationMaster.location_id] }),
   costCenter: one(costCenterMaster, { fields: [goodsIssue.cost_center_id], references: [costCenterMaster.cost_center_id] }),
   lines: many(goodsIssueLine),
 }));
@@ -3114,8 +3066,8 @@ export const goodsIssueLineRelations = relations(goodsIssueLine, ({ one }) => ({
 
 export const stockTransferRelations = relations(stockTransfer, ({ one, many }) => ({
   company: one(companyMaster, { fields: [stockTransfer.company_id], references: [companyMaster.company_id] }),
-  fromWarehouse: one(warehouseMaster, { fields: [stockTransfer.from_warehouse_id], references: [warehouseMaster.warehouse_id], relationName: 'transfer_from_warehouse' }),
-  toWarehouse: one(warehouseMaster, { fields: [stockTransfer.to_warehouse_id], references: [warehouseMaster.warehouse_id], relationName: 'transfer_to_warehouse' }),
+  fromWarehouse: one(locationMaster, { fields: [stockTransfer.from_warehouse_id], references: [locationMaster.location_id], relationName: 'transfer_from_warehouse' }),
+  toWarehouse: one(locationMaster, { fields: [stockTransfer.to_warehouse_id], references: [locationMaster.location_id], relationName: 'transfer_to_warehouse' }),
   lines: many(stockTransferLine),
 }));
 
@@ -3126,7 +3078,7 @@ export const stockTransferLineRelations = relations(stockTransferLine, ({ one })
 
 export const stockAdjustmentRelations = relations(stockAdjustment, ({ one, many }) => ({
   company: one(companyMaster, { fields: [stockAdjustment.company_id], references: [companyMaster.company_id] }),
-  warehouse: one(warehouseMaster, { fields: [stockAdjustment.warehouse_id], references: [warehouseMaster.warehouse_id] }),
+  warehouse: one(locationMaster, { fields: [stockAdjustment.warehouse_id], references: [locationMaster.location_id] }),
   lines: many(stockAdjustmentLine),
 }));
 

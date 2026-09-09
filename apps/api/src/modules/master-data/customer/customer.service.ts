@@ -57,7 +57,7 @@ export class CustomerService {
     );
     const customerCode = dto.customer_code?.trim()
       ? await this.numberSeriesService.manualCode('CUSTOMER', dto.customer_code, tenantId, dto.company_id)
-      : await this.numberSeriesService.generateNext('CUSTOMER', tenantId, dto.company_id);
+      : await this.numberSeriesService.generateNext('CUSTOMER', tenantId, dto.company_id, undefined, dto as unknown as Record<string, unknown>);
 
     const customerId = randomUUID();
     const newCustomer = {

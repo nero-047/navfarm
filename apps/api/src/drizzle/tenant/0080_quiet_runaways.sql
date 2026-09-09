@@ -1,0 +1,1 @@
+ALTER TABLE `no_series_master` ADD `seq_separator` varchar(1);

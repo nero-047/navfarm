@@ -134,7 +134,7 @@ describe('ResourceService', () => {
         expect.objectContaining({ seriesCode: 'RESOURCE', prefix: 'RES', seqLength: 3 }),
         expect.any(Function),
       );
-      expect(mockGenerateNext).toHaveBeenCalledWith('RESOURCE', 'tenant-123', 'comp-1');
+      expect(mockGenerateNext).toHaveBeenCalledWith('RESOURCE', 'tenant-123', 'comp-1', undefined, expect.any(Object));
       expect(result.resource_code).toBe('RES-001');
     });
   });

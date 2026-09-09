@@ -67,7 +67,7 @@ export class ResourceService {
     );
     const resourceCode = dto.resource_code?.trim()
       ? await this.numberSeriesService.manualCode('RESOURCE', dto.resource_code, tenantId, dto.company_id)
-      : await this.numberSeriesService.generateNext('RESOURCE', tenantId, dto.company_id);
+      : await this.numberSeriesService.generateNext('RESOURCE', tenantId, dto.company_id, undefined, dto as unknown as Record<string, unknown>);
 
     // NOB/LOB are no longer asked on the form — derive them from the company's
     // operational areas (an explicit dto value, if a caller still sends one,

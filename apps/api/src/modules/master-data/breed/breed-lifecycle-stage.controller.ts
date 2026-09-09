@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { BreedService } from './breed.service';
 import { CreateBreedLifecycleStageDto, UpdateBreedLifecycleStageDto, QueryBreedLifecycleStageDto } from './dto/breed.dto';
@@ -57,5 +57,17 @@ export class BreedLifecycleStageController {
   async remove(@Param('id') id: string, @Req() req: any) {
     const tenantId = req.user?.tenantId || req['tenantId'];
     return this.breedService.removeLifecycleStage(id, tenantId, req.user);
+  }
+
+  // Mirrors Breed's own restore, down to the permission: reactivating is an
+  // edit, not a separate right. Without this the list had no way back from a
+  // deactivated row, so its Active column could not be a switch.
+  @Patch(':id/restore')
+  @RequirePermission('MASTER_DATA', 'BREED_LIFECYCLE_STAGE', 'edit')
+  @ApiOperation({ summary: 'Reactivate a deactivated breed lifecycle stage' })
+  @ApiParam({ name: 'id', description: 'Lifecycle stage UUID' })
+  async restore(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    return this.breedService.restoreLifecycleStage(id, tenantId, req.user);
   }
 }

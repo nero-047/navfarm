@@ -130,7 +130,7 @@ describe('SupplierService', () => {
         expect.objectContaining({ seriesCode: 'SUPPLIER', prefix: 'SUP', seqLength: 3 }),
         expect.any(Function),
       );
-      expect(mockGenerateNext).toHaveBeenCalledWith('SUPPLIER', 'tenant-123', 'comp-1');
+      expect(mockGenerateNext).toHaveBeenCalledWith('SUPPLIER', 'tenant-123', 'comp-1', undefined, expect.any(Object));
       expect(result.supplier_code).toBe('SUP-001');
     });
 

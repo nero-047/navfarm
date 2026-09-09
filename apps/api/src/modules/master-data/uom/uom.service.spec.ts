@@ -170,7 +170,7 @@ describe('UomService', () => {
       const result = await service.create({ uom_name: 'Weight unit', uom_type: 'WEIGHT' }, 'tenant-123');
 
       expect(numberSeries.resolveSeriesFor).toHaveBeenCalledWith('UOM', 'WEIGHT', 'tenant-123', null);
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('UOM_WEIGHT', 'tenant-123', null);
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('UOM_WEIGHT', 'tenant-123', null, undefined, expect.any(Object));
       expect(result.uom_code).toBe('WGT-001');
     });
 

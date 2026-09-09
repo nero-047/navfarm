@@ -50,9 +50,9 @@ export class NumberSeriesController {
    */
   @Get('masters')
   @RequirePermission('SYSTEM', 'NUMBER_SERIES', 'view')
-  async appliesTo(@Req() req: any) {
+  async appliesTo(@Req() req: any, @Query('current') current?: string, @Query('all') all?: string) {
     const companyId = req.headers['x-workspace-scope'] === 'TENANT' ? null : (req.headers['x-active-company-id'] || req.user?.companyId);
-    return this.numberSeriesService.availableMasters(req.user?.tenantId || req.tenantId, companyId);
+    return this.numberSeriesService.availableMasters(req.user?.tenantId || req.tenantId, companyId, current, all === 'true');
   }
 
   @Get('preview')

@@ -2,7 +2,12 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsInt, Min, IsIn, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
-const DATA_TYPES = ['STRING', 'NUMBER', 'BOOLEAN', 'LIST'] as const;
+// TDD row 130 lists LIST as a fifth type, with row 131's List Values behind it.
+// Both are out: nothing on the item enforces a fixed set of values — the item's
+// Attribute Value is a free text input whatever the attribute's type — so LIST
+// defined options that no screen could apply. TEXT replaces the old STRING, the
+// same type under the client's own word. Rishi's call, 2026-09-08.
+const DATA_TYPES = ['TEXT', 'NUMBER', 'DATE', 'BOOLEAN'] as const;
 
 export class CreateItemAttributeDto {
   @ApiProperty({ description: 'Company UUID scope (null means tenant-wide, usable by all companies)', required: false })

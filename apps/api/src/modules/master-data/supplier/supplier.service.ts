@@ -86,7 +86,7 @@ export class SupplierService {
     );
     const supplierCode = dto.supplier_code?.trim()
       ? await this.numberSeriesService.manualCode('SUPPLIER', dto.supplier_code, tenantId, dto.company_id)
-      : await this.numberSeriesService.generateNext('SUPPLIER', tenantId, dto.company_id);
+      : await this.numberSeriesService.generateNext('SUPPLIER', tenantId, dto.company_id, undefined, dto as unknown as Record<string, unknown>);
 
     const supplierId = randomUUID();
     const newSupplier = {

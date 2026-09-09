@@ -70,7 +70,7 @@ export class ItemService {
     await this.db.insert(schema.noSeriesMaster).values({
       series_id: randomUUID(), tenant_id: tenantId, company_id: companyId,
       series_code: 'ITEM', series_name: template.series_name, document_type: template.document_type,
-      prefix: template.prefix, date_format: template.date_format, separator: template.separator,
+      prefix: template.prefix, separator: template.separator,
       seq_length: template.seq_length, current_seq: currentSeq,
       reset_frequency: template.reset_frequency, allow_manual: true,
     }).onDuplicateKeyUpdate({ set: { series_name: template.series_name } });
@@ -118,6 +118,51 @@ export class ItemService {
     if (valuationMethod === 'STANDARD' && standardCost == null) {
       throw new BadRequestException('standard_cost is required when valuation_method is STANDARD.');
     }
+  }
+
+  /**
+   * The Item Master Template has the item's factor "Auto-filled from
+   * uom_conversion_master", so the conversion belongs in that table rather than
+   * only on the item's own column. If the pair is already recorded the form
+   * shows it read-only and nothing is written here; if it was captured on the
+   * item form for the first time, it is recorded now, so the next item inherits
+   * it and the two can never disagree.
+   *
+   * Called from update as well as create. It used to run on create only, which
+   * meant an item edited to add a secondary unit and a factor wrote the number
+   * to its own row and nowhere else — the next item over the same pair was
+   * asked for it again, with nothing to stop a different answer.
+   */
+  private async recordUomConversion(
+    tx: any,
+    args: { tenantId: string; companyId: string | null; fromUom?: string | null; toUom?: string | null; factor?: number | string | null; userId?: string | null },
+  ) {
+    const { tenantId, companyId, fromUom, toUom, factor } = args;
+    if (!fromUom || !toUom || factor == null || factor === '') return;
+    const pair = [
+      eq(schema.uomConversionMaster.tenant_id, tenantId),
+      eq(schema.uomConversionMaster.from_uom, fromUom.toUpperCase()),
+      eq(schema.uomConversionMaster.to_uom, toUom.toUpperCase()),
+      companyId ? eq(schema.uomConversionMaster.company_id, companyId) : isNull(schema.uomConversionMaster.company_id),
+    ];
+    const [existing] = await tx.select({ id: schema.uomConversionMaster.conversion_id })
+      .from(schema.uomConversionMaster).where(and(...pair)).limit(1);
+    if (existing) return;
+    await tx.insert(schema.uomConversionMaster).values({
+      conversion_id: randomUUID(),
+      tenant_id: tenantId,
+      company_id: companyId,
+      item_id: null, // applies to every item using this unit pair
+      from_uom: fromUom.toUpperCase(),
+      to_uom: toUom.toUpperCase(),
+      conversion_factor: factor.toString(),
+      // effective_from is NOT NULL and the form does not ask for it here; the
+      // factor is true from the moment it is recorded, and left open-ended
+      // until someone supersedes it in UOM Conversion.
+      effective_from: toMysqlTimestamp().slice(0, 10),
+      is_active: true,
+      created_by: args.userId || null,
+    });
   }
 
   /** tracking_series_id is mandatory when the item is lot- or serial-tracked, per spec. */
@@ -179,7 +224,7 @@ export class ItemService {
     const seriesCode = await this.numberSeriesService.resolveSeriesFor('ITEM', dto.item_type, tenantId, companyId) || 'ITEM';
     const itemCode = dto.item_code?.trim()
       ? await this.numberSeriesService.manualCode('ITEM', dto.item_code, tenantId, companyId, dto.item_type)
-      : await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
+      : await this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, undefined, dto as unknown as Record<string, unknown>);
 
     const itemId = randomUUID();
     const newItem = {
@@ -227,39 +272,14 @@ export class ItemService {
     await this.db.transaction(async (tx) => {
       await tx.insert(schema.itemMaster).values(newItem);
 
-      // The Item Master Template has the item's factor "Auto-filled from
-      // uom_conversion_master", so the conversion belongs in that table rather
-      // than only on the item. If the pair is already recorded the form shows it
-      // read-only and nothing is written here; if it was captured on this form
-      // for the first time, record it now so the next item inherits it and the
-      // two can never disagree.
-      if (dto.uom_secondary && dto.uom_conversion_factor != null) {
-        const pair = [
-          eq(schema.uomConversionMaster.tenant_id, tenantId),
-          eq(schema.uomConversionMaster.from_uom, dto.uom_primary.toUpperCase()),
-          eq(schema.uomConversionMaster.to_uom, dto.uom_secondary.toUpperCase()),
-          companyId ? eq(schema.uomConversionMaster.company_id, companyId) : isNull(schema.uomConversionMaster.company_id),
-        ];
-        const [existing] = await tx.select({ id: schema.uomConversionMaster.conversion_id })
-          .from(schema.uomConversionMaster).where(and(...pair)).limit(1);
-        if (!existing) {
-          await tx.insert(schema.uomConversionMaster).values({
-            conversion_id: randomUUID(),
-            tenant_id: tenantId,
-            company_id: companyId,
-            item_id: null, // applies to every item using this unit pair
-            from_uom: dto.uom_primary.toUpperCase(),
-            to_uom: dto.uom_secondary.toUpperCase(),
-            conversion_factor: dto.uom_conversion_factor.toString(),
-            // effective_from is NOT NULL and the form does not ask for it here;
-            // the factor is true from the moment it is recorded, and left
-            // open-ended until someone supersedes it in UOM Conversion.
-            effective_from: toMysqlTimestamp().slice(0, 10),
-            is_active: true,
-            created_by: userPayload?.userId || null,
-          });
-        }
-      }
+      await this.recordUomConversion(tx, {
+        tenantId,
+        companyId,
+        fromUom: dto.uom_primary,
+        toUom: dto.uom_secondary,
+        factor: dto.uom_conversion_factor,
+        userId: userPayload?.userId,
+      });
 
       if (dto.attributes && dto.attributes.length > 0) {
         for (const attr of dto.attributes) {
@@ -297,11 +317,23 @@ export class ItemService {
     return this.findOne(itemId);
   }
 
-  async findOne(id: string) {
+  /**
+   * `includeBlocked` is what the read endpoint passes. findAll deliberately
+   * keeps soft-deleted rows in the list so a blocked item can be found and
+   * restored (see its comment), but this filtered them out — so the row was
+   * listed and then 404'd the moment it was opened. Blocking an item is not
+   * supposed to make it unreadable.
+   *
+   * Left off everywhere else: update() and remove() call this to load the row
+   * they are about to change, and neither should act on a blocked one.
+   */
+  async findOne(id: string, includeBlocked = false) {
     const [item] = await this.db
       .select()
       .from(schema.itemMaster)
-      .where(and(eq(schema.itemMaster.item_id, id), isNull(schema.itemMaster.deleted_at)))
+      .where(includeBlocked
+        ? eq(schema.itemMaster.item_id, id)
+        : and(eq(schema.itemMaster.item_id, id), isNull(schema.itemMaster.deleted_at)))
       .limit(1);
 
     if (!item) {
@@ -433,6 +465,10 @@ export class ItemService {
     if (dto.is_lot_tracked !== undefined) updates.is_lot_tracked = dto.is_lot_tracked;
     if (dto.is_serial_tracked !== undefined) updates.is_serial_tracked = dto.is_serial_tracked;
     if (dto.tracking_series_id !== undefined) updates.tracking_series_id = dto.tracking_series_id;
+    // Switching tracking off takes the series with it. A series left standing on
+    // an untracked item reads as configuration still in force, and whoever turns
+    // tracking back on inherits a choice nobody made on this visit.
+    if (!effectiveIsLotTracked && !effectiveIsSerialTracked) updates.tracking_series_id = null;
     if (dto.is_biological_asset !== undefined) updates.is_biological_asset = dto.is_biological_asset;
     if (dto.is_biological_costing_method !== undefined) updates.is_biological_costing_method = dto.is_biological_costing_method;
     if (dto.is_inventoriable !== undefined) updates.is_inventoriable = dto.is_inventoriable;
@@ -456,6 +492,15 @@ export class ItemService {
         .update(schema.itemMaster)
         .set(updates)
         .where(eq(schema.itemMaster.item_id, id));
+
+      await this.recordUomConversion(tx, {
+        tenantId,
+        companyId: item.company_id || null,
+        fromUom: dto.uom_primary !== undefined ? dto.uom_primary : item.uom_primary,
+        toUom: dto.uom_secondary !== undefined ? dto.uom_secondary : item.uom_secondary,
+        factor: dto.uom_conversion_factor !== undefined ? dto.uom_conversion_factor : item.uom_conversion_factor,
+        userId: userPayload?.userId,
+      });
 
       if (dto.attributes) {
         // Drop existing attributes map

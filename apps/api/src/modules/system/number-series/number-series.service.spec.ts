@@ -107,7 +107,7 @@ describe('NumberSeriesService', () => {
       jest.spyOn(service, 'resolveSeriesFor').mockResolvedValue('GL_MAPPING');
       const generate = jest.spyOn(service, 'generateNext').mockResolvedValue('MAP-007');
       await expect(service.resolveOptionalCode('GL_MAPPING', undefined, 'tenant', 'company')).resolves.toBe('MAP-007');
-      expect(generate).toHaveBeenCalledWith('GL_MAPPING', 'tenant', 'company');
+      expect(generate).toHaveBeenCalledWith('GL_MAPPING', 'tenant', 'company', undefined, {});
     });
 
     it('scopes breed_lifecycle_stages on tenant alone — that table has no company_id column', async () => {
@@ -222,13 +222,17 @@ describe('NumberSeriesService', () => {
       expect(setArg.last_generated_code).toBe('BATCH-000005');
     });
 
-    it('inserts the date segment between prefix and sequence when date_format is set', async () => {
+    // Was date_format: 'YYYY', which stamped the year the record was created.
+    // ANIMAL_PIGGERY now takes the year off the animal's own dob, so an animal
+    // entered late carries the year it was born rather than the year of typing.
+    it('inserts the date segment between prefix and sequence, from the record', async () => {
       mockLockedSelect({
         series_id: 'series-1',
         current_seq: 20,
         seq_length: 4,
         prefix: 'PIG',
-        date_format: 'YYYY',
+        prefix_position: 'START',
+        code_segments: ['dob:YEAR'],
         separator: '-',
         reset_frequency: 'NEVER',
         is_active: true,
@@ -236,9 +240,14 @@ describe('NumberSeriesService', () => {
       });
       mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
 
-      const code = await service.generateNext('ANIMAL_PIGGERY', 'tenant-123', 'comp-1');
+      const code = await service.generateNext('ANIMAL_PIGGERY', 'tenant-123', 'comp-1', undefined, { dob: '2019-04-02' });
 
-      expect(code).toBe(`PIG-${new Date().getFullYear()}-0021`);
+      // 0001, not 0021: a segmented series counts within its own stem, so
+      // animals born in 2019 number separately from those born in 2020. For the
+      // live data this is continuous — PIG-2026-0026 exists, so the next 2026
+      // animal is 0027 — while a late-entered 2019 animal starts its own run
+      // instead of being stamped with this year.
+      expect(code).toBe('PIG-2019-0001');
     });
 
     it('resets current_seq to 0 before incrementing when the YEARLY period has rolled over', async () => {

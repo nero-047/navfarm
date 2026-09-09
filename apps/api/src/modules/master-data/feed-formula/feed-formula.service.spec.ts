@@ -242,7 +242,7 @@ describe('FeedFormulaService', () => {
         'tenant-123',
       );
 
-      expect(numberSeries.generateNext).toHaveBeenCalledWith('FEED_FORMULA', 'tenant-123', 'comp-1');
+      expect(numberSeries.generateNext).toHaveBeenCalledWith('FEED_FORMULA', 'tenant-123', 'comp-1', undefined, expect.any(Object));
       expect(result.formula_code).toBe('FF-001');
     });
   });

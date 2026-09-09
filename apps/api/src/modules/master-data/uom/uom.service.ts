@@ -48,7 +48,7 @@ export class UomService {
     if (series.allow_manual && dto.uom_code) {
       return dto.uom_code.toUpperCase();
     }
-    return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId);
+    return this.numberSeriesService.generateNext(seriesCode, tenantId, companyId, undefined, dto as unknown as Record<string, unknown>);
   }
 
   async create(dto: CreateUomDto, tenantId: string, userPayload?: any) {
@@ -376,7 +376,7 @@ export class UomService {
 
     // Manual today, automatic once a UOM_CONVERSION series is configured; null
     // when neither applies, which is why the column is nullable.
-    const conversionCode = await this.numberSeriesService.resolveOptionalCode('UOM_CONVERSION', dto.conversion_code, tenantId, companyId);
+    const conversionCode = await this.numberSeriesService.resolveOptionalCode('UOM_CONVERSION', dto.conversion_code, tenantId, companyId, undefined, dto as unknown as Record<string, unknown>);
 
     const conversionId = randomUUID();
     const newConv = {
