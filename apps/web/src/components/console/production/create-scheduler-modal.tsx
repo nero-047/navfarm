@@ -523,7 +523,7 @@ export default function CreateSchedulerModal({ open, onClose, onCreated, company
               {/* Animal Count */}
               <div>
                 <label className="mb-1 block font-semibold" style={S.sub}>
-                  Starting Animal Count <span className="text-red-500">*</span>
+                  Animal Count <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
