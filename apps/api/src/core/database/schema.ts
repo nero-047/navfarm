@@ -2537,6 +2537,7 @@ export const schedulerHeader = mysqlTable('scheduler_header', {
  */
 export const schedulerLine = mysqlTable('scheduler_line', {
   line_id: varchar('line_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  scheduler_id: varchar('scheduler_id', { length: 36 }).notNull(),
   // Unique per scheduler_id (uqSchedulerLineSeq below) — the data-entry screen
   // groups rows by line_type first, then orders by this within that group.
   line_seq: int('line_seq').notNull(),
