@@ -179,9 +179,14 @@ async function bootstrap() {
 
   SwaggerModule.setup(docsPath, app, document, customOptions);
 
-  const port = process.env.PORT ?? 2877;
-  await app.listen(port);
-  Logger.log(`NAVFarm API: http://localhost:${port}/${apiPrefix}`);
-  Logger.log(`Swagger: http://localhost:${port}/${docsPath}`);
+  const host = process.env.NAVFARM_API_HOST || '0.0.0.0';
+  const portValue = process.env.NAVFARM_API_PORT || process.env.PORT || '2877';
+  const port = Number.parseInt(portValue, 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid NAVFarm API port: ${portValue}`);
+  }
+  await app.listen(port, host);
+  Logger.log(`NAVFarm API: http://${host}:${port}/${apiPrefix}`);
+  Logger.log(`Swagger: http://${host}:${port}/${docsPath}`);
 }
 void bootstrap();

@@ -1,119 +1,114 @@
-# Windows RDP development-server deployment
+# Windows RDP test-server deployment
 
-This runbook hosts the current NAVFarm API, web application and MySQL on one
-Windows Server. It is a shared **demo/testing** deployment, not a production
-architecture.
+This runbook deploys the current NAVFarm repository to the shared Windows test
+server. It is a demo/testing deployment, not a production architecture.
 
-## Current test server
+## Server layout
 
-- Server address: `103.234.185.14`
-- RDP management endpoint: `103.234.185.14:9296`
+| Component | Binding | Public? |
+|---|---|---|
+| RDP administration | `103.234.185.14:9296` | Restricted to administrators |
+| NAVFarm web | `0.0.0.0:3002` | Yes, for initial testing |
+| NAVFarm API | `127.0.0.1:2877` | No; reached through the web proxy |
+| MySQL 8.4 (`MySQL84`) | `127.0.0.1:3306` | No |
+| MySQL X Protocol | `33060`, if enabled | No |
 
-Port `9296` is only the Remote Desktop port. It is not the NAVFarm web port,
-API port, or MySQL port and must not appear in the NAVFarm environment files.
-The screenshot confirms that IIS is already installed, so the preferred public
-shape is IIS on HTTPS port 443 proxying to a private web process on 3002 and API
-process on 2877.
+Port 9296 is only the RDP endpoint. It is not an application port and must not
+appear in NAVFarm environment files. Redis is not used by NAVFarm and is not
+required for this deployment.
 
-## What is required
+The browser always calls the same web origin under `/api/v1`. The Next.js
+server proxies those requests internally to `http://127.0.0.1:2877`; testers do
+not connect to the API port directly.
 
-- Windows Server with inbound RDP restricted to the administrators who need it.
-- Node.js 24 and Corepack/pnpm 11.10.0.
-- Git.
-- MySQL 8, running as a Windows service.
-- A DNS name and HTTPS reverse proxy are strongly recommended for testers.
+## 1. Update the repository
 
-Redis is **not required by the current application**. There is no Redis client,
-module or `REDIS_*` environment read in the API or web application. Installing a
-Redis server or adding a `REDIS_URL` today has no effect.
-
-## Inspect the existing MySQL installation
-
-Open PowerShell as Administrator on the RDP server. These commands do not reveal
-the database password:
+Run from an ordinary PowerShell session. Replace the example path below with
+the actual repository checkout. Confirm that `git status` is clean before
+changing branches or pulling; do not discard unreviewed server changes.
 
 ```powershell
-# Find the Windows service and whether it is running.
-Get-Service | Where-Object { $_.Name -match 'mysql|maria' -or $_.DisplayName -match 'mysql|maria' }
+Set-Location C:\path\to\navfarm
+git status --short
+git fetch origin
+git switch main
+git pull --ff-only origin main
+```
 
-# Show the executable/configuration used by the service.
-Get-CimInstance Win32_Service |
-  Where-Object { $_.Name -match 'mysql|maria' -or $_.DisplayName -match 'mysql|maria' } |
+Install the repository's declared pnpm version and dependencies:
+
+```powershell
+corepack enable
+corepack prepare pnpm@11.10.0 --activate
+pnpm install --frozen-lockfile
+```
+
+## 2. Verify MySQL
+
+MySQL Community Server 8.4.11 is expected as service `MySQL84`:
+
+```powershell
+Get-Service MySQL84
+Get-CimInstance Win32_Service -Filter "Name='MySQL84'" |
   Select-Object Name, State, StartMode, PathName
-
-# Confirm which process is listening on the normal MySQL port.
 Get-NetTCPConnection -State Listen -LocalPort 3306 -ErrorAction SilentlyContinue |
   Select-Object LocalAddress, LocalPort, OwningProcess
-
-# Find the CLI and print its version, if it is on PATH.
-Get-Command mysql -ErrorAction SilentlyContinue
-mysql --version
 ```
 
-If `mysql` is not on `PATH`, its usual location is
-`C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe`. Use the `PathName`
-reported for the service to locate the actual installation and `my.ini`.
-
-The existing MySQL password cannot be displayed in plaintext. Obtain it from
-the server owner/password manager, or follow MySQL's controlled password-reset
-procedure if it has been lost. When a credential is available, connect locally:
+If the `mysql` command is not on `PATH`, use the installation path reported by
+the service. For the current version it will normally resemble:
 
 ```powershell
-mysql -h 127.0.0.1 -P 3306 -u root -p
+& "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" --version
+& "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -h 127.0.0.1 -P 3306 -u root -p
 ```
 
-Enter the password only at the prompt, then inspect the server:
+Enter the password only at the prompt. It cannot be recovered from NAVFarm and
+must not be written into terminal history. In MySQL, verify the local service:
 
 ```sql
 SELECT VERSION() AS mysql_version, @@hostname AS host, @@port AS port,
        @@datadir AS data_directory;
 SHOW VARIABLES LIKE 'bind_address';
-SHOW DATABASES;
-SELECT user, host, plugin FROM mysql.user ORDER BY user, host;
-```
-
-For NAVFarm, confirm whether the required databases already exist:
-
-```sql
 SHOW DATABASES LIKE 'navfarm_master';
 SHOW DATABASES LIKE 'tenant_system';
 SHOW DATABASES LIKE 'tenant\_%';
 ```
 
-Use `127.0.0.1` as `DATABASE_HOST` when MySQL and NAVFarm run on this same
-Windows server. Keep TCP 3306 closed publicly; the application does not need a
-public MySQL endpoint.
+The database account in `apps/api/.env` must be able to create and migrate
+`navfarm_master`, `tenant_system`, and `tenant_<tenant_code>` during bootstrap.
+Keep MySQL bound locally and do not create inbound firewall rules for 3306 or
+33060.
 
-## Environment files
+## 3. Create the required environment files
 
-Create these files directly on the server. Both are ignored by Git and must
-never be committed.
+Both files below are ignored by Git. Create them directly on the server and
+never commit them. Do not put a generic `PORT` in the repository root or in the
+PowerShell profile; it can leak from the API process into Next.js.
 
 ### `apps/api/.env`
 
 ```dotenv
 NODE_ENV=production
-PORT=2877
+NAVFARM_API_HOST=127.0.0.1
+NAVFARM_API_PORT=2877
 API_PREFIX=api/v1
 API_DOCS_PATH=api/docs
 
-# Exact browser origins only; comma-separate additional origins.
-# Do not add a trailing slash.
-CORS_ORIGINS=https://navfarm-dev.example.com
-FRONTEND_URL=https://navfarm-dev.example.com
+# The browser origin has no trailing slash.
+CORS_ORIGINS=http://103.234.185.14:3002
+FRONTEND_URL=http://103.234.185.14:3002
 
-# Keep uploads outside the Git checkout so a pull/redeploy does not remove them.
-UPLOADS_DIR=C:/NAVFarm/data/uploads
+# Replace this with a persistent directory outside disposable build output.
+UPLOADS_DIR=C:/path/to/persistent/navfarm-uploads
 
-# MySQL is on this Windows server.
 DATABASE_HOST=127.0.0.1
 DATABASE_PORT=3306
-DATABASE_USERNAME=navfarm_app
-DATABASE_PASSWORD=REPLACE_WITH_MYSQL_PASSWORD
+DATABASE_USERNAME=REPLACE_WITH_LOCAL_MYSQL_USER
+DATABASE_PASSWORD=REPLACE_WITH_LOCAL_MYSQL_PASSWORD
 DATABASE_NAME=navfarm_master
 DATABASE_SSL=false
 
-# Generate independent long random values. Never reuse the examples.
 JWT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
@@ -124,14 +119,14 @@ SYSTEM_ADMIN_NAME="NAVFarm System Administrator"
 SYSTEM_ADMIN_EMAIL=REPLACE_WITH_ADMIN_EMAIL
 SYSTEM_ADMIN_PASSWORD=REPLACE_WITH_A_STRONG_ADMIN_PASSWORD
 
-# Demo tenant seeded for testing. These are not Triple C production records.
+# Demo seed identity. The seeded operational values are intentionally synthetic
+# test data until the real client dataset is supplied.
 DEV_TENANT_CODE=devco
 DEV_TENANT_NAME="Triple C Demo"
 DEV_COMPANY_CODE=TRIPLEC
 DEV_COMPANY_NAME="Triple C Demo"
 
-# Optional until real SMTP details are available. Password reset/email delivery
-# will not work with blank credentials.
+# Optional; password reset/email delivery is unavailable while these are blank.
 SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
@@ -140,100 +135,166 @@ SMTP_FROM_EMAIL=
 SMTP_FROM_NAME="NAVFarm Support"
 ```
 
-If the web application is exposed directly on port 3002 instead of through
-HTTPS, use the exact public address in both URL fields, for example
-`http://SERVER_NAME_OR_IP:3002`. Every browser origin used by testers must be in
-`CORS_ORIGINS`.
+Generate JWT and encryption secrets independently using an approved password
+manager or cryptographic secret generator. Do not reuse the MySQL or system
+administrator password.
 
 ### `apps/web/.env.local`
 
-Preferred values when IIS/Nginx exposes the API at the same HTTPS host:
-
 ```dotenv
-NEXT_PUBLIC_API_URL=https://navfarm-dev.example.com/api/v1
-NEXT_PUBLIC_SOCKET_URL=https://navfarm-dev.example.com
+NAVFARM_API_MODE=proxy
+NAVFARM_API_UPSTREAM_URL=http://127.0.0.1:2877
 ```
 
-Direct-port values when there is no reverse proxy:
+These are server-only settings. No public server IP or API port is compiled
+into the browser bundle, and no `NEXT_PUBLIC_API_URL` or
+`NEXT_PUBLIC_SOCKET_URL` is needed. Rebuild the web application if this file
+changes because Next.js records rewrites during the build.
 
-```dotenv
-NEXT_PUBLIC_API_URL=http://SERVER_NAME_OR_IP:2877/api/v1
-NEXT_PUBLIC_SOCKET_URL=http://SERVER_NAME_OR_IP:2877
-```
-
-`NEXT_PUBLIC_*` values are compiled into the browser bundle. Change them before
-running the web production build, then rebuild whenever they change.
-
-There are currently no application environment variables for Redis or R2.
-
-## Install and build
-
-Run in an elevated PowerShell only where administrator access is required:
-
-```powershell
-corepack enable
-corepack prepare pnpm@11.10.0 --activate
-pnpm install --frozen-lockfile
-pnpm nx run-many -t build -p api web
-```
-
-The API build entry point is `apps/api/dist/main.js`. The web production output
-is `apps/web/.next`.
-
-## Database setup and demo seed
-
-The MySQL account must be able to create and migrate `navfarm_master`,
-`tenant_system`, and `tenant_<code>` databases. Do not expose MySQL port 3306 to
-the public internet.
-
-On a new, dedicated test database server:
-
-```powershell
-pnpm nx run api:db-seed-demo --fresh
-```
-
-`--fresh` drops and recreates the configured master, system and demo-tenant
-databases. Never run it against a database containing data that must be kept.
-After seeding, verify the users, company/area assignments, roles and important
-master counts directly in MySQL, then sign in with every seeded role.
-
-## Start the applications
+## 4. One-time database bootstrap and demo seed
 
 From the repository root:
 
 ```powershell
-node apps/api/dist/main.js
-pnpm nx run web:start -- --port=3002
+pnpm nx run api:db-bootstrap
+pnpm nx run api:db-seed-demo
+pnpm nx run api:verify-demo-master-integrity
 ```
 
-For a persistent shared server, register each command with a Windows service
-wrapper or Task Scheduler using the repository root as its working directory.
-Configure automatic restart and separate log files. Do not rely on an open RDP
-terminal to keep either process alive.
+`db-seed-demo` intentionally installs synthetic test/demo data. Do not remove
+those values merely because they are synthetic. Do not add `--fresh` on an
+existing server: the fresh mode drops and recreates the configured NAVFarm
+databases and is only for a deliberately disposable database.
 
-Expose only HTTPS port 443 through the Windows firewall when using a reverse
-proxy. If direct ports are temporarily used, allow TCP 3002 and 2877 only from
-the testers' known networks; keep 3306 private.
+## 5. Production builds
 
-## Redis later, if a feature actually adopts it
-
-Do not install Redis merely for this deployment. When caching, queues, distributed
-rate limiting or Socket.IO scaling is implemented, add a supported Redis client
-to the API first and define the environment contract in code.
-
-For Windows Server, the practical choices are:
-
-1. A managed Redis service — simplest operationally.
-2. Memurai, Redis's Windows compatibility partner, for a native Windows service.
-3. Redis under WSL2 on Windows Server 2022/2025.
-
-For WSL2, run `wsl.exe --install` in Administrator PowerShell and restart, then
-install Redis inside Ubuntu from the official Redis APT repository. Keep Redis
-bound to localhost/protected mode and do not open port 6379 publicly. A future
-application integration would likely use a single secret such as:
-
-```dotenv
-REDIS_URL=redis://:REPLACE_WITH_REDIS_PASSWORD@127.0.0.1:6379/0
+```powershell
+pnpm nx run api:build --skipNxCache
+pnpm nx run web:build --skipNxCache
 ```
 
-That variable is illustrative only: the current NAVFarm code does not read it.
+The API output is `apps/api/dist/main.js`; the web output is `apps/web/.next`.
+
+## 6. Interactive production startup
+
+Before starting, verify no stale process owns either application port:
+
+```powershell
+Get-NetTCPConnection -State Listen -LocalPort 2877,3002 -ErrorAction SilentlyContinue |
+  Select-Object LocalAddress, LocalPort, OwningProcess
+```
+
+Open two PowerShell windows in the repository root.
+
+API window:
+
+```powershell
+pnpm nx run api:start
+```
+
+This starts `node apps/api/dist/main.js` with production environment, binds the
+API to `127.0.0.1:2877`, and does not enable the Node inspector.
+
+Web window:
+
+```powershell
+pnpm nx run web:start
+```
+
+This runs Next.js with explicit `--hostname 0.0.0.0 --port 3002`. It does not
+inherit a generic `PORT` value from the API environment.
+
+## 7. Health and localhost verification
+
+Run from a third PowerShell window on the server:
+
+```powershell
+# Direct private API health.
+Invoke-RestMethod http://127.0.0.1:2877/api/v1/health
+
+# The same health route through the public-facing Next.js origin/proxy.
+Invoke-RestMethod http://127.0.0.1:3002/api/v1/health
+
+# Web page and API documentation.
+(Invoke-WebRequest http://127.0.0.1:3002 -UseBasicParsing).StatusCode
+(Invoke-WebRequest http://127.0.0.1:2877/api/docs -UseBasicParsing).StatusCode
+
+# Confirm the intended bindings/PIDs.
+Get-NetTCPConnection -State Listen -LocalPort 2877,3002 |
+  Select-Object LocalAddress, LocalPort, OwningProcess
+```
+
+Both health requests must return `status: ok`. Startup output must not contain
+`Debugger listening` and nothing should listen on 9229:
+
+```powershell
+Get-NetTCPConnection -State Listen -LocalPort 9229 -ErrorAction SilentlyContinue
+```
+
+## 8. Windows Firewall
+
+For the initial direct-port test deployment, create one inbound application
+rule in an elevated PowerShell window:
+
+```powershell
+New-NetFirewallRule `
+  -DisplayName "NAVFarm Test Web 3002" `
+  -Direction Inbound `
+  -Action Allow `
+  -Protocol TCP `
+  -LocalPort 3002
+```
+
+Where tester addresses are known, add `-RemoteAddress` with those addresses or
+networks. Do not add NAVFarm rules for 2877, 3306, 33060, 6379, or 9229. The
+existing restricted RDP rule for 9296 is separate and should not be changed.
+
+## 9. Public verification
+
+From a computer outside the RDP server, open:
+
+```text
+http://103.234.185.14:3002
+```
+
+Then sign in and exercise at least one read and one safe write. Browser network
+requests should target `http://103.234.185.14:3002/api/v1/...`, never port 2877.
+
+## 10. Safe restart and update
+
+After interactive verification, stop the API and web processes gracefully
+with `Ctrl+C` in their own windows. For an update:
+
+1. Back up the NAVFarm MySQL databases if server data must be retained.
+2. Confirm both processes are stopped and ports 2877/3002 are free.
+3. Run `git status --short`; preserve and review any server-only changes.
+4. Run `git fetch origin`, `git switch main`, and
+   `git pull --ff-only origin main`.
+5. Run `pnpm install --frozen-lockfile`.
+6. Run `pnpm nx run api:db-bootstrap` to apply current database setup/migrations.
+7. Run `pnpm nx run api:verify-demo-master-integrity` when this is the demo tenant.
+8. Rebuild API and web with the commands in section 5.
+9. Start API first, verify direct health, then start web and verify proxied health.
+
+Do not use `db-seed-demo --fresh` during a normal update. Run the non-fresh demo
+seed only when the release intentionally adds or repairs demo fixtures.
+
+## 11. Persistent processes after interactive testing
+
+Do not keep a shared test server alive through open RDP terminals. After the
+commands above pass interactively, register two separate Windows services using
+an approved service wrapper such as WinSW/NSSM, or use two Task Scheduler tasks
+configured to run whether the administrator is logged in or not.
+
+Each process must have:
+
+- repository root as its working directory;
+- its own command (`pnpm nx run api:start` or `pnpm nx run web:start`);
+- automatic restart on failure;
+- separate stdout/stderr log files;
+- startup order with API before web;
+- a service account that can read the checkout and environment files, write the
+  uploads/log directories, and connect to local MySQL.
+
+Validate the same direct and proxied health checks after converting the
+interactive commands into services.

@@ -245,11 +245,11 @@ pnpm nx show project web --json
 
 ### API
 
-Build with `pnpm nx build api`. Deploy the `apps/api/dist` output with a supported Node runtime, inject MySQL, Redis, R2, and application secrets from the hosting platform, expose the configured API port, and run database migrations as a separately controlled release step once migrations exist. Rishi owns the backend production release.
+Build with `pnpm nx build api`. Deploy the `apps/api/dist` output with a supported Node runtime, inject MySQL and application secrets from the hosting platform, and run database migrations as a separately controlled release step. Redis is not used by the current application. Rishi owns the backend production release.
 
 ### Web
 
-Build with `pnpm nx build web`. Deploy the Next.js application independently with its project root set to the monorepo root or with an Nx-aware build command. Configure `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` for the deployed API origin before building. Rishi owns the web release.
+Build with `pnpm nx build web`. Deploy the Next.js application independently with its project root set to the monorepo root or with an Nx-aware build command. The browser uses same-origin `/api/v1`; configure the server-only `NAVFARM_API_MODE=proxy` and `NAVFARM_API_UPSTREAM_URL` values so Next.js can reach the private API origin. Rishi owns the web release.
 
 ### Mobile
 
