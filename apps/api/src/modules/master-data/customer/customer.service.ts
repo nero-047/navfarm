@@ -63,6 +63,8 @@ export class CustomerService {
     const newCustomer = {
       customer_id: customerId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: dto.company_id || null,
       customer_code: customerCode,
       customer_name: dto.customer_name,

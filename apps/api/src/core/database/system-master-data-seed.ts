@@ -91,7 +91,9 @@ export const SYSTEM_SPECIES_SEED: Array<{
   { species_code: 'PIG', species_name: 'Pig' },
   { species_code: 'FISH', species_name: 'Fish' },
   { species_code: 'SHRIMP', species_name: 'Shrimp' },
-  { species_code: 'BEE', species_name: 'Honey Bee' },
+  // HONEY_BEE, not BEE: the SPECIES series is named on species_name, and this
+  // was the one row of twelve whose code was not already what that produces.
+  { species_code: 'HONEY_BEE', species_name: 'Honey Bee' },
 ];
 
 /**
@@ -365,6 +367,15 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
   allow_manual?: boolean;
   code_segments?: string[];
   prefix_position?: 'START' | 'END';
+  /**
+   * Defaults to true. False is how a master says "this code is typed, never
+   * generated": resolveSeriesFor() and resolveCodeSettings() both filter on
+   * is_active, so an inactive row resolves to null and the master falls to its
+   * own createManual() path — while the row still exists, so the master counts
+   * as having a series and the screen shows the definition rather than an empty
+   * slot inviting someone to invent one.
+   */
+  is_active?: boolean;
 }> = [
   // One series per master, named after the master it serves. There used to be a
   // row per VARIANT — LOCATION_FARM, LOCATION_SHED, LOCATION_PEN and so on, one
@@ -404,6 +415,21 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
   // collide, and the second is refused rather than numbered. That is the same
   // rule every name-based master follows.
   { series_code: 'ITEM_CATEGORY', series_name: 'Item Category Code', document_type: 'ITEM_CATEGORY', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['category_name'] },
+  // STAGE and SPECIES were serials — STG-001, SPC-001 — and nothing has ever
+  // carried such a code. Every stage in the tenant is GESTATION, FARROWING,
+  // QUARANTINE: the name, which is also what twelve files match on as a string
+  // literal, location.service and animal.service among them. A serial series
+  // described none of that and could only ever have been overridden by hand.
+  //
+  // Named on the stage's own name, the series produces exactly the fifteen
+  // codes already in the database, so the definition now describes the data
+  // instead of contradicting it — and STG-004 can no longer be generated for
+  // something the rest of the codebase expects to find as GESTATION.
+  { series_code: 'STAGE', series_name: 'Stage Code', document_type: 'STAGE', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['stage_name'] },
+  // Same for species: eleven of the twelve seeded codes are already the name.
+  // The twelfth was BEE against the name "Honey Bee", corrected in
+  // SYSTEM_SPECIES_SEED rather than special-cased here.
+  { series_code: 'SPECIES', series_name: 'Species Code', document_type: 'SPECIES', separator: '-', seq_length: 0, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['species_name'] },
 
   // built
   { series_code: 'ITEM', series_name: 'Item Code', document_type: 'ITEM', prefix: 'ITM', separator: '-', seq_length: 4, reset_frequency: 'NEVER', allow_manual: true, code_segments: ['item_type', 'category_id', 'sub_category'] },
@@ -427,13 +453,20 @@ export const SYSTEM_NO_SERIES_SEED: Array<{
   { series_code: 'CUSTOMER', series_name: 'Customer Code', document_type: 'CUSTOMER', prefix: 'CUS', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
   { series_code: 'RESOURCE', series_name: 'Resource Code', document_type: 'RESOURCE', prefix: 'RES', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
   { series_code: 'UOM_CONVERSION', series_name: 'UOM Conversion Code', document_type: 'UOM_CONVERSION', prefix: 'CONV', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
-  { series_code: 'STAGE', series_name: 'Stage Code', document_type: 'STAGE', prefix: 'STG', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
-  { series_code: 'SPECIES', series_name: 'Species Code', document_type: 'SPECIES', prefix: 'SPC', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
   { series_code: 'DISEASE', series_name: 'Disease Code', document_type: 'DISEASE', prefix: 'DIS', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
   { series_code: 'FEED_FORMULA', series_name: 'Feed Formula Code', document_type: 'FEED_FORMULA', prefix: 'FORM', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
 
-  { series_code: 'COST_CENTER', series_name: 'Cost Center Code', document_type: 'COST_CENTER', prefix: 'CC', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
-  { series_code: 'GL_ACCOUNT', series_name: 'GL Account Code (reserved; BC-owned catalog)', document_type: 'GL_ACCOUNT', prefix: 'GL', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
+  // Both inactive: defined, so the master is not shown as missing a series, but
+  // never generating, so the code stays whatever accounting says it is.
+  //
+  // A GL account's number IS the chart of accounts — 1000s assets, 4000s
+  // revenue, 5000s expenses — and the twenty seeded accounts follow it (1010,
+  // 4020, 5050). GL-001 would throw that away, and BBP-1 §1.6 puts the catalog
+  // in D365BC anyway, so nothing here should be minting account numbers.
+  // Cost centres follow for the same reason: CC-FEEDMILL-A says which mill,
+  // CC-001 says nothing, and the pairing to a GL account is done by hand.
+  { series_code: 'COST_CENTER', series_name: 'Cost Center Code (typed, not generated)', document_type: 'COST_CENTER', prefix: 'CC', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true, is_active: false },
+  { series_code: 'GL_ACCOUNT', series_name: 'GL Account Code (typed; BC-owned catalog)', document_type: 'GL_ACCOUNT', prefix: 'GL', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true, is_active: false },
   { series_code: 'GL_MAPPING', series_name: 'GL Mapping Code', document_type: 'GL_MAPPING', prefix: 'GLMAP', separator: '-', seq_length: 3, reset_frequency: 'NEVER', allow_manual: true },
   // No LOT or SERIAL series. One item has many lots, so a lot number is not a
   // property of the item — it belongs to the receipt that delivered it, and

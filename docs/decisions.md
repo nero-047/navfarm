@@ -46,6 +46,160 @@ LOCATION are excluded from the series picker although the Animal template says
 the animal code comes from a series. Rishi deferred this: *"we would work on the
 number series later"*.
 
+### The series describes the data, or the data follows the series — per master
+*Decided 2026-09-09.*
+
+The series and the master data had never agreed. Every series read
+`current_seq = 0` and `last_generated_code = NULL`: not one code in the database
+had come out of the mechanism that claims to issue them. Running the real
+`formatSeriesCode` over the real rows showed why that had gone unnoticed — the
+definitions described codes nothing carried. SPECIES said `SPC-001` over twelve
+rows coded CHICKEN, PIG, GOAT; STAGE said `STG-001` over fifteen coded
+GESTATION, FARROWING, QUARANTINE.
+
+Rishi's call is per master, not one blanket rewrite:
+
+- **SPECIES and STAGE became "named" series** — the code is the name, sequence 0
+  — which reproduces the codes already in the database exactly. Stage codes are
+  matched as string literals in twelve files, `location.service.ts` and
+  `animal.service.ts` among them; `STG-004` would have broken all of it. Only
+  `BEE` moved, to `HONEY_BEE`, being the one species code of twelve that was not
+  already its own name.
+- **GL_ACCOUNT and COST_CENTER are `is_active = 0`** — defined, so the master is
+  not reported as lacking a series, but never generating. A GL account's number
+  *is* the chart of accounts (1000s assets, 4000s revenue, 5000s expenses) and
+  BBP-1 §1.6 puts that catalog in D365BC. `GL-001` discards the only information
+  the number carries. `resolveSeriesFor` filters on `is_active`, so both fall to
+  their existing `createManual` paths.
+- **Location codes were regenerated** from the LOCATION series — `FARM-001`,
+  `FARM-001/SHED-001`, `FARM-001/SHED-001/PEN-003`. Theirs was the one case
+  where the hand-written code (`PEN-AI-B2`) carried nothing the series does not,
+  and the series' "/" between levels and "-" before the number exists precisely
+  to express that path.
+- **UOM and LOCATION_TYPE were left alone.** KG, ML and SHED are the standard
+  symbols; no rule derives them from "Kilogram", "Millilitre" or "Shed/House".
+  `SYSTEM_NO_SERIES_SEED` already documents this as what `allow_manual` is for.
+
+`current_seq = 0` is **correct** and was not "fixed". The masters that hold
+codes — location, animal, item, breed lifecycle — all use segmented series,
+which count within a stem via `nextSequenceInStem` and never consult
+`current_seq`; every flat series' master is either empty or holds NULL codes.
+There is no counter here that is behind.
+
+`SYSTEM_NO_SERIES_SEED` now seeds this shape for new tenants;
+`db-align-master-codes-to-series` brings an existing one into line.
+
+### Code columns widened, and item categories conformed
+*Decided 2026-09-10, unblocking the above.*
+
+Conforming ITEM_CATEGORY yields `BIOLOGICAL_ASSETS-BREEDING_STOCK`, which the
+ITEM series composes into a **57-character** item code against `item_code
+varchar(50)` — `assertCodeFits` rejects it and item creation stops working for
+the biological-asset categories. So the column moved instead.
+
+Migration **0082** widens six columns to `varchar(255)`, the width five master
+code columns (breed, cost centre, GL account, item category, location) have
+carried all along:
+
+| Column | Was | Why |
+|---|---|---|
+| `item_master.item_code` | 50 | The actual overflow — 57 chars. |
+| `inventory_ledger.item_code` | 50 | Denormalised snapshot; has to move with the master or a long code truncates at posting. |
+| `uom_master.uom_code` | 20 | Series now derives from `uom_name`, which is prose. |
+| `item_type_master.type_code` | 30 | Same — derives from `type_name`. |
+| `location_type_master.type_code` | 30 | Same. |
+| `item_attribute_master.attribute_code` | 50 | Same — derives from `attribute_name`. |
+
+Every one of these already sits inside a composite unique key; at
+utf8mb4 a `(tenant_id, company_id, code)` key is 1092 bytes against InnoDB's
+3072-byte limit, which the five columns already at 255 had proven.
+
+The eight item categories are now conformed (`CAT-RAW-GRAINS` →
+`RAW_GRAINS_CEREALS`). Nothing referenced a category by code —
+`item_master.sub_category` is the only column that could and it is NULL on every
+row; everything else joins on `category_id`.
+
+**ITEM itself is still not conformed.** Existing item codes stay
+`BIO-SWINE-BOAR`; only newly created items take a series code, now that one
+fits. Regenerating the 27 existing ones cascades into batch, inventory and
+goods-receipt fixtures and is its own piece of work.
+
+**A bug this caught, worth remembering.** The first version of the category seed
+passed the seed's own `{key, name}` shape to a series configured on
+`category_name`. `formatSeriesStem` found no matching field, returned an empty
+stem, and `formatSeriesCode` fell through to the bare sequence — every category
+got the code `"1"`, and the second insert died on
+`uq_item_category_master_scope_code`. Tests did not catch it; running the seed
+did. `seed-series-code.ts` now throws when a named series composes an empty
+stem, rather than inventing a code or quietly falling back to a hand-written one.
+
+Noticed while doing this and **not** fixed: all 29 `gl_mapping_master` rows have
+`mapping_code` NULL, although a GL_MAPPING series exists and
+`gl-mapping.service` calls `resolveOptionalCode`. The seed inserts them without
+codes.
+
+### Every code column is varchar(255), and the seeds generate every code
+*Decided 2026-09-10.*
+
+**Why not TEXT.** The obvious answer to "make any series combination fit" is to
+make the column TEXT. It breaks two things, both demonstrated rather than
+assumed:
+
+1. MySQL refuses a unique key on TEXT outright — *"BLOB/TEXT column used in key
+   specification without a key length"* — and every master code column sits in
+   a composite unique key. The workaround, a prefix length, makes uniqueness
+   prefix-only: with `code(20)`,
+   `LIVESTOCK-BIOLOGICAL_ASSETS-BREEDING_STOCK-ITM-0001` and
+   `LIVESTOCK-BIOLOGICAL_ASSETS-GROWER_FINISHER-ITM-0001` collide as duplicates.
+   Codes exist to be identities; that is the one guarantee they cannot lose.
+2. `assertCodeFits` reads the declared varchar length off the Drizzle column to
+   reject an over-long code at generation time (Option C, decided 2026-09-08).
+   TEXT has no length, `codeColumnLength()` returns undefined, and the guard
+   silently disables — so an absurd code gets written instead of refused.
+
+"Any length" is unreachable anyway: InnoDB's key limit is 3072 bytes, so at
+utf8mb4 a `(tenant_id, company_id, code)` key tops out near varchar(696);
+varchar(700) is rejected. **255 is the answer** — 1092 bytes in that key, and
+already proven by the five columns that carried it from the start.
+
+Migration **0083** takes the remaining 18 columns to 255: every column
+`MASTER_CODE_COLUMNS` names, plus the by-value mirrors that must move with them
+(`no_series_master.last_generated_code`, `batch_header.current_stage_code`,
+`batch_stage_log.from/to_stage_code`, `farm_record.stage_code`,
+`scheduler_parameter_line.stage_code`).
+
+**The seeds now generate every code through the series.** `lib/seed-series-code.ts`
+composes with the same formatter the API uses and persists `current_seq` /
+`last_generated_code`, so the app continues where the seed stopped — verified by
+creating a supplier through the API after seeding four and getting `SUP-005`.
+After a full `db-seed-demo --fresh`, 11 rows out of ~300 do not match their
+series, and all 11 are the deliberately-manual ones: UOM (KG, ML — standard
+symbols), two ITEM_TYPEs, one LOCATION_TYPE. GL_ACCOUNT and COST_CENTER stay
+inactive.
+
+Three bugs this surfaced, none of which the tests caught:
+
+- **`inArray` was never imported** in `seed-demo-full-coverage.ts` and
+  `seed-demo-gaps.ts`. Stage 4 of `db-seed-demo` had been dying at runtime; the
+  typecheck had been reporting it as part of an accepted baseline.
+- **The series were seeded after the masters that need them.** Starter items and
+  breed-lifecycle rows came out `LVS-PIGLET` and `LANDRACE-WEANING` — their
+  fallbacks — because no series existed yet. The series block now runs first.
+- **`animal_register.dob` was never populated**, so the ANIMAL series' `dob:YEAR`
+  segment resolved to nothing and would have composed `PIG-0001`, while the seed
+  hand-wrote `PIG-2026-0001`. The seed sets a dob now, so the series produces
+  that code itself. This does not settle the open question of `PIG-` vs `ANM-`.
+
+**Still hand-written:** nothing in the master data. Note `item_master.sub_category`
+is NULL throughout, so item codes are `<type>-<category>-ITM-<seq>`; the
+three-segment form only appears once a sub-category is set.
+
+**Unrelated, and flagged not fixed:** `seed-demo-gaps.ts` still carries Indian
+placeholder data on a Zimbabwe piggery — Pune/Maharashtra addresses, `+91`
+phone numbers, `27AABCU…` GSTINs. Same class as the bug AGENTS.md §3 already
+records. Not corrected here because inventing replacement client data is exactly
+what that rule forbids; Triple C has to supply real values.
+
 ### Medicine is not a master — it is an item
 *Decided 2026-09-06.*
 
@@ -364,5 +518,5 @@ entry UI is company-scoped and lives in Finance.
 | ZWL or ZiG? | The currency master. |
 | The 47 reason codes — 3 exist. Mortality alone is specified as 21. | Mortality, cull, return, scan-fail and selection entry screens. |
 | Kill Sheet and DOA have **no tables**. The BBP gives the kill sheet a process (attached to the TO, carcass weights per line, invoice = Delivered Qty × Avg Carcass Weight × Price/KG) but no field specification. | Revenue, and the end of the traceability chain. |
-| Location code format — the template says only "Unique code per tenant". | Our hierarchical scheme was an invention. |
+| Location code format — the template says only "Unique code per tenant". | Our hierarchical scheme was an invention, and as of 2026-09-09 every seeded location carries it (`FARM-001/SHED-001/PEN-003`). If Triple C wants something else, the LOCATION series and `db-align-master-codes-to-series` are where it changes. |
 | Is the cull flow in scope? Out-of-production date, cull date, reason, weight, write-off, and the 14-day INFO alert are all specified and none are built. | CULLED cannot be set anywhere today. |

@@ -126,6 +126,8 @@ export class CostCenterService {
     const newCC = {
       cost_center_id: costCenterId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: dto.company_id || null,
       cost_center_code: dto.cost_center_code.toUpperCase(),
       cost_center_name: dto.cost_center_name,
@@ -203,6 +205,8 @@ export class CostCenterService {
     const newCC = {
       cost_center_id: costCenterId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: dto.company_id || null,
       cost_center_code: costCenterCode,
       cost_center_name: dto.cost_center_name,

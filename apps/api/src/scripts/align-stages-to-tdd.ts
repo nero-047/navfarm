@@ -64,6 +64,14 @@ const ADDITIONS: [string, string, string, number, number | null][] = [
  */
 const LEFT_INACTIVE = ['FLUSH_SERVICE', 'CB_GROWER'];
 
+const host = process.env.DATABASE_HOST || '127.0.0.1';
+const port = Number(process.env.DATABASE_PORT || 3306);
+const user = process.env.DATABASE_USERNAME || 'root';
+const password = process.env.DATABASE_PASSWORD || '';
+const ssl = process.env.DATABASE_SSL === 'true'
+  ? { minVersion: 'TLSv1.2' as const, rejectUnauthorized: true }
+  : undefined;
+
 async function run() {
   const apply = process.argv.includes('--apply');
   const verify = process.argv.includes('--verify');
@@ -71,7 +79,7 @@ async function run() {
     throw new Error('Use no flags (read-only), --verify, or --apply.');
   }
 
-  const db = await mysql.createConnection({ host: '127.0.0.1', user: 'root', database: 'tenant_devco' });
+  const db = await mysql.createConnection({ host, port, user, password, database: process.env.DEV_TENANT_DATABASE || 'tenant_devco', ssl });
   try {
     const [[lock]] = await db.query<RowDataPacket[]>("SELECT GET_LOCK('navfarm-stage-tdd', 5) acquired");
     if (Number(lock.acquired) !== 1) throw new Error('Another stage alignment run is active.');

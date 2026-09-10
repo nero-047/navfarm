@@ -36,6 +36,16 @@ export class CreateLocationTypeDto {
   @IsArray()
   @IsOptional()
   allowed_parent_types?: string[];
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
 
 export class UpdateLocationTypeDto {
@@ -60,6 +70,16 @@ export class UpdateLocationTypeDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
 
 export class QueryLocationTypeDto {

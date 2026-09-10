@@ -9,6 +9,7 @@ import * as master from '../core/database/master-schema';
 import * as tenant from '../core/database/schema';
 import { forSeededLobs, SYSTEM_UOM_SEED, SYSTEM_SPECIES_SEED, SYSTEM_ITEM_TYPE_SEED, SYSTEM_LOCATION_TYPE_SEED, SYSTEM_BREED_SEED, SYSTEM_ITEM_SEED, SYSTEM_PARAMETER_SEED, SYSTEM_STAGE_SEED, SYSTEM_NO_SERIES_SEED, SYSTEM_BREED_LIFECYCLE_SEED } from '../core/database/system-master-data-seed';
 import { seedLocation } from './lib/seed-location';
+import { seedCode } from './lib/seed-series-code';
 import { seedDefaultCompanyRoles } from '../modules/core/role/default-role-seed';
 import { STARTER_GL_ACCOUNTS, STARTER_GL_MAPPINGS, STARTER_WAREHOUSE } from '../modules/system/setup-wizard/seed/starter-master-data.seed-data';
 
@@ -126,6 +127,41 @@ export async function seedDevTenant() {
       for (const row of masterNobs) await tenantDb.insert(tenant.nobMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });
       for (const row of masterLobs) await tenantDb.insert(tenant.lobMaster).values(row).onDuplicateKeyUpdate({ set: { ...row } });
 
+      const nobIdByCode = new Map(masterNobs.map((n) => [n.nob_code, n.nob_id]));
+      const lobIdByCode = new Map(masterLobs.map((l) => [l.lob_code, l.lob_id]));
+      // The number series come first: every master below takes its code from
+      // one, and a master seeded before its series exists silently falls back
+      // to a hand-written code. That is exactly what happened to the starter
+      // items and the breed-lifecycle rows, which were seeded above this block
+      // and came out as LVS-PIGLET and LANDRACE-WEANING instead of series codes.
+      const existingSeriesCodes = new Set((await tenantDb.select({ c: tenant.noSeriesMaster.series_code }).from(tenant.noSeriesMaster)).map((r) => r.c));
+      for (const series of SYSTEM_NO_SERIES_SEED) {
+        if (existingSeriesCodes.has(series.series_code)) continue;
+        const seriesNobId = series.nob_code ? nobIdByCode.get(series.nob_code) : undefined;
+        const seriesLobId = series.lob_code ? lobIdByCode.get(series.lob_code) : undefined;
+        if ((series.nob_code && !seriesNobId) || (series.lob_code && !seriesLobId)) continue;
+        await tenantDb.insert(tenant.noSeriesMaster).values({
+          series_id: randomUUID(),
+          tenant_id: tenantId,
+          company_id: null,
+          nob_id: seriesNobId || null,
+          lob_id: seriesLobId || null,
+          series_code: series.series_code,
+          series_name: series.series_name,
+          document_type: series.document_type,
+          prefix: series.prefix || null,
+          separator: series.separator,
+          seq_separator: series.seq_separator || null,
+          code_segments: series.code_segments ?? null,
+          prefix_position: series.prefix_position ?? 'END',
+          seq_length: series.seq_length,
+          current_seq: 0,
+          reset_frequency: series.reset_frequency,
+          allow_manual: series.allow_manual ?? false,
+          is_active: series.is_active ?? true,
+        });
+      }
+
       const [existingUom] = await tenantDb.select().from(tenant.uomMaster).limit(1);
       if (!existingUom) {
         await tenantDb.insert(tenant.uomMaster).values(SYSTEM_UOM_SEED.map((u) => ({ ...u, tenant_id: tenantId })));
@@ -150,8 +186,6 @@ export async function seedDevTenant() {
       // real catalog instead of empty dropdowns. Idempotent per-code (not a
       // single any-row-exists gate) so extending these lists later backfills
       // cleanly into tenants that were seeded before the addition.
-      const nobIdByCode = new Map(masterNobs.map((n) => [n.nob_code, n.nob_id]));
-      const lobIdByCode = new Map(masterLobs.map((l) => [l.lob_code, l.lob_id]));
       const speciesRows = await tenantDb.select().from(tenant.speciesMaster);
       const speciesIdByCode = new Map(speciesRows.map((s) => [s.species_code, s.species_id]));
 
@@ -187,7 +221,13 @@ export async function seedDevTenant() {
       }
 
       const itemIdByCode = new Map<string, string>();
-      for (const row of await tenantDb.select().from(tenant.itemMaster)) itemIdByCode.set(row.item_code, row.item_id);
+      // Keyed by the SEED's item_code (LVS-PIGLET), which is this script's handle
+      // for wiring breed-lifecycle rows to items — not by the stored item_code,
+      // which the ITEM series composes and which therefore is not known here.
+      const seedItemCodeByName = new Map(SYSTEM_ITEM_SEED.map((i) => [i.item_name, i.item_code]));
+      for (const row of await tenantDb.select().from(tenant.itemMaster)) {
+        itemIdByCode.set(seedItemCodeByName.get(row.item_name) ?? row.item_code, row.item_id);
+      }
       for (const item of forSeededLobs(SYSTEM_ITEM_SEED)) {
         if (itemIdByCode.has(item.item_code)) continue;
         const nobId = nobIdByCode.get(item.nob_code);
@@ -201,7 +241,9 @@ export async function seedDevTenant() {
           company_id: null,
           nob_id: nobId,
           lob_id: lobId,
-          item_code: item.item_code,
+          // These starter items carry no category, so the ITEM series composes
+          // <item_type>-ITM-<seq> for them.
+          item_code: await seedCode(tenantDb, tenantId, null, 'ITEM', tenant.itemMaster, tenant.itemMaster.item_code, item.item_code, { item_type: item.item_type }),
           item_name: item.item_name,
           item_type: item.item_type,
           uom_primary: item.uom_primary,
@@ -304,6 +346,7 @@ export async function seedDevTenant() {
           await tenantDb.insert(tenant.breedLifecycleStages).values({
             lifecycle_id:                 randomUUID(),
             tenant_id:                    tenantId,
+            lifecycle_code:               await seedCode(tenantDb, tenantId, null, 'BREED_LIFECYCLE_STAGE', tenant.breedLifecycleStages, tenant.breedLifecycleStages.lifecycle_code, `${lc.breed_code}-${lc.stage_code}`, { breed_id: lc.breed_code, stage_id: lc.stage_code }),
             breed_id:                     breedId,
             stage_id:                     stageId,
             calc_unit:                    lc.calc_unit,
@@ -326,33 +369,6 @@ export async function seedDevTenant() {
             is_active:                    true,
           });
         }
-      }
-
-      const existingSeriesCodes = new Set((await tenantDb.select({ c: tenant.noSeriesMaster.series_code }).from(tenant.noSeriesMaster)).map((r) => r.c));
-      for (const series of SYSTEM_NO_SERIES_SEED) {
-        if (existingSeriesCodes.has(series.series_code)) continue;
-        const seriesNobId = series.nob_code ? nobIdByCode.get(series.nob_code) : undefined;
-        const seriesLobId = series.lob_code ? lobIdByCode.get(series.lob_code) : undefined;
-        if ((series.nob_code && !seriesNobId) || (series.lob_code && !seriesLobId)) continue;
-        await tenantDb.insert(tenant.noSeriesMaster).values({
-          series_id: randomUUID(),
-          tenant_id: tenantId,
-          company_id: null,
-          nob_id: seriesNobId || null,
-          lob_id: seriesLobId || null,
-          series_code: series.series_code,
-          series_name: series.series_name,
-          document_type: series.document_type,
-          prefix: series.prefix || null,
-          separator: series.separator,
-          seq_separator: series.seq_separator || null,
-          code_segments: series.code_segments ?? null,
-          prefix_position: series.prefix_position ?? 'END',
-          seq_length: series.seq_length,
-          current_seq: 0,
-          reset_frequency: series.reset_frequency,
-          allow_manual: series.allow_manual ?? false,
-        });
       }
 
       const defaultLangId = masterLangs.find((l) => l.is_system_default)?.lang_id || masterLangs[0]?.lang_id;
@@ -455,6 +471,7 @@ export async function seedDevTenant() {
               mapping_id: randomUUID(),
               tenant_id: tenantId,
               company_id: cc.id,
+              mapping_code: await seedCode(tenantDb, tenantId, cc.id, 'GL_MAPPING', tenant.glMappingMaster, tenant.glMappingMaster.mapping_code, mapping.transaction_type),
               transaction_type: mapping.transaction_type,
               debit_gl_account_id: debitAccountId,
               credit_gl_account_id: creditAccountId,
@@ -472,15 +489,15 @@ export async function seedDevTenant() {
         // FARM -> SHED -> (PEN seeded by the piggery script), plus a STORE on
         // the farm and a SILO on the shed, which is the attachment the
         // location type master allows (SILO parents: FARM or SHED).
-        const farmLoc = await seedLocation(tenantDb, locCtx, { code: cc.farmCode, name: cc.farmName, type: 'FARM', capacity: cc.farmCapacity });
+        const farmLoc = await seedLocation(tenantDb, locCtx, { key: cc.farmCode, name: cc.farmName, type: 'FARM', capacity: cc.farmCapacity });
         const farmId = farmLoc.id;
-        const shedLoc = await seedLocation(tenantDb, locCtx, { code: cc.shedCode, name: cc.shedName, type: 'SHED', parent: farmLoc, subType: cc.shedType, capacity: cc.shedCapacity });
+        const shedLoc = await seedLocation(tenantDb, locCtx, { key: cc.shedCode, name: cc.shedName, type: 'SHED', parent: farmLoc, subType: cc.shedType, capacity: cc.shedCapacity });
         await seedLocation(tenantDb, locCtx, {
-          code: `WH-${cc.code}-MAIN`, name: `${cc.name} Central Warehouse`, type: 'STORE',
+          key: `WH-${cc.code}-MAIN`, name: `${cc.name} Central Warehouse`, type: 'STORE',
           parent: farmLoc, storageType: 'STORE', subType: STARTER_WAREHOUSE.warehouse_type,
         });
         await seedLocation(tenantDb, locCtx, {
-          code: `SILO-${cc.code}-01`, name: `${cc.shedName} Feed Silo`, type: 'SILO',
+          key: `SILO-${cc.code}-01`, name: `${cc.shedName} Feed Silo`, type: 'SILO',
           parent: shedLoc, storageType: 'SILO', siloCapacityKg: 25000, siloReorderDays: 7,
         });
 

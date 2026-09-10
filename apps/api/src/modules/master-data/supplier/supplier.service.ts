@@ -92,6 +92,8 @@ export class SupplierService {
     const newSupplier = {
       supplier_id: supplierId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: dto.company_id || null,
       supplier_code: supplierCode,
       supplier_name: dto.supplier_name,

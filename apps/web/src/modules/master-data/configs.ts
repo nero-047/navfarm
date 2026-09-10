@@ -23,7 +23,10 @@ const locationType: MasterDataConfig = {
     { key: "type_name", label: "Name" },
     { key: "code_prefix", label: "Prefix" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this location type is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this location type is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "type_code", label: "Type Code", type: "text", required: true, placeholder: "FARM", createOnly: true },
     { key: "type_name", label: "Type Name", type: "text", required: true, placeholder: "Farm" },
@@ -46,7 +49,10 @@ const location: MasterDataConfig = {
     { key: "location_type", label: "Type" },
     { key: "location_level", label: "Level" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this location is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this location is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "location_code", label: "Location Code", type: "text", readOnly: true, helpText: "Generated from the selected Location Type prefix and kept permanently." , section: "Identification" },
     { key: "location_name", label: "Location Name", type: "text", required: true, placeholder: "Porta Farm", section: "Identification" },
@@ -381,7 +387,10 @@ const itemCategory: MasterDataConfig = {
     { key: "category_name", label: "Name" },
     { key: "item_type", label: "Item Type" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this category is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this category is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "category_code", label: "Category Code", type: "text", required: true, placeholder: "FEED" },
     { key: "category_name", label: "Category Name", type: "text", required: true, placeholder: "Animal Feed Products" },
@@ -405,7 +414,10 @@ const itemType: MasterDataConfig = {
     { key: "type_code", label: "Code" },
     { key: "type_name", label: "Name" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this item type is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this item type is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     // createOnly: items reference a type by its code string, so the code is
     // immutable after create (UpdateItemTypeDto has no type_code, and the
@@ -433,7 +445,10 @@ const uom: MasterDataConfig = {
     { key: "uom_type", label: "Type" },
     { key: "is_base_uom", label: "Base Unit" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this unit is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this unit is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
     { key: "uom_code", label: "UOM Code", type: "text", required: true, placeholder: "KG" },
     { key: "uom_name", label: "UOM Name", type: "text", required: true, placeholder: "Kilogram" },
@@ -471,7 +486,10 @@ const uomConversion: MasterDataConfig = {
     { key: "effective_from", label: "Effective From" },
     { key: "effective_to", label: "Effective To" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this conversion is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this conversion is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
     { key: "conversion_code", label: "Conversion Code", type: "text", placeholder: "CONV-001" },
     // The four fields below are the whole of the client's "UOM Conversion" sheet
@@ -730,7 +748,10 @@ const species: MasterDataConfig = {
     { key: "species_code", label: "Code" },
     { key: "species_name", label: "Name" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this species is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this species is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company (blank = global)", type: "text", hideInForm: true },
     { key: "species_code", label: "Species Code", type: "text", required: true, placeholder: "PIG" },
     { key: "species_name", label: "Species Name", type: "text", required: true, placeholder: "Domestic Pig" },
@@ -806,7 +827,10 @@ const breedLifecycleStage: MasterDataConfig = {
     { key: "period_to", label: "To" },
     { key: "std_fcr", label: "Std FCR" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this lifecycle row is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this lifecycle row is shared across all LOBs under the selected NOB." },
     { key: "lifecycle_code", label: "Lifecycle Code", type: "text", placeholder: "BLS-001", helpText: "Optional. Leave blank until the numbering convention is agreed; a series can generate it later." },
     { key: "breed_id", label: "Breed", type: "select-entity", required: true, entityEndpoint: "/breed", entityValueKey: "breed_id", entityLabelKeys: ["breed_code", "breed_name"] },
     { key: "stage_id", label: "Stage", type: "select-entity", required: true, entityEndpoint: "/stage", entityValueKey: "stage_id", entityLabelKeys: ["stage_code", "stage_name"] },
@@ -861,7 +885,10 @@ const reason: MasterDataConfig = {
   group: "Livestock & Health", isPrimary: true, businessAdminOnly: true,
   description: "Shared company reasons for mortality, culling, returns, selection, disposal and transfers. Only documented examples are loaded; Tenant and Company Admins maintain this catalog.",
   columns: [{ key: "reason_code", label: "Code" }, { key: "reason_name", label: "Name" }, { key: "category", label: "Category" }, { key: "mandatory_weight", label: "Weight Required" }],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this reason is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this reason is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "reason_code", label: "Reason Code", type: "text", required: true, createOnly: true },
     { key: "reason_name", label: "Reason Name", type: "text", required: true },
@@ -884,7 +911,10 @@ const disease: MasterDataConfig = {
     { key: "disease_name", label: "Name" },
     { key: "scientific_name", label: "Scientific Name" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this disease is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this disease is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "disease_code", label: "Disease Code", type: "text", required: true, placeholder: "DIS-ND" },
     { key: "disease_name", label: "Disease Name", type: "text", required: true, placeholder: "Newcastle Disease" },
@@ -956,7 +986,10 @@ const supplier: MasterDataConfig = {
     { key: "vendor_type", label: "Type" },
     { key: "is_approved", label: "Approved" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this supplier is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this supplier is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "supplier_code", label: "Supplier Code", type: "text", readOnly: true, placeholder: "Generated as SUP-001", helpText: "Generated automatically from this company's Supplier sequence.", section: "Identification" },
     { key: "supplier_name", label: "Supplier Name", type: "text", required: true, placeholder: "Feed Ingredients Corp Ltd", section: "Identification" },
@@ -997,7 +1030,10 @@ const customer: MasterDataConfig = {
     { key: "mobile", label: "Mobile" },
     { key: "credit_limit", label: "Credit Limit" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this customer is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this customer is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "customer_code", label: "Customer Code", type: "text", readOnly: true, placeholder: "Generated as CUS-001", helpText: "Generated automatically from this company's Customer sequence.", section: "Identification" },
     { key: "customer_name", label: "Customer Name", type: "text", required: true, placeholder: "John Doe Wholesalers", section: "Identification" },
@@ -1100,7 +1136,10 @@ const glAccount: MasterDataConfig = {
     { key: "account_name", label: "Name" },
     { key: "account_type", label: "Type" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this G/L account is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this G/L account is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "account_code", label: "Account Code", type: "text", required: true, placeholder: "101000", section: "Identification" },
     { key: "account_name", label: "Account Name", type: "text", required: true, placeholder: "Cash at Bank", section: "Identification" },
@@ -1195,7 +1234,10 @@ const costCenter: MasterDataConfig = {
     { key: "cost_center_name", label: "Name" },
     { key: "cost_center_type", label: "Type" },
   ],
+  supportsNobLobFilter: true,
   fields: [
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this cost centre is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this cost centre is shared across all LOBs under the selected NOB." },
     { key: "company_id", label: "Company", type: "text", hideInForm: true },
     { key: "cost_center_code", label: "Cost Center Code", type: "text", required: true, placeholder: "DEPT-ADMIN" },
     { key: "cost_center_name", label: "Cost Center Name", type: "text", required: true, placeholder: "Administrative Department" },

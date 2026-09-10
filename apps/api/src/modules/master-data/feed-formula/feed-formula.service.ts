@@ -115,6 +115,8 @@ export class FeedFormulaService {
       const newFormula = {
         formula_id: formulaId,
         tenant_id: tenantId,
+        nob_id: (dto as any).nob_id ?? null,
+        lob_id: (dto as any).lob_id ?? null,
         company_id: dto.company_id || null,
         formula_code: formulaCode,
         formula_name: dto.formula_name,
@@ -135,6 +137,8 @@ export class FeedFormulaService {
       const newIngredients = dto.ingredients.map((ingr) => ({
         ingredient_id: randomUUID(),
         tenant_id: tenantId,
+        nob_id: (dto as any).nob_id ?? null,
+        lob_id: (dto as any).lob_id ?? null,
         company_id: dto.company_id || null,
         formula_id: formulaId,
         item_id: ingr.item_id,

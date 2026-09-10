@@ -22,6 +22,16 @@ export class CreateSpeciesDto {
   @IsUUID()
   @IsOptional()
   company_id?: string;
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
 
 export class UpdateSpeciesDto {
@@ -44,6 +54,16 @@ export class UpdateSpeciesDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
 
 export class QuerySpeciesDto {
@@ -642,6 +662,16 @@ export class CreateBreedLifecycleStageDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
 
 export class UpdateBreedLifecycleStageDto {
@@ -787,6 +817,16 @@ export class UpdateBreedLifecycleStageDto {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
 
 export class QueryBreedLifecycleStageDto {

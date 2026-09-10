@@ -1,4 +1,4 @@
-import { PartialType, OmitType } from '@nestjs/swagger';
+import { ApiProperty, PartialType, OmitType } from '@nestjs/swagger';
 import { IsArray, ArrayUnique, ArrayMaxSize, IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { REASON_CATEGORIES } from '../../../core/database/reason-code-seed';
@@ -13,8 +13,28 @@ export class CreateReasonDto {
   @IsOptional() @IsArray() @ArrayUnique() @ArrayMaxSize(50)
   @IsString({ each: true }) @Matches(/^[A-Z][A-Z0-9_]{0,49}$/, { each: true }) applicable_stages?: string[] | null;
   @IsOptional() @IsBoolean() mandatory_weight?: boolean;
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
-export class UpdateReasonDto extends PartialType(OmitType(CreateReasonDto, ['company_id'] as const)) {}
+export class UpdateReasonDto extends PartialType(OmitType(CreateReasonDto, ['company_id'] as const)) {
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
+}
 export class QueryReasonDto {
   @IsOptional() @IsUUID() companyId?: string;
   @IsOptional() @IsString() @MaxLength(150) search?: string;

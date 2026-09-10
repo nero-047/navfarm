@@ -97,9 +97,15 @@ export async function loadCompanyTemplateCopies(tx: Pick<MySql2Database<typeof s
     if (c.deleted_at) conditions.push(isNull(c.deleted_at));
     sets.push({ table, rows: await tx.select().from(table).where(and(...conditions)) });
   }
+  // Child tables that carry no company_id of their own, so they can only be
+  // found through the parent that does.
+  //
+  // breed_lifecycle_stages used to be one of these. It has a company_id now, so
+  // companyTemplateTables above already picks it up — listing it here as well
+  // planned every row twice and the second insert died on
+  // uq_breed_lifecycle_stages_scope_code.
   for (const [table, parent, key] of [
     [schema.itemAttributeValues, schema.itemMaster, 'item_id'],
-    [schema.breedLifecycleStages, schema.breedMaster, 'breed_id'],
     [schema.feedFormulaIngredients, schema.feedFormulaMaster, 'formula_id'],
   ] as const) {
     const ids = sets.find((s) => s.table === parent)?.rows.map((r) => r[key]) || [];

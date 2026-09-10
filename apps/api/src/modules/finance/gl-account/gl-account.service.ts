@@ -127,6 +127,8 @@ export class GlAccountService {
     const newAccount = {
       gl_account_id: glAccountId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: dto.company_id || null,
       account_code: dto.account_code,
       account_name: dto.account_name,
@@ -206,6 +208,8 @@ export class GlAccountService {
     const newAccount = {
       gl_account_id: glAccountId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: dto.company_id || null,
       account_code: accountCode,
       account_name: dto.account_name,

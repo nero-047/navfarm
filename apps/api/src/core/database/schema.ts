@@ -496,7 +496,12 @@ export const uomMaster = mysqlTable('uom_master', {
   uom_id: varchar('uom_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }), // Null for tenant-wide global UOMs
-  uom_code: varchar('uom_code', { length: 20 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  uom_code: varchar('uom_code', { length: 255 }).notNull(),
   uom_name: varchar('uom_name', { length: 100 }).notNull(),
   uom_type: varchar('uom_type', { length: 20 }).notNull(),
   decimal_places: int('decimal_places').default(0).notNull(),
@@ -515,6 +520,11 @@ export const itemCategoryMaster = mysqlTable('item_category_master', {
   category_id: varchar('category_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }), // null means global tenant-wide category
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   category_code: varchar('category_code', { length: 255 }).notNull(),
   category_name: varchar('category_name', { length: 100 }).notNull(),
   parent_category_id: varchar('parent_category_id', { length: 36 }),
@@ -554,7 +564,12 @@ export const itemTypeMaster = mysqlTable('item_type_master', {
   item_type_id: varchar('item_type_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }), // null means global tenant-wide type
-  type_code: varchar('type_code', { length: 30 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  type_code: varchar('type_code', { length: 255 }).notNull(),
   type_name: varchar('type_name', { length: 100 }).notNull(),
   // Mirrors location_type_master.code_prefix: the more specific configuration an
   // ITEM_<type_code> series' generated code defers to instead of its own `prefix`
@@ -583,7 +598,7 @@ export const itemMaster = mysqlTable('item_master', {
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
   category_id: varchar('category_id', { length: 36 }).references(() => itemCategoryMaster.category_id, { onDelete: 'restrict' }),
-  item_code: varchar('item_code', { length: 50 }).notNull(),
+  item_code: varchar('item_code', { length: 255 }).notNull(),
   item_name: varchar('item_name', { length: 200 }).notNull(),
   item_type: varchar('item_type', { length: 30 }).notNull(),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
@@ -644,11 +659,16 @@ export const uomConversionMaster = mysqlTable('uom_conversion_master', {
   conversion_id: varchar('conversion_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   // Nullable by design: no numbering convention has been supplied for this master
   // yet, so no no_series_master row exists for it. A code may be typed manually
   // today; the moment a series is configured, NumberSeriesService.resolveOptionalCode()
   // starts generating one with no further code change. Existing rows keep NULL.
-  conversion_code: varchar('conversion_code', { length: 50 }),
+  conversion_code: varchar('conversion_code', { length: 255 }),
   item_id: varchar('item_id', { length: 36 }).references(() => itemMaster.item_id, { onDelete: 'cascade' }),
   from_uom: varchar('from_uom', { length: 20 }).notNull(),
   to_uom: varchar('to_uom', { length: 20 }).notNull(),
@@ -670,7 +690,7 @@ export const itemAttributeMaster = mysqlTable('item_attribute_master', {
   company_id: varchar('company_id', { length: 36 }),
   nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'cascade' }),
   lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'cascade' }),
-  attribute_code: varchar('attribute_code', { length: 50 }).notNull(),
+  attribute_code: varchar('attribute_code', { length: 255 }).notNull(),
   attribute_name: varchar('attribute_name', { length: 100 }).notNull(),
   data_type: varchar('data_type', { length: 20 }).notNull(), // STRING, NUMBER, BOOLEAN, LIST
   list_values: json('list_values'),
@@ -704,7 +724,12 @@ export const speciesMaster = mysqlTable('species_master', {
   species_id: varchar('species_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
-  species_code: varchar('species_code', { length: 50 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  species_code: varchar('species_code', { length: 255 }).notNull(),
   species_name: varchar('species_name', { length: 100 }).notNull(),
   status: varchar('status', { length: 20 }).default('ACTIVE').notNull(),
   is_active: boolean('is_active').default(true).notNull(),
@@ -803,7 +828,12 @@ export const locationTypeMaster = mysqlTable('location_type_master', {
   location_type_id: varchar('location_type_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }), // null = tenant-wide
-  type_code: varchar('type_code', { length: 30 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  type_code: varchar('type_code', { length: 255 }).notNull(),
   type_name: varchar('type_name', { length: 100 }).notNull(),
   code_prefix: varchar('code_prefix', { length: 20 }).notNull(),
   allowed_parent_types: json('allowed_parent_types').$type<string[]>().notNull(),
@@ -1101,7 +1131,12 @@ export const supplierMaster = mysqlTable('supplier_master', {
   supplier_id: varchar('supplier_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  supplier_code: varchar('supplier_code', { length: 50 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  supplier_code: varchar('supplier_code', { length: 255 }).notNull(),
   supplier_name: varchar('supplier_name', { length: 150 }).notNull(),
   email: varchar('email', { length: 200 }),
   phone: varchar('phone', { length: 30 }),
@@ -1144,7 +1179,12 @@ export const customerMaster = mysqlTable('customer_master', {
   customer_id: varchar('customer_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  customer_code: varchar('customer_code', { length: 50 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  customer_code: varchar('customer_code', { length: 255 }).notNull(),
   customer_name: varchar('customer_name', { length: 150 }).notNull(),
   email: varchar('email', { length: 200 }),
   mobile: varchar('mobile', { length: 30 }).notNull(),
@@ -1176,7 +1216,7 @@ export const resourceMaster = mysqlTable('resource_master', {
   resource_id: varchar('resource_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
-  resource_code: varchar('resource_code', { length: 50 }).notNull(),
+  resource_code: varchar('resource_code', { length: 255 }).notNull(),
   resource_name: varchar('resource_name', { length: 150 }).notNull(),
   resource_type: varchar('resource_type', { length: 30 }).notNull(), // LABOR, EQUIPMENT, VEHICLE
   nob_id: varchar('nob_id', { length: 36 }), // NOB scope (null = available across all NOBs)
@@ -1280,7 +1320,12 @@ export const reasonMaster = mysqlTable('reason_master', {
   reason_id: varchar('reason_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  reason_code: varchar('reason_code', { length: 50 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  reason_code: varchar('reason_code', { length: 255 }).notNull(),
   reason_name: varchar('reason_name', { length: 150 }).notNull(),
   category: varchar('category', { length: 20 }).notNull(),
   applicable_stages: json('applicable_stages').$type<string[] | null>(),
@@ -1298,7 +1343,12 @@ export const diseaseMaster = mysqlTable('disease_master', {
   disease_id: varchar('disease_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
-  disease_code: varchar('disease_code', { length: 50 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  disease_code: varchar('disease_code', { length: 255 }).notNull(),
   disease_name: varchar('disease_name', { length: 150 }).notNull(),
   scientific_name: varchar('scientific_name', { length: 150 }),
   symptoms: text('symptoms'),
@@ -1326,7 +1376,12 @@ export const feedFormulaMaster = mysqlTable('feed_formula_master', {
   formula_id: varchar('formula_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
-  formula_code: varchar('formula_code', { length: 50 }).notNull(),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
+  formula_code: varchar('formula_code', { length: 255 }).notNull(),
   formula_name: varchar('formula_name', { length: 150 }).notNull(),
   target_item_id: varchar('target_item_id', { length: 36 }).notNull(),
   batch_size: decimal('batch_size', { precision: 18, scale: 4 }).notNull(),
@@ -1421,6 +1476,11 @@ export const glAccountMaster = mysqlTable('gl_account_master', {
   gl_account_id: varchar('gl_account_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   account_code: varchar('account_code', { length: 255 }).notNull(),
   account_name: varchar('account_name', { length: 150 }).notNull(),
   account_type: varchar('account_type', { length: 50 }).notNull(), // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
@@ -1475,7 +1535,7 @@ export const glMappingMaster = mysqlTable('gl_mapping_master', {
   // yet, so no no_series_master row exists for it. A code may be typed manually
   // today; the moment a series is configured, NumberSeriesService.resolveOptionalCode()
   // starts generating one with no further code change. Existing rows keep NULL.
-  mapping_code: varchar('mapping_code', { length: 50 }),
+  mapping_code: varchar('mapping_code', { length: 255 }),
   item_category_id: varchar('item_category_id', { length: 36 }),
   // Additive lookup-key dimensions — the spec's full 6-dimensional gl_posting_setup model
   // (nob_id, lob_id, stage_id, transaction_type, posting_group/item_category, valuation_method).
@@ -1565,6 +1625,11 @@ export const costCenterMaster = mysqlTable('cost_center_master', {
   cost_center_id: varchar('cost_center_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   cost_center_code: varchar('cost_center_code', { length: 255 }).notNull(),
   cost_center_name: varchar('cost_center_name', { length: 150 }).notNull(),
   cost_center_type: varchar('cost_center_type', { length: 50 }).notNull(), // DEPARTMENT, FARM, WAREHOUSE, PROJECT, OTHER
@@ -1681,7 +1746,7 @@ export const stageMaster = mysqlTable('stage_master', {
   company_id: varchar('company_id', { length: 36 }), // null = tenant-wide
   nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
-  stage_code: varchar('stage_code', { length: 50 }).notNull(),
+  stage_code: varchar('stage_code', { length: 255 }).notNull(),
   stage_name: varchar('stage_name', { length: 100 }).notNull(),
   stage_category: varchar('stage_category', { length: 30 }).notNull(), // PRE_PRODUCTIVE, PRODUCTIVE, OUTPUT, DISPOSAL
   stage_sequence: int('stage_sequence').notNull(),
@@ -1732,11 +1797,20 @@ export const stageMaster = mysqlTable('stage_master', {
 export const breedLifecycleStages = mysqlTable('breed_lifecycle_stages', {
   lifecycle_id: varchar('lifecycle_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  // The only master that had no company_id — it was scoped indirectly through
+  // its breed. Given directly so it scopes like every other master, and so its
+  // unique key can carry company the way the other 22 already do.
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'cascade' }),
+  // NOB/LOB on every master: selectable at company scope, hidden and auto-filled
+  // from the active operational area at operational scope (enforceMasterRequest).
+  // Nullable — NULL means the record is shared across every business vertical.
+  nob_id: varchar('nob_id', { length: 36 }).references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
+  lob_id: varchar('lob_id', { length: 36 }).references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   // Nullable by design: no numbering convention has been supplied for this master
   // yet, so no no_series_master row exists for it. A code may be typed manually
   // today; the moment a series is configured, NumberSeriesService.resolveOptionalCode()
   // starts generating one with no further code change. Existing rows keep NULL.
-  lifecycle_code: varchar('lifecycle_code', { length: 50 }),
+  lifecycle_code: varchar('lifecycle_code', { length: 255 }),
   breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'cascade' }),
   stage_id: varchar('stage_id', { length: 36 }).notNull().references(() => stageMaster.stage_id, { onDelete: 'restrict' }),
   // TDD row 77: "Category, should be fetched as per the animal register data".
@@ -1783,9 +1857,9 @@ export const breedLifecycleStages = mysqlTable('breed_lifecycle_stages', {
   is_active: boolean('is_active').default(true).notNull(),
   created_by: varchar('created_by', { length: 36 }),
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
-  // No company_id on this table — a lifecycle row is scoped through its breed —
-  // so the scope key is tenant + code, not tenant + company + code.
-}, (table) => [ uniqueIndex('uq_breed_lifecycle_stages_scope_code').on(table.tenant_id, table.lifecycle_code) ]);
+  // company_id is direct now rather than inherited through the breed, so the
+  // scope key carries it the same way the other 22 masters do.
+}, (table) => [ uniqueIndex('uq_breed_lifecycle_stages_scope_code').on(table.tenant_id, sql`(coalesce(${table.company_id}, ''))`, table.lifecycle_code) ]);
 
 // Reusable, concurrency-safe business-code generator. generateNext() in
 // number-series.service.ts locks a single row here (SELECT ... FOR UPDATE) rather
@@ -1804,7 +1878,7 @@ export const noSeriesMaster = mysqlTable('no_series_master', {
   separator: varchar('separator', { length: 1 }).default('-').notNull(),
   seq_length: int('seq_length').notNull(),
   current_seq: bigint('current_seq', { mode: 'number' }).default(0).notNull(),
-  last_generated_code: varchar('last_generated_code', { length: 80 }),
+  last_generated_code: varchar('last_generated_code', { length: 255 }),
   reset_frequency: varchar('reset_frequency', { length: 20 }).default('NEVER').notNull(), // YEARLY, MONTHLY, NEVER
   /**
    * The ordered parts of a generated code, before the sequence. Each entry is
@@ -1877,7 +1951,7 @@ export const batchHeader = mysqlTable('batch_header', {
   // from shed_id/location_id above (the batch's starting assignment); this is
   // the CURRENT sub-location, updated by transferStage(). History lives in
   // batch_stage_log.
-  current_stage_code: varchar('current_stage_code', { length: 50 }),
+  current_stage_code: varchar('current_stage_code', { length: 255 }),
   // Opportunistic link to stage_master when current_stage_code resolves to a real
   // seeded stage for this batch's LOB (see transferStage()). Nullable and additive —
   // current_stage_code stays authoritative for LOBs without Stage Master data.
@@ -2013,8 +2087,8 @@ export const batchOutputLine = mysqlTable('batch_output_line', {
 export const batchStageLog = mysqlTable('batch_stage_log', {
   log_id: varchar('log_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'cascade' }),
-  from_stage_code: varchar('from_stage_code', { length: 50 }),
-  to_stage_code: varchar('to_stage_code', { length: 50 }).notNull(),
+  from_stage_code: varchar('from_stage_code', { length: 255 }),
+  to_stage_code: varchar('to_stage_code', { length: 255 }).notNull(),
   from_location_id: varchar('from_location_id', { length: 36 }),
   to_location_id: varchar('to_location_id', { length: 36 }),
   transferred_at: timestamp('transferred_at', { mode: 'string' }).defaultNow().notNull(),
@@ -2191,7 +2265,7 @@ export const farmRecord = mysqlTable('farm_record', {
   // BATCH = the whole cohort; ANIMALS = the members in farm_record_animal.
   scope: varchar('scope', { length: 10 }).notNull(),
   /** Stage the batch was in on record_date, captured so later moves don't rewrite history. */
-  stage_code: varchar('stage_code', { length: 50 }),
+  stage_code: varchar('stage_code', { length: 255 }),
   item_id: varchar('item_id', { length: 36 }),
   resource_id: varchar('resource_id', { length: 36 }),
   quantity: decimal('quantity', { precision: 18, scale: 4 }),
@@ -2395,7 +2469,7 @@ export const schedulerParameterLine = mysqlTable('scheduler_parameter_line', {
   // this stage (batch_header.current_stage_code) — lets a scheduler define
   // different thresholds pre- vs. post-transfer (e.g. setter vs. hatcher
   // temperature ranges). Null = applies regardless of stage (today's behavior).
-  stage_code: varchar('stage_code', { length: 50 }),
+  stage_code: varchar('stage_code', { length: 255 }),
   expected_qty_override: decimal('expected_qty_override', { precision: 18, scale: 8 }),
   uom_override: varchar('uom_override', { length: 20 }),
   kpi_enabled: boolean('kpi_enabled').default(true).notNull(),
@@ -2645,7 +2719,7 @@ export const inventoryLedger = mysqlTable('inventory_ledger', {
   tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
   company_id: varchar('company_id', { length: 36 }).notNull().references(() => companyMaster.company_id, { onDelete: 'restrict' }),
   item_id: varchar('item_id', { length: 36 }).notNull().references(() => itemMaster.item_id, { onDelete: 'restrict' }),
-  item_code: varchar('item_code', { length: 50 }).notNull(), // denormalized snapshot at posting time
+  item_code: varchar('item_code', { length: 255 }).notNull(), // denormalized snapshot at posting time
   item_description: varchar('item_description', { length: 200 }).notNull(),
   document_type: varchar('document_type', { length: 30 }).notNull(), // GOODS_RECEIPT, GOODS_ISSUE, TRANSFER, ADJUSTMENT
   document_no: varchar('document_no', { length: 50 }).notNull(),
@@ -2797,7 +2871,7 @@ export const animalRegister = mysqlTable('animal_register', {
   nob_id: varchar('nob_id', { length: 36 }).notNull().references(() => nobMaster.nob_id, { onDelete: 'restrict' }),
   lob_id: varchar('lob_id', { length: 36 }).notNull().references(() => lobMaster.lob_id, { onDelete: 'restrict' }),
   operational_area_id: varchar('operational_area_id', { length: 36 }),
-  animal_code: varchar('animal_code', { length: 30 }).notNull(), // AUTO via no_series_master (ANIMAL_PIGGERY)
+  animal_code: varchar('animal_code', { length: 255 }).notNull(), // AUTO via no_series_master (ANIMAL_PIGGERY)
   animal_type: varchar('animal_type', { length: 20 }).notNull(), // SOW, BOAR, GILT, PIGLET, COMMERCIAL_PIG
   breed_id: varchar('breed_id', { length: 36 }).notNull().references(() => breedMaster.breed_id, { onDelete: 'restrict' }),
   gender: char('gender', { length: 1 }).notNull(), // F, M

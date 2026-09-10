@@ -4,6 +4,7 @@ import { seedDevTenant } from './seed-dev-tenant';
 import { seedPiggeryData } from './seed-piggery-complete-data';
 import { seedFullCoverage } from './seed-demo-full-coverage';
 import { seedDemoGaps } from './seed-demo-gaps';
+import { stampMasterNobLob } from './stamp-master-nob-lob';
 
 /**
  * One command to build the entire demo environment.
@@ -61,7 +62,29 @@ const stages: Array<{ label: string; fn: () => Promise<unknown> }> = [
   { label: 'Piggery operational dataset (both companies)', fn: seedPiggeryData },
   { label: 'Cross-module coverage (inventory, finance, QC, approvals)', fn: seedFullCoverage },
   { label: 'Master-data & configuration gap fill', fn: seedDemoGaps },
+  // Last, because it stamps whatever the stages above created. Every master
+  // carries nob_id/lob_id now; piggery is the only area, so every seeded row
+  // belongs to it. Only NULLs are filled, so it is safe to re-run.
+  { label: 'Stamp NOB/LOB on every master', fn: stampSeededMasters },
 ];
+
+async function stampSeededMasters() {
+  const conn = await mysql.createConnection({
+    host, port, user, password, ssl, database: assertDatabaseName(`tenant_${tenantCode}`),
+  });
+  try {
+    const [[tenant]] = await conn.query<any[]>('SELECT tenant_id FROM company_master LIMIT 1');
+    const [[area]] = await conn.query<any[]>(
+      'SELECT nob_id, lob_id FROM operational_area_master WHERE deleted_at IS NULL AND is_active = 1 LIMIT 1',
+    );
+    if (!tenant || !area) return;
+    const stamped = await stampMasterNobLob(conn, tenant.tenant_id, area.nob_id, area.lob_id);
+    const total = stamped.reduce((sum, r) => sum + r.stamped, 0);
+    console.log(`  stamped NOB/LOB on ${total} rows across ${stamped.length} masters.`);
+  } finally {
+    await conn.end();
+  }
+}
 
 export async function seedDemo() {
   const started = Date.now();

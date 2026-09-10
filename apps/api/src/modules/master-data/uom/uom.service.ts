@@ -110,6 +110,8 @@ export class UomService {
     const newUom = {
       uom_id: uomId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: companyId,
       uom_code: uomCode,
       uom_name: dto.uom_name,
@@ -382,6 +384,8 @@ export class UomService {
     const newConv = {
       conversion_id: conversionId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: companyId,
       conversion_code: conversionCode,
       item_id: dto.item_id || null,

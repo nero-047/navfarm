@@ -82,6 +82,7 @@ export class LocationTypeService {
 
     const row = {
       location_type_id: randomUUID(), tenant_id: tenantId, company_id: companyId,
+      nob_id: (dto as any).nob_id ?? null, lob_id: (dto as any).lob_id ?? null,
       type_code: typeCode, type_name: dto.type_name.trim(), code_prefix: prefix,
       allowed_parent_types: parentTypes, is_system: false, is_active: true, status: 'ACTIVE',
       created_by: user?.userId || null, updated_by: user?.userId || null,

@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/mysql2';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, inArray } from 'drizzle-orm';
 import * as mysql from 'mysql2/promise';
 import * as schema from '../core/database/schema';
+import { SEED_KEY_BY_ITEM_NAME } from './lib/seed-item-catalog';
+import { seedCode } from './lib/seed-series-code';
 
 /**
  * Fills the master-data and configuration tables that no earlier seed touches,
@@ -55,7 +57,7 @@ export async function seedDemoGaps() {
     const itemsFor = async (companyId: string) =>
       new Map(
         (await db.select().from(schema.itemMaster).where(eq(schema.itemMaster.company_id, companyId)))
-          .map((i) => [i.item_code, i.item_id] as const)
+          .map((i) => [SEED_KEY_BY_ITEM_NAME[i.item_name] ?? i.item_code, i.item_id] as const)
       );
     const apexItems = await itemsFor(apex.company_id);
     const highItems = await itemsFor(high.company_id);
@@ -71,18 +73,18 @@ export async function seedDemoGaps() {
     await run('Suppliers', async () => {
       for (const { c, tag } of perCompany) {
         const rows = [
-          { code: `SUP-${tag}-001`, name: 'Nutrimix Feed Industries Pvt Ltd', type: 'FEED', email: 'sales@nutrimix.example', phone: '+91 98200 11223', city: 'Pune', state: 'Maharashtra', terms: 'NET30', credit: 1500000 },
-          { code: `SUP-${tag}-002`, name: 'VetCare Pharmaceuticals', type: 'MEDICINE', email: 'orders@vetcare.example', phone: '+91 98200 44556', city: 'Hyderabad', state: 'Telangana', terms: 'NET15', credit: 500000 },
-          { code: `SUP-${tag}-003`, name: 'AgriEquip Machinery & Spares', type: 'EQUIPMENT', email: 'support@agriequip.example', phone: '+91 98200 77889', city: 'Ludhiana', state: 'Punjab', terms: 'NET45', credit: 800000 },
-          { code: `SUP-${tag}-004`, name: 'Premier Swine Genetics Import', type: 'LIVESTOCK', email: 'genetics@premierswine.example', phone: '+91 98200 33445', city: 'Bengaluru', state: 'Karnataka', terms: 'ADVANCE', credit: 2500000 },
+          { key: `SUP-${tag}-001`, name: 'Nutrimix Feed Industries Pvt Ltd', type: 'FEED', email: 'sales@nutrimix.example', phone: '+91 98200 11223', city: 'Pune', state: 'Maharashtra', terms: 'NET30', credit: 1500000 },
+          { key: `SUP-${tag}-002`, name: 'VetCare Pharmaceuticals', type: 'MEDICINE', email: 'orders@vetcare.example', phone: '+91 98200 44556', city: 'Hyderabad', state: 'Telangana', terms: 'NET15', credit: 500000 },
+          { key: `SUP-${tag}-003`, name: 'AgriEquip Machinery & Spares', type: 'EQUIPMENT', email: 'support@agriequip.example', phone: '+91 98200 77889', city: 'Ludhiana', state: 'Punjab', terms: 'NET45', credit: 800000 },
+          { key: `SUP-${tag}-004`, name: 'Premier Swine Genetics Import', type: 'LIVESTOCK', email: 'genetics@premierswine.example', phone: '+91 98200 33445', city: 'Bengaluru', state: 'Karnataka', terms: 'ADVANCE', credit: 2500000 },
         ];
         for (const r of rows) {
           const [x] = await db.select().from(schema.supplierMaster)
-            .where(and(eq(schema.supplierMaster.company_id, c.company_id), eq(schema.supplierMaster.supplier_code, r.code))).limit(1);
+            .where(and(eq(schema.supplierMaster.company_id, c.company_id), eq(schema.supplierMaster.supplier_name, r.name))).limit(1);
           if (x) continue;
           await db.insert(schema.supplierMaster).values({
             supplier_id: randomUUID(), tenant_id: tenantId, company_id: c.company_id,
-            supplier_code: r.code, supplier_name: r.name, email: r.email, phone: r.phone,
+            supplier_code: await seedCode(db, tenantId, c.company_id, 'SUPPLIER', schema.supplierMaster, schema.supplierMaster.supplier_code, r.key), supplier_name: r.name, email: r.email, phone: r.phone,
             tax_number: `27AABCU${Math.floor(1000 + Math.random() * 8999)}M1Z5`, payment_terms: r.terms,
             address_line1: 'Plot 14, Industrial Estate', city: r.city, state: r.state, country: 'India', pincode: '411019',
             vendor_type: r.type, is_approved: true, approved_by: by, credit_limit: d4(r.credit),
@@ -96,18 +98,18 @@ export async function seedDemoGaps() {
     await run('Customers', async () => {
       for (const { c, tag } of perCompany) {
         const rows = [
-          { code: `CUS-${tag}-001`, name: 'Apex Meat Processors Pvt Ltd', mobile: '+91 99300 10101', city: 'Mumbai', credit: 2000000 },
-          { code: `CUS-${tag}-002`, name: 'Golden Pork Retail Chain', mobile: '+91 99300 20202', city: 'Pune', credit: 900000 },
-          { code: `CUS-${tag}-003`, name: 'Highland Hotels & Catering', mobile: '+91 99300 30303', city: 'Goa', credit: 450000 },
+          { key: `CUS-${tag}-001`, name: 'Apex Meat Processors Pvt Ltd', mobile: '+91 99300 10101', city: 'Mumbai', credit: 2000000 },
+          { key: `CUS-${tag}-002`, name: 'Golden Pork Retail Chain', mobile: '+91 99300 20202', city: 'Pune', credit: 900000 },
+          { key: `CUS-${tag}-003`, name: 'Highland Hotels & Catering', mobile: '+91 99300 30303', city: 'Goa', credit: 450000 },
         ];
         for (const r of rows) {
           const [x] = await db.select().from(schema.customerMaster)
-            .where(and(eq(schema.customerMaster.company_id, c.company_id), eq(schema.customerMaster.customer_code, r.code))).limit(1);
+            .where(and(eq(schema.customerMaster.company_id, c.company_id), eq(schema.customerMaster.customer_name, r.name))).limit(1);
           if (x) continue;
           await db.insert(schema.customerMaster).values({
             customer_id: randomUUID(), tenant_id: tenantId, company_id: c.company_id,
-            customer_code: r.code, customer_name: r.name, mobile: r.mobile,
-            email: `${r.code.toLowerCase()}@buyers.example`,
+            customer_code: await seedCode(db, tenantId, c.company_id, 'CUSTOMER', schema.customerMaster, schema.customerMaster.customer_code, r.key), customer_name: r.name, mobile: r.mobile,
+            email: `${r.key.toLowerCase()}@buyers.example`,
             tax_number: `27AACCG${Math.floor(1000 + Math.random() * 8999)}K1Z2`,
             credit_limit: d4(r.credit), address_line1: 'Unit 8, Cold Chain Park', city: r.city,
             state: 'Maharashtra', country: 'India', pincode: '400072', is_active: true, created_by: by,
@@ -119,21 +121,21 @@ export async function seedDemoGaps() {
     /* ── Diseases ──────────────────────────────────────────────────────── */
     await run('Diseases', async () => {
       const rows = [
-        { code: 'DIS-PRRS', name: 'Porcine Reproductive & Respiratory Syndrome', sci: 'Betaarterivirus suid', sym: 'Late-term abortion, stillbirths, respiratory distress in piglets, fever.', tx: 'No specific antiviral. Vaccinate breeding herd, strict biosecurity, all-in/all-out flow.' },
-        { code: 'DIS-ASF', name: 'African Swine Fever', sci: 'Asfarviridae ASFV', sym: 'High fever, skin haemorrhage, sudden death, near 100% mortality.', tx: 'Notifiable. No vaccine or treatment — culling and movement control.' },
-        { code: 'DIS-SWINEFLU', name: 'Swine Influenza', sci: 'Influenza A virus', sym: 'Coughing, nasal discharge, fever, sudden onset across the pen.', tx: 'Supportive care, NSAIDs, antibiotics for secondary infection. Vaccinate sows pre-farrow.' },
-        { code: 'DIS-ILEITIS', name: 'Porcine Proliferative Enteropathy (Ileitis)', sci: 'Lawsonia intracellularis', sym: 'Loose dark faeces, poor growth, sudden death in finishers.', tx: 'Tylosin or tiamulin in feed/water. Oral vaccine available.' },
-        { code: 'DIS-MASTITIS', name: 'Mastitis-Metritis-Agalactia (MMA)', sci: 'Coliform complex', sym: 'Hot swollen udder, no milk let-down, sow off-feed post-farrow.', tx: 'Antibiotics plus oxytocin. Improve farrowing-crate hygiene.' },
-        { code: 'DIS-ERYSIP', name: 'Swine Erysipelas', sci: 'Erysipelothrix rhusiopathiae', sym: 'Diamond-shaped skin lesions, fever, joint swelling.', tx: 'Penicillin responds rapidly. Vaccinate breeding stock twice yearly.' },
+        { key: 'DIS-PRRS', name: 'Porcine Reproductive & Respiratory Syndrome', sci: 'Betaarterivirus suid', sym: 'Late-term abortion, stillbirths, respiratory distress in piglets, fever.', tx: 'No specific antiviral. Vaccinate breeding herd, strict biosecurity, all-in/all-out flow.' },
+        { key: 'DIS-ASF', name: 'African Swine Fever', sci: 'Asfarviridae ASFV', sym: 'High fever, skin haemorrhage, sudden death, near 100% mortality.', tx: 'Notifiable. No vaccine or treatment — culling and movement control.' },
+        { key: 'DIS-SWINEFLU', name: 'Swine Influenza', sci: 'Influenza A virus', sym: 'Coughing, nasal discharge, fever, sudden onset across the pen.', tx: 'Supportive care, NSAIDs, antibiotics for secondary infection. Vaccinate sows pre-farrow.' },
+        { key: 'DIS-ILEITIS', name: 'Porcine Proliferative Enteropathy (Ileitis)', sci: 'Lawsonia intracellularis', sym: 'Loose dark faeces, poor growth, sudden death in finishers.', tx: 'Tylosin or tiamulin in feed/water. Oral vaccine available.' },
+        { key: 'DIS-MASTITIS', name: 'Mastitis-Metritis-Agalactia (MMA)', sci: 'Coliform complex', sym: 'Hot swollen udder, no milk let-down, sow off-feed post-farrow.', tx: 'Antibiotics plus oxytocin. Improve farrowing-crate hygiene.' },
+        { key: 'DIS-ERYSIP', name: 'Swine Erysipelas', sci: 'Erysipelothrix rhusiopathiae', sym: 'Diamond-shaped skin lesions, fever, joint swelling.', tx: 'Penicillin responds rapidly. Vaccinate breeding stock twice yearly.' },
       ];
       for (const { c } of perCompany) {
         for (const r of rows) {
           const [x] = await db.select().from(schema.diseaseMaster)
-            .where(and(eq(schema.diseaseMaster.company_id, c.company_id), eq(schema.diseaseMaster.disease_code, r.code))).limit(1);
+            .where(and(eq(schema.diseaseMaster.company_id, c.company_id), eq(schema.diseaseMaster.disease_name, r.name))).limit(1);
           if (x) continue;
           await db.insert(schema.diseaseMaster).values({
             disease_id: randomUUID(), tenant_id: tenantId, company_id: c.company_id,
-            disease_code: r.code, disease_name: r.name, scientific_name: r.sci,
+            disease_code: await seedCode(db, tenantId, c.company_id, 'DISEASE', schema.diseaseMaster, schema.diseaseMaster.disease_code, r.key), disease_name: r.name, scientific_name: r.sci,
             symptoms: r.sym, treatment_guideline: r.tx, is_active: true, created_by: by,
           });
         }
@@ -144,21 +146,21 @@ export async function seedDemoGaps() {
     await run('Resources & maintenance', async () => {
       for (const { c, tag } of perCompany) {
         const rows = [
-          { code: `RES-${tag}-LAB01`, name: 'Farm Operations Crew (6 hands)', type: 'LABOUR', sub: 'PERMANENT', rate: 550, unit: 'HR', cap: 6, desig: 'Stockperson' },
-          { code: `RES-${tag}-LAB02`, name: 'Veterinary Officer', type: 'LABOUR', sub: 'CONTRACT', rate: 1800, unit: 'HR', cap: 1, desig: 'Veterinarian' },
-          { code: `RES-${tag}-EQ01`, name: 'Feed Mill & Pellet Line', type: 'EQUIPMENT', sub: 'FIXED', rate: 950, unit: 'HR', cap: 2, make: 'Buhler', model: 'MDDK-1000' },
-          { code: `RES-${tag}-EQ02`, name: 'High-Pressure Washer', type: 'EQUIPMENT', sub: 'PORTABLE', rate: 180, unit: 'HR', cap: 1, make: 'Karcher', model: 'HD 6/15' },
-          { code: `RES-${tag}-VH01`, name: 'Livestock Transport Truck', type: 'VEHICLE', sub: 'OWNED', rate: 42, unit: 'KM', cap: 40, make: 'Tata', model: 'LPT 1109' },
-          { code: `RES-${tag}-UTIL01`, name: 'Grid Electricity Supply', type: 'UTILITY', sub: 'METERED', rate: 9.2, unit: 'KWH', cap: 1000 },
+          { key: `RES-${tag}-LAB01`, name: 'Farm Operations Crew (6 hands)', type: 'LABOUR', sub: 'PERMANENT', rate: 550, unit: 'HR', cap: 6, desig: 'Stockperson' },
+          { key: `RES-${tag}-LAB02`, name: 'Veterinary Officer', type: 'LABOUR', sub: 'CONTRACT', rate: 1800, unit: 'HR', cap: 1, desig: 'Veterinarian' },
+          { key: `RES-${tag}-EQ01`, name: 'Feed Mill & Pellet Line', type: 'EQUIPMENT', sub: 'FIXED', rate: 950, unit: 'HR', cap: 2, make: 'Buhler', model: 'MDDK-1000' },
+          { key: `RES-${tag}-EQ02`, name: 'High-Pressure Washer', type: 'EQUIPMENT', sub: 'PORTABLE', rate: 180, unit: 'HR', cap: 1, make: 'Karcher', model: 'HD 6/15' },
+          { key: `RES-${tag}-VH01`, name: 'Livestock Transport Truck', type: 'VEHICLE', sub: 'OWNED', rate: 42, unit: 'KM', cap: 40, make: 'Tata', model: 'LPT 1109' },
+          { key: `RES-${tag}-UTIL01`, name: 'Grid Electricity Supply', type: 'UTILITY', sub: 'METERED', rate: 9.2, unit: 'KWH', cap: 1000 },
         ];
         for (const r of rows) {
           let [x] = await db.select().from(schema.resourceMaster)
-            .where(and(eq(schema.resourceMaster.company_id, c.company_id), eq(schema.resourceMaster.resource_code, r.code))).limit(1);
+            .where(and(eq(schema.resourceMaster.company_id, c.company_id), eq(schema.resourceMaster.resource_name, r.name))).limit(1);
           if (!x) {
             const id = randomUUID();
             await db.insert(schema.resourceMaster).values({
               resource_id: id, tenant_id: tenantId, company_id: c.company_id, nob_id: nobId, lob_id: lobId,
-              resource_code: r.code, resource_name: r.name, resource_type: r.type, resource_sub_type: r.sub,
+              resource_code: await seedCode(db, tenantId, c.company_id, 'RESOURCE', schema.resourceMaster, schema.resourceMaster.resource_code, r.key), resource_name: r.name, resource_type: r.type, resource_sub_type: r.sub,
               capacity: d4(r.cap), unit: r.unit, capacity_uom: r.unit, cost_rate: d4(r.rate),
               asset_make: (r as any).make ?? null, asset_model: (r as any).model ?? null,
               designation: (r as any).desig ?? null,
@@ -224,14 +226,16 @@ export async function seedDemoGaps() {
         const targets = [...items.keys()].filter((k) => k.startsWith('FEED-'));
         for (const targetCode of targets) {
           const targetId = items.get(targetCode)!;
-          const code = `FRM-${targetCode.replace('FEED-', '')}`;
+          // One formula per target item, so that is what identifies it across
+          // re-runs; the code comes from the FEED_FORMULA series (FORM-001).
           const [x] = await db.select().from(schema.feedFormulaMaster)
-            .where(and(eq(schema.feedFormulaMaster.company_id, c.company_id), eq(schema.feedFormulaMaster.formula_code, code))).limit(1);
+            .where(and(eq(schema.feedFormulaMaster.company_id, c.company_id), eq(schema.feedFormulaMaster.target_item_id, targetId))).limit(1);
           if (x) continue;
           const formulaId = randomUUID();
           await db.insert(schema.feedFormulaMaster).values({
             formula_id: formulaId, tenant_id: tenantId, company_id: c.company_id,
-            formula_code: code, formula_name: `${targetCode} — 1 tonne mix sheet`,
+            formula_code: await seedCode(db, tenantId, c.company_id, 'FEED_FORMULA', schema.feedFormulaMaster, schema.feedFormulaMaster.formula_code, `FRM-${targetCode}`),
+            formula_name: `${targetCode} — 1 tonne mix sheet`,
             target_item_id: targetId, batch_size: d4(1000), batch_unit: 'KG',
             description: 'Least-cost ration sheet. Percentages are as-fed inclusion on a 1,000 kg batch.',
             is_active: true, created_by: by,
@@ -267,12 +271,13 @@ export async function seedDemoGaps() {
       const attrIds = new Map<string, string>();
       for (const a of attrs) {
         const [x] = await db.select().from(schema.itemAttributeMaster)
-          .where(and(eq(schema.itemAttributeMaster.tenant_id, tenantId), eq(schema.itemAttributeMaster.attribute_code, a.code))).limit(1);
+          .where(and(eq(schema.itemAttributeMaster.tenant_id, tenantId), eq(schema.itemAttributeMaster.attribute_name, a.name))).limit(1);
         if (!x) {
           const id = randomUUID();
           await db.insert(schema.itemAttributeMaster).values({
             attribute_id: id, tenant_id: tenantId, nob_id: nobId, lob_id: lobId,
-            attribute_code: a.code, attribute_name: a.name, data_type: a.type,
+            attribute_code: await seedCode(db, tenantId, null, 'ITEM_ATTRIBUTE', schema.itemAttributeMaster, schema.itemAttributeMaster.attribute_code, a.code, { attribute_name: a.name }),
+            attribute_name: a.name, data_type: a.type,
             list_values: (a as any).list ?? null, unit: a.unit, is_mandatory: false,
             affects_costing: false, is_variant: a.variant, is_active: true, created_by: by,
           });
@@ -330,6 +335,7 @@ export async function seedDemoGaps() {
           if (x) continue;
           await db.insert(schema.uomConversionMaster).values({
             conversion_id: randomUUID(), tenant_id: tenantId, company_id: c.company_id,
+            conversion_code: await seedCode(db, tenantId, c.company_id, 'UOM_CONVERSION', schema.uomConversionMaster, schema.uomConversionMaster.conversion_code, `CONV-${r.from}-${r.to}`),
             from_uom: r.from, to_uom: r.to, conversion_factor: r.f.toFixed(6),
             effective_from: '2026-01-01', is_active: true, created_by: by,
           });

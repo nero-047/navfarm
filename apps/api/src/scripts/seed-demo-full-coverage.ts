@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
 import * as mysql from 'mysql2/promise';
 import { drizzle } from 'drizzle-orm/mysql2';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import * as schema from '../core/database/schema';
+import { SEED_KEY_BY_ITEM_NAME } from './lib/seed-item-catalog';
+import { seriesCodeFor } from './lib/seed-series-code';
 import { seedDefaultCompanyRoles } from '../modules/core/role/default-role-seed';
 
 /**
@@ -85,8 +87,12 @@ export async function seedFullCoverage() {
     const breedByCode = new Map(breeds.map((b) => [b.breed_code, b]));
 
     const itemsAll = await db.select().from(schema.itemMaster);
-    const itemMap1 = new Map(itemsAll.filter((i) => i.company_id === comp1Id).map((i) => [i.item_code, i]));
-    const itemMap2 = new Map(itemsAll.filter((i) => i.company_id === comp2Id).map((i) => [i.item_code, i]));
+    // Keyed by the seed's own handle (RAW-MAIZE-CORN), not by item_code: codes
+    // now come from the ITEM series and move whenever the category codes do.
+    const itemMap1 = new Map(itemsAll.filter((i) => i.company_id === comp1Id)
+      .map((i) => [SEED_KEY_BY_ITEM_NAME[i.item_name] ?? i.item_code, i]));
+    const itemMap2 = new Map(itemsAll.filter((i) => i.company_id === comp2Id)
+      .map((i) => [SEED_KEY_BY_ITEM_NAME[i.item_name] ?? i.item_code, i]));
 
     const locationsAll = await db.select().from(schema.locationMaster);
     const locMap2 = new Map(locationsAll.filter((l) => l.company_id === comp2Id).map((l) => [l.location_code, l]));
@@ -448,7 +454,11 @@ export async function seedFullCoverage() {
             location_id: feedmillWhId,
             tenant_id: tenantId,
             company_id: cfg.compId,
-            location_code: feedmillCode,
+            location_code: (await seriesCodeFor(db, { tenantId, companyId: cfg.compId }, 'LOCATION',
+              { parent_location_id: farmLoc?.location_code ?? null, location_type: 'STORE' },
+              (await db.select({ code: schema.locationMaster.location_code }).from(schema.locationMaster)
+                .where(eq(schema.locationMaster.company_id, cfg.compId))).map((r: { code: string }) => r.code),
+            )) ?? feedmillCode,
             location_name: `${cfg.tag} Feed Mill Store`,
             location_level: farmLoc ? 2 : 1,
             location_type: 'STORE',

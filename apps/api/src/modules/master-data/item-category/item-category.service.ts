@@ -120,6 +120,8 @@ export class ItemCategoryService {
     const newCategory = {
       category_id: categoryId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: companyId,
       category_code: dto.category_code.toUpperCase(),
       category_name: dto.category_name,
@@ -201,6 +203,8 @@ export class ItemCategoryService {
     const newCategory = {
       category_id: categoryId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: companyId,
       category_code: categoryCode,
       category_name: dto.category_name,

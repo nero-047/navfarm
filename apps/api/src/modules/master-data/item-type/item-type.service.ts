@@ -90,6 +90,8 @@ export class ItemTypeService {
     const newType = {
       item_type_id: itemTypeId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: companyId,
       type_code: typeCode,
       // code_prefix is the more specific configuration an ITEM_<type_code> series

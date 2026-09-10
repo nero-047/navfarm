@@ -36,6 +36,20 @@
           "command": "node --import tsx src/scripts/reseed-number-series.ts"
         }
       },
+      "db-stamp-master-nob-lob": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/stamp-master-nob-lob.ts"
+        }
+      },
+      "db-align-master-codes-to-series": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/align-master-codes-to-series.ts"
+        }
+      },
       "db-align-stages-to-tdd": {
         "executor": "nx:run-commands",
         "cache": false,

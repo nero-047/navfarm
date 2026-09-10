@@ -89,6 +89,8 @@ export class DiseaseService {
     const newDisease = {
       disease_id: diseaseId,
       tenant_id: tenantId,
+      nob_id: (dto as any).nob_id ?? null,
+      lob_id: (dto as any).lob_id ?? null,
       company_id: dto.company_id || null,
       disease_code: diseaseCode,
       disease_name: dto.disease_name,

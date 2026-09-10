@@ -99,6 +99,16 @@ export class CreateSupplierDto {
   @ApiProperty({ description: 'Flexible custom config configurations in JSON format', required: false })
   @IsOptional()
   extension_config?: any;
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
 
 export class UpdateSupplierDto {
@@ -201,6 +211,16 @@ export class UpdateSupplierDto {
   @ApiProperty({ required: false })
   @IsOptional()
   extension_config?: any;
+
+  @ApiProperty({ description: 'Nature of Business UUID scope (blank = available across all NOBs)', required: false })
+  @IsString()
+  @IsOptional()
+  nob_id?: string;
+
+  @ApiProperty({ description: 'Line of Business UUID scope (blank = not LOB-restricted)', required: false })
+  @IsString()
+  @IsOptional()
+  lob_id?: string;
 }
 
 export class QuerySupplierDto {
