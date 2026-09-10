@@ -314,11 +314,9 @@ const animal: MasterDataConfig = {
     // goods receipt it could never legally carry.
     { key: "source_receipt_id", label: "Source Goods Receipt", type: "select-entity", entityEndpoint: "/goods-receipt", entityValueKey: "receipt_id", entityLabelKeys: ["receipt_no"], visibleWhen: { anyOf: [{ key: "entry_type", equals: ["PURCHASED_IMPORTED", "PURCHASED_LOCAL"] }] }, requiredWhen: { anyOf: [{ key: "entry_type", equals: ["PURCHASED_IMPORTED", "PURCHASED_LOCAL"] }] }, helpText: "The receipt this animal arrived on.", section: "Acquisition" },
     { key: "source_batch_id", label: "Source Batch", type: "select-entity", entityEndpoint: "/batch", entityValueKey: "batch_id", entityLabelKeys: ["batch_no"], visibleWhen: { anyOf: [{ key: "entry_type", equals: "BORN_ON_FARM" }] }, requiredWhen: { anyOf: [{ key: "entry_type", equals: "BORN_ON_FARM" }] }, helpText: "The farrowing batch this animal was born from.", section: "Acquisition" },
-    // Filtered to LIVING_ASSET: the field is the animal's inventory identity, and
-    // an unfiltered /item offered feed and grain here — "Maize grain" was a valid
-    // choice for what a pig is. The picker appends isActive=true, and its URL
-    // builder handles the existing query string.
-    { key: "item_id", label: "Item (Living Asset)", type: "select-entity", required: true, entityEndpoint: "/item?itemType=LIVING_ASSET", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"], section: "Acquisition" },
+    // LIVESTOCK is the item type seeded for living biological assets. There is
+    // no LIVING_ASSET item type; using it here left this required picker empty.
+    { key: "item_id", label: "Item (Living Asset)", type: "select-entity", required: true, entityEndpoint: "/item?itemType=LIVESTOCK", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"], section: "Acquisition" },
     // Two fields, one column. A purchased animal's cost is read off its goods
     // receipt by the API and anything typed here is discarded, so offering an
     // editable box for it would take input it then throws away. Everything else
@@ -960,7 +958,7 @@ const feedFormula: MasterDataConfig = {
       jsonRow: [
         { key: "item_id", label: "Item", type: "select-entity", entityEndpoint: "/item", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
         { key: "quantity", label: "Quantity", type: "number", step: "0.001" },
-        { key: "unit", label: "Unit", type: "select-entity", entityEndpoint: "/uom", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
+        { key: "unit", label: "Unit", type: "select-entity", entityEndpoint: "/uom?uomType=WEIGHT", entityValueKey: "uom_code", entityLabelKeys: ["uom_code", "uom_name"] },
         { key: "inclusion_pct", label: "Inclusion %", type: "number", step: "0.01" },
       ],
       helpText: 'Array of { item_id, quantity, unit, inclusion_pct?, loss_pct? }. Example: [{"item_id":"...","quantity":650,"unit":"KG"}]. Set at creation only — the API does not yet support editing ingredients after a formula is created.',

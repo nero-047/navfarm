@@ -200,6 +200,62 @@ phone numbers, `27AABCU…` GSTINs. Same class as the bug AGENTS.md §3 already
 records. Not corrected here because inventing replacement client data is exactly
 what that rule forbids; Triple C has to supply real values.
 
+### Tenant is the draft, the company is what is used
+*Decided 2026-09-10.*
+
+Every master carries `company_id`, `nob_id` and `lob_id`. No `area_id` — one LOB
+is one operational area for now, and a wider scope is later work.
+
+- **Tenant scope** holds the draft. **Company scope** holds the copy that is
+  actually used, and **operational scope shows the same rows** as company scope.
+- **NOB/LOB are selectable at tenant and company scope** (added to all 23 master
+  configs, with `supportsNobLobFilter`), and **hidden and auto-filled at
+  operational scope** from the active area. A mismatched value is rejected.
+
+`copy-master-templates.ts` already implemented the draft→copy mechanism, and
+`no_series_master` was already one of its 22 template tables. **Nothing ever
+called it** except a one-time migration script, which is the whole reason a
+number series resolved to nothing at company scope: the series is a master, the
+company had no copy of it, and `resolveSeriesFor` correctly found none. It now
+runs as stage 3 of `db-seed-demo`, before any company data is written.
+
+Migrations 0084/0085 add the columns, plus `company_id` on
+`breed_lifecycle_stages` — the one master that had none — with its unique key
+rebuilt to the `(tenant_id, coalesce(company_id,''), code)` form the other 22
+use. drizzle-kit escapes the `coalesce` expression into backticks and emits
+invalid SQL, so 0085 is hand-written to match 0067–0069.
+
+Four things this broke, each found by driving the app rather than by tests:
+
+- **The auto-fill broke every create.** `enforceMasterRequest` writes
+  `body.nob_id` before the ValidationPipe runs, and `forbidNonWhitelisted`
+  rejected it because the DTOs did not declare the field. 12 DTOs updated.
+- **The auto-fill was then silently dropped.** The guard fills `body`, but each
+  service builds its own insert object; 11 services never copied it, so the first
+  "successful" create stored NULL NOB/LOB. `reason.service` was fine — it
+  spreads `...dto`.
+- **Template copies were planned twice.** Giving `breed_lifecycle_stages` a
+  `company_id` made it a first-class template while it was still in
+  `loadCompanyTemplateCopies`'s explicit child list — which existed *because* it
+  had none. Every row was planned twice and the second insert died on the scope
+  key. Removed from the child list.
+- **Item attributes were invisible at company scope.** They are seeded at stage 6,
+  after adoption at stage 3, so a tenant-only row never got a copy. They are
+  written per company now.
+
+`seriesCodeFor` prefers the company's series over the draft
+(`ORDER BY company_id IS NULL`), mirroring `generateNext` — without it a code
+could be composed from the draft while the app read the company's row.
+
+**Field completeness.** After a full reseed, 9 of 23 masters have every column
+populated. The rest leave optional columns NULL — GPS coordinates, warranty and
+licence expiry, bank details, disposal and amortisation fields on live animals,
+KPI thresholds. Those are deliberately empty: filling them means inventing Triple
+C's data, which §3 forbids. Two are genuine gaps and neither is ours to close:
+`reason_master` is **empty** (47 reason codes were promised, none exist), and
+`item_master.sub_category` is NULL throughout, so item codes are
+`<type>-<category>-ITM-<seq>` and the three-segment form never appears.
+
 ### Medicine is not a master — it is an item
 *Decided 2026-09-06.*
 
@@ -507,6 +563,20 @@ entry UI is company-scoped and lives in Finance.
 
 ---
 
+## Master data lookup controls
+
+### Entity-backed selections use a searchable code/name lookup
+*Decided 2026-09-10: "all for the selective fields we need a custom lookup popup with a search bar at top with a table below it with the name and code in 2 columns".*
+
+Every `select-entity` field in the config-driven master-data forms opens the
+same lookup dialog: search at the top, followed by Code and Name columns. This
+also applies to entity selections inside editable JSON rows and to multi-value
+entity fields. Fixed application choices such as status, Lot/Serial and other
+enumerations remain compact selects or segmented controls because they are not
+rows from a master and therefore do not have a code/name catalog to search.
+
+---
+
 ## Open — Triple C's to answer, not ours
 
 | Question | Where it bites |
@@ -520,3 +590,19 @@ entry UI is company-scoped and lives in Finance.
 | Kill Sheet and DOA have **no tables**. The BBP gives the kill sheet a process (attached to the TO, carcass weights per line, invoice = Delivered Qty × Avg Carcass Weight × Price/KG) but no field specification. | Revenue, and the end of the traceability chain. |
 | Location code format — the template says only "Unique code per tenant". | Our hierarchical scheme was an invention, and as of 2026-09-09 every seeded location carries it (`FARM-001/SHED-001/PEN-003`). If Triple C wants something else, the LOCATION series and `db-align-master-codes-to-series` are where it changes. |
 | Is the cull flow in scope? Out-of-production date, cull date, reason, weight, write-off, and the 14-day INFO alert are all specified and none are built. | CULLED cannot be set anywhere today. |
+
+---
+
+## Demo data may be synthetic when it is clearly demo-only
+*Decided 2026-09-10.*
+
+The values written by the demo-only seed are not Triple C's production data.
+Synthetic values are allowed there so that testers can exercise complete forms
+and workflows before the client supplies its real records. They must remain
+clearly identified as demo data, must not be copied into a production tenant,
+and must not be described as client-provided facts or requirements. When Triple
+C supplies real data, it replaces the synthetic dataset.
+
+This does not weaken the standing rule against inventing client data: product
+defaults, production seeds, migrations, and claims about Triple C still require
+client evidence or Rishi's decision.

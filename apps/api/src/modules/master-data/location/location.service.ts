@@ -835,7 +835,10 @@ export class LocationService {
     // left-join farm_master and shed_master and fall back farm -> shed, which
     // could not name a parent of any other type (a pen under a pen, a silo
     // under a shed) and needed two dead tables to answer one question.
-    const parentLocation = alias(schema.locationMaster, 'parent_location');
+    // locationMaster is self-referential, so Drizzle's alias overload widens it
+    // to a table/view union under TS 5.9. It is still the same MySQL table shape;
+    // keep that shape explicit so leftJoin accepts the alias.
+    const parentLocation = alias(schema.locationMaster, 'parent_location') as unknown as typeof schema.locationMaster;
     const locations = await this.db
       .select({
         location: schema.locationMaster,

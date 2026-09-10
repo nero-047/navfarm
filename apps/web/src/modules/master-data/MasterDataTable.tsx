@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Search, Loader2, Inbox, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Inbox, Eye, SlidersHorizontal } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -19,6 +20,7 @@ import { codeFieldOf } from "./useCodeSeries";
 import { useCodeSeries } from "./useCodeSeries";
 import { MasterRecordView } from "./MasterRecordView";
 import { BcOwnershipNotice } from "./BcOwnershipNotice";
+import { EntityLookupField } from "./EntityLookupField";
 
 const PAGE_SIZE = 25;
 
@@ -38,12 +40,6 @@ const inputCls = "nf-input";
 
 function unwrap<T = any>(res: any): T {
   return (Array.isArray(res) ? res : res?.data ?? res) as T;
-}
-
-function entityLabel(row: Row, field: MasterDataField): string {
-  const keys = field.entityLabelKeys || [];
-  const text = keys.map((k) => row[k]).filter(Boolean).join(" — ");
-  return text || row[field.entityValueKey || "id"];
 }
 
 function parentKeys(f: MasterDataField): string[] {
@@ -87,8 +83,13 @@ function resolveEndpoint(f: MasterDataField, form: Row): string | null {
   if (f.dependsOnMode === "query") {
     const params = new URLSearchParams();
     for (const key of parents) {
-      const val = form[key];
+      const raw = form[key];
       const paramName = f.queryParams?.[key];
+      // A field may translate the parent's value before sending it — item_type
+      // LIVESTOCK narrows the UOM list to COUNT, not to "LIVESTOCK". An
+      // unmapped value omits the param and leaves the list unfiltered.
+      const map = f.queryValueMap?.[key];
+      const val = map ? (raw ? map[String(raw)] : undefined) : raw;
       if (val && paramName) params.set(paramName, val);
     }
     const qs = params.toString();
@@ -248,11 +249,33 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const detailFor = config.detailPanel;
   const selectedRow = detailFor ? rows.find((r) => String(r[config.idKey]) === selectedId) : undefined;
   const statusActiveValues = config.statusActiveValues;
-  const lookupConfigs = MASTER_DATA_CONFIGS.filter((c) => c.lookupFor?.includes(config.key));
+  // The masters that fill this screen's dropdowns.
+  //
+  // Derived from the select-entity fields themselves — each one's entityEndpoint
+  // is another master's apiBase — and unioned with the hand-declared lookupFor.
+  // Declaring it by hand covered five masters and silently missed the rest; a
+  // field added later is picked up here with no second place to remember.
+  const lookupConfigs = (() => {
+    const referenced = new Set(
+      config.fields
+        .filter((f) => f.type === "select-entity" && f.entityEndpoint)
+        .map((f) => "/" + f.entityEndpoint!.replace(/^\//, "").split(/[?/{]/)[0]),
+    );
+    const seen = new Set<string>();
+    return MASTER_DATA_CONFIGS.filter((c) => {
+      if (c.key === config.key || seen.has(c.key)) return false;
+      const related = c.lookupFor?.includes(config.key) || referenced.has(c.apiBase);
+      if (related) seen.add(c.key);
+      return related;
+    });
+  })();
   const sectionCount = new Set(visibleFields.map((f) => f.section || "Identification")).size;
   // Business Central-style adaptive presentation: compact masters remain a
   // centred modal, while a dense or multi-card master gets a near-full-page
   // dialog with its own scrolling body and pinned actions.
+  // A BC-owned lookup is read-only here, so offering "manage" on it would lead
+  // to a screen that cannot save.
+  const manageableLookups = lookupConfigs.filter((c) => c.owner !== "BC");
   const usePageDialog = visibleFields.length > 10 || sectionCount > 3 || lookupConfigs.length > 2;
 
   const load = async () => {
@@ -928,28 +951,32 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           {broken && <InlineAlert>This entry is not a JSON array, so it cannot be shown as rows. Clear it to start again.</InlineAlert>}
           {rows.map((row, idx) => (
             <div key={idx} className="flex flex-wrap items-end gap-2 rounded-lg border p-2" style={S.raised}>
-              {f.jsonRow!.map((col) => (
-                <label key={col.key} className="flex min-w-[8rem] flex-1 flex-col gap-1">
-                  <span className="text-[11px] font-medium" style={S.sub}>{tLabel(col.label)}</span>
-                  {col.type === "select-entity" ? (
-                    <select className={`${inputCls} nf-select`} style={S.input} disabled={readOnly || (isLocked(row) && col.key === req?.key)}
-                      value={String(row[col.key] ?? "")}
-                      onChange={(e) => write(rows.map((r, i) => i === idx ? { ...r, [col.key]: e.target.value } : r))}>
-                      <option value="">{t("selectPlaceholder")}</option>
-                      {(entityOptions[col.entityEndpoint || ""] || []).map((o) => (
-                        <option key={String(o[col.entityValueKey || "id"])} value={String(o[col.entityValueKey || "id"])}>
-                          {(col.entityLabelKeys || []).map((k) => o[k]).filter(Boolean).join(" — ") || String(o[col.entityValueKey || "id"])}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input className={inputCls} style={S.input} disabled={readOnly}
-                      type={col.type === "number" ? "number" : "text"} step={col.step} placeholder={col.placeholder}
-                      value={String(row[col.key] ?? "")}
-                      onChange={(e) => write(rows.map((r, i) => i === idx ? { ...r, [col.key]: col.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value } : r))} />
-                  )}
-                </label>
-              ))}
+              {f.jsonRow!.map((col) => {
+                const rowFieldId = `master-${config.key}-${f.key}-${idx}-${col.key}`;
+                return (
+                  <Field key={col.key} label={tLabel(col.label)} htmlFor={rowFieldId} className="min-w-[8rem] flex-1">
+                    {col.type === "select-entity" ? (
+                      <EntityLookupField
+                        id={rowFieldId}
+                        label={tLabel(col.label)}
+                        options={entityOptions[col.entityEndpoint || ""] || []}
+                        value={String(row[col.key] ?? "")}
+                        valueKey={col.entityValueKey || "id"}
+                        labelKeys={col.entityLabelKeys || []}
+                        onChange={(next) => write(rows.map((r, i) => i === idx ? { ...r, [col.key]: next } : r))}
+                        disabled={readOnly || (isLocked(row) && col.key === req?.key)}
+                        loading={!!col.entityEndpoint && entityOptions[col.entityEndpoint] === undefined}
+                        placeholder={t("selectPlaceholder")}
+                      />
+                    ) : (
+                      <input id={rowFieldId} className={inputCls} style={S.input} disabled={readOnly}
+                        type={col.type === "number" ? "number" : "text"} step={col.step} placeholder={col.placeholder}
+                        value={String(row[col.key] ?? "")}
+                        onChange={(e) => write(rows.map((r, i) => i === idx ? { ...r, [col.key]: col.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value } : r))} />
+                    )}
+                  </Field>
+                );
+              })}
               {!readOnly && (isLocked(row)
                 ? <span className="rounded-lg border px-2 py-1.5 text-xs font-medium" style={{ ...S.raised, color: "var(--text-muted)" }}>Mandatory</span>
                 : <button type="button" onClick={() => write(rows.filter((_, i) => i !== idx))}
@@ -1043,7 +1070,8 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
     }
     if (f.type === "select-entity") {
       const resolvedEp = resolveEndpoint(f, form);
-      let options = resolvedEp ? entityOptions[resolvedEp] || [] : [];
+      const loadedOptions = resolvedEp ? entityOptions[resolvedEp] : undefined;
+      let options = loadedOptions || [];
       const parents = parentKeys(f);
       // "query" mode never blocks — an unset parent just narrows the results less, it
       // doesn't prevent fetching (mirrors the backend treating an absent filter as "show all").
@@ -1071,44 +1099,36 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         if (taken.length) options = options.filter((o) => !taken.includes(String(o[f.entityValueKey || "id"])));
       }
       if (f.multiple) {
-        // A real multi-select rather than a column of checkboxes: with eight
-        // stages the checkbox list was taller than the rest of the form, and it
-        // read as a settings panel rather than one field. Chosen values show as
-        // removable chips so the selection is legible without opening the list.
         const selected = parseStringList(form[f.key]);
-        const missing = selected.filter((key) => !options.some((option) => option[f.entityValueKey || "id"] === key));
-        const unselected = options.filter((o) => !selected.includes(String(o[f.entityValueKey || "id"])));
-        return <div className="flex flex-col gap-2">
-          {(selected.length > 0) && <div className="flex flex-wrap gap-1.5">
-            {selected.map((key) => {
-              const option = options.find((o) => String(o[f.entityValueKey || "id"]) === key);
-              return <span key={key} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs" style={S.raised}>
-                {option ? entityLabel(option, f) : `${key} — unavailable in active catalog`}
-                {!f.readOnly && <button type="button" aria-label={`Remove ${key}`} onClick={() => setField(f.key, selected.filter((entry) => entry !== key))}
-                  className="font-semibold" style={{ color: "var(--danger)" }}>×</button>}
-              </span>;
-            })}
-          </div>}
-          <select {...accessibility} value="" disabled={disabled || f.readOnly || !unselected.length}
-            className={`${inputCls} nf-select`} style={S.input}
-            onChange={(e) => { if (e.target.value) setField(f.key, [...selected, e.target.value]); }}>
-            <option value="">{!options.length ? t("selectPlaceholder") : unselected.length ? t("selectPlaceholder") : ""}</option>
-            {unselected.map((o) => (
-              <option key={String(o[f.entityValueKey || "id"])} value={String(o[f.entityValueKey || "id"])}>{entityLabel(o, f)}</option>
-            ))}
-          </select>
-          {!!missing.length && <p className="text-xs" style={S.muted}>{missing.length} selected value(s) are not in the active catalog.</p>}
-        </div>;
+        return (
+          <EntityLookupField
+            id={accessibility.id}
+            label={accessibility["aria-label"]}
+            options={options}
+            value={selected}
+            valueKey={f.entityValueKey || "id"}
+            labelKeys={f.entityLabelKeys || []}
+            onChange={(next) => setField(f.key, next)}
+            multiple
+            disabled={disabled || !!f.readOnly}
+            loading={!!resolvedEp && loadedOptions === undefined}
+            placeholder={restrictedReason || (disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder"))}
+          />
+        );
       }
       return (
-        <select {...accessibility} value={value} onChange={(e) => setField(f.key, e.target.value)} className={`${inputCls} nf-select`} style={S.input} disabled={disabled}>
-          <option value="">{restrictedReason || (disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder"))}</option>
-          {options.map((o) => (
-            <option key={o[f.entityValueKey || "id"]} value={o[f.entityValueKey || "id"]}>
-              {entityLabel(o, f)}
-            </option>
-          ))}
-        </select>
+        <EntityLookupField
+          id={accessibility.id}
+          label={accessibility["aria-label"]}
+          options={options}
+          value={String(value ?? "")}
+          valueKey={f.entityValueKey || "id"}
+          labelKeys={f.entityLabelKeys || []}
+          onChange={(next) => setField(f.key, next)}
+          disabled={disabled || !!f.readOnly}
+          loading={!!resolvedEp && loadedOptions === undefined}
+          placeholder={restrictedReason || (disabled ? t("selectXFirst", { name: parentLabel }) : t("selectPlaceholder"))}
+        />
       );
     }
     return (
@@ -1200,11 +1220,24 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
       {bcOwned && <BcOwnershipNotice config={config} />}
       {administrationRestricted && <p className="rounded-lg border p-3 text-sm" style={S.raised}>Only a Tenant Admin or Company Admin can add, edit or deactivate reasons. You can view the shared catalog here.</p>}
-      {bcOwned && lookupConfigs.length > 0 && <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-(--text-muted)">Related NAVFarm setup:</span>
-        {lookupConfigs.filter((c) => c.owner !== "BC").map((c) => <button key={c.key} type="button"
-          className="text-xs underline" onClick={() => setLookupManager(c)}>Manage {c.label}</button>)}
-      </div>}
+      {manageableLookups.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-(--text-muted)">Dropdown options come from</span>
+          {manageableLookups.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setLookupManager(c)}
+              title={`Manage ${tLabel(c.label)}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors hover:border-(--accent) hover:text-(--accent) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent)"
+              style={S.surface}
+            >
+              <SlidersHorizontal className="h-3 w-3" aria-hidden />
+              {tLabel(c.label)}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className={selectedRow ? "grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : undefined}>
       <div className="min-w-0 overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
@@ -1411,13 +1444,16 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               <CollapsibleCard key={s} title={s} defaultOpen={i === 0 || bySection.get(s)!.some((f) => isFieldRequired(f, form))}>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {bySection.get(s)!.map((f) => (
-                    <div key={f.key} className={f.type === "textarea" || f.type === "json" || f.type === "string-list" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
-                      <label htmlFor={`master-${config.key}-${f.key}`} className="nf-text-label" style={S.sub}>
-                        {tLabel(currentLabel(f, form))}{isFieldRequired(f, form) && <span style={{ color: "var(--danger)" }}> *</span>}
-                      </label>
+                    <Field
+                      key={f.key}
+                      label={tLabel(currentLabel(f, form))}
+                      htmlFor={`master-${config.key}-${f.key}`}
+                      required={isFieldRequired(f, form)}
+                      hint={f.helpText}
+                      className={f.type === "textarea" || f.type === "json" || f.type === "string-list" ? "sm:col-span-2" : undefined}
+                    >
                       {renderField(f)}
-                      {f.helpText && <p className="text-[11px]" style={S.muted}>{f.helpText}</p>}
-                    </div>
+                    </Field>
                   ))}
                 </div>
               </CollapsibleCard>

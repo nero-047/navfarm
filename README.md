@@ -80,7 +80,8 @@ If pnpm reports ignored dependency build scripts, review the package name and ad
 The repository contains only templates:
 
 - `.env.example` for shared local port conventions.
-- `apps/api/.env.example` for the API, MySQL, Redis, and Cloudflare R2.
+- `apps/api/.env.example` for the API, MySQL, authentication, encryption and
+  optional email delivery.
 - `apps/web/.env.example` for public API/socket URLs and a public R2 URL.
 
 Create local files without committing them:
@@ -107,9 +108,11 @@ R2_PUBLIC_URL
 
 Create an R2 bucket and scoped API token in Cloudflare, keep the secret access key server-side, and configure CORS only for the web origins that need direct browser access. `R2_ENDPOINT` follows `https://<account-id>.r2.cloudflarestorage.com`. Do not expose `R2_SECRET_ACCESS_KEY` through a `NEXT_PUBLIC_` variable.
 
-## Local MySQL and Redis
+## Local MySQL and optional Redis
 
-Run MySQL and Redis with your preferred local package manager or containers. Use non-production credentials and create a dedicated `navfarm` database. Example container setup:
+Run MySQL with your preferred local package manager or containers. Redis is not
+connected to the application today; the Redis command below is only for future
+feature development. Use non-production credentials and a dedicated database.
 
 ```sh
 docker run --name navfarm-mysql -e MYSQL_ROOT_PASSWORD=local-root-password -e MYSQL_DATABASE=navfarm -p 3306:3306 -d mysql:8

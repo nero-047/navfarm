@@ -9,7 +9,7 @@
         "cache": false,
         "options": {
           "cwd": "apps/api",
-          "command": "node --import tsx src/scripts/verify-demo-master-integrity.ts"
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/verify-demo-master-integrity.ts"
         }
       },
       "db-align-demo-bbp-masters": {

@@ -70,6 +70,17 @@ export interface MasterDataField {
   /** Required when dependsOnMode is "query": maps each dependsOn field key to its query-param name. */
   queryParams?: Record<string, string>;
   /**
+   * Optional with dependsOnMode "query": translates the parent's value before it
+   * is sent, keyed by parent field then by that field's value.
+   *
+   * Without it the parent's raw value is the param value, which only works when
+   * the two vocabularies match. A UOM list narrowed by item type does not:
+   * item_type is LIVESTOCK but the UOM master's type is COUNT. A value with no
+   * entry sends no param at all, so the field falls back to the unfiltered list
+   * rather than showing nothing.
+   */
+  queryValueMap?: Record<string, Record<string, string>>;
+  /**
    * Narrows this select-entity field's options to whichever "types" another already-selected
    * master row allows — driven entirely by live master data, not a hardcoded rule. Location's
    * Parent Location uses this: the selected Location Type's own `allowed_parent_types` list

@@ -21,6 +21,21 @@ export const SYSTEM_UOM_SEED: Array<{
   { uom_code: 'TONNE', uom_name: 'Metric Tonne', uom_type: 'WEIGHT', decimal_places: 3, is_base_uom: false },
   { uom_code: 'LITER', uom_name: 'Litre', uom_type: 'VOLUME', decimal_places: 3, is_base_uom: true },
   { uom_code: 'ML', uom_name: 'Millilitre', uom_type: 'VOLUME', decimal_places: 0, is_base_uom: false },
+  // Units the rest of the master data already referenced but the UOM master did
+  // not contain, so their dropdowns rendered blank and the value could not be
+  // re-selected: 15 pens and 6 livestock items are measured in HEAD, medicines
+  // come in VIAL/PACK, vaccines in DOSE, and vehicle/utility resources bill in
+  // KM/KWH. HEAD is the unit a piggery counts in, so its absence was the most
+  // visible of these.
+  //
+  // KM and KWH are OTHER: the type list is WEIGHT/VOLUME/COUNT/AREA/TIME/OTHER,
+  // and adding a distance or energy type for two units is not worth the churn.
+  { uom_code: 'HEAD', uom_name: 'Head', uom_type: 'COUNT', decimal_places: 0, is_base_uom: false },
+  { uom_code: 'DOSE', uom_name: 'Dose', uom_type: 'COUNT', decimal_places: 0, is_base_uom: false },
+  { uom_code: 'VIAL', uom_name: 'Vial', uom_type: 'COUNT', decimal_places: 0, is_base_uom: false },
+  { uom_code: 'PACK', uom_name: 'Pack', uom_type: 'COUNT', decimal_places: 0, is_base_uom: false },
+  { uom_code: 'KM', uom_name: 'Kilometre', uom_type: 'OTHER', decimal_places: 2, is_base_uom: false },
+  { uom_code: 'KWH', uom_name: 'Kilowatt Hour', uom_type: 'OTHER', decimal_places: 2, is_base_uom: false },
   { uom_code: 'PCS', uom_name: 'Pieces', uom_type: 'COUNT', decimal_places: 0, is_base_uom: true },
   { uom_code: 'DOZEN', uom_name: 'Dozen', uom_type: 'COUNT', decimal_places: 0, is_base_uom: false },
   { uom_code: 'BOX', uom_name: 'Box', uom_type: 'COUNT', decimal_places: 0, is_base_uom: false },
