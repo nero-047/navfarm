@@ -248,6 +248,43 @@ const numberSeries: MasterDataConfig = {
   ],
 };
 
+const activity: MasterDataConfig = {
+  key: "activity",
+  label: "Activities",
+  description: "Standard activities catalog (feed, vaccines, weigh, tasks) used across schedulers and daily data entry.",
+  apiBase: "/activity",
+  idKey: "activity_id",
+  group: "Production",
+  isPrimary: true,
+  supportsNobLobFilter: true,
+  supportsRestore: true,
+  columns: [
+    { key: "activity_code", label: "Code" },
+    { key: "activity_name", label: "Name" },
+    { key: "line_type", label: "Line Type" },
+    { key: "description", label: "Description" },
+  ],
+  fields: [
+    { key: "company_id", label: "Company", type: "text", hideInForm: true },
+    { key: "activity_code", label: "Activity Code", type: "text", required: true, placeholder: "e.g. MORN_FEED", createOnly: true, helpText: "Short unique uppercase code (e.g. MORN_FEED) for lookups and reporting." },
+    { key: "activity_name", label: "Activity Name", type: "text", required: true, placeholder: "e.g. Morning Feed" },
+    {
+      key: "line_type", label: "Line Type", type: "select", required: true,
+      options: [
+        { value: "CONSUMPTION", label: "CONSUMPTION" },
+        { value: "OUTPUT", label: "OUTPUT" },
+        { value: "DESCRIPTIVE", label: "DESCRIPTIVE" },
+        { value: "OVERHEAD", label: "OVERHEAD" },
+        { value: "RESOURCE", label: "RESOURCE" },
+        { value: "TRANSFER", label: "TRANSFER" },
+      ],
+    },
+    { key: "nob_id", label: "Nature of Business", type: "select-entity", entityEndpoint: "/setup/wizard/nobs", entityValueKey: "nob_id", entityLabelKeys: ["nob_code", "nob_name"], helpText: "Leave blank if this activity is shared across all business verticals." },
+    { key: "lob_id", label: "Line of Business", type: "select-entity", entityEndpoint: "/setup/wizard/lobs/{value}", entityValueKey: "lob_id", entityLabelKeys: ["lob_code", "lob_name"], dependsOn: "nob_id", helpText: "Leave blank if this activity is shared across all LOBs under the selected NOB." },
+    { key: "description", label: "Description", type: "textarea", placeholder: "Optional notes or instructions for this activity" },
+  ],
+};
+
 // ── Piggery ──────────────────────────────────────────────────────────────────
 
 const animal: MasterDataConfig = {
@@ -804,6 +841,7 @@ const breedLifecycleStage: MasterDataConfig = {
   tabLabel: "Lifecycle Stages",
   columns: [
     { key: "lifecycle_code", label: "Code" },
+    { key: "stage", label: "Stage" },
     { key: "calc_unit", label: "Unit" },
     { key: "period_from", label: "From" },
     { key: "period_to", label: "To" },
@@ -1229,7 +1267,7 @@ const costCenter: MasterDataConfig = {
 
 export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   locationType, location,
-  stage, numberSeries,
+  stage, numberSeries, activity,
   animal,
   itemCategory, itemType, uom, uomConversion, item, itemAttribute,
   species, breed, breedLifecycleStage, reason, disease, feedFormula,

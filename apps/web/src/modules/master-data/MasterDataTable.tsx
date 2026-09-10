@@ -106,8 +106,16 @@ function resolveEndpoint(f: MasterDataField, form: Row): string | null {
 }
 
 function displayValue(row: Row, key: string, yesLabel: string, noLabel: string): string {
+  if ((key === "stage" || key === "stage_id") && (row.stage || row.stage_name || row.stage_code)) {
+    return String(row.stage || row.stage_name || row.stage_code);
+  }
   const v = row[key];
-  if (v === null || v === undefined || v === "") return "—";
+  if (v === null || v === undefined || v === "") {
+    if (key === "stage" || key === "stage_id") {
+      return row.stage || row.stage_name || row.stage_code || "—";
+    }
+    return "—";
+  }
   if (typeof v === "boolean") return v ? yesLabel : noLabel;
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);

@@ -15,13 +15,13 @@ import {
   LogOut,
   RefreshCw,
   Layers,
-  CalendarClock,
   Wheat,
   Pill,
   CheckSquare,
   Settings,
   AlertTriangle,
   Package,
+  CalendarClock,
 } from "lucide-react";
 import {
   getStoredUser,
@@ -305,6 +305,7 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
       { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
       { label: t("financeCosting"), href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },
       { label: t("navBatches"), href: "/batches", icon: Wheat, activePrefix: "/batches", children: batchChildren },
+      { label: t("navSchedulers"), href: "/schedulers", icon: CalendarClock, activePrefix: "/schedulers" },
       { label: t("navLivestock"), href: "/livestock", icon: Pill, children: livestockChildren },
       { label: t("teamManagement"),  href: "/users",          icon: Users },
       { label: t("rolePermissions"), href: "/roles",          icon: ShieldAlert },
@@ -334,7 +335,12 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
         icon: Layers,
         children: batchChildren,
       },
-      { label: t("navSchedulers"), href: "/schedulers", icon: CalendarClock },
+      {
+        label: t("navSchedulers"),
+        href: "/schedulers",
+        icon: CalendarClock,
+        activePrefix: "/schedulers",
+      },
       {
         label: t("navLivestock"),
         href: "/livestock",

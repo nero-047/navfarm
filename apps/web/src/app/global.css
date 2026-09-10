@@ -765,6 +765,8 @@ html[data-scroll-locked] body {
   width: auto;
   min-width: 0;
   max-width: none;
+  max-height: none;
+  overflow: hidden;
 }
 
 /* Identity/caption block. Full-bleed rule, no card, no icon. */

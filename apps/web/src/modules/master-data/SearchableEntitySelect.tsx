@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Search } from "lucide-react";
+import { Search, Check } from "lucide-react";
 import { Popover, usePopoverSurface } from "@/components/ui/popover";
 
 type Row = Record<string, any>;
@@ -33,17 +33,32 @@ function SearchableEntityPanel({
 }) {
   const { close } = usePopoverSurface();
   const [query, setQuery] = useState("");
-  const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { inputRef.current?.focus({ preventScroll: true }); }, []);
-  useEffect(() => { setHighlight(0); }, [query]);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
     return options.filter((o) => getLabel(o).toLowerCase().includes(q));
   }, [options, query, getLabel]);
+
+  const selectedIdx = useMemo(() => {
+    return filtered.findIndex((o) => String(o[valueKey]) === String(value));
+  }, [filtered, valueKey, value]);
+
+  const [highlight, setHighlight] = useState(selectedIdx >= 0 ? selectedIdx : 0);
+
+  useEffect(() => {
+    inputRef.current?.focus({ preventScroll: true });
+    if (selectedIdx >= 0 && listRef.current) {
+      const activeEl = listRef.current.children[selectedIdx] as HTMLElement | undefined;
+      activeEl?.scrollIntoView({ block: "nearest" });
+    }
+  }, []);
+
+  useEffect(() => {
+    setHighlight(selectedIdx >= 0 ? selectedIdx : 0);
+  }, [query, selectedIdx]);
 
   function pick(row: Row) {
     onPick(row);
@@ -53,10 +68,20 @@ function SearchableEntityPanel({
   function onKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+      setHighlight((h) => {
+        const next = Math.min(h + 1, Math.max(0, filtered.length - 1));
+        const el = listRef.current?.children[next] as HTMLElement | undefined;
+        el?.scrollIntoView({ block: "nearest" });
+        return next;
+      });
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setHighlight((h) => Math.max(h - 1, 0));
+      setHighlight((h) => {
+        const prev = Math.max(h - 1, 0);
+        const el = listRef.current?.children[prev] as HTMLElement | undefined;
+        el?.scrollIntoView({ block: "nearest" });
+        return prev;
+      });
     } else if (event.key === "Enter") {
       event.preventDefault();
       if (filtered[highlight]) pick(filtered[highlight]);
@@ -64,9 +89,12 @@ function SearchableEntityPanel({
   }
 
   return (
-    <div className="flex w-full flex-col gap-1">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+    <div className="flex w-full min-h-0 flex-col gap-1.5 p-1">
+      <div className="relative shrink-0">
+        <Search
+          className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
+          style={{ color: "var(--text-muted)" }}
+        />
         <input
           ref={inputRef}
           type="text"
@@ -78,16 +106,30 @@ function SearchableEntityPanel({
           onKeyDown={onKeyDown}
           placeholder={searchPlaceholder}
           className="nf-input-sm w-full"
-          style={{ backgroundColor: "var(--input-bg)", color: "var(--input-text)", borderColor: "var(--input-border)", paddingLeft: "1.75rem" }}
+          style={{
+            backgroundColor: "var(--input-bg)",
+            color: "var(--input-text)",
+            borderColor: "var(--input-border)",
+            paddingLeft: "1.75rem",
+          }}
         />
       </div>
-      <div role="listbox" aria-label={ariaLabel} className="flex flex-col overflow-y-auto" style={{ maxHeight: "240px" }}>
+      <div
+        ref={listRef}
+        role="listbox"
+        aria-label={ariaLabel}
+        className="flex min-h-0 flex-col overflow-y-auto overscroll-contain gap-0.5 pr-0.5"
+        style={{ maxHeight: "240px" }}
+      >
         {filtered.length === 0 && (
-          <div className="px-2 py-2 text-xs" style={{ color: "var(--text-muted)" }}>{noMatchesLabel}</div>
+          <div className="px-2.5 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+            {noMatchesLabel}
+          </div>
         )}
         {filtered.map((o, idx) => {
           const v = String(o[valueKey]);
           const isSelected = v === String(value);
+          const isHighlighted = idx === highlight;
           return (
             <button
               key={v}
@@ -96,14 +138,17 @@ function SearchableEntityPanel({
               aria-selected={isSelected}
               onMouseEnter={() => setHighlight(idx)}
               onClick={() => pick(o)}
-              className="truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-sm"
+              className="shrink-0 flex items-center justify-between w-full min-h-[34px] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-left text-sm transition-colors cursor-pointer"
               style={{
-                backgroundColor: idx === highlight ? "var(--surface-secondary)" : "transparent",
+                backgroundColor: isHighlighted ? "var(--surface-secondary)" : "transparent",
                 color: "var(--text-primary)",
                 fontWeight: isSelected ? 600 : 400,
               }}
             >
-              {getLabel(o)}
+              <span className="truncate pr-2">{getLabel(o)}</span>
+              {isSelected && (
+                <Check className="h-4 w-4 shrink-0" style={{ color: "var(--accent)" }} />
+              )}
             </button>
           );
         })}
