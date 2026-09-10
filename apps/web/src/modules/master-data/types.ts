@@ -85,7 +85,7 @@ export interface MasterDataField {
    * master row allows — driven entirely by live master data, not a hardcoded rule. Location's
    * Parent Location uses this: the selected Location Type's own `allowed_parent_types` list
    * says which location types may be its parent (an empty list means it's a root type, e.g.
-   * Farm, and the field is disabled with no options at all).
+   * Farm, and the field has no options at all).
    *
    * Pair with `dependsOn: selectorKey` (default "path" mode) so the field is disabled until
    * the selector has a value and resets when the selector changes — this prop only adds the
@@ -102,6 +102,8 @@ export interface MasterDataField {
     allowListKey: string;
     /** Column on this field's own option rows to test against the allow-list (e.g. "location_type"). */
     optionCodeKey: string;
+    /** Hide the control when the selected row's allow-list is empty (e.g. a root Location Type has no parent). */
+    hideWhenEmpty?: boolean;
   };
   /**
    * For dependsOnMode "query": hide this field until every parent has a value,

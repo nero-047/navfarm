@@ -31,7 +31,12 @@ const locationType: MasterDataConfig = {
     { key: "type_code", label: "Type Code", type: "text", required: true, placeholder: "FARM", createOnly: true },
     { key: "type_name", label: "Type Name", type: "text", required: true, placeholder: "Farm" },
     { key: "code_prefix", label: "Code Prefix", type: "text", required: true, placeholder: "FARM", helpText: "Future locations use PREFIX-001, PREFIX-002, and so on." },
-    { key: "allowed_parent_types", label: "Allowed Parent Types", type: "text", showInLookup: true, placeholder: "FARM,SHED", helpText: "Comma-separated type codes. Leave blank for a root type." },
+    {
+      key: "allowed_parent_types", label: "Allowed Parent Types", type: "select-entity", multiple: true,
+      entityEndpoint: "/location-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"],
+      excludeValuesOf: ["type_code"], showInLookup: true,
+      helpText: "Leave empty for a level 1 root type. Otherwise choose the location type(s) allowed at the immediately preceding level.",
+    },
   ],
 };
 
@@ -62,14 +67,14 @@ const location: MasterDataConfig = {
       entityEndpoint: "/location-type", entityValueKey: "type_code", entityLabelKeys: ["type_code", "type_name"], section: "Identification",
     },
     {
-      key: "parent_location_id", label: "Parent Location", type: "select-entity",
+      key: "parent_location_id", label: "Parent Location", type: "select-entity", required: true,
       entityEndpoint: "/location", entityValueKey: "location_id", entityLabelKeys: ["location_code", "location_name"],
       dependsOn: "location_type",
       restrictOptionsBy: {
         selectorKey: "location_type", selectorEntityEndpoint: "/location-type", selectorCodeKey: "type_code",
-        allowListKey: "allowed_parent_types", optionCodeKey: "location_type",
+        allowListKey: "allowed_parent_types", optionCodeKey: "location_type", hideWhenEmpty: true,
       },
-      helpText: "Options are limited to the parent types the selected Location Type allows; a root type (e.g. Farm) needs no parent.",
+      helpText: "Only locations from the immediately preceding hierarchy level are available. Level 1 root types, such as Farm, have no Parent Location field.",
       section: "Identification",
     },
     { key: "location_level", label: "Hierarchy Level", type: "number", hideInForm: true, helpText: "Computed from the parent location." },

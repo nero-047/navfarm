@@ -132,6 +132,31 @@ function parseStringList(v: any): string[] {
   return [];
 }
 
+export function entityRestrictionState(
+  field: MasterDataField,
+  values: Record<string, any>,
+  allOptions: Record<string, Record<string, any>[]>,
+): { selected: boolean; resolved: boolean; allowedCodes: string[]; hidden: boolean } | undefined {
+  const restriction = field.restrictOptionsBy;
+  if (!restriction) return undefined;
+
+  const selectedCode = String(values[restriction.selectorKey] ?? "");
+  const selectorRows = allOptions[restriction.selectorEntityEndpoint];
+  const selectorRow = selectorRows?.find(
+    (row) => String(row[restriction.selectorCodeKey] ?? "") === selectedCode,
+  );
+  const allowedCodes = selectorRow ? parseStringList(selectorRow[restriction.allowListKey]) : [];
+  const selected = selectedCode.length > 0;
+  const resolved = selectorRows !== undefined;
+
+  return {
+    selected,
+    resolved,
+    allowedCodes,
+    hidden: !!restriction.hideWhenEmpty && (!selected || (resolved && allowedCodes.length === 0)),
+  };
+}
+
 export default function MasterDataTable({ config }: { config: MasterDataConfig }) {
   const { t, tLabel } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
@@ -229,6 +254,7 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   const visibleFields = (editing ? formFields.filter((f) => !f.createOnly) : formFields.filter((f) => !f.editOnly))
     .filter((f) => !f.visibleWhen || isFieldRequired({ ...f, required: false, requiredWhen: f.visibleWhen }, form))
+    .filter((f) => !entityRestrictionState(f, form, entityOptions)?.hidden)
     .filter((f) => parentSatisfied(f) && hasChoices(f));
   const columns = config.columns || config.fields.filter((f) => !f.hideInTable).slice(0, 5);
   // Status and Active are different facts — Status is the master's domain
@@ -1080,13 +1106,13 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       let restrictedReason = "";
       if (f.restrictOptionsBy && !disabled) {
         const r = f.restrictOptionsBy;
-        const selectorRow = (entityOptions[r.selectorEntityEndpoint] || []).find((row) => row[r.selectorCodeKey] === form[r.selectorKey]);
-        const allowList = selectorRow ? parseStringList(selectorRow[r.allowListKey]) : [];
-        if (!allowList.length) {
+        const restriction = entityRestrictionState(f, form, entityOptions);
+        const allowList = restriction?.allowedCodes || [];
+        if (restriction?.resolved && !allowList.length) {
           disabled = true;
           restrictedReason = t("mdNoParentForType");
           options = [];
-        } else {
+        } else if (allowList.length) {
           options = options.filter((o) => allowList.includes(o[r.optionCodeKey]));
         }
       }

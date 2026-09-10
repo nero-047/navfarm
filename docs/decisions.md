@@ -575,6 +575,18 @@ entity fields. Fixed application choices such as status, Lot/Serial and other
 enumerations remain compact selects or segmented controls because they are not
 rows from a master and therefore do not have a code/name catalog to search.
 
+### Location parent selection follows the immediate hierarchy level
+*Decided 2026-09-10: "when level 1 then no parent location and when level n then only locations with level n-1".*
+
+`parent_location_id` is the one canonical hierarchy link and `location_level`
+continues to be derived by the API, never typed by the user. A root Location
+Type (Farm/level 1) has an empty `allowed_parent_types` list, so its form does
+not show Parent Location. A non-root type requires a parent and its searchable
+lookup contains only locations whose type is configured as the immediately
+preceding level: Shed offers Farms; Pen offers Sheds. Allowed Parent Types is
+itself a searchable multi-select over Location Types, not a comma-separated
+free-text field.
+
 ---
 
 ## Open — Triple C's to answer, not ours
