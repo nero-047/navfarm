@@ -125,7 +125,23 @@
             "buildTarget": "api:build:development"
           },
           "production": {
-            "buildTarget": "api:build:production"
+            "buildTarget": "api:build:production",
+            "inspect": false,
+            "watch": false
+          }
+        }
+      },
+      "start": {
+        "executor": "nx:run-commands",
+        "continuous": true,
+        "dependsOn": ["build"],
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env dist/main.js",
+          "env": {
+            "NODE_ENV": "production",
+            "NAVFARM_API_HOST": "127.0.0.1",
+            "NAVFARM_API_PORT": "2877"
           }
         }
       },
