@@ -51,6 +51,14 @@ export interface MasterDataField {
   /** Select multiple related values with checkboxes (submitted as an array). */
   multiple?: boolean;
   /**
+   * What an empty `multiple` value means on the record view. It defaults to
+   * "All (no restriction)", which is right where empty widens the rule —
+   * Allowed Parent Types, Applicable Stages — and wrong where empty just means
+   * nothing was recorded. A currency with no countries is not legal tender
+   * everywhere.
+   */
+  emptyMultipleLabel?: string;
+  /**
    * For type "select-entity": key(s) of other field(s) in this form whose value this dropdown
    * depends on (e.g. lob_id depending on nob_id). Disabled until every parent has a value;
    * resets when any parent changes.

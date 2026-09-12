@@ -185,6 +185,13 @@
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/sync-nob-lob.ts"
         }
       },
+      "db-sync-currency-master": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/sync-currency-master.ts"
+        }
+      },
       "db-sync-locale-master": {
         "executor": "nx:run-commands",
         "options": {
@@ -203,7 +210,7 @@
         "executor": "nx:run-commands",
         "options": {
           "cwd": "apps/api",
-          "command": "drizzle-kit migrate --config drizzle.master.config.ts"
+          "command": "node --env-file-if-exists=.env --import tsx src/scripts/migrate-master.ts"
         }
       },
       "db-generate-tenant": {

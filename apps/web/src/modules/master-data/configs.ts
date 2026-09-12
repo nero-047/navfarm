@@ -1252,6 +1252,105 @@ const costCenter: MasterDataConfig = {
   ],
 };
 
+/**
+ * Both tables have been in the database since the start — currency_master and
+ * exchange_rate, with endpoints behind them — and neither had a screen. It
+ * showed: exchange_rate held zero rows, because there was no way to enter one,
+ * and currency_master held three, one of which was the Indian Rupee.
+ *
+ * No NOB/LOB or company scoping. currency_master has no company_id column and a
+ * currency means the same thing in every workspace, so unlike the other masters
+ * this one is platform-wide reference data the client curates.
+ */
+const currency: MasterDataConfig = {
+  key: "currency",
+  label: "Currencies",
+  singular: "Currency",
+  description: "Currencies the business transacts in, and the countries each one is legal tender in.",
+  apiBase: "/currency",
+  idKey: "currency_id",
+  group: "Finance",
+  isPrimary: true,
+  columns: [
+    { key: "iso_code", label: "Code" },
+    { key: "currency_name", label: "Name" },
+    { key: "symbol", label: "Symbol" },
+    { key: "country_codes", label: "Countries" },
+    { key: "decimal_places", label: "Decimals" },
+  ],
+  fields: [
+    { key: "iso_code", label: "Currency Code", type: "text", required: true, placeholder: "USD", helpText: "The three-letter ISO 4217 code. Saved uppercase, and unique." },
+    { key: "currency_name", label: "Currency Name", type: "text", required: true, placeholder: "US Dollar" },
+    { key: "symbol", label: "Symbol", type: "text", required: true, placeholder: "$" },
+    {
+      // Countries, not one country: the euro is legal tender across the
+      // eurozone and the US dollar is legal tender in Zimbabwe as well as the
+      // United States, so a single country field could record neither.
+      key: "country_codes", label: "Countries", type: "select-entity", multiple: true,
+      entityEndpoint: "/country", entityValueKey: "iso2", entityLabelKeys: ["iso2", "country_name"],
+      emptyMultipleLabel: "None recorded",
+      helpText: "Every country where this currency is legal tender.",
+    },
+    {
+      key: "symbol_position", label: "Symbol Position", type: "select",
+      options: [
+        { value: "PREFIX", label: "Before the amount — $100" },
+        { value: "SUFFIX", label: "After the amount — 100 $" },
+      ],
+    },
+    {
+      key: "decimal_places", label: "Decimal Places", type: "number", min: 0, max: 6, placeholder: "2",
+      helpText: "0 for currencies with no minor unit, such as the yen and the dong.",
+    },
+  ],
+};
+
+/**
+ * Rates are entered by hand and kept per date, never overwritten: BBP-1 §1.1
+ * has Finance entering the USD rate manually, and restating a past period needs
+ * the rate as at that date.
+ *
+ * Every rate is quoted against the US dollar and reads "1 USD = rate", so the
+ * base side is not on the form — the API fills it with USD (Rishi, 2026-09-11).
+ * It is still shown as a column, so what the rate is measured against is never
+ * left implicit.
+ */
+const exchangeRate: MasterDataConfig = {
+  key: "exchange-rate",
+  label: "Exchange Rates",
+  singular: "Exchange Rate",
+  description: "Manually entered USD conversion rates. Each row reads 1 USD = rate, on a date.",
+  apiBase: "/currency/rates",
+  idKey: "rate_id",
+  group: "Finance",
+  tabOf: "currency",
+  tabLabel: "Exchange Rates",
+  supportsRestore: false,
+  columns: [
+    { key: "from_currency", label: "Base" },
+    { key: "to_currency", label: "Currency" },
+    { key: "rate", label: "Rate" },
+    { key: "rate_date", label: "Date" },
+    { key: "rate_source", label: "Source" },
+  ],
+  fields: [
+    {
+      key: "to_currency_id", label: "Currency", type: "select-entity", required: true,
+      entityEndpoint: "/currency", entityValueKey: "currency_id", entityLabelKeys: ["iso_code", "currency_name"],
+      helpText: "The currency being quoted against the US dollar.",
+    },
+    {
+      key: "rate", label: "Rate (1 USD =)", type: "number", required: true, step: "0.000001", placeholder: "36.25",
+      helpText: "How many units of the chosen currency one US dollar buys. 1 USD = 36.25 ZWL is entered as 36.25.",
+    },
+    {
+      key: "rate_date", label: "Rate Date", type: "date", required: true,
+      helpText: "Rates are kept per date and never overwritten, so a past period can be restated at the rate that applied then.",
+    },
+    { key: "rate_source", label: "Source", type: "text", placeholder: "MANUAL", helpText: "Where the rate came from. The client enters these by hand." },
+  ],
+};
+
 export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   locationType, location,
   stage, numberSeries,
@@ -1259,7 +1358,7 @@ export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   itemCategory, itemType, uom, uomConversion, item, itemAttribute,
   species, breed, breedLifecycleStage, reason, disease, feedFormula,
   supplier, customer, resource,
-  glAccount, glMapping, costCenter,
+  glAccount, glMapping, costCenter, currency, exchangeRate,
 ];
 
 export const MASTER_DATA_GROUPS = ["Farm Operations", "Production", "Piggery", "Inventory", "Livestock & Health", "Business Partners", "Finance"] as const;

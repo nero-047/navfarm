@@ -561,6 +561,77 @@ Residual value is a **rate that computes an amount**, not a stored figure, so
 so a past period can be restated with the rate that applied at the time, and the
 entry UI is company-scoped and lives in Finance.
 
+### Currency master lives in master data; rates are quoted against USD
+*Decided 2026-09-11.*
+
+`currency_master` and `exchange_rate` had existed since the first schema, with
+endpoints and no screen — which is why `exchange_rate` held zero rows and
+`currency_master` held three, one of them the Indian Rupee. Currencies are now
+a master under Finance, reachable from master data only, with Exchange Rates as
+a tab beneath them (the `uom` / `uom-conversion` pattern).
+
+Four decisions inside that:
+
+- **Rates are anchored to USD and read "1 USD = rate".** The tab asks only for
+  the quoted currency; `from_currency_id` defaults to the USD row in the
+  service. Entering ZWL as `36.25` rather than `0.027586` is how the rate is
+  actually quoted, and small decimals invite typos. This settles the *rate
+  anchor* only — it does not answer the open question about the reporting
+  currency, which is still ZWL-vs-USD and still Triple C's.
+- **A currency records its countries, not its country.** `currency_master`
+  gained `country_codes`, a JSON array of ISO alpha-2 codes, because one country
+  could express neither fact that matters: the euro spans Germany, France and
+  the Netherlands, and the US dollar is legal tender in Zimbabwe as well as the
+  United States. Codes in a JSON array rather than a join table follows
+  `location_type_master.allowed_parent_types` and `reason_master.applicable_stages`.
+  `country_master.default_currency_id` answers the opposite direction — one
+  country's default — and neither is derived from the other.
+- **A small, real currency set, not the full ISO 4217 register.** The seed
+  covers the currencies of the 25 countries already seeded: 24 rows, up from 3.
+  Twenty-two of those countries previously had no default currency at all.
+  `lib/currency-seed-data.ts` holds the list, shared by `bootstrap-database.ts`
+  and `sync-currency-master.ts` so a fresh database and an existing one cannot
+  drift.
+- **Retiring a currency deactivates it.** `DELETE /currency/:id` sets
+  `is_active = false` rather than deleting: `exchange_rate` cascades on delete,
+  so a hard delete took the whole rate history with it, and
+  `company_currency_config` restricts, so the same call raised a raw FK error
+  for any currency a company had configured. `PATCH /:id/restore` is the other
+  half.
+
+`is_system_default` stays false on every row, preserving the 2026-09-09 decision
+that there is no system-wide default currency.
+
+ZWG (the ZiG) is seeded alongside ZWL so both exist and the client can choose;
+the open question below is unchanged by that.
+
+---
+
+### Master codes stay unique; the tenant_id in their unique index is redundant
+*Decided 2026-09-11.*
+
+Allowing duplicate master codes behind a per-series switch was considered and
+rejected. The code is not display-only in this schema: `item.uom_primary` and
+`uom_secondary` hold `KG`/`PCS`/`ML`, `location.location_type` holds a
+`type_code`, `uom_conversion.from_uom`/`to_uom` hold codes, and
+`location.service.ts` resolves a UOM with `eq(uomMaster.uom_code, ...)`. Two rows
+sharing a code would make those references ambiguous and silently resolve to
+whichever row MySQL returned first. Enforcement is also a database UNIQUE index
+across 18 tables, which a per-series flag cannot conditionally disable.
+
+If codes are ever to be duplicable, the code-valued references above have to
+become UUID foreign keys first, in that order.
+
+Separately, and not acted on: `uq_<table>_scope_code` is
+`(tenant_id, company_id, code)`, but each tenant has its own database and every
+master row in it carries the same `tenant_id`, so the first column is a
+constant. Harmless, but it leaves a small hole — a row written with a wrong or
+null `tenant_id` would slip past a duplicate-code check. Not worth rewriting 18
+indexes for no behaviour change; recorded so the next person does not assume the
+column is doing work.
+
+---
+
 ---
 
 ## Deployment
