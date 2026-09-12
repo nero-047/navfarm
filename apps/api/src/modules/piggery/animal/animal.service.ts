@@ -12,6 +12,7 @@ import { AuditLogService } from '../../system/audit-log/audit-log.service';
 
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
+import { listFilterConditions } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -580,6 +581,8 @@ export class AnimalService {
         )
       );
     }
+
+    conditions.push(...listFilterConditions(schema.animalRegister, query.filter));
 
     const limit = query.limit || 50;
     const offset = query.offset || 0;

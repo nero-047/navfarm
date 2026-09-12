@@ -296,16 +296,26 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
   } else if (activeScope === "COMPANY") {
     navItems = [
       { label: t("companyDashboard"), href: "/dashboard",      icon: LayoutDashboard },
+      // The work-shaped spine first, in the order an operational area lists it,
+      // then the company's own entities. Master Data used to sit 4th here and
+      // 10th in an area, Batches 7th and 2nd, Livestock 8th and 4th — so what
+      // you learned in one scope was wrong in the other, over the same routes.
+      // specs/nav-scope-consistency.spec.ts locks the relative order of every
+      // route two scopes share; each scope still keeps its own items.
+      { label: t("navBatches"), href: "/batches", icon: Wheat, activePrefix: "/batches", children: batchChildren },
+      { label: t("navLivestock"), href: "/livestock", icon: Pill, children: livestockChildren },
+      { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
+      { label: t("financeCosting"), href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },
+      { label: t("masterData"),      href: "/master-data",    icon: Database, activePrefix: "/master-data" },
+      // A company is the entity under the tenant; an operational area is only a
+      // scope for one LOB inside it. Neither is grouped under Settings — they
+      // are not the same kind of thing as the three area configuration screens
+      // that operational scope collects there.
       { label: t("operationalAreas"), href: "/operational-areas", icon: Layers },
       // Company scope has exactly one company and this route lands on its
       // settings page, not a list — "Companies" was the tenant-scope label
       // leaking into a scope where it describes the wrong thing.
       { label: t("companySettings"), href: "/company/settings", icon: Building2 },
-      { label: t("masterData"),      href: "/master-data",    icon: Database, activePrefix: "/master-data" },
-      { label: t("inventoryStock"), href: "/inventory/balance", icon: Boxes, activePrefix: "/inventory" },
-      { label: t("financeCosting"), href: "/finance/journal", icon: Landmark, activePrefix: "/finance" },
-      { label: t("navBatches"), href: "/batches", icon: Wheat, activePrefix: "/batches", children: batchChildren },
-      { label: t("navLivestock"), href: "/livestock", icon: Pill, children: livestockChildren },
       { label: t("teamManagement"),  href: "/users",          icon: Users },
       { label: t("rolePermissions"), href: "/roles",          icon: ShieldAlert },
       { label: t("notifications"),   href: "/notifications",  icon: Bell, activePrefix: "/notifications" },
@@ -331,7 +341,10 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
       {
         label: t("navBatches"),
         href: "/batches",
-        icon: Layers,
+        // Wheat in both scopes. Batches carried Wheat in company scope and
+        // Layers here, while Layers is also Operational Areas' icon — so one
+        // item had two icons and one icon meant two items.
+        icon: Wheat,
         children: batchChildren,
       },
       { label: t("navSchedulers"), href: "/schedulers", icon: CalendarClock },

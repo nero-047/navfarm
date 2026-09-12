@@ -50,7 +50,15 @@
           "command": "node --env-file-if-exists=.env --import tsx src/scripts/align-master-codes-to-series.ts"
         }
       },
-      "db-align-stages-to-tdd": {
+      "db-seed-farm-locations": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "cwd": "apps/api",
+          "command": "node --import tsx src/scripts/seed-farm-locations.ts"
+        }
+      },
+"db-align-stages-to-tdd": {
         "executor": "nx:run-commands",
         "cache": false,
         "options": {

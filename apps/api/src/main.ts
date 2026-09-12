@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -8,7 +9,15 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  // Express 5 — which Nest 11 ships — defaults the query parser to 'simple',
+  // where Express 4 defaulted to 'extended'. Simple parsing does not read
+  // bracket syntax: 'filter[location_type]=PEN' arrives as one flat key
+  // literally named 'filter[location_type]', which the whitelisting
+  // ValidationPipe then rejects as an unknown property. The master list
+  // contract (see common/master-list-query.ts) is built on filter[column],
+  // so the parser is set back to the one that understands it.
+  app.set('query parser', 'extended');
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
 

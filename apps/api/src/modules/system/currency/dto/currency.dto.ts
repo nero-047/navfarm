@@ -4,6 +4,7 @@ import {
   IsNotEmpty, IsInt, IsBoolean, IsArray, IsIn, Length, Min, Max,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
+import { MasterListQueryDto } from '../../../../common/master-list-query';
 
 /**
  * Every property here carried only @ApiProperty, which is Swagger metadata and
@@ -161,26 +162,11 @@ export class UpdateCurrencyDto {
 }
 
 /** List filters. MasterDataTable sends limit, search and companyId on every load. */
-export class QueryCurrencyDto {
+export class QueryCurrencyDto extends MasterListQueryDto {
   @ApiProperty({ required: false, description: 'Matches ISO code or currency name' })
   @IsString()
   @IsOptional()
   search?: string;
-
-  @ApiProperty({ required: false, default: 50 })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(500)
-  @IsOptional()
-  limit?: number;
-
-  @ApiProperty({ required: false, default: 0 })
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  offset?: number;
 
   /**
    * Parsed with @Transform, not @Type(() => Boolean): Boolean('false') is true,

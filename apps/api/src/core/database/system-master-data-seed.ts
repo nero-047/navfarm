@@ -85,6 +85,12 @@ export const SYSTEM_LOCATION_TYPE_SEED: Array<{
   { type_code: 'FARM', type_name: 'Farm', code_prefix: 'FARM', allowed_parent_types: [] },
   { type_code: 'SHED', type_name: 'Shed / House', code_prefix: 'SHED', allowed_parent_types: ['FARM'] },
   { type_code: 'PEN', type_name: 'Pen', code_prefix: 'PEN', allowed_parent_types: ['SHED'] },
+  // Porta's Location Master has 89 rows of type CRATE — farrowing and
+  // service-line crates, under its houses, capacity 1. Not folded into CAGE,
+  // which is poultry vocabulary and would make the screens say something the
+  // farm does not; not folded into PEN either, because the capacity data
+  // separates them plainly: a crate holds one animal, a pen holds 34 to 39.
+  { type_code: 'CRATE', type_name: 'Crate', code_prefix: 'CRATE', allowed_parent_types: ['SHED'] },
   { type_code: 'CAGE', type_name: 'Cage', code_prefix: 'CAGE', allowed_parent_types: ['FARM', 'SHED'] },
   { type_code: 'STORE', type_name: 'Store', code_prefix: 'STORE', allowed_parent_types: ['FARM'] },
   { type_code: 'QUARANTINE', type_name: 'Quarantine', code_prefix: 'QUAR', allowed_parent_types: ['FARM', 'SHED'] },

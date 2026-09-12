@@ -610,6 +610,13 @@
       "when": 1789071453429,
       "tag": "0086_thin_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "5",
+      "when": 1789234400180,
+      "tag": "0087_free_chat",
+      "breakpoints": true
     }
   ]
 }

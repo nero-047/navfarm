@@ -86,6 +86,13 @@ const location: MasterDataConfig = {
     { key: "silo_capacity_kg", label: "Silo Capacity (KG)", type: "number", step: "0.01", visibleWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, requiredWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, helpText: "Required when Storage Location is SILO.", section: "Identification" },
     { key: "silo_reorder_days", label: "Silo Reorder Days", type: "number", visibleWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, requiredWhen: { anyOf: [{ key: "storage_type", equals: "SILO" }] }, helpText: "Required when Storage Location is SILO.", section: "Identification" },
     { key: "downtime_days_required", label: "Downtime Days Required", type: "number", helpText: "Empty days required between batches for biosecurity.", section: "Identification" },
+    // The silo or store's own name-number. storage_type says which kind of
+    // store this is; this says which one — MULTIPLIER writes MGH1 against each
+    // grower house, Porta writes PSL FS - 01 and STORE.
+    { key: "storage_name", label: "Silo / Store Name", type: "text", placeholder: "MGH1", visibleWhen: { anyOf: [{ key: "storage_type", equals: ["STORE", "SILO"] }] }, helpText: "The name or number this silo or store is known by on the farm.", section: "Identification" },
+    // Both Location Master templates carry this per location, and the breed
+    // lifecycle sheets read it: a stage's feed is "bagged" at MFH, "Bulk" at MSL.
+    { key: "feed_in_bags", label: "Feed in Bags", type: "boolean", helpText: "On when feed arrives here in bags rather than blown into a silo.", section: "Identification" },
   ],
 };
 
@@ -603,10 +610,21 @@ const item: MasterDataConfig = {
   idKey: "item_id",
   group: "Inventory",
   isPrimary: true,
+  // Classification belongs on the list. An item's identity here is its type,
+  // its category and its sub-category — the three questions the form asks in
+  // that order, and the three segments its own code is built from — yet the
+  // list showed only the type, so the category an item was filed under could
+  // not be seen without opening it.
+  //
+  // category_code is joined by the API. The column itself holds a UUID, and a
+  // list rendering it raw would show the reader a UUID; sub_category already
+  // stores the child category's own code and needs no join.
   columns: [
     { key: "item_code", label: "Code" },
     { key: "item_name", label: "Name" },
     { key: "item_type", label: "Type" },
+    { key: "category_code", label: "Category" },
+    { key: "sub_category", label: "Sub Category" },
     { key: "uom_primary", label: "UOM" },
   ],
   fields: [
@@ -873,8 +891,53 @@ const breedLifecycleStage: MasterDataConfig = {
     // Breed Master Template, Lifecycle sheet: "Resource Requirements". The
     // column existed and nothing on the form could fill it.
     { key: "resource_requirements", label: "Resource Requirements", type: "json", helpText: "Resources this breed needs at this stage, from the resource planner." },
-    { key: "vaccination_protocol", label: "Vaccination Protocol", type: "json", helpText: "Entries of { vaccine, day, route, dose } for this breed at this stage." },
-    { key: "medication_protocol", label: "Medication Protocol", type: "json", helpText: "Entries of { medicine, day, route, dose, withdrawal_days } for this breed at this stage." },
+    // Rows, not a JSON textarea. The Breed Master workbook's Vaccination
+    // Schedule was filled in as five repeated columns — "1st vaccine -
+    // farrowsure (gilt) 25 weeks", "Vaccine porcillis 11 weeks pregnant every
+    // pregnancy cycle" — which is a spreadsheet saying "this is a list of
+    // unknown length". Five columns cannot be a schema and hand-typed JSON is
+    // not a form, so each entry is a row that can be added and deleted.
+    //
+    // trigger_type is what makes the client's own entries expressible: the
+    // triggers are not one kind of number. Some count from the animal's age in
+    // weeks, some from weeks pregnant, and some recur every pregnancy cycle. A
+    // single age_days field — which is what the template's own JSON example
+    // proposed — can hold only the first of the three.
+    //
+    // The master holds the plan; the scheduler holds the dated instances, as
+    // the template says ("Auto-populates scheduler params on batch create").
+    {
+      key: "vaccination_protocol", label: "Vaccination Protocol", type: "json",
+      jsonRow: [
+        { key: "vaccine_item_id", label: "Vaccine", type: "select-entity", entityEndpoint: "/item?itemType=VACCINE", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+        { key: "trigger_type", label: "Triggered by", type: "select", options: [
+          { value: "AGE_WEEKS", label: "Age (weeks)" },
+          { value: "WEEKS_PREGNANT", label: "Weeks pregnant" },
+          { value: "PER_CYCLE", label: "Every pregnancy cycle" },
+        ] },
+        { key: "trigger_value", label: "At", type: "number", step: "0.5" },
+        { key: "dose_ml", label: "Dose (ml)", type: "number", step: "0.01" },
+        { key: "route", label: "Route", type: "select", options: ["IM", "SC", "IN", "ORAL"].map((v) => ({ value: v, label: v })) },
+      ],
+      helpText: "One row per vaccination. Triggered by tells the scheduler what to count from — the animal's age, weeks pregnant, or every pregnancy cycle.",
+    },
+    {
+      key: "medication_protocol", label: "Medication Protocol", type: "json",
+      // The workbook's Medication Table is symptom-driven, not dated: Problem →
+      // Symptom → Drug → Dose → Repeat, grouped by Suckling Piglets /
+      // Lactating Sows / Dry Sows. It is a treatment reference the stockman
+      // reads when an animal presents, so it carries no trigger — the problem
+      // is the trigger.
+      jsonRow: [
+        { key: "problem", label: "Problem", type: "text", placeholder: "E.coli" },
+        { key: "symptom", label: "Symptom", type: "text", placeholder: "Scour — 1st line" },
+        { key: "medicine_item_id", label: "Drug", type: "select-entity", entityEndpoint: "/item?itemType=MEDICINE", entityValueKey: "item_id", entityLabelKeys: ["item_code", "item_name"] },
+        { key: "dose", label: "Dose", type: "text", placeholder: "0.5ml" },
+        { key: "repeat", label: "Repeat", type: "text", placeholder: "every day for 3 days" },
+        { key: "withdrawal_days", label: "Withdrawal (days)", type: "number" },
+      ],
+      helpText: "One row per problem, as the farm's treatment card is written. Dose is free text because the card records it per head and per kg both.",
+    },
     { key: "notes", label: "Notes", type: "textarea", helpText: "Shown as a tooltip on the data entry screen." },
     // TDD row 102 — traceability. The column has always been written; nothing
     // ever displayed it. hideInForm keeps it off the create/edit form while

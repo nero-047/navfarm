@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
 import { QueryCurrencyDto, CreateExchangeRateDto, UpdateExchangeRateRowDto } from './dto/currency.dto';
+import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
 
 @Injectable()
 export class CurrencyService {
@@ -39,6 +40,7 @@ export class CurrencyService {
    */
   async listCurrencies(query: QueryCurrencyDto = {}) {
     const conditions: any[] = [];
+    conditions.push(...listFilterConditions(schema.currencyMaster, query.filter));
     if (query.isActive !== undefined) {
       conditions.push(eq(schema.currencyMaster.is_active, query.isActive));
     }
@@ -54,7 +56,7 @@ export class CurrencyService {
       .select()
       .from(schema.currencyMaster)
       .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(schema.currencyMaster.iso_code)
+      .orderBy(listOrderBy(schema.currencyMaster, query, schema.currencyMaster.iso_code))
       .limit(query.limit || 50)
       .offset(query.offset || 0);
   }

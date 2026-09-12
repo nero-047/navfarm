@@ -8,6 +8,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateGlMappingDto, UpdateGlMappingDto, QueryGlMappingDto } from './dto/gl-mapping.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -251,6 +252,8 @@ export class GlMappingService {
       conditions.push(eq(schema.glMappingMaster.is_active, query.isActive));
     }
 
+    conditions.push(...listFilterConditions(schema.glMappingMaster, query.filter));
+
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
@@ -258,6 +261,7 @@ export class GlMappingService {
       .select()
       .from(schema.glMappingMaster)
       .where(and(...conditions))
+      .orderBy(listOrderBy(schema.glMappingMaster, query, schema.glMappingMaster.mapping_code))
       .limit(limit)
       .offset(offset);
   }

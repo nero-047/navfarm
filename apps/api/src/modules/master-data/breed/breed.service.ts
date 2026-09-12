@@ -20,6 +20,7 @@ import {
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
+import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -176,6 +177,8 @@ export class BreedService {
       );
     }
 
+    conditions.push(...listFilterConditions(schema.speciesMaster, query.filter));
+
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
@@ -183,6 +186,7 @@ export class BreedService {
       .select()
       .from(schema.speciesMaster)
       .where(and(...conditions))
+      .orderBy(listOrderBy(schema.speciesMaster, query, schema.speciesMaster.species_code))
       .limit(limit)
       .offset(offset);
   }
@@ -473,6 +477,8 @@ export class BreedService {
       );
     }
 
+    conditions.push(...listFilterConditions(schema.breedMaster, query.filter));
+
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
@@ -480,6 +486,7 @@ export class BreedService {
       .select()
       .from(schema.breedMaster)
       .where(and(...conditions))
+      .orderBy(listOrderBy(schema.breedMaster, query, schema.breedMaster.breed_code))
       .limit(limit)
       .offset(offset);
   }

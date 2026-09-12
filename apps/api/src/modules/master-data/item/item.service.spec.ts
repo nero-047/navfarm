@@ -324,11 +324,18 @@ describe('ItemService', () => {
       await expect(service.findOne('item-1')).resolves.toMatchObject({ item_type: 'BY_PRODUCT' });
     });
 
+    // findAll left-joins item_category_master so the list can show the category
+    // an item is filed under by code rather than by UUID, and orders by
+    // item_code so the sequence is stable between loads.
     it('still lists rows whose stored item_type is unknown', async () => {
       mockDbSelect.mockReturnValueOnce({
         from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({ offset: jest.fn().mockResolvedValue([legacyItem]) }),
+          leftJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({ offset: jest.fn().mockResolvedValue([legacyItem]) }),
+              }),
+            }),
           }),
         }),
       });

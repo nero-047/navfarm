@@ -9,6 +9,7 @@ import { CreateCostCenterDto, UpdateCostCenterDto, QueryCostCenterDto } from './
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { generateCompositeCode } from '../../system/number-series/composite-code.util';
+import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -262,6 +263,8 @@ export class CostCenterService {
       );
     }
 
+    conditions.push(...listFilterConditions(schema.costCenterMaster, query.filter));
+
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
@@ -269,6 +272,7 @@ export class CostCenterService {
       .select()
       .from(schema.costCenterMaster)
       .where(and(...conditions))
+      .orderBy(listOrderBy(schema.costCenterMaster, query, schema.costCenterMaster.cost_center_code))
       .limit(limit)
       .offset(offset);
   }

@@ -8,6 +8,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateItemTypeDto, UpdateItemTypeDto, QueryItemTypeDto } from './dto/item-type.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
+import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -155,6 +156,8 @@ export class ItemTypeService {
       );
     }
 
+    conditions.push(...listFilterConditions(schema.itemTypeMaster, query.filter));
+
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
@@ -162,6 +165,7 @@ export class ItemTypeService {
       .select()
       .from(schema.itemTypeMaster)
       .where(and(...conditions))
+      .orderBy(listOrderBy(schema.itemTypeMaster, query, schema.itemTypeMaster.type_code))
       .limit(limit)
       .offset(offset);
   }

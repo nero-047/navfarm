@@ -145,7 +145,9 @@ export interface MasterDataField {
    *
    * Each column may itself be a select-entity, so an entry that references
    * another master (an item attribute, a feed ingredient) is chosen rather
-   * than pasted as a UUID.
+   * than pasted as a UUID — or a plain `select` with `options`, for a closed
+   * set of values that is not a master at all (a vaccination's route, or what
+   * its schedule counts from). Anything else renders as a text or number input.
    */
   jsonRow?: MasterDataField[];
   /**

@@ -12,6 +12,7 @@ import { formatSeriesCode, formatSeriesStem, nextSequence, nextSequenceInStem, s
 import { MASTER_CODE_COLUMNS } from './master-code-columns';
 import { generateCompositeCode } from './composite-code.util';
 import { CodePreviewDto } from './dto/code-preview.dto';
+import { listFilterConditions } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -746,6 +747,8 @@ export class NumberSeriesService {
         )
       );
     }
+
+    conditions.push(...listFilterConditions(schema.noSeriesMaster, query.filter));
 
     const limit = query.limit || 50;
     const offset = query.offset || 0;

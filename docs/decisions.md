@@ -707,3 +707,353 @@ C supplies real data, it replaces the synthetic dataset.
 This does not weaken the standing rule against inventing client data: product
 defaults, production seeds, migrations, and claims about Triple C still require
 client evidence or Rishi's decision.
+
+---
+
+## Every dropdown's source master is named on the screen that uses it
+*Decided 2026-09-12.*
+
+The "Dropdown options come from" row is derived from the select-entity fields
+themselves, so a field added later needs no second place to remember. Three
+things it got wrong, all now fixed and covered by
+`specs/master-data-lookup-chips.spec.ts`:
+
+It read only top-level fields, so Item Attributes — reached only through Items'
+Attribute Values row editor — was the one master the row never mentioned. It
+truncated an endpoint at its first slash, which credits `/uom` for a reference
+to `/uom/conversion`; the longest matching `apiBase` now wins. And it withheld
+Business Central-owned catalogs from the row while the dialog offered those very
+same masters as inline lookup cards.
+
+**A BC-owned master is not read-only.** `readOnly` tracks administration
+rights, not BC ownership, and until the Business Central integration is
+connected every one of these catalogs is created and edited locally against our
+own database — BC sync comes later. Items, Suppliers, GL Accounts and Cost
+Centers therefore appear in the row like any other lookup; `BcOwnershipNotice`
+still states the provenance. Withholding the chip while offering the card said
+two different things about one catalog, and the card was the one telling the
+truth.
+
+An endpoint no master serves — `/setup/wizard/nobs`, `/costing-method`,
+`/goods-receipt` — deliberately names nothing. NOB and LOB come from the setup
+wizard, not from a master on the screen.
+
+## Vaccination and medication are rows, not hand-typed JSON
+*Decided 2026-09-12.*
+
+Both were `type: "json"` textareas on Breed Lifecycle Stages — someone typing
+valid JSON by hand into a form. They are now `jsonRow` row editors, the
+mechanism the codebase already had for exactly this.
+
+The Breed Master workbook (MULTIPLIER and Porta) settles the shape. Management
+filled `Vaccination Schedule` in as **five repeated columns** — "1st vaccine -
+farrowsure (gilt) 25 weeks", "3rd vaccination (Every pregnancy cycle) 14 weeks
+preg farrowsure", "Vaccine porcillis 11 weeks pregnant every pregnancy cycle".
+Five columns is a spreadsheet saying "this is a list of unknown length", so it
+is a list of rows.
+
+The triggers are not one kind of number: some count from the animal's age in
+weeks, some from weeks pregnant, and some recur every pregnancy cycle. So each
+row carries a `trigger_type` (AGE_WEEKS / WEEKS_PREGNANT / PER_CYCLE) beside its
+value. The template's own JSON example proposed a single `age_days`, which can
+express only the first of the three.
+
+Medication is a different thing and is shaped differently. The workbook's
+Medication Table is symptom-driven, not dated — Problem → Symptom → Drug → Dose
+→ Repeat, grouped by Suckling Piglets / Lactating Sows / Dry Sows. It is the
+treatment card a stockman reads when an animal presents, so it carries no
+trigger: the problem is the trigger. Dose stays free text because the card
+records it per head and per kg both ("0.5ml", "1ml /10kg").
+
+**The master holds the plan; the scheduler holds the dated instances** — which
+is what the template says of the vaccination schedule: "Auto-populates scheduler
+params on batch create." `breed_master.vaccination_schedule` is a third home for
+the same fact, has never been exposed on any screen, and is NULL in every row;
+it is to be dropped when the next migration batch runs.
+
+## Exchange Rates lives in Master Data only
+*Decided 2026-09-12.*
+
+The same screen was reachable at Master Data → Exchange Rates and at Finance →
+Exchange Rates, over the same `/currency/rates` endpoint — one catalog under two
+names. The Finance tab and its now-orphaned panel are removed.
+
+The Finance placement rested on reading BBP-1 §1.1, which has Finance entering
+the USD/ZWL rate by hand, as saying the screen belonged among the finance work.
+§1.1 says who types the rate, not which menu it hangs from. The API settles it:
+every rate route is gated on `MASTER_DATA`/`CURRENCY`, not on a finance
+permission, so the move aligns the UI with the permission model that was already
+in force.
+
+## Shared sidebar routes keep one relative order across scopes
+*Decided 2026-09-12.*
+
+Master Data sat 4th in company scope and 10th in an operational area, Batches
+7th and 2nd, Livestock 8th and 4th. Same routes, same labels, different order —
+so the muscle memory built in one scope was wrong in the other. Company scope
+now follows the operational spine: Dashboard, Batches, Livestock, Inventory &
+Stock, Finance & Costing, Master Data, then the company's own entities.
+
+Only the *relative* order of shared routes is locked, by
+`specs/nav-scope-consistency.spec.ts`. Each scope keeps its own items and may
+interleave them — Schedulers sits next to Batches in an operational area and
+exists nowhere else. What a scope may not do is reshuffle the routes it has in
+common with another.
+
+Batches now carries the same icon in both scopes. It was Wheat in company scope
+and Layers in an area, while Layers is also Operational Areas' icon — one item
+with two icons, one icon meaning two items.
+
+**Operational Areas and Company Settings stay top level, ungrouped.** Grouping
+them under a Settings parent was proposed and rejected: a company is the entity
+under the tenant, an operational area is only a scope for one LOB inside it, and
+neither is the same kind of thing as the three area configuration screens that
+operational scope collects under Settings.
+
+The Notifications asymmetry is deliberate and stays: tenant and company scope
+have it, an operational area does not.
+
+## Animal Register is a master, and only a master
+*Decided 2026-09-12. Not yet implemented.*
+
+Animal Register existed twice over the same `/animal` endpoint: Master Data →
+Animal Register, and Livestock → Animal Register (`/livestock`, `animal-panel`).
+Master Data keeps it; the Livestock entry goes.
+
+`animal-panel` is the richer screen — it owns stage transition and the
+medications view, which the Master Data screen does not have. Those two move to
+Batches → Batch Animals, where the batch context already is. `/livestock` then
+redirects to `/livestock/breeding`, and `specs/livestock-sections.spec.ts` —
+which asserts the register owns the module root — changes with it.
+
+Held back from the 2026-09-12 batch deliberately: `animal-panel` is 1096 lines
+and `batch-animal-assignment-panel` is 1227, and a move between two files that
+size does not belong in the same change as a nav reorder.
+
+Not duplicates, verified: Batches → Batch Stages reads `/stage` but posts
+`/batch/:id/transfer-stage`, so it is operational stage transition rather than
+the Stages master. The RFID scanner, batch-animal assignment and stage
+transition modals write to `/animal` but are operational actions, not a second
+register.
+
+## Item Tracking stays a three-way choice; "LOT AND SERIAL" imports as LOT
+*Decided 2026-09-12.*
+
+The Item Master template's real rows use Item Tracking = "LOT AND SERIAL" on
+several feed items (Creep-3 Lacto, Creep1-Lacto, Creep2-Lacto). That contradicts
+the 2026-09-09 decision that TDD row 11's one three-way choice — LOT, SERIAL or
+neither — is what the form may express, reconciled against the two independent
+boolean columns the table carries.
+
+The 2026-09-09 decision stands. Those items import as LOT, and the mapping is
+recorded here rather than silently applied, because it is a narrowing of what
+the client's sheet says.
+
+## CRATE is a location type under SHED
+*Decided 2026-09-12. Not yet implemented.*
+
+Porta's Location Master has 89 rows of type CRATE — farrowing and service-line
+crates, capacity 1 — under its houses. `location_type_master` has FARM, SHED,
+PEN, SILO, STORE, CAGE and QUARANTINE, but no CRATE. CRATE is added with
+`allowed_parent_types` of `["SHED"]`.
+
+Not mapped onto CAGE, which is poultry vocabulary and would make the screens say
+something the farm does not. Not mapped onto PEN either: the capacity data
+separates them plainly — a crate holds 1, a pen holds 34 to 39.
+
+---
+
+## Open — pending Rishi, from the 2026-09-12 template review
+
+Read only the MULTIPLIER and PortaMasterTemplates folders, as instructed. Seven
+other farms (Grasmere, Lionshead, Lionshead Extensions, Learig, Richlands, Villa
+Franca, AI Station) have the same four templates and were not opened.
+
+| Question | Where it bites |
+|---|---|
+| Do MULTIPLIER and PORTA FARM become two top-level locations under Triple C, replacing the single `FARM-001` "Triple C Farm" placeholder? | Every location, and the farm each batch runs on. The real addresses are Grasmere Farm, Norton and Kintyre Estate, Norton. |
+| The other seven farms — same treatment later, or out of scope? | Whether the location loader is written for two farms or nine. |
+| The ~17 Breed Master KPI columns — `avg litter total born`, `# born dead`, `# mummified`, pre-wean mortality %, total litter mass weaned, `w/s/y`, litter index, empty days, 70-day weight and gain, weaner FCE and mortality, grower FCE, mortality and ADG, AVG CDM to Colcom. A KPI/target master, or fields on Breed? | These are performance targets, not breed genetics. `KPI Triple C Pigs_SUBMISSIONS.xlsx` exists and has not been opened. |
+| `Period From`/`Period To` on the lifecycle sheets are natural language, not numbers: "from service week", "15 weeks pregnant", "Thursday day of weaning", "weekly farrow batch". `Calculation Unit` includes "Service week". Add a free-text anchor beside the numeric range, or normalise to numbers and keep the sheet text as a note? | `breed_lifecycle_stages.period_from`/`period_to` are numeric. Until this is settled the client's lifecycle data cannot be loaded. |
+| Breed Lifecycle Stages rows in the templates are per **(breed, stage, location, feed silo)** — the same stage repeats once per pen, crate or house (MDS-01…16, MWH-01…06, MGH-01…10), each pinning the silo to draw feed from. Our table has neither `location_id` nor silo columns. | The same blocker as above, and the reason a single "Weaner" row cannot hold the data. |
+| Location Master carries a Silo/Store name-number (`MGH1`, `PSL FS - 01`) and a "Feed in Bags" yes/no per location. Neither has a column. | Silo-level feed tracking and the bagged-vs-bulk distinction the lifecycle sheets depend on. |
+| Should `masterScopeConditions` scope master data by farm? `operational_area_master.farm_id` exists and is populated, and the service joins it, but the scope function filters only on tenant, company, NOB and LOB. | Rishi: "the top level location is the location of the actual farm on which the operations would be running and the things would be according to the top level location." |
+
+---
+
+## Master lists are sorted, filtered and paged in SQL
+*Decided 2026-09-12.*
+
+Every master list asked the API for `limit=200`, never sent an offset, and cut
+pages out of the result in the browser. Sixteen of the seventeen master services
+had no `orderBy` at all, so the order rows came back in was whatever MySQL
+chose and could differ between two loads of the same page — which is why the
+Items list read LIVESTOCK, VACCINE, RAW_MATERIAL-0002, RAW_MATERIAL-PROTEIN.
+
+That survives demo data and fails on the client's. MULTIPLIER's location
+template is **508** rows and Porta's **191**: the Locations list would have shown
+200 of 699 with no way to reach the rest, and a filter applied in the browser
+would only ever have searched those 200. Adding filters on top of that window
+would have made it look like it worked while hiding two thirds of the farm.
+
+So `common/master-list-query.ts` holds one contract for every master:
+`sort`, `dir`, `filter[column]`, `limit`, `offset`, with `total` returned beside
+the rows. `data` stays the array it always was, so no existing caller breaks;
+total/limit/offset are new siblings. Sorting falls back to the master's own code
+column, so a list is never unordered even when nothing is asked for.
+
+**Every filter and sort key is checked against the table's real columns and
+refused by name if it is not one.** A filter that appears to be applied and is
+not is the worst of the three outcomes, because the list then reads as an answer.
+This was not theoretical: the first version of the helper skipped columns that
+the service also exposed under a camelCase name of its own, to avoid filtering
+twice — and `filter[location_type]=PEN` duly returned all 18 locations and
+reported success. Applying both is harmless; two identical conditions AND to the
+same result. Only `tenant_id` and `company_id` are refused, because the
+workspace sets them.
+
+**Express 5 was the reason bracket syntax did not arrive at all.** Nest 11 ships
+Express 5, which defaults `query parser` to `simple` where Express 4 defaulted to
+`extended`; `filter[location_type]=PEN` arrived as one flat key literally named
+`filter[location_type]` and the whitelisting ValidationPipe rejected it as an
+unknown property. `main.ts` sets the parser back to `extended`.
+
+## Item classification is on the Item list
+*Decided 2026-09-12.*
+
+The list showed Code, Name, Type and UOM, so the category an item was filed
+under could not be seen without opening it — though the type, category and
+sub-category are the three questions the form asks and the three segments the
+item's own code is built from. Category and Sub Category are now columns.
+
+`item_master.category_id` holds a UUID, and a list rendering it raw shows the
+reader a UUID, so `findAll` left-joins `item_category_master` for
+`category_code`. Resolving it per row from the client would have been one
+request per row. `sub_category` needs no join: it already stores the child
+category's own code, which is what makes it readable as it stands. The join also
+makes Category filterable in SQL.
+
+## Lookup chips follow the form, not the registry
+*Decided 2026-09-12.*
+
+"Dropdown options come from" listed masters in the order they happen to sit in
+`MASTER_DATA_CONFIGS`, so the Item screen read Item Categories before Item
+Types — the opposite of the order the form asks, where Item Type comes first and
+Category cannot be answered until it is. The row is now ordered by field
+position, with any master that declares `lookupFor` without owning a field on
+the screen following in registry order.
+
+## Only MULTIPLIER and Porta are seeded
+*Decided 2026-09-12.*
+
+Nine farms submitted master templates. Only MULTIPLIER and PORTA FARM are
+seeded; the other seven (Grasmere, Lionshead, Lionshead Extensions, Learig,
+Richlands, Villa Franca, AI Station) are not, and their templates were not
+opened.
+
+Four decisions the seed rests on:
+
+- **The client's own location codes**, exactly as submitted — `MUL100`,
+  `MUGR1`, `MUGR1P1`, `POR100`, `PGH1`, `PSLCr1`. These are what farm staff use
+  and what the sow cards reference. The LOCATION number series stops generating
+  codes for seeded rows, and `decisions.md`'s open question on location code
+  format closes: the templates answered it.
+- **The 18 synthetic locations are replaced**, not kept alongside. "Triple C
+  Farm" and its invented pens go; MULTIPLIER and PORTA FARM become the estate.
+  Consistent with the standing rule that real client data replaces the synthetic
+  dataset. Destructive, so the script follows the house shape — read-only by
+  default, `--verify` inside a rolled-back transaction, `--apply` to commit —
+  and the plan is reviewed before it commits.
+- **HECTARE is added to `uom_master`; NUMBERS maps to the existing HEAD.**
+  MULTIPLIER's farm area is in hectares and there is no equivalent unit, so it
+  is genuinely missing. Capacity in "NUMBERS" is a headcount of animals and HEAD
+  already means exactly that, so it maps rather than adding a near-duplicate.
+- **CRATE, silo name and feed-in-bags are migrated first.** Porta has 89 crates
+  and no CRATE type exists; the templates also carry a silo/store name-number
+  (`MGH1`, `PSL FS - 01`) and a per-location "Feed in Bags" flag with no columns.
+  Without them the location data would load with those fields dropped.
+
+## The list contract reached every master by probing, not by reading
+*Recorded 2026-09-12.*
+
+Rolling the contract out across 22 master endpoints turned up two failures that
+tests and typecheck both passed:
+
+**Four masters accepted `filter[column]` and ignored it.** Their DTOs extended
+the shared base, so the parameter validated; their services never applied it. So
+`filter[item_type]=FEED` returned all 28 items with a 200 — the silent-ignore
+failure this contract was written to prevent, reproduced by the rollout itself.
+`/location-type`, `/animal`, `/item` and `/reason` were wired; `/currency` was
+found the same way on the second pass.
+
+**Every endpoint is now probed for three things, not one:** that it sorts, that a
+real filter narrows the result, and that a nonsense column is refused with a 400.
+The third is the one that catches a service whose DTO has run ahead of it — a
+list that accepts a filter it does not apply looks like an answer. A service is
+not considered wired until a bogus column returns 400 from it.
+
+**`location_type_master` keeps its own ordering first.** Its `company_id IS NULL`
+sort is a precedence rule, not a preference — the dedupe below it pairs tenant
+templates against company overrides and depends on that order. A caller's sort is
+applied within it rather than replacing it.
+
+Masters not reached, deliberately: `farm`, `shed` and `warehouse` (read-only
+views over `location_master`, not master-data screens), `plan` and `journal`.
+Their DTOs accept the parameters but their services do not apply them, so they
+must be wired before any screen offers filters over them.
+
+---
+
+## MULTIPLIER and Porta are loaded; 453 rows wait on Triple C
+*Applied 2026-09-12 via `nx run api:db-seed-farm-locations --apply`.*
+
+250 of the 703 submitted location rows are in `tenant_devco`: MULTIPLIER 75 of
+512, Porta 175 of 191. `docs/triple-c-location-code-queries.md` lists every one
+of the 453 that could not be loaded, with its code, type, SUB-LOC and the reason.
+
+**Why so few.** Both templates require "Unique code per tenant" for Location
+Code, and neither delivers it. MULTIPLIER's codes omit the parent: `MUP1` is
+five pens, one in each farrowing house FH1–FH5, all named "PEN 1"; `MUWN1` is
+six weaner houses with different areas (66.5, 66.5, 70.02, 70.02, 66.5, 66.5
+m²), so six places under one code; `MUFHE` is five farrowing houses. Porta's
+problem is different and smaller: `PGH2`, `PGH3`, `PGH4`, `PFH1` and `PFH2` are
+each used once for a Porta Grower House and once for a Porta Gilt House, because
+both abbreviate to PGH. Four MULTIPLIER rows have a code and a pen name but a
+blank Location Type.
+
+**The cascade is why 453 and not 232.** A duplicated shed code makes its children
+unplaceable too — 221 of the blocked rows are pens and cages whose parent shed
+could not be identified. Counting only the directly duplicated rows understated
+it by nearly half.
+
+Nothing was renamed, derived or guessed. Deriving `MUFH1P1` from `MUP1` + `FH1`
+would be minting client identifiers, and only Triple C knows whether `MUWN1` ×6
+is six houses or one house typed six times.
+
+**What the seed does.** Parents first, keyed on `location_code`, so a re-run
+updates in place rather than duplicating — the script is re-runnable the moment
+corrected codes arrive. Hierarchy comes from code prefix (`MUGR1P1` under
+`MUGR1`), which placed every loadable child unambiguously. It adds `HECTARE` to
+`uom_master` (MULTIPLIER states its farm area in hectares and no equivalent
+existed) and `CRATE` to `location_type_master`, each in both scopes, matching how
+every other lookup is held here. Capacity in "NUMBERS" maps to the existing
+`HEAD`.
+
+**The synthetic farm is switched off, not deleted.** 59 rows point at it — 27
+animals, 5 batches, 5 mortality records, 6 inventory ledger lines, 4 breeds, the
+goods receipts and the operational area itself. A delete is blocked by those
+foreign keys and forcing it would strand every one of them. All 27 animals still
+resolve to a location after the run. `PIGGERY-01` now points at MULTIPLIER.
+
+Retirement targets the demo codes specifically — `FARM-001` and
+`FARM-001/%` — not "everything not in the seed", which on a second run would
+switch off every location added since the first.
+
+**`storage_name` and `feed_in_bags`** are now on the Location form, not just in
+the table: the silo's own name-number (`MGH1`, `PSL FS - 01`) shown only when
+Storage Location is set, and the bagged-vs-bulk flag both templates carry per
+location.
+
+MULTIPLIER's 97 housing rows are typed `CAGE` while Porta's 89 are `CRATE`. Both
+types now exist. Whether the two farms mean different things by them is a
+question for Triple C, not an inference for us.

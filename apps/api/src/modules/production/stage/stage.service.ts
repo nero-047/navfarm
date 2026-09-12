@@ -9,6 +9,7 @@ import { CreateStageDto, UpdateStageDto, QueryStageDto } from './dto/stage.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
+import { listFilterConditions } from '../../../common/master-list-query';
 
 @Injectable()
 export class StageService {
@@ -208,6 +209,8 @@ export class StageService {
         )
       );
     }
+
+    conditions.push(...listFilterConditions(schema.stageMaster, query.filter));
 
     const limit = query.limit || 50;
     const offset = query.offset || 0;

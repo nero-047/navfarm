@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsInt, Min, Max, IsNumber, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
+import { MasterListQueryDto } from '../../../../common/master-list-query';
 
 // ==========================================
 // SPECIES DTOs
@@ -66,7 +67,7 @@ export class UpdateSpeciesDto {
   lob_id?: string;
 }
 
-export class QuerySpeciesDto {
+export class QuerySpeciesDto extends MasterListQueryDto {
   @ApiProperty({ description: 'Filter by company UUID', required: false })
   @IsOptional()
   @IsString()
@@ -82,20 +83,6 @@ export class QuerySpeciesDto {
   @IsOptional()
   @IsString()
   search?: string;
-
-  @ApiProperty({ description: 'Results per page', default: 50, required: false })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  limit?: number;
-
-  @ApiProperty({ description: 'Pagination offset', default: 0, required: false })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number;
 }
 
 // ==========================================
@@ -457,7 +444,7 @@ export class UpdateBreedDto {
   extension_config?: any;
 }
 
-export class QueryBreedDto {
+export class QueryBreedDto extends MasterListQueryDto {
   @ApiProperty({ description: 'Filter by company UUID', required: false })
   @IsOptional()
   @IsString()
@@ -493,20 +480,6 @@ export class QueryBreedDto {
   @IsOptional()
   @IsString()
   search?: string;
-
-  @ApiProperty({ description: 'Results per page', default: 50, required: false })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  limit?: number;
-
-  @ApiProperty({ description: 'Pagination offset', default: 0, required: false })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number;
 }
 
 // ==========================================
@@ -829,7 +802,7 @@ export class UpdateBreedLifecycleStageDto {
   lob_id?: string;
 }
 
-export class QueryBreedLifecycleStageDto {
+export class QueryBreedLifecycleStageDto extends MasterListQueryDto {
   // breed_lifecycle_stages is tenant-wide — it has no company_id column — but
   // the master-data table appends companyId to every list request, and the
   // global pipe runs forbidNonWhitelisted, so an undeclared param 400s the
@@ -848,18 +821,4 @@ export class QueryBreedLifecycleStageDto {
   @IsOptional()
   @IsUUID()
   stageId?: string;
-
-  @ApiProperty({ description: 'Results per page', default: 50, required: false })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  limit?: number;
-
-  @ApiProperty({ description: 'Pagination offset', default: 0, required: false })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number;
 }

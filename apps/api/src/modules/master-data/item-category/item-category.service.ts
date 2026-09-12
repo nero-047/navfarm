@@ -9,6 +9,7 @@ import { CreateItemCategoryDto, UpdateItemCategoryDto, QueryItemCategoryDto } fr
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { generateCompositeCode } from '../../system/number-series/composite-code.util';
+import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -266,6 +267,8 @@ export class ItemCategoryService {
       );
     }
 
+    conditions.push(...listFilterConditions(schema.itemCategoryMaster, query.filter));
+
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
@@ -273,6 +276,7 @@ export class ItemCategoryService {
       .select()
       .from(schema.itemCategoryMaster)
       .where(and(...conditions))
+      .orderBy(listOrderBy(schema.itemCategoryMaster, query, schema.itemCategoryMaster.category_code))
       .limit(limit)
       .offset(offset);
   }

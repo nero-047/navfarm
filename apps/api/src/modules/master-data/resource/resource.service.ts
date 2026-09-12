@@ -15,6 +15,7 @@ import {
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
+import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -178,6 +179,8 @@ export class ResourceService {
       );
     }
 
+    conditions.push(...listFilterConditions(schema.resourceMaster, query.filter));
+
     const limit = query.limit || 50;
     const offset = query.offset || 0;
 
@@ -185,6 +188,7 @@ export class ResourceService {
       .select()
       .from(schema.resourceMaster)
       .where(and(...conditions))
+      .orderBy(listOrderBy(schema.resourceMaster, query, schema.resourceMaster.resource_code))
       .limit(limit)
       .offset(offset);
   }
