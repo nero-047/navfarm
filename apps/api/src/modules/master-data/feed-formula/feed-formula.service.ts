@@ -8,7 +8,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateFeedFormulaDto, UpdateFeedFormulaDto, QueryFeedFormulaDto } from './dto/feed-formula.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
-import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
+import { listFilterConditions, runMasterList } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -225,16 +225,9 @@ export class FeedFormulaService {
 
     conditions.push(...listFilterConditions(schema.feedFormulaMaster, query.filter));
 
-    const limit = query.limit || 50;
-    const offset = query.offset || 0;
-
-    return this.db
-      .select()
-      .from(schema.feedFormulaMaster)
-      .where(and(...conditions))
-      .orderBy(listOrderBy(schema.feedFormulaMaster, query, schema.feedFormulaMaster.formula_code))
-      .limit(limit)
-      .offset(offset);
+    // Rows and the matching count together, so the pager knows how many
+    // pages there really are rather than guessing from a full page.
+    return runMasterList(this.db, schema.feedFormulaMaster, conditions, query, schema.feedFormulaMaster.formula_code);
   }
 
   async update(id: string, dto: UpdateFeedFormulaDto, tenantId: string, userPayload?: any) {

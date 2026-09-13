@@ -8,7 +8,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateGlMappingDto, UpdateGlMappingDto, QueryGlMappingDto } from './dto/gl-mapping.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
-import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
+import { listFilterConditions, runMasterList } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -254,16 +254,9 @@ export class GlMappingService {
 
     conditions.push(...listFilterConditions(schema.glMappingMaster, query.filter));
 
-    const limit = query.limit || 50;
-    const offset = query.offset || 0;
-
-    return this.db
-      .select()
-      .from(schema.glMappingMaster)
-      .where(and(...conditions))
-      .orderBy(listOrderBy(schema.glMappingMaster, query, schema.glMappingMaster.mapping_code))
-      .limit(limit)
-      .offset(offset);
+    // Rows and the matching count together, so the pager knows how many
+    // pages there really are rather than guessing from a full page.
+    return runMasterList(this.db, schema.glMappingMaster, conditions, query, schema.glMappingMaster.mapping_code);
   }
 
   async update(id: string, dto: UpdateGlMappingDto, tenantId: string, userPayload?: any) {

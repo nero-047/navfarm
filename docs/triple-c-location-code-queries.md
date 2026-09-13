@@ -1,4 +1,4 @@
-# Location Master — codes we cannot key on
+# Master templates — values we cannot key on or read
 
 Generated 2026-09-12 from the MULTIPLIER and Porta Location Master Templates.
 
@@ -479,3 +479,65 @@ Nothing here has been guessed or renamed. Once these are re-coded the seed reloa
    are each used once for a Porta Grower House and once for a Porta Gilt House.
 3. **Four MULTIPLIER rows have no Location Type** — `MUDST1P4`, `MUDST2P4`, `MUDST3P4` and one
    more. They appear to be pens in the Double Stock houses; please confirm rather than let us assume.
+
+---
+
+# Resource Master — 28 of 44 rows cannot be loaded
+
+`resource_code`, `resource_name` and `resource_type` are all mandatory and all NOT NULL in the
+database. **MULTIPLIER's sheet has no Resource Codes at all**, so none of its six rows can be
+keyed. Porta supplied 35 codes but left Resource Type blank on most rows.
+
+| Farm | Code | Name | Type | Number | Why it cannot be loaded |
+|---|---|---|---|---|---|
+| MULTIPLIER | `(blank)` | Water pump | Equipment | 1 | Resource Code is blank (mandatory, must be unique per tenant) |
+| MULTIPLIER | `(blank)` | Heaters | Equipment | 6 | Resource Code is blank (mandatory, must be unique per tenant) |
+| MULTIPLIER | `(blank)` | Coolers | (blank) | 6 | Resource Code is blank (mandatory, must be unique per tenant) |
+| MULTIPLIER | `(blank)` | Tractor | (blank) | — | Resource Code is blank (mandatory, must be unique per tenant) |
+| MULTIPLIER | `(blank)` | Scales | (blank) | 2 | Resource Code is blank (mandatory, must be unique per tenant) |
+| MULTIPLIER | `(blank)` | Manpower | (blank) | 35 | Resource Code is blank (mandatory, must be unique per tenant) |
+| PORTA | `(blank)` | (blank) | (blank) | — | Resource Code is blank (mandatory, must be unique per tenant) |
+| PORTA | `PIRL` | INFRA-RED HEAT LAMPS | (blank) | 48 | Resource Code appears 6x in this template |
+| PORTA | `PIRL` | INFRA-RED HEAT LAMPS | (blank) | 48 | Resource Code appears 6x in this template |
+| PORTA | `PIRL` | INFRA-RED HEAT LAMPS | (blank) | 48 | Resource Code appears 6x in this template |
+| PORTA | `PIRL` | INFRA-RED HEAT LAMPS | (blank) | 48 | Resource Code appears 6x in this template |
+| PORTA | `PIRL` | INFRA-RED HEAT LAMPS | (blank) | 48 | Resource Code appears 6x in this template |
+| PORTA | `PIRL` | INFRA-RED HEAT LAMPS | (blank) | 48 | Resource Code appears 6x in this template |
+| PORTA | `PCP1` | Cooling Pad | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PCP2` | Cooling Pad | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PCP3` | Cooling Pad | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PCP4` | Cooling Pad | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PCP5` | Cooling Pad | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PCP6` | Cooling Pad | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `(blank)` | Tractor | (blank) | 1 | Resource Code is blank (mandatory, must be unique per tenant) |
+| PORTA | `PS1` | Scales | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PS2` | Scales | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PS3` | Scales | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PS4` | Scales | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PS5` | Scales | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PS6` | Scales | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `PUVS` | UV System | (blank) | 1 | Resource Type is 'blank' (mandatory: MANPOWER/EQUIPMENT/VEHICLE/UTILITY/OTHER) |
+| PORTA | `(blank)` | Manpower | (blank) | 60 | Resource Code is blank (mandatory, must be unique per tenant) |
+
+# Breed Master — 2 of 4 rows cannot be loaded
+
+| Farm | Name | Why it cannot be loaded |
+|---|---|---|
+| MULTIPLIER | Teaser Boar | Breed Code is blank (mandatory, must be unique per tenant) |
+| PORTA | Teaser Boar | Breed Code is blank (mandatory, must be unique per tenant) |
+
+## Breed values we did not store
+
+1. **Farrowing Rate %** — the template's example is `85.00`; MULTIPLIER wrote `0.9` and Porta
+   `0.93`. A 0.9% farrowing rate is impossible for a piggery and 90% is ordinary, so these look
+   like fractions in a percent column. Left unset: storing 0.9 would make every report quoting
+   it wrong. Please confirm the unit.
+2. **Boar Doses Per Week** — example `4.00`; the farms wrote `36` and `74`. Per stud rather than
+   per boar? Left unset for the same reason.
+3. **Residual Value Amount** reads `accounts` on both sheets — who decides it, not a number.
+4. **`breed_type` is not in either template** but the column is mandatory. Both seeded breeds were
+   given `MEAT`, matching every piggery breed already in the database. `Z-Line-Sow` and
+   `TN-70-Sow` are maternal lines and `BREEDER` is an available value, so please confirm.
+5. **The "Number" column on Resource Master** has no field in our resource master. Every row we
+   loaded is a Porta row with Number = 1, each already listed individually, so nothing was lost —
+   but MULTIPLIER's `Heaters x6` and `Coolers x6` would need six rows each, or a quantity field.

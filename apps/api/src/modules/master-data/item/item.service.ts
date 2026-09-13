@@ -1,7 +1,7 @@
 import { masterScopeConditions } from '../../../common/master-data-scope';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
-import { eq, and, like, or, isNull, getTableColumns } from 'drizzle-orm';
+import { eq, and, like, or, isNull, getTableColumns, count } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import * as schema from '../../../core/database/schema';
@@ -407,7 +407,11 @@ export class ItemService {
     //
     // sub_category needs no join — it already stores the child category's own
     // code, which is what makes it readable as it stands.
-    return this.db
+    // Not runMasterList: that helper selects from one table, and this list joins
+    // the category so the screen shows a code rather than a UUID. The count
+    // repeats the same conditions, so the two can never disagree about what
+    // they are counting.
+    const data = await this.db
       .select({
         ...getTableColumns(schema.itemMaster),
         category_code: schema.itemCategoryMaster.category_code,
@@ -422,6 +426,13 @@ export class ItemService {
       .orderBy(listOrderBy(schema.itemMaster, query, schema.itemMaster.item_code))
       .limit(limit)
       .offset(offset);
+
+    const [counted] = await this.db
+      .select({ total: count() })
+      .from(schema.itemMaster)
+      .where(and(...conditions));
+
+    return { data, total: Number(counted?.total ?? 0), limit, offset };
   }
 
   async update(id: string, dto: UpdateItemDto, tenantId: string, userPayload?: any) {

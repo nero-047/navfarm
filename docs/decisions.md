@@ -1057,3 +1057,54 @@ location.
 MULTIPLIER's 97 housing rows are typed `CAGE` while Porta's 89 are `CRATE`. Both
 types now exist. Whether the two farms mean different things by them is a
 question for Triple C, not an inference for us.
+
+---
+
+## Resources and breeds seeded; master lists report a real total
+*2026-09-13.*
+
+**Resources and breeds.** `db-seed-farm-masters` loads 16 of 44 submitted
+resource rows and 2 of 4 breeds — Z-Line-Sow to MULTIPLIER, TN-70-Sow to PORTA,
+each linked to its farm. The synthetic `RES-00n` resources and the four demo
+breeds are switched off, not deleted: 27 animals and 72 lifecycle-stage rows
+point at those breeds.
+
+The shortfall is the templates again. `resource_code`, `resource_name` and
+`resource_type` are all mandatory and all NOT NULL; **MULTIPLIER's resource
+sheet carries no codes at all**, and Porta left Resource Type blank on most
+rows. "Teaser Boar" has no Breed Code on either farm.
+
+Four values were deliberately not stored, and are questions rather than data:
+
+- **Farrowing Rate %** — template example `85.00`, farms wrote `0.9` and `0.93`.
+  A 0.9% farrowing rate is impossible and 90% is ordinary, so the cell holds a
+  fraction in a percent column. Storing it would make every report quoting it
+  wrong.
+- **Boar Doses Per Week** — example `4.00`, farms wrote `36` and `74`. Per stud
+  rather than per boar, most likely; unconfirmed.
+- **Residual Value Amount** reads "accounts" — who decides it, not a number.
+- **`breed_type`** is in neither template but the column is NOT NULL. Both rows
+  were given `MEAT`, matching every piggery breed already here. Both are
+  maternal lines and `BREEDER` exists, so this is flagged, not settled.
+
+The Resource template's "Number" column has no field in `resource_master`. Every
+row loaded is a Porta row with Number = 1, already listed individually, so
+nothing was lost — but MULTIPLIER's "Heaters ×6" would need six rows or a
+quantity field.
+
+**Exact totals.** Twelve masters now return `total` beside their rows —
+location, item, item-category, item-type, item-attribute, customer, disease,
+feed-formula, resource, gl-account, gl-mapping, cost-center. Nine still do not
+(uom, supplier, breed, species, reason, stage, number-series, currency, animal);
+their list queries have shapes the shared helper does not fit — several hold more
+than one list method in a file, and `item` needed a hand-written count because it
+joins the category. Those nine page and filter correctly; only the pager's count
+is approximate. `data` remains an array on every one of the 21, so no caller
+broke.
+
+**The API dev server had been serving a stale bundle since 00:46.** Its Nx
+watcher had died, so `dist/main.js` predated hours of committed source. Two
+verifications in that window passed against old code. Restarted by the PID
+`lsof -ti :2877` confirmed, after stopping the orphaned `nx serve` wrapper that
+still held the task lock. Worth checking `stat dist/main.js` against source
+mtimes when a change appears not to take.

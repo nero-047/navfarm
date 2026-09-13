@@ -325,22 +325,29 @@ describe('ItemService', () => {
     });
 
     // findAll left-joins item_category_master so the list can show the category
-    // an item is filed under by code rather than by UUID, and orders by
-    // item_code so the sequence is stable between loads.
+    // an item is filed under by code rather than by UUID, orders by item_code so
+    // the sequence is stable between loads, and runs a second query for the
+    // total so the pager knows how many pages there really are.
     it('still lists rows whose stored item_type is unknown', async () => {
-      mockDbSelect.mockReturnValueOnce({
-        from: jest.fn().mockReturnValue({
-          leftJoin: jest.fn().mockReturnValue({
-            where: jest.fn().mockReturnValue({
-              orderBy: jest.fn().mockReturnValue({
-                limit: jest.fn().mockReturnValue({ offset: jest.fn().mockResolvedValue([legacyItem]) }),
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            leftJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                orderBy: jest.fn().mockReturnValue({
+                  limit: jest.fn().mockReturnValue({ offset: jest.fn().mockResolvedValue([legacyItem]) }),
+                }),
               }),
             }),
           }),
-        }),
-      });
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue([{ total: 1 }]) }),
+        });
 
-      await expect(service.findAll({}, 'tenant-123')).resolves.toEqual([legacyItem]);
+      await expect(service.findAll({}, 'tenant-123')).resolves.toEqual({
+        data: [legacyItem], total: 1, limit: 50, offset: 0,
+      });
     });
   });
 

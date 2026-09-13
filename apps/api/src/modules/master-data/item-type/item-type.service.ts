@@ -8,7 +8,7 @@ import * as schema from '../../../core/database/schema';
 import { CreateItemTypeDto, UpdateItemTypeDto, QueryItemTypeDto } from './dto/item-type.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
-import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
+import { listFilterConditions, runMasterList } from '../../../common/master-list-query';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -158,16 +158,9 @@ export class ItemTypeService {
 
     conditions.push(...listFilterConditions(schema.itemTypeMaster, query.filter));
 
-    const limit = query.limit || 50;
-    const offset = query.offset || 0;
-
-    return this.db
-      .select()
-      .from(schema.itemTypeMaster)
-      .where(and(...conditions))
-      .orderBy(listOrderBy(schema.itemTypeMaster, query, schema.itemTypeMaster.type_code))
-      .limit(limit)
-      .offset(offset);
+    // Rows and the matching count together, so the pager knows how many
+    // pages there really are rather than guessing from a full page.
+    return runMasterList(this.db, schema.itemTypeMaster, conditions, query, schema.itemTypeMaster.type_code);
   }
 
   async update(id: string, dto: UpdateItemTypeDto, tenantId: string, userPayload?: any) {
