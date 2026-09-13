@@ -1108,3 +1108,205 @@ verifications in that window passed against old code. Restarted by the PID
 `lsof -ti :2877` confirmed, after stopping the orphaned `nx serve` wrapper that
 still held the task lock. Worth checking `stat dist/main.js` against source
 mtimes when a change appears not to take.
+
+---
+
+## Column filters are a set, taken behind a drawer
+*Decided 2026-09-13.*
+
+The search box in the toolbar narrows on every keystroke: it is one field over
+the whole list, and typing is the interaction. Column filters are not that —
+they are several decisions taken together — so they moved out of the always-on
+row under the headers and into a right-hand Drawer behind a Filter button.
+
+Nothing applies until **Apply**. The drawer edits a draft; Apply is the single
+point where the draft becomes the live filter. That is what lets someone set
+four columns and pay for one refetch instead of four, and back out of a
+half-built filter by closing the panel. **Reset** clears everything and closes.
+The button carries a badge with the number of filters actually in force, so a
+narrowed list never looks like the whole list.
+
+**One filter body, two shells, chosen by width.** At `lg` and above it is a
+second grid column beside the table — the shape the Animal detail panel already
+uses — so the rows being filtered stay visible and the panel stays open after
+Apply to be refined. Below `lg` the same fields interrupt as a dialog, because a
+340px side column would leave the table too narrow to read; there Apply closes
+it and hands the list back.
+
+Two earlier attempts were wrong. The first used `components/ui/drawer`, which
+portals over a scrim and buries the rows behind the thing filtering them. The
+second put the in-page column behind `xl` (1280px), so on a 1200px window the
+panel silently stacked *below* the table, off screen — it looked like the button
+did nothing. The breakpoint is `lg` (1024) now, matched by `useIsDesktop()` so
+the grid and the shell can never disagree about which one is showing.
+
+Rendered once, never twice: a `hidden lg:block` pair would mount both shells and
+duplicate every input's id and focus trap.
+
+The toolbar search stays where it is: common search in the main search bar,
+everything else in the panel.
+
+**Filter labels come from the field, not the column head.** A table header is
+read together with the values under it, so Stages heads its sequence column "#"
+and is perfectly clear; stripped of that column and put on a filter input, "#"
+says nothing. The field behind it calls itself "Display Order", which is the
+name the panel uses.
+
+## Arun's branches, reviewed 2026-09-13
+
+`origin/arun_new` is the live one — last commit 2026-09-10, 5 ahead of `neroen`
+and 7 behind. It is **remote-only**, which is why a `git branch` listing misses
+it. `arun.pratap` (2026-07-30), `arun.pratap1` (2026-08-13) and
+`arun.pratap2` (2026-08-18) are stale and hold nothing worth recovering: their
+master-data module is the ancestor of ours, their `app/console/*` tree was
+replaced by `(app)/`, their Medicine master is correctly superseded by
+item_type MEDICINE per BBP-1 §1.5, and their farm/shed/warehouse specs test a
+`create()` those services no longer have.
+
+**What is on `arun_new`:**
+
+- **The scheduler is rebuilt, not adjusted.** `scheduler_master` and
+  `scheduler_parameter_line` are dropped and replaced by `scheduler_header` +
+  `scheduler_line`, and `batch_header.scheduler_id` goes with them. The
+  semantics change: `scheduler_header` carries `batch_id` and `stage_id` NOT
+  NULL, so a scheduler belongs to one batch and stage rather than being a
+  reusable template. `scheduler_line.parameter_name` becomes `activity_name`.
+- **An Activity master** — `/activity`, full API and UI, migration
+  `0089_activity_master.sql`, a seed script, `line_type` of CONSUMPTION /
+  OUTPUT / DESCRIPTIVE / OVERHEAD / RESOURCE / TRANSFER. Neither the module nor
+  the table exists on our side.
+- **Batch follows the scheduler** — the batch header gains `stage_id` and reads
+  stages from Stage Master per LOB instead of a fixed enum; data entry is driven
+  by each line's `line_type`.
+- **`SearchableEntitySelect`** and a `searchable?: boolean` field flag, for
+  catalogs long enough that a native dropdown stops being usable.
+
+**The branches cannot merge cleanly.** Both forked at 0085 and both wrote an
+0086 and an 0087 with different content — ours are currency and the location
+columns, his are the scheduler replacement and its gap fixes. Drizzle tracks
+applied migrations by tag in `_journal.json`, so one side must be renumbered and
+both snapshots regenerated. Seventeen files are touched by both, including
+`schema.ts`, `MasterDataTable.tsx`, `configs.ts`, `types.ts`, `translations.ts`,
+`location.service.ts` and `layout.tsx`.
+
+**Rishi's call, 2026-09-13: leave it entirely for now.** Nothing of his has been
+merged or modified. The collision grows with every commit on either side, so
+this is deferred, not resolved.
+
+
+## Sorting was accepted and ignored on three masters
+*Fixed 2026-09-13.*
+
+Clicking a column header did nothing on Stages, Number Series and Animal
+Register. The API answered 200 to `sort=stage_code&dir=desc` and returned the
+same rows in the same order.
+
+The cause was my own rollout. The script that wired the list contract skipped
+any service that already had an `orderBy`, on the reasoning that it was
+"already ordered" — so those three kept a hardcoded sort while their DTOs
+happily accepted `sort` and `dir`. The same silent-ignore failure as the
+filters, in the same week, found the same way: by asking the endpoint for
+ascending and descending and noticing the answers matched.
+
+Stage keeps `stage_sequence` as its default and Number Series keeps its
+tenant-template precedence; the caller's sort is applied within those rather
+than replacing them. Animal Register had no `ORDER BY` at all.
+
+**Test sort by comparing asc against desc, never by checking for a 200.** A
+sorted and an unsorted list look identical from a status code.
+
+## A list column shows its values, not its JSON
+*Fixed 2026-09-13.*
+
+`displayValue` sent every object through `JSON.stringify`, so the Currencies
+list rendered the euro's countries as `["DE","FR","NL"]` — brackets, quotes and
+all — and every other multi-value column with it. Arrays now join on ", ", and
+an empty one reads as "—" like any other empty cell.
+
+---
+
+## Countries are a master now
+*Decided 2026-09-13.*
+
+Countries could be read and never added from the console. `country_master`
+holds 25 rows, `country_codes` on Currencies picks from them, and Suppliers and
+Customers record a country as **free text** — the same fact chosen from a list
+in one master and typed by hand in two others. Countries had no entry in
+`MASTER_DATA_CONFIGS`, so no screen, and no chip in "Dropdown options come
+from" either, which is what made it look unlike every other selection source.
+
+It is a master now, under Finance, with the ISO2/ISO3 codes, name, dialing code
+and flag. Its list answers the shared contract — sort, `filter[column]`,
+paging, a total — where `listCountries()` previously took no query at all and
+returned every active row.
+
+**It stopped forcing `isActive`.** A master list has to show a blocked row so it
+can be found and restored; the pickers that consume it pass `isActive=true`
+themselves, as they already do everywhere else.
+
+**The response is now the standard envelope, and two callers had to change.**
+`/country` used to answer with a bare array — the console layout's onboarding
+wizard and `/admin/masters` both assigned it straight into state. Both now take
+`data` out of the envelope.
+
+**Adding one is still `SystemAdminGuard`.** Countries were already addable, from
+`/admin/masters` ("Master Registries"), which is the platform admin area rather
+than the tenant console. So the new screen lists and edits nothing for a Tenant
+Admin — Add will 403 until that guard is relaxed. `CountryService` reads the
+**tenant** database, so a country added here would belong to this tenant alone,
+which is an argument for relaxing it; that is a permissions decision, not ours.
+
+## Eight masters have no page of their own
+
+`MASTER_DATA_CONFIGS` holds 25 masters. Thirteen are `isPrimary` and appear in
+the Master Data sub-nav; four are tabs of another master. The remaining eight —
+Location Types, Item Categories, Item Types, Species, Diseases, Feed Formulas,
+Customers, GL Mappings — are reachable only as a lookup card or chip inside
+another master's screen. Recorded because it is not obvious from the sub-nav,
+and because "why is X not listed" has now been asked twice.
+
+## The bottom of a long list could sit under a scrollbar
+*Fixed 2026-09-13.*
+
+Scrolled to its limit, a master list's last row was not visible — there was
+nothing further to scroll and the row was still underneath something.
+
+It does not reproduce in headless Chromium, which is why an earlier check
+passed it: headless overlays its scrollbars, and this only happens when macOS
+is set to show them always. Then the content scroller's bar takes 15px out of
+the width the moment the list is long enough to scroll, that squeeze pushes a
+wide table into needing a horizontal scrollbar of its own, and that bar lands
+across the last row. The list has genuinely bottomed out, so scrolling further
+does nothing.
+
+Two changes, both of which hold whichever way the setting is:
+
+- `scrollbar-gutter: stable` on the content region, so the gutter is reserved
+  whether or not the bar is showing and the table is measured against the width
+  it will actually have.
+- `ConsolePage` bottom padding from `pb-6` to `pb-10`, so the last row never
+  finishes flush against the scroller's edge where an overlay — a horizontal
+  scrollbar, the floating assistant button — can cover it.
+
+Verified by forcing 15px classic scrollbars in the page and scrolling to the
+limit: the last row and the whole pagination bar clear the bottom by 94px.
+
+**Reproduce environment-dependent layout bugs with the environment forced.** A
+headless browser is not the reader's browser, and scrollbar behaviour is one of
+the places they differ most.
+
+## Countries is a sheet of the Currencies workbook
+*Corrected 2026-09-13.*
+
+Countries was added as its own entry in the Master Data sidebar. Wrong: a
+country is only ever reached through the thing that needs it — which currency
+is legal tender where, which country a supplier sits in — so it is a tab beside
+Exchange Rates, not a master of its own. Rishi's call.
+
+It also shipped broken for one turn. `MasterDataTable` sends the active company
+on every list request, `QueryCountryDto` did not declare `companyId`, and the
+whitelisting ValidationPipe answered "property companyId should not exist" — so
+the screen rendered "No countries yet" over 25 rows that were there all along.
+The DTO now accepts it and documents that it is not applied: `country_master`
+has no `company_id`, because countries are tenant-wide reference data, the same
+list for every company under the tenant.

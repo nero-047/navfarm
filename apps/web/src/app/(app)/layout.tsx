@@ -157,7 +157,9 @@ export default function ConsoleLayout({ children, modal }: { children: React.Rea
         api.get("/language").catch(() => []),
         api.get("/currency").catch(() => []),
         api.get("/timezone").catch(() => []),
-        api.get("/country").catch(() => []),
+        // /country now answers with the shared list envelope, like every
+        // other master; take the rows out of it.
+        api.get("/country").then((r: any) => r?.data ?? r).catch(() => []),
         api.get("/setup/wizard/nobs").catch(() => []),
       ]);
       setLanguages(langList);

@@ -9,7 +9,7 @@ import { CreateStageDto, UpdateStageDto, QueryStageDto } from './dto/stage.dto';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
-import { listFilterConditions } from '../../../common/master-list-query';
+import { listFilterConditions, listOrderBy } from '../../../common/master-list-query';
 
 @Injectable()
 export class StageService {
@@ -219,7 +219,7 @@ export class StageService {
       .select()
       .from(schema.stageMaster)
       .where(and(...conditions))
-      .orderBy(schema.stageMaster.stage_sequence)
+      .orderBy(listOrderBy(schema.stageMaster, query, schema.stageMaster.stage_sequence))
       .limit(limit)
       .offset(offset);
   }

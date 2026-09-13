@@ -1325,6 +1325,47 @@ const costCenter: MasterDataConfig = {
  * currency means the same thing in every workspace, so unlike the other masters
  * this one is platform-wide reference data the client curates.
  */
+/**
+ * Countries are reference data, not a picker with no home: Currencies names the
+ * countries a currency is legal tender in, and Suppliers and Customers record
+ * one. Without a screen the list could only be read, never extended — the 25
+ * seeded rows were the whole world as far as the app was concerned.
+ *
+ * Tenant-scoped despite living in the platform schema too: CountryService reads
+ * the tenant database, so adding one here adds it for this tenant only.
+ *
+ * It sits in the Currencies workbook rather than the sidebar — see tabOf below.
+ */
+const country: MasterDataConfig = {
+  key: "country",
+  label: "Countries",
+  singular: "Country",
+  description: "Countries the business deals with — used by currencies, suppliers and customers.",
+  apiBase: "/country",
+  idKey: "country_id",
+  group: "Finance",
+  // A sheet of the Currencies workbook, not a master of its own. A country is
+  // only ever reached through the thing that needs it — which currency is legal
+  // tender where, which country a supplier is in — so it earns a tab beside
+  // Exchange Rates rather than its own line in the sidebar. Rishi's call.
+  tabOf: "currency",
+  tabLabel: "Countries",
+  columns: [
+    { key: "iso2", label: "Code" },
+    { key: "country_name", label: "Name" },
+    { key: "iso3", label: "ISO3" },
+    { key: "phone_code", label: "Dialing Code" },
+    { key: "flag_emoji", label: "Flag" },
+  ],
+  fields: [
+    { key: "iso2", label: "ISO Code", type: "text", required: true, placeholder: "ZW", helpText: "The two-letter ISO 3166-1 alpha-2 code. This is what currencies and addresses store." },
+    { key: "country_name", label: "Country Name", type: "text", required: true, placeholder: "Zimbabwe" },
+    { key: "iso3", label: "ISO3 Code", type: "text", required: true, placeholder: "ZWE", helpText: "The three-letter ISO 3166-1 alpha-3 code." },
+    { key: "phone_code", label: "Dialing Code", type: "text", placeholder: "+263" },
+    { key: "flag_emoji", label: "Flag", type: "text", placeholder: "🇿🇼" },
+  ],
+};
+
 const currency: MasterDataConfig = {
   key: "currency",
   label: "Currencies",
@@ -1421,7 +1462,7 @@ export const MASTER_DATA_CONFIGS: MasterDataConfig[] = [
   itemCategory, itemType, uom, uomConversion, item, itemAttribute,
   species, breed, breedLifecycleStage, reason, disease, feedFormula,
   supplier, customer, resource,
-  glAccount, glMapping, costCenter, currency, exchangeRate,
+  glAccount, glMapping, costCenter, country, currency, exchangeRate,
 ];
 
 export const MASTER_DATA_GROUPS = ["Farm Operations", "Production", "Piggery", "Inventory", "Livestock & Health", "Business Partners", "Finance"] as const;

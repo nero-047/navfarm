@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Search, Loader2, Inbox, Eye, SlidersHorizontal, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Inbox, Eye, SlidersHorizontal, ArrowUpDown, X } from "lucide-react";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
+import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -109,6 +110,10 @@ function displayValue(row: Row, key: string, yesLabel: string, noLabel: string):
   const v = row[key];
   if (v === null || v === undefined || v === "") return "—";
   if (typeof v === "boolean") return v ? yesLabel : noLabel;
+  // A list column is a list of values, not the JSON that carried them. The euro
+  // read `["DE","FR","NL"]` in the Countries column, brackets and quotes and
+  // all, because every object fell through to JSON.stringify.
+  if (Array.isArray(v)) return v.length ? v.map((entry) => String(entry)).join(", ") : "—";
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
@@ -313,8 +318,17 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
   const [serverTotal, setServerTotal] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<string>("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  /** Per-column filters, sent as filter[column]=value. */
+  /**
+   * Two copies deliberately. `colFilters` is what the list is filtered by;
+   * `filterDraft` is what the drawer is editing. They diverge while the drawer
+   * is open and rejoin on Apply, which is what makes the filters deferred —
+   * typing in the panel does not refetch on every keystroke, and closing it
+   * without applying leaves the list exactly as it was.
+   */
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
+  const [filterDraft, setFilterDraft] = useState<Record<string, string>>({});
+  const [filterOpen, setFilterOpen] = useState(false);
+  const isDesktop = useIsDesktop();
 
   const workspaceScope = getActiveWorkspaceScope();
   const companyId = workspaceScope === "TENANT" ? null : getActiveCompanyId();
@@ -448,7 +462,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
 
   // A different master has different columns, so neither the sort nor the
   // column filters carry over to it.
-  useEffect(() => { setSortKey(""); setSortDir("asc"); setColFilters({}); }, [config.key]);
+  useEffect(() => {
+    setSortKey(""); setSortDir("asc");
+    setColFilters({}); setFilterDraft({}); setFilterOpen(false);
+  }, [config.key]);
 
   // The server returns the page, so these are the rows. Slicing here is what
   // capped every master at the 200 rows the old request asked for.
@@ -483,6 +500,81 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       }))
       .filter((o) => o.value !== "");
   };
+
+  /**
+   * What to call a column in the filter panel.
+   *
+   * A table header is read with the column of values under it, so Stages can
+   * head its sequence column "#" and be perfectly clear. Stripped of that
+   * context and put on a filter input, "#" says nothing — the field behind it
+   * calls itself "Display Order", which is the name to use.
+   */
+  const filterLabelFor = (key: string, columnLabel: string) => {
+    const field = config.fields.find((f) => f.key === key);
+    const label = field && field.label.length > columnLabel.length ? field.label : columnLabel;
+    return tLabel(label);
+  };
+
+  /**
+   * One filter body, two shells. Beside the table on a desktop, where there is
+   * room and keeping the rows visible is the point; as a dialog below `lg`,
+   * where a 340px column would leave the table 20px wide and the honest thing
+   * is to interrupt. Rendered once either way — a `hidden lg:block` pair would
+   * mount both and duplicate every input's id.
+   */
+  const filterFields = (
+    <div className="flex flex-col gap-4">
+      {columns.map((c) => {
+        const choices = filterChoicesFor(c.key);
+        const value = filterDraft[c.key] ?? "";
+        const fieldId = `master-${config.key}-filter-${c.key}`;
+        const set = (next: string) =>
+          setFilterDraft((prev) => {
+            const out = { ...prev };
+            if (next === "") delete out[c.key];
+            else out[c.key] = next;
+            return out;
+          });
+        return (
+          <Field key={c.key} label={filterLabelFor(c.key, c.label)} htmlFor={fieldId}>
+            {choices ? (
+              <select id={fieldId} className={`${inputCls} nf-select`} style={S.input}
+                value={value} onChange={(e) => set(e.target.value)}>
+                <option value="">{t("mdFilterAll")}</option>
+                {choices.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            ) : (
+              // Wrapped in asterisks on the way out: a column filter is a
+              // "contains", so a partial code finds its rows. The stars are the
+              // wire format, never shown to the person typing.
+              <input id={fieldId} className={inputCls} style={S.input}
+                value={value.replace(/^\*|\*$/g, "")} placeholder={t("mdFilterAny")}
+                onChange={(e) => set(e.target.value ? `*${e.target.value}*` : "")} />
+            )}
+          </Field>
+        );
+      })}
+    </div>
+  );
+
+  // Apply closes the dialog on a phone, where the list is behind it;
+  // on a desktop the panel stays open beside the rows it just filtered.
+  const filterActions = (
+    <>
+      <button type="button" onClick={() => { setFilterDraft({}); setColFilters({}); }}
+        className="rounded-lg border px-3 py-1.5 text-xs font-medium" style={S.surface}>
+        {t("mdFiltersReset")}
+      </button>
+      <button type="button" onClick={() => { setColFilters(filterDraft); if (!isDesktop) setFilterOpen(false); }}
+        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
+        style={{ backgroundColor: "var(--accent)" }}>
+        {t("mdFiltersApply")}
+      </button>
+    </>
+  );
+
+  /** How many column filters are actually in force, for the button's badge. */
+  const appliedFilterCount = Object.values(colFilters).filter((v) => v !== "").length;
 
   const pagedRows = rows;
   /**
@@ -1417,6 +1509,29 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
               style={{ ...S.input, paddingLeft: "1.75rem" }}
             />
           </div>
+          {/* The search box above narrows on every keystroke because it is one
+              field and the whole list is its subject. Column filters are a set
+              of decisions taken together, so they live behind this button and
+              take effect on Apply — see the drawer at the foot of this file. */}
+          {columns.length > 0 && (
+            <button
+              type="button"
+              onClick={() => { setFilterDraft(colFilters); setFilterOpen(true); }}
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors hover:border-(--accent) hover:text-(--accent)"
+              style={appliedFilterCount ? { ...S.surface, borderColor: "var(--accent)", color: "var(--accent)" } : S.surface}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+              {t("mdFilters")}
+              {appliedFilterCount > 0 && (
+                <span
+                  className="rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
+                  style={{ backgroundColor: "var(--accent)" }}
+                >
+                  {appliedFilterCount}
+                </span>
+              )}
+            </button>
+          )}
           {!readOnly && !exhausted && <button
             onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
@@ -1450,7 +1565,10 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
         </div>
       )}
 
-      <div className={selectedRow ? "grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : undefined}>
+      {/* The filter panel is a second column of this grid, not a layer over
+          it: the table narrows and the panel takes the space, so the rows
+          being filtered stay visible and nothing is buried behind a scrim. */}
+      <div className={selectedRow || filterOpen ? "grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]" : undefined}>
       <div className="min-w-0 overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
@@ -1495,52 +1613,6 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
                     nothing the Status column has not already said. */}
                 {!ownsStatusColumn && <TableHead className="text-right">{t("activeColumn")}</TableHead>}
                 <TableHead className="text-right">{t("actionsColumn")}</TableHead>
-              </tr>
-              {/* One filter per column, applied in SQL over the whole table
-                  rather than over the rows in view. A column backed by a field
-                  with a closed set of values gets that set as a dropdown; the
-                  rest take text, matched as "contains" so a partial code finds
-                  its rows. */}
-              <tr className="border-b" style={{ borderColor: "var(--row-border)" }}>
-                {columns.map((c) => {
-                  const choices = filterChoicesFor(c.key);
-                  const value = colFilters[c.key] ?? "";
-                  const set = (next: string) =>
-                    setColFilters((prev) => {
-                      const out = { ...prev };
-                      if (next === "") delete out[c.key];
-                      else out[c.key] = next;
-                      return out;
-                    });
-                  return (
-                    <TableCell key={c.key} className="py-1.5">
-                      {choices ? (
-                        <select
-                          aria-label={t("mdFilterBy", { name: tLabel(c.label) })}
-                          className="nf-input nf-select h-8 py-0 text-xs"
-                          style={S.input}
-                          value={value}
-                          onChange={(e) => set(e.target.value)}
-                        >
-                          <option value="">{t("mdFilterAll")}</option>
-                          {choices.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          aria-label={t("mdFilterBy", { name: tLabel(c.label) })}
-                          className="nf-input h-8 py-0 text-xs"
-                          style={S.input}
-                          value={value.replace(/^\*|\*$/g, "")}
-                          onChange={(e) => set(e.target.value ? `*${e.target.value}*` : "")}
-                        />
-                      )}
-                    </TableCell>
-                  );
-                })}
-                {!ownsStatusColumn && <TableCell />}
-                <TableCell />
               </tr>
             </TableHeader>
             <TableBody>
@@ -1661,6 +1733,28 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
           <AnimalDetailPanel row={selectedRow} onClose={() => setSelectedId(null)} />
         </div>
       )}
+      {filterOpen && isDesktop && (
+        <aside className="min-w-0 lg:sticky lg:top-4" aria-label={t("mdFilters")}>
+          <div className="flex max-h-[calc(100dvh-8rem)] flex-col overflow-hidden rounded-[var(--radius-md)] border" style={S.surface}>
+            <div className="flex items-start justify-between gap-2 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              <div>
+                <h2 className="text-sm font-semibold" style={S.primary}>{t("mdFilters")}</h2>
+                <p className="mt-0.5 text-xs" style={S.sub}>{t("mdFiltersDesc", { label: tLabel(config.label) })}</p>
+              </div>
+              <button type="button" onClick={() => setFilterOpen(false)} aria-label={t("close")}
+                className="rounded-lg p-1 transition-colors hover:text-(--accent)" style={S.muted}>
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              {filterFields}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              {filterActions}
+            </div>
+          </div>
+        </aside>
+      )}
       </div>
 
       {viewingId && <MasterRecordView config={config} id={viewingId} onClose={() => setViewingId(null)} />}
@@ -1769,6 +1863,21 @@ export default function MasterDataTable({ config }: { config: MasterDataConfig }
       >
         <p className="text-sm" style={S.sub}>{t("confirmDeactivate")}</p>
       </Dialog>
+
+      {/* Below `lg` the same filters interrupt as a dialog: a 340px side column
+          would leave the table too narrow to read, so the honest presentation
+          is to cover it and hand it back on Apply. */}
+      <Dialog
+        open={filterOpen && !isDesktop}
+        onClose={() => setFilterOpen(false)}
+        title={t("mdFilters")}
+        description={t("mdFiltersDesc", { label: tLabel(config.label) })}
+        maxWidth="sm"
+        footer={filterActions}
+      >
+        {filterFields}
+      </Dialog>
+
     </div>
   );
 }
