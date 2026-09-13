@@ -631,6 +631,20 @@
       "when": 1789030911285,
       "tag": "0089_activity_master",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "5",
+      "when": 1789104498419,
+      "tag": "0090_tracking_mode_and_animal_movement_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "5",
+      "when": 1789200000000,
+      "tag": "0091_batch_data_entry_lock",
+      "breakpoints": true
     }
   ]
 }

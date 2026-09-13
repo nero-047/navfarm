@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Search, Loader2, Inbox, Eye, PlayCircle, CheckCircle2, ClipboardCheck, QrCode as QrCodeIcon, RefreshCw, CalendarClock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Trash2, Search, Loader2, Inbox, Eye, PlayCircle, CheckCircle2, ClipboardCheck, QrCode as QrCodeIcon, RefreshCw, CalendarClock, FileText } from "lucide-react";
 import QRCode from "react-qr-code";
 import { api } from "@/services/api-client";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/alert";
 import { Pagination } from "@/components/ui/pagination";
-import { getActiveCompanyId, getActiveOperationalAreaId } from "@/hooks/useAuth";
+import { getActiveCompanyId, getActiveOperationalAreaId, getActiveWorkspaceScope, getStoredUser } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -38,10 +39,10 @@ function unwrap<T = any>(res: any): T {
 
 const emptyInputLine = () => ({ item_id: "", source_batch_id: "", quantity: "", uom: "", rate: "" });
 const emptyOutputLine = () => ({ item_id: "", output_type: "MAIN", cost_split_pct: "100", quantity: "", uom: "", warehouse_id: "" });
-const emptyTxForm = () => ({ transaction_date: new Date().toISOString().slice(0, 10), transaction_type: "CONSUMPTION", item_id: "", resource_id: "", quantity: "", uom: "", rate: "", remarks: "", output_type: "", nrv_rate: "" });
 const emptyStdConsumptionLine = () => ({ item_id: "", std_qty_per_unit_per_day: "", std_rate: "" });
 
 export default function BatchPanel() {
+  const router = useRouter();
   const { formatMoney } = useCompanyCurrency();
   const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
@@ -59,24 +60,28 @@ export default function BatchPanel() {
   const [items, setItems] = useState<Row[]>([]);
   const [uoms, setUoms] = useState<Row[]>([]);
   const [warehouses, setWarehouses] = useState<Row[]>([]);
-  const [resources, setResources] = useState<Row[]>([]);
   const [batches, setBatches] = useState<Row[]>([]);
   const [stages, setStages] = useState<Row[]>([]);
+  const [locations, setLocations] = useState<Row[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [nobId, setNobId] = useState("");
   const [header, setHeader] = useState<Row>({ lob_id: "", costing_method: "STANDARD", breed_id: "", stage_id: "", shed_id: "", start_date: "", expected_end_date: "", opening_quantity: "", uom: "", remarks: "" });
+  const [trackingMode, setTrackingMode] = useState<"BATCH_WISE" | "ANIMAL_WISE">("BATCH_WISE");
+  const [animalCandidates, setAnimalCandidates] = useState<Row[]>([]);
+  const [selectedAnimalIds, setSelectedAnimalIds] = useState<Set<string>>(new Set());
+  const [animalSearch, setAnimalSearch] = useState("");
+  const [animalGenderFilter, setAnimalGenderFilter] = useState("");
+  const [animalStageFilter, setAnimalStageFilter] = useState("");
   const [inputLines, setInputLines] = useState<Row[]>([emptyInputLine()]);
   const [stdForm, setStdForm] = useState<Row>({ std_output_quantity: "", std_output_cost_per_unit: "", std_overhead_rate_per_unit: "" });
   const [stdConsumptionLines, setStdConsumptionLines] = useState<Row[]>([emptyStdConsumptionLine()]);
 
   const [viewing, setViewing] = useState<Row | null>(null);
   const [acting, setActing] = useState(false);
-  const [txForm, setTxForm] = useState<Row>(emptyTxForm());
-
-  const [detailTab, setDetailTab] = useState<"overview" | "transactions" | "data-entry" | "curves">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "curves">("overview");
 
   // A batch split out of another can be merged back once the group is ready —
   // every live animal returns to the parent and this child closes.
@@ -100,21 +105,6 @@ export default function BatchPanel() {
       setMergeBusy(false);
     }
   };
-  const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().slice(0, 10));
-  const [dataEntryLoading, setDataEntryLoading] = useState(false);
-  const [dataEntryError, setDataEntryError] = useState("");
-  const [dataEntryLines, setDataEntryLines] = useState<Row[]>([]);
-  const [dataEntryValues, setDataEntryValues] = useState<Record<string, string>>({});
-  const [dataEntryLotNos, setDataEntryLotNos] = useState<Record<string, string>>({});
-  const [dataEntryDestBatches, setDataEntryDestBatches] = useState<Record<string, string>>({});
-  const [dataEntryTexts, setDataEntryTexts] = useState<Record<string, string>>({});
-
-  // A DESCRIPTIVE line's kpi_uom is normally a numeric unit (KG, SCORE, HEAD...);
-  // a "/"-separated one (e.g. YES/NO) is the template's own convention for a
-  // non-numeric capture — those lines need a text field, not a number input.
-  const isTextCapture = (line: Row) => line.line_type === "DESCRIPTIVE" && !!line.kpi_uom && line.kpi_uom.includes("/");
-  const [dataEntrySavingId, setDataEntrySavingId] = useState<string | null>(null);
-
   const [closeModalOpen, setCloseModalOpen] = useState(false);
   const [closeError, setCloseError] = useState("");
   const [closeDate, setCloseDate] = useState(new Date().toISOString().slice(0, 10));
@@ -157,6 +147,13 @@ export default function BatchPanel() {
 
   const companyId = getActiveCompanyId();
   const scope = typeof window !== "undefined" ? localStorage.getItem("active_workspace_scope") : "COMPANY";
+  // Working inside an Operational Area pins NOB/LOB to that area — the create-batch
+  // form auto-fills and hides both fields instead of asking the user to repeat a
+  // choice their workspace already made. Only a Company-level workspace (no area
+  // selected) still needs the manual NOB → LOB pickers.
+  const activeArea = getActiveWorkspaceScope() === "OPERATIONAL"
+    ? (getStoredUser()?.operationalAreas || []).find((a) => a.area_id === getActiveOperationalAreaId())
+    : undefined;
 
   const load = async () => {
     setLoading(true);
@@ -240,7 +237,7 @@ export default function BatchPanel() {
     api.get(`/breed?${qs}`).then((r) => setBreeds(unwrap<Row[]>(r) || [])).catch(() => setBreeds([]));
     api.get(`/shed?${qs}`).then((r) => setSheds(unwrap<Row[]>(r) || [])).catch(() => setSheds([]));
     api.get(`/item?${qs}`).then((r) => setItems(unwrap<Row[]>(r) || [])).catch(() => setItems([]));
-    api.get(`/resource?${qs}`).then((r) => setResources(unwrap<Row[]>(r) || [])).catch(() => setResources([]));
+    api.get(`/location?${qs}`).then((r) => setLocations(unwrap<Row[]>(r) || [])).catch(() => setLocations([]));
     if (activeLobId) {
       api.get(`/stage?lobId=${activeLobId}&isActive=true&limit=200`).then((r) => setStages(unwrap<Row[]>(r) || [])).catch(() => setStages([]));
     } else {
@@ -250,13 +247,95 @@ export default function BatchPanel() {
   }, [activeNobId, activeLobId]);
 
   const openCreate = () => {
-    setNobId("");
-    setHeader({ lob_id: "", costing_method: "STANDARD", breed_id: "", stage_id: "", shed_id: "", start_date: new Date().toISOString().slice(0, 10), expected_end_date: "", opening_quantity: "", uom: "", remarks: "" });
+    setNobId(activeArea?.nob_id || "");
+    setHeader({ lob_id: activeArea?.lob_id || "", costing_method: "STANDARD", breed_id: "", stage_id: "", shed_id: "", start_date: new Date().toISOString().slice(0, 10), expected_end_date: "", opening_quantity: "", uom: "", remarks: "" });
+    setTrackingMode("BATCH_WISE");
+    setSelectedAnimalIds(new Set());
+    setAnimalSearch("");
+    setAnimalGenderFilter("");
+    setAnimalStageFilter("");
     setInputLines([emptyInputLine()]);
     setStdForm({ std_output_quantity: "", std_output_cost_per_unit: "", std_overhead_rate_per_unit: "" });
     setStdConsumptionLines([emptyStdConsumptionLine()]);
     setFormError("");
     setModalOpen(true);
+  };
+
+  // ANIMAL_WISE picker: every currently-unassigned animal company-wide,
+  // filtered client-side (same pattern batch-animal-assignment-panel.tsx
+  // uses for its own "add animal" candidate list) rather than a new
+  // server-side unassigned-only filter.
+  useEffect(() => {
+    if (!modalOpen || trackingMode !== "ANIMAL_WISE" || !companyId) return;
+    api.get(`/animal?companyId=${companyId}&limit=500`)
+      .then((res) => setAnimalCandidates(unwrap<Row[]>(res) || []))
+      .catch(() => setAnimalCandidates([]));
+  }, [modalOpen, trackingMode, companyId]);
+
+  const unassignedAnimalCandidates = animalCandidates.filter(
+    (a) => !a.current_batch_id && (!header.lob_id || a.lob_id === header.lob_id),
+  );
+  // Stage options offered in the filter dropdown are only the stages actually
+  // present among this LOB's unassigned candidates — no point listing a stage
+  // nobody available is currently sitting in.
+  const animalStageFilterOptions = [...new Map(
+    unassignedAnimalCandidates
+      .filter((a) => a.current_stage_id)
+      .map((a) => [a.current_stage_id as string, stages.find((s) => s.stage_id === a.current_stage_id)?.stage_code || a.current_stage_id]),
+  ).entries()];
+
+  const filteredAnimalCandidates = unassignedAnimalCandidates.filter((a) => {
+    if (animalGenderFilter && a.gender !== animalGenderFilter) return false;
+    if (animalStageFilter && a.current_stage_id !== animalStageFilter) return false;
+    if (animalSearch) {
+      const q = animalSearch.toLowerCase();
+      const matches = (a.animal_code || "").toLowerCase().includes(q)
+        || (a.ear_tag || "").toLowerCase().includes(q)
+        || (a.rfid_tag || "").toLowerCase().includes(q);
+      if (!matches) return false;
+    }
+    return true;
+  });
+
+  const breedLabel = (breedId: string) => {
+    const b = breeds.find((x) => x.breed_id === breedId);
+    return b ? (b.breed_name || b.breed_code) : "—";
+  };
+  const stageLabel = (stageId: string | null) => {
+    if (!stageId) return "—";
+    const s = stages.find((x) => x.stage_id === stageId);
+    return s ? s.stage_code : "—";
+  };
+  const locationLabel = (locationId: string | null) => {
+    if (!locationId) return "—";
+    const l = locations.find((x) => x.location_id === locationId);
+    return l ? l.location_name : "—";
+  };
+  const animalAge = (a: Row) => {
+    if (!a.dob) return a.age_at_entry_weeks != null ? `${a.age_at_entry_weeks} wks (at entry)` : "—";
+    const days = Math.floor((Date.now() - new Date(a.dob).getTime()) / 86400000);
+    return days < 60 ? `${days} days` : `${Math.floor(days / 30)} mo`;
+  };
+
+  const toggleAnimalSelected = (animalId: string) => {
+    setSelectedAnimalIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(animalId)) next.delete(animalId);
+      else next.add(animalId);
+      return next;
+    });
+  };
+  const allFilteredSelected = filteredAnimalCandidates.length > 0 && filteredAnimalCandidates.every((a) => selectedAnimalIds.has(a.animal_id));
+  const toggleSelectAllFiltered = () => {
+    setSelectedAnimalIds((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filteredAnimalCandidates.forEach((a) => next.delete(a.animal_id));
+      } else {
+        filteredAnimalCandidates.forEach((a) => next.add(a.animal_id));
+      }
+      return next;
+    });
   };
 
   const setInputLineField = (idx: number, key: string, value: any) => {
@@ -277,7 +356,29 @@ export default function BatchPanel() {
     try {
       if (!header.lob_id) throw new Error(t("blErrLobRequired"));
       if (!header.start_date) throw new Error(t("blErrStartDateRequired"));
-      if (!header.opening_quantity || !header.uom) throw new Error(t("blErrOpeningQtyUomRequired"));
+      if (!header.uom) throw new Error(trackingMode === "ANIMAL_WISE" ? "UOM is required." : t("blErrOpeningQtyUomRequired"));
+
+      if (trackingMode === "ANIMAL_WISE") {
+        if (selectedAnimalIds.size === 0) throw new Error("Select at least one animal for an Animal Wise batch.");
+        await api.post("/batch", {
+          tracking_mode: "ANIMAL_WISE",
+          animal_ids: [...selectedAnimalIds],
+          company_id: companyId,
+          lob_id: header.lob_id,
+          costing_method: header.costing_method,
+          breed_id: header.breed_id || undefined,
+          shed_id: header.shed_id || undefined,
+          start_date: header.start_date,
+          expected_end_date: header.expected_end_date || undefined,
+          uom: header.uom,
+          remarks: header.remarks || undefined,
+        });
+        setModalOpen(false);
+        load();
+        return;
+      }
+
+      if (!header.opening_quantity) throw new Error(t("blErrOpeningQtyUomRequired"));
       const cleanLines = inputLines
         .filter((l) => l.item_id && l.quantity && l.uom)
         .map((l) => ({
@@ -337,12 +438,7 @@ export default function BatchPanel() {
     try {
       const res = await api.get(`/batch/${row.batch_id}`);
       setViewing(unwrap<Row>(res));
-      setTxForm(emptyTxForm());
       setDetailTab("overview");
-      setDataEntryDate(new Date().toISOString().slice(0, 10));
-      setDataEntryLines([]);
-      setDataEntryValues({});
-      setDataEntryError("");
     } catch (err: any) {
       setError(err?.message || t("blErrLoadBatchDetails"));
     }
@@ -354,69 +450,6 @@ export default function BatchPanel() {
     setViewing(unwrap<Row>(res));
   };
 
-  const loadDataEntry = async () => {
-    if (!viewing) return;
-    setDataEntryLoading(true);
-    setDataEntryError("");
-    try {
-      const res = await api.get(`/batch/${viewing.batch_id}/data-entry?date=${dataEntryDate}`);
-      const data = unwrap<Row>(res);
-      const dueLines = data.lines || [];
-      setDataEntryLines(dueLines);
-      setDataEntryValues(
-        Object.fromEntries(dueLines.map((l: Row) => [l.line_id, l.already_entered_qty ? String(l.already_entered_qty) : ""]))
-      );
-      setDataEntryLotNos({});
-      setDataEntryDestBatches({});
-      setDataEntryTexts({});
-    } catch (err: any) {
-      setDataEntryError(err?.message || t("blErrLoadDataEntryLines"));
-      setDataEntryLines([]);
-    } finally {
-      setDataEntryLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (viewing && detailTab === "data-entry") loadDataEntry();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewing?.batch_id, detailTab, dataEntryDate]);
-
-  const dataEntryCanSave = (line: Row) => {
-    if (isTextCapture(line)) return !!dataEntryTexts[line.line_id];
-    const rawValue = dataEntryValues[line.line_id];
-    if (rawValue === undefined || rawValue === "") return false;
-    if (line.lot_required && !dataEntryLotNos[line.line_id]) return false;
-    if (line.line_type === "TRANSFER" && !dataEntryDestBatches[line.line_id]) return false;
-    return true;
-  };
-
-  const handleDataEntrySave = async (line: Row) => {
-    if (!viewing) return;
-    if (!dataEntryCanSave(line)) return;
-    setDataEntrySavingId(line.line_id);
-    setDataEntryError("");
-    try {
-      // Dispatch (inventory/GL/alert/transfer) happens server-side, keyed off
-      // this line's own line_type — the form only needs to say what was entered.
-      const payload: Row = { line_id: line.line_id, entry_date: dataEntryDate };
-      if (isTextCapture(line)) {
-        payload.entered_text = dataEntryTexts[line.line_id];
-      } else {
-        payload.entered_value = Number(dataEntryValues[line.line_id]);
-      }
-      if (line.lot_required) payload.lot_no = dataEntryLotNos[line.line_id];
-      if (line.line_type === "TRANSFER") payload.destination_batch_id = dataEntryDestBatches[line.line_id];
-      await api.post(`/batch/${viewing.batch_id}/daily-data`, payload);
-      await loadDataEntry();
-      await refreshViewing();
-    } catch (err: any) {
-      setDataEntryError(err?.message || t("blErrRecordEntry"));
-    } finally {
-      setDataEntrySavingId(null);
-    }
-  };
-
   const handleActivate = async () => {
     if (!viewing) return;
     setActing(true);
@@ -426,47 +459,6 @@ export default function BatchPanel() {
       load();
     } catch (err: any) {
       setError(err?.message || t("blErrActivateBatch"));
-    } finally {
-      setActing(false);
-    }
-  };
-
-  const handleAddTransaction = async () => {
-    if (!viewing) return;
-    setActing(true);
-    setError("");
-    try {
-      if (!txForm.transaction_date) throw new Error(t("blErrTransactionDateRequired"));
-      const payload: Row = {
-        transaction_date: txForm.transaction_date,
-        transaction_type: txForm.transaction_type,
-        remarks: txForm.remarks || undefined,
-      };
-      if (["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type)) {
-        if (!txForm.item_id || !txForm.quantity || !txForm.uom) throw new Error(t("blErrItemQtyUomRequired"));
-        payload.item_id = txForm.item_id;
-        payload.quantity = Number(txForm.quantity);
-        payload.uom = txForm.uom;
-        if (txForm.rate) payload.rate = Number(txForm.rate);
-        if (txForm.transaction_type === "OUTPUT" && txForm.output_type) {
-          if (!txForm.nrv_rate) throw new Error(t("blErrNrvRateRequired"));
-          payload.output_type = txForm.output_type;
-          payload.nrv_rate = Number(txForm.nrv_rate);
-        }
-      } else if (txForm.transaction_type === "MORTALITY") {
-        if (!txForm.quantity) throw new Error(t("blErrQtyRequiredMortality"));
-        payload.quantity = Number(txForm.quantity);
-      } else if (txForm.transaction_type === "OVERHEAD") {
-        if (!txForm.quantity || !txForm.rate) throw new Error(t("blErrQtyRateRequiredOverhead"));
-        payload.quantity = Number(txForm.quantity);
-        payload.rate = Number(txForm.rate);
-        if (txForm.resource_id) payload.resource_id = txForm.resource_id;
-      }
-      await api.post(`/batch/${viewing.batch_id}/transaction`, payload);
-      setTxForm(emptyTxForm());
-      await refreshViewing();
-    } catch (err: any) {
-      setError(err?.message || t("blErrRecordTransaction"));
     } finally {
       setActing(false);
     }
@@ -933,21 +925,59 @@ export default function BatchPanel() {
             <InlineAlert>{formError}</InlineAlert>
           )}
 
+          <div className="flex flex-col gap-1.5">
+            <label className="nf-text-label" style={S.sub}>Tracking Mode</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setTrackingMode("BATCH_WISE"); setHeader((h) => ({ ...h, uom: h.uom === "HEAD" ? "" : h.uom })); }}
+                className="flex-1 rounded-lg border px-3 py-2 text-left text-xs"
+                style={trackingMode === "BATCH_WISE" ? { borderColor: "var(--accent)", backgroundColor: "var(--surface-raised)" } : S.surface}
+              >
+                <span className="font-semibold" style={S.primary}>Batch Wise</span>
+                <p className="mt-0.5" style={S.muted}>The whole batch moves through one stage at a time. Opening quantity + input lines.</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTrackingMode("ANIMAL_WISE"); setHeader((h) => ({ ...h, uom: "HEAD" })); }}
+                className="flex-1 rounded-lg border px-3 py-2 text-left text-xs"
+                style={trackingMode === "ANIMAL_WISE" ? { borderColor: "var(--accent)", backgroundColor: "var(--surface-raised)" } : S.surface}
+              >
+                <span className="font-semibold" style={S.primary}>Animal Wise</span>
+                <p className="mt-0.5" style={S.muted}>Pick existing, unassigned animals — each keeps its own stage and location.</p>
+              </button>
+            </div>
+          </div>
+
+          {activeArea && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
+              <span className="font-semibold" style={S.primary}>Operational Area: {activeArea.area_name}</span>
+              <span className="ml-1" style={S.sub}>
+                — Nature/Line of Business auto-set from this area
+                ({nobs.find((n) => n.nob_id === activeArea.nob_id)?.nob_name || activeArea.nob_id} / {lobs.find((l) => l.lob_id === activeArea.lob_id)?.lob_name || activeArea.lob_id}).
+              </span>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className="nf-text-label" style={S.sub}>{t("blLabelNob")} <span className="text-(--danger)">*</span></label>
-              <select value={nobId} onChange={(e) => { setNobId(e.target.value); setHeader((h) => ({ ...h, lob_id: "" })); }} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">{t("blSelectEllipsis")}</option>
-                {nobs.map((n) => <option key={n.nob_id} value={n.nob_id}>{n.nob_code} — {n.nob_name}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="nf-text-label" style={S.sub}>{t("blLabelLob")} <span className="text-(--danger)">*</span></label>
-              <select value={header.lob_id} onChange={(e) => setHeader((h) => ({ ...h, lob_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!nobId}>
-                <option value="">{nobId ? t("blSelectEllipsis") : t("blSelectNobFirst")}</option>
-                {lobs.map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
-              </select>
-            </div>
+            {!activeArea && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelNob")} <span className="text-(--danger)">*</span></label>
+                  <select value={nobId} onChange={(e) => { setNobId(e.target.value); setHeader((h) => ({ ...h, lob_id: "" })); }} className={`${inputCls} nf-select`} style={S.input}>
+                    <option value="">{t("blSelectEllipsis")}</option>
+                    {nobs.map((n) => <option key={n.nob_id} value={n.nob_id}>{n.nob_code} — {n.nob_name}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="nf-text-label" style={S.sub}>{t("blLabelLob")} <span className="text-(--danger)">*</span></label>
+                  <select value={header.lob_id} onChange={(e) => setHeader((h) => ({ ...h, lob_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input} disabled={!nobId}>
+                    <option value="">{nobId ? t("blSelectEllipsis") : t("blSelectNobFirst")}</option>
+                    {lobs.map((l) => <option key={l.lob_id} value={l.lob_id}>{l.lob_code} — {l.lob_name}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
             <div className="flex flex-col gap-1.5">
               <label className="nf-text-label" style={S.sub}>{t("blLabelCostingMethod")} <span className="text-(--danger)">*</span></label>
               <select value={header.costing_method} onChange={(e) => setHeader((h) => ({ ...h, costing_method: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
@@ -963,35 +993,37 @@ export default function BatchPanel() {
                 {breeds.map((b) => <option key={b.breed_id} value={b.breed_id}>{b.breed_code} — {b.breed_name}</option>)}
               </select>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="nf-text-label" style={S.sub}>Initial Stage <span className="text-(--danger)">*</span></label>
-              <select
-                value={header.stage_id}
-                onChange={(e) => {
-                  const sId = e.target.value;
-                  const st = stages.find((s) => s.stage_id === sId);
-                  setHeader((h) => {
-                    let end = h.expected_end_date;
-                    if (st?.typical_duration_days && h.start_date) {
-                      const d = new Date(h.start_date);
-                      d.setDate(d.getDate() + Number(st.typical_duration_days));
-                      end = d.toISOString().slice(0, 10);
-                    }
-                    return { ...h, stage_id: sId, expected_end_date: end };
-                  });
-                }}
-                className={`${inputCls} nf-select`}
-                style={S.input}
-                disabled={!header.lob_id}
-              >
-                <option value="">{header.lob_id ? t("blSelectEllipsis") : t("blSelectNobFirst")}</option>
-                {stages.map((s) => (
-                  <option key={s.stage_id} value={s.stage_id}>
-                    {s.stage_code} — {s.stage_name} ({s.typical_duration_days ? `${s.typical_duration_days} days` : "Open duration"})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {trackingMode === "BATCH_WISE" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="nf-text-label" style={S.sub}>Initial Stage <span className="text-(--danger)">*</span></label>
+                <select
+                  value={header.stage_id}
+                  onChange={(e) => {
+                    const sId = e.target.value;
+                    const st = stages.find((s) => s.stage_id === sId);
+                    setHeader((h) => {
+                      let end = h.expected_end_date;
+                      if (st?.typical_duration_days && h.start_date) {
+                        const d = new Date(h.start_date);
+                        d.setDate(d.getDate() + Number(st.typical_duration_days));
+                        end = d.toISOString().slice(0, 10);
+                      }
+                      return { ...h, stage_id: sId, expected_end_date: end };
+                    });
+                  }}
+                  className={`${inputCls} nf-select`}
+                  style={S.input}
+                  disabled={!header.lob_id}
+                >
+                  <option value="">{header.lob_id ? t("blSelectEllipsis") : t("blSelectNobFirst")}</option>
+                  {stages.map((s) => (
+                    <option key={s.stage_id} value={s.stage_id}>
+                      {s.stage_code} — {s.stage_name} ({s.typical_duration_days ? `${s.typical_duration_days} days` : "Open duration"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <label className="nf-text-label" style={S.sub}>{t("blLabelShed")}</label>
               <select value={header.shed_id} onChange={(e) => setHeader((h) => ({ ...h, shed_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
@@ -1008,15 +1040,25 @@ export default function BatchPanel() {
               <input type="date" value={header.expected_end_date} onChange={(e) => setHeader((h) => ({ ...h, expected_end_date: e.target.value }))} className={inputCls} style={S.input} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="nf-text-label" style={S.sub}>{t("blLabelOpeningQty")} <span className="text-(--danger)">*</span></label>
-              <input type="number" value={header.opening_quantity} onChange={(e) => setHeader((h) => ({ ...h, opening_quantity: e.target.value }))} placeholder="5000" className={inputCls} style={S.input} />
+              <label className="nf-text-label" style={S.sub}>
+                {t("blLabelOpeningQty")} {trackingMode === "BATCH_WISE" && <span className="text-(--danger)">*</span>}
+              </label>
+              {trackingMode === "ANIMAL_WISE" ? (
+                <input type="number" value={selectedAnimalIds.size} disabled className={inputCls} style={{ ...S.input, opacity: 0.7 }} title="Derived from the number of animals selected below" />
+              ) : (
+                <input type="number" value={header.opening_quantity} onChange={(e) => setHeader((h) => ({ ...h, opening_quantity: e.target.value }))} placeholder="5000" className={inputCls} style={S.input} />
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="nf-text-label" style={S.sub}>{t("blLabelUom")} <span className="text-(--danger)">*</span></label>
-              <select value={header.uom} onChange={(e) => setHeader((h) => ({ ...h, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                <option value="">{t("blSelectEllipsis")}</option>
-                {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
-              </select>
+              {trackingMode === "ANIMAL_WISE" ? (
+                <input value="HEAD" disabled className={inputCls} style={{ ...S.input, opacity: 0.7 }} title="Animal Wise batches are always counted in HEAD" />
+              ) : (
+                <select value={header.uom} onChange={(e) => setHeader((h) => ({ ...h, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
+                  <option value="">{t("blSelectEllipsis")}</option>
+                  {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
+                </select>
+              )}
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="nf-text-label" style={S.sub}>{t("blLabelRemarks")}</label>
@@ -1035,6 +1077,8 @@ export default function BatchPanel() {
             )}
           </div>
 
+          {trackingMode === "BATCH_WISE" && (
+          <>
           <div className="flex items-center justify-between pt-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blInputLinesTitle")}</p>
             <button onClick={addInputLine} type="button" className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold" style={S.surface}>
@@ -1171,6 +1215,104 @@ export default function BatchPanel() {
               </div>
             </>
           )}
+          </>
+          )}
+
+          {trackingMode === "ANIMAL_WISE" && (
+            <div className="flex flex-col gap-2 pt-2">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>
+                  Select Animals ({selectedAnimalIds.size} of {filteredAnimalCandidates.length} selected)
+                </p>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={animalGenderFilter}
+                    onChange={(e) => setAnimalGenderFilter(e.target.value)}
+                    className={`${inputCls} nf-select w-auto`}
+                    style={S.input}
+                  >
+                    <option value="">All genders</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                  </select>
+                  <select
+                    value={animalStageFilter}
+                    onChange={(e) => setAnimalStageFilter(e.target.value)}
+                    className={`${inputCls} nf-select w-auto`}
+                    style={S.input}
+                  >
+                    <option value="">All stages</option>
+                    {animalStageFilterOptions.map(([stageId, code]) => (
+                      <option key={stageId} value={stageId}>{code}</option>
+                    ))}
+                  </select>
+                  <div className="relative w-64">
+                    <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={S.muted} />
+                    <input
+                      value={animalSearch}
+                      onChange={(e) => setAnimalSearch(e.target.value)}
+                      placeholder="Search code, ear tag, RFID…"
+                      className={`${inputCls} pl-7`}
+                      style={S.input}
+                    />
+                  </div>
+                </div>
+              </div>
+              {!header.lob_id ? (
+                <p className="text-xs" style={S.muted}>Select a Line of Business first.</p>
+              ) : filteredAnimalCandidates.length === 0 ? (
+                <p className="text-xs" style={S.muted}>No unassigned animals found for this Line of Business.</p>
+              ) : (
+                <div className="max-h-72 overflow-auto rounded-[var(--radius-sm)] border" style={S.surface}>
+                  <table className="w-full border-collapse text-left text-xs">
+                    <TableHeader>
+                      <tr className="border-b border-(--row-border)">
+                        <TableHead className="h-auto w-8 px-3 py-2">
+                          <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAllFiltered} aria-label="Select all" />
+                        </TableHead>
+                        <TableHead className="h-auto px-3 py-2">Animal Code</TableHead>
+                        <TableHead className="h-auto px-3 py-2">Ear Tag</TableHead>
+                        <TableHead className="h-auto px-3 py-2">Type / Sex</TableHead>
+                        <TableHead className="h-auto px-3 py-2">Breed</TableHead>
+                        <TableHead className="h-auto px-3 py-2">Age</TableHead>
+                        <TableHead className="h-auto px-3 py-2">Stage</TableHead>
+                        <TableHead className="h-auto px-3 py-2">Location</TableHead>
+                        <TableHead className="h-auto px-3 py-2">Status</TableHead>
+                      </tr>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAnimalCandidates.map((a) => {
+                        const selected = selectedAnimalIds.has(a.animal_id);
+                        return (
+                          <TableRow
+                            key={a.animal_id}
+                            onClick={() => toggleAnimalSelected(a.animal_id)}
+                            className="cursor-pointer"
+                            style={selected ? { backgroundColor: "var(--surface-raised)" } : undefined}
+                          >
+                            <TableCell className="px-3 py-1.5">
+                              <input type="checkbox" checked={selected} onChange={() => toggleAnimalSelected(a.animal_id)} onClick={(e) => e.stopPropagation()} />
+                            </TableCell>
+                            <TableCell className="px-3 py-1.5 font-mono">{a.animal_code}</TableCell>
+                            <TableCell className="px-3 py-1.5 font-mono" style={S.sub}>{a.ear_tag || "—"}</TableCell>
+                            <TableCell className="px-3 py-1.5" style={S.sub}>{a.animal_type} / {a.gender === "F" ? "Female" : "Male"}</TableCell>
+                            <TableCell className="px-3 py-1.5" style={S.sub}>{breedLabel(a.breed_id)}</TableCell>
+                            <TableCell className="px-3 py-1.5" style={S.sub}>{animalAge(a)}</TableCell>
+                            <TableCell className="px-3 py-1.5" style={S.sub}>{stageLabel(a.current_stage_id)}</TableCell>
+                            <TableCell className="px-3 py-1.5" style={S.sub}>{locationLabel(a.current_location_id)}</TableCell>
+                            <TableCell className="px-3 py-1.5" style={S.sub}>{a.status || "—"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </table>
+                </div>
+              )}
+              <p className="text-[11px]" style={S.muted}>
+                Each selected animal keeps its own current stage and location — a scheduler is created for every distinct stage among them.
+              </p>
+            </div>
+          )}
         </div>
       </Dialog>
 
@@ -1229,8 +1371,6 @@ export default function BatchPanel() {
               {([
                 ["overview", t("blTabOverview")],
                 ["curves", t("blTabCurves")],
-                ["transactions", t("blTabTransactions")],
-                ["data-entry", t("blTabDataEntry")],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -1256,9 +1396,18 @@ export default function BatchPanel() {
             )}
 
             {viewing.status === "ACTIVE" && (
-              <Button onClick={openTransferStage} variant="outline" size="sm" className="self-start gap-1.5">
-                <RefreshCw className="h-3.5 w-3.5" /> {t("blTransferStage")}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={openTransferStage} variant="outline" size="sm" className="self-start gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" /> {t("blTransferStage")}
+                </Button>
+                <Button
+                  onClick={() => router.push(`/batches/entry?batchId=${viewing.batch_id}`)}
+                  size="sm"
+                  className="nf-btn-primary self-start gap-1.5"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Data Entry
+                </Button>
+              </div>
             )}
 
             {(viewing.stage_log || []).length > 0 && (
@@ -1342,197 +1491,6 @@ export default function BatchPanel() {
                 </div>
               </div>
             )}
-            </>
-            )}
-
-            {detailTab === "data-entry" && (
-              <div className="flex flex-col gap-3">
-                {!viewing.scheduler ? (
-                  <InlineAlert variant="info">{t("blNoSchedulerInfo")}</InlineAlert>
-                ) : viewing.status !== "ACTIVE" ? (
-                  <InlineAlert variant="info">{t("blDataEntryActiveOnly")}</InlineAlert>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <label className="nf-text-label" style={S.sub}>{t("blLabelDate")}</label>
-                      <input type="date" value={dataEntryDate} onChange={(e) => setDataEntryDate(e.target.value)} className={inputCls + " w-auto"} style={S.input} />
-                      {dataEntryLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" style={S.accent} />}
-                    </div>
-
-                    {dataEntryError && <InlineAlert>{dataEntryError}</InlineAlert>}
-
-                    <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                      <table className="w-full border-collapse text-left text-xs">
-                        <TableHeader><tr className="border-b border-[var(--row-border)]">
-                          <TableHead className="h-auto px-3 py-2">{t("blColParameterType")}</TableHead>
-                          <TableHead className="h-auto px-3 py-2">{t("blColDataEntryType")}</TableHead>
-                          <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
-                          <TableHead className="h-auto px-3 py-2">{t("blColUom")}</TableHead>
-                          <TableHead className="h-auto px-3 py-2">{t("blColOccurrence")}</TableHead>
-                          <TableHead className="h-auto px-3 py-2">{t("blColExpected")}</TableHead>
-                          <TableHead className="h-auto px-3 py-2">{t("blColActual")}</TableHead>
-                          <TableHead className="h-auto px-3 py-2"></TableHead>
-                        </tr></TableHeader>
-                        <TableBody>
-                          {!dataEntryLoading && dataEntryLines.length === 0 ? (
-                            <tr><TableCell colSpan={8} className="py-6 text-center" style={S.sub}>{t("blNoParamsScheduled")}</TableCell></tr>
-                          ) : dataEntryLines.map((line) => (
-                            <TableRow key={line.line_id}>
-                              <TableCell className="px-3 py-2" style={S.sub}>{line.line_type}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.primary}>{line.activity_name}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.sub}>{line.item_label || "—"}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.sub}>{line.uom || "—"}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.sub}>{line.occurrence ? line.occurrence.charAt(0) + line.occurrence.slice(1).toLowerCase() : "—"}</TableCell>
-                              <TableCell className="px-3 py-2" style={S.primary}>{Number(line.expected_qty).toLocaleString(undefined, { maximumFractionDigits: 4 })}</TableCell>
-                              <TableCell className="px-2 py-1.5 w-28">
-                                {isTextCapture(line) ? (
-                                  <input
-                                    type="text"
-                                    value={dataEntryTexts[line.line_id] ?? ""}
-                                    onChange={(e) => setDataEntryTexts((v) => ({ ...v, [line.line_id]: e.target.value }))}
-                                    placeholder={line.kpi_uom}
-                                    className={inputCls}
-                                    style={S.input}
-                                  />
-                                ) : (
-                                  <input
-                                    type="number"
-                                    value={dataEntryValues[line.line_id] ?? ""}
-                                    onChange={(e) => setDataEntryValues((v) => ({ ...v, [line.line_id]: e.target.value }))}
-                                    className={inputCls}
-                                    style={S.input}
-                                  />
-                                )}
-                                {line.lot_required && (
-                                  <input
-                                    type="text"
-                                    value={dataEntryLotNos[line.line_id] ?? ""}
-                                    onChange={(e) => setDataEntryLotNos((v) => ({ ...v, [line.line_id]: e.target.value }))}
-                                    placeholder={t("blPlaceholderLotNo")}
-                                    className={inputCls + " mt-1"}
-                                    style={S.input}
-                                  />
-                                )}
-                                {line.line_type === "TRANSFER" && (
-                                  <select
-                                    value={dataEntryDestBatches[line.line_id] ?? ""}
-                                    onChange={(e) => setDataEntryDestBatches((v) => ({ ...v, [line.line_id]: e.target.value }))}
-                                    className={`${inputCls} nf-select mt-1`}
-                                    style={S.input}
-                                  >
-                                    <option value="">{t("blPlaceholderDestBatch")}</option>
-                                    {batches.filter((b) => b.batch_id !== viewing.batch_id).map((b) => (
-                                      <option key={b.batch_id} value={b.batch_id}>{b.batch_no}</option>
-                                    ))}
-                                  </select>
-                                )}
-                              </TableCell>
-                              <TableCell className="px-2 py-1.5">
-                                <button
-                                  onClick={() => handleDataEntrySave(line)}
-                                  disabled={dataEntrySavingId === line.line_id || !dataEntryCanSave(line)}
-                                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                                  style={{ backgroundColor: "var(--accent)" }}
-                                >
-                                  {dataEntrySavingId === line.line_id ? t("blSaving") : t("blSave")}
-                                </button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </table>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-
-            {detailTab === "transactions" && (
-            <>
-            {viewing.status === "ACTIVE" && (
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blAddTransactionTitle")}</p>
-                <div className="grid grid-cols-2 gap-2 rounded-[var(--radius-sm)] border p-3 sm:grid-cols-3" style={S.surface}>
-                  <select value={txForm.transaction_type} onChange={(e) => setTxForm((f: Row) => ({ ...f, transaction_type: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                    {["CONSUMPTION", "MORTALITY", "OUTPUT", "OVERHEAD", "OBSERVATION"].map((tt) => <option key={tt} value={tt}>{tt}</option>)}
-                  </select>
-                  <input type="date" value={txForm.transaction_date} onChange={(e) => setTxForm((f: Row) => ({ ...f, transaction_date: e.target.value }))} className={inputCls} style={S.input} />
-                  {["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type) && (
-                    <select value={txForm.item_id} onChange={(e) => setTxForm((f: Row) => ({ ...f, item_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">{t("blSelectItemOptions", { count: items.length })}</option>
-                      {items.map((it, i) => (
-                        <option key={it.item_id} value={it.item_id}>
-                          {i + 1}. {it.item_code} — {it.item_name || it.item_code}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {txForm.transaction_type === "OVERHEAD" && (
-                    <select value={txForm.resource_id} onChange={(e) => setTxForm((f: Row) => ({ ...f, resource_id: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">{t("blSelectResourcePlaceholder")}</option>
-                      {resources.map((r) => <option key={r.resource_id} value={r.resource_id}>{r.resource_code}</option>)}
-                    </select>
-                  )}
-                  {["CONSUMPTION", "MORTALITY", "OUTPUT", "OVERHEAD"].includes(txForm.transaction_type) && (
-                    <input type="number" placeholder={t("blPlaceholderQty")} value={txForm.quantity} onChange={(e) => setTxForm((f: Row) => ({ ...f, quantity: e.target.value }))} className={inputCls} style={S.input} />
-                  )}
-                  {["CONSUMPTION", "OUTPUT"].includes(txForm.transaction_type) && (
-                    <select value={txForm.uom} onChange={(e) => setTxForm((f: Row) => ({ ...f, uom: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">{t("blSelectUomPlaceholder")}</option>
-                      {uoms.map((u) => <option key={u.uom_code} value={u.uom_code}>{u.uom_code}</option>)}
-                    </select>
-                  )}
-                  {["OUTPUT", "OVERHEAD"].includes(txForm.transaction_type) && (
-                    <input type="number" placeholder={t("blPlaceholderRate")} value={txForm.rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, rate: e.target.value }))} className={inputCls} style={S.input} />
-                  )}
-                  {txForm.transaction_type === "OUTPUT" && (
-                    <select value={txForm.output_type} onChange={(e) => setTxForm((f: Row) => ({ ...f, output_type: e.target.value }))} className={`${inputCls} nf-select`} style={S.input}>
-                      <option value="">{t("blOutputMainProduct")}</option>
-                      <option value="BY_PRODUCT">{t("blOutputByProduct")}</option>
-                      <option value="WASTE">{t("blOutputWaste")}</option>
-                    </select>
-                  )}
-                  {txForm.transaction_type === "OUTPUT" && txForm.output_type && (
-                    <input type="number" placeholder={t("blPlaceholderNrvRate")} value={txForm.nrv_rate} onChange={(e) => setTxForm((f: Row) => ({ ...f, nrv_rate: e.target.value }))} className={inputCls} style={S.input} />
-                  )}
-                  <input placeholder={t("blPlaceholderRemarks")} value={txForm.remarks} onChange={(e) => setTxForm((f: Row) => ({ ...f, remarks: e.target.value }))} className={inputCls + " sm:col-span-3"} style={S.input} />
-                  <Button onClick={handleAddTransaction} disabled={acting} size="sm" className="nf-btn-primary">
-                    {acting ? t("blSaving") : t("blAddTransactionBtn")}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={S.sub}>{t("blTransactionLogTitle")}</p>
-              <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.surface}>
-                <table className="w-full border-collapse text-left text-xs">
-                  <TableHeader><tr className="border-b border-[var(--row-border)]">
-                    <TableHead className="h-auto px-3 py-2">{t("blColDate")}</TableHead>
-                    <TableHead className="h-auto px-3 py-2">{t("blColType")}</TableHead>
-                    <TableHead className="h-auto px-3 py-2">{t("blColItem")}</TableHead>
-                    <TableHead className="h-auto px-3 py-2">{t("blColQty")}</TableHead>
-                    <TableHead className="h-auto px-3 py-2">{t("blColAmount")}</TableHead>
-                    <TableHead className="h-auto px-3 py-2">{t("blColRemarks")}</TableHead>
-                  </tr></TableHeader>
-                  <TableBody>
-                    {(viewing.transactions || []).length === 0 ? (
-                      <tr><TableCell colSpan={6} className="py-6 text-center" style={S.sub}>{t("blNoTransactions")}</TableCell></tr>
-                    ) : (viewing.transactions || []).map((t: Row) => (
-                      <TableRow key={t.transaction_id}>
-                        <TableCell className="px-3 py-2" style={S.primary}>{t.transaction_date}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.sub}>{t.transaction_type}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{t.item_id ? itemLabel(t.item_id) : "—"}</TableCell>
-                        <TableCell className="px-3 py-2" style={S.primary}>{t.quantity != null ? `${t.quantity} ${t.uom || ""}`.trim() : "—"}</TableCell>
-                        <TableCell className="px-3 py-2 font-semibold" style={Number(t.amount) >= 0 ? { color: "var(--success)" } : { color: "var(--danger)" }}>{t.amount}</TableCell>
-                        <TableCell className="px-3 py-2 max-w-[220px] truncate" style={S.sub} title={t.remarks || ""}>{t.remarks || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </table>
-              </div>
-            </div>
             </>
             )}
 

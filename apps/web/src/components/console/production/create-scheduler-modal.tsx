@@ -694,10 +694,10 @@ export default function CreateSchedulerModal({ open, onClose, onCreated, company
           {lineFormError && <InlineAlert>{lineFormError}</InlineAlert>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {/* Line Type */}
+            {/* Activity Type */}
             <div>
               <label className="mb-1 block font-semibold" style={S.sub}>
-                Line Type <span className="text-red-500">*</span>
+                Activity Type <span className="text-red-500">*</span>
               </label>
               <select
                 value={lineForm.line_type}
@@ -831,7 +831,7 @@ export default function CreateSchedulerModal({ open, onClose, onCreated, company
             </div>
           </div>
 
-          {/* Conditional Line Type Section */}
+          {/* Conditional Activity Type Section */}
           <div className="rounded-[var(--radius-sm)] border p-3 bg-(--surface-raised)" style={{ borderColor: "var(--border)" }}>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wider" style={S.primary}>
               {lineForm.line_type} Specific Configuration

@@ -24,7 +24,15 @@ const TABS = [
   { key: "data", label: "Animal data" },
   { key: "breeding", label: "Breeding details" },
   { key: "traceability", label: "Traceability" },
+  { key: "history", label: "History" },
+  { key: "location", label: "Location traceability" },
 ] as const;
+
+// Movements that represent the animal physically moving/leaving/entering,
+// as opposed to STAGE_CHANGE/ASSIGN/UNASSIGN which are registry-only moves
+// within the same physical spot — Rishi's HISTORY vs LOCATION TRACEABILITY
+// split (2026-09-08), both reading the one shared animal_movement_log table.
+const LOCATION_MOVEMENT_TYPES = new Set(["PURCHASE", "OUTPUT", "TRANSFER", "MORTALITY", "CULL"]);
 
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -60,6 +68,9 @@ export default function AnimalDetailPanel({ row, onClose }: { row: Row; onClose:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [openEvent, setOpenEvent] = useState<string | null>(null);
+  const [movementLog, setMovementLog] = useState<Row[]>([]);
+  const [movementLoading, setMovementLoading] = useState(false);
+  const [movementError, setMovementError] = useState("");
 
   const animalId = row.animal_id;
 
@@ -76,6 +87,27 @@ export default function AnimalDetailPanel({ row, onClose }: { row: Row; onClose:
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [animalId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMovementLog([]);
+    setMovementError("");
+    if (!animalId) return;
+    setMovementLoading(true);
+    api.get(`/animal/${animalId}/movement-log`)
+      .then((res) => { if (!cancelled) setMovementLog(unwrap<Row[]>(res) ?? []); })
+      .catch((err: any) => { if (!cancelled) setMovementError(err?.message || "Could not load movement history."); })
+      .finally(() => { if (!cancelled) setMovementLoading(false); });
+    return () => { cancelled = true; };
+  }, [animalId]);
+
+  // HISTORY reads newest first — the most recent move is what someone
+  // checking "where has this animal been" usually wants at the top.
+  const historyRows = useMemo(() => [...movementLog].reverse(), [movementLog]);
+  const locationRows = useMemo(
+    () => historyRows.filter((m) => LOCATION_MOVEMENT_TYPES.has(m.movement_type)),
+    [historyRows],
+  );
 
   const matings: Row[] = breeding?.matings ?? [];
   const farrowings: Row[] = breeding?.farrowings ?? [];
@@ -374,6 +406,81 @@ export default function AnimalDetailPanel({ row, onClose }: { row: Row; onClose:
                 the schema — BBP-1 describes the kill sheet as a process, attached to the transfer order
                 with carcass weights per line, without a field specification.
               </p>
+            </div>
+          )
+        )}
+
+        {/* HISTORY and LOCATION TRACEABILITY both read animal_movement_log —
+            the append-only batch/stage/location move log written by every
+            assign/transfer/transition/dispose path, distinct from the
+            breeding-derived Traceability tab above. Rishi's decision
+            (2026-09-08): one shared table, two tabs/filters over it. */}
+        {tab === "history" && (
+          movementLoading ? (
+            <div className="py-10 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin" style={S.muted} /></div>
+          ) : movementError ? (
+            <InlineAlert>{movementError}</InlineAlert>
+          ) : !historyRows.length ? (
+            <p className="text-xs" style={S.muted}>No movement recorded for this animal yet.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.raised}>
+              <table className="w-full min-w-[560px] text-left text-xs">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                    <th className="p-2 font-semibold" style={S.sub}>Last date</th>
+                    <th className="p-2 font-semibold" style={S.sub}>Batch</th>
+                    <th className="p-2 font-semibold" style={S.sub}>Current date</th>
+                    <th className="p-2 font-semibold" style={S.sub}>Entry no.</th>
+                    <th className="p-2 font-semibold" style={S.sub}>Stage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRows.map((m) => (
+                    <tr key={m.movement_id} className="border-b last:border-b-0" style={{ borderColor: "var(--border)" }}>
+                      <td className="p-2 font-mono" style={S.sub}>{fmt(m.last_date) || "—"}</td>
+                      <td className="p-2" style={S.primary}>{fmt(m.to_batch_no) || "—"}</td>
+                      <td className="p-2 font-mono" style={S.primary}>{fmt(m.event_date)}</td>
+                      <td className="p-2 font-mono" style={S.sub}>{fmt(m.entry_no) || "—"}</td>
+                      <td className="p-2" style={S.sub}>{fmt(m.to_stage_code) || fmt(m.from_stage_code) || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+
+        {tab === "location" && (
+          movementLoading ? (
+            <div className="py-10 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin" style={S.muted} /></div>
+          ) : movementError ? (
+            <InlineAlert>{movementError}</InlineAlert>
+          ) : !locationRows.length ? (
+            <p className="text-xs" style={S.muted}>No purchase, output, transfer, mortality or cull recorded for this animal yet.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-[var(--radius-sm)] border" style={S.raised}>
+              <table className="w-full min-w-[560px] text-left text-xs">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                    <th className="p-2 font-semibold" style={S.sub}>Date</th>
+                    <th className="p-2 font-semibold" style={S.sub}>Movement</th>
+                    <th className="p-2 font-semibold" style={S.sub}>Batch</th>
+                    <th className="p-2 font-semibold" style={S.sub}>Location</th>
+                    <th className="p-2 font-semibold" style={S.sub}>Entry no.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {locationRows.map((m) => (
+                    <tr key={m.movement_id} className="border-b last:border-b-0" style={{ borderColor: "var(--border)" }}>
+                      <td className="p-2 font-mono" style={S.primary}>{fmt(m.event_date)}</td>
+                      <td className="p-2" style={S.primary}>{fmt(m.movement_type).replaceAll("_", " ")}</td>
+                      <td className="p-2" style={S.sub}>{fmt(m.to_batch_no) || "—"}</td>
+                      <td className="p-2" style={S.sub}>{fmt(m.to_location_name) || fmt(m.from_location_name) || "—"}</td>
+                      <td className="p-2 font-mono" style={S.sub}>{fmt(m.entry_no) || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )
         )}

@@ -61,6 +61,7 @@ import { QcParameterModule } from './modules/production/qc-parameter/qc-paramete
 import { QcModule } from './modules/production/qc/qc.module';
 import { QrCodeModule } from './modules/production/qr-code/qr-code.module';
 import { AnimalModule } from './modules/piggery/animal/animal.module';
+import { AnimalMovementLogModule } from './modules/piggery/animal-movement-log/animal-movement-log.module';
 import { BreedingModule } from './modules/piggery/breeding/breeding.module';
 import { TenantMiddleware } from './common/middlewares/tenant.middleware';
 import appConfig from './config/app.config';
@@ -97,6 +98,7 @@ import { SystemController } from './system/system.controller';
     CountryModule,
     CostingMethodModule,
     AuditLogModule,
+    AnimalMovementLogModule,
     NumberSeriesModule,
     EncryptionModule,
     NotificationModule,

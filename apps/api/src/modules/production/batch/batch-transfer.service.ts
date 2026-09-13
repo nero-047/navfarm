@@ -8,6 +8,7 @@ import { CreateBatchTransferDto, MergeBatchDto, QueryBatchTransferDto, SplitBatc
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { SchedulerHeaderService } from '../scheduler-header/scheduler-header.service';
+import { AnimalMovementLogService } from '../../piggery/animal-movement-log/animal-movement-log.service';
 
 // Local time, not UTC. MySQL's own DEFAULT (now()) on created_at is local, so
 // formatting through toISOString() (as some older services here do) stamps
@@ -44,6 +45,7 @@ export class BatchTransferService {
     private readonly auditService: AuditLogService,
     private readonly numberSeriesService: NumberSeriesService,
     private readonly schedulerHeaderService: SchedulerHeaderService,
+    private readonly movementLog: AnimalMovementLogService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -204,7 +206,7 @@ export class BatchTransferService {
     });
 
     if (dto.post_immediately !== false) {
-      return this.post(transferId, tenantId, userPayload, dto.auto_triggers_stage);
+      return this.post(transferId, tenantId, userPayload, dto.auto_triggers_stage, dto.skip_movement_log);
     }
     return this.findOne(transferId, tenantId);
   }
@@ -405,7 +407,7 @@ export class BatchTransferService {
    * Applies the movement. Everything here is idempotent-guarded by the DRAFT
    * check, so a double-submit cannot move the same animals twice.
    */
-  async post(transferId: string, tenantId: string, userPayload?: { userId?: string }, autoTriggersStage?: boolean) {
+  async post(transferId: string, tenantId: string, userPayload?: { userId?: string }, autoTriggersStage?: boolean, skipMovementLog?: boolean) {
     const transfer = await this.findOne(transferId, tenantId);
     if (transfer.status !== 'DRAFT') {
       throw new BadRequestException(`Only a DRAFT transfer can be posted (this one is ${transfer.status}).`);
@@ -415,25 +417,6 @@ export class BatchTransferService {
     const headCount = animalIds.length;
     const totalValue = transfer.lines.reduce((sum, l) => sum + Number(l.book_value), 0);
     const toLocationId = transfer.lines[0]?.to_location_id || null;
-
-    // Guard against the pool shifting between draft and post (an animal that
-    // died or was sold in the meantime).
-    const stillLive = await this.db
-      .select({ animal_id: schema.animalRegister.animal_id })
-      .from(schema.animalRegister)
-      .where(
-        and(
-          inArray(schema.animalRegister.animal_id, animalIds),
-          eq(schema.animalRegister.current_batch_id, transfer.from_batch_id),
-          eq(schema.animalRegister.is_active, true),
-          sql`${schema.animalRegister.status} NOT IN ('DEAD','SOLD','CULLED','SLAUGHTERED')`,
-        )
-      );
-    if (stillLive.length !== headCount) {
-      throw new BadRequestException(
-        `${headCount - stillLive.length} animal(s) on this transfer are no longer live members of the source batch. Re-create the transfer.`
-      );
-    }
 
     // The destination batch's stage. Animals carry their own current_stage_id
     // (read by the herd and bio-asset-by-stage reports), so moving them into a
@@ -445,18 +428,53 @@ export class BatchTransferService {
       .where(eq(schema.batchHeader.batch_id, transfer.to_batch_id))
       .limit(1);
 
-    // 1. Repoint the animals. They stay ACTIVE and is_active — a transferred
-    //    animal is still fully operable, just under a different batch.
-    await this.db
-      .update(schema.animalRegister)
-      .set({
-        current_batch_id: transfer.to_batch_id,
-        ...(toLocationId ? { current_location_id: toLocationId } : {}),
-        ...(destBatch?.stage_id ? { current_stage_id: destBatch.stage_id } : {}),
-        updated_by: userPayload?.userId || null,
-        updated_at: toMysqlTimestamp(),
-      })
-      .where(inArray(schema.animalRegister.animal_id, animalIds));
+    // Guard against the pool shifting between draft and post (an animal that
+    // died, was sold, or was independently reassigned elsewhere in the
+    // meantime) — also captures each animal's pre-transfer stage/location,
+    // needed below to log an accurate "from" side since the repoint
+    // overwrites these same columns. Locked (FOR UPDATE) and repointed inside
+    // one transaction: two concurrent post()s racing over an overlapping
+    // animal must not both see it as still-live and both repoint it — the
+    // second one has to fail the headcount check against the first's
+    // already-committed move, not silently overwrite it.
+    const stillLive = await this.db.transaction(async (tx) => {
+      const locked = await tx
+        .select({
+          animal_id: schema.animalRegister.animal_id,
+          current_stage_id: schema.animalRegister.current_stage_id,
+          current_location_id: schema.animalRegister.current_location_id,
+        })
+        .from(schema.animalRegister)
+        .where(
+          and(
+            inArray(schema.animalRegister.animal_id, animalIds),
+            eq(schema.animalRegister.current_batch_id, transfer.from_batch_id),
+            eq(schema.animalRegister.is_active, true),
+            sql`${schema.animalRegister.status} NOT IN ('DEAD','SOLD','CULLED','SLAUGHTERED')`,
+          )
+        )
+        .for('update');
+      if (locked.length !== headCount) {
+        throw new BadRequestException(
+          `${headCount - locked.length} animal(s) on this transfer are no longer live members of the source batch. Re-create the transfer.`
+        );
+      }
+
+      // 1. Repoint the animals. They stay ACTIVE and is_active — a transferred
+      //    animal is still fully operable, just under a different batch.
+      await tx
+        .update(schema.animalRegister)
+        .set({
+          current_batch_id: transfer.to_batch_id,
+          ...(toLocationId ? { current_location_id: toLocationId } : {}),
+          ...(destBatch?.stage_id ? { current_stage_id: destBatch.stage_id } : {}),
+          updated_by: userPayload?.userId || null,
+          updated_at: toMysqlTimestamp(),
+        })
+        .where(inArray(schema.animalRegister.animal_id, animalIds));
+
+      return locked;
+    });
 
     // 1b. "Destination stage auto-triggered if auto_triggers_stage = TRUE"
     // (Schedule_master_template.xlsx) — the TRANSFER scheduler_line that
@@ -469,6 +487,37 @@ export class BatchTransferService {
     // animals.
     if (autoTriggersStage && destBatch?.stage_id) {
       await this.schedulerHeaderService.createForStage(transfer.to_batch_id, destBatch.stage_id, tenantId, userPayload);
+    }
+
+    // 1c. One animal_movement_log row per animal moved — this is the single
+    // place a real batch-to-batch value transfer actually happens, so it's
+    // also the single place that logs it, EXCEPT when the caller already
+    // logged a more precise entry itself (AnimalService.transitionStage()
+    // knows the exact destination stage it asked for, which can differ from
+    // the destination batch's own nominal stage_id used here — logging both
+    // would duplicate the same move under two different stage values).
+    if (!skipMovementLog) {
+      const stillLiveById = new Map(stillLive.map((a) => [a.animal_id, a]));
+      for (const line of transfer.lines) {
+        const pre = stillLiveById.get(line.animal_id);
+        await this.movementLog.record({
+          tenantId,
+          companyId: transfer.company_id,
+          animalId: line.animal_id,
+          movementType: 'TRANSFER',
+          eventDate: transfer.transfer_date,
+          fromBatchId: transfer.from_batch_id,
+          toBatchId: transfer.to_batch_id,
+          fromStageId: pre?.current_stage_id || null,
+          toStageId: destBatch?.stage_id || null,
+          fromLocationId: pre?.current_location_id || null,
+          toLocationId: line.to_location_id || toLocationId,
+          entryNo: transfer.transfer_no,
+          reason: transfer.reason,
+          remarks: transfer.remarks,
+          userId: userPayload?.userId,
+        });
+      }
     }
 
     // 2. Move the carrying value and head count between the two batches' states.

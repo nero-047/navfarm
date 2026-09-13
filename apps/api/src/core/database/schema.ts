@@ -16,6 +16,7 @@ import {
   primaryKey,
   foreignKey,
   uniqueIndex,
+  index,
   AnyMySqlColumn,
 } from 'drizzle-orm/mysql-core';
 import { relations, sql } from 'drizzle-orm';
@@ -2004,6 +2005,11 @@ export const batchHeader = mysqlTable('batch_header', {
   expected_end_date: date('expected_end_date', { mode: 'string' }),
   actual_end_date: date('actual_end_date', { mode: 'string' }),
   status: varchar('status', { length: 20 }).default('DRAFT').notNull(), // DRAFT, ACTIVE, CLOSED, CANCELLED
+  // BATCH_WISE: the whole batch moves through one stage at a time (today's
+  // only behavior, unchanged). ANIMAL_WISE: animals in this batch each carry
+  // their own current_stage_id/current_location_id and can diverge — the
+  // batch itself has no single "current stage" in that mode.
+  tracking_mode: varchar('tracking_mode', { length: 20 }).default('BATCH_WISE').notNull(),
   opening_quantity: decimal('opening_quantity', { precision: 18, scale: 4 }).notNull(),
   uom: varchar('uom', { length: 20 }).notNull(),
   closing_quantity: decimal('closing_quantity', { precision: 18, scale: 4 }),
@@ -2627,6 +2633,10 @@ export const batchDailyData = mysqlTable('batch_daily_data', {
   company_id: varchar('company_id', { length: 36 }).notNull(),
   line_id: varchar('line_id', { length: 36 }).notNull().references(() => schedulerLine.line_id, { onDelete: 'restrict' }),
   batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  // Null for BATCH_WISE batches (unchanged historical meaning: the row applies
+  // to the whole batch). Set for ANIMAL_WISE batches — the same nullable
+  // per-row-attribution pattern batch_transaction.animal_id already uses.
+  animal_id: varchar('animal_id', { length: 36 }).references(() => animalRegister.animal_id, { onDelete: 'set null' }),
   entry_date: date('entry_date', { mode: 'string' }).notNull(),
   entered_value: decimal('entered_value', { precision: 18, scale: 6 }),
   entered_text: varchar('entered_text', { length: 500 }),
@@ -2643,7 +2653,46 @@ export const batchDailyData = mysqlTable('batch_daily_data', {
   created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
-  uqLineDate: uniqueIndex('uq_batch_daily_data_line_date').on(table.line_id, table.entry_date),
+  // MySQL treats every NULL as distinct in a UNIQUE index, so a plain
+  // UNIQUE(line_id, entry_date, animal_id) would silently stop enforcing
+  // "one row per line/date for the whole batch" the moment animal_id is
+  // nullable — multiple NULL-animal rows for the same (line_id, entry_date)
+  // would no longer collide. The coalesce(...) expression substitutes a fixed
+  // sentinel for NULL so the constraint still holds for BATCH_WISE rows,
+  // while still letting distinct animals collide on their own real id for
+  // ANIMAL_WISE rows. Same trick already used by reason_master/activity_master.
+  uqLineDate: uniqueIndex('uq_batch_daily_data_line_date').on(table.line_id, table.entry_date, sql`(coalesce(${table.animal_id}, ''))`),
+}));
+
+// ANIMAL_WISE only (see BatchDailyDataService/BatchService — Batch-wise has no
+// day-lock today and this feature doesn't add one for it). One row per
+// (batch, stage, date): LOCKED once "POST STAGE DATA" succeeds — every
+// mandatory line for every animal currently in that stage on that date is
+// filled — after which postEntry() refuses further writes against it.
+// REOPENED is a direct, audit-logged, permissioned action (no automated
+// ledger/GL/bio-asset reversal yet — the reopened entries are corrected by
+// hand and reconciled the same way an unposted entry always was); it does not
+// undo the underlying financial postings, so it's deliberately scoped smaller
+// than a full reversal. The row is reused (not re-inserted) across a
+// lock -> reopen -> lock cycle; audit_log already carries the full history of
+// each transition.
+export const batchDataEntryLock = mysqlTable('batch_data_entry_lock', {
+  lock_id: varchar('lock_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).notNull(),
+  batch_id: varchar('batch_id', { length: 36 }).notNull().references(() => batchHeader.batch_id, { onDelete: 'restrict' }),
+  stage_id: varchar('stage_id', { length: 36 }).notNull().references(() => stageMaster.stage_id, { onDelete: 'restrict' }),
+  entry_date: date('entry_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 10 }).notNull(), // LOCKED, REOPENED
+  locked_by: varchar('locked_by', { length: 36 }),
+  locked_at: timestamp('locked_at', { mode: 'string' }),
+  reopened_by: varchar('reopened_by', { length: 36 }),
+  reopened_at: timestamp('reopened_at', { mode: 'string' }),
+  reopen_reason: varchar('reopen_reason', { length: 500 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+  uqBatchStageDate: uniqueIndex('uq_batch_data_entry_lock_batch_stage_date').on(table.batch_id, table.stage_id, table.entry_date),
 }));
 
 export const notificationAlertLog = mysqlTable('notification_alert_log', {
@@ -3113,6 +3162,57 @@ export const animalRegister = mysqlTable('animal_register', {
   uqAnimalCode: uniqueIndex('uq_animal_register_tenant_code').on(table.tenant_id, table.animal_code),
   uqRfidTag: uniqueIndex('uq_animal_register_tenant_rfid').on(table.tenant_id, table.rfid_tag),
 }));
+
+/**
+ * Append-only log of every batch/stage/location movement an animal makes —
+ * the single source both the animal-detail HISTORY tab and the LOCATION
+ * TRACEABILITY tab read (Rishi's decision, 2026-09-08: "Both read one
+ * append-only animal_movement_log rather than two tables, so the two tabs
+ * cannot disagree about the same move").
+ *
+ * animal_register.current_batch_id/current_stage_id/current_location_id are
+ * CURRENT state only and get overwritten on every move — this table is where
+ * "where has this animal been" actually lives. Never updated or deleted, only
+ * inserted to; a later move never rewrites an earlier row.
+ *
+ * "LAST DATE" on the HISTORY tab is deliberately not a column here — it's the
+ * previous row's event_date for the same animal, read at query time, so it
+ * can never drift from this log.
+ */
+export const animalMovementLog = mysqlTable('animal_movement_log', {
+  movement_id: varchar('movement_id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  tenant_id: varchar('tenant_id', { length: 36 }).notNull(),
+  company_id: varchar('company_id', { length: 36 }).references(() => companyMaster.company_id, { onDelete: 'restrict' }),
+  animal_id: varchar('animal_id', { length: 36 }).notNull().references(() => animalRegister.animal_id, { onDelete: 'restrict' }),
+  // PURCHASE, ASSIGN, TRANSFER, STAGE_CHANGE, RELOCATE, UNASSIGN, MORTALITY, OUTPUT, CULL
+  movement_type: varchar('movement_type', { length: 20 }).notNull(),
+  event_date: date('event_date', { mode: 'string' }).notNull(),
+  from_batch_id: varchar('from_batch_id', { length: 36 }),
+  to_batch_id: varchar('to_batch_id', { length: 36 }),
+  from_stage_id: varchar('from_stage_id', { length: 36 }),
+  to_stage_id: varchar('to_stage_id', { length: 36 }),
+  from_location_id: varchar('from_location_id', { length: 36 }),
+  to_location_id: varchar('to_location_id', { length: 36 }),
+  // Source document's own number, e.g. batch_transfer.transfer_no — the
+  // HISTORY tab's "ENTRY NO." column.
+  entry_no: varchar('entry_no', { length: 50 }),
+  reason: varchar('reason', { length: 200 }),
+  remarks: text('remarks'),
+  created_by: varchar('created_by', { length: 36 }),
+  created_at: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+  index('idx_animal_movement_log_animal').on(table.animal_id, table.event_date),
+  // SET NULL, never RESTRICT/CASCADE — a movement row is history and must
+  // survive its referenced batch/stage/location being deleted later, same
+  // principle breeding_record/farrowing_record already apply to their own
+  // batch_id.
+  foreignKey({ columns: [table.from_batch_id], foreignColumns: [batchHeader.batch_id], name: 'aml_from_batch_fk' }).onDelete('set null'),
+  foreignKey({ columns: [table.to_batch_id], foreignColumns: [batchHeader.batch_id], name: 'aml_to_batch_fk' }).onDelete('set null'),
+  foreignKey({ columns: [table.from_stage_id], foreignColumns: [stageMaster.stage_id], name: 'aml_from_stage_fk' }).onDelete('set null'),
+  foreignKey({ columns: [table.to_stage_id], foreignColumns: [stageMaster.stage_id], name: 'aml_to_stage_fk' }).onDelete('set null'),
+  foreignKey({ columns: [table.from_location_id], foreignColumns: [locationMaster.location_id], name: 'aml_from_location_fk' }).onDelete('set null'),
+  foreignKey({ columns: [table.to_location_id], foreignColumns: [locationMaster.location_id], name: 'aml_to_location_fk' }).onDelete('set null'),
+]);
 
 // Purpose-built per-animal medication event log — not derived from the batch-scoped
 // consumption ledger (inventory_ledger/batch_input_line have no animal_id dimension; see

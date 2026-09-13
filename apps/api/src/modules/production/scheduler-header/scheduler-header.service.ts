@@ -239,8 +239,15 @@ export class SchedulerHeaderService {
     //     count lives, since it has no animal_register rows to re-derive from;
     // (3) batch.closing_quantity/opening_quantity, for this batch's very first
     //     scheduler (no prior header to inherit from).
+    // Filtered by stage too, not just batch — an ANIMAL_WISE batch can have
+    // several stages active at once, each with its own scheduler_header; this
+    // count must be that stage's own share, not every animal in the batch.
     const [{ liveCount }] = await this.db.select({ liveCount: count() }).from(schema.animalRegister)
-      .where(and(eq(schema.animalRegister.current_batch_id, batchId), eq(schema.animalRegister.is_active, true)));
+      .where(and(
+        eq(schema.animalRegister.current_batch_id, batchId),
+        eq(schema.animalRegister.current_stage_id, stageId),
+        eq(schema.animalRegister.is_active, true),
+      ));
     const animalCount = liveCount > 0
       ? liveCount
       : priorHeader?.animal_count != null

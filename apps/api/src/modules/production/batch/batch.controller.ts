@@ -16,6 +16,7 @@ import {
   RenewBatchDto,
   TransferStageDto,
   BulkDailyEntryDto,
+  ReopenStageDayDto,
 } from './dto/batch.dto';
 
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -92,6 +93,38 @@ export class BatchController {
   async getDataEntry(@Param('id') id: string, @Query('date') date: string) {
     const result = await this.batchService.getDataEntry(id, date || new Date().toISOString().slice(0, 10));
     return { success: true, message: 'Scheduled data-entry lines retrieved.', data: result };
+  }
+
+  @Post(':id/post-day')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'BATCH_WISE only — lock a whole-batch date once every mandatory activity has been entered; refuses further edits (no reopen path yet — posted is final)' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  async postBatchDay(@Param('id') id: string, @Query('date') date: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.postBatchDay(id, date || new Date().toISOString().slice(0, 10), tenantId, req.user);
+    return { success: true, message: 'Batch day posted and locked.', data: result };
+  }
+
+  @Post(':id/stage/:stageId/post-day')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'ANIMAL_WISE only — lock a stage/date once every mandatory activity for every animal currently in it has been entered; refuses further edits until reopened' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiParam({ name: 'stageId', description: 'Stage UUID' })
+  async postStageDay(@Param('id') id: string, @Param('stageId') stageId: string, @Query('date') date: string, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.postStageDay(id, stageId, date || new Date().toISOString().slice(0, 10), tenantId, req.user);
+    return { success: true, message: 'Stage data posted and locked.', data: result };
+  }
+
+  @Post(':id/stage/:stageId/reopen')
+  @RequirePermission('PRODUCTION', 'BATCH', 'edit')
+  @ApiOperation({ summary: 'ANIMAL_WISE only — reopen a locked stage/date for correction (does not reverse the underlying postings; reconciliation is manual)' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiParam({ name: 'stageId', description: 'Stage UUID' })
+  async reopenStageDay(@Param('id') id: string, @Param('stageId') stageId: string, @Query('date') date: string, @Body() dto: ReopenStageDayDto, @Req() req: any) {
+    const tenantId = req.user?.tenantId || req['tenantId'];
+    const result = await this.batchService.reopenStageDay(id, stageId, date || new Date().toISOString().slice(0, 10), dto.reason, tenantId, req.user);
+    return { success: true, message: 'Stage data reopened for correction.', data: result };
   }
 
   @Post(':id/transaction')

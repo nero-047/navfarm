@@ -1,11 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsNumber, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsNumber, IsDateString, IsBoolean } from 'class-validator';
 
 export class CreateBatchDailyDataDto {
   @ApiProperty({ description: 'scheduler_line UUID this entry answers' })
   @IsUUID()
   @IsNotEmpty()
   line_id: string;
+
+  @ApiProperty({
+    description: 'ANIMAL_WISE batches only — the specific animal in the batch this entry is for. Required when the line\'s scheduler_header belongs to an ANIMAL_WISE batch (data entry is per-animal, grouped by stage); omit entirely for BATCH_WISE, where entries stay whole-batch.',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  animal_id?: string;
 
   @ApiProperty({ example: '2026-09-08' })
   @IsDateString()
@@ -41,4 +49,12 @@ export class CreateBatchDailyDataDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  @ApiProperty({
+    description: 'Save-only — records the value on batch_daily_data (posted: false) without touching inventory/GL/animal-count/transfer. The value only takes real effect (ledger entry, alert, etc.) once re-submitted with draft omitted/false — see BatchService.postBatchDay(), which does this for every draft row when the day is posted.',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  draft?: boolean;
 }

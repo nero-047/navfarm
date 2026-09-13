@@ -22,6 +22,7 @@ const COSTING_METHODS = ['STANDARD', 'FIFO', 'BIO_ASSET'] as const;
 const DISPOSAL_TYPES = ['HARVEST', 'SOLD'] as const;
 const TRANSACTION_TYPES = ['CONSUMPTION', 'MORTALITY', 'OUTPUT', 'OVERHEAD', 'OBSERVATION'] as const;
 const OUTPUT_TYPES = ['MAIN', 'BY_PRODUCT', 'WASTE'] as const;
+const TRACKING_MODES = ['BATCH_WISE', 'ANIMAL_WISE'] as const;
 
 export class BatchInputLineInput {
   @ApiProperty({ description: 'Item UUID being placed into the batch' })
@@ -92,6 +93,27 @@ export class BatchStandardInput {
 }
 
 export class CreateBatchDto {
+  @ApiProperty({
+    description: 'Tracking mode — BATCH_WISE (default): the whole batch moves through one stage at a time, one scheduler per (batch, stage), whole-batch data entry. ANIMAL_WISE: animals in the same batch can sit at different stages/locations; each animal\'s own current_stage_id drives its schedule, and animal_ids (not input_lines/opening_quantity) populates the batch.',
+    enum: TRACKING_MODES,
+    required: false,
+    default: 'BATCH_WISE',
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(TRACKING_MODES)
+  tracking_mode?: string;
+
+  @ApiProperty({
+    description: 'ANIMAL_WISE only — currently-unassigned animal UUIDs to place into this batch, each keeping its own existing current_stage_id/current_location_id',
+    type: [String],
+    required: false,
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  animal_ids?: string[];
+
   @ApiProperty({ description: 'Company UUID scope' })
   @IsUUID()
   @IsNotEmpty()
@@ -143,10 +165,10 @@ export class CreateBatchDto {
   @IsOptional()
   expected_end_date?: string;
 
-  @ApiProperty({ description: 'Opening quantity', example: 5000 })
+  @ApiProperty({ description: 'Opening quantity — required for BATCH_WISE; ignored for ANIMAL_WISE (derived from animal_ids.length)', example: 5000, required: false })
   @IsNumber()
-  @IsNotEmpty()
-  opening_quantity: number;
+  @IsOptional()
+  opening_quantity?: number;
 
   @ApiProperty({ description: 'Unit of measure for the opening quantity' })
   @IsString()
@@ -158,12 +180,12 @@ export class CreateBatchDto {
   @IsOptional()
   remarks?: string;
 
-  @ApiProperty({ description: 'Input lines — what the batch opens with', type: [BatchInputLineInput] })
+  @ApiProperty({ description: 'Input lines — what the batch opens with. Required for BATCH_WISE; not used for ANIMAL_WISE (use animal_ids instead)', type: [BatchInputLineInput], required: false })
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => BatchInputLineInput)
-  input_lines: BatchInputLineInput[];
+  @IsOptional()
+  input_lines?: BatchInputLineInput[];
 
   @ApiProperty({ description: 'Standard-cost assumptions for variance calculation — only meaningful when costing_method = STANDARD', type: BatchStandardInput, required: false })
   @ValidateNested()
@@ -221,6 +243,13 @@ export class TransferStageDto {
   @IsString()
   @IsOptional()
   remarks?: string;
+}
+
+export class ReopenStageDayDto {
+  @ApiProperty({ description: 'Why this posted stage/date needs to be reopened for correction — required for the audit trail' })
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
 }
 
 const TREATMENT_ROUTES = ['IM', 'IV', 'SUBCUTANEOUS', 'ORAL', 'ORAL_IN_FEED', 'ORAL_IN_WATER', 'TOPICAL', 'INTRAMAMMARY', 'INTRAUTERINE'] as const;
@@ -675,6 +704,14 @@ export class CreateBatchTransferDto {
   @IsOptional()
   @IsBoolean()
   auto_triggers_stage?: boolean;
+
+  @ApiProperty({
+    description: 'Internal — set by AnimalService.transitionStage() when it already logs its own, more precise animal_movement_log entry (it knows the exact destination stage requested, which can differ from the destination batch\'s own nominal stage used here). Not intended for direct/manual use.',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  skip_movement_log?: boolean;
 }
 
 export class SplitBatchDto {

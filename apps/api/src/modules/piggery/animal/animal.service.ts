@@ -12,6 +12,9 @@ import { AuditLogService } from '../../system/audit-log/audit-log.service';
 
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
+import { AnimalMovementLogService } from '../animal-movement-log/animal-movement-log.service';
+import { SchedulerHeaderService } from '../../production/scheduler-header/scheduler-header.service';
+import { BatchTransferService } from '../../production/batch/batch-transfer.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => date.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -140,6 +143,9 @@ export class AnimalService {
     private readonly auditService: AuditLogService,
     private readonly numberSeriesService: NumberSeriesService,
     private readonly nobLobResolution: NobLobResolutionService,
+    private readonly movementLog: AnimalMovementLogService,
+    private readonly schedulerHeaderService: SchedulerHeaderService,
+    private readonly batchTransferService: BatchTransferService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -470,6 +476,21 @@ export class AnimalService {
       newValues: newAnimal,
     });
 
+    // First entry in this animal's movement history — no "from" side, since
+    // the animal did not exist in this register before this moment.
+    await this.movementLog.record({
+      tenantId,
+      companyId: dto.company_id,
+      animalId,
+      movementType: dto.entry_type === 'BORN_ON_FARM' ? 'ASSIGN' : 'PURCHASE',
+      eventDate: dto.entry_date,
+      toBatchId: dto.current_batch_id || null,
+      toStageId: dto.current_stage_id || null,
+      toLocationId: dto.current_location_id || null,
+      entryNo: dto.source_receipt_id || dto.source_batch_id || null,
+      userId: userPayload?.userId,
+    });
+
     return this.findOne(animalId);
   }
 
@@ -708,10 +729,77 @@ export class AnimalService {
     if (dto.serial_number !== undefined) updates.serial_number = dto.serial_number;
     if (dto.notes !== undefined) updates.notes = dto.notes;
 
-    await this.db
-      .update(schema.animalRegister)
-      .set(updates)
-      .where(eq(schema.animalRegister.animal_id, id));
+    // current_batch_id/current_stage_id are the fields two concurrent requests
+    // can race on — e.g. two users assigning the same currently-unassigned
+    // animal to two different batches at once. Locking the row and re-reading
+    // it inside the transaction catches a concurrent commit that landed
+    // between the plain findOne() above and this write: if either field no
+    // longer matches what this request read, someone else already moved this
+    // animal, and this write must fail loudly rather than silently overwrite
+    // that commit ("last write wins" would let both callers believe they
+    // succeeded). Other fields on this DTO don't have this race, so the lock
+    // is scoped to only when the request actually touches assignment state.
+    const touchesAssignment = dto.current_batch_id !== undefined || dto.current_stage_id !== undefined;
+    if (touchesAssignment) {
+      await this.db.transaction(async (tx) => {
+        const [locked] = await tx
+          .select({ current_batch_id: schema.animalRegister.current_batch_id, current_stage_id: schema.animalRegister.current_stage_id })
+          .from(schema.animalRegister)
+          .where(eq(schema.animalRegister.animal_id, id))
+          .for('update');
+        if (dto.current_batch_id !== undefined && locked.current_batch_id !== animal.current_batch_id) {
+          throw new ConflictException(`Animal '${animal.animal_code}' was already moved to a different batch by another request. Reload and try again.`);
+        }
+        if (dto.current_stage_id !== undefined && locked.current_stage_id !== animal.current_stage_id) {
+          throw new ConflictException(`Animal '${animal.animal_code}' was already moved to a different stage by another request. Reload and try again.`);
+        }
+        await tx.update(schema.animalRegister).set(updates).where(eq(schema.animalRegister.animal_id, id));
+      });
+    } else {
+      await this.db
+        .update(schema.animalRegister)
+        .set(updates)
+        .where(eq(schema.animalRegister.animal_id, id));
+    }
+
+    // This is the generic PUT /animal/:id the Batch Animals roster already
+    // uses for assign ({ current_batch_id }), unassign ({ current_batch_id:
+    // null }), and relocate ({ current_location_id }) — none of those
+    // dedicated flows exist as separate endpoints, so movement logging has to
+    // live here too, not just in transitionStage(). No explicit event date on
+    // this DTO (unlike transitionStage's transition_date), so today stands in.
+    const batchChanged = dto.current_batch_id !== undefined && dto.current_batch_id !== animal.current_batch_id;
+    const stageChanged = dto.current_stage_id !== undefined && dto.current_stage_id !== animal.current_stage_id;
+    const locationChanged = dto.current_location_id !== undefined && dto.current_location_id !== animal.current_location_id;
+    if (batchChanged || stageChanged || locationChanged) {
+      const newBatchId = batchChanged ? dto.current_batch_id! : animal.current_batch_id;
+      const newStageId = stageChanged ? dto.current_stage_id! : animal.current_stage_id;
+      const newLocationId = locationChanged ? dto.current_location_id! : animal.current_location_id;
+      const movementType = batchChanged
+        ? (newBatchId ? (animal.current_batch_id ? 'TRANSFER' : 'ASSIGN') : 'UNASSIGN')
+        : stageChanged ? 'STAGE_CHANGE' : 'RELOCATE';
+
+      await this.movementLog.record({
+        tenantId,
+        companyId: animal.company_id,
+        animalId: id,
+        movementType,
+        eventDate: toMysqlTimestamp().slice(0, 10),
+        fromBatchId: animal.current_batch_id,
+        toBatchId: newBatchId,
+        fromStageId: animal.current_stage_id,
+        toStageId: newStageId,
+        fromLocationId: animal.current_location_id,
+        toLocationId: newLocationId,
+        userId: userPayload?.userId,
+      });
+
+      // Only meaningful once the animal has landed in both a batch and a
+      // stage — an assign-with-no-stage-yet has nothing to schedule against.
+      if (newBatchId && newStageId) {
+        await this.schedulerHeaderService.createForStage(newBatchId, newStageId, tenantId, userPayload);
+      }
+    }
 
     await this.auditService.log({
       tenantId,
@@ -798,6 +886,25 @@ export class AnimalService {
       entityId: id,
       oldValues: animal,
       newValues: updates,
+    });
+
+    // DIED -> MORTALITY; SOLD/SLAUGHTERED/TRANSFERRED (left the tenant's
+    // register entirely) -> OUTPUT — the closest fit among the LOCATION
+    // TRACEABILITY tab's 5 named categories (PURCHASE/OUTPUT/TRANSFER/
+    // MORTALITY/CULLS); this codebase has no dedicated CULL flow yet
+    // (dispose() itself refuses CULLED), so CULL never actually fires here.
+    await this.movementLog.record({
+      tenantId,
+      companyId: animal.company_id,
+      animalId: id,
+      movementType: dto.disposal_type === 'DIED' ? 'MORTALITY' : 'OUTPUT',
+      eventDate: dto.disposal_date,
+      fromBatchId: animal.current_batch_id,
+      fromStageId: animal.current_stage_id,
+      fromLocationId: animal.current_location_id,
+      reason: dto.disposal_type,
+      remarks: dto.notes,
+      userId: userPayload?.userId,
     });
 
     return this.findOne(id);
@@ -930,13 +1037,29 @@ export class AnimalService {
         .limit(1);
 
       if (currentStage?.min_days_before_move && currentStage.min_days_before_move > 0) {
-        const entryDate = animal.entry_date ? new Date(animal.entry_date) : new Date(animal.created_at);
+        // Prefer the date the animal actually entered its CURRENT stage (the
+        // most recent movement-log row that landed it there) over its overall
+        // farm entry_date — otherwise an animal past its first stage is
+        // validated against total farm tenure instead of time-in-stage.
+        const [lastStageEntry] = await this.db
+          .select({ event_date: schema.animalMovementLog.event_date })
+          .from(schema.animalMovementLog)
+          .where(and(
+            eq(schema.animalMovementLog.animal_id, id),
+            eq(schema.animalMovementLog.to_stage_id, animal.current_stage_id),
+          ))
+          .orderBy(desc(schema.animalMovementLog.event_date))
+          .limit(1);
+
+        const stageEntryDate = lastStageEntry
+          ? new Date(lastStageEntry.event_date)
+          : (animal.entry_date ? new Date(animal.entry_date) : new Date(animal.created_at));
         const transDate = new Date(dto.transition_date);
-        const daysPassed = Math.floor((transDate.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
+        const daysPassed = Math.floor((transDate.getTime() - stageEntryDate.getTime()) / (1000 * 60 * 60 * 24));
 
         if (daysPassed < currentStage.min_days_before_move && !dto.reason) {
           throw new BadRequestException(
-            `Minimum duration of ${currentStage.min_days_before_move} days required for '${currentStage.stage_name}' before transition (current: ${daysPassed} days). Provide a reason to override.`
+            `Minimum duration of ${currentStage.min_days_before_move} days required for '${currentStage.stage_name}' before transition (current: ${daysPassed} days in this stage). Provide a reason to override.`
           );
         }
       }
@@ -977,19 +1100,90 @@ export class AnimalService {
       newParity += 1;
     }
 
-    const updates = {
-      current_stage_id: dto.to_stage_id,
-      current_location_id: dto.to_location_id !== undefined ? dto.to_location_id : animal.current_location_id,
-      current_batch_id: dto.to_batch_id !== undefined ? dto.to_batch_id : animal.current_batch_id,
-      parity_count: newParity,
-      updated_by: userPayload?.userId || null,
-      updated_at: toMysqlTimestamp(),
-    };
+    const newBatchId = dto.to_batch_id !== undefined ? dto.to_batch_id : animal.current_batch_id;
+    const newLocationId = dto.to_location_id !== undefined ? dto.to_location_id : animal.current_location_id;
+    const isCrossBatchMove = newBatchId !== animal.current_batch_id;
 
-    await this.db
-      .update(schema.animalRegister)
-      .set(updates)
-      .where(eq(schema.animalRegister.animal_id, id));
+    // A real cross-batch move (this animal already belongs to a source batch,
+    // and is moving to a different one) is a financial event, not just a
+    // registry update — BatchTransferService is what actually shifts the bio-
+    // asset carrying value between the two batches' batch_bio_asset_state and
+    // writes the ledger legs; a raw field update here would leave the source
+    // batch's book value overstated and the destination's understated.
+    //
+    // An animal with no current batch (current_batch_id null — freshly
+    // registered or previously unassigned) has no source batch to move value
+    // FROM, so BatchTransferService.create() — which requires an ACTIVE source
+    // batch — cannot be used for that case; it stays a direct assignment below.
+    let entryNo: string | null = null;
+    if (isCrossBatchMove && animal.current_batch_id && newBatchId) {
+      const transfer = await this.batchTransferService.create(
+        {
+          company_id: animal.company_id,
+          to_batch_id: newBatchId,
+          to_location_id: newLocationId || undefined,
+          transfer_date: dto.transition_date,
+          transfer_type: 'PARTIAL',
+          animal_ids: [id],
+          reason: dto.reason,
+          remarks: dto.remarks,
+          skip_movement_log: true,
+        } as any,
+        tenantId,
+        animal.current_batch_id,
+        userPayload,
+      );
+      entryNo = (transfer as any)?.transfer_no || null;
+      // BatchTransferService.post() already repointed current_batch_id and
+      // current_location_id (and current_stage_id, from the destination
+      // batch's own stage) — but the destination STAGE here is the one this
+      // transition explicitly asked for, which may differ from the
+      // destination batch's own nominal stage (exactly the ANIMAL_WISE case:
+      // several animals landing in the same batch at different stages). Set
+      // it explicitly rather than trusting whatever the transfer inferred.
+      await this.db.update(schema.animalRegister).set({ current_stage_id: dto.to_stage_id, parity_count: newParity })
+        .where(eq(schema.animalRegister.animal_id, id));
+    } else {
+      await this.db
+        .update(schema.animalRegister)
+        .set({
+          current_stage_id: dto.to_stage_id,
+          current_location_id: newLocationId,
+          current_batch_id: newBatchId,
+          parity_count: newParity,
+          updated_by: userPayload?.userId || null,
+          updated_at: toMysqlTimestamp(),
+        })
+        .where(eq(schema.animalRegister.animal_id, id));
+    }
+
+    // The destination stage needs its own scheduler — same idempotent call
+    // transferStage() already makes for a whole-batch move, just scoped to
+    // this one animal's own stage instead. No-ops if it already exists.
+    if (newBatchId) {
+      await this.schedulerHeaderService.createForStage(newBatchId, dto.to_stage_id, tenantId, userPayload);
+    }
+
+    const movementType = isCrossBatchMove
+      ? (animal.current_batch_id ? 'TRANSFER' : 'ASSIGN') // same distinction update() makes: no prior batch means nothing to move value FROM
+      : (newLocationId !== animal.current_location_id && dto.to_stage_id === animal.current_stage_id ? 'RELOCATE' : 'STAGE_CHANGE');
+    await this.movementLog.record({
+      tenantId,
+      companyId: animal.company_id,
+      animalId: id,
+      movementType,
+      eventDate: dto.transition_date,
+      fromBatchId: animal.current_batch_id,
+      toBatchId: newBatchId,
+      fromStageId: animal.current_stage_id,
+      toStageId: dto.to_stage_id,
+      fromLocationId: animal.current_location_id,
+      toLocationId: newLocationId,
+      entryNo,
+      reason: dto.reason,
+      remarks: dto.remarks,
+      userId: userPayload?.userId,
+    });
 
     await this.auditService.log({
       tenantId,
@@ -1004,7 +1198,9 @@ export class AnimalService {
         current_batch_id: animal.current_batch_id,
       },
       newValues: {
-        ...updates,
+        current_stage_id: dto.to_stage_id,
+        current_location_id: newLocationId,
+        current_batch_id: newBatchId,
         transition_date: dto.transition_date,
         reason: dto.reason,
         remarks: dto.remarks,

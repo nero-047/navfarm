@@ -261,7 +261,7 @@ const activity: MasterDataConfig = {
   columns: [
     { key: "activity_code", label: "Code" },
     { key: "activity_name", label: "Name" },
-    { key: "line_type", label: "Line Type" },
+    { key: "line_type", label: "Activity Type" },
     { key: "description", label: "Description" },
   ],
   fields: [
@@ -269,7 +269,7 @@ const activity: MasterDataConfig = {
     { key: "activity_code", label: "Activity Code", type: "text", required: true, placeholder: "e.g. MORN_FEED", createOnly: true, helpText: "Short unique uppercase code (e.g. MORN_FEED) for lookups and reporting." },
     { key: "activity_name", label: "Activity Name", type: "text", required: true, placeholder: "e.g. Morning Feed" },
     {
-      key: "line_type", label: "Line Type", type: "select", required: true,
+      key: "line_type", label: "Activity Type", type: "select", required: true,
       options: [
         { value: "CONSUMPTION", label: "CONSUMPTION" },
         { value: "OUTPUT", label: "OUTPUT" },

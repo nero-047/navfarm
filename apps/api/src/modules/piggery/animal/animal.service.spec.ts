@@ -4,6 +4,9 @@ import { ClsService } from 'nestjs-cls';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { NobLobResolutionService } from '../../core/operational-area/nob-lob-resolution.service';
+import { AnimalMovementLogService } from '../animal-movement-log/animal-movement-log.service';
+import { SchedulerHeaderService } from '../../production/scheduler-header/scheduler-header.service';
+import { BatchTransferService } from '../../production/batch/batch-transfer.service';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('AnimalService', () => {
@@ -13,14 +16,17 @@ describe('AnimalService', () => {
   const mockDbSelect = jest.fn();
   const mockDbInsert = jest.fn();
   const mockDbUpdate = jest.fn();
+  const mockDbTransaction = jest.fn();
 
   const mockDb = {
     select: mockDbSelect,
     insert: mockDbInsert,
     update: mockDbUpdate,
+    transaction: mockDbTransaction,
   };
 
   const found = (row: any) => ({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue(row ? [row] : []) }) }) });
+  const foundOrdered = (row: any) => ({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ orderBy: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue(row ? [row] : []) }) }) }) });
 
   const baseDto = {
     company_id: 'comp-1',
@@ -47,6 +53,8 @@ describe('AnimalService', () => {
     mockDbSelect.mockReset();
     mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
+    mockDbTransaction.mockReset();
+    mockDbTransaction.mockImplementation(async (cb: any) => cb(mockDb));
     nobLobResolution.resolve.mockReset();
     nobLobResolution.resolve.mockImplementation(async (_tenantId: string, _companyId: any, explicit: any) => ({
       nob_id: explicit?.nob_id ?? null,
@@ -60,6 +68,9 @@ describe('AnimalService', () => {
         { provide: AuditLogService, useValue: { log: jest.fn().mockResolvedValue({}) } },
         { provide: NumberSeriesService, useValue: { generateNext: jest.fn().mockResolvedValue('PIG-2026-0001') } },
         { provide: NobLobResolutionService, useValue: nobLobResolution },
+        { provide: AnimalMovementLogService, useValue: { record: jest.fn().mockResolvedValue('movement-1') } },
+        { provide: SchedulerHeaderService, useValue: { createForStage: jest.fn().mockResolvedValue({}) } },
+        { provide: BatchTransferService, useValue: { create: jest.fn().mockResolvedValue({ transfer_no: 'TRF-0001' }) } },
       ],
     }).compile();
 
@@ -149,6 +160,40 @@ describe('AnimalService', () => {
       await expect(
         service.update('a-1', { dam_animal_id: 'a-1' }, 'tenant-123'),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    describe('concurrent assignment (BBP §37)', () => {
+      const lockedFound = (row: any) => ({
+        from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ for: jest.fn().mockResolvedValue([row]) }) }),
+      });
+
+      it('assigns to a batch when nothing else changed it in the meantime', async () => {
+        mockDbSelect
+          .mockReturnValueOnce(found({ animal_id: 'a-1', animal_code: 'PIG-0001', company_id: 'comp-1', current_batch_id: null, current_stage_id: null }))
+          .mockReturnValueOnce(found({ batch_id: 'batch-1' })) // current_batch_id existence check
+          .mockReturnValueOnce(lockedFound({ current_batch_id: null, current_stage_id: null })) // locked re-check — unchanged
+          .mockReturnValueOnce(found({ animal_id: 'a-1', current_batch_id: 'batch-1' })); // final findOne() before returning
+
+        mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
+
+        await expect(
+          service.update('a-1', { current_batch_id: 'batch-1' }, 'tenant-123'),
+        ).resolves.toBeDefined();
+        expect(mockDbTransaction).toHaveBeenCalled();
+      });
+
+      it('rejects with ConflictException when another request already moved the animal to a different batch', async () => {
+        mockDbSelect
+          .mockReturnValueOnce(found({ animal_id: 'a-1', animal_code: 'PIG-0001', company_id: 'comp-1', current_batch_id: null, current_stage_id: null }))
+          .mockReturnValueOnce(found({ batch_id: 'batch-1' })) // current_batch_id existence check
+          .mockReturnValueOnce(lockedFound({ current_batch_id: 'batch-rival', current_stage_id: null })); // someone else already claimed it
+
+        await expect(
+          service.update('a-1', { current_batch_id: 'batch-1' }, 'tenant-123'),
+        ).rejects.toThrow(ConflictException);
+        // The losing request must never overwrite the winner's assignment.
+        expect(mockDbUpdate).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -637,6 +682,7 @@ describe('AnimalService', () => {
           min_days_before_move: 10,
           stage_name: 'Gilt Grower',
         })) // currentStage check
+        .mockReturnValueOnce(foundOrdered(null)) // last stage-entry movement-log lookup — none, falls back to entry_date
         .mockReturnValueOnce(found({
           location_id: 'loc-2',
           location_name: 'Pen 2B',
@@ -690,6 +736,7 @@ describe('AnimalService', () => {
           stage_name: 'Farrowing',
           min_days_before_move: 1,
         })) // currentStage
+        .mockReturnValueOnce(foundOrdered(null)) // last stage-entry movement-log lookup — none, falls back to entry_date
         .mockReturnValueOnce(found({ animal_id: 'a-2', parity_count: 3 })); // findOne return
 
       mockDbUpdate.mockReturnValue({

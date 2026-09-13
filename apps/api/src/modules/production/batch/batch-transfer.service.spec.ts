@@ -5,6 +5,7 @@ import { BatchTransferService } from './batch-transfer.service';
 import { AuditLogService } from '../../system/audit-log/audit-log.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { SchedulerHeaderService } from '../scheduler-header/scheduler-header.service';
+import { AnimalMovementLogService } from '../../piggery/animal-movement-log/animal-movement-log.service';
 import * as schema from '../../../core/database/schema';
 
 describe('BatchTransferService', () => {
@@ -13,11 +14,13 @@ describe('BatchTransferService', () => {
   const mockDbSelect = jest.fn();
   const mockDbUpdate = jest.fn();
   const mockDbInsert = jest.fn();
+  const mockDbTransaction = jest.fn();
 
   const mockDb = {
     select: mockDbSelect,
     update: mockDbUpdate,
     insert: mockDbInsert,
+    transaction: mockDbTransaction,
   };
 
   const draftTransfer = {
@@ -38,6 +41,8 @@ describe('BatchTransferService', () => {
     mockDbSelect.mockReset();
     mockDbUpdate.mockReset();
     mockDbInsert.mockReset();
+    mockDbTransaction.mockReset();
+    mockDbTransaction.mockImplementation(async (cb: any) => cb(mockDb));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,6 +51,7 @@ describe('BatchTransferService', () => {
         { provide: AuditLogService, useValue: { log: jest.fn().mockResolvedValue({}) } },
         { provide: NumberSeriesService, useValue: { generateNext: jest.fn().mockResolvedValue('BTR-2026-0001') } },
         { provide: SchedulerHeaderService, useValue: { createForStage: jest.fn().mockResolvedValue({}) } },
+        { provide: AnimalMovementLogService, useValue: { record: jest.fn().mockResolvedValue('movement-1') } },
       ],
     }).compile();
 
@@ -211,16 +217,18 @@ describe('BatchTransferService', () => {
       mockDbSelect
         .mockReturnValueOnce({
           from: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue([{ animal_id: 'a-1' }, { animal_id: 'a-2' }]),
-          }),
-        }) // stillLive guard
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
               limit: jest.fn().mockResolvedValue([{ stage_id: 'stage-farrowing' }]),
             }),
           }),
-        }); // destination batch stage
+        }) // destination batch stage
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              for: jest.fn().mockResolvedValue([{ animal_id: 'a-1' }, { animal_id: 'a-2' }]),
+            }),
+          }),
+        }); // stillLive guard (locked, inside transaction)
 
       mockDbUpdate.mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue({}) }) });
 
@@ -230,6 +238,31 @@ describe('BatchTransferService', () => {
       const animalSet = (mockDbUpdate.mock.results[0].value.set as jest.Mock).mock.calls[0][0];
       expect(animalSet.current_batch_id).toBe('batch-farrow');
       expect(animalSet.current_stage_id).toBe('stage-farrowing');
+    });
+
+    it('refuses to post when a concurrent request already moved one of the animals off the source batch', async () => {
+      // BBP §37: the locked re-check runs inside the transaction, immediately
+      // before the repoint — if it finds fewer still-live animals than the
+      // transfer expects (one got claimed elsewhere between draft and post),
+      // this post must fail rather than silently transfer the rest.
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(draftTransfer as any);
+
+      mockDbSelect
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([{ stage_id: 'stage-farrowing' }]) }),
+          }),
+        }) // destination batch stage
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({ for: jest.fn().mockResolvedValue([{ animal_id: 'a-1' }]) }), // only 1 of 2 still live
+          }),
+        });
+
+      await expect(
+        service.post('tr-1', 'tenant-123', { userId: 'user-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockDbUpdate).not.toHaveBeenCalled();
     });
   });
 });

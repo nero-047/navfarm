@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Inject } from '@nestjs/common';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { eq, and, like, isNull, inArray, desc, SQL } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -25,6 +25,16 @@ import { InventoryLedgerService } from '../../inventory/inventory-ledger/invento
 import { GlPostingService } from '../../finance/journal/gl-posting.service';
 import { NumberSeriesService } from '../../system/number-series/number-series.service';
 import { SchedulerHeaderService } from '../scheduler-header/scheduler-header.service';
+import { AnimalMovementLogService } from '../../piggery/animal-movement-log/animal-movement-log.service';
+// Type-only — BatchDailyDataService itself already depends on BatchService
+// (for addTransaction), so a normal value import here would form a real
+// circular module reference between the two compiled files. `import type`
+// is erased entirely, so the actual instance below is wired up through the
+// 'BATCH_DAILY_DATA_POSTER' token (see BatchDailyDataModule) instead of a
+// direct class reference — the DI graph stays circular (both modules import
+// each other, which is fine and forwardRef-guarded at the module level) but
+// no compiled file ends up needing the other's class value at load time.
+import type { BatchDailyDataService } from '../batch-daily-data/batch-daily-data.service';
 
 const toMysqlTimestamp = (date: Date = new Date()) => {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -63,6 +73,13 @@ export class BatchService {
     private readonly glPostingService: GlPostingService,
     private readonly numberSeriesService: NumberSeriesService,
     private readonly schedulerHeaderService: SchedulerHeaderService,
+    private readonly movementLog: AnimalMovementLogService,
+    // Only postBatchDay() uses this, to finalize each of the day's draft
+    // entries through the exact same dispatch logic postEntry() already has,
+    // rather than duplicating it. Injected by string token, not the class
+    // itself — see the `import type` comment above.
+    @Inject('BATCH_DAILY_DATA_POSTER')
+    private readonly batchDailyDataService: BatchDailyDataService,
   ) {}
 
   private get db(): MySql2Database<typeof schema> {
@@ -104,6 +121,24 @@ export class BatchService {
   }
 
   async create(dto: CreateBatchDto, tenantId: string, userPayload?: UserContext) {
+    const trackingMode = (dto.tracking_mode || 'BATCH_WISE').toUpperCase();
+
+    // ANIMAL_WISE batches are populated from animal_ids, not input_lines/opening_quantity —
+    // each is required for exactly one mode, enforced here rather than as DTO decorators
+    // since which one applies depends on this same field.
+    if (trackingMode === 'ANIMAL_WISE') {
+      if (!dto.animal_ids || dto.animal_ids.length === 0) {
+        throw new BadRequestException('animal_ids is required for ANIMAL_WISE batches.');
+      }
+    } else {
+      if (!dto.input_lines || dto.input_lines.length === 0) {
+        throw new BadRequestException('input_lines is required for BATCH_WISE batches.');
+      }
+      if (dto.opening_quantity === undefined || dto.opening_quantity === null) {
+        throw new BadRequestException('opening_quantity is required for BATCH_WISE batches.');
+      }
+    }
+
     const [lob] = await this.db
       .select()
       .from(schema.lobMaster)
@@ -117,6 +152,33 @@ export class BatchService {
       throw new BadRequestException(
         `Costing method '${dto.costing_method}' is not allowed for LOB '${lob.lob_name}' (allowed: ${lob.costing_method_allowed}).`
       );
+    }
+
+    // ANIMAL_WISE: validate the selected animals up front (before any row is
+    // written) so a bad animal_id fails clean instead of leaving a half-built batch.
+    let animalWiseAnimals: (typeof schema.animalRegister.$inferSelect)[] = [];
+    if (trackingMode === 'ANIMAL_WISE') {
+      animalWiseAnimals = await this.db
+        .select()
+        .from(schema.animalRegister)
+        .where(and(inArray(schema.animalRegister.animal_id, dto.animal_ids!), eq(schema.animalRegister.tenant_id, tenantId)));
+      const foundIds = new Set(animalWiseAnimals.map((a) => a.animal_id));
+      const missing = dto.animal_ids!.filter((id) => !foundIds.has(id));
+      if (missing.length) {
+        throw new BadRequestException(`Animal(s) not found: ${missing.join(', ')}.`);
+      }
+      const alreadyAssigned = animalWiseAnimals.filter((a) => a.current_batch_id);
+      if (alreadyAssigned.length) {
+        throw new BadRequestException(
+          `Animal(s) already assigned to a batch: ${alreadyAssigned.map((a) => a.animal_code).join(', ')}.`
+        );
+      }
+      const wrongLob = animalWiseAnimals.filter((a) => a.lob_id !== dto.lob_id);
+      if (wrongLob.length) {
+        throw new BadRequestException(
+          `Animal(s) do not belong to this Line of Business: ${wrongLob.map((a) => a.animal_code).join(', ')}.`
+        );
+      }
     }
 
     let initialStage: typeof schema.stageMaster.$inferSelect | undefined;
@@ -147,48 +209,113 @@ export class BatchService {
     }
 
     const batchId = randomUUID();
-    const batchNo = await this.db.transaction(async (tx) => {
-      const no = await this.generateBatchNo(tenantId, dto.company_id, tx);
-      await tx.insert(schema.batchHeader).values({
-        batch_id: batchId,
-        tenant_id: tenantId,
-        company_id: dto.company_id,
-        batch_no: no,
-        lob_id: dto.lob_id,
-        nob_id: lob.nob_id,
-        costing_method: dto.costing_method.toUpperCase(),
-        breed_id: dto.breed_id || null,
-        stage_id: initialStage?.stage_id || null,
-        current_stage_code: initialStage?.stage_code || null,
-        shed_id: dto.shed_id || null,
-        location_id: dto.location_id || null,
-        start_date: dto.start_date,
-        expected_end_date: computedExpectedEndDate,
-        status: 'DRAFT',
-        opening_quantity: dto.opening_quantity.toString(),
-        uom: dto.uom,
-        remarks: dto.remarks || null,
-        created_by: userPayload?.userId || null,
-        updated_by: userPayload?.userId || null,
+    const batchHeaderValues = {
+      batch_id: batchId,
+      tenant_id: tenantId,
+      company_id: dto.company_id,
+      lob_id: dto.lob_id,
+      nob_id: lob.nob_id,
+      costing_method: dto.costing_method.toUpperCase(),
+      breed_id: dto.breed_id || null,
+      stage_id: initialStage?.stage_id || null,
+      current_stage_code: initialStage?.stage_code || null,
+      shed_id: dto.shed_id || null,
+      location_id: dto.location_id || null,
+      start_date: dto.start_date,
+      expected_end_date: computedExpectedEndDate,
+      status: 'DRAFT',
+      tracking_mode: trackingMode,
+      uom: dto.uom,
+      remarks: dto.remarks || null,
+      created_by: userPayload?.userId || null,
+      updated_by: userPayload?.userId || null,
+    };
+
+    let batchNo: string;
+    if (trackingMode === 'ANIMAL_WISE') {
+      // The whole header-insert + animal-claim sequence is one transaction so a
+      // losing concurrent claim (see the locked re-check below) rolls back the
+      // batch_header too — otherwise a race would leave behind an orphaned
+      // DRAFT batch with none of its intended animals.
+      batchNo = await this.db.transaction(async (tx) => {
+        const no = await this.generateBatchNo(tenantId, dto.company_id, tx);
+        await tx.insert(schema.batchHeader).values({ ...batchHeaderValues, batch_no: no, opening_quantity: animalWiseAnimals.length.toString() });
+
+        // Re-check under a row lock, immediately before claiming — the plain
+        // SELECT above (this.db, no lock) ran before batch_no generation and
+        // the header insert, a wide-enough window for another request to have
+        // assigned one of these same animals elsewhere in the meantime. Only
+        // one concurrent claim on any given animal may win; the other must see
+        // a clean failure, not silently overwrite the winner's assignment.
+        const locked = await tx
+          .select({ animal_id: schema.animalRegister.animal_id, animal_code: schema.animalRegister.animal_code, current_batch_id: schema.animalRegister.current_batch_id })
+          .from(schema.animalRegister)
+          .where(inArray(schema.animalRegister.animal_id, dto.animal_ids!))
+          .for('update');
+        const claimedElsewhere = locked.filter((a) => a.current_batch_id);
+        if (claimedElsewhere.length) {
+          throw new ConflictException(
+            `Animal(s) were just assigned to another batch by a different request: ${claimedElsewhere.map((a) => a.animal_code).join(', ')}. Reload and try again.`
+          );
+        }
+
+        await tx
+          .update(schema.animalRegister)
+          .set({ current_batch_id: batchId, updated_by: userPayload?.userId || null, updated_at: toMysqlTimestamp() })
+          .where(inArray(schema.animalRegister.animal_id, dto.animal_ids!));
+
+        return no;
       });
-      return no;
-    });
 
-    await this.db.insert(schema.batchInputLine).values(
-      dto.input_lines.map((line, idx) => ({
-        line_id: randomUUID(),
-        batch_id: batchId,
-        line_no: idx + 1,
-        item_id: line.item_id,
-        source_batch_id: line.source_batch_id || null,
-        quantity: line.quantity.toString(),
-        uom: line.uom,
-        rate: line.rate?.toString() || null,
-        amount: line.rate ? (line.quantity * line.rate).toString() : null,
-      }))
-    );
+      // Animals already exist in animal_register (selected from currently-unassigned
+      // stock) — assign them to this batch while explicitly preserving each animal's
+      // own current_stage_id/current_location_id, then log the move and stand up a
+      // scheduler for every distinct stage now represented in the batch. Deliberately
+      // skips registerPlaceholderAnimals() (that creates NEW animal rows for a
+      // headcount — not applicable here) and the input-line-driven bio-asset ledger
+      // posting (no acquisition is happening; these animals' value is already on the
+      // books from whatever batch/purchase originally brought them in).
+      for (const animal of animalWiseAnimals) {
+        await this.movementLog.record({
+          tenantId,
+          companyId: dto.company_id,
+          animalId: animal.animal_id,
+          movementType: 'ASSIGN',
+          eventDate: dto.start_date,
+          toBatchId: batchId,
+          toStageId: animal.current_stage_id,
+          toLocationId: animal.current_location_id,
+          userId: userPayload?.userId,
+        });
+      }
 
-    if (dto.costing_method.toUpperCase() === 'STANDARD') {
+      const distinctStageIds = [...new Set(animalWiseAnimals.map((a) => a.current_stage_id).filter((id): id is string => !!id))];
+      for (const stageId of distinctStageIds) {
+        await this.schedulerHeaderService.createForStage(batchId, stageId, tenantId, userPayload);
+      }
+    } else {
+      batchNo = await this.db.transaction(async (tx) => {
+        const no = await this.generateBatchNo(tenantId, dto.company_id, tx);
+        await tx.insert(schema.batchHeader).values({ ...batchHeaderValues, batch_no: no, opening_quantity: dto.opening_quantity!.toString() });
+        return no;
+      });
+
+      await this.db.insert(schema.batchInputLine).values(
+        dto.input_lines!.map((line, idx) => ({
+          line_id: randomUUID(),
+          batch_id: batchId,
+          line_no: idx + 1,
+          item_id: line.item_id,
+          source_batch_id: line.source_batch_id || null,
+          quantity: line.quantity.toString(),
+          uom: line.uom,
+          rate: line.rate?.toString() || null,
+          amount: line.rate ? (line.quantity * line.rate).toString() : null,
+        }))
+      );
+    }
+
+    if (trackingMode !== 'ANIMAL_WISE' && dto.costing_method.toUpperCase() === 'STANDARD') {
       let stdOutputQty = dto.standard?.std_output_quantity;
       if (stdOutputQty === undefined || stdOutputQty === null) {
         let mortalityPct = 0;
@@ -200,7 +327,7 @@ export class BatchService {
             .limit(1);
           mortalityPct = breed?.avg_mortality_pct ? Number(breed.avg_mortality_pct) : 0;
         }
-        stdOutputQty = dto.opening_quantity * (1 - mortalityPct / 100);
+        stdOutputQty = dto.opening_quantity! * (1 - mortalityPct / 100);
       }
 
       await this.db.insert(schema.batchStandard).values({
@@ -225,12 +352,16 @@ export class BatchService {
       }
     }
 
-    if (dto.costing_method.toUpperCase() === 'BIO_ASSET') {
+    // ANIMAL_WISE skips this entirely: the assigned animals already carry their own
+    // bio-asset value on their own animal_register rows (from whatever batch/purchase
+    // originally brought them in) — there is no new acquisition happening here, so
+    // there is nothing for a fresh batch_bio_asset_state row to represent.
+    if (trackingMode !== 'ANIMAL_WISE' && dto.costing_method.toUpperCase() === 'BIO_ASSET') {
       await this.db.insert(schema.batchBioAssetState).values({
         state_id: randomUUID(),
         batch_id: batchId,
         stage: 'PREMATURE',
-        current_quantity: dto.opening_quantity.toString(),
+        current_quantity: dto.opening_quantity!.toString(),
         nca_book_value: '0.0000',
       });
 
@@ -250,10 +381,10 @@ export class BatchService {
           lobId: dto.lob_id,
           breedId: dto.breed_id,
           locationId: dto.location_id || null,
-          headcount: dto.opening_quantity,
+          headcount: dto.opening_quantity!,
           entryDate: dto.start_date,
-          inputLines: dto.input_lines,
-          sourceBatchId: dto.input_lines.find((l) => l.source_batch_id)?.source_batch_id || null,
+          inputLines: dto.input_lines!,
+          sourceBatchId: dto.input_lines!.find((l) => l.source_batch_id)?.source_batch_id || null,
           userId: userPayload?.userId,
         });
       }
@@ -504,6 +635,37 @@ export class BatchService {
       }
     }
 
+    // Minimum-duration validation, mirroring AnimalService.transitionStage():
+    // a whole-batch move should not bypass the same per-stage duration floor
+    // that already applies to animal-wise moves. "Entered this stage on" is
+    // the batch's own last transfer into batch.stage_id, falling back to
+    // start_date for a batch still in its first stage.
+    if (batch.stage_id) {
+      const [currentStageInfo] = await this.db
+        .select({ min_days_before_move: schema.stageMaster.min_days_before_move, stage_name: schema.stageMaster.stage_name })
+        .from(schema.stageMaster)
+        .where(eq(schema.stageMaster.stage_id, batch.stage_id))
+        .limit(1);
+
+      if (currentStageInfo?.min_days_before_move && currentStageInfo.min_days_before_move > 0) {
+        const [lastTransfer] = await this.db
+          .select({ transferred_at: schema.batchStageLog.transferred_at })
+          .from(schema.batchStageLog)
+          .where(eq(schema.batchStageLog.batch_id, id))
+          .orderBy(desc(schema.batchStageLog.transferred_at))
+          .limit(1);
+
+        const stageEntryDate = lastTransfer ? new Date(lastTransfer.transferred_at) : new Date(batch.start_date);
+        const daysPassed = Math.floor((Date.now() - stageEntryDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysPassed < currentStageInfo.min_days_before_move && !dto.remarks) {
+          throw new BadRequestException(
+            `Minimum duration of ${currentStageInfo.min_days_before_move} days required for '${currentStageInfo.stage_name}' before transition (current: ${daysPassed} days in this stage). Provide remarks to override.`,
+          );
+        }
+      }
+    }
+
     await this.db
       .update(schema.batchHeader)
       .set({
@@ -546,6 +708,26 @@ export class BatchService {
             updated_at: toMysqlTimestamp(),
           })
           .where(inArray(schema.animalRegister.animal_id, inStep.map((a) => a.animal_id)));
+
+        // Batch-level moves used to only land in batch_stage_log, leaving
+        // animal_movement_log (the single source the animal-detail HISTORY /
+        // LOCATION TRACEABILITY tabs read) silent about every cascaded animal.
+        const moveDate = toMysqlTimestamp().slice(0, 10);
+        for (const animal of inStep) {
+          await this.movementLog.record({
+            tenantId,
+            companyId: batch.company_id,
+            animalId: animal.animal_id,
+            movementType: 'STAGE_CHANGE',
+            eventDate: moveDate,
+            fromBatchId: id,
+            toBatchId: id,
+            fromStageId: batch.stage_id,
+            toStageId: matchedStage.stage_id,
+            remarks: dto.remarks,
+            userId: userPayload?.userId,
+          });
+        }
       }
     }
 
@@ -776,11 +958,16 @@ export class BatchService {
     const batch = await this.findOne(id);
     this.assertStatus(batch, 'DRAFT');
 
-    if (!batch.input_lines || batch.input_lines.length === 0) {
+    // ANIMAL_WISE batches never have input lines — their animals are already-
+    // owned stock being grouped, not a fresh acquisition — so there's nothing
+    // to require or post here; skip straight to flipping status/schedulers.
+    if (batch.tracking_mode !== 'ANIMAL_WISE' && (!batch.input_lines || batch.input_lines.length === 0)) {
       throw new BadRequestException('Cannot activate a batch with no input lines.');
     }
 
-    if (batch.costing_method === 'BIO_ASSET') {
+    if (batch.tracking_mode === 'ANIMAL_WISE') {
+      // no-op: no acquisition to post
+    } else if (batch.costing_method === 'BIO_ASSET') {
       // Acquiring animals is a direct purchase creating an NCA — not a draw
       // against existing warehouse stock, so no FIFO/inventory_ledger here.
       let totalAcquisitionCost = 0;
@@ -857,7 +1044,15 @@ export class BatchService {
       .set({ status: 'ACTIVE', updated_by: userPayload?.userId || null, updated_at: toMysqlTimestamp() })
       .where(eq(schema.batchHeader.batch_id, id));
 
-    if (batch.stage_id) {
+    if (batch.tracking_mode === 'ANIMAL_WISE') {
+      // No single batch.stage_id to key off — an ANIMAL_WISE batch can have
+      // several scheduler_header rows live at once (one per stage), so all of
+      // this batch's still-DRAFT schedulers activate together.
+      await this.db
+        .update(schema.schedulerHeader)
+        .set({ scheduler_status: 'ACTIVE', updated_at: toMysqlTimestamp() })
+        .where(and(eq(schema.schedulerHeader.batch_id, id), eq(schema.schedulerHeader.scheduler_status, 'DRAFT')));
+    } else if (batch.stage_id) {
       await this.db
         .update(schema.schedulerHeader)
         .set({ scheduler_status: 'ACTIVE', updated_at: toMysqlTimestamp() })
@@ -1414,7 +1609,21 @@ export class BatchService {
   ) {
     const header = await this.loadCurrentSchedulerHeader(batch);
     if (!header) return [];
+    return this.loadScheduleLinesForHeader(header, dateStr);
+  }
 
+  /**
+   * Same due-line computation as loadActiveScheduleLines(), but keyed off an
+   * already-resolved scheduler_header rather than deriving one from
+   * batch.stage_id — batch.stage_id only ever names one stage, which an
+   * ANIMAL_WISE batch (several stages live at once, each with its own header)
+   * cannot use. loadActiveScheduleLines() stays the BATCH_WISE entry point;
+   * getDataEntryByStage() calls this directly, once per stage.
+   */
+  private async loadScheduleLinesForHeader(
+    header: typeof schema.schedulerHeader.$inferSelect,
+    dateStr: string,
+  ) {
     const lines = await this.db
       .select()
       .from(schema.schedulerLine)
@@ -1531,26 +1740,454 @@ export class BatchService {
    * given date under the batch's current-stage scheduler_header, with its
    * expected quantity and whatever's already been recorded that day — so the
    * UI can show a guided checklist instead of a blank generic transaction
-   * form.
+   * form. ANIMAL_WISE batches have no single current stage, so they delegate
+   * to getDataEntryByStage() instead — see that method's comment.
    */
   async getDataEntry(id: string, dateStr: string) {
     const batch = await this.findOne(id);
+    if (batch.tracking_mode === 'ANIMAL_WISE') {
+      return this.getDataEntryByStage(batch, dateStr);
+    }
     const activePairs = await this.loadActiveScheduleLines(batch, dateStr);
+    const lockInfo = batch.stage_id ? await this.getLockInfo(id, batch.stage_id, dateStr) : { lock_status: null, locked_by: null, locked_at: null, reopen_reason: null };
     if (!activePairs.length) {
-      return { date: dateStr, day_of_batch: null, lines: [] };
+      return { date: dateStr, day_of_batch: null, lines: [], ...lockInfo };
     }
     const header = activePairs[0].header;
-    const animalCount = Number(header.animal_count);
+    const { lines, dayOfStage } = await this.buildDataEntryLines(id, header, activePairs, dateStr);
+    return { date: dateStr, day_of_batch: dayOfStage, lines, ...lockInfo };
+  }
+
+  /** Shared by getDataEntry() (BATCH_WISE) and getDataEntryByStage() — one stage/date's current lock state. */
+  private async getLockInfo(batchId: string, stageId: string, dateStr: string) {
+    const [lock] = await this.db.select().from(schema.batchDataEntryLock)
+      .where(and(
+        eq(schema.batchDataEntryLock.batch_id, batchId),
+        eq(schema.batchDataEntryLock.stage_id, stageId),
+        eq(schema.batchDataEntryLock.entry_date, dateStr),
+      ))
+      .limit(1);
+    return { lock_status: lock?.status || null, locked_by: lock?.locked_by || null, locked_at: lock?.locked_at || null, reopen_reason: lock?.reopen_reason || null };
+  }
+
+  /**
+   * "POST ENTRY" — BATCH_WISE only (ANIMAL_WISE uses postStageDay() per
+   * stage). Reuses the exact same batch_data_entry_lock table and the same
+   * postEntry() lock-refusal this batch already gets for free — a BATCH_WISE
+   * scheduler_header always carries a real stage_id (the batch's one current
+   * stage), so no schema change was needed to support this mode too. Unlike
+   * ANIMAL_WISE, there is deliberately no reopen path for BATCH_WISE yet —
+   * posted is final; a mistake needs a direct data fix until that follow-up
+   * is built.
+   *
+   * "Save Draft" on the data-entry screen posts each scheduled row with
+   * `draft: true` — BatchDailyDataService.postEntry() records the value on
+   * batch_daily_data but deliberately skips the ledger/GL/animal-count/
+   * transfer dispatch for it (posted: false). This is the one place that
+   * dispatch actually happens: every due line's still-draft row is
+   * resubmitted here through the exact same postEntry(), minus `draft`, so
+   * it runs for real — before the day gets locked.
+   */
+  async postBatchDay(batchId: string, dateStr: string, tenantId: string, userPayload?: UserContext) {
+    const batch = await this.findOne(batchId);
+    if (batch.tracking_mode === 'ANIMAL_WISE') {
+      throw new BadRequestException('ANIMAL_WISE batches post per stage — use POST /batch/:id/stage/:stageId/post-day.');
+    }
+    if (!batch.stage_id) {
+      throw new BadRequestException('This batch has not transferred into a stage yet — nothing to post.');
+    }
+
+    const activePairs = await this.loadActiveScheduleLines(batch, dateStr);
+    const mandatoryPairs = activePairs.filter(({ line }) => line.is_mandatory);
+    if (mandatoryPairs.length) {
+      const lineIds = mandatoryPairs.map(({ line }) => line.line_id);
+      // BATCH_WISE entries carry animal_id = NULL (the whole-batch row) — see
+      // batch_daily_data's own schema comment on that column's dual meaning.
+      const entries = await this.db.select({ line_id: schema.batchDailyData.line_id })
+        .from(schema.batchDailyData)
+        .where(and(
+          inArray(schema.batchDailyData.line_id, lineIds),
+          eq(schema.batchDailyData.entry_date, dateStr),
+          isNull(schema.batchDailyData.animal_id),
+        ));
+      const enteredSet = new Set(entries.map((e) => e.line_id));
+      const missing = mandatoryPairs.filter(({ line }) => !enteredSet.has(line.line_id)).map(({ line }) => line.activity_name);
+      if (missing.length) {
+        throw new BadRequestException(`Cannot post — required activities not yet entered: ${missing.join('; ')}.`);
+      }
+    }
+
+    if (activePairs.length) {
+      const dueLineIds = activePairs.map(({ line }) => line.line_id);
+      const draftRows = await this.db.select().from(schema.batchDailyData)
+        .where(and(
+          inArray(schema.batchDailyData.line_id, dueLineIds),
+          eq(schema.batchDailyData.entry_date, dateStr),
+          isNull(schema.batchDailyData.animal_id),
+          eq(schema.batchDailyData.posted, false),
+        ));
+      for (const row of draftRows) {
+        await this.batchDailyDataService.postEntry(batchId, {
+          line_id: row.line_id,
+          entry_date: dateStr,
+          entered_value: row.entered_value != null ? Number(row.entered_value) : undefined,
+          entered_text: row.entered_text || undefined,
+          lot_no: row.lot_no || undefined,
+          remarks: row.remarks || undefined,
+        } as any, tenantId, userPayload);
+      }
+    }
+
+    const now = toMysqlTimestamp();
+    const lockId = randomUUID();
+    await this.db.insert(schema.batchDataEntryLock).values({
+      lock_id: lockId,
+      tenant_id: tenantId,
+      company_id: batch.company_id,
+      batch_id: batchId,
+      stage_id: batch.stage_id,
+      entry_date: dateStr,
+      status: 'LOCKED',
+      locked_by: userPayload?.userId || null,
+      locked_at: now,
+    }).onDuplicateKeyUpdate({
+      set: { status: 'LOCKED', locked_by: userPayload?.userId || null, locked_at: now, updated_at: now },
+    });
+
+    await this.auditService.log({
+      tenantId, companyId: batch.company_id, userId: userPayload?.userId,
+      action: 'CREATE', entityName: 'batch_data_entry_lock', entityId: lockId,
+      newValues: { batch_id: batchId, stage_id: batch.stage_id, entry_date: dateStr, status: 'LOCKED' },
+    });
+
+    return { batch_id: batchId, stage_id: batch.stage_id, entry_date: dateStr, status: 'LOCKED', locked_by: userPayload?.userId || null, locked_at: now };
+  }
+
+  /**
+   * ANIMAL_WISE variant: an animal-wise batch can have several stages active
+   * at once (each with its own scheduler_header, per M-tracking-mode design),
+   * so there is no single "current stage" scheduler to key off. Instead,
+   * group the batch's live animals by current_stage_id and return one
+   * checklist section per stage — each scoped to that stage's own scheduler
+   * and its own animal headcount/list, so data entry stays stage-grouped and
+   * animal-aware rather than mixing every stage's activities together.
+   */
+  private async getDataEntryByStage(batch: Awaited<ReturnType<BatchService['findOne']>>, dateStr: string) {
+    const liveAnimals = await this.db
+      .select()
+      .from(schema.animalRegister)
+      .where(and(eq(schema.animalRegister.current_batch_id, batch.batch_id), eq(schema.animalRegister.is_active, true)));
+
+    const stageGroups = new Map<string, typeof liveAnimals>();
+    for (const animal of liveAnimals) {
+      if (!animal.current_stage_id) continue;
+      const group = stageGroups.get(animal.current_stage_id) || [];
+      group.push(animal);
+      stageGroups.set(animal.current_stage_id, group);
+    }
+
+    // The stage-progress bar: every stage in this batch's own LOB pipeline
+    // (not just the ones with animals right now), in lifecycle order, each
+    // carrying its own live headcount — 0 for a stage no current animal has
+    // reached or already passed. Scoped to the batch's own company (not the
+    // shared template row of the same stage_code) so a template/adopted-copy
+    // pair never shows the same stage twice.
+    const pipelineStages = await this.db
+      .select()
+      .from(schema.stageMaster)
+      .where(and(
+        eq(schema.stageMaster.lob_id, batch.lob_id),
+        eq(schema.stageMaster.company_id, batch.company_id),
+        eq(schema.stageMaster.is_active, true),
+        isNull(schema.stageMaster.deleted_at),
+      ))
+      .orderBy(schema.stageMaster.stage_sequence);
+    const progress = pipelineStages.map((s) => ({
+      stage_id: s.stage_id,
+      stage_code: s.stage_code,
+      stage_name: s.stage_name,
+      stage_sequence: s.stage_sequence,
+      animal_count: stageGroups.get(s.stage_id)?.length || 0,
+    }));
+
+    if (!stageGroups.size) {
+      return { date: dateStr, progress, stages: [] };
+    }
+
+    const stageIds = [...stageGroups.keys()];
+    const stageRows = await this.db.select().from(schema.stageMaster).where(inArray(schema.stageMaster.stage_id, stageIds));
+    // One query for every stage's lock state on this date, so the UI can show
+    // POSTED/LOCKED vs still-open without a round trip per stage.
+    const lockRows = await this.db.select().from(schema.batchDataEntryLock)
+      .where(and(
+        eq(schema.batchDataEntryLock.batch_id, batch.batch_id),
+        inArray(schema.batchDataEntryLock.stage_id, stageIds),
+        eq(schema.batchDataEntryLock.entry_date, dateStr),
+      ));
+
+    type AnimalLines = { animal_id: string; animal_code: string; lines: Awaited<ReturnType<BatchService['buildDataEntryLines']>>['lines'] };
+    const stages: Array<{
+      stage_id: string;
+      stage_code: string | null;
+      stage_name: string | null;
+      animal_count: number;
+      day_of_stage: number | null;
+      lock_status: string | null;
+      locked_by: string | null;
+      locked_at: string | null;
+      reopen_reason: string | null;
+      animals: AnimalLines[];
+    }> = [];
+
+    for (const stageId of stageIds) {
+      const animals = stageGroups.get(stageId)!;
+      const stageInfo = stageRows.find((s) => s.stage_id === stageId);
+
+      const [header] = await this.db
+        .select()
+        .from(schema.schedulerHeader)
+        .where(and(eq(schema.schedulerHeader.batch_id, batch.batch_id), eq(schema.schedulerHeader.stage_id, stageId)))
+        .limit(1);
+
+      const lock = lockRows.find((l) => l.stage_id === stageId);
+
+      if (!header) {
+        stages.push({
+          stage_id: stageId, stage_code: stageInfo?.stage_code || null, stage_name: stageInfo?.stage_name || null,
+          animal_count: animals.length, day_of_stage: null,
+          lock_status: lock?.status || null, locked_by: lock?.locked_by || null, locked_at: lock?.locked_at || null, reopen_reason: lock?.reopen_reason || null,
+          animals: animals.map((a) => ({ animal_id: a.animal_id, animal_code: a.animal_code, lines: [] })),
+        });
+        continue;
+      }
+
+      const activePairs = await this.loadScheduleLinesForHeader(header, dateStr);
+      // One full lines array per animal — each animal's own already-entered
+      // value and its own PER_HEAD share, not the stage group's shared total
+      // (see buildDataEntryLines()'s animalId param).
+      let dayOfStage: number | null = null;
+      const animalLines: AnimalLines[] = [];
+      for (const animal of animals) {
+        const built = await this.buildDataEntryLines(batch.batch_id, header, activePairs, dateStr, animal.animal_id);
+        dayOfStage = built.dayOfStage;
+        animalLines.push({ animal_id: animal.animal_id, animal_code: animal.animal_code, lines: built.lines });
+      }
+
+      stages.push({
+        stage_id: stageId,
+        stage_code: stageInfo?.stage_code || null,
+        stage_name: stageInfo?.stage_name || null,
+        animal_count: animals.length,
+        day_of_stage: dayOfStage,
+        lock_status: lock?.status || null,
+        locked_by: lock?.locked_by || null,
+        locked_at: lock?.locked_at || null,
+        reopen_reason: lock?.reopen_reason || null,
+        animals: animalLines,
+      });
+    }
+
+    return { date: dateStr, progress, stages };
+  }
+
+  /**
+   * "POST STAGE DATA" — ANIMAL_WISE only (Batch-wise has no day-lock in this
+   * pass; see batch_data_entry_lock's schema comment for why). Validates every
+   * mandatory scheduler_line due on this date has an actual batch_daily_data
+   * row for every animal currently in the stage, then locks (batch, stage,
+   * date). Once locked, postEntry() refuses all further writes against it —
+   * that refusal is also what closes the double-posting hole (re-saving an
+   * already-posted line used to silently re-run its ledger/GL/transfer
+   * dispatch a second time).
+   */
+  async postStageDay(batchId: string, stageId: string, dateStr: string, tenantId: string, userPayload?: UserContext) {
+    const batch = await this.findOne(batchId);
+    if (batch.tracking_mode !== 'ANIMAL_WISE') {
+      throw new BadRequestException('Stage-level posting only applies to ANIMAL_WISE batches.');
+    }
+
+    const animals = await this.db.select().from(schema.animalRegister)
+      .where(and(
+        eq(schema.animalRegister.current_batch_id, batchId),
+        eq(schema.animalRegister.current_stage_id, stageId),
+        eq(schema.animalRegister.is_active, true),
+      ));
+    if (!animals.length) {
+      throw new BadRequestException('No animals are currently in this stage — nothing to post.');
+    }
+
+    const [header] = await this.db.select().from(schema.schedulerHeader)
+      .where(and(eq(schema.schedulerHeader.batch_id, batchId), eq(schema.schedulerHeader.stage_id, stageId)))
+      .limit(1);
+
+    if (header) {
+      const activePairs = await this.loadScheduleLinesForHeader(header, dateStr);
+      const mandatoryLineIds = activePairs.filter(({ line }) => line.is_mandatory).map(({ line }) => line.line_id);
+      if (mandatoryLineIds.length) {
+        // A row's mere existence is "entered" — even a genuine zero (no
+        // deaths today) is a real answer, so this checks presence, not value,
+        // avoiding a false "missing" on an honestly-zero mandatory KPI.
+        const entries = await this.db.select({ line_id: schema.batchDailyData.line_id, animal_id: schema.batchDailyData.animal_id })
+          .from(schema.batchDailyData)
+          .where(and(
+            inArray(schema.batchDailyData.line_id, mandatoryLineIds),
+            eq(schema.batchDailyData.entry_date, dateStr),
+            inArray(schema.batchDailyData.animal_id, animals.map((a) => a.animal_id)),
+          ));
+        const enteredSet = new Set(entries.map((e) => `${e.line_id}:${e.animal_id}`));
+        const missing: string[] = [];
+        for (const animal of animals) {
+          for (const { line } of activePairs) {
+            if (!line.is_mandatory) continue;
+            if (!enteredSet.has(`${line.line_id}:${animal.animal_id}`)) {
+              missing.push(`${animal.animal_code} — ${line.activity_name}`);
+            }
+          }
+        }
+        if (missing.length) {
+          throw new BadRequestException(`Cannot post — required activities not yet entered: ${missing.join('; ')}.`);
+        }
+      }
+
+      // Finalize every still-draft row for this stage/date — mirrors
+      // postBatchDay()'s own draft-finalize loop. Without this, a per-line
+      // save that now (correctly) posts with draft:true would sit un-
+      // dispatched forever: locking here would look like posting without
+      // ever actually touching the ledger/GL/transfer engine.
+      if (activePairs.length) {
+        const dueLineIds = activePairs.map(({ line }) => line.line_id);
+        const draftRows = await this.db.select().from(schema.batchDailyData)
+          .where(and(
+            inArray(schema.batchDailyData.line_id, dueLineIds),
+            eq(schema.batchDailyData.entry_date, dateStr),
+            inArray(schema.batchDailyData.animal_id, animals.map((a) => a.animal_id)),
+            eq(schema.batchDailyData.posted, false),
+          ));
+        for (const row of draftRows) {
+          await this.batchDailyDataService.postEntry(batchId, {
+            line_id: row.line_id,
+            entry_date: dateStr,
+            animal_id: row.animal_id || undefined,
+            entered_value: row.entered_value != null ? Number(row.entered_value) : undefined,
+            entered_text: row.entered_text || undefined,
+            lot_no: row.lot_no || undefined,
+            remarks: row.remarks || undefined,
+          } as any, tenantId, userPayload);
+        }
+      }
+    }
+
+    const now = toMysqlTimestamp();
+    const lockId = randomUUID();
+    await this.db.insert(schema.batchDataEntryLock).values({
+      lock_id: lockId,
+      tenant_id: tenantId,
+      company_id: batch.company_id,
+      batch_id: batchId,
+      stage_id: stageId,
+      entry_date: dateStr,
+      status: 'LOCKED',
+      locked_by: userPayload?.userId || null,
+      locked_at: now,
+    }).onDuplicateKeyUpdate({
+      set: { status: 'LOCKED', locked_by: userPayload?.userId || null, locked_at: now, reopened_by: null, reopened_at: null, reopen_reason: null, updated_at: now },
+    });
+
+    await this.auditService.log({
+      tenantId, companyId: batch.company_id, userId: userPayload?.userId,
+      action: 'CREATE', entityName: 'batch_data_entry_lock', entityId: lockId,
+      newValues: { batch_id: batchId, stage_id: stageId, entry_date: dateStr, status: 'LOCKED' },
+    });
+
+    return { batch_id: batchId, stage_id: stageId, entry_date: dateStr, status: 'LOCKED', locked_by: userPayload?.userId || null, locked_at: now };
+  }
+
+  /**
+   * Reopen-only correction path — no automated ledger/GL/bio-asset reversal
+   * exists yet (flagged as its own, larger follow-up). Unlocking lets the
+   * stage/date accept writes again; the corrected re-entry, once re-posted,
+   * still re-runs its own dispatch exactly like a fresh entry — reconciling
+   * whatever the original (now-superseded) posting produced is a manual step,
+   * same as it always was before locking existed at all. Requires a reason so
+   * every reopen is explained in the audit trail.
+   */
+  async reopenStageDay(batchId: string, stageId: string, dateStr: string, reason: string, tenantId: string, userPayload?: UserContext) {
+    if (!reason?.trim()) {
+      throw new BadRequestException('A reason is required to reopen posted data.');
+    }
+    const batch = await this.findOne(batchId);
+    const [lock] = await this.db.select().from(schema.batchDataEntryLock)
+      .where(and(
+        eq(schema.batchDataEntryLock.batch_id, batchId),
+        eq(schema.batchDataEntryLock.stage_id, stageId),
+        eq(schema.batchDataEntryLock.entry_date, dateStr),
+      ))
+      .limit(1);
+    if (!lock || lock.status !== 'LOCKED') {
+      throw new BadRequestException('This stage/date is not currently locked.');
+    }
+
+    const now = toMysqlTimestamp();
+    await this.db.update(schema.batchDataEntryLock)
+      .set({ status: 'REOPENED', reopened_by: userPayload?.userId || null, reopened_at: now, reopen_reason: reason, updated_at: now })
+      .where(eq(schema.batchDataEntryLock.lock_id, lock.lock_id));
+
+    await this.auditService.log({
+      tenantId, companyId: batch.company_id, userId: userPayload?.userId,
+      action: 'UPDATE', entityName: 'batch_data_entry_lock', entityId: lock.lock_id,
+      oldValues: { status: 'LOCKED' }, newValues: { status: 'REOPENED', reopen_reason: reason },
+    });
+
+    return { batch_id: batchId, stage_id: stageId, entry_date: dateStr, status: 'REOPENED', reopen_reason: reason };
+  }
+
+  /**
+   * Shared by getDataEntry() (one header, the batch's current stage) and
+   * getDataEntryByStage() (one call per stage) — resolves each due
+   * scheduler_line's display label, UOM, standard rate, and already-entered
+   * quantity for the given date, against one already-resolved header/pairs.
+   */
+  private async buildDataEntryLines(
+    batchId: string,
+    header: typeof schema.schedulerHeader.$inferSelect,
+    activePairs: Array<{ header: typeof schema.schedulerHeader.$inferSelect; line: typeof schema.schedulerLine.$inferSelect }>,
+    dateStr: string,
+    animalId?: string,
+  ) {
+    // ANIMAL_WISE calls this once per animal in the stage (animalId set) — the
+    // group's shared PER_HEAD standard is this one animal's own share (count
+    // of 1), and already-entered/legacy-transaction lookups are scoped to
+    // just this animal, not the whole stage. Without this, two animals
+    // sharing a stage would each see the other's entered value and a
+    // group-wide expected quantity instead of their own.
+    const animalCount = animalId ? 1 : Number(header.animal_count);
     const dayOfStage = Math.floor((new Date(dateStr).getTime() - new Date(header.effective_from).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    if (!activePairs.length) {
+      return { lines: [] as Array<{
+        line_id: string; line_type: string; activity_name: string; item_id: string | null; item_description: string | null;
+        item_label: string | null; item_type: string | null; item_code: string | null; withdrawal_days: number | null;
+        resource_id: string | null; uom: string | null; occurrence: string; is_mandatory: boolean; lot_required: boolean;
+        expected_qty: number; already_entered_qty: number; std_rate: number | null;
+      }>, dayOfStage };
+    }
 
     const sameDayTx = await this.db
       .select()
       .from(schema.batchTransaction)
-      .where(and(eq(schema.batchTransaction.batch_id, id), eq(schema.batchTransaction.transaction_date, dateStr)));
+      .where(and(
+        eq(schema.batchTransaction.batch_id, batchId),
+        eq(schema.batchTransaction.transaction_date, dateStr),
+        ...(animalId ? [eq(schema.batchTransaction.animal_id, animalId)] : []),
+      ));
     const sameDayEntries = await this.db
       .select()
       .from(schema.batchDailyData)
-      .where(and(eq(schema.batchDailyData.batch_id, id), eq(schema.batchDailyData.entry_date, dateStr)));
+      .where(and(
+        eq(schema.batchDailyData.batch_id, batchId),
+        eq(schema.batchDailyData.entry_date, dateStr),
+        ...(animalId ? [eq(schema.batchDailyData.animal_id, animalId)] : []),
+      ));
 
     const itemIds = [...new Set(activePairs.map(({ line }) => line.item_id).filter((x): x is string => !!x))];
     const itemRows = itemIds.length
@@ -1643,7 +2280,7 @@ export class BatchService {
       };
     });
 
-    return { date: dateStr, day_of_batch: dayOfStage, lines };
+    return { lines, dayOfStage };
   }
 
   async close(id: string, dto: CloseBatchDto, tenantId: string, userPayload?: UserContext) {
